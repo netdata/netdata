@@ -95,7 +95,6 @@ static void initialize(void) {
 
 static void netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock,
                                              PERF_OBJECT_TYPE *pObjectType,
-                                             char *object_name,
                                              int update_every)
 {
     PERF_INSTANCE_DEFINITION *pi = NULL;
@@ -262,7 +261,6 @@ static void netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock,
 
 static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock,
                                           PERF_OBJECT_TYPE *pObjectType,
-                                          char *object_name,
                                           int update_every)
 {
     PERF_INSTANCE_DEFINITION *pi = NULL;
@@ -393,7 +391,6 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock,
 
 static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock,
                                       PERF_OBJECT_TYPE *pObjectType,
-                                      char *object_name,
                                       int update_every)
 {
     PERF_INSTANCE_DEFINITION *pi = NULL;
@@ -564,7 +561,6 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock,
 
 static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
                                           PERF_OBJECT_TYPE *pObjectType,
-                                          char *object_name,
                                           int update_every)
 {
     PERF_INSTANCE_DEFINITION *pi = NULL;
@@ -583,7 +579,7 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
 
 struct netdata_netframework_objects {
     char *object;
-    void (*fnct)(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, char *, int);
+    void (*fnct)(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int);
 } netframewrk_obj[NETDATA_NETFRAMEWORK_END] = {
     {
         .fnct = netdata_framework_clr_exceptions,
@@ -623,7 +619,7 @@ int do_PerflibNetFramework(int update_every, usec_t dt __maybe_unused) {
         PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, netframewrk_obj[i].object);
         if(!pObjectType) continue;
 
-        netframewrk_obj[i].fnct(pDataBlock, pObjectType, netframewrk_obj[i].object, update_every);
+        netframewrk_obj[i].fnct(pDataBlock, pObjectType, update_every);
     }
 
     return 0;
