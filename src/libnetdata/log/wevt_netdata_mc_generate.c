@@ -171,29 +171,29 @@ int main(int argc, const char **argv) {
                  "                      parameterFileName=\"%SystemRoot%\\System32\\nd_wevents.dll\"\r\n"
                  "                      message=\"$(string.ND_PROVIDER_NAME)\">\r\n"
                  "\r\n"
-                 "                <!-- Define the channels -->\r\n"
+                 "                <!-- Define the provider sub-channels -->\r\n"
                  "                <channels>\r\n"
-                 "                    <channel name=\"" NETDATA_PROVIDER_NAME "/Daemon\"\r\n"
+                 "                    <channel name=\"" NETDATA_SUBCHANNEL_DAEMON "\"\r\n"
                  "                             symbol=\"ChannelDaemon\"\r\n"
                  "                             type=\"Operational\"\r\n"
                  "                             message=\"$(string.Channel.Daemon)\"/>\r\n"
                  "\r\n"
-                 "                    <channel name=\"" NETDATA_PROVIDER_NAME "/Collectors\"\r\n"
+                 "                    <channel name=\"" NETDATA_SUBCHANNEL_COLLECTORS "\"\r\n"
                  "                             symbol=\"ChannelCollectors\"\r\n"
                  "                             type=\"Operational\"\r\n"
                  "                             message=\"$(string.Channel.Collectors)\"/>\r\n"
                  "\r\n"
-                 "                    <channel name=\"" NETDATA_PROVIDER_NAME "/Access\"\r\n"
+                 "                    <channel name=\"" NETDATA_SUBCHANNEL_ACCESS "\"\r\n"
                  "                             symbol=\"ChannelAccess\"\r\n"
                  "                             type=\"Operational\"\r\n"
                  "                             message=\"$(string.Channel.Access)\"/>\r\n"
                  "\r\n"
-                 "                    <channel name=\"" NETDATA_PROVIDER_NAME "/Health\"\r\n"
+                 "                    <channel name=\"" NETDATA_SUBCHANNEL_HEALTH "\"\r\n"
                  "                             symbol=\"ChannelHealth\"\r\n"
                  "                             type=\"Operational\"\r\n"
                  "                             message=\"$(string.Channel.Health)\"/>\r\n"
                  "\r\n"
-                 "                    <channel name=\"" NETDATA_PROVIDER_NAME "/Aclk\"\r\n"
+                 "                    <channel name=\"" NETDATA_SUBCHANNEL_ACLK "\"\r\n"
                  "                             symbol=\"ChannelAclk\"\r\n"
                  "                             type=\"Operational\"\r\n"
                  "                             message=\"$(string.Channel.Aclk)\"/>\r\n"
@@ -329,7 +329,7 @@ int main(int argc, const char **argv) {
                  "              )\r\n"
                  "\r\n"
                  "FacilityNames=(\r\n"
-                 "                " NETDATA_PROVIDER_NAME "=0x0FFF:FACILITY_NETDATA\r\n"
+                 "                " NETDATA_CHANNEL_NAME "=0x0FFF:FACILITY_NETDATA\r\n"
                  "              )\r\n"
                  "\r\n"
                  "LanguageNames=(\r\n"
@@ -429,37 +429,37 @@ int main(int argc, const char **argv) {
                 switch(src) {
                     case NDLS_COLLECTORS:
                         src_txt = "COLLECTORS";
-                        channel = NETDATA_PROVIDER_NAME "/Collectors";
+                        channel = NETDATA_SUBCHANNEL_COLLECTORS;
                         task = "TaskCollectors";
                         break;
 
                     case NDLS_ACCESS:
                         src_txt = "ACCESS";
-                        channel = NETDATA_PROVIDER_NAME "/Access";
+                        channel = NETDATA_SUBCHANNEL_ACCESS;
                         task = "TaskAccess";
                         break;
 
                     case NDLS_HEALTH:
                         src_txt = "HEALTH";
-                        channel = NETDATA_PROVIDER_NAME "/Health";
+                        channel = NETDATA_SUBCHANNEL_HEALTH;
                         task = "TaskHealth";
                         break;
 
                     case NDLS_DEBUG:
                         src_txt = "DEBUG";
-                        channel = NETDATA_PROVIDER_NAME "/Daemon";
+                        channel = NETDATA_SUBCHANNEL_DAEMON;
                         task = "TaskDaemon";
                         break;
 
                     case NDLS_DAEMON:
                         src_txt = "DAEMON";
-                        channel = NETDATA_PROVIDER_NAME "/Daemon";
+                        channel = NETDATA_SUBCHANNEL_DAEMON;
                         task = "TaskDaemon";
                         break;
 
                     case NDLS_ACLK:
                         src_txt = "ACLK";
-                        channel = NETDATA_PROVIDER_NAME "/Aclk";
+                        channel = NETDATA_SUBCHANNEL_ACLK;
                         task = "TaskAclk";
                         break;
 
@@ -505,7 +505,7 @@ int main(int argc, const char **argv) {
                 else
                     printf("MessageId=0x%x\r\n"
                            "Severity=%s\r\n"
-                           "Facility=" NETDATA_PROVIDER_NAME "\r\n"
+                           "Facility=" NETDATA_CHANNEL_NAME "\r\n"
                            "SymbolicName=%s\r\n"
                            "Language=English\r\n"
                            "%s"

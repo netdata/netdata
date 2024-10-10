@@ -68,15 +68,15 @@ static bool check_event_id(ND_LOG_SOURCES source __maybe_unused, ND_LOG_FIELD_PR
 // --------------------------------------------------------------------------------------------------------------------
 // initialization
 
-// Define source names with "Netdata" prefix
-static const wchar_t *provider_name_per_source[_NDLS_MAX] = {
-        [NDLS_UNSET]        = NULL,                                     // not used, linked to NDLS_DAEMON
-        [NDLS_ACCESS]       = NETDATA_PROVIDER_WPREFIX L"Access",       //
-        [NDLS_ACLK]         = NETDATA_PROVIDER_WPREFIX L"Aclk",         //
-        [NDLS_COLLECTORS]   = NETDATA_PROVIDER_WPREFIX L"Collectors",   //
-        [NDLS_DAEMON]       = NETDATA_PROVIDER_WPREFIX L"Daemon",       //
-        [NDLS_HEALTH]       = NETDATA_PROVIDER_WPREFIX L"Health",       //
-        [NDLS_DEBUG]        = NULL,                                     // used, linked to NDLS_DAEMON
+// Define provider names per source
+static const wchar_t *sub_channel_name_per_source[_NDLS_MAX] = {
+        [NDLS_UNSET]        = NULL,                             // not used, linked to NDLS_DAEMON
+        [NDLS_ACCESS]       = NETDATA_SUBCHANNEL_ACCESS_W,      //
+        [NDLS_ACLK]         = NETDATA_SUBCHANNEL_ACLK_W,        //
+        [NDLS_COLLECTORS]   = NETDATA_SUBCHANNEL_COLLECTORS_W,  //
+        [NDLS_DAEMON]       = NETDATA_SUBCHANNEL_DAEMON_W,      //
+        [NDLS_HEALTH]       = NETDATA_SUBCHANNEL_HEALTH_W,      //
+        [NDLS_DEBUG]        = NULL,                             // used, linked to NDLS_DAEMON
 };
 
 bool replace_program_with_wev_netdata_dll(wchar_t *str, size_t size) {
@@ -112,7 +112,10 @@ bool replace_program_with_wev_netdata_dll(wchar_t *str, size_t size) {
 static bool add_to_registry(const wchar_t *channel, const wchar_t *provider, DWORD defaultMaxSize) {
     // Build the registry path: SYSTEM\CurrentControlSet\Services\EventLog\<LogName>\<SourceName>
     wchar_t key[MAX_PATH];
-    swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls\\%ls", channel, provider);
+    if(!channel)
+        swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls", provider);
+    else
+        swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls\\%ls", channel, provider);
 
     HKEY hRegKey;
     DWORD disposition;
@@ -161,14 +164,17 @@ bool nd_log_wevents_init(void) {
             !check_event_id(NDLS_DEBUG, NDLP_ALERT, MSGID_ACCESS_FORWARDER_USER, DEBUG_ALERT_ACCESS_FORWARDER_USER))
        return false;
 
-    const wchar_t *channel = NETDATA_PROVIDER_WNAME; // We create our own channel
+#if (MANIFEST_BASED_WEL_PROVIDER == 1)
+    if(!add_to_registry(NETDATA_CHANNEL_NAME_W, NETDATA_PROVIDER_NAME_W, 20 * 1024 * 1024)) return false;
+#endif
 
     // Loop through each source and add it to the registry
     for(size_t i = 0; i < _NDLS_MAX; i++) {
         nd_log.sources[i].source = i;
 
-        const wchar_t *provider = provider_name_per_source[i];
-        if(!provider)
+        const wchar_t *sub_channel = sub_channel_name_per_source[i];
+
+        if(!sub_channel)
             // we will map these to NDLS_DAEMON
             continue;
 
@@ -190,19 +196,26 @@ bool nd_log_wevents_init(void) {
                 break;
         }
 
-        if(!add_to_registry(channel, provider, defaultMaxSize))
-            return false;
+        if(!add_to_registry(NETDATA_CHANNEL_NAME_W, sub_channel, defaultMaxSize)) return false;
 
-        // Register the event source with the prefixed source name
-        nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, provider);
+#if !(MANIFEST_BASED_WEL_PROVIDER == 1)
+        // when not using a manifest, each source is a provider
+        nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, sub_channel);
         if (!nd_log.sources[i].hEventLog)
             return false;
+#endif
     }
+
+#if (MANIFEST_BASED_WEL_PROVIDER == 1)
+    // when using a manifest, we need only 1 provider (NDLS_DAEMON - the rest will get the same below))
+    nd_log.sources[NDLS_DAEMON].hEventLog = RegisterEventSourceW(NULL, NETDATA_PROVIDER_NAME_W);
+        if (!nd_log.sources[NDLS_DAEMON].hEventLog)
+            return false;
+#endif
 
     // Map the unset ones to NDLS_DAEMON
     for(size_t i = 0; i < _NDLS_MAX; i++) {
-        const wchar_t *provider = provider_name_per_source[i];
-        if(!provider)
+        if(!nd_log.sources[i].hEventLog)
             nd_log.sources[i].hEventLog = nd_log.sources[NDLS_DAEMON].hEventLog;
     }
 
@@ -402,7 +415,6 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
         priority = (ND_LOG_FIELD_PRIORITY) fields[NDF_PRIORITY].entry.u64;
 
     DWORD wType = get_event_type_from_priority(priority);
-    MESSAGE_ID messageID = MSGID_MESSAGE_ONLY;
 
     CLEAN_BUFFER *tmp = NULL;
 
@@ -410,16 +422,11 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
     spinlock_lock(&spinlock);
     wevt_generate_all_fields_unsafe(fields, fields_max);
 
+    MESSAGE_ID messageID;
     switch(source->source) {
         default:
         case NDLS_DEBUG:
-            messageID = MSGID_MESSAGE_ONLY;
-            break;
-
         case NDLS_DAEMON:
-            messageID = MSGID_MESSAGE_ONLY;
-            break;
-
         case NDLS_COLLECTORS:
             messageID = MSGID_MESSAGE_ONLY;
             break;

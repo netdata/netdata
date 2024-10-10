@@ -13,9 +13,10 @@ if "%~2"=="" (
 
 REM Set variables
 set "SRC_DIR=%~1"
-set "DEST_DIR=%~2"
-set "MC_FILE=%SRC_DIR%\nd_wevents.mc"
-set "MAN_FILE=%SRC_DIR%\nd_wevents_manifest.xml"
+set "BIN_DIR=%~2"
+set "MC_FILE=%BIN_DIR%\wevt_netdata.mc"
+set "MAN_FILE=%BIN_DIR%\wevt_netdata_manifest.xml"
+set "BASE_NAME=wevt_netdata"
 set "SDK_PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64"
 set "VS_PATH=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\bin\Hostx64\x64"
 
@@ -23,8 +24,19 @@ if not exist "%SDK_PATH%" (
     echo Error: Windows SDK path not found.
     exit /b 1
 )
+
 if not exist "%VS_PATH%" (
     echo Error: Visual Studio path not found.
+    exit /b 1
+)
+
+if not exist "%SRC_DIR%" (
+    echo Error: Source directory does not exist.
+    exit /b 1
+)
+
+if not exist "%BIN_DIR%" (
+    echo Error: Destination directory does not exist.
     exit /b 1
 )
 
@@ -35,11 +47,6 @@ if not exist "%MC_FILE%" (
 
 if not exist "%MAN_FILE%" (
     echo Error: %MAN_FILE% not found.
-    exit /b 1
-)
-
-if not exist "%DEST_DIR%" (
-    echo Error: Destination directory does not exist.
     exit /b 1
 )
 
@@ -69,7 +76,7 @@ if %errorlevel% neq 0 (
 )
 
 REM Change to the destination directory
-cd /d "%DEST_DIR%"
+cd /d "%BIN_DIR%"
 
 echo.
 echo Running mc.exe...
@@ -79,44 +86,38 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo.
-echo Modifying nd_wevents.rc to include the manifest...
-copy "%MAN_FILE%" nd_wevents_manifest.man
-echo 1 2004 "nd_wevents_manifest.man" >> nd_wevents.rc
+if not exist "%BASE_NAME%.rc" (
+    echo Error: %BASE_NAME%.rc not found.
+    exit /b 1
+)
 
 echo.
-echo nd_wevents.rc contents:
-type nd_wevents.rc
+echo Modifying %BASE_NAME%.rc to include the manifest...
+copy "%MAN_FILE%" %BASE_NAME%_manifest.man
+echo 1 2004 "%BASE_NAME%_manifest.man" >> %BASE_NAME%.rc
+
+echo.
+echo %BASE_NAME%.rc contents:
+type %BASE_NAME%.rc
 
 echo.
 echo Running rc.exe...
-rc /v /fo nd_wevents.res nd_wevents.rc
+rc /v /fo %BASE_NAME%.res %BASE_NAME%.rc
 if %errorlevel% neq 0 (
     echo Error: rc.exe failed.
     exit /b 1
 )
 
+if not exist "%BASE_NAME%.res" (
+    echo Error: %BASE_NAME%.res not found.
+    exit /b 1
+)
+
 echo.
 echo Running link.exe...
-link /dll /noentry /machine:x64 /out:nd_wevents.dll nd_wevents.res
+link /dll /noentry /machine:x64 /out:%BASE_NAME%.dll %BASE_NAME%.res
 if %errorlevel% neq 0 (
     echo Error: link.exe failed.
-    exit /b 1
-)
-
-echo.
-echo Copying nd_wevents.dll to %SystemRoot%\System32\...
-copy /y nd_wevents.dll "%SystemRoot%\System32"
-if %errorlevel% neq 0 (
-    echo Error: Failed to copy nd_wevents.dll to System32.
-    exit /b 1
-)
-
-echo.
-echo Granting access to nd_wevents.dll for Windows Event Logging...
-icacls %SystemRoot%\System32\nd_wevents.dll /grant "NT SERVICE\EventLog":R
-if %errorlevel% neq 0 (
-    echo Error: Failed to grant access to nd_wevents.dll.
     exit /b 1
 )
 
@@ -125,8 +126,24 @@ echo Uninstalling previous manifest (if any)...
 wevtutil um "%MAN_FILE%"
 
 echo.
+echo Copying %BASE_NAME%.dll to %SystemRoot%\System32\...
+copy /y %BASE_NAME%.dll "%SystemRoot%\System32"
+if %errorlevel% neq 0 (
+    echo Error: Failed to copy %BASE_NAME%.dll to %SystemRoom%\System32\
+    exit /b 1
+)
+
+echo.
+echo Granting access to %BASE_NAME%.dll for Windows Event Logging...
+icacls %SystemRoot%\System32\%BASE_NAME%.dll /grant "NT SERVICE\EventLog":R
+if %errorlevel% neq 0 (
+    echo Error: Failed to grant access to %BASE_NAME%.dll.
+    exit /b 1
+)
+
+echo.
 echo Importing the manifest...
-wevtutil im "%MAN_FILE%" /rf:"%SystemRoot%\System32\nd_wevents.dll" /mf:"%SystemRoot%\System32\nd_wevents.dll"
+wevtutil im "%MAN_FILE%" /rf:"%SystemRoot%\System32\%BASE_NAME%.dll" /mf:"%SystemRoot%\System32\%BASE_NAME%.dll"
 if %errorlevel% neq 0 (
     echo Error: Failed to import the manifest.
     exit /b 1
