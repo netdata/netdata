@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/splunk-black.svg" width="150"/>
 
 
-From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on Splunk.
+From the Netdata Cloud UI, you can configure notification delivery to Splunk.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
@@ -22,26 +22,24 @@ From the Cloud interface, you can manage your space's notification settings and 
 
 ### Prerequisites
 
-To add Splunk notification you need:
-
 - A Netdata Cloud account
-- Access to the space as an **Admin**
+- Access to the Space as an **Admin**
 - The Space needs to be on a paid plan
-- URI and token for your Splunk HTTP Event Collector. Refer to the [Splunk documentation](https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector) for detailed instructions.
+- The URI and token for your Splunk HTTP Event Collector. Refer to the [Splunk documentation](https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector) for detailed instructions on how to set it up.
 
-### Steps
+### Netdata Configuration
 
 1. Click on the **Space settings** cog (located above your profile icon)
-2. Click on the **Notification** tab
-3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-4. On the **Splunk** card click on **+ Add**
-5. A modal will be presented to you to enter the required details to enable the configuration:
-  - **Notification settings** are Netdata specific settings
-      - Configuration name - provide a descriptive name for your configuration to easily identify it.
-      - Rooms - select the nodes or areas of your infrastructure you want to receive notifications about.
-      - Notification - choose the type of notifications you want to receive: All Alerts and unreachable, All Alerts, Critical only.
-  - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Splunk:
-      - HTTP Event Collector URI - The URI of your HTTP event collector in Splunk
-      - HTTP Event Collector Token - the token that Splunk provided to you when you created the HTTP Event Collector
+2. Click on the **Alerts & Notifications** tab
+3. Click on the **+ Add configuration** button
+4. Add the Splunk Integration
+5. A modal will be presented to you to enter the required details to enable the integration:
+    - **Notification settings**
+      - Configuration name (optional): A name for your configuration in order to easily refer to it
+      - Rooms: A list of Rooms for which you want to be notified
+      - Notifications: The notifications which you want to be notified
+    - **Integration configuration**
+      - HTTP Event Collector URI: The URI of your HTTP event collector in Splunk
+      - HTTP Event Collector Token: The token that Splunk provided to you when you created the HTTP Event Collector
 
 

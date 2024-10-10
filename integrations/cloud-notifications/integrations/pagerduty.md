@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/pagerduty.png" width="150"/>
 
 
-From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on PagerDuty.
+From the Netdata Cloud UI, you can configure notification delivery to PagerDuty.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
@@ -21,32 +21,31 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
 ## Setup
 
 ### Prerequisites
+
 - A Netdata Cloud account
-- Access to the Netdata Space as an **Admin**
-- The Netdata Space needs to be on a paid plan
+- Access to the Space as an **Admin**
+- The Space needs to be on a paid plan
 - You need to have a PagerDuty service to receive events using webhooks.
 
-
 ### PagerDuty Server Configuration
-Steps to configure your PagerDuty to receive notifications from Netdata:
 
 1. Create a service to receive events from your services directory page on PagerDuty
-2. At step 3, select `Events API V2` Integration or **View Webhooks** if you already have some defined
-3. Once the service is created, you will be redirected to its configuration page, where you can copy the **Integration Key** and **Integration URL (Alert Events)** fields to add them to your notification configuration in the Netdata UI.
+2. On the third step of the service creation, select `Events API V2` Integration
+3. Once the service is created, you will be redirected to its configuration page, where you can copy the **Integration Key** and **Integration URL (Alert Events)** in order to add them to your integration configuration in the Netdata Cloud UI
 
-### Netdata Configuration Steps
+### Netdata Configuration
 
 1. Click on the **Space settings** cog (located above your profile icon)
-2. Click on the **Notification** tab
-3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-4. On the **PagerDuty** card click on **+ Add**
-5. A modal will be presented to you to enter the required details to enable the configuration:
-  * **Notification settings** are Netdata specific settings
-    - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
-    - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-    - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-  * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For PagerDuty:
-    - Integration Key - is a 32 character key provided by PagerDuty to receive events on your service.
-    - Integration URL (Alert Events) - is the URL provided by PagerDuty where we will send notifications.
+2. Click on the **Alerts & Notifications** tab
+3. Click on the **+ Add configuration** button
+4. Add the PagerDuty Integration
+5. A modal will be presented to you to enter the required details to enable the integration:
+    - **Notification settings**
+      - Configuration name (optional): A name for your configuration in order to easily refer to it
+      - Rooms: A list of Rooms for which you want to be notified
+      - Notifications: The notifications which you want to be notified
+    - **Integration configuration**
+      - Integration Key: A 32 character key provided by PagerDuty to receive events on your service.
+      - Integration URL (Alert Events): The URL provided by PagerDuty where Netdata Cloud will send notifications.
 
 
