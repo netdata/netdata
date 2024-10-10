@@ -97,6 +97,10 @@ struct nd_log_source {
 #if defined(OS_WINDOWS)
     ND_LOG_SOURCES source;
     HANDLE hEventLog;
+    USHORT channelID;
+    UCHAR Opcode;
+    USHORT Task;
+    ULONGLONG Keyword;
 #endif
 };
 

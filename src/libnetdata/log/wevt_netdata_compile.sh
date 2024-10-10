@@ -21,7 +21,7 @@ temp_bat=$(mktemp --suffix=.bat)
 # Use cygpath directly within the heredoc
 cat << EOF > "$temp_bat"
 @echo off
-call "$(cygpath -w -a "$SCRIPT_DIR/nd_wevents_compile.bat")" "$(cygpath -w -a "$src_dir")" "$(cygpath -w -a "$dest_dir")"
+call "$(cygpath -w -a "$SCRIPT_DIR/wevt_netdata_compile.bat")" "$(cygpath -w -a "$src_dir")" "$(cygpath -w -a "$dest_dir")"
 EOF
 
 grep call <"$temp_bat"

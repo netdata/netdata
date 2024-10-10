@@ -1,7 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM Check if both parameters are provided
 if "%~1"=="" (
     echo Error: Missing .mc file path.
     goto :usage
@@ -19,16 +18,6 @@ set "MAN_FILE=%BIN_DIR%\wevt_netdata_manifest.xml"
 set "BASE_NAME=wevt_netdata"
 set "SDK_PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64"
 set "VS_PATH=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\bin\Hostx64\x64"
-
-if not exist "%SDK_PATH%" (
-    echo Error: Windows SDK path not found.
-    exit /b 1
-)
-
-if not exist "%VS_PATH%" (
-    echo Error: Visual Studio path not found.
-    exit /b 1
-)
 
 if not exist "%SRC_DIR%" (
     echo Error: Source directory does not exist.
@@ -80,7 +69,7 @@ cd /d "%BIN_DIR%"
 
 echo.
 echo Running mc.exe...
-mc /v -U "%MC_FILE%" "%MAN_FILE%"
+mc -v -b -U "%MC_FILE%" "%MAN_FILE%"
 if %errorlevel% neq 0 (
     echo Error: mc.exe failed on messages.
     exit /b 1
@@ -118,42 +107,6 @@ echo Running link.exe...
 link /dll /noentry /machine:x64 /out:%BASE_NAME%.dll %BASE_NAME%.res
 if %errorlevel% neq 0 (
     echo Error: link.exe failed.
-    exit /b 1
-)
-
-echo.
-echo Uninstalling previous manifest (if any)...
-wevtutil um "%MAN_FILE%"
-
-echo.
-echo Copying %BASE_NAME%.dll to %SystemRoot%\System32\...
-copy /y %BASE_NAME%.dll "%SystemRoot%\System32"
-if %errorlevel% neq 0 (
-    echo Error: Failed to copy %BASE_NAME%.dll to %SystemRoom%\System32\
-    exit /b 1
-)
-
-echo.
-echo Granting access to %BASE_NAME%.dll for Windows Event Logging...
-icacls %SystemRoot%\System32\%BASE_NAME%.dll /grant "NT SERVICE\EventLog":R
-if %errorlevel% neq 0 (
-    echo Error: Failed to grant access to %BASE_NAME%.dll.
-    exit /b 1
-)
-
-echo.
-echo Importing the manifest...
-wevtutil im "%MAN_FILE%" /rf:"%SystemRoot%\System32\%BASE_NAME%.dll" /mf:"%SystemRoot%\System32\%BASE_NAME%.dll"
-if %errorlevel% neq 0 (
-    echo Error: Failed to import the manifest.
-    exit /b 1
-)
-
-echo.
-echo Verifying publisher...
-wevtutil gp "Netdata"
-if %errorlevel% neq 0 (
-    echo Error: Failed to get publisher Netdata.
     exit /b 1
 )
 

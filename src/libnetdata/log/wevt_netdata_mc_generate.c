@@ -163,40 +163,49 @@ int main(int argc, const char **argv) {
                  "    <instrumentation>\r\n"
                  "        <events>\r\n"
                  "\r\n"
-                 "            <provider name=\"" NETDATA_PROVIDER_NAME "\"\r\n"
-                 "                      guid=\"{96c5ca72-9bd8-4634-81e5-000014e7da7a}\"\r\n"
-                 "                      symbol=\"ND_PROVIDER_NAME\"\r\n"
-                 "                      messageFileName=\"%SystemRoot%\\System32\\nd_wevents.dll\"\r\n"
-                 "                      resourceFileName=\"%SystemRoot%\\System32\\nd_wevents.dll\"\r\n"
-                 "                      parameterFileName=\"%SystemRoot%\\System32\\nd_wevents.dll\"\r\n"
+                 "            <provider name=\"" NETDATA_ETW_PROVIDER_NAME "\"\r\n"
+                 "                      guid=\"" NETDATA_ETW_PROVIDER_GUID_STR "\"\r\n"
+                 "                      symbol=\"NETDATA_ETW_PROVIDER_GUID\"\r\n"
+                 "                      messageFileName=\"%SystemRoot%\\System32\\wevt_netdata.dll\"\r\n"
+                 "                      resourceFileName=\"%SystemRoot%\\System32\\wevt_netdata.dll\"\r\n"
                  "                      message=\"$(string.ND_PROVIDER_NAME)\">\r\n"
                  "\r\n"
                  "                <!-- Define the provider sub-channels -->\r\n"
                  "                <channels>\r\n"
-                 "                    <channel name=\"" NETDATA_SUBCHANNEL_DAEMON "\"\r\n"
-                 "                             symbol=\"ChannelDaemon\"\r\n"
+                 "                    <channel name=\"" NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_DAEMON "\"\r\n"
+                 "                             symbol=\"CHANNEL_DAEMON\"\r\n"
                  "                             type=\"Operational\"\r\n"
-                 "                             message=\"$(string.Channel.Daemon)\"/>\r\n"
+                 "                             message=\"$(string.Channel.Daemon)\"\r\n"
+                 "                             enabled=\"true\"\r\n"
+                 "                             />\r\n"
                  "\r\n"
-                 "                    <channel name=\"" NETDATA_SUBCHANNEL_COLLECTORS "\"\r\n"
-                 "                             symbol=\"ChannelCollectors\"\r\n"
+                 "                    <channel name=\"" NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_COLLECTORS "\"\r\n"
+                 "                             symbol=\"CHANNEL_COLLECTORS\"\r\n"
                  "                             type=\"Operational\"\r\n"
-                 "                             message=\"$(string.Channel.Collectors)\"/>\r\n"
+                 "                             message=\"$(string.Channel.Collectors)\"\r\n"
+                 "                             enabled=\"true\"\r\n"
+                 "                             />\r\n"
                  "\r\n"
-                 "                    <channel name=\"" NETDATA_SUBCHANNEL_ACCESS "\"\r\n"
-                 "                             symbol=\"ChannelAccess\"\r\n"
+                 "                    <channel name=\"" NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_ACCESS "\"\r\n"
+                 "                             symbol=\"CHANNEL_ACCESS\"\r\n"
                  "                             type=\"Operational\"\r\n"
-                 "                             message=\"$(string.Channel.Access)\"/>\r\n"
+                 "                             message=\"$(string.Channel.Access)\"\r\n"
+                 "                             enabled=\"true\"\r\n"
+                 "                             />\r\n"
                  "\r\n"
-                 "                    <channel name=\"" NETDATA_SUBCHANNEL_HEALTH "\"\r\n"
-                 "                             symbol=\"ChannelHealth\"\r\n"
+                 "                    <channel name=\"" NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_HEALTH "\"\r\n"
+                 "                             symbol=\"CHANNEL_HEALTH\"\r\n"
                  "                             type=\"Operational\"\r\n"
-                 "                             message=\"$(string.Channel.Health)\"/>\r\n"
+                 "                             message=\"$(string.Channel.Health)\"\r\n"
+                 "                             enabled=\"true\"\r\n"
+                 "                             />\r\n"
                  "\r\n"
-                 "                    <channel name=\"" NETDATA_SUBCHANNEL_ACLK "\"\r\n"
-                 "                             symbol=\"ChannelAclk\"\r\n"
+                 "                    <channel name=\"" NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_ACLK "\"\r\n"
+                 "                             symbol=\"CHANNEL_ACLK\"\r\n"
                  "                             type=\"Operational\"\r\n"
-                 "                             message=\"$(string.Channel.Aclk)\"/>\r\n"
+                 "                             message=\"$(string.Channel.Aclk)\"\r\n"
+                 "                             enabled=\"true\"\r\n"
+                 "                             />\r\n"
                  "                </channels>\r\n"
                  "\r\n"
                  "                <levels>\r\n"
@@ -206,11 +215,6 @@ int main(int argc, const char **argv) {
                  "                </opcodes>\r\n"
                  "\r\n"
                  "                <tasks>\r\n"
-                 "                    <task name=\"TaskDaemon\" value=\"1\" eventGUID=\"{00000000-0000-0000-0000-000000000000}\" message=\"$(string.Task.Daemon)\"/>\r\n"
-                 "                    <task name=\"TaskCollectors\" value=\"2\" eventGUID=\"{00000000-0000-0000-0000-000000000000}\" message=\"$(string.Task.Collectors)\"/>\r\n"
-                 "                    <task name=\"TaskAccess\" value=\"3\" eventGUID=\"{00000000-0000-0000-0000-000000000000}\" message=\"$(string.Task.Access)\"/>\r\n"
-                 "                    <task name=\"TaskHealth\" value=\"4\" eventGUID=\"{00000000-0000-0000-0000-000000000000}\" message=\"$(string.Task.Health)\"/>\r\n"
-                 "                    <task name=\"TaskAclk\" value=\"5\" eventGUID=\"{00000000-0000-0000-0000-000000000000}\" message=\"$(string.Task.Aclk)\"/>\r\n"
                  "                </tasks>\r\n"
                  "\r\n"
                  "                <templates>\r\n"
@@ -223,10 +227,10 @@ int main(int argc, const char **argv) {
                  "                        <data name=\"UnixErrno\" inType=\"win:UnicodeString\"/>           <!-- 5 (NDF_ERRNO) -->\r\n"
                  "                        <data name=\"WindowsLastError\" inType=\"win:UnicodeString\"/>    <!-- 6 (NDF_WINERROR) -->\r\n"
                  "                        <data name=\"InvocationID\" inType=\"win:UnicodeString\"/>        <!-- 7 (NDF_INVOCATION_ID) -->\r\n"
-                 "                        <data name=\"CodeLine\" inType=\"win:UInt32\"/>                   <!-- 8 (NDF_LINE) -->\r\n"
+                 "                        <data name=\"CodeLine\" inType=\"win:UnicodeString\"/>                   <!-- 8 (NDF_LINE) -->\r\n"
                  "                        <data name=\"CodeFile\" inType=\"win:UnicodeString\"/>            <!-- 9 (NDF_FILE) -->\r\n"
                  "                        <data name=\"CodeFunction\" inType=\"win:UnicodeString\"/>        <!-- 10 (NDF_FUNC) -->\r\n"
-                 "                        <data name=\"ThreadID\" inType=\"win:UInt32\"/>                   <!-- 11 (NDF_TID) -->\r\n"
+                 "                        <data name=\"ThreadID\" inType=\"win:UnicodeString\"/>                   <!-- 11 (NDF_TID) -->\r\n"
                  "                        <data name=\"ThreadName\" inType=\"win:UnicodeString\"/>          <!-- 12 (NDF_THREAD_TAG) -->\r\n"
                  "                        <data name=\"MessageID\" inType=\"win:UnicodeString\"/>           <!-- 13 (NDF_MESSAGE_ID) -->\r\n"
                  "                        <data name=\"Module\" inType=\"win:UnicodeString\"/>              <!-- 14 (NDF_MODULE) -->\r\n"
@@ -242,21 +246,21 @@ int main(int argc, const char **argv) {
                  "                        <data name=\"SourceIP\" inType=\"win:UnicodeString\"/>            <!-- 24 (NDF_SRC_IP) -->\r\n"
                  "                        <data name=\"SourceForwardedHost\" inType=\"win:UnicodeString\"/> <!-- 25 (NDF_SRC_PORT) -->\r\n"
                  "                        <data name=\"SourceForwardedFor\" inType=\"win:UnicodeString\"/>  <!-- 26 (NDF_SRC_FORWARDED_HOST) -->\r\n"
-                 "                        <data name=\"SourcePort\" inType=\"win:UInt32\"/>                 <!-- 27 (NDF_SRC_FORWARDED_FOR) -->\r\n"
+                 "                        <data name=\"SourcePort\" inType=\"win:UnicodeString\"/>                 <!-- 27 (NDF_SRC_FORWARDED_FOR) -->\r\n"
                  "                        <data name=\"SourceCapabilities\" inType=\"win:UnicodeString\"/>  <!-- 28 (NDF_SRC_CAPABILITIES) -->\r\n"
                  "                        <data name=\"DestinationTransport\" inType=\"win:UnicodeString\"/> <!-- 29 (NDF_DST_TRANSPORT) -->\r\n"
                  "                        <data name=\"DestinationIP\" inType=\"win:UnicodeString\"/>       <!-- 30 (NDF_DST_IP) -->\r\n"
-                 "                        <data name=\"DestinationPort\" inType=\"win:UInt32\"/>            <!-- 31 (NDF_DST_PORT) -->\r\n"
+                 "                        <data name=\"DestinationPort\" inType=\"win:UnicodeString\"/>            <!-- 31 (NDF_DST_PORT) -->\r\n"
                  "                        <data name=\"DestinationCapabilities\" inType=\"win:UnicodeString\"/> <!-- 32 (NDF_DST_CAPABILITIES) -->\r\n"
                  "                        <data name=\"RequestMethod\" inType=\"win:UnicodeString\"/>       <!-- 33 (NDF_REQUEST_METHOD) -->\r\n"
-                 "                        <data name=\"ResponseCode\" inType=\"win:UInt32\"/>               <!-- 34 (NDF_RESPONSE_CODE) -->\r\n"
+                 "                        <data name=\"ResponseCode\" inType=\"win:UnicodeString\"/>               <!-- 34 (NDF_RESPONSE_CODE) -->\r\n"
                  "                        <data name=\"ConnectionID\" inType=\"win:UnicodeString\"/>        <!-- 35 (NDF_CONNECTION_ID) -->\r\n"
                  "                        <data name=\"TransactionID\" inType=\"win:UnicodeString\"/>       <!-- 36 (NDF_TRANSACTION_ID) -->\r\n"
-                 "                        <data name=\"ResponseSentBytes\" inType=\"win:UInt64\"/>          <!-- 37 (NDF_RESPONSE_SENT_BYTES) -->\r\n"
-                 "                        <data name=\"ResponseSizeBytes\" inType=\"win:UInt64\"/>          <!-- 38 (NDF_RESPONSE_SIZE_BYTES) -->\r\n"
-                 "                        <data name=\"ResponsePreparationTimeUsec\" inType=\"win:UInt64\"/> <!-- 39 (NDF_RESPONSE_PREPARATION_TIME_USEC) -->\r\n"
-                 "                        <data name=\"ResponseSentTimeUsec\" inType=\"win:UInt64\"/>       <!-- 40 (NDF_RESPONSE_SENT_TIME_USEC) -->\r\n"
-                 "                        <data name=\"ResponseTotalTimeUsec\" inType=\"win:UInt64\"/>      <!-- 41 (NDF_RESPONSE_TOTAL_TIME_USEC) -->\r\n"
+                 "                        <data name=\"ResponseSentBytes\" inType=\"win:UnicodeString\"/>          <!-- 37 (NDF_RESPONSE_SENT_BYTES) -->\r\n"
+                 "                        <data name=\"ResponseSizeBytes\" inType=\"win:UnicodeString\"/>          <!-- 38 (NDF_RESPONSE_SIZE_BYTES) -->\r\n"
+                 "                        <data name=\"ResponsePreparationTimeUsec\" inType=\"win:UnicodeString\"/> <!-- 39 (NDF_RESPONSE_PREPARATION_TIME_USEC) -->\r\n"
+                 "                        <data name=\"ResponseSentTimeUsec\" inType=\"win:UnicodeString\"/>       <!-- 40 (NDF_RESPONSE_SENT_TIME_USEC) -->\r\n"
+                 "                        <data name=\"ResponseTotalTimeUsec\" inType=\"win:UnicodeString\"/>      <!-- 41 (NDF_RESPONSE_TOTAL_TIME_USEC) -->\r\n"
                  "                        <data name=\"AlertID\" inType=\"win:UnicodeString\"/>             <!-- 42 (NDF_ALERT_ID) -->\r\n"
                  "                        <data name=\"AlertUniqueID\" inType=\"win:UnicodeString\"/>       <!-- 43 (NDF_ALERT_UNIQUE_ID) -->\r\n"
                  "                        <data name=\"AlertTransitionID\" inType=\"win:UnicodeString\"/>   <!-- 44 (NDF_ALERT_TRANSITION_ID) -->\r\n"
@@ -268,16 +272,16 @@ int main(int argc, const char **argv) {
                  "                        <data name=\"AlertType\" inType=\"win:UnicodeString\"/>           <!-- 50 (NDF_ALERT_TYPE) -->\r\n"
                  "                        <data name=\"AlertExec\" inType=\"win:UnicodeString\"/>           <!-- 51 (NDF_ALERT_EXEC) -->\r\n"
                  "                        <data name=\"AlertRecipient\" inType=\"win:UnicodeString\"/>      <!-- 52 (NDF_ALERT_RECIPIENT) -->\r\n"
-                 "                        <data name=\"AlertDuration\" inType=\"win:UInt64\"/>              <!-- 53 (NDF_ALERT_DURATION) -->\r\n"
-                 "                        <data name=\"AlertValue\" inType=\"win:Double\"/>                 <!-- 54 (NDF_ALERT_VALUE) -->\r\n"
-                 "                        <data name=\"AlertOldValue\" inType=\"win:Double\"/>              <!-- 55 (NDF_ALERT_VALUE_OLD) -->\r\n"
+                 "                        <data name=\"AlertDuration\" inType=\"win:UnicodeString\"/>              <!-- 53 (NDF_ALERT_DURATION) -->\r\n"
+                 "                        <data name=\"AlertValue\" inType=\"win:UnicodeString\"/>                 <!-- 54 (NDF_ALERT_VALUE) -->\r\n"
+                 "                        <data name=\"AlertOldValue\" inType=\"win:UnicodeString\"/>              <!-- 55 (NDF_ALERT_VALUE_OLD) -->\r\n"
                  "                        <data name=\"AlertStatus\" inType=\"win:UnicodeString\"/>         <!-- 56 (NDF_ALERT_STATUS) -->\r\n"
                  "                        <data name=\"AlertOldStatus\" inType=\"win:UnicodeString\"/>      <!-- 57 (NDF_ALERT_STATUS_OLD) -->\r\n"
                  "                        <data name=\"Source\" inType=\"win:UnicodeString\"/>              <!-- 58 (NDF_ALERT_SOURCE) -->\r\n"
                  "                        <data name=\"AlertUnits\" inType=\"win:UnicodeString\"/>          <!-- 59 (NDF_ALERT_UNITS) -->\r\n"
                  "                        <data name=\"AlertSummary\" inType=\"win:UnicodeString\"/>        <!-- 60 (NDF_ALERT_SUMMARY) -->\r\n"
                  "                        <data name=\"AlertInfo\" inType=\"win:UnicodeString\"/>           <!-- 61 (NDF_ALERT_INFO) -->\r\n"
-                 "                        <data name=\"AlertNotificationTime\" inType=\"win:UInt64\"/>      <!-- 62 (NDF_ALERT_NOTIFICATION_REALTIME_USEC) -->\r\n"
+                 "                        <data name=\"AlertNotificationTime\" inType=\"win:UnicodeString\"/>      <!-- 62 (NDF_ALERT_NOTIFICATION_REALTIME_USEC) -->\r\n"
                  "                        <data name=\"Request\" inType=\"win:UnicodeString\"/>             <!-- 63 (NDF_REQUEST) -->\r\n"
                  "                        <data name=\"Message\" inType=\"win:UnicodeString\"/>             <!-- 64 (NDF_MESSAGE) -->\r\n"
                  "                    </template>\r\n"
@@ -295,19 +299,13 @@ int main(int argc, const char **argv) {
         s_header = "    <localization>\r\n"
                    "        <resources culture=\"en-US\">\r\n"
                    "            <stringTable>\r\n"
-                   "                <string id=\"ND_PROVIDER_NAME\" value=\"" NETDATA_PROVIDER_NAME "\"/>\r\n"
+                   "                <string id=\"ND_PROVIDER_NAME\" value=\"" NETDATA_ETW_PROVIDER_NAME "\"/>\r\n"
                    "\r\n"
                    "                <string id=\"Channel.Daemon\" value=\"Daemon\"/>\r\n"
                    "                <string id=\"Channel.Collectors\" value=\"Collectors\"/>\r\n"
                    "                <string id=\"Channel.Access\" value=\"Access\"/>\r\n"
                    "                <string id=\"Channel.Health\" value=\"Health\"/>\r\n"
                    "                <string id=\"Channel.Aclk\" value=\"Aclk\"/>\r\n"
-                   "\r\n"
-                   "                <string id=\"Task.Daemon\" value=\"ND Daemon\"/>\r\n"
-                   "                <string id=\"Task.Collectors\" value=\"ND Collectors\"/>\r\n"
-                   "                <string id=\"Task.Access\" value=\"ND Access\"/>\r\n"
-                   "                <string id=\"Task.Health\" value=\"ND Health\"/>\r\n"
-                   "                <string id=\"Task.Aclk\" value=\"ND Aclk\"/>\r\n"
                    "\r\n"
                    ;
 
@@ -375,47 +373,39 @@ int main(int argc, const char **argv) {
                 if(done[eventID]) continue;
                 done[eventID] = true;
 
-                const char *level;
+                const char *level = get_level_from_priority_str(pri);
                 const char *pri_txt;
                 switch(pri) {
                     case NDLP_EMERG:
                         pri_txt = "EMERG";
-                        level = "win:Critical";
                         break;
 
                     case NDLP_CRIT:
                         pri_txt = "CRIT";
-                        level = "win:Critical";
                         break;
 
                     case NDLP_ALERT:
                         pri_txt = "ALERT";
-                        level = "win:Error";
                         break;
 
                     case NDLP_ERR:
                         pri_txt = "ERR";
-                        level = "win:Error";
                         break;
 
                     case NDLP_WARNING:
                         pri_txt = "WARN";
-                        level = "win:Warning";
                         break;
 
                     case NDLP_INFO:
                         pri_txt = "INFO";
-                        level = "win:Informational";
                         break;
 
                     case NDLP_NOTICE:
                         pri_txt = "NOTICE";
-                        level = "win:Informational";
                         break;
 
                     case NDLP_DEBUG:
                         pri_txt = "DEBUG";
-                        level = "win:Verbose";
                         break;
 
                     default:
@@ -423,44 +413,37 @@ int main(int argc, const char **argv) {
                         return 1;
                 }
 
-                const char *task;
                 const char *channel;
                 const char *src_txt;
                 switch(src) {
                     case NDLS_COLLECTORS:
                         src_txt = "COLLECTORS";
-                        channel = NETDATA_SUBCHANNEL_COLLECTORS;
-                        task = "TaskCollectors";
+                        channel = NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_COLLECTORS;
                         break;
 
                     case NDLS_ACCESS:
                         src_txt = "ACCESS";
-                        channel = NETDATA_SUBCHANNEL_ACCESS;
-                        task = "TaskAccess";
+                        channel = NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_ACCESS;
                         break;
 
                     case NDLS_HEALTH:
                         src_txt = "HEALTH";
-                        channel = NETDATA_SUBCHANNEL_HEALTH;
-                        task = "TaskHealth";
+                        channel = NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_HEALTH;
                         break;
 
                     case NDLS_DEBUG:
                         src_txt = "DEBUG";
-                        channel = NETDATA_SUBCHANNEL_DAEMON;
-                        task = "TaskDaemon";
+                        channel = NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_DAEMON;
                         break;
 
                     case NDLS_DAEMON:
                         src_txt = "DAEMON";
-                        channel = NETDATA_SUBCHANNEL_DAEMON;
-                        task = "TaskDaemon";
+                        channel = NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_DAEMON;
                         break;
 
                     case NDLS_ACLK:
                         src_txt = "ACLK";
-                        channel = NETDATA_SUBCHANNEL_ACLK;
-                        task = "TaskAclk";
+                        channel = NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_ACLK;
                         break;
 
                     default:
@@ -490,7 +473,10 @@ int main(int argc, const char **argv) {
                         return 1;
                 }
 
-                snprintf(symbol, sizeof(symbol), "%s_%s_%s", src_txt, pri_txt, msg_txt);
+                if(manifest)
+                    snprintf(symbol, sizeof(symbol), "ED_%s_%s_%s", src_txt, pri_txt, msg_txt);
+                else
+                    snprintf(symbol, sizeof(symbol), "MC_%s_%s_%s", src_txt, pri_txt, msg_txt);
 
                 if(manifest)
                     printf("                    <event symbol=\"%s\"\r\n"
@@ -498,10 +484,10 @@ int main(int argc, const char **argv) {
                            "                           message=\"$(string.msg.MAN_%s)\"\r\n"
                            "                           channel=\"%s\"\r\n"
                            "                           level=\"%s\"\r\n"
-                           "                           task=\"%s\"\r\n"
+                           "                           task=\"win:None\"\r\n"
                            "                           opcode=\"win:Info\"\r\n"
                            "                           template=\"AllFieldsTemplate\"/>\r\n\r\n",
-                           symbol, eventID, msg_txt, channel, level, task);
+                           symbol, eventID, msg_txt, channel, level);
                 else
                     printf("MessageId=0x%x\r\n"
                            "Severity=%s\r\n"

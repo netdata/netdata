@@ -7,15 +7,31 @@
 #include <winevt.h>
 #include <evntprov.h>
 #include <wchar.h>
-#include <objbase.h>
 #include <guiddef.h>
 
+static bool use_etw = true;
 
 // --------------------------------------------------------------------------------------------------------------------
-// construct an event id (must be aligned with .mc file)
+// construct an event id
 
+// load message resources generated header
 #include "wevt_netdata.h"
+
+// include the common definitions with the message resources and manifest generator
 #include "nd_log-to-windows-common.h"
+
+#if (USE_ETW == 1)
+// we need the manifest, only in ETW mode
+
+// eliminate compiler warnings and load manifest generated header
+#undef EXTERN_C
+#define EXTERN_C
+#undef __declspec
+#define __declspec(x)
+#include "wevt_netdata_manifest.h"
+
+static REGHANDLE regHandle;
+#endif
 
 // Function to construct EventID
 static DWORD complete_event_id(DWORD facility, DWORD severity, DWORD event_code) {
@@ -68,18 +84,18 @@ static bool check_event_id(ND_LOG_SOURCES source __maybe_unused, ND_LOG_FIELD_PR
 // --------------------------------------------------------------------------------------------------------------------
 // initialization
 
-// Define provider names per source
-static const wchar_t *sub_channel_name_per_source[_NDLS_MAX] = {
+// Define provider names per source (only when not using ETW)
+static const wchar_t *wel_provider_per_source[_NDLS_MAX] = {
         [NDLS_UNSET]        = NULL,                             // not used, linked to NDLS_DAEMON
-        [NDLS_ACCESS]       = NETDATA_SUBCHANNEL_ACCESS_W,      //
-        [NDLS_ACLK]         = NETDATA_SUBCHANNEL_ACLK_W,        //
-        [NDLS_COLLECTORS]   = NETDATA_SUBCHANNEL_COLLECTORS_W,  //
-        [NDLS_DAEMON]       = NETDATA_SUBCHANNEL_DAEMON_W,      //
-        [NDLS_HEALTH]       = NETDATA_SUBCHANNEL_HEALTH_W,      //
+        [NDLS_ACCESS]       = NETDATA_WEL_PROVIDER_ACCESS_W,    //
+        [NDLS_ACLK]         = NETDATA_WEL_PROVIDER_ACLK_W,      //
+        [NDLS_COLLECTORS]   = NETDATA_WEL_PROVIDER_COLLECTORS_W,//
+        [NDLS_DAEMON]       = NETDATA_WEL_PROVIDER_DAEMON_W,    //
+        [NDLS_HEALTH]       = NETDATA_WEL_PROVIDER_HEALTH_W,    //
         [NDLS_DEBUG]        = NULL,                             // used, linked to NDLS_DAEMON
 };
 
-bool replace_program_with_wev_netdata_dll(wchar_t *str, size_t size) {
+bool wel_replace_program_with_wevt_netdata_dll(wchar_t *str, size_t size) {
     const wchar_t *replacement = L"\\wevt_netdata.dll";
 
     // Find the last occurrence of '\\' to isolate the filename
@@ -109,7 +125,7 @@ bool replace_program_with_wev_netdata_dll(wchar_t *str, size_t size) {
     return false; // No backslash found (likely invalid input)
 }
 
-static bool add_to_registry(const wchar_t *channel, const wchar_t *provider, DWORD defaultMaxSize) {
+static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider, DWORD defaultMaxSize) {
     // Build the registry path: SYSTEM\CurrentControlSet\Services\EventLog\<LogName>\<SourceName>
     wchar_t key[MAX_PATH];
     if(!channel)
@@ -139,7 +155,7 @@ static bool add_to_registry(const wchar_t *channel, const wchar_t *provider, DWO
         return false;
     }
 
-    if(replace_program_with_wev_netdata_dll(modulePath, _countof(modulePath))) {
+    if(wel_replace_program_with_wevt_netdata_dll(modulePath, _countof(modulePath))) {
         RegSetValueExW(hRegKey, L"EventMessageFile", 0, REG_EXPAND_SZ,
                        (LPBYTE)modulePath, (wcslen(modulePath) + 1) * sizeof(wchar_t));
 
@@ -151,28 +167,60 @@ static bool add_to_registry(const wchar_t *channel, const wchar_t *provider, DWO
     return true;
 }
 
+#if (USE_ETW == 1)
+static void etw_set_source_meta(struct nd_log_source *source, USHORT channelID, const EVENT_DESCRIPTOR *ed) {
+    // It turns out that the keyword varies per only per channel!
+    // so, to log with the right keyword, Task, Opcode we copy the ids from the header
+    // the messages compiler (mc.exe) generated from the manifest.
+
+    source->channelID = channelID;
+    source->Opcode = ed->Opcode;
+    source->Task = ed->Task;
+    source->Keyword = ed->Keyword;
+}
+
+static bool etw_register_provider(void) {
+    // Register the ETW provider
+    if (EventRegister(&NETDATA_ETW_PROVIDER_GUID, NULL, NULL, &regHandle) != ERROR_SUCCESS)
+        return false;
+
+    etw_set_source_meta(&nd_log.sources[NDLS_DAEMON], CHANNEL_DAEMON, &ED_DAEMON_INFO_MESSAGE_ONLY);
+    etw_set_source_meta(&nd_log.sources[NDLS_COLLECTORS], CHANNEL_COLLECTORS, &ED_COLLECTORS_INFO_MESSAGE_ONLY);
+    etw_set_source_meta(&nd_log.sources[NDLS_ACCESS], CHANNEL_ACCESS, &ED_ACCESS_INFO_MESSAGE_ONLY);
+    etw_set_source_meta(&nd_log.sources[NDLS_HEALTH], CHANNEL_HEALTH, &ED_HEALTH_INFO_MESSAGE_ONLY);
+    etw_set_source_meta(&nd_log.sources[NDLS_ACLK], CHANNEL_ACLK, &ED_ACLK_INFO_MESSAGE_ONLY);
+    etw_set_source_meta(&nd_log.sources[NDLS_UNSET], CHANNEL_DAEMON, &ED_DAEMON_INFO_MESSAGE_ONLY);
+    etw_set_source_meta(&nd_log.sources[NDLS_DEBUG], CHANNEL_DAEMON, &ED_DAEMON_INFO_MESSAGE_ONLY);
+
+    return true;
+}
+#endif
+
 bool nd_log_wevents_init(void) {
     if(nd_log.wevents.initialized)
         return true;
 
     // validate we have the right keys
     if(
-            !check_event_id(NDLS_COLLECTORS, NDLP_INFO, MSGID_MESSAGE_ONLY, COLLECTORS_INFO_MESSAGE_ONLY) ||
-            !check_event_id(NDLS_DAEMON, NDLP_ERR, MSGID_MESSAGE_ONLY, DAEMON_ERR_MESSAGE_ONLY) ||
-            !check_event_id(NDLS_ACCESS, NDLP_WARNING, MSGID_ACCESS_USER, ACCESS_WARN_ACCESS_USER) ||
-            !check_event_id(NDLS_HEALTH, NDLP_CRIT, MSGID_ALERT_TRANSITION, HEALTH_CRIT_ALERT_TRANSITION) ||
-            !check_event_id(NDLS_DEBUG, NDLP_ALERT, MSGID_ACCESS_FORWARDER_USER, DEBUG_ALERT_ACCESS_FORWARDER_USER))
+            !check_event_id(NDLS_COLLECTORS, NDLP_INFO, MSGID_MESSAGE_ONLY, MC_COLLECTORS_INFO_MESSAGE_ONLY) ||
+            !check_event_id(NDLS_DAEMON, NDLP_ERR, MSGID_MESSAGE_ONLY, MC_DAEMON_ERR_MESSAGE_ONLY) ||
+            !check_event_id(NDLS_ACCESS, NDLP_WARNING, MSGID_ACCESS_USER, MC_ACCESS_WARN_ACCESS_USER) ||
+            !check_event_id(NDLS_HEALTH, NDLP_CRIT, MSGID_ALERT_TRANSITION, MC_HEALTH_CRIT_ALERT_TRANSITION) ||
+            !check_event_id(NDLS_DEBUG, NDLP_ALERT, MSGID_ACCESS_FORWARDER_USER, MC_DEBUG_ALERT_ACCESS_FORWARDER_USER))
        return false;
 
-#if (MANIFEST_BASED_WEL_PROVIDER == 1)
-    if(!add_to_registry(NETDATA_CHANNEL_NAME_W, NETDATA_PROVIDER_NAME_W, 20 * 1024 * 1024)) return false;
+#if (USE_ETW == 1)
+    if(!etw_register_provider())
+        use_etw = false;
+#else
+    use_etw = false;
 #endif
 
     // Loop through each source and add it to the registry
     for(size_t i = 0; i < _NDLS_MAX; i++) {
         nd_log.sources[i].source = i;
 
-        const wchar_t *sub_channel = sub_channel_name_per_source[i];
+        const wchar_t *sub_channel = wel_provider_per_source[i];
 
         if(!sub_channel)
             // we will map these to NDLS_DAEMON
@@ -196,27 +244,22 @@ bool nd_log_wevents_init(void) {
                 break;
         }
 
-        if(!add_to_registry(NETDATA_CHANNEL_NAME_W, sub_channel, defaultMaxSize)) return false;
+        if(!use_etw) {
+            if(!wel_add_to_registry(NETDATA_CHANNEL_NAME_W, sub_channel, defaultMaxSize)) return false;
 
-#if !(MANIFEST_BASED_WEL_PROVIDER == 1)
-        // when not using a manifest, each source is a provider
-        nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, sub_channel);
-        if (!nd_log.sources[i].hEventLog)
-            return false;
-#endif
+            // when not using a manifest, each source is a provider
+            nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, sub_channel);
+            if (!nd_log.sources[i].hEventLog)
+                return false;
+        }
     }
 
-#if (MANIFEST_BASED_WEL_PROVIDER == 1)
-    // when using a manifest, we need only 1 provider (NDLS_DAEMON - the rest will get the same below))
-    nd_log.sources[NDLS_DAEMON].hEventLog = RegisterEventSourceW(NULL, NETDATA_PROVIDER_NAME_W);
-        if (!nd_log.sources[NDLS_DAEMON].hEventLog)
-            return false;
-#endif
-
-    // Map the unset ones to NDLS_DAEMON
-    for(size_t i = 0; i < _NDLS_MAX; i++) {
-        if(!nd_log.sources[i].hEventLog)
-            nd_log.sources[i].hEventLog = nd_log.sources[NDLS_DAEMON].hEventLog;
+    if(!use_etw) {
+        // Map the unset ones to NDLS_DAEMON
+        for (size_t i = 0; i < _NDLS_MAX; i++) {
+            if (!nd_log.sources[i].hEventLog)
+                nd_log.sources[i].hEventLog = nd_log.sources[NDLS_DAEMON].hEventLog;
+        }
     }
 
     nd_log.wevents.initialized = true;
@@ -242,7 +285,11 @@ static struct {
     wchar_t *buf;
 } fields_buffers[_NDF_MAX] = { 0 };
 
-static LPCWSTR messages[_NDF_MAX - 1];
+#if (USE_ETW == 1)
+static EVENT_DATA_DESCRIPTOR etw_eventData[_NDF_MAX - 1];
+#endif
+
+static LPCWSTR wel_messages[_NDF_MAX - 1];
 
 __attribute__((constructor)) void wevents_initialize_buffers(void) {
     for(size_t i = 0; i < _NDF_MAX ;i++) {
@@ -259,14 +306,14 @@ __attribute__((constructor)) void wevents_initialize_buffers(void) {
     fields_buffers[NDF_MESSAGE].size = BIG_WIDE_BUFFERS_SIZE;
 
     for(size_t i = 1; i < _NDF_MAX ;i++)
-        messages[i - 1] = fields_buffers[i].buf;
+        wel_messages[i - 1] = fields_buffers[i].buf;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
 #define is_field_set(fields, fields_max, field) ((field) < (fields_max) && (fields)[field].entry.set)
 
-static const char *get_field_value(struct log_field *fields, ND_LOG_FIELD_ID i, size_t fields_max, BUFFER **tmp) {
+static const char *get_field_value_unsafe(struct log_field *fields, ND_LOG_FIELD_ID i, size_t fields_max, BUFFER **tmp) {
     if(!is_field_set(fields, fields_max, i) || !fields[i].wevents)
         return "";
 
@@ -325,105 +372,72 @@ static const char *get_field_value(struct log_field *fields, ND_LOG_FIELD_ID i, 
     if(!s || !*s) return "";
     return s;
 }
+static void etw_replace_percent_with_unicode(wchar_t *s, size_t size) {
+    size_t original_len = wcslen(s);
 
-static void wevt_generate_all_fields_unsafe(struct log_field *fields, size_t fields_max) {
-    CLEAN_BUFFER *tmp = NULL;
-    char number_str[MAX(MAX(UINT64_MAX_LENGTH, DOUBLE_MAX_LENGTH), UUID_STR_LEN)];
+    // Traverse the string, replacing '%' with the Unicode fullwidth percent sign
+    for (size_t i = 0; i < original_len && i < size - 1; i++) {
+        if (s[i] == L'%') {
+            s[i] = 0xFF05;  // Replace '%' with fullwidth percent sign '％'
+        }
+    }
 
+    // Ensure null termination if needed
+    s[size - 1] = L'\0';
+}
+
+static void wevt_generate_all_fields_unsafe(struct log_field *fields, size_t fields_max, BUFFER **tmp) {
     for (size_t i = 0; i < fields_max; i++) {
         fields_buffers[i].buf[0] = L'\0';
 
         if (!fields[i].entry.set || !fields[i].wevents)
             continue;
 
-        const char *s = NULL;
-        if (fields[i].annotator)
-            s = fields[i].annotator(&fields[i]);
-
-        else
-            switch (fields[i].entry.type) {
-                case NDFT_TXT:
-                    s = fields[i].entry.txt;
-                    break;
-                case NDFT_STR:
-                    s = string2str(fields[i].entry.str);
-                    break;
-                case NDFT_BFR:
-                    s = buffer_tostring(fields[i].entry.bfr);
-                    break;
-                case NDFT_U64:
-                    print_uint64(number_str, fields[i].entry.u64);
-                    s = number_str;
-                    break;
-                case NDFT_I64:
-                    print_int64(number_str, fields[i].entry.i64);
-                    s = number_str;
-                    break;
-                case NDFT_DBL:
-                    print_netdata_double(number_str, fields[i].entry.dbl);
-                    s = number_str;
-                    break;
-                case NDFT_UUID:
-                    if (!uuid_is_null(*fields[i].entry.uuid)) {
-                        uuid_unparse_lower(*fields[i].entry.uuid, number_str);
-                        s = number_str;
-                    }
-                    break;
-                case NDFT_CALLBACK:
-                    if (!tmp)
-                        tmp = buffer_create(1024, NULL);
-                    else
-                        buffer_flush(tmp);
-
-                    if (fields[i].entry.cb.formatter(tmp, fields[i].entry.cb.formatter_data))
-                        s = buffer_tostring(tmp);
-                    else
-                        s = NULL;
-                    break;
-
-                default:
-                    s = "UNHANDLED";
-                    break;
-            }
-
-        if (s && *s)
+        const char *s = get_field_value_unsafe(fields, i, fields_max, tmp);
+        if (s && *s) {
             utf8_to_utf16(fields_buffers[i].buf, (int) fields_buffers[i].size, s, -1);
+
+            if(use_etw)
+                // UNBELIEVABLE! they do recursive parameter expansion in ETW...
+                etw_replace_percent_with_unicode(fields_buffers[i].buf, fields_buffers[i].size);
+        }
     }
 }
 
 static bool has_user_role_permissions(struct log_field *fields, size_t fields_max, BUFFER **tmp) {
     const char *t;
 
-    t = get_field_value(fields, NDF_USER_NAME, fields_max, tmp);
+    t = get_field_value_unsafe(fields, NDF_USER_NAME, fields_max, tmp);
     if (*t) return true;
 
-    t = get_field_value(fields, NDF_USER_ROLE, fields_max, tmp);
+    t = get_field_value_unsafe(fields, NDF_USER_ROLE, fields_max, tmp);
     if (*t && strcmp(t, "none") != 0) return true;
 
-    t = get_field_value(fields, NDF_USER_ACCESS, fields_max, tmp);
+    t = get_field_value_unsafe(fields, NDF_USER_ACCESS, fields_max, tmp);
     if (*t && strcmp(t, "0x0") != 0) return true;
 
     return false;
 }
 
 bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
-    if(!nd_log.wevents.initialized || !source->hEventLog)
+    if (!nd_log.wevents.initialized)
         return false;
 
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
-    if(fields[NDF_PRIORITY].entry.set)
+    if (fields[NDF_PRIORITY].entry.set)
         priority = (ND_LOG_FIELD_PRIORITY) fields[NDF_PRIORITY].entry.u64;
 
     DWORD wType = get_event_type_from_priority(priority);
+    (void) wType;
 
     CLEAN_BUFFER *tmp = NULL;
 
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
-    wevt_generate_all_fields_unsafe(fields, fields_max);
+    wevt_generate_all_fields_unsafe(fields, fields_max, &tmp);
 
     MESSAGE_ID messageID;
-    switch(source->source) {
+    switch (source->source) {
         default:
         case NDLS_DEBUG:
         case NDLS_DAEMON:
@@ -436,28 +450,26 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
             break;
 
         case NDLS_ACCESS:
-            if(is_field_set(fields, fields_max, NDF_MESSAGE)) {
+            if (is_field_set(fields, fields_max, NDF_MESSAGE)) {
                 messageID = MSGID_ACCESS_MESSAGE;
 
-                if(has_user_role_permissions(fields, fields_max, &tmp))
+                if (has_user_role_permissions(fields, fields_max, &tmp))
                     messageID = MSGID_ACCESS_MESSAGE_USER;
-                else if(*get_field_value(fields, NDF_REQUEST, fields_max, &tmp))
+                else if (*get_field_value_unsafe(fields, NDF_REQUEST, fields_max, &tmp))
                     messageID = MSGID_ACCESS_MESSAGE_REQUEST;
-            }
-            else if(is_field_set(fields, fields_max, NDF_RESPONSE_CODE)) {
+            } else if (is_field_set(fields, fields_max, NDF_RESPONSE_CODE)) {
                 messageID = MSGID_ACCESS;
 
-                if(*get_field_value(fields, NDF_SRC_FORWARDED_FOR, fields_max, &tmp))
+                if (*get_field_value_unsafe(fields, NDF_SRC_FORWARDED_FOR, fields_max, &tmp))
                     messageID = MSGID_ACCESS_FORWARDER;
 
-                if(has_user_role_permissions(fields, fields_max, &tmp)) {
-                    if(messageID == MSGID_ACCESS)
+                if (has_user_role_permissions(fields, fields_max, &tmp)) {
+                    if (messageID == MSGID_ACCESS)
                         messageID = MSGID_ACCESS_USER;
                     else
                         messageID = MSGID_ACCESS_FORWARDER_USER;
                 }
-            }
-            else
+            } else
                 messageID = MSGID_REQUEST_ONLY;
             break;
 
@@ -466,9 +478,9 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
             break;
     }
 
-    if(messageID == MSGID_MESSAGE_ONLY && (
-        *get_field_value(fields, NDF_ERRNO, fields_max, &tmp) ||
-        *get_field_value(fields, NDF_WINERROR, fields_max, &tmp))) {
+    if (messageID == MSGID_MESSAGE_ONLY && (
+            *get_field_value_unsafe(fields, NDF_ERRNO, fields_max, &tmp) ||
+            *get_field_value_unsafe(fields, NDF_WINERROR, fields_max, &tmp))) {
         messageID = MSGID_MESSAGE_ERRNO;
     }
 
@@ -486,7 +498,34 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
     // without a manifest => numeric Task values appear
     // with a manifest    => Task from the manifest is used (wCategory ignored)
 
-    BOOL rc = ReportEventW(source->hEventLog, wType, 0, eventID, NULL, _NDF_MAX - 1, 0, messages, NULL);
+    BOOL rc;
+#if (USE_ETW == 1)
+    if (use_etw) {
+        // metadata based logging - ETW
+
+        for (size_t i = 1; i < _NDF_MAX; i++)
+            EventDataDescCreate(&etw_eventData[i - 1], fields_buffers[i].buf,
+                                (wcslen(fields_buffers[i].buf) + 1) * sizeof(WCHAR));
+
+        EVENT_DESCRIPTOR EventDesc = {
+                .Id = eventID & EVENT_ID_CODE_MASK, // ETW needs the raw event id
+                .Version = 0,
+                .Channel = source->channelID,
+                .Level = get_level_from_priority(priority),
+                .Opcode = source->Opcode,
+                .Task = source->Task,
+                .Keyword = source->Keyword,
+        };
+
+        rc = ERROR_SUCCESS == EventWrite(regHandle, &EventDesc, _NDF_MAX - 1, etw_eventData);
+
+    }
+    else
+#endif
+    {
+        // eventID based logging - WEL
+        rc = ReportEventW(source->hEventLog, wType, 0, eventID, NULL, _NDF_MAX - 1, 0, wel_messages, NULL);
+    }
 
     spinlock_unlock(&spinlock);
 

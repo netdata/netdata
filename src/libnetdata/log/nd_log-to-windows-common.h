@@ -7,32 +7,50 @@
 #define WIDEN2(x) L ## x
 #define WIDEN(x) WIDEN2(x)
 
-// DO NOT ENABLE - NEVER MADE IT ACTUALLY WORK
-#define MANIFEST_BASED_WEL_PROVIDER 0
+#define USE_ETW 1
 
-#define NETDATA_CHANNEL_NAME            "Netdata"
-#define NETDATA_CHANNEL_NAME_W           WIDEN(NETDATA_CHANNEL_NAME)
+#define NETDATA_ETW_PROVIDER_GUID_STR       "{96c5ca72-9bd8-4634-81e5-000014e7da7a}"
+#define NETDATA_ETW_PROVIDER_GUID_STR_W     WIDEN(NETDATA_ETW_PROVIDER_GUID)
 
-#define NETDATA_PROVIDER_NAME           "Netdata"
-#define NETDATA_PROVIDER_NAME_W          WIDEN(NETDATA_PROVIDER_NAME)
+#define NETDATA_CHANNEL_NAME                "Netdata"
+#define NETDATA_CHANNEL_NAME_W              WIDEN(NETDATA_CHANNEL_NAME)
 
-#define NETDATA_PROVIDER_PREFIX         "Nd"
-#define NETDATA_PROVIDER_PREFIX_W       WIDEN(NETDATA_PROVIDER_PREFIX)
+#define NETDATA_ETW_PROVIDER_NAME           "Netdata"
+#define NETDATA_ETW_PROVIDER_NAME_W         WIDEN(NETDATA_ETW_PROVIDER_NAME)
 
-#define NETDATA_SUBCHANNEL_ACCESS       NETDATA_PROVIDER_PREFIX "Access"
-#define NETDATA_SUBCHANNEL_ACCESS_W     WIDEN(NETDATA_SUBCHANNEL_ACCESS)
+#define NETDATA_WEL_PROVIDER_PREFIX         "Nd"
+#define NETDATA_WEL_PROVIDER_PREFIX_W       WIDEN(NETDATA_WEL_PROVIDER_PREFIX)
 
-#define NETDATA_SUBCHANNEL_ACLK         NETDATA_PROVIDER_PREFIX "Aclk"
-#define NETDATA_SUBCHANNEL_ACLK_W       WIDEN(NETDATA_SUBCHANNEL_ACLK)
+#define NETDATA_WEL_PROVIDER_ACCESS         NETDATA_WEL_PROVIDER_PREFIX "Access"
+#define NETDATA_WEL_PROVIDER_ACCESS_W       WIDEN(NETDATA_WEL_PROVIDER_ACCESS)
 
-#define NETDATA_SUBCHANNEL_COLLECTORS   NETDATA_PROVIDER_PREFIX "Collectors"
-#define NETDATA_SUBCHANNEL_COLLECTORS_W WIDEN(NETDATA_SUBCHANNEL_COLLECTORS)
+#define NETDATA_WEL_PROVIDER_ACLK           NETDATA_WEL_PROVIDER_PREFIX "Aclk"
+#define NETDATA_WEL_PROVIDER_ACLK_W         WIDEN(NETDATA_WEL_PROVIDER_ACLK)
 
-#define NETDATA_SUBCHANNEL_DAEMON       NETDATA_PROVIDER_PREFIX "Daemon"
-#define NETDATA_SUBCHANNEL_DAEMON_W     WIDEN(NETDATA_SUBCHANNEL_DAEMON)
+#define NETDATA_WEL_PROVIDER_COLLECTORS     NETDATA_WEL_PROVIDER_PREFIX "Collectors"
+#define NETDATA_WEL_PROVIDER_COLLECTORS_W   WIDEN(NETDATA_WEL_PROVIDER_COLLECTORS)
 
-#define NETDATA_SUBCHANNEL_HEALTH       NETDATA_PROVIDER_PREFIX "Health"
-#define NETDATA_SUBCHANNEL_HEALTH_W     WIDEN(NETDATA_SUBCHANNEL_HEALTH)
+#define NETDATA_WEL_PROVIDER_DAEMON         NETDATA_WEL_PROVIDER_PREFIX "Daemon"
+#define NETDATA_WEL_PROVIDER_DAEMON_W       WIDEN(NETDATA_WEL_PROVIDER_DAEMON)
+
+#define NETDATA_WEL_PROVIDER_HEALTH         NETDATA_WEL_PROVIDER_PREFIX "Health"
+#define NETDATA_WEL_PROVIDER_HEALTH_W       WIDEN(NETDATA_WEL_PROVIDER_HEALTH)
+
+
+#define NETDATA_ETW_SUBCHANNEL_ACCESS       "Access"
+#define NETDATA_ETW_SUBCHANNEL_ACCESS_W     WIDEN(NETDATA_ETW_SUBCHANNEL_ACCESS)
+
+#define NETDATA_ETW_SUBCHANNEL_ACLK         "Aclk"
+#define NETDATA_ETW_SUBCHANNEL_ACLK_W       WIDEN(NETDATA_ETW_SUBCHANNEL_ACLK)
+
+#define NETDATA_ETW_SUBCHANNEL_COLLECTORS   "Collectors"
+#define NETDATA_ETW_SUBCHANNEL_COLLECTORS_W WIDEN(NETDATA_ETW_SUBCHANNEL_COLLECTORS)
+
+#define NETDATA_ETW_SUBCHANNEL_DAEMON       "Daemon"
+#define NETDATA_ETW_SUBCHANNEL_DAEMON_W     WIDEN(NETDATA_ETW_SUBCHANNEL_DAEMON)
+
+#define NETDATA_ETW_SUBCHANNEL_HEALTH       "Health"
+#define NETDATA_ETW_SUBCHANNEL_HEALTH_W     WIDEN(NETDATA_ETW_SUBCHANNEL_HEALTH)
 
 // Define shift values
 #define EVENT_ID_SEV_SHIFT          30
@@ -106,6 +124,56 @@ static inline uint8_t get_severity_from_priority(ND_LOG_FIELD_PRIORITY priority)
         case NDLP_DEBUG:
         default:
             return STATUS_SEVERITY_INFORMATIONAL;
+    }
+}
+
+static inline uint8_t get_level_from_priority(ND_LOG_FIELD_PRIORITY priority) {
+    switch (priority) {
+        // return 0 = log an event regardless of any filtering applied
+
+        case NDLP_EMERG:
+        case NDLP_ALERT:
+        case NDLP_CRIT:
+            return 1;
+
+        case NDLP_ERR:
+            return 2;
+
+        case NDLP_WARNING:
+            return 3;
+
+        case NDLP_NOTICE:
+        case NDLP_INFO:
+            return 4;
+
+        case NDLP_DEBUG:
+        default:
+            return 5;
+    }
+}
+
+static inline const char *get_level_from_priority_str(ND_LOG_FIELD_PRIORITY priority) {
+    switch (priority) {
+        // return "win:LogAlways" to log an event regardless of any filtering applied
+
+        case NDLP_EMERG:
+        case NDLP_ALERT:
+        case NDLP_CRIT:
+            return "win:Critical";
+
+        case NDLP_ERR:
+            return "win:Error";
+
+        case NDLP_WARNING:
+            return "win:Warning";
+
+        case NDLP_NOTICE:
+        case NDLP_INFO:
+            return "win:Informational";
+
+        case NDLP_DEBUG:
+        default:
+            return "win:Verbose";
     }
 }
 

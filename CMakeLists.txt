@@ -1770,26 +1770,32 @@ target_link_libraries(libnetdata PUBLIC
 
 if(OS_WINDOWS)
         # Define the source and generated file paths
-        set(WEVT_GEN_H_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/nd_log-to-windows-common.h")
-        set(WEVT_GEN_SRC_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_mc_generate.c")
+        set(WEVT_GEN_SRC_H_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/nd_log-to-windows-common.h")
+        set(WEVT_GEN_SRC_C_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_mc_generate.c")
         set(WEVT_GEN_BIN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_mc_generate")
+
+        set(WEVT_BUILD_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_compile.sh")
+
         set(WEVT_MC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.mc")
         set(WEVT_MAN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_manifest.xml")
         set(WEVT_RC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.rc")
         set(WEVT_H_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.h")
         set(WEVT_RES_OBJECT "${CMAKE_BINARY_DIR}/wevt_netdata_res.o")
+
         set(WEVT_DLL_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.dll")
+        set(WEVT_INSTALL_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_install.bat")
 
         add_custom_command(
                 OUTPUT ${WEVT_H_FILE} ${WEVT_DLL_FILE}
-                COMMAND ${CMAKE_C_COMPILER} -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_FILE}"
+                COMMAND ${CMAKE_C_COMPILER} -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
                 COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
                 COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
-                COMMAND windmc -r "${CMAKE_BINARY_DIR}" -h "${CMAKE_BINARY_DIR}" ${WEVT_MC_FILE}
-                COMMAND echo "1 2004" "wevt_netdata_manifest.xml" >> "${WEVT_RC_FILE}"
-                COMMAND windres ${WEVT_RC_FILE} -o ${WEVT_RES_OBJECT}
-                COMMAND ${CMAKE_LINKER} -dll --entry 0 -nostdlib -o ${WEVT_DLL_FILE} ${WEVT_RES_OBJECT}
-                DEPENDS "${WEVT_GEN_SRC_FILE}" "${WEVT_GEN_H_FILE}"
+                COMMAND "${WEVT_BUILD_SCRIPT}" "${CMAKE_SOURCE_DIR}/src/libnetdata/log" "${CMAKE_BINARY_DIR}"
+                # COMMAND windmc -r "${CMAKE_BINARY_DIR}" -h "${CMAKE_BINARY_DIR}" ${WEVT_MC_FILE}
+                # COMMAND echo "1 2004" "wevt_netdata_manifest.xml" >> "${WEVT_RC_FILE}"
+                # COMMAND windres ${WEVT_RC_FILE} -o ${WEVT_RES_OBJECT}
+                # COMMAND ${CMAKE_LINKER} -dll --entry 0 -nostdlib -o ${WEVT_DLL_FILE} ${WEVT_RES_OBJECT}
+                DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
                 COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_H_FILE} and ${WEVT_DLL_FILE}"
         )
 
@@ -1801,7 +1807,7 @@ if(OS_WINDOWS)
                 OBJECT_DEPENDS "${WEVT_H_FILE}")
 
         # Install the wevt_netdata DLL
-        install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}"
+        install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}" "${WEVT_INSTALL_SCRIPT}"
                 COMPONENT wevt_netdata_dll
                 DESTINATION "${BINDIR}")
 endif()
