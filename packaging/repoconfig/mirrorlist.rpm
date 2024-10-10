@@ -1,0 +1,2 @@
+https://repo.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/@DIST_VERSION@/$basearch
+https://repo2.netdata.cloud/repos/@VARIANT@/@DIST_NAME@/@DIST_VERSION@/$basearch
