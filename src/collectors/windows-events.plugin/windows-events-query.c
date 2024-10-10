@@ -108,24 +108,24 @@ cleanup:
 }
 
 static bool wevt_get_field_from_events_log(
-    WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent,
+    TXT_UNICODE *tmp, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent,
     TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS flags) {
 
     dst->src = TXT_SOURCE_EVENT_LOG;
 
-    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), hEvent, 0, flags))
-        return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
+    if(wevt_get_message_unicode(tmp, publisher_handle(p), hEvent, 0, flags))
+        return wevt_str_unicode_to_utf8(dst, tmp);
 
     wevt_utf8_empty(dst);
     return false;
 }
 
-bool wevt_get_event_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
-    return wevt_get_field_from_events_log(log, p, hEvent, dst, EvtFormatMessageEvent);
+bool wevt_get_event_utf8(TXT_UNICODE *tmp, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
+    return wevt_get_field_from_events_log(tmp, p, hEvent, dst, EvtFormatMessageEvent);
 }
 
-bool wevt_get_xml_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
-    return wevt_get_field_from_events_log(log, p, hEvent, dst, EvtFormatMessageXml);
+bool wevt_get_xml_utf8(TXT_UNICODE *tmp, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
+    return wevt_get_field_from_events_log(tmp, p, hEvent, dst, EvtFormatMessageXml);
 }
 
 static inline void wevt_event_done(WEVT_LOG *log) {
@@ -153,7 +153,7 @@ static void wevt_get_field_from_cache(
     if (field_cache_get(cache_type, provider, value, dst))
         return;
 
-    wevt_get_field_from_events_log(log, h, log->hEvent, dst, flags);
+    wevt_get_field_from_events_log(&log->ops.unicode, h, log->hEvent, dst, flags);
     field_cache_set(cache_type, provider, value, dst);
 }
 
@@ -358,7 +358,7 @@ bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
 
     // obtain the information from selected events
     DWORD bytes_used = 0, property_count = 0;
-    if (!EvtRender(log->hRenderContext, log->hEvent, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
+        if (!EvtRender(log->hRenderContext, log->hEvent, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
         // information exceeds the allocated space
         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, hRenderContext: 0x%lx, hEvent: 0x%lx, content: 0x%lx, size: %zu, extended info: %s",

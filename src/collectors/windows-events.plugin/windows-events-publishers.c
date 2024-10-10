@@ -32,8 +32,14 @@ struct provider_list {
     struct provider_data *array;        // the array of entries, sorted (for binary search)
 };
 
-typedef struct publisher {
+typedef struct publisher_key {
     ND_UUID uuid;                       // the Provider GUID
+    DWORD len;                          // the length of the provider name
+    const wchar_t *wname;               // the Provider wide-string name (UTF-16)
+} PUBLISHER_KEY;
+
+typedef struct publisher {
+    PUBLISHER_KEY key;
     const char *name;                   // the Provider name (UTF-8)
     uint32_t total_handles;             // the number of handles allocated
     uint32_t available_handles;         // the number of available handles
@@ -48,9 +54,9 @@ typedef struct publisher {
 
 // A hashtable implementation for publishers
 // using the provider GUID as key and PUBLISHER as value
-#define SIMPLE_HASHTABLE_NAME _PROVIDER_GUID
+#define SIMPLE_HASHTABLE_NAME _PUBLISHER
 #define SIMPLE_HASHTABLE_VALUE_TYPE PUBLISHER
-#define SIMPLE_HASHTABLE_KEY_TYPE ND_UUID
+#define SIMPLE_HASHTABLE_KEY_TYPE PUBLISHER_KEY
 #define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION publisher_value_to_key
 #define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION publisher_cache_compar
 #define SIMPLE_HASHTABLE_SAMPLE_IMPLEMENTATION 1
@@ -61,7 +67,7 @@ static struct {
     uint32_t total_publishers;
     uint32_t total_handles;
     uint32_t deleted_handles;
-    struct simple_hashtable_PROVIDER_GUID hashtable;
+    struct simple_hashtable_PUBLISHER hashtable;
     ARAL *aral_publishers;
     ARAL *aral_handles;
 } pbc = {
@@ -70,38 +76,53 @@ static struct {
 
 static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *dst, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id);
 
-static inline ND_UUID *publisher_value_to_key(PUBLISHER *p) {
-    return &p->uuid;
+const char *publisher_get_name(PROVIDER_META_HANDLE *p) {
+    return (p && p->publisher && p->publisher->name) ? p->publisher->name : "__UNKNOWN PUBLISHER__";
 }
 
-static inline bool publisher_cache_compar(ND_UUID *a, ND_UUID *b) {
-    return UUIDeq(*a, *b);
+ND_UUID publisher_get_uuid(PROVIDER_META_HANDLE *p) {
+    return (p && p->publisher) ? p->publisher->key.uuid : UUID_ZERO;
+}
+
+static inline PUBLISHER_KEY *publisher_value_to_key(PUBLISHER *p) {
+    return &p->key;
+}
+
+static inline bool publisher_cache_compar(PUBLISHER_KEY *a, PUBLISHER_KEY *b) {
+    return a->len == b->len && UUIDeq(a->uuid, b->uuid) && memcmp(a->wname, b->wname, a->len) == 0;
 }
 
 void publisher_cache_init(void) {
-    simple_hashtable_init_PROVIDER_GUID(&pbc.hashtable, 100000);
+    simple_hashtable_init_PUBLISHER(&pbc.hashtable, 100000);
     pbc.aral_publishers = aral_create("wevt_publishers", sizeof(PUBLISHER), 0, 4096, NULL, NULL, NULL, false, true);
     pbc.aral_handles = aral_create("wevt_handles", sizeof(PROVIDER_META_HANDLE), 0, 4096, NULL, NULL, NULL, false, true);
 }
 
 PROVIDER_META_HANDLE *publisher_get(ND_UUID uuid, LPCWSTR providerName) {
-    if(!providerName || !providerName[0] || UUIDiszero(uuid))
+    if(!providerName || !providerName[0])
         return NULL;
 
-    // XXH64_hash_t hash = XXH3_64bits(&uuid, sizeof(uuid));
-    uint64_t hash = uuid.parts.low64 + uuid.parts.hig64;
+    PUBLISHER_KEY key = {
+            .uuid = uuid,
+            .len = wcslen(providerName),
+            .wname = providerName,
+    };
+    XXH64_hash_t hash = XXH3_64bits(providerName, wcslen(key.wname) * sizeof(*key.wname));
 
     spinlock_lock(&pbc.spinlock);
 
-    SIMPLE_HASHTABLE_SLOT_PROVIDER_GUID *slot =
-            simple_hashtable_get_slot_PROVIDER_GUID(&pbc.hashtable, hash, &uuid, true);
+    SIMPLE_HASHTABLE_SLOT_PUBLISHER *slot =
+            simple_hashtable_get_slot_PUBLISHER(&pbc.hashtable, hash, &key, true);
 
     bool load_it = false;
     PUBLISHER *p = SIMPLE_HASHTABLE_SLOT_DATA(slot);
     if(!p) {
         p = aral_callocz(pbc.aral_publishers);
-        p->uuid = uuid;
-        simple_hashtable_set_slot_PROVIDER_GUID(&pbc.hashtable, slot, hash, p);
+        p->key.uuid = key.uuid;
+        p->key.len = key.len;
+        p->key.wname = wcsdup(key.wname);
+        p->name = strdupz(provider2utf8(key.wname));
+        simple_hashtable_set_slot_PUBLISHER(&pbc.hashtable, slot, hash, p);
         load_it = true;
         pbc.total_publishers++;
     }

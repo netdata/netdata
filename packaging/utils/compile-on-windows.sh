@@ -72,6 +72,9 @@ fi
 
 ninja -v -C "${build}" install || ninja -v -C "${build}" -j 1
 
+# register the event log publisher
+cmd.exe //c "$(cygpath -w -a "/opt/netdata/usr/bin/wevt_netdata_install.bat")"
+
 #echo
 #echo "Compile with:"
 #echo "ninja -v -C \"${build}\" install || ninja -v -C \"${build}\" -j 1"

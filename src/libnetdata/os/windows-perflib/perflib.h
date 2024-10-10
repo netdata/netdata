@@ -25,6 +25,7 @@ const char *RegistryFindNameByID(DWORD id);
 const char *RegistryFindHelpByID(DWORD id);
 DWORD RegistryFindIDByName(const char *name);
 #define PERFLIB_REGISTRY_NAME_NOT_FOUND (DWORD)-1
+#define PERFLIB_MAX_NAME_LENGTH 1024
 
 PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id);
 void perflibFreePerformanceData(void);

@@ -1331,7 +1331,7 @@ char *get_value_from_key(char *buffer, char *key) {
     return s;
 }
 
-void get_install_type(char **install_type, char **prebuilt_arch, char **prebuilt_dist) {
+void get_install_type(char **install_type, char **prebuilt_arch __maybe_unused, char **prebuilt_dist __maybe_unused) {
 #ifndef OS_WINDOWS
     char *install_type_filename;
 

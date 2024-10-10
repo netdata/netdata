@@ -114,8 +114,8 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full);
 
 bool wevt_get_message_unicode(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags);
 
-bool wevt_get_event_utf8(WEVT_LOG *log, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
-bool wevt_get_xml_utf8(WEVT_LOG *log, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
+bool wevt_get_event_utf8(TXT_UNICODE *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
+bool wevt_get_xml_utf8(TXT_UNICODE *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
 
 static inline void wevt_variant_cleanup(WEVT_VARIANT *v) {
     freez(v->data);

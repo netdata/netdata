@@ -66,6 +66,7 @@ FACET_ROW_SEVERITY wevt_levelid_to_facet_severity(FACETS *facets __maybe_unused,
 
 struct wevt_bin_data {
     bool rendered;
+    WEVT_EVENT ev;
     WEVT_LOG *log;
     EVT_HANDLE hEvent;
     PROVIDER_META_HANDLE *publisher;
@@ -81,9 +82,18 @@ static void wevt_cleanup_bin_data(void *data) {
     freez(d);
 }
 
-static inline void wevt_facets_register_bin_data(WEVT_LOG *log, FACETS *facets, WEVT_EVENT *ev __maybe_unused) {
+static inline void wevt_facets_register_bin_data(WEVT_LOG *log, FACETS *facets, WEVT_EVENT *ev) {
     struct wevt_bin_data *d = mallocz(sizeof(struct wevt_bin_data));
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    internal_fatal(strcmp(log->ops.provider.data, publisher_get_name(log->publisher)) != 0,
+                   "Publisher name mismatch in data!");
+
+    internal_fatal(!UUIDeq(ev->provider, publisher_get_uuid(log->publisher)),
+                   "Publisher UUID mismatch in data!");
+#endif
+
+    d->ev = *ev;
     d->log = log;
     d->rendered = false;
 
@@ -99,8 +109,21 @@ static inline void wevt_facets_register_bin_data(WEVT_LOG *log, FACETS *facets, 
 static void wevt_lazy_loading_event_and_xml(struct wevt_bin_data *d, FACET_ROW *row __maybe_unused) {
     if(d->rendered) return;
 
-    wevt_get_xml_utf8(d->log, d->publisher, d->hEvent, &d->log->ops.xml);
-    wevt_get_event_utf8(d->log, d->publisher, d->hEvent, &d->log->ops.event);
+#ifdef NETDATA_INTERNAL_CHECKS
+    const FACET_ROW_KEY_VALUE *provider_rkv = dictionary_get(row->dict, WEVT_FIELD_PROVIDER);
+    internal_fatal(!provider_rkv || strcmp(buffer_tostring(provider_rkv->wb), publisher_get_name(d->publisher)) != 0,
+                   "Publisher of row does not match the bin data associated with it");
+
+    uint64_t event_record_id = UINT64_MAX;
+    const FACET_ROW_KEY_VALUE *event_record_id_rkv = dictionary_get(row->dict, WEVT_FIELD_EVENTRECORDID);
+    if(event_record_id_rkv)
+        event_record_id = str2uint64_t(buffer_tostring(event_record_id_rkv->wb), NULL);
+    internal_fatal(event_record_id != d->ev.id,
+                   "Event Record ID of row does not match the bin data associated with it");
+#endif
+
+    wevt_get_xml_utf8(&d->log->ops.unicode, d->publisher, d->hEvent, &d->log->ops.xml);
+    wevt_get_event_utf8(&d->log->ops.unicode, d->publisher, d->hEvent, &d->log->ops.event);
     d->rendered = true;
 }
 
