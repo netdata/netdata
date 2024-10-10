@@ -12,10 +12,10 @@ import (
 
 type nvmeDeviceList struct {
 	Devices []struct {
-		DevicePath   string     `json:"DevicePath"`
-		UsedBytes    nvmeNumber `json:"UsedBytes"`
-		PhysicalSize nvmeNumber `json:"PhysicalSize"`
-		SectorSize   nvmeNumber `json:"SectorSize"`
+		DevicePath   string `json:"DevicePath"`
+		Firmware     string `json:"Firmware"`
+		ModelNumber  string `json:"ModelNumber"`
+		SerialNumber string `json:"SerialNumber"`
 	}
 }
 

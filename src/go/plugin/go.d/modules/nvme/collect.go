@@ -43,59 +43,60 @@ func (n *NVMe) collectNVMeDevice(mx map[string]int64, devicePath string) error {
 		return fmt.Errorf("exec nvme smart-log for '%s': %v", devicePath, err)
 	}
 
-	device := extractDeviceFromPath(devicePath)
+	dev := extractDeviceFromPath(devicePath)
 
-	mx["device_"+device+"_temperature"] = int64(float64(parseValue(stats.Temperature)) - 273.15) // Kelvin => Celsius
-	mx["device_"+device+"_percentage_used"] = parseValue(stats.PercentUsed)
-	mx["device_"+device+"_available_spare"] = parseValue(stats.AvailSpare)
-	mx["device_"+device+"_data_units_read"] = parseValue(stats.DataUnitsRead) * 1000 * 512       // units => bytes
-	mx["device_"+device+"_data_units_written"] = parseValue(stats.DataUnitsWritten) * 1000 * 512 // units => bytes
-	mx["device_"+device+"_host_read_commands"] = parseValue(stats.HostReadCommands)
-	mx["device_"+device+"_host_write_commands"] = parseValue(stats.HostWriteCommands)
-	mx["device_"+device+"_power_cycles"] = parseValue(stats.PowerCycles)
-	mx["device_"+device+"_power_on_time"] = parseValue(stats.PowerOnHours) * 3600 // hours => seconds
-	mx["device_"+device+"_unsafe_shutdowns"] = parseValue(stats.UnsafeShutdowns)
-	mx["device_"+device+"_media_errors"] = parseValue(stats.MediaErrors)
-	mx["device_"+device+"_num_err_log_entries"] = parseValue(stats.NumErrLogEntries)
-	mx["device_"+device+"_controller_busy_time"] = parseValue(stats.ControllerBusyTime) * 60 // minutes => seconds
-	mx["device_"+device+"_warning_temp_time"] = parseValue(stats.WarningTempTime) * 60       // minutes => seconds
-	mx["device_"+device+"_critical_comp_time"] = parseValue(stats.CriticalCompTime) * 60     // minutes => seconds
-	mx["device_"+device+"_thm_temp1_trans_count"] = parseValue(stats.ThmTemp1TransCount)
-	mx["device_"+device+"_thm_temp2_trans_count"] = parseValue(stats.ThmTemp2TransCount)
-	mx["device_"+device+"_thm_temp1_total_time"] = parseValue(stats.ThmTemp1TotalTime) // seconds
-	mx["device_"+device+"_thm_temp2_total_time"] = parseValue(stats.ThmTemp2TotalTime) // seconds
+	mx["device_"+dev+"_temperature"] = int64(float64(parseValue(stats.Temperature)) - 273.15) // Kelvin => Celsius
+	mx["device_"+dev+"_percentage_used"] = parseValue(stats.PercentUsed)
+	mx["device_"+dev+"_available_spare"] = parseValue(stats.AvailSpare)
+	mx["device_"+dev+"_data_units_read"] = parseValue(stats.DataUnitsRead) * 1000 * 512       // units => bytes
+	mx["device_"+dev+"_data_units_written"] = parseValue(stats.DataUnitsWritten) * 1000 * 512 // units => bytes
+	mx["device_"+dev+"_host_read_commands"] = parseValue(stats.HostReadCommands)
+	mx["device_"+dev+"_host_write_commands"] = parseValue(stats.HostWriteCommands)
+	mx["device_"+dev+"_power_cycles"] = parseValue(stats.PowerCycles)
+	mx["device_"+dev+"_power_on_time"] = parseValue(stats.PowerOnHours) * 3600 // hours => seconds
+	mx["device_"+dev+"_unsafe_shutdowns"] = parseValue(stats.UnsafeShutdowns)
+	mx["device_"+dev+"_media_errors"] = parseValue(stats.MediaErrors)
+	mx["device_"+dev+"_num_err_log_entries"] = parseValue(stats.NumErrLogEntries)
+	mx["device_"+dev+"_controller_busy_time"] = parseValue(stats.ControllerBusyTime) * 60 // minutes => seconds
+	mx["device_"+dev+"_warning_temp_time"] = parseValue(stats.WarningTempTime) * 60       // minutes => seconds
+	mx["device_"+dev+"_critical_comp_time"] = parseValue(stats.CriticalCompTime) * 60     // minutes => seconds
+	mx["device_"+dev+"_thm_temp1_trans_count"] = parseValue(stats.ThmTemp1TransCount)
+	mx["device_"+dev+"_thm_temp2_trans_count"] = parseValue(stats.ThmTemp2TransCount)
+	mx["device_"+dev+"_thm_temp1_total_time"] = parseValue(stats.ThmTemp1TotalTime) // seconds
+	mx["device_"+dev+"_thm_temp2_total_time"] = parseValue(stats.ThmTemp2TotalTime) // seconds
 
-	mx["device_"+device+"_critical_warning_available_spare"] = boolToInt(parseValue(stats.CriticalWarning)&1 != 0)
-	mx["device_"+device+"_critical_warning_temp_threshold"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<1) != 0)
-	mx["device_"+device+"_critical_warning_nvm_subsystem_reliability"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<2) != 0)
-	mx["device_"+device+"_critical_warning_read_only"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<3) != 0)
-	mx["device_"+device+"_critical_warning_volatile_mem_backup_failed"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<4) != 0)
-	mx["device_"+device+"_critical_warning_persistent_memory_read_only"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<5) != 0)
+	mx["device_"+dev+"_critical_warning_available_spare"] = boolToInt(parseValue(stats.CriticalWarning)&1 != 0)
+	mx["device_"+dev+"_critical_warning_temp_threshold"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<1) != 0)
+	mx["device_"+dev+"_critical_warning_nvm_subsystem_reliability"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<2) != 0)
+	mx["device_"+dev+"_critical_warning_read_only"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<3) != 0)
+	mx["device_"+dev+"_critical_warning_volatile_mem_backup_failed"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<4) != 0)
+	mx["device_"+dev+"_critical_warning_persistent_memory_read_only"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<5) != 0)
 
 	return nil
 }
 
 func (n *NVMe) listNVMeDevices() error {
-	devices, err := n.exec.list()
+	devList, err := n.exec.list()
 	if err != nil {
 		return fmt.Errorf("exec nvme list: %v", err)
 	}
 
-	seen := make(map[string]bool)
-	for _, v := range devices.Devices {
-		device := extractDeviceFromPath(v.DevicePath)
-		seen[device] = true
+	n.Debugf("found %d NVMe devices (%v)", len(devList.Devices), devList.Devices)
 
-		if !n.devicePaths[v.DevicePath] {
-			n.devicePaths[v.DevicePath] = true
-			n.addDeviceCharts(device)
+	seen := make(map[string]bool)
+
+	for _, dev := range devList.Devices {
+		path := dev.DevicePath
+		seen[path] = true
+		if !n.devicePaths[path] {
+			n.devicePaths[path] = true
+			n.addDeviceCharts(path, dev.ModelNumber)
 		}
 	}
 	for path := range n.devicePaths {
-		device := extractDeviceFromPath(path)
-		if !seen[device] {
-			delete(n.devicePaths, device)
-			n.removeDeviceCharts(device)
+		if !seen[path] {
+			delete(n.devicePaths, path)
+			n.removeDeviceCharts(path)
 		}
 	}
 
