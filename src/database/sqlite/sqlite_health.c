@@ -746,20 +746,20 @@ done:
  * Store an alert config hash in the database
  */
 #define SQL_STORE_ALERT_CONFIG_HASH                                                                                    \
-    "insert or replace into alert_hash (hash_id, date_updated, alarm, template, "                                      \
+    "INSERT OR REPLACE INTO alert_hash (hash_id, date_updated, alarm, template, "                                      \
     "on_key, class, component, type, lookup, every, units, calc, "                                                     \
     "green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, "                                \
     "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, "                             \
     "p_db_lookup_before, p_update_every, source, chart_labels, summary, time_group_condition, "                        \
     "time_group_value, dims_group, data_source) "                                                                      \
-    "values (@hash_id,UNIXEPOCH(),@alarm,@template,"                                                                   \
+    "VALUES (@hash_id,UNIXEPOCH(),@alarm,@template,"                                                                   \
     "@on_key,@class,@component,@type,@lookup,@every,@units,@calc,"                                                     \
     "@green,@red,@warn,@crit,@exec,@to_key,@info,@delay,@options,@repeat,@host_labels,"                                \
     "@p_db_lookup_dimensions,@p_db_lookup_method,@p_db_lookup_options,@p_db_lookup_after,"                             \
     "@p_db_lookup_before,@p_update_every,@source,@chart_labels,@summary, @time_group_condition, "                      \
     "@time_group_value, @dims_group, @data_source)"
 
-void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
+void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
 {
     static __thread sqlite3_stmt *res = NULL;
     int param = 0;
@@ -767,7 +767,7 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_STORE_ALERT_CONFIG_HASH, &res))
         return;
 
-    BUFFER *buf = buffer_create(128, NULL);
+    CLEAN_BUFFER *buf = buffer_create(128, NULL);
 
     SQLITE_BIND_FAIL(
         done, sqlite3_bind_blob(res, ++param, &ap->config.hash_id, sizeof(ap->config.hash_id), SQLITE_STATIC));
@@ -833,7 +833,14 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     else
         SQLITE_BIND_FAIL(done, sqlite3_bind_null(res, ++param));
 
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.update_every));
+    if (!ap->config.has_custom_repeat_config)
+        SQLITE_BIND_FAIL(done, sqlite3_bind_null(res, ++param));
+    else {
+        char repeat[255];
+        snprintfz(repeat, sizeof(repeat) - 1, "warning %us critical %us", ap->config.warn_repeat_every, ap->config.crit_repeat_every);
+        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, repeat, -1, SQLITE_STATIC));
+    }
+
     SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->match.host_labels));
 
     if (ap->config.after) {
@@ -866,7 +873,6 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
         error_report("Failed to store alert config, rc = %d", rc);
 
 done:
-    buffer_free(buf);
     REPORT_BIND_FAIL(res, param);
     SQLITE_RESET(res);
 }
