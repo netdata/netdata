@@ -63,6 +63,7 @@ Labels:
 | Label      | Description     |
 |:-----------|:----------------|
 | device | NVMe device name |
+| model_number | NVMe device model |
 
 Metrics:
 
