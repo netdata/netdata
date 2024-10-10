@@ -41,6 +41,8 @@ struct arcstats {
     unsigned long long hash_chains;
     unsigned long long hash_chain_max;
     unsigned long long p;
+    unsigned long long pd;
+    unsigned long long pm;
     unsigned long long c;
     unsigned long long c_min;
     unsigned long long c_max;
