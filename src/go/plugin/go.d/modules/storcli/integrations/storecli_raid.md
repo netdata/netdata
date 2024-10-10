@@ -80,6 +80,7 @@ Metrics:
 | storcli.controller_health_status | healthy, unhealthy | status |
 | storcli.controller_status | optimal, degraded, partially_degraded, failed | status |
 | storcli.controller_bbu_status | healthy, unhealthy, na | status |
+| storcli.controller_roc_temperature | temperature | Celsius |
 
 ### Per physical drive
 

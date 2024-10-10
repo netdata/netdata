@@ -1165,6 +1165,12 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [MS SQL Server](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/windows/integrations/ms_sql_server.md)
 
+- [Memory statistics](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/memory_statistics.md)
+
 - [NET Framework](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/windows/integrations/net_framework.md)
+
+- [System statistics](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/system_statistics.md)
+
+- [System thermal zone](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/system_thermal_zone.md)
 
 - [Windows](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/windows/integrations/windows.md)
