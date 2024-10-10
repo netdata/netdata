@@ -37,6 +37,11 @@ inline STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria) {
 
 inline RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    if (rrd_flag_check(ri, RRD_FLAG_OWN_LABELS | RRD_FLAG_DEMAND_LABELS)) {
+        rrd_flag_clear(ri, RRD_FLAG_DEMAND_LABELS);
+        load_instance_labels_on_demand(&ri->uuid, ri);
+        rrdinstance_trigger_updates(ri, __FUNCTION__ );
+    }
     return ri->rrdlabels;
 }
 
@@ -101,11 +106,11 @@ static void rrdinstance_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
 
     if(ri->rrdset) {
         ri->rrdlabels = ri->rrdset->rrdlabels;
-        ri->flags &= ~RRD_FLAG_OWN_LABELS; // no need of atomics at the constructor
+        ri->flags &= ~(RRD_FLAG_OWN_LABELS| RRD_FLAG_DEMAND_LABELS); // no need of atomics at the constructor
     }
     else {
         ri->rrdlabels = rrdlabels_create();
-        ri->flags |= RRD_FLAG_OWN_LABELS; // no need of atomics at the constructor
+        ri->flags |= (RRD_FLAG_OWN_LABELS | RRD_FLAG_DEMAND_LABELS); // no need of atomics at the constructor
     }
 
     if(ri->rrdset) {
@@ -213,12 +218,12 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
         if(ri->rrdset && rrd_flag_check(ri, RRD_FLAG_OWN_LABELS)) {
             RRDLABELS *old = ri->rrdlabels;
             ri->rrdlabels = ri->rrdset->rrdlabels;
-            rrd_flag_clear(ri, RRD_FLAG_OWN_LABELS);
+            rrd_flag_clear(ri, RRD_FLAG_OWN_LABELS| RRD_FLAG_DEMAND_LABELS);
             rrdlabels_destroy(old);
         }
         else if(!ri->rrdset && !rrd_flag_check(ri, RRD_FLAG_OWN_LABELS)) {
             ri->rrdlabels = rrdlabels_create();
-            rrd_flag_set(ri, RRD_FLAG_OWN_LABELS);
+            rrd_flag_set(ri, RRD_FLAG_OWN_LABELS | RRD_FLAG_DEMAND_LABELS);
         }
     }
 
@@ -431,8 +436,9 @@ inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
 
     if(!rrd_flag_check(ri, RRD_FLAG_OWN_LABELS)) {
         ri->rrdlabels = rrdlabels_create();
-        rrdlabels_copy(ri->rrdlabels, st->rrdlabels);
-        rrd_flag_set(ri, RRD_FLAG_OWN_LABELS);
+        // Do not load copy labels, just load on demand
+        //rrdlabels_copy(ri->rrdlabels, st->rrdlabels);
+        rrd_flag_set(ri, RRD_FLAG_OWN_LABELS | RRD_FLAG_DEMAND_LABELS);
     }
 
     ri->rrdset = NULL;

@@ -24,6 +24,10 @@ static void rrdinstance_load_clabel(SQL_CLABEL_DATA *sld, void *data) {
     rrdlabels_add(ri->rrdlabels, sld->label_key, sld->label_value, sld->label_source);
 }
 
+void load_instance_labels_on_demand(nd_uuid_t *uuid, void *data) {
+    ctx_get_label_list(uuid, rrdinstance_load_clabel, data);
+}
+
 static void rrdinstance_load_dimension(SQL_DIMENSION_DATA *sd, void *data) {
     RRDINSTANCE *ri = data;
 
@@ -73,7 +77,6 @@ static void rrdinstance_load_chart_callback(SQL_CHART_DATA *sc, void *data) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
 
     ctx_get_dimension_list(&ri->uuid, rrdinstance_load_dimension, ri);
-    ctx_get_label_list(&ri->uuid, rrdinstance_load_clabel, ri);
     rrdinstance_trigger_updates(ri, __FUNCTION__ );
     rrdinstance_release(ria);
     rrdcontext_release(rca);
