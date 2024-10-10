@@ -46,7 +46,7 @@ For more details please check [Incoming webhooks for Slack](https://slack.com/he
 1. Click on the **Space settings** cog (located above your profile icon)
 2. Click on the **Alerts & Notifications** tab
 3. Click on the **+ Add configuration** button
-4. Add the PagerDuty Integration
+4. Add the Slack Integration
 5. A modal will be presented to you to enter the required details to enable the integration:
     - **Notification settings**
       - Configuration name (optional): A name for your configuration in order to easily refer to it
