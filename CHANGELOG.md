@@ -6,8 +6,15 @@
 
 **Merged pull requests:**
 
+- Fix crash on agent initialization [\#18746](https://github.com/netdata/netdata/pull/18746) ([stelfrag](https://github.com/stelfrag))
+- fix\(apps.plugin\): fix debug msg spam on macOS/freeBSD [\#18743](https://github.com/netdata/netdata/pull/18743) ([ilyam8](https://github.com/ilyam8))
+- docs\(apps.plugin\): fix prefix/suffix pattern example [\#18742](https://github.com/netdata/netdata/pull/18742) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d/nvme\): add model\_number label [\#18741](https://github.com/netdata/netdata/pull/18741) ([ilyam8](https://github.com/ilyam8))
+- sanitizers should not remove trailing underscores [\#18738](https://github.com/netdata/netdata/pull/18738) ([ktsaou](https://github.com/ktsaou))
+- Add `ilert` cloud notification integration [\#18736](https://github.com/netdata/netdata/pull/18736) ([car12o](https://github.com/car12o))
 - fix\(go.d/sensors\): fix parsing power accuracy [\#18735](https://github.com/netdata/netdata/pull/18735) ([ilyam8](https://github.com/ilyam8))
 - apps.plugin; allow parents to identify the children [\#18734](https://github.com/netdata/netdata/pull/18734) ([ktsaou](https://github.com/ktsaou))
+- Windows deploy metadata [\#18733](https://github.com/netdata/netdata/pull/18733) ([Ancairon](https://github.com/Ancairon))
 - \[storcli\] Support for controller ROC temperature. [\#18732](https://github.com/netdata/netdata/pull/18732) ([eatnumber1](https://github.com/eatnumber1))
 - systemd-cat-native negative timeout [\#18729](https://github.com/netdata/netdata/pull/18729) ([ktsaou](https://github.com/ktsaou))
 - fix\(perf.plugin\): disable if all events disabled during init [\#18728](https://github.com/netdata/netdata/pull/18728) ([ilyam8](https://github.com/ilyam8))
@@ -16,6 +23,7 @@
 - reset the log sources to apply user selection [\#18725](https://github.com/netdata/netdata/pull/18725) ([ktsaou](https://github.com/ktsaou))
 - fix logs POST query payload parsing [\#18722](https://github.com/netdata/netdata/pull/18722) ([ktsaou](https://github.com/ktsaou))
 - fix\(go.d/portcheck\): stop checking UDP ports on ICMP listen error [\#18721](https://github.com/netdata/netdata/pull/18721) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18720](https://github.com/netdata/netdata/pull/18720) ([netdatabot](https://github.com/netdatabot))
 - static install: bump openssl and curl to latest stable versions [\#18719](https://github.com/netdata/netdata/pull/18719) ([ilyam8](https://github.com/ilyam8))
 - go.d: use lib function to check if stderr connected to journal [\#18718](https://github.com/netdata/netdata/pull/18718) ([ilyam8](https://github.com/ilyam8))
 - Pass correct GOOS and GOARCH on to package builders in CI. [\#18717](https://github.com/netdata/netdata/pull/18717) ([Ferroin](https://github.com/Ferroin))
@@ -420,12 +428,6 @@
 - docs: simplify "Disk Requirements and Retention" [\#18205](https://github.com/netdata/netdata/pull/18205) ([ilyam8](https://github.com/ilyam8))
 - do not rely on the queued flag to queue a context [\#18198](https://github.com/netdata/netdata/pull/18198) ([ktsaou](https://github.com/ktsaou))
 - Do not include REMOVED status in the alert snapshot [\#18197](https://github.com/netdata/netdata/pull/18197) ([stelfrag](https://github.com/stelfrag))
-- remove fluent-bit submodule [\#18196](https://github.com/netdata/netdata/pull/18196) ([ilyam8](https://github.com/ilyam8))
-- go.d icecast single source response [\#18195](https://github.com/netdata/netdata/pull/18195) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18193](https://github.com/netdata/netdata/pull/18193) ([netdatabot](https://github.com/netdatabot))
-- Skip building ndsudo when it’s not actually needed. [\#18191](https://github.com/netdata/netdata/pull/18191) ([Ferroin](https://github.com/Ferroin))
-- Port Icecast collector to Go [\#18190](https://github.com/netdata/netdata/pull/18190) ([Ancairon](https://github.com/Ancairon))
-- ndsudo setuid before looking for command [\#18189](https://github.com/netdata/netdata/pull/18189) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
