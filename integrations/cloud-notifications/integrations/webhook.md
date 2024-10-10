@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/webhook.svg" width="150"/>
 
 
-From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on a webhook using a predefined schema.
+From the Netdata Cloud UI, you can configure notification delivery to a webhook using a predefined schema.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
@@ -23,142 +23,142 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
 ### Prerequisites
 
 - A Netdata Cloud account
-- Access to the Netdata Space as an **Admin**
-- The Netdata Space needs to be on a paid plan
+- Access to the Space as an **Admin**
+- The Space needs to be on a paid plan
 - You need to have an app that allows you to receive webhooks following a predefined schema.
 
-### Netdata Configuration Steps
+### Netdata Configuration
 
 1. Click on the **Space settings** cog (located above your profile icon)
-2. Click on the **Notification** tab
-3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-4. On the **Webhook** card click on **+ Add**
+2. Click on the **Alerts & Notifications** tab
+3. Click on the **+ Add configuration** button
+4. Add the Webhook integration
 5. A modal will be presented to you to enter the required details to enable the configuration:
-  * **Notification settings** are Netdata specific settings
-    - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
-    - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-    - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-  * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Webhook:
-    - Webhook URL - webhook URL is the url of the service that Netdata will send notifications to. In order to keep the communication secured, we only accept HTTPS urls.
-    - Extra headers - these are optional key-value pairs that you can set to be included in the HTTP requests sent to the webhook URL.
-    - Authentication Mechanism - Netdata webhook integration supports 3 different authentication mechanisms.
-      * Mutual TLS (recommended) - default authentication mechanism used if no other method is selected.
-      * Basic - the client sends a request with an Authorization header that includes a base64-encoded string in the format **username:password**. These will settings will be required inputs.
-      * Bearer - the client sends a request with an Authorization header that includes a **bearer token**. This setting will be a required input.
+    - **Notification settings**
+      - Configuration name (optional): A name for your configuration in order to easily refer to it
+      - Rooms: A list of Rooms for which you want to be notified
+      - Notifications: The notifications which you want to be notified
+    - **Integration configuration**
+      - Webhook URL: The url of the service that Netdata will send notifications to. In order to keep the communication secured, Netdata only accepts HTTPS urls.
+      - Extra headers: Optional key-value pairs that you can set to be included in the HTTP requests sent to the webhook URL.
+      - Authentication Mechanism, Netdata webhook integration supports 3 different authentication mechanisms.
+        - Mutual TLS (recommended): Default authentication mechanism used if no other method is selected
+        - Basic: The client sends a request with an Authorization header that includes a base64-encoded string in the format **username:password**.
+        - Bearer: The client sends a request with an Authorization header that includes a **bearer token**.
 
+### Webhook service
 
-  ### Webhook service
+A webhook service allows your application to receive real-time alerts from Netdata by sending HTTP requests to a specified URL.
 
-  A webhook integration allows your application to receive real-time alerts from Netdata by sending HTTP requests to a specified URL. In this document, we'll go over the steps to set up a generic webhook integration, including adding headers, and implementing different types of authorization mechanisms.
+In this section, we'll go over the steps to set up a generic webhook service, including adding headers, and implementing different types of authorization mechanisms.
 
-  #### Netdata webhook integration
+#### Netdata webhook integration
 
-  A webhook integration is a way for one service to notify another service about events that occur within it. This is done by sending an HTTP POST request to a specified URL (known as the "webhook URL") when an event occurs.
+Netdata webhook integration service will send alert and reachability notifications to the destination service as soon as they are detected.
 
-  Netdata webhook integration service will send alert and reachability notifications to the destination service as soon as they are detected.
+For alert notifications, the content sent to the destination service contains a JSON object with the following properties:
 
-  For alert notifications, the content sent to the destination service contains a JSON object with the following properties:
+| field                             | type                            | description                                                               |
+|:----------------------------------|:--------------------------------|:--------------------------------------------------------------------------|
+| message                           | string                          | A summary message of the alert.                                           |
+| alert                             | string                          | The alert the notification is related to.                                 |
+| info                              | string                          | Additional info related with the alert.                                   |
+| chart                             | string                          | The chart associated with the alert.                                      |
+| context                           | string                          | The chart context.                                                        |
+| space                             | string                          | The space where the node that raised the alert is assigned.               |
+| Rooms                             | object\[object(string,string)\] | Object with list of Rooms names and urls where the node belongs to.       |
+| family                            | string                          | Context family.                                                           |
+| class                             | string                          | Classification of the alert, e.g. `Error`.                                |
+| severity                          | string                          | Alert severity, can be one of `warning`, `critical` or `clear`.           |
+| date                              | string                          | Date of the alert in ISO8601 format.                                      |
+| duration                          | string                          | Duration the alert has been raised.                                       |
+| additional_active_critical_alerts | integer                         | Number of additional critical alerts currently existing on the same node. |
+| additional_active_warning_alerts  | integer                         | Number of additional warning alerts currently existing on the same node.  |
+| alert_url                         | string                          | Netdata Cloud URL for this alert.                                         |
 
-  | field   | type   | description |
-  | :--     | :--    | :--         |
-  | message | string | A summary message of the alert. |
-  | alarm | string | The alarm the notification is about. |
-  | info | string | Additional info related with the alert. |
-  | chart | string | The chart associated with the alert. |
-  | context | string | The chart context. |
-  | space | string | The space where the node that raised the alert is assigned. |
-  | Rooms | object[object(string,string)] | Object with list of Rooms names and urls where the node belongs to. |
-  | family | string | Context family. |
-  | class | string | Classification of the alert, e.g. "Error". |
-  | severity | string | Alert severity, can be one of "warning", "critical" or "clear". |
-  | date | string | Date of the alert in ISO8601 format. |
-  | duration | string |  Duration the alert has been raised. |
-  | additional_active_critical_alerts | integer | Number of additional critical alerts currently existing on the same node. |
-  | additional_active_warning_alerts | integer | Number of additional warning alerts currently existing on the same node. |
-  | alarm_url | string | Netdata Cloud URL for this alarm. |
+For reachability notifications, the JSON object will contain the following properties:
 
-  For reachability notifications, the JSON object will contain the following properties:
+| field            | type    | description                                                                                                                   |
+|:-----------------|:--------|:------------------------------------------------------------------------------------------------------------------------------|
+| message          | string  | A summary message of the reachability alert.                                                                                  |
+| url              | string  | Netdata Cloud URL for the host experiencing the reachability alert.                                                           |
+| host             | string  | The hostname experiencing the reachability alert.                                                                             |
+| severity         | string  | Severity for this notification. If host is reachable, severity will be `info`, if host is unreachable, it will be `critical`. |
+| status           | object  | An object with the status information.                                                                                        |
+| status.reachable | boolean | `true` if host is reachable, `false` otherwise                                                                                |
+| status.text      | string  | Can be `reachable` or `unreachable`                                                                                           |
 
-  | field        | type   | description |
-  | :--          | :--    | :--         |
-  | message      | string | A summary message of the reachability alert. |
-  | url          | string | Netdata Cloud URL for the host experiencing the reachability alert. |
-  | host         | string | the host experiencing the reachability alert. |
-  | severity     | string | severity for this notification. If host is reachable, severity will be 'info', if host is unreachable, it will be 'critical'. |
-  | status       | object | an object with the status information. |
-  | status.reachable  | boolean | true if host is reachable, false otherwise |
-  | status.text       | string  | can be 'reachable' or 'unreachable'  |
+#### Extra headers
 
-  #### Extra headers
+When setting up a webhook service, the user can specify a set of headers to be included in the HTTP requests sent to the webhook URL.
 
-  When setting up a webhook integration, the user can specify a set of headers to be included in the HTTP requests sent to the webhook URL.
+By default, the following headers will be sent in the HTTP request
 
-  By default, the following headers will be sent in the HTTP request
+  |  **Header**  | **Value**        |
+  |:------------:|------------------|
+  | Content-Type | application/json |
 
-  |            **Header**            | **Value**                 |
-  |:-------------------------------:|-----------------------------|
-  |     Content-Type             | application/json        |
+#### Authentication mechanisms
 
-  #### Authentication mechanisms
+Netdata webhook integration supports 3 different authentication mechanisms:
 
-  Netdata webhook integration supports 3 different authentication mechanisms:
+##### Mutual TLS authentication (recommended)
 
-  ##### Mutual TLS authentication (recommended)
+In mutual Transport Layer Security (mTLS) authentication, the client and the server authenticate each other using X.509 certificates. This ensures that the client is connecting to the intended server, and that the server is only accepting connections from authorized clients.
 
-  In mutual Transport Layer Security (mTLS) authentication, the client and the server authenticate each other using X.509 certificates. This ensures that the client is connecting to the intended server, and that the server is only accepting connections from authorized clients.
+This is the default authentication mechanism used if no other method is selected.
 
-  This is the default authentication mechanism used if no other method is selected.
+To take advantage of mutual TLS, you can configure your server to verify Netdata's client certificate. In order to achieve this, the Netdata client sending the notification supports mutual TLS (mTLS) to identify itself with a client certificate that your server can validate.
 
-  To take advantage of mutual TLS, you can configure your server to verify Netdata's client certificate. In order to achieve this, the Netdata client sending the notification supports mutual TLS (mTLS) to identify itself with a client certificate that your server can validate.
+The steps to perform this validation are as follows:
 
-  The steps to perform this validation are as follows:
-
-  - Store Netdata CA certificate on a file in your disk. The content of this file should be:
+- Store Netdata CA certificate on a file in your disk. The content of this file should be:
 
   <details>
     <summary>Netdata CA certificate</summary>
 
-  ```
-  -----BEGIN CERTIFICATE-----
-  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
-  5zrbwvQf
-  -----END CERTIFICATE-----
-  ```
+    ```text
+    -----BEGIN CERTIFICATE-----
+    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
+    5zrbwvQf
+    -----END CERTIFICATE-----
+    ```
+
   </details>
 
-  - Enable client certificate validation on the web server that is doing the TLS termination. Below we show you how to perform this configuration in `NGINX` and `Apache`
+- Enable client certificate validation on the web server that is doing the TLS termination. Below there are examples on how to perform this configuration in `NGINX` and `Apache`.
 
-   **NGINX**
+  **NGINX**
 
   ```bash
   server {
@@ -172,7 +172,7 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
           if ($ssl_client_s_dn !~ "CN=app.netdata.cloud") {
               return 403;
           }
-         # ... existing location configuration ...
+          # ... existing location configuration ...
       }
   }
   ```
@@ -192,68 +192,68 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
   </Directory>
   ```
 
-  ##### Basic authentication
+##### Basic authentication
 
-  In basic authorization, the client sends a request with an Authorization header that includes a base64-encoded string in the format username:password. The server then uses this information to authenticate the client. If this authentication method is selected, the user can set the user and password that will be used when connecting to the destination service.
+In basic authorization, the client sends a request with an Authorization header that includes a base64-encoded string in the format username:password. The server then uses this information to authenticate the client. If this authentication method is selected, the user can set the user and password that will be used when connecting to the destination service.
 
-  ##### Bearer token authentication
+##### Bearer token authentication
 
-  In bearer token authentication, the client sends a request with an Authorization header that includes a bearer token. The server then uses this token to authenticate the client. Bearer tokens are typically generated by an authentication service, and are passed to the client after a successful authentication. If this method is selected, the user can set the token to be used for connecting to the destination service.
+In bearer token authentication, the client sends a request with an Authorization header that includes a bearer token. The server then uses this token to authenticate the client. Bearer tokens are typically generated by an authentication service, and are passed to the client after a successful authentication. If this method is selected, the user can set the token to be used for connecting to the destination service.
 
-  ##### Challenge secret
+##### Challenge secret
 
-  To validate that you have ownership of the web application that will receive the webhook events, we are using a challenge response check mechanism.
+To validate that you have ownership of the web application that will receive the webhook events, Netdata is using a challenge response check mechanism.
 
-  This mechanism works as follows:
+This mechanism works as follows:
 
-  - The challenge secret parameter that you provide is a shared secret between you and Netdata only.
-  - On your request for creating a new Webhook integration, we will make a GET request to the url of the webhook, adding a query parameter `crc_token`, consisting of a random string.
-  - You will receive this request on your application and it must construct an encrypted response, consisting of a base64-encoded HMAC SHA-256 hash created from the crc_token and the shared secret. The response will be in the format:
+- The challenge secret parameter that you provide is a shared secret between only you and Netdata.
+- On your request for creating a new Webhook integration, Netdata will make a GET request to the URL of the webhook, adding a query parameter `crc_token`, consisting of a random string.
+- You will receive this request on your application and it must construct an encrypted response, consisting of a base64-encoded HMAC SHA-256 hash created from the crc_token and the shared secret. The response will be in the format:
 
-  ```json
-  {
+    ```json
+    {
     "response_token": "sha256=9GKoHJYmcHIkhD+C182QWN79YBd+D+Vkj4snmZrfNi4="
-  }
-  ```
-
-  - We will compare your application's response with the hash that we will generate using the challenge secret, and if they are the same, the integration creation will succeed.
-
-  We will do this validation everytime you update your integration configuration.
-
-  - Response requirements:
-      - A base64 encoded HMAC SHA-256 hash created from the crc_token and the shared secret.
-      - Valid response_token and JSON format.
-      - Latency less than 5 seconds.
-      - 200 HTTP response code.
-
-  **Example response token generation in Python:**
-
-  Here you can see how to define a handler for a Flask application in python 3:
-
-  ```python
-  import base64
-  import hashlib
-  import hmac
-  import json
-
-  key ='YOUR_CHALLENGE_SECRET'
-
-  @app.route('/webhooks/netdata')
-  def webhook_challenge():
-    token = request.args.get('crc_token').encode('ascii')
-
-    # creates HMAC SHA-256 hash from incomming token and your consumer secret
-    sha256_hash_digest = hmac.new(key.encode(),
-                                  msg=token,
-                                  digestmod=hashlib.sha256).digest()
-
-    # construct response data with base64 encoded hash
-    response = {
-      'response_token': 'sha256=' + base64.b64encode(sha256_hash_digest).decode('ascii')
     }
+    ```
 
-    # returns properly formatted json response
-    return json.dumps(response)
-  ```
+- Netdata will compare your application's response with the hash that it will generate using the challenge secret, and if they are the same, the integration creation will succeed.
+
+Netdata does this validation every time you update your integration configuration.
+
+- Response requirements:
+  - A base64 encoded HMAC SHA-256 hash created from the crc_token and the shared secret.
+  - Valid response_token and JSON format.
+  - Latency less than 5 seconds.
+  - 200 HTTP response code.
+
+**Example response token generation in Python:**
+
+Here you can see how to define a handler for a Flask application in python 3:
+
+```python
+import base64
+import hashlib
+import hmac
+import json
+
+key ='YOUR_CHALLENGE_SECRET'
+
+@app.route('/webhooks/netdata')
+def webhook_challenge():
+token = request.args.get('crc_token').encode('ascii')
+
+# creates HMAC SHA-256 hash from incomming token and your consumer secret
+sha256_hash_digest = hmac.new(key.encode(),
+                                msg=token,
+                                digestmod=hashlib.sha256).digest()
+
+# construct response data with base64 encoded hash
+response = {
+    'response_token': 'sha256=' + base64.b64encode(sha256_hash_digest).decode('ascii')
+}
+
+# returns properly formatted json response
+return json.dumps(response)
+```
 
 

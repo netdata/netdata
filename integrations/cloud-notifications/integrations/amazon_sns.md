@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/awssns.png" width="150"/>
 
 
-From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on AWS SNS.
+From the Netdata Cloud UI, you can configure notification delivery to AWS SNS.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
@@ -22,36 +22,32 @@ From the Cloud interface, you can manage your space's notification settings and 
 
 ### Prerequisites
 
-To add AWS SNS notification you need:
-
 - A Netdata Cloud account
 - Access to the space as an **Admin**
 - The Space needs to be on a paid plan
-- Have an AWS account with AWS SNS access, for more details check [how to configure this on AWS SNS](#settings-on-aws-sns)
+- An AWS account with AWS SNS access
 
-### Steps
+### AWS SNS Configuration
 
-1. Click on the **Space settings** cog (located above your profile icon)
-2. Click on the **Notification** tab
-3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-4. On the **AwsSns** card click on **+ Add**
-5. A modal will be presented to you to enter the required details to enable the configuration:
-  * **Notification settings** are Netdata specific settings
-      - Configuration name - you can optionally provide a name for your configuration  you can easily refer to it
-      - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-      - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-  * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For AWS SNS:
-      - Topic ARN - topic provided on AWS SNS (with region) for where to publish your notifications. For more details check [how to configure this on AWS SNS](#settings-on-aws-sns)
-
-### Settings on AWS SNS
-
-To enable the webhook integration on AWS SNS you need:
 1. [Setting up access for Amazon SNS](https://docs.aws.amazon.com/sns/latest/dg/sns-setting-up.html)
 2. Create a topic
     - On AWS SNS management console click on **Create topic**
-    - On the **Details** section, the standard type and provide the topic name
+    - On the **Details** section, select the standard type and provide the topic name
     - On the **Access policy** section, change the **Publishers** option to **Only the specified AWS accounts** and provide the Netdata AWS account **(123269920060)** that will be used to publish notifications to the topic being created
-    - Finally, click on **Create topic** on the bottom of the page
-3. Now, use the new **Topic ARN** while adding AWS SNS integration on your space.
+3. Copy the **Topic ARN** in order to add it to your integration configuration in the Netdata Cloud UI
+
+### Netdata Configuration
+
+1. Click on the **Space settings** cog (located above your profile icon)
+2. Click on the **Alerts & Notifications** tab
+3. Click on the **+ Add configuration** button
+4. Add the AWS SNS Integration
+5. A modal will be presented to you to enter the required details to enable the integration:
+    - **Notification settings**
+      - Configuration name (optional): A name for your configuration in order to easily refer to it
+      - Rooms: A list of Rooms for which you want to be notified
+      - Notifications: The notifications which you want to be notified
+    - **Integration configuration**
+      - Topic ARN: The topic provided on AWS SNS (with region) for where to publish your notifications.
 
 

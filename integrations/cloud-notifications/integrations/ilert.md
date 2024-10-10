@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/ilert.svg" width="150"/>
 
 
-From the Cloud interface, you can manage your space's notification settings and from there you can add a specific configuration to get notifications delivered on ilert.
+From the Netdata Cloud UI, you can configure notification delivery to ilert.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
@@ -22,40 +22,35 @@ From the Cloud interface, you can manage your space's notification settings and 
 
 ### Prerequisites
 
-To add ilert notification you need:
-
 - A Netdata Cloud account
-- Access to the space as an **Admin**
+- Access to the Space as an **Admin**
 - The Space needs to be on a paid plan
 - You need to have permissions on ilert to add new Alert sources.
 
-### Settings on ilert
+### ilert Configuration
 
-1. **Access the Alert sources Settings**: From the navigation bar, open the Alert sources drop down and click "Alert sources".
-2. **Create a New Alert source**: Click on the "+ Create a new alert source" button.
-3. **Configure an Alert source**:
-  - select "API integration" and click Next
-  - provide a name that suits the source's purpose, for example Netdata
-  - select Escalation policy
-  - select Alert grouping (optional)
-  - review all configurations and click "Finish setup"
-4. **Obtain the API Key**:
-  - Once the Alert source is created, you will be provided with an API key.
-  - Copy this API Key, as it will be required to configure the integration on Netdata Cloud.
+1. From the navigation bar, open the Alert sources drop down and click "Alert sources"
+2. Click on the "+ Create a new alert source" button
+3. Configure an Alert source:
+    - Select "API integration" and click Next
+    - Provide a name that suits the source's purpose, for example "Netdata"
+    - Select Escalation policy
+    - Select Alert grouping (optional)
+4. Obtain the API Key:
+    - Once the Alert source is created, you will be provided with an API key. Copy it in order to add it to your integration configuration in the Netdata Cloud UI
 
-### Settings on Netdata Cloud
+### Netdata Configuration
 
 1. Click on the **Space settings** cog (located above your profile icon)
 2. Click on the **Alerts & Notifications** tab
 3. Click on the **+ Add configuration** button
-4. Click on **+ Add** on the **ilert** card 
-5. A modal will be presented in order to enter the required details to enable the configuration:
-
-- **Notification settings** are Netdata specific settings
-    - Configuration name: provide a descriptive name for your configuration to easily identify it.
-    - Rooms: select the nodes or areas of your infrastructure you want to receive notifications about.
-    - Notification: choose the type of notifications you want to receive.
-  - **Integration configuration** are the required integration settings, which vary by notification method. For ilert:
-    - Alert Source API key.
+4. Add the ilert Integration
+5. A modal will be presented to you to enter the required details to enable the integration:
+    - **Notification settings**
+      - Configuration name (optional): A name for your configuration in order to easily refer to it
+      - Rooms: A list of Rooms for which you want to be notified
+      - Notifications: The notifications which you want to be notified
+    - **Integration configuration**
+      - Alert Source API key: The key you copied in the ilert configuration step.
 
 
