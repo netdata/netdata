@@ -43,6 +43,8 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
         int hash_chains[5];
         int hash_chain_max[5];
         int p[5];
+        int pd[5];
+        int pm[5];
         int c[5];
         int c_min[5];
         int c_max[5];
@@ -145,7 +147,14 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.hash_collisions", mibs.hash_collisions, arcstats.hash_collisions);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.hash_chains", mibs.hash_chains, arcstats.hash_chains);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.hash_chain_max", mibs.hash_chain_max, arcstats.hash_chain_max);
+
+#if __FreeBSD_version >= 1400000
+    GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.pd", mibs.pd, arcstats.pd);
+    GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.pm", mibs.pm, arcstats.pm);
+#else
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.p", mibs.p, arcstats.p);
+#endif
+
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.c", mibs.c, arcstats.c);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.c_min", mibs.c_min, arcstats.c_min);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.c_max", mibs.c_max, arcstats.c_max);

@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/victorops.svg" width="150"/>
 
 
-From the Netdata Cloud UI, you can configure notification delivery to Splunk On-Call/VictorOps.
+You can configure notification delivery to Splunk On-Call/VictorOps from the Netdata Cloud UI.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />

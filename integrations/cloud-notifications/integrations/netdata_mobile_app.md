@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/netdata.png" width="150"/>
 
 
-From the Netdata Cloud UI, you can configure notification delivery to the Netdata Mobile Application.
+You can configure notification delivery to the Netdata Mobile Application from the Netdata Cloud UI.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
