@@ -206,8 +206,6 @@ fail:
 static void invalidate_host_last_connected(nd_uuid_t *host_uuid)
 {
     sqlite3_stmt *res = NULL;
-    if (!host_uuid)
-        return;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_INVALIDATE_HOST_LAST_CONNECTED, &res))
         return;
@@ -358,6 +356,27 @@ static int read_query_thread_count()
     return threads;
 }
 
+static void node_update_timer_cb(uv_timer_t *handle)
+{
+    struct aclk_sync_cfg_t *ahc = handle->data;
+    RRDHOST *host = ahc->host;
+
+    spinlock_lock(&host->receiver_lock);
+    int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
+    spinlock_unlock(&host->receiver_lock);
+    nd_log(NDLS_ACLK, NDLP_DEBUG,"Timer: Sending node update info for %s, LIVE = %d", rrdhost_hostname(host), live);
+    aclk_host_state_update(host, live, 1);
+}
+
+static void close_callback(uv_handle_t *handle, void *data __maybe_unused)
+{
+    if (handle->type == UV_TIMER) {
+        uv_timer_stop((uv_timer_t *)handle);
+    }
+
+    uv_close(handle, NULL);  // Automatically close and free the handle
+}
+
 static void aclk_synchronization(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
@@ -414,11 +433,36 @@ static void aclk_synchronization(void *arg)
 // NODE STATE
                 case ACLK_DATABASE_NODE_STATE:;
                     RRDHOST *host = cmd.param[0];
-                    int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
                     struct aclk_sync_cfg_t *ahc = host->aclk_config;
                     if (unlikely(!ahc))
                         create_aclk_config(host, &host->host_id.uuid, &host->node_id.uuid);
+
+                    uint64_t schedule_time = (uint64_t)(uintptr_t)cmd.param[1];
+
+                    if (!ahc->timer_initialized) {
+                        int rc = uv_timer_init(loop, &ahc->timer);
+                        if (!rc) {
+                            ahc->timer_initialized = true;
+                            ahc->timer.data = ahc;
+                        }
+                    }
+
+                    if (ahc->timer_initialized) {
+                        if (uv_is_active((uv_handle_t *)&ahc->timer))
+                            uv_timer_stop(&ahc->timer);
+
+                        ahc->timer.data = ahc;
+                        int rc = uv_timer_start(&ahc->timer, node_update_timer_cb, schedule_time, 0);
+                        if (!rc)
+                            break; // Timer started, exit
+                    }
+
+                    // This is fallback if timer fails
+                    spinlock_lock(&host->receiver_lock);
+                    int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
+                    spinlock_unlock(&host->receiver_lock);
                     aclk_host_state_update(host, live, 1);
+                    nd_log(NDLS_ACLK, NDLP_DEBUG,"Sending node update info for %s, LIVE = %d", rrdhost_hostname(host), live);
                     break;
                 case ACLK_DATABASE_NODE_UNREGISTER:
                     sql_unregister_node(cmd.param[0]);
@@ -467,6 +511,11 @@ static void aclk_synchronization(void *arg)
         uv_close((uv_handle_t *)&config->timer_req, NULL);
 
     uv_close((uv_handle_t *)&config->async, NULL);
+    uv_run(loop, UV_RUN_DEFAULT);
+
+    uv_walk(loop, (uv_walk_cb) close_callback, NULL);
+    uv_run(loop, UV_RUN_DEFAULT);
+
     (void) uv_loop_close(loop);
 
     worker_unregister();
@@ -581,11 +630,12 @@ void aclk_query_init(mqtt_wss_client client) {
     queue_aclk_sync_cmd(ACLK_MQTT_WSS_CLIENT, client, NULL);
 }
 
-void schedule_node_info_update(RRDHOST *host __maybe_unused)
+void schedule_node_state_update(RRDHOST *host, uint64_t delay)
 {
-    if (unlikely(!host))
+    if (unlikely(!aclk_sync_config.initialized || !host))
         return;
-    queue_aclk_sync_cmd(ACLK_DATABASE_NODE_STATE, host, NULL);
+
+    queue_aclk_sync_cmd(ACLK_DATABASE_NODE_STATE, host, (void *)(uintptr_t)delay);
 }
 
 void unregister_node(const char *machine_guid)

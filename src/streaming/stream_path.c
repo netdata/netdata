@@ -101,6 +101,21 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
     return p;
 }
 
+STREAM_PATH rrdhost_stream_path_fetch(RRDHOST *host) {
+    STREAM_PATH p = { 0 };
+
+    spinlock_lock(&host->rrdpush.path.spinlock);
+    for (size_t i = 0; i < host->rrdpush.path.used; i++) {
+        STREAM_PATH *tmp_path = &host->rrdpush.path.array[i];
+        if(UUIDeq(host->host_id, tmp_path->host_id)) {
+            p = *tmp_path;
+            break;
+        }
+    }
+    spinlock_unlock(&host->rrdpush.path.spinlock);
+    return p;
+}
+
 void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *key, bool add_version) {
     if(add_version)
         buffer_json_member_add_uint64(wb, "version", 1);
