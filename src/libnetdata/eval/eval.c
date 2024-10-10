@@ -1239,7 +1239,6 @@ void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable,
         snprintfz(find2, sizeof(find2), "${%s}", string2str(variable));
         size_t find2_len = strlen(find2);
 
-        size_t found = 0;
         char *buf_ptr = buf;
         const char *source_ptr = source_str;
 
@@ -1272,7 +1271,6 @@ void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable,
 
                 // Move the source pointer past the replaced variable.
                 source_ptr = s + len;
-                found++;
             } else {
                 // Copy the rest of the string if no more variables are found.
                 strcpy(buf_ptr, source_ptr);
