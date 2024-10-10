@@ -1784,7 +1784,7 @@ if(OS_WINDOWS)
                 COMMAND ${CMAKE_C_COMPILER} -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_FILE}"
                 COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
                 COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
-                COMMAND windmc --customflag -r "${CMAKE_BINARY_DIR}" -h "${CMAKE_BINARY_DIR}" ${WEVT_MC_FILE}
+                COMMAND windmc -r "${CMAKE_BINARY_DIR}" -h "${CMAKE_BINARY_DIR}" ${WEVT_MC_FILE}
                 COMMAND windres ${WEVT_RC_FILE} -o ${WEVT_RES_OBJECT}
                 COMMAND ${CMAKE_LINKER} -dll --entry 0 -nostdlib -o ${WEVT_DLL_FILE} ${WEVT_RES_OBJECT}
                 DEPENDS "${WEVT_GEN_SRC_FILE}"

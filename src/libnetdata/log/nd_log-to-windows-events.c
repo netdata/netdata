@@ -25,7 +25,7 @@ static DWORD complete_event_id(DWORD facility, DWORD severity, DWORD event_code)
     event_id |= ((DWORD)(severity) << EVENT_ID_SEV_SHIFT) & EVENT_ID_SEV_MASK;
 
     // Set Customer Code Flag (C)
-    event_id |= (0x1 << EVENT_ID_C_SHIFT) & EVENT_ID_C_MASK;
+    event_id |= (0x0 << EVENT_ID_C_SHIFT) & EVENT_ID_C_MASK;
 
     // Set Reserved Bit (R) - typically 0
     event_id |= (0x0 << EVENT_ID_R_SHIFT) & EVENT_ID_R_MASK;
@@ -44,11 +44,11 @@ DWORD construct_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, 
     return complete_event_id(FACILITY_NETDATA, get_severity_from_priority(priority), event_code);
 }
 
-static bool check_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, MESSAGE_ID messageID, DWORD event_code) {
+static bool check_event_id(ND_LOG_SOURCES source __maybe_unused, ND_LOG_FIELD_PRIORITY priority __maybe_unused, MESSAGE_ID messageID __maybe_unused, DWORD event_code __maybe_unused) {
+#ifdef NETDATA_INTERNAL_CHECKS
     DWORD generated = construct_event_id(source, priority, messageID);
     if(generated != event_code) {
 
-#ifdef NETDATA_INTERNAL_CHECKS
         // this is just used for a break point, to see the values in hex
         char current[UINT64_HEX_MAX_LENGTH];
         print_uint64_hex(current, generated);
@@ -58,11 +58,9 @@ static bool check_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority
 
         const char *got = current;
         const char *good = wanted;
-        (void)got; (void)good;
-#endif
-
-        return false;
+        internal_fatal(true, "EventIDs mismatch, expected %s, got %s", good, got);
     }
+#endif
 
     return true;
 }
@@ -71,14 +69,14 @@ static bool check_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority
 // initialization
 
 // Define source names with "Netdata" prefix
-static const wchar_t *source_names[_NDLS_MAX] = {
-        [NDLS_UNSET]        = NULL,                                     // not used, linked to daemon
+static const wchar_t *provider_name_per_source[_NDLS_MAX] = {
+        [NDLS_UNSET]        = NULL,                                     // not used, linked to NDLS_DAEMON
         [NDLS_ACCESS]       = NETDATA_PROVIDER_WPREFIX L"Access",       //
         [NDLS_ACLK]         = NETDATA_PROVIDER_WPREFIX L"Aclk",         //
         [NDLS_COLLECTORS]   = NETDATA_PROVIDER_WPREFIX L"Collectors",   //
         [NDLS_DAEMON]       = NETDATA_PROVIDER_WPREFIX L"Daemon",       //
         [NDLS_HEALTH]       = NETDATA_PROVIDER_WPREFIX L"Health",       //
-        [NDLS_DEBUG]        = NULL,                                     // used, linked to daemon
+        [NDLS_DEBUG]        = NULL,                                     // used, linked to NDLS_DAEMON
 };
 
 bool replace_program_with_wev_netdata_dll(wchar_t *str, size_t size) {
@@ -111,10 +109,10 @@ bool replace_program_with_wev_netdata_dll(wchar_t *str, size_t size) {
     return false; // No backslash found (likely invalid input)
 }
 
-static bool add_to_registry(const wchar_t *logName, const wchar_t *sourceName, DWORD defaultMaxSize) {
+static bool add_to_registry(const wchar_t *channel, const wchar_t *provider, DWORD defaultMaxSize) {
     // Build the registry path: SYSTEM\CurrentControlSet\Services\EventLog\<LogName>\<SourceName>
     wchar_t key[MAX_PATH];
-    swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls\\%ls", logName, sourceName);
+    swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls\\%ls", channel, provider);
 
     HKEY hRegKey;
     DWORD disposition;
@@ -155,22 +153,24 @@ bool nd_log_wevents_init(void) {
         return true;
 
     // validate we have the right keys
-    internal_fatal(
+    if(
             !check_event_id(NDLS_COLLECTORS, NDLP_INFO, MSGID_MESSAGE_ONLY, COLLECTORS_INFO_MESSAGE_ONLY) ||
             !check_event_id(NDLS_DAEMON, NDLP_ERR, MSGID_MESSAGE_ONLY, DAEMON_ERR_MESSAGE_ONLY) ||
             !check_event_id(NDLS_ACCESS, NDLP_WARNING, MSGID_ACCESS_USER, ACCESS_WARN_ACCESS_USER) ||
             !check_event_id(NDLS_HEALTH, NDLP_CRIT, MSGID_ALERT_TRANSITION, HEALTH_CRIT_ALERT_TRANSITION) ||
-            !check_event_id(NDLS_DEBUG, NDLP_ALERT, MSGID_ACCESS_FORWARDER_USER, DEBUG_ALERT_ACCESS_FORWARDER_USER),
-       "The encoding of the event ids is wrong!");
+            !check_event_id(NDLS_DEBUG, NDLP_ALERT, MSGID_ACCESS_FORWARDER_USER, DEBUG_ALERT_ACCESS_FORWARDER_USER))
+       return false;
 
-    const wchar_t *logName = NETDATA_PROVIDER_WNAME; // Custom log name "Netdata"
+    const wchar_t *channel = NETDATA_PROVIDER_WNAME; // We create our own channel
 
     // Loop through each source and add it to the registry
     for(size_t i = 0; i < _NDLS_MAX; i++) {
         nd_log.sources[i].source = i;
 
-        // Skip NDLS_UNSET
-        if(i == NDLS_UNSET || i == NDLS_DEBUG) continue;
+        const wchar_t *provider = provider_name_per_source[i];
+        if(!provider)
+            // we will map these to NDLS_DAEMON
+            continue;
 
         DWORD defaultMaxSize = 0;
         switch (i) {
@@ -190,16 +190,21 @@ bool nd_log_wevents_init(void) {
                 break;
         }
 
-        if(!add_to_registry(logName, source_names[i], defaultMaxSize))
+        if(!add_to_registry(channel, provider, defaultMaxSize))
             return false;
 
         // Register the event source with the prefixed source name
-        nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, source_names[i]);
+        nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, provider);
         if (!nd_log.sources[i].hEventLog)
             return false;
     }
-    nd_log.sources[NDLS_UNSET].hEventLog = nd_log.sources[NDLS_DAEMON].hEventLog;
-    nd_log.sources[NDLS_DEBUG].hEventLog = nd_log.sources[NDLS_DAEMON].hEventLog;
+
+    // Map the unset ones to NDLS_DAEMON
+    for(size_t i = 0; i < _NDLS_MAX; i++) {
+        const wchar_t *provider = provider_name_per_source[i];
+        if(!provider)
+            nd_log.sources[i].hEventLog = nd_log.sources[NDLS_DAEMON].hEventLog;
+    }
 
     nd_log.wevents.initialized = true;
     return true;
