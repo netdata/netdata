@@ -44,47 +44,10 @@ DWORD construct_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, 
     return complete_event_id(FACILITY_NETDATA, get_severity_from_priority(priority), event_code);
 }
 
-// --------------------------------------------------------------------------------------------------------------------
-// initialization
-
-// Define source names with "Netdata" prefix
-static const wchar_t *source_names[_NDLS_MAX] = {
-        NETDATA_PROVIDER_WNAME L"_Unset",        // NDLS_UNSET (not used)
-        NETDATA_PROVIDER_WNAME L"_Access",       // NDLS_ACCESS
-        NETDATA_PROVIDER_WNAME L"_ACLK",         // NDLS_ACLK
-        NETDATA_PROVIDER_WNAME L"_Collectors",   // NDLS_COLLECTORS
-        NETDATA_PROVIDER_WNAME L"_Daemon",       // NDLS_DAEMON
-        NETDATA_PROVIDER_WNAME L"_Health",       // NDLS_HEALTH
-        NETDATA_PROVIDER_WNAME L"_Debug",        // NDLS_DEBUG
-};
-
-static bool add_to_registry(const wchar_t *logName, const wchar_t *sourceName) {
-    // Build the registry path: SYSTEM\CurrentControlSet\Services\EventLog\<LogName>\<SourceName>
-    wchar_t key[MAX_PATH];
-    swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls\\%ls", logName, sourceName);
-
-    HKEY hRegKey;
-    DWORD disposition;
-    LONG result = RegCreateKeyExW(HKEY_LOCAL_MACHINE, key,
-                                  0, NULL, REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, NULL, &hRegKey, &disposition);
-
-    if (result != ERROR_SUCCESS)
-        return false; // Could not create the registry key
-
-    wchar_t *modulePath = L"%SystemRoot%\\System32\\wevt_netdata.dll"; // Update as needed
-    RegSetValueExW(hRegKey, L"EventMessageFile", 0, REG_EXPAND_SZ,
-                   (LPBYTE)modulePath, (wcslen(modulePath) + 1) * sizeof(wchar_t));
-    DWORD types_supported = EVENTLOG_SUCCESS | EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | EVENTLOG_INFORMATION_TYPE;
-    RegSetValueExW(hRegKey, L"TypesSupported", 0, REG_DWORD, (LPBYTE)&types_supported, sizeof(DWORD));
-
-    RegCloseKey(hRegKey);
-    return true;
-}
-
 static bool check_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, MESSAGE_ID messageID, DWORD event_code) {
     DWORD generated = construct_event_id(source, priority, messageID);
     if(generated != event_code) {
-        
+
 #ifdef NETDATA_INTERNAL_CHECKS
         // this is just used for a break point, to see the values in hex
         char current[UINT64_HEX_MAX_LENGTH];
@@ -101,6 +64,89 @@ static bool check_event_id(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority
         return false;
     }
 
+    return true;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// initialization
+
+// Define source names with "Netdata" prefix
+static const wchar_t *source_names[_NDLS_MAX] = {
+        [NDLS_UNSET]        = NULL,                                     // not used, linked to daemon
+        [NDLS_ACCESS]       = NETDATA_PROVIDER_WPREFIX L"Access",       //
+        [NDLS_ACLK]         = NETDATA_PROVIDER_WPREFIX L"Aclk",         //
+        [NDLS_COLLECTORS]   = NETDATA_PROVIDER_WPREFIX L"Collectors",   //
+        [NDLS_DAEMON]       = NETDATA_PROVIDER_WPREFIX L"Daemon",       //
+        [NDLS_HEALTH]       = NETDATA_PROVIDER_WPREFIX L"Health",       //
+        [NDLS_DEBUG]        = NULL,                                     // used, linked to daemon
+};
+
+bool replace_program_with_wev_netdata_dll(wchar_t *str, size_t size) {
+    const wchar_t *replacement = L"\\wevt_netdata.dll";
+
+    // Find the last occurrence of '\\' to isolate the filename
+    wchar_t *lastBackslash = wcsrchr(str, L'\\');
+
+    if (lastBackslash != NULL) {
+        // Calculate new length after replacement
+        size_t newLen = (lastBackslash - str) + wcslen(replacement);
+
+        // Ensure new length does not exceed buffer size
+        if (newLen >= size)
+            return false; // Not enough space in the buffer
+
+        // Terminate the string at the last backslash
+        *lastBackslash = L'\0';
+
+        // Append the replacement filename
+        wcsncat(str, replacement, size - wcslen(str) - 1);
+
+        // Check if the new file exists
+        if (GetFileAttributesW(str) != INVALID_FILE_ATTRIBUTES)
+            return true; // The file exists
+        else
+            return false; // The file does not exist
+    }
+
+    return false; // No backslash found (likely invalid input)
+}
+
+static bool add_to_registry(const wchar_t *logName, const wchar_t *sourceName, DWORD defaultMaxSize) {
+    // Build the registry path: SYSTEM\CurrentControlSet\Services\EventLog\<LogName>\<SourceName>
+    wchar_t key[MAX_PATH];
+    swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls\\%ls", logName, sourceName);
+
+    HKEY hRegKey;
+    DWORD disposition;
+    LONG result = RegCreateKeyExW(HKEY_LOCAL_MACHINE, key,
+                                  0, NULL, REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, NULL, &hRegKey, &disposition);
+
+    if (result != ERROR_SUCCESS)
+        return false; // Could not create the registry key
+
+    // Check if MaxSize is already set
+    DWORD maxSize = 0;
+    DWORD size = sizeof(maxSize);
+    if (RegQueryValueExW(hRegKey, L"MaxSize", NULL, NULL, (LPBYTE)&maxSize, &size) != ERROR_SUCCESS) {
+        // MaxSize is not set, set it to the default value
+        RegSetValueExW(hRegKey, L"MaxSize", 0, REG_DWORD, (const BYTE*)&defaultMaxSize, sizeof(defaultMaxSize));
+    }
+
+    wchar_t modulePath[MAX_PATH];
+    if (GetModuleFileNameW(NULL, modulePath, MAX_PATH) == 0) {
+        RegCloseKey(hRegKey);
+        return false;
+    }
+
+    if(replace_program_with_wev_netdata_dll(modulePath, _countof(modulePath))) {
+        RegSetValueExW(hRegKey, L"EventMessageFile", 0, REG_EXPAND_SZ,
+                       (LPBYTE)modulePath, (wcslen(modulePath) + 1) * sizeof(wchar_t));
+
+        DWORD types_supported = EVENTLOG_SUCCESS | EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | EVENTLOG_INFORMATION_TYPE;
+        RegSetValueExW(hRegKey, L"TypesSupported", 0, REG_DWORD, (LPBYTE)&types_supported, sizeof(DWORD));
+    }
+
+    RegCloseKey(hRegKey);
     return true;
 }
 
@@ -124,20 +170,36 @@ bool nd_log_wevents_init(void) {
         nd_log.sources[i].source = i;
 
         // Skip NDLS_UNSET
-        if(i == NDLS_UNSET) continue;
+        if(i == NDLS_UNSET || i == NDLS_DEBUG) continue;
 
-        if(!add_to_registry(logName, source_names[i])) {
-            // Handle error (optional)
-            return false;
+        DWORD defaultMaxSize = 0;
+        switch (i) {
+            case NDLS_ACLK:
+                defaultMaxSize = 5 * 1024 * 1024;
+                break;
+
+            case NDLS_HEALTH:
+                defaultMaxSize = 35 * 1024 * 1024;
+                break;
+
+            default:
+            case NDLS_ACCESS:
+            case NDLS_COLLECTORS:
+            case NDLS_DAEMON:
+                defaultMaxSize = 20 * 1024 * 1024;
+                break;
         }
+
+        if(!add_to_registry(logName, source_names[i], defaultMaxSize))
+            return false;
 
         // Register the event source with the prefixed source name
         nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, source_names[i]);
-        if (!nd_log.sources[i].hEventLog) {
-            // Handle error (optional)
+        if (!nd_log.sources[i].hEventLog)
             return false;
-        }
     }
+    nd_log.sources[NDLS_UNSET].hEventLog = nd_log.sources[NDLS_DAEMON].hEventLog;
+    nd_log.sources[NDLS_DEBUG].hEventLog = nd_log.sources[NDLS_DAEMON].hEventLog;
 
     nd_log.wevents.initialized = true;
     return true;
@@ -312,13 +374,16 @@ static void wevt_generate_all_fields_unsafe(struct log_field *fields, size_t fie
 }
 
 static bool has_user_role_permissions(struct log_field *fields, size_t fields_max, BUFFER **tmp) {
-    if(is_field_set(fields, fields_max, NDF_USER_NAME)) return true;
-    if(is_field_set(fields, fields_max, NDF_USER_ACCESS)) return true;
+    const char *t;
 
-    if(is_field_set(fields, fields_max, NDF_USER_ACCESS)) {
-        const char *t = get_field_value(fields, NDF_USER_ROLE, fields_max, tmp);
-        if (*t && strcmp(t, "none") != 0) return true;
-    }
+    t = get_field_value(fields, NDF_USER_NAME, fields_max, tmp);
+    if (*t) return true;
+
+    t = get_field_value(fields, NDF_USER_ROLE, fields_max, tmp);
+    if (*t && strcmp(t, "none") != 0) return true;
+
+    t = get_field_value(fields, NDF_USER_ACCESS, fields_max, tmp);
+    if (*t && strcmp(t, "0x0") != 0) return true;
 
     return false;
 }
@@ -364,6 +429,8 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
 
                 if(has_user_role_permissions(fields, fields_max, &tmp))
                     messageID = MSGID_ACCESS_MESSAGE_USER;
+                else if(*get_field_value(fields, NDF_REQUEST, fields_max, &tmp))
+                    messageID = MSGID_ACCESS_MESSAGE_REQUEST;
             }
             else if(is_field_set(fields, fields_max, NDF_RESPONSE_CODE)) {
                 messageID = MSGID_ACCESS;

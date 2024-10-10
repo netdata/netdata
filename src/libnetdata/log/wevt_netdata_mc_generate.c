@@ -37,6 +37,9 @@ const char *get_msg_symbol(MESSAGE_ID msg) {
         case MSGID_ACCESS_MESSAGE:
             return "ACCESS_MESSAGE";
 
+        case MSGID_ACCESS_MESSAGE_REQUEST:
+            return "ACCESS_MESSAGE_REQUEST";
+
         case MSGID_ACCESS_MESSAGE_USER:
             return "ACCESS_MESSAGE_USER";
 
@@ -78,6 +81,12 @@ const char *get_msg_format(MESSAGE_ID msg) {
 
         case MSGID_ACCESS_MESSAGE:
             return "%64\r\n";
+
+        case MSGID_ACCESS_MESSAGE_REQUEST:
+            return "%64%n\r\n"
+                   "%n\r\n"
+                   "  Request: %63%n\r\n"
+                    ;
 
         case MSGID_ACCESS_MESSAGE_USER:
             return "%64%n\r\n"

@@ -1801,7 +1801,7 @@ if(OS_WINDOWS)
         # Install the wevt_netdata DLL
         install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}"
                 COMPONENT wevt_netdata_dll
-                DESTINATION "/c/windows/system32")
+                DESTINATION "${BINDIR}")
 endif()
 
 # ebpf

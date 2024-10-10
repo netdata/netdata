@@ -5,6 +5,7 @@
 
 #define NETDATA_PROVIDER_WNAME L"Netdata"
 #define NETDATA_PROVIDER_NAME "Netdata"
+#define NETDATA_PROVIDER_WPREFIX L"Nd"
 
 // Define shift values
 #define EVENT_ID_SEV_SHIFT          30
@@ -36,6 +37,7 @@ typedef enum __attribute__((packed)) {
     MSGID_ACCESS_USER,
     MSGID_ACCESS_FORWARDER_USER,
     MSGID_ACCESS_MESSAGE,
+    MSGID_ACCESS_MESSAGE_REQUEST,
     MSGID_ACCESS_MESSAGE_USER,
 
     // terminator
