@@ -24,7 +24,7 @@ From the Netdata Cloud UI, you can configure notification delivery to a Microsof
 
 - A Netdata Cloud account
 - Access to the Space as an **Admin**
-- The Space to be on a paid plan
+- The Space needs to be on a paid plan
 - A [Microsoft Teams Essentials subscription](https://www.microsoft.com/en-sg/microsoft-teams/essentials) or higher. Note that this is a **paid** feature
 
 ### Microsoft Teams Configuration
