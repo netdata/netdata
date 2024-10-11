@@ -38,7 +38,7 @@ You can send Netdata alerts to Microsoft Teams using Netdata's Agent alert notif
 The configuration file name for this integration is `health_alarm_notify.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
@@ -64,7 +64,7 @@ In Microsoft Teams the channel name is encoded in the URI after `/IncomingWebhoo
 All roles will default to this variable if left unconfigured.
 
 You can have different channels per role, by editing `DEFAULT_RECIPIENT_MSTEAMS` with the channel you want, in the following entries at the bottom of the same file:
-```conf
+```text
 role_recipients_msteams[sysadmin]="CHANNEL1"
 role_recipients_msteams[domainadmin]="CHANNEL2"
 role_recipients_msteams[dba]="databases CHANNEL3"

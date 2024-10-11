@@ -1,12 +1,3 @@
-<!--
-title: "BUFFER"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/buffer/README.md
-sidebar_label: "BUFFER library"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Developers/libnetdata"
--->
-
 # BUFFER
 
 `BUFFER` is a convenience library for working with strings in `C`.

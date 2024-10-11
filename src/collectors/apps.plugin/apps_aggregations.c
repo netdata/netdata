@@ -74,7 +74,7 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     if(!w->uptime_min || p->values[PDF_UPTIME] < w->uptime_min) w->uptime_min = p->values[PDF_UPTIME];
     if(!w->uptime_max || w->uptime_max < p->values[PDF_UPTIME]) w->uptime_max = p->values[PDF_UPTIME];
 
-    if(unlikely(debug_enabled || w->debug_enabled)) {
+    if(unlikely(debug_enabled)) {
         struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
         pid_on_target->pid = p->pid;
         pid_on_target->next = w->root_pid;
@@ -110,27 +110,18 @@ static inline void cleanup_exited_pids(void) {
     }
 }
 
-static struct target *get_app_group_target_for_pid(struct pid_stat *p) {
+static struct target *get_apps_groups_target_for_pid(struct pid_stat *p) {
     targets_assignment_counter++;
 
     for(struct target *w = apps_groups_root_target; w ; w = w->next) {
         if(w->type != TARGET_TYPE_APP_GROUP) continue;
 
-        // find it - 4 cases:
-        // 1. the target is not a pattern
-        // 2. the target has the prefix
-        // 3. the target has the suffix
-        // 4. the target is something inside cmdline
-
-        if(unlikely(( (!w->starts_with && !w->ends_with && w->compare == p->comm)
-                      || (w->starts_with && !w->ends_with && string_starts_with_string(p->comm, w->compare))
-                      || (!w->starts_with && w->ends_with && string_ends_with_string(p->comm, w->compare))
-                      || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(pid_stat_cmdline(p), string2str(w->compare)))
-                          ))) {
+        if(pid_match_check(p, &w->match)) {
+            if(p->is_manager)
+                return NULL;
 
             p->matched_by_config = true;
-            if(w->target) return w->target;
-            else return w;
+            return w->target ? w->target : w;
         }
     }
 
@@ -141,19 +132,20 @@ static void assign_a_target_to_all_processes(void) {
     // assign targets from app_groups.conf
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
         if(!p->target)
-            p->target = get_app_group_target_for_pid(p);
+            p->target = get_apps_groups_target_for_pid(p);
     }
 
     // assign targets from their parents, if they have
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
         if(!p->target) {
-            for(struct pid_stat *pp = p->parent ; pp ; pp = pp->parent) {
-                if(pp->target) {
-                    if(pp->matched_by_config) {
-                        // we are only interested about app_groups.conf matches
+            if(!p->is_manager) {
+                for (struct pid_stat *pp = p->parent; pp; pp = pp->parent) {
+                    if(pp->is_manager) break;
+
+                    if (pp->target) {
                         p->target = pp->target;
+                        break;
                     }
-                    break;
                 }
             }
 
@@ -180,6 +172,7 @@ void aggregate_processes_to_targets(void) {
 
     // this has to be done, before the cleanup
     struct target *w = NULL, *o = NULL;
+    (void)w; (void)o;
 
     // concentrate everything on the targets
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {

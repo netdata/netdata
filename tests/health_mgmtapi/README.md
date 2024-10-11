@@ -1,12 +1,3 @@
-<!--
-title: "Health command API tester"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/tests/health_mgmtapi/README.md
-sidebar_label: "Health command API tester"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Developers"
--->
-
 # Health command API tester
 
 The directory `tests/health_cmdapi` contains the test script `health-cmdapi-test.sh` for the [health command API](/src/web/api/health/README.md).

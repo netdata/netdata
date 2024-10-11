@@ -10,7 +10,7 @@ The default script is `alarm-notify.sh`.
 >
 > This file mentions editing configuration files.  
 >
-> - To edit configuration files in a safe way, we provide the [`edit config` script](/docs/netdata-agent/configuration/README.md#edit-netdataconf)located in your [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
+> - To edit configuration files in a safe way, we provide the [`edit config` script](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config)located in your [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
 > Note that to run the script you need to be inside your Netdata config directory.
 >
 > - Please also note that after most configuration changes you will need to [restart the Agent](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for the changes to take effect.
@@ -29,7 +29,7 @@ It uses **roles**. For example `sysadmin`, `webmaster`, `dba`, etc.
 
 Each alert is assigned to one or more roles, using the `to` line of the alert  configuration. For example, here is the alert configuration for `ram.conf` that defaults to the role `sysadmin`:
 
-```conf
+```text
     alarm: ram_in_use
        on: system.ram
     class: Utilization
@@ -52,7 +52,7 @@ Then `alarm-notify.sh` uses its own configuration file `health_alarm_notify.conf
 Here is an example, of the `sysadmin`'s role recipients for the email notification.  
 You can send the notification to multiple recipients by separating the emails with a space.
 
-```conf
+```text
 
 ###############################################################################
 # RECIPIENTS PER ROLE
@@ -84,7 +84,7 @@ You can edit `health_alarm_notify.conf` using the `edit-config` script to config
 
 - **Recipients** per role per notification method
 
-     ```conf
+     ```text
      role_recipients_email[sysadmin]="${DEFAULT_RECIPIENT_EMAIL}"
      role_recipients_pushover[sysadmin]="${DEFAULT_RECIPIENT_PUSHOVER}"
      role_recipients_pushbullet[sysadmin]="${DEFAULT_RECIPIENT_PUSHBULLET}"
@@ -132,7 +132,7 @@ When you define recipients per role for notification methods, you can append `|c
 In the following examples, the first recipient receives all the alerts, while the second one receives only notifications for alerts that have at some point become critical.
 The second user may still receive warning and clear notifications, but only for the event that previously caused a critical alert.
 
-```conf
+```text
  email      : "user1@example.com user2@example.com|critical"
  pushover   : "2987343...9437837 8756278...2362736|critical"
  telegram   : "111827421 112746832|critical"
@@ -158,7 +158,7 @@ This works for all notification methods (including the default recipients).
 If you need to send curl based notifications (pushover, pushbullet, slack, alerta,
 flock, discord, telegram) via a proxy, you should set these variables to your proxy address:
 
-```conf
+```text
 export http_proxy="http://10.0.0.1:3128/"
 export https_proxy="http://10.0.0.1:3128/"
 ```
@@ -173,7 +173,7 @@ If you have an Internet facing netdata (or you have copied the images/ folder
 of netdata to your web server), set its URL here, to fetch the notification
 images from it.
 
-```conf
+```text
 images_base_url="http://my.public.netdata.server:19999"
 ```
 

@@ -88,15 +88,13 @@ require disk I/O may stop and show gaps in charts.
 
 To optimize your disk footprint in any aspect described below you can:
 
-
-To configure retention, you can: 
+To configure retention, you can:
 
 1. [Change how long Netdata stores metrics](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
 
 To control disk I/O:
 
 1. [Use a different metric storage database](/src/database/README.md),
-
 
 Minimize deployment impact on the production system by optimizing disk footprint:
 
@@ -118,7 +116,7 @@ and makes it easier to configure or disable alerts and agent notifications.
 The parents by default run health checks for each child, as long as the child is connected (the details are
 in `stream.conf`). On the child nodes you should add to `netdata.conf` the following:
 
-```conf
+```text
 [health]
    enabled = no
 ```
@@ -138,12 +136,12 @@ actively collecting metrics.
 Open `netdata.conf` and scroll down to the `[plugins]` section. To disable any plugin, uncomment it and set the value to
 `no`. For example, to explicitly keep the `proc` and `go.d` plugins enabled while disabling `python.d` and `charts.d`.
 
-```conf
+```text
 [plugins]
     proc = yes
-	python.d = no
-	charts.d = no
-	go.d = yes
+    python.d = no
+    charts.d = no
+    go.d = yes
 ```
 
 Disable specific collectors by opening their respective plugin configuration files, uncommenting the line for the
@@ -157,11 +155,11 @@ sudo ./edit-config charts.d.conf
 
 For example, to disable a few Python collectors:
 
-```conf
+```text
 modules:
-  apache: no
-	dockerd: no
-	fail2ban: no
+    apache: no
+    dockerd: no
+    fail2ban: no
 ```
 
 ## Reduce collection frequency
@@ -181,7 +179,7 @@ If you change this to `2`, Netdata enforces a minimum `update every` setting of 
 other second, which will effectively halve CPU utilization. Set this to `5` or `10` to collect metrics every 5 or 10
 seconds, respectively.
 
-```conf
+```text
 [global]
     update every = 5
 ```
@@ -199,7 +197,7 @@ an [internal_plugin/collector](/src/collectors/README.md#collector-architecture-
 open `netdata.conf` and find the appropriate section. For example, to reduce the frequency of the `apps` plugin, which
 collects and visualizes metrics on application resource utilization:
 
-```conf
+```text
 [plugin:apps]
     update every = 5
 ```
@@ -208,7 +206,7 @@ To [configure an individual collector](/src/collectors/REFERENCE.md#configure-a-
 open its specific configuration file with `edit-config` and look for the `update_every` setting. For example, to reduce
 the frequency of the `nginx` collector, run `sudo ./edit-config go.d/nginx.conf`:
 
-```conf
+```text
 # [ GLOBAL ]
 update_every: 10
 ```
@@ -229,7 +227,7 @@ on [streaming and replication](/docs/observability-centralization-points/README.
 Automated anomaly detection may be a powerful tool, but we recommend it to only be enabled on Netdata parents that sit
 outside your production infrastructure, or if you have cpu and memory to spare. You can disable ML with the following:
 
-```conf
+```text
 [ml]
    enabled = no
 ```
@@ -251,16 +249,15 @@ looking at the local Agent dashboard.
 
 To disable gzip compression, open `netdata.conf` and find the `[web]` section:
 
-```conf
+```text
 [web]
     enable gzip compression = no
 ```
 
 Or to lower the default compression level:
 
-```conf
+```text
 [web]
     enable gzip compression = yes
     gzip compression level = 1
 ```
-

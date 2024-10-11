@@ -160,7 +160,7 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
     memcpy(buf, rfe->function, sizeof(buf));
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
-    size_t num_words = quoted_strings_splitter_pluginsd(buf, words, MAX_FUNCTION_PARAMETERS);
+    size_t num_words = quoted_strings_splitter_whitespace(buf, words, MAX_FUNCTION_PARAMETERS);
 
     const char *config = get_word(words, num_words, 0);
     const char *action = get_word(words, num_words, 1);

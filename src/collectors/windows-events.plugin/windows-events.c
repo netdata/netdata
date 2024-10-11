@@ -1139,6 +1139,15 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     sid_cache_init();
     field_cache_init();
 
+    if(!EnableWindowsPrivilege(SE_SECURITY_NAME))
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to enable %s privilege", SE_SECURITY_NAME);
+
+    if(!EnableWindowsPrivilege(SE_BACKUP_NAME))
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to enable %s privilege", SE_BACKUP_NAME);
+
+    if(!EnableWindowsPrivilege(SE_AUDIT_NAME))
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to enable %s privilege", SE_AUDIT_NAME);
+
     // ------------------------------------------------------------------------
     // debug
 

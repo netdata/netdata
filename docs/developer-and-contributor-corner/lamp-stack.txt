@@ -104,8 +104,7 @@ GRANT USAGE, REPLICATION CLIENT, PROCESS ON *.* TO 'netdata'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-Run `sudo systemctl restart netdata`, or the [appropriate alternative for your
-system](/packaging/installer/README.md#maintaining-a-netdata-agent-installation), to collect dozens of metrics every second for robust MySQL monitoring.
+Run `sudo systemctl restart netdata`, or the [appropriate alternative for your system](/docs/netdata-agent/start-stop-restart.md), to collect dozens of metrics every second for robust MySQL monitoring.
 
 ## Enable PHP monitoring
 
@@ -125,7 +124,7 @@ sudo nano /etc/php/7.4/fpm/pool.d/www.conf
 
 Find the line that reads `;pm.status_path = /status` and remove the `;` so it looks like this:
 
-```conf
+```text
 pm.status_path = /status
 ```
 

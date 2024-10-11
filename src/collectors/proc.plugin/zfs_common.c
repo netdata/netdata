@@ -560,7 +560,7 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int upd
     //unsigned long long anon_hits = arcstats.hits - (arcstats.mfu_hits + arcstats.mru_hits + arcstats.mfu_ghost_hits + arcstats.mru_ghost_hits);
 
     unsigned long long arc_size = arcstats.size;
-    unsigned long long mru_size = arcstats.p;
+    unsigned long long mru_size = arcstats.p > 0 ? arcstats.p : arcstats.pd + arcstats.pm;
     //unsigned long long target_min_size = arcstats.c_min;
     //unsigned long long target_max_size = arcstats.c_max;
     unsigned long long target_size = arcstats.c;

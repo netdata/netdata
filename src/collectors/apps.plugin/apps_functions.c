@@ -86,7 +86,7 @@ void function_processes(const char *transaction, char *function,
             access, HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA | HTTP_ACCESS_VIEW_AGENT_CONFIG) || enable_function_cmdline;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
-    size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
+    size_t num_words = quoted_strings_splitter_whitespace(function, words, PLUGINSD_MAX_WORDS);
 
     struct target *category = NULL, *user = NULL, *group = NULL; (void)category; (void)user; (void)group;
     const char *process_name = NULL;

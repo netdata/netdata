@@ -2,19 +2,19 @@
 
 ## Intro
 
-[Nginx](https://nginx.org/en/) is an HTTP and reverse proxy server, a mail proxy server, and a generic TCP/UDP proxy server used to host websites and applications of all sizes. 
+[Nginx](https://nginx.org/en/) is an HTTP and reverse proxy server, a mail proxy server, and a generic TCP/UDP proxy server used to host websites and applications of all sizes.
 
 The software is known for its low impact on memory resources, high scalability, and its modular, event-driven architecture which can offer secure, predictable performance.
 
 ## Why Nginx
 
--   By default, Nginx is fast and lightweight out of the box.
+- By default, Nginx is fast and lightweight out of the box.
 
--   Nginx is used and useful in cases when you want to access different instances of Netdata from a single server.
+- Nginx is used and useful in cases when you want to access different instances of Netdata from a single server.
 
--   Password-protect access to Netdata, until distributed authentication is implemented via the Netdata cloud Sign In mechanism.
+- Password-protect access to Netdata, until distributed authentication is implemented via the Netdata cloud Sign In mechanism.
 
--   A proxy was necessary to encrypt the communication to Netdata, until v1.16.0, which provided TLS (HTTPS) support.
+- A proxy was necessary to encrypt the communication to Netdata, until v1.16.0, which provided TLS (HTTPS) support.
 
 ## Nginx configuration file
 
@@ -22,23 +22,23 @@ All Nginx configurations can be found in the `/etc/nginx/` directory. The main c
 
 Configuration options in Nginx are known as directives. Directives are organized into groups known as blocks or contexts. The two terms can be used interchangeably.
 
-Depending on your installation source, you’ll find an example configuration file at `/etc/nginx/conf.d/default.conf` or `etc/nginx/sites-enabled/default`, in some cases you may have to manually create the `sites-available` and `sites-enabled` directories. 
+Depending on your installation source, you’ll find an example configuration file at `/etc/nginx/conf.d/default.conf` or `etc/nginx/sites-enabled/default`, in some cases you may have to manually create the `sites-available` and `sites-enabled` directories.
 
 You can edit the Nginx configuration file with Nano, Vim or any other text editors you are comfortable with.
 
 After making changes to the configuration files:
 
--   Test Nginx configuration with `nginx -t`.
+- Test Nginx configuration with `nginx -t`.
 
--   Restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
+- Restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
 
 ## Ways to access Netdata via Nginx
 
 ### As a virtual host
 
-With this method instead of `SERVER_IP_ADDRESS:19999`, the Netdata dashboard can be accessed via a human-readable URL such as `netdata.example.com` used in the configuration below. 
+With this method instead of `SERVER_IP_ADDRESS:19999`, the Netdata dashboard can be accessed via a human-readable URL such as `netdata.example.com` used in the configuration below.
 
-```conf
+```text
 upstream backend {
     # the Netdata server
     server 127.0.0.1:19999;
@@ -69,10 +69,10 @@ server {
 
 ### As a subfolder to an existing virtual host
 
-This method is recommended when Netdata is to be served from a subfolder (or directory). 
+This method is recommended when Netdata is to be served from a subfolder (or directory).
 In this case, the virtual host `netdata.example.com` already exists and Netdata has to be accessed via `netdata.example.com/netdata/`.
 
-```conf
+```text
 upstream netdata {
     server 127.0.0.1:19999;
     keepalive 64;
@@ -112,9 +112,9 @@ server {
 
 ### As a subfolder for multiple Netdata servers, via one Nginx
 
-This is the recommended configuration when one Nginx will be used to manage multiple Netdata servers via subfolders. 
+This is the recommended configuration when one Nginx will be used to manage multiple Netdata servers via sub-folders.
 
-```conf
+```text
 upstream backend-server1 {
     server 10.1.1.103:19999;
     keepalive 64;
@@ -159,16 +159,16 @@ Of course you can add as many backend servers as you like.
 
 Using the above, you access Netdata on the backend servers, like this:
 
--   `http://netdata.example.com/netdata/server1/` to reach `backend-server1`
--   `http://netdata.example.com/netdata/server2/` to reach `backend-server2`
+- `http://netdata.example.com/netdata/server1/` to reach `backend-server1`
+- `http://netdata.example.com/netdata/server2/` to reach `backend-server2`
 
 ### Encrypt the communication between Nginx and Netdata
 
-In case Netdata's web server has been [configured to use TLS](/src/web/server/README.md#enabling-tls-support), it is
+In case Netdata's web server has been [configured to use TLS](/src/web/server/README.md#enable-httpstls-support), it is
 necessary to specify inside the Nginx configuration that the final destination is using TLS. To do this, please, append
 the following parameters in your `nginx.conf`
 
-```conf
+```text
 proxy_set_header X-Forwarded-Proto https;
 proxy_pass https://localhost:19999;
 ```
@@ -189,7 +189,7 @@ printf "yourusername:$(openssl passwd -apr1)" > /etc/nginx/passwords
 
 And then enable the authentication inside your server directive:
 
-```conf
+```text
 server {
     # ...
     auth_basic "Protected";
@@ -202,39 +202,34 @@ server {
 
 If your Nginx is on `localhost`, you can use this to protect your Netdata:
 
-```
+```text
 [web]
     bind to = 127.0.0.1 ::1
 ```
 
 You can also use a unix domain socket. This will also provide a faster route between Nginx and Netdata:
 
-```
+```text
 [web]
     bind to = unix:/var/run/netdata/netdata.sock
 ```
 
-*note: Netdata v1.8+ support unix domain sockets*
-
 At the Nginx side, use something like this to use the same unix domain socket:
 
-```conf
+```text
 upstream backend {
     server unix:/var/run/netdata/netdata.sock;
     keepalive 64;
 }
 ```
 
-
 If your Nginx server is not on localhost, you can set:
 
-```
+```text
 [web]
     bind to = *
     allow connections from = IP_OF_NGINX_SERVER
 ```
-
-*note: Netdata v1.9+ support `allow connections from`*
 
 `allow connections from` accepts [Netdata simple patterns](/src/libnetdata/simple_pattern/README.md) to match against the
 connection IP address.
@@ -243,7 +238,7 @@ connection IP address.
 
 Nginx logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
-```
+```text
 [logs]
     access = off
 ```
@@ -252,18 +247,18 @@ Nginx logs accesses and Netdata logs them too. You can prevent Netdata from gene
 
 By default, netdata compresses its responses. You can have nginx do that instead, with the following options in the `location /` block:
 
-```conf
-  location / {
-		...
-		gzip on;
-		gzip_proxied any;
-		gzip_types *;
-	}
+```text
+location / {
+    ...
+    gzip on;
+    gzip_proxied any;
+    gzip_types *;
+}
 ```
 
 To disable Netdata's gzip compression, open `netdata.conf` and in the `[web]` section put:
 
-```conf
+```text
 [web]
     enable gzip compression = no
 ```
@@ -278,5 +273,3 @@ If you get an 502 Bad Gateway error you might check your Nginx error log:
 ```
 
 If you see something like the above, chances are high that SELinux prevents nginx from connecting to the backend server. To fix that, just use this policy: `setsebool -P httpd_can_network_connect true`.
-
-

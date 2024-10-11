@@ -9,11 +9,11 @@ Netdata Agents are available in 2 versions:
 |     Stable      | At most once per month, usually every 45 days | Receiving bug fixes and security updates between releases | Up to the 2nd stable release after them  |     Previous configuration semantics and data are supported by newer releases     |
 |     Nightly     |           Every night at 00:00 UTC            |               Latest pre-released features                | Up to the 2nd nightly release after them | Configuration and data of unreleased features may change between nightly releases |
 
-> "Support Duration" defines the time we consider the release as actively used by users in production systems, so that all features of Netdata should be working like the day they were released. However, after the latest release, previous releases stop receiving bug fixes and security updates. All users are advised to update to the latest release to get the latest bug fixes. 
+> "Support Duration" defines the time we consider the release as actively used by users in production systems, so that all features of Netdata should be working like the day they were released. However, after the latest release, previous releases stop receiving bug fixes and security updates. All users are advised to update to the latest release to get the latest bug fixes.
 
 ## Binary Distribution Packages
 
-Binary distribution packages are provided by Netdata, via CI integration, for the following platforms and architectures: 
+Binary distribution packages are provided by Netdata, via CI integration, for the following platforms and architectures:
 
 |        Platform         |        Platform Versions         |          Released Packages Architecture          |    Format    |
 |:-----------------------:|:--------------------------------:|:------------------------------------------------:|:------------:|
@@ -30,7 +30,7 @@ Binary distribution packages are provided by Netdata, via CI integration, for th
 | Redhat Enterprise Linux |             8.x, 9.x             |               `x86_64`, `AArch64`                |     RPM      |
 |         Ubuntu          |       20.04, 22.04, 23.10        |       `x86_64`, `i386`, `ARMv7`, `AArch64`       |     DEB      |
 
-> IMPORTANT: Linux distributions frequently provide binary packages of Netdata. However, the packages you will find in the distributions' repositories may be outdated, incomplete, missing significant features or completely broken. We recommend using the packages we provide. 
+> IMPORTANT: Linux distributions frequently provide binary packages of Netdata. However, the packages you will find in the distributions' repositories may be outdated, incomplete, missing significant features or completely broken. We recommend using the packages we provide.
 
 ## Third-party Supported Binary Packages
 
@@ -40,7 +40,6 @@ The following distributions always provide the latest stable version of Netdata:
 |:----------:|:-----------------:|:------------------------------------:|
 | Arch Linux |      Latest       | All the Arch supported architectures |
 | MacOS Brew |      Latest       | All the Brew supported architectures |
-
 
 ## Builds from Source
 
@@ -59,7 +58,7 @@ The following builds from source should usually work, although we don't regularl
 
 ## Static Builds and Unsupported Linux Versions
 
-The static builds of Netdata can be used on any Linux platform of the supported architectures. The only requirement these static builds have is a working Linux kernel, any version. Everything else required for Netdata to run, is inside the package itself. 
+The static builds of Netdata can be used on any Linux platform of the supported architectures. The only requirement these static builds have is a working Linux kernel, any version. Everything else required for Netdata to run, is inside the package itself.
 
 Static builds usually miss certain features that require operating-system support and cannot be provided in a generic way. These features include:
 

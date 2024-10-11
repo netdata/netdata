@@ -6,7 +6,7 @@ As such, we want to provide a little Glossary as a reference starting point for 
 
 If you're here looking for the definition of a term you heard elsewhere in our community or products, or if you just want to learn Netdata from the ground up, you've come to the right page.
 
-Use the alphabatized list below to find the answer to your single-term questions, and click the bolded list items to explore more on the topics! We'll be sure to keep constantly updating this list, so if you hear a word that you would like for us to cover, just let us know or submit a request!
+Use the alphabetized list below to find the answer to your single-term questions, and click the bolded list items to explore more on the topics! We'll be sure to keep constantly updating this list, so if you hear a word that you would like for us to cover, just let us know or submit a request!
 
 [A](#a) | [B](#b) | [C](#c) | [D](#d)| [E](#e) | [F](#f) | [G](#g) | [H](#h) | [I](#i) | [J](#j) | [K](#k) | [L](#l) | [M](#m) | [N](#n) | [O](#o) | [P](#p)
 | [Q](#q) | [R](#r) | [S](#s) | [T](#t) | [U](#u) | [V](#v) | [W](#w) | [X](#x) | [Y](#y) | [Z](#z)
@@ -65,7 +65,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## G
 
-- [**Group by**](/docs/dashboards-and-charts/netdata-charts.md#group-by-dimension-node-or-chart): The drop-down on the dimension bar of a composite chart that allows you to group metrics by dimension, node, or chart.
+- [**Group by**](/docs/dashboards-and-charts/netdata-charts.md#group-by-dropdown): The drop-down on the dimension bar of a composite chart that allows you to group metrics by dimension, node, or chart.
 
 - [**Health Configuration Files**](/src/health/REFERENCE.md#edit-health-configuration-files): Files that you can edit to configure your Agent's health watchdog service.
 
@@ -110,7 +110,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 ## O
 
-- [**Obsoletion**(of nodes)](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#obsoleting-offline-nodes-from-a-space): Removing nodes from a space.
+- [**Obsoletion**(of nodes)](/docs/dashboards-and-charts/nodes-tab.md): Removing nodes from a space.
 
 - [**Orchestrators**](/src/collectors/README.md#collector-architecture-and-terminology): External plugins that run and manage one or more modules. They run as independent processes.
 
@@ -145,8 +145,8 @@ even thousands of nodes. There are no actual bottlenecks especially if you retai
 
 ## V
 
-- [**Visualizations**](/docs/category-overview-pages/visualizations-overview.md): Netdata uses dimensions, contexts, and families to sort your metric data into graphs, charts, and alerts that maximize your understand of your infrastructure and your ability to troubleshoot it, along or on a team.
+- [**Visualizations**](/docs/dashboards-and-charts/README.md): Netdata uses dimensions, contexts, and families to sort your metric data into graphs, charts, and alerts that maximize your understand of your infrastructure and your ability to troubleshoot it, along or on a team.
 
 ## Z
 
-- **Zero Configuration**: Netdata is preconfigured and capable to autodetect and monitor any well known application that runs on your system. You just deploy and claim Netdata Agents in your Netdata space, and monitor them in seconds.
+- **Zero Configuration**: Netdata is pre-configured and capable to autodetect and monitor any well known application that runs on your system. You just deploy and claim Netdata Agents in your Netdata space, and monitor them in seconds.

@@ -39,7 +39,7 @@ You can send Netdata alerts to Alerta to see alerts coming from many Netdata hos
 The configuration file name for this integration is `health_alarm_notify.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
@@ -71,7 +71,7 @@ You will need an API key to send messages from any source, if Alerta is configur
 
 The `DEFAULT_RECIPIENT_CUSTOM` can be edited in the following entries at the bottom of the same file:
 
-```conf
+```text
 role_recipients_alerta[sysadmin]="Systems"
 role_recipients_alerta[domainadmin]="Domains"
 role_recipients_alerta[dba]="Databases Systems"

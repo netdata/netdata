@@ -37,7 +37,7 @@ Send notifications to Twilio using Netdata's Agent alert notification feature, w
 The configuration file name for this integration is `health_alarm_notify.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
@@ -62,7 +62,7 @@ The following options can be defined for this notification
 
 You can then have different recipients per role, by editing DEFAULT_RECIPIENT_TWILIO with the recipient's number you want, in the following entries at the bottom of the same file:
 
-```conf
+```text
 role_recipients_twilio[sysadmin]="+15555555555"
 role_recipients_twilio[domainadmin]="+15555555556"
 role_recipients_twilio[dba]="+15555555557"

@@ -270,7 +270,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
 // RRD DIMENSION - this is a metric
 
 struct rrddim {
-    nd_uuid_t metric_uuid;                             // global UUID for this metric (unique_across hosts)
+    nd_uuid_t metric_uuid;                          // global UUID for this metric (unique_across hosts)
 
     // ------------------------------------------------------------------------
     // dimension definition
@@ -289,10 +289,10 @@ struct rrddim {
     // operational state members
 
     struct rrdset *rrdset;
-    rrd_ml_dimension_t *ml_dimension;                   // machine learning data about this dimension
+    rrd_ml_dimension_t *ml_dimension;               // machine learning data about this dimension
 
     struct {
-        RRDMETRIC_ACQUIRED *rrdmetric;                  // the rrdmetric of this dimension
+        RRDMETRIC_ACQUIRED *rrdmetric;              // the rrdmetric of this dimension
         bool collected;
     } rrdcontexts;
 
@@ -1569,7 +1569,6 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 // ----------------------------------------------------------------------------
 // Miscellaneous functions
 
-char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 void reload_host_labels(void);
 void rrdhost_set_is_parent_label(void);
 

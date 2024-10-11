@@ -829,8 +829,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 
     // in case we have cloud connection we inform cloud
     // new child connected
-    aclk_host_state_update(rpt->host, 1, 1);
-
+    schedule_node_state_update(rpt->host, 300);
     rrdhost_set_is_parent_label();
 
     if (is_ephemeral)
@@ -848,14 +847,14 @@ static void rrdpush_receive(struct receiver_state *rpt)
     {
         char msg[100 + 1];
         snprintfz(msg, sizeof(msg) - 1, "disconnected (completed %zu updates)", count);
-        rrdpush_receive_log_status(
-                rpt, msg,
-                RRDPUSH_STATUS_DISCONNECTED, NDLP_WARNING);
+        rrdpush_receive_log_status(rpt, msg, RRDPUSH_STATUS_DISCONNECTED, NDLP_WARNING);
     }
 
     // in case we have cloud connection we inform cloud
     // a child disconnected
-    aclk_host_state_update(rpt->host, 0, 1);
+    STREAM_PATH tmp = rrdhost_stream_path_fetch(rpt->host);
+    uint64_t total_reboot = (tmp.start_time + tmp.shutdown_time);
+    schedule_node_state_update(rpt->host, MIN((total_reboot * MAX_CHILD_DISC_TOLERANCE), MAX_CHILD_DISC_DELAY));
 
 cleanup:
     ;

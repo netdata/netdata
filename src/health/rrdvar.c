@@ -9,20 +9,6 @@ typedef struct rrdvar {
 // ----------------------------------------------------------------------------
 // RRDVAR management
 
-inline int rrdvar_fix_name(char *variable) {
-    int fixed = 0;
-    while(*variable) {
-        if (!isalnum((uint8_t)*variable) && *variable != '.' && *variable != '_') {
-            *variable++ = '_';
-            fixed++;
-        }
-        else
-            variable++;
-    }
-
-    return fixed;
-}
-
 inline STRING *rrdvar_name_to_string(const char *name) {
     char *variable = strdupz(name);
     rrdvar_fix_name(variable);

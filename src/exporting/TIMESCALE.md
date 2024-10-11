@@ -1,12 +1,3 @@
-<!--
-title: "Writing metrics to TimescaleDB"
-description: "Send Netdata metrics to TimescaleDB for long-term archiving and further analysis."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/exporting/TIMESCALE.md"
-sidebar_label: "Writing metrics to TimescaleDB"
-learn_status: "Published"
-learn_rel_path: "Integrations/Export"
--->
-
 # Writing metrics to TimescaleDB
 
 Thanks to Netdata's community of developers and system administrators, and Mahlon Smith
@@ -23,14 +14,18 @@ What's TimescaleDB? Here's how their team defines the project on their [GitHub p
 To get started archiving metrics to TimescaleDB right away, check out Mahlon's [`netdata-timescale-relay`
 repository](https://github.com/mahlonsmith/netdata-timescale-relay) on GitHub. Please be aware that backends subsystem
 was removed and Netdata configuration should be moved to the new `exporting.conf` configuration file. Use
-```conf
+
+```text
 [json:my_instance]
 ```
+
 in `exporting.conf` instead of
-```conf
+
+```text
 [backend]
     type = json
 ```
+
 in `netdata.conf`.
 
 This small program takes JSON streams from a Netdata client and writes them to a PostgreSQL (aka TimescaleDB) table.
@@ -67,5 +62,3 @@ blog](https://blog.timescale.com/blog/writing-it-metrics-from-netdata-to-timesca
 
 Thank you to Mahlon, Rune, TimescaleDB, and the members of the Netdata community that requested and then built this
 exporting connection between Netdata and TimescaleDB!
-
-

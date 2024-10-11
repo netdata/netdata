@@ -1,9 +1,9 @@
 # Start, stop, or restart the Netdata Agent
 
-When you install the Netdata Agent, the [daemon](/src/daemon/README.md) is 
+When you install the Netdata Agent, the [daemon](/src/daemon/README.md) is
 configured to start at boot and stop and restart/shutdown.
 
-You will most often need to _restart_ the Agent to load new or editing configuration files. 
+You will most often need to _restart_ the Agent to load new or editing configuration files.
 [Health configuration](#reload-health-configuration) files are the only exception, as they can be reloaded without restarting
 the entire Agent.
 
@@ -24,7 +24,7 @@ If the above commands fail, or you know that you're using a non-systemd system, 
 
 ## Using `netdata`
 
-Use the `netdata` command, typically located at `/usr/sbin/netdata`, to start the Netdata daemon. 
+Use the `netdata` command, typically located at `/usr/sbin/netdata`, to start the Netdata daemon.
 
 ```bash
 sudo netdata

@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/rocketchat.png" width="150"/>
 
 
-From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications on RocketChat.
+You can configure notification delivery to RocketChat from the Netdata Cloud UI.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
@@ -23,38 +23,33 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
 ### Prerequisites
 
 - A Netdata Cloud account
-- Access to the Netdata Space as an **Admin**
-- The Netdata Space needs to be on a paid plan
-- You need to have permissions on Mattermost to add new integrations.
-- You need to have a RocketChat app on your workspace to receive the webhooks.
+- Access to the Space as an **Admin**
+- The Space needs to be on a paid plan
+- You need to have permissions on RocketChat to add new integrations.
 
-### Mattermost Server Configuration
+### RocketChat Server Configuration
 
-Steps to configure your RocketChat to receive notifications from Netdata:
+Steps to configure your RocketChat server to receive notifications from Netdata Cloud:
 
-1. In RocketChat, Navigate to Administration > Workspace > Integrations.
-2. Click **+New** at the top right corner.
-3. For more details about each parameter, check [create-a-new-incoming-webhook](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations#create-a-new-incoming-webhook).
-4. After configuring integration, click Save.
-5. You will end up with a webhook endpoint that looks like below:
-  `https://your-server.rocket.chat/hooks/YYYYYYYYYYYYYYYYYYYYYYYY/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
-  - Treat this endpoint as a secret. Anyone who has it will be able to post messages to your RocketChat instance.
+1. In RocketChat, Navigate to Administration > Workspace > Integrations
+2. Click **+New** at the top right corner
+3. For more details about each parameter, check [Create a new incoming webhook](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations#create-a-new-incoming-webhook)
+4. You will end up with a webhook endpoint that looks like `https://your-server.rocket.chat/hooks/YYYYYYYYYYYYYYYYYYYYYYYY/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`, copy it in order to add it to your integration configuration in the Netdata Cloud UI
 
+For more details please check [Incoming webhooks for RocketChat](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations/).
 
-For more details please check RocketChat's article Incoming webhooks for [RocketChat](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations/).
-
-### Netdata Configuration Steps
+### Netdata Configuration
 
 1. Click on the **Space settings** cog (located above your profile icon)
-2. Click on the **Notification** tab
-3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-4. On the **RocketChat** card click on **+ Add**
-5. A modal will be presented to you to enter the required details to enable the configuration:
-  * **Notification settings** are Netdata specific settings
-    - Configuration name - you can optionally provide a name for your configuration you can easily refer to it
-    - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-    - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-  * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For RocketChat:
-    - Webhook URL - URL provided on RocketChat for the channel you want to receive your notifications.
+2. Click on the **Alerts & Notifications** tab
+3. Click on the **+ Add configuration** button
+4. Add the PagerDuty Integration
+5. A modal will be presented to you to enter the required details to enable the integration:
+    - **Notification settings**
+      - Configuration name (optional): A name for your configuration in order to easily refer to it
+      - Rooms: A list of Rooms for which you want to be notified
+      - Notifications: The notifications which you want to be notified
+    - **Integration configuration**
+      - Webhook URL: URL provided on RocketChat for the channel you want to receive your notifications
 
 

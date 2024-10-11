@@ -19,14 +19,14 @@ These charts provide a lot of useful information, so that you can:
 - View individual metric collection status about a chart
 
 These charts are available on Netdata Cloud's
-[Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md), [single sode tabs](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) and
+[Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md), [single node tabs](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) and
 on your [Custom Dashboards](/docs/dashboards-and-charts/dashboards-tab.md).
 
 ## Overview
 
 A Netdata chart looks like this:  
 
-<img src="https://user-images.githubusercontent.com/70198089/236133212-353c102f-a6ed-45b7-9251-34e004c7a10a.png"  width="900"/>
+<img src="https://user-images.githubusercontent.com/70198089/236133212-353c102f-a6ed-45b7-9251-34e004c7a10a.png"  width="900" alt="A Netdata Chart"/>
 
 With a quick glance you have immediate information available at your disposal:
 
@@ -37,7 +37,7 @@ With a quick glance you have immediate information available at your disposal:
 - [Chart area](#hover-over-the-chart)
 - [Legend with dimensions](#dimensions-bar)
 
-## Fundemental elements
+## Fundamental elements
 
 While Netdata's charts require no configuration and are easy to interact with, they have a lot of underlying complexity. To meaningfully organize charts out of the box based on what's happening in your nodes, Netdata uses the concepts of [dimensions](#dimensions), [contexts](#contexts), and [families](#families).
 
@@ -100,7 +100,7 @@ names:
 
 When you start interacting with a chart, you'll notice valuable information on the Title bar:
 
-<img src="https://github.com/netdata/netdata/assets/70198089/75d700de-bc7d-4b96-b73d-7b248b83afea" width="900"/>
+<img src="https://github.com/netdata/netdata/assets/70198089/75d700de-bc7d-4b96-b73d-7b248b83afea" width="900" alt="Netdata Chart Title bar"/>
 
 Title bar elements:
 
@@ -110,8 +110,7 @@ Title bar elements:
 
 Along with viewing chart type, context and units, on this bar you have access to immediate actions over the chart:
 
-
-<img src="https://github.com/netdata/netdata/assets/70198089/d21f326e-065c-4a08-bee9-69ad23736e38" width="200" />
+<img src="https://github.com/netdata/netdata/assets/70198089/d21f326e-065c-4a08-bee9-69ad23736e38" width="200" alt="Netdata Chart Title bar immediate actions"/>
 
 - **Manage Alerts**: manage [Alert configurations](/docs/dashboards-and-charts/alerts-tab.md#alert-configurations-tab) for this chart.
 - **Chart info**: get more information relevant to the chart you are interacting with.
@@ -119,14 +118,14 @@ Along with viewing chart type, context and units, on this bar you have access to
 - **Enter fullscreen mode**: expand the current chart to the full size of your screen.
 - **User settings**: save your settings for the chart at hand, so it persists across dashboard reloads.
   - Personal has the top priority.
-  - Room and Space settings for a chart are shared across all users who don't have personal settings for it. 
+  - Room and Space settings for a chart are shared across all users who don't have personal settings for it.
 - **Drag and Drop the chart to a Dashboard**: add the chart to an existing custom [Dashboard](/docs/dashboards-and-charts/dashboards-tab.md) or directly create a new one that includes the chart.
 
 ## Definition bar
 
 Each composite chart has a definition bar to provide information and options about the following:
 
-<img src="https://user-images.githubusercontent.com/70198089/236134615-e53a1d68-8a0f-466b-b2ef-1974085f0e8d.png" width="900"/>
+<img src="https://user-images.githubusercontent.com/70198089/236134615-e53a1d68-8a0f-466b-b2ef-1974085f0e8d.png" width="900" alt="Netdata Chart Definition bar"/>
 
 - Group by option
 - Aggregate function to be applied in case multiple data sources exist
@@ -145,14 +144,14 @@ To help users instantly understand and validate the data they see on charts, we 
 > allowing you to zoom in to the different parts of it.
 >
 > <a href="https://user-images.githubusercontent.com/2662304/235475061-44628011-3b1f-4c44-9528-34452018eb89.png" target="_blank">
->  <img src="https://user-images.githubusercontent.com/2662304/235475061-44628011-3b1f-4c44-9528-34452018eb89.png" width="400" border="0" align="center"/>
+>  <img src="https://user-images.githubusercontent.com/2662304/235475061-44628011-3b1f-4c44-9528-34452018eb89.png" width="400" border="0" align="center" alt="Netdata NIDL Framework"/>
 > </a>
 
 You can rapidly access condensed information for collected metrics, grouped by node, monitored instances, dimension, or any key/value label pair.
 
 At the Definition bar of each chart, there are a few dropdown menus:
 
-<img src="https://user-images.githubusercontent.com/43294513/235470150-62a3b9ac-51ca-4c0d-81de-8804e3d733eb.png" width="900"/>
+<img src="https://user-images.githubusercontent.com/43294513/235470150-62a3b9ac-51ca-4c0d-81de-8804e3d733eb.png" width="900" alt="Netdata Chart NIDL Dropdown menus"/>
 
 These dropdown menus have 2 functions:
 
@@ -171,7 +170,7 @@ All of these dropdown menus can be used for instantly filtering the information 
 
 The "Group by" dropdown menu allows selecting 1 or more groupings to be applied at once on the same dataset.
 
-<img src="https://user-images.githubusercontent.com/43294513/235468819-3af5a1d3-8619-48fb-a8b7-8e8b4cf6a8ff.png" width="900"/>
+<img src="https://user-images.githubusercontent.com/43294513/235468819-3af5a1d3-8619-48fb-a8b7-8e8b4cf6a8ff.png" width="900" alt="Netdata Chart Group by dropdown"/>
 
 It supports:
 
@@ -188,7 +187,7 @@ Using this menu, you can slice and dice the data in any possible way, to quickly
 > You have the means to change the default group by or apply filtering to get a better view into what data your are trying to analyze.
 > For example, if you change the group by to _instance_ you get a view with the data of all the instances (cgroups) that contribute to that chart.
 > Then you can use further filtering tools to focus the data that is important to you and even save the result to your own dashboards.
-
+>
 > ### Tip
 >
 > Group by instance, dimension to see the time series of every individual collected metric participating in the chart.
@@ -197,7 +196,7 @@ Using this menu, you can slice and dice the data in any possible way, to quickly
 
 Each chart uses an opinionated-but-valuable default aggregate function over the data sources.
 
-<img src="https://user-images.githubusercontent.com/70198089/236136725-778670b4-7e81-44a8-8d3d-f38ded823c94.png" width="500"/>
+<img src="https://user-images.githubusercontent.com/70198089/236136725-778670b4-7e81-44a8-8d3d-f38ded823c94.png" width="500" alt="Netdata Chart Aggregate functions over data"/>
 
 For example, the `system.cpu` chart shows the average for each dimension from every contributing chart, while the `net.net` chart shows the sum for each dimension from every contributing chart, which can also come from multiple networking interfaces.
 
@@ -218,7 +217,7 @@ The following aggregate functions are available for each selected dimension:
 In this dropdown, you can view or filter the nodes contributing time-series metrics to the chart.  
 This menu also provides the contribution of each node to the volume of the chart, and a break down of the anomaly rate of the queried data per node.
 
-<img src="https://user-images.githubusercontent.com/70198089/236137765-b57d5443-3d4b-42f4-9e3d-db1eb606626f.png" width="900"/>
+<img src="https://user-images.githubusercontent.com/70198089/236137765-b57d5443-3d4b-42f4-9e3d-db1eb606626f.png" width="900" alt="Netdata Chart Nodes dropdown"/>
 
 If one or more nodes can't contribute to a given chart, the definition bar shows a warning symbol plus the number of
 affected nodes, then lists them in the dropdown along with the associated error. Nodes might return errors because of
@@ -229,38 +228,38 @@ networking issues, a stopped `netdata` service, or because that node does not ha
 In this dropdown, you can view or filter the instances contributing time-series metrics to the chart.  
 This menu also provides the contribution of each instance to the volume of the chart, and a break down of the anomaly rate of the queried data per instance.
 
-<img src="https://user-images.githubusercontent.com/70198089/236138302-4dd4072e-3a0d-43bb-a9d8-4dde79c65e92.png" width="900"/>
+<img src="https://user-images.githubusercontent.com/70198089/236138302-4dd4072e-3a0d-43bb-a9d8-4dde79c65e92.png" width="900" alt="Netdata Chart Instances dropdown"/>
 
 ### Dimensions dropdown
 
 In this dropdown, you can view or filter the original dimensions contributing time-series metrics to the chart.  
 This menu also presents the contribution of each original dimensions on the chart, and a break down of the anomaly rate of the data per dimension.
 
-<img src="https://user-images.githubusercontent.com/70198089/236138796-08dc6ac6-9a50-4913-a46d-d9bbcedd48f6.png" width="900"/>
+<img src="https://user-images.githubusercontent.com/70198089/236138796-08dc6ac6-9a50-4913-a46d-d9bbcedd48f6.png" width="900" alt="Netdata Chart Dimensions Dropdown"/>
 
 ### Labels dropdown
 
 In this dropdown, you can view or filter the contributing time-series labels of the chart.  
 This menu also presents the contribution of each label on the chart,and a break down of the anomaly rate of the data per label.
 
-<img src="https://user-images.githubusercontent.com/70198089/236139027-8a51a958-2074-4675-a41b-efff30d8f51a.png" width="900"/>
+<img src="https://user-images.githubusercontent.com/70198089/236139027-8a51a958-2074-4675-a41b-efff30d8f51a.png" width="900" alt="Netdata Chart Labels Dropdown"/>
 
 ### Aggregate functions over time
 
 When the granularity of the data collected is higher than the plotted points on the chart an aggregation function over
 time is applied.
 
-<img src="https://user-images.githubusercontent.com/70198089/236411297-e123db06-0117-4e24-a5ac-955b980a8f55.png" width="400"/>
+<img src="https://user-images.githubusercontent.com/70198089/236411297-e123db06-0117-4e24-a5ac-955b980a8f55.png" width="400" alt="Netdata Chart Aggregate functions over time"/>
 
 By default the aggregation applied is _average_ but the user can choose different options from the following:
 
 - Min, Max, Average or Sum
 - Percentile
   - you can specify the percentile you want to focus on: 25th, 50th, 75th, 80th, 90th, 95th, 97th, 98th and 99th.  
-    <img src="https://user-images.githubusercontent.com/70198089/236410299-de5f3367-f3b0-4beb-a73f-a49007c543d4.png" width="250"/>
+    <img src="https://user-images.githubusercontent.com/70198089/236410299-de5f3367-f3b0-4beb-a73f-a49007c543d4.png" width="250" alt="Netdata Chart Aggregate functions over time Percentile selection"/>
 - Trimmed Mean or Trimmed Median
   - you can choose the percentage of data tha you want to focus on: 1%, 2%, 3%, 5%, 10%, 15%, 20% and 25%.  
-    <img src="https://user-images.githubusercontent.com/70198089/236410858-74b46af9-280a-4ab2-ad26-5a6aa9403aa8.png" width="250"/>
+    <img src="https://user-images.githubusercontent.com/70198089/236410858-74b46af9-280a-4ab2-ad26-5a6aa9403aa8.png" width="250" alt="Netdata Chart Aggregate functions over time Trimmed Mean or Median selection"/>
 - Median
 - Standard deviation
 - Coefficient of variation
@@ -280,7 +279,7 @@ It then uses these unique models during data collection to predict the value tha
 
 If the value collected is an outlier, it is marked as anomalous.
 
-<img src="https://user-images.githubusercontent.com/70198089/236139886-79d63cf6-61ed-4aa7-842c-b5a1728c870d.png" width="900"/>
+<img src="https://user-images.githubusercontent.com/70198089/236139886-79d63cf6-61ed-4aa7-842c-b5a1728c870d.png" width="900" alt="Netdata Chart Anomaly Rate Ribbon"/>
 
 This unmatched capability of real-time predictions as data is collected allows you to **detect anomalies for potentially millions of metrics across your entire infrastructure within a second of occurrence**.
 
@@ -297,29 +296,29 @@ It includes a bar indicating the volume percentage of each time series compared 
 
 This overlay sorts all dimensions by value, makes bold the closest dimension to the mouse and presents a histogram based on the values of the dimensions.
 
-<img src="https://user-images.githubusercontent.com/70198089/236141460-bfa66b99-d63c-4a2c-84b1-2509ed94857f.png" width="500"/>
+<img src="https://user-images.githubusercontent.com/70198089/236141460-bfa66b99-d63c-4a2c-84b1-2509ed94857f.png" width="500" alt="Netdata Chart Hover over Chart"/>
 
 When hovering the anomaly ribbon, the overlay sorts all dimensions by anomaly rate, and presents a histogram of these anomaly rates.
 
-#### Info column
+### Info column
 
 Additionally, when hovering over the chart, the overlay may display an indication in the "Info" column.
 
 Currently, this column is used to inform users of any data collection issues that might affect the chart.
 Below each chart, there is an information ribbon. This ribbon currently shows 3 states related to the points presented in the chart:
 
-1. **[P]: Partial Data**
+1. **Partial Data**
    At least one of the dimensions in the chart has partial data, meaning that not all instances available contributed data to this point. This can happen when a container is stopped, or when a node is restarted. This indicator helps to gain confidence of the dataset, in situations when unusual spikes or dives appear due to infrastructure maintenance, or due to failures to part of the infrastructure.
 
-2. **[O]: Overflown**
+2. **Overflown**
    At least one of the data sources included in the chart has a counter that has overflowed at this point.
 
-3. **[E]: Empty Data**
+3. **Empty Data**
    At least one of the dimensions included in the chart has no data at all for the given points.
 
 All these indicators are also visualized per dimension, in the pop-over that appears when hovering the chart.
 
-<img src="https://user-images.githubusercontent.com/70198089/236145768-8ffadd02-93a4-4e9e-b4ae-c1367f614a7e.png" width="700"/>
+<img src="https://user-images.githubusercontent.com/70198089/236145768-8ffadd02-93a4-4e9e-b4ae-c1367f614a7e.png" width="700" alt="Netdata Chart Hover over the chart Info Column"/>
 
 ## Play, Pause and Reset
 
@@ -346,7 +345,7 @@ Note: These interactions are available when the default "Pan" action is used fro
 While exploring the chart, a tool bar will appear. This tool bar is there to support you on this task.
 The available manipulation tools you can select are:
 
-<img src="https://user-images.githubusercontent.com/70198089/236143292-c1d75528-263d-4ddd-9db8-b8d6a31cb83e.png" width="400" />
+<img src="https://user-images.githubusercontent.com/70198089/236143292-c1d75528-263d-4ddd-9db8-b8d6a31cb83e.png" width="400" alt="Netdata Chart Tool bar"/>
 
 - Pan
 - Highlight
@@ -382,10 +381,10 @@ Selecting timeframes is useful when you see an interesting spike or change in a 
 
 You can zoom to a specific timeframe, either horizontally of vertically, by selecting a timeframe.
 
-| Interaction                                | Keyboard/mouse                       | Touchpad/touchscreen                                 |
-|:-------------------------------------------|:-------------------------------------|:-----------------------------------------------------|
-| **Zoom** to a specific timeframe           | `Shift + mouse vertical selection`   | `n/a`                                                |
-| **Horizontal Zoom** a specific Y-axis area | `Shift + mouse horizontal selection` | `n/a`                                                |
+| Interaction                                | Keyboard/mouse                       | Touchpad/touchscreen |
+|:-------------------------------------------|:-------------------------------------|:---------------------|
+| **Zoom** to a specific timeframe           | `Shift + mouse vertical selection`   | `n/a`                |
+| **Horizontal Zoom** a specific Y-axis area | `Shift + mouse horizontal selection` | `n/a`                |
 
 ### Chart zoom
 
@@ -394,9 +393,9 @@ of an anomaly or outage.
 
 Zooming out lets you see metrics within the larger context, such as the last hour, day, or week, which is useful in understanding what "normal" looks like, or to identify long-term trends, like a slow creep in memory usage.
 
-| Interaction                                | Keyboard/mouse                       | Touchpad/touchscreen                                 |
-|:-------------------------------------------|:-------------------------------------|:-----------------------------------------------------|
-| **Zoom** in or out                         | `Shift + mouse scrollwheel`          | `two-finger pinch` <br />`Shift + two-finger scroll` |
+| Interaction        | Keyboard/mouse              | Touchpad/touchscreen                                 |
+|:-------------------|:----------------------------|:-----------------------------------------------------|
+| **Zoom** in or out | `Shift + mouse scrollwheel` | `two-finger pinch` <br />`Shift + two-finger scroll` |
 
 ## Dimensions bar
 
@@ -404,7 +403,7 @@ Zooming out lets you see metrics within the larger context, such as the last hou
 
 The bottom legend where you can see the dimensions of the chart can be ordered by:
 
-<img src="https://user-images.githubusercontent.com/70198089/236144658-6c3d0e31-9bcb-45f3-bb95-4eafdcbb0a58.png" width="300" />
+<img src="https://user-images.githubusercontent.com/70198089/236144658-6c3d0e31-9bcb-45f3-bb95-4eafdcbb0a58.png" width="300" alt="Netdata Chart order dimensions legend"/>
 
 - Dimension name (Ascending or Descending)
 - Dimension value (Ascending or Descending)

@@ -29,7 +29,7 @@ of `netdata.conf` so
 that it is greater than `1`. An `update every` of `5` means the Netdata Agent enforces a _minimum_ collection frequency
 of 5 seconds.
 
-```conf
+```text
 [global]
     update every = 5
 ```
@@ -52,7 +52,7 @@ for that specific module. Uncomment the line and change its value to `no`.
 
 ## Modify alerts and notifications
 
-Netdata's health monitoring watchdog uses hundreds of preconfigured health entities, with intelligent thresholds, to
+Netdata's health monitoring watchdog uses hundreds of pre-configured health entities, with intelligent thresholds, to
 generate warning and critical alerts for most production systems and their applications without configuration. However,
 each alert and notification method is completely customizable.
 
@@ -90,7 +90,7 @@ Because the source path contains `health.d/cpu.conf`, run `sudo edit-config heal
 
 Open the configuration file for that alert and set the `to` line to `silent`.
 
-```conf
+```text
 template: disk_fill_rate
        on: disk.space
    lookup: max -1s at -30m unaligned of avail
@@ -107,7 +107,7 @@ section of `netdata.conf`.
 
 ### Enable alert notifications
 
-Open `health_alarm_notify.conf` for editing. First, read the [enabling notifications](/docs/alerts-and-notifications/notifications/README.md#netdata-agent) doc
+Open `health_alarm_notify.conf` for editing. First, read the [enabling notifications](/src/health/notifications/README.md) doc
 for an example of the process using Slack, then
 click on the link to your preferred notification method to find documentation for that specific endpoint.
 

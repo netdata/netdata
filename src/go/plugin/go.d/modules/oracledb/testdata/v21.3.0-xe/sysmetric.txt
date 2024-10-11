@@ -1,0 +1,13 @@
+METRIC_NAME				|			      VALUE
+---------------------------------------------------------------- ----------
+Buffer Cache Hit Ratio			|				100
+Cursor Cache Hit Ratio			|			 377.385159
+Global Cache Blocks Corrupted	|					  0
+Global Cache Blocks Lost		|				  0
+SQL Service Response Time		|			  .24775561
+Database Wait Time Ratio		|				  0
+Row Cache Hit Ratio				|		 99.6407723
+Library Cache Hit Ratio 		|			 98.7795576
+Session Limit % 				|		 7.27459016
+Session Count					|			142
+Average Active Sessions 		|			 .093455298

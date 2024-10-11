@@ -1,0 +1,12 @@
+WAIT_CLASS				|			  WAIT_TIME
+---------------------------------------------------------------- ----------
+Other					|				  0
+Application				|				  0
+Configuration			|					  0
+Administrative			|					  0
+Concurrency				|				  0
+Commit					|				  0
+Network 				|				  0
+User I/O				|				  0
+System I/O				|			       .004
+Scheduler				|				  0

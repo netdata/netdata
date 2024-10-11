@@ -1,12 +1,3 @@
-<!--
-title: "Query formatting"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/README.md
-sidebar_label: "Query formatting"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Developers/Web/Api/Formatters"
--->
-
 # Query formatting
 
 API data queries need to be formatted before returned to the caller.

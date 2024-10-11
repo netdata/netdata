@@ -7,8 +7,6 @@
 
 #define RRDVAR_MAX_LENGTH 1024
 
-int rrdvar_fix_name(char *variable);
-
 #include "database/rrd.h"
 
 STRING *rrdvar_name_to_string(const char *name);

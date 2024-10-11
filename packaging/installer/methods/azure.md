@@ -1,15 +1,6 @@
-<!--
-title: "Install Netdata on Azure"
-description: "The Netdata Agent runs on all popular cloud providers, but often requires additional steps and configuration for full functionality."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/azure.md
-sidebar_label: "Azure"
-learn_status: "Published"
-learn_rel_path: "Installation/Install on specific environments"
--->
-
 # Install Netdata on Azure
 
-Netdata is fully compatible with Azure. 
+Netdata is fully compatible with Azure.
 You can install Netdata on cloud instances to monitor the apps/services running there, or use
 multiple instances in a [parent-child streaming](/src/streaming/README.md) configuration.
 
@@ -41,18 +32,18 @@ command from a remote system, and it fails, it's likely that a firewall is block
 Another option is to put Netdata behind web server, which will proxy requests through standard HTTP/HTTPS ports
 (80/443), which are likely already open on your instance. We have a number of guides available:
 
--   [Apache](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-apache.md)
--   [Nginx](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md)
--   [Caddy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-caddy.md)
--   [HAProxy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md)
--   [lighttpd](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-lighttpd.md)
+- [Apache](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-apache.md)
+- [Nginx](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md)
+- [Caddy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-caddy.md)
+- [HAProxy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md)
+- [lighttpd](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-lighttpd.md)
 
 Sign in to the [Azure portal](https://portal.azure.com) and open the virtual machine running Netdata. Click on the
 **Networking** link beneath the **Settings** header, then click on the **Add inbound security rule** button.
 
 Add a new rule with the following options:
 
-```conf
+```text
 Source: Any
 Source port ranges: 19999
 Destination: Any
@@ -64,5 +55,3 @@ Name: Netdata
 ```
 
 Click **Add** to apply your new inbound security rule.
-
-

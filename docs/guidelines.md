@@ -49,7 +49,7 @@ Please ensure that any links to a different documentation resource are fully exp
 
 e.g.
 
-```
+```text
 [Correct link to this document](/docs/guidelines.md)
 vs
 [Incorrect link to this document](https://learn.netdata.cloud/XYZ)

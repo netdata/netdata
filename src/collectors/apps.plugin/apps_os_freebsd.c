@@ -291,7 +291,7 @@ bool apps_os_read_pid_stat_freebsd(struct pid_stat *p, void *ptr) {
     usec_t started_ut = timeval_usec(&proc_info->ki_start);
     p->values[PDF_UPTIME] = (system_current_time_ut > started_ut) ? (system_current_time_ut - started_ut) / USEC_PER_SEC : 0;
 
-    if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
+    if(unlikely(debug_enabled))
         debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d",
                       netdata_configured_host_prefix, p->pid, pid_stat_comm(p), (p->target)?string2str(p->target->name):"UNSET",
                       p->stat_collected_usec - p->last_stat_collected_usec,

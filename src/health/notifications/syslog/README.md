@@ -37,7 +37,7 @@ Send notifications to Syslog using Netdata's Agent alert notification feature, w
 The configuration file name for this integration is `health_alarm_notify.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
@@ -78,7 +78,7 @@ All roles will default to this variable if left unconfigured.
 
 You can then have different recipients per role, by editing DEFAULT_RECIPIENT_SYSLOG with the recipient you want, in the following entries at the bottom of the same file:
 
-```conf
+```text
 role_recipients_syslog[sysadmin]="daemon.notice@loghost1:514/netdata"
 role_recipients_syslog[domainadmin]="daemon.notice@loghost2:514/netdata"
 role_recipients_syslog[dba]="daemon.notice@loghost3:514/netdata"

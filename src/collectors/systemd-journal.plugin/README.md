@@ -1,4 +1,3 @@
-
 # `systemd` journal plugin
 
 [KEY FEATURES](#key-features) | [JOURNAL SOURCES](#journal-sources) | [JOURNAL FIELDS](#journal-fields) |
@@ -40,8 +39,8 @@ For more information check [this discussion](https://github.com/netdata/netdata/
 
 The following are limitations related to the availability of the plugin:
 
-- Netdata versions prior to 1.44 shipped in a docker container do not include this plugin. 
-  The problem is that `libsystemd` is not available in Alpine Linux (there is a `libsystemd`, but it is a dummy that 
+- Netdata versions prior to 1.44 shipped in a docker container do not include this plugin.
+  The problem is that `libsystemd` is not available in Alpine Linux (there is a `libsystemd`, but it is a dummy that
   returns failure on all calls). Starting with Netdata version 1.44, Netdata containers use a Debian base image
   making this plugin available when Netdata is running in a container.
 - For the same reason (lack of `systemd` support for Alpine Linux), the plugin is not available on `static` builds of
@@ -321,7 +320,7 @@ algorithm to allow it respond promptly. It works like this:
 6. In systemd versions 254 or later, the plugin fetches the unique sequence number of each log entry and calculates the
    the percentage of the file matched by the query, versus the total number of the log entries in the journal file.
 7. In systemd versions prior to 254, the plugin estimates the number of entries the journal file contributes to the
-   query, using the amount of log entries matched it vs. the total duration the log file has entries for. 
+   query, using the amount of log entries matched it vs. the total duration the log file has entries for.
 
 The above allow the plugin to respond promptly even when the number of log entries in the journal files is several
 dozens millions, while providing accurate estimations of the log entries over time at the histogram and enough counters

@@ -11,6 +11,13 @@
 // stable for the purposes of TBEB (truncated binary exponential backoff)
 #define ACLK_PUBACKS_CONN_STABLE 3
 
+typedef enum {
+    ACLK_NO_DISCONNECT = 0,
+    ACLK_CLOUD_DISCONNECT = 1,
+    ACLK_RELOAD_CONF = 2,
+    ACLK_PING_TIMEOUT = 3
+} ACLK_DISCONNECT_ACTION;
+
 typedef enum __attribute__((packed)) {
     ACLK_STATUS_CONNECTED = 0,
     ACLK_STATUS_NONE,
@@ -62,7 +69,7 @@ extern time_t aclk_session_sec;
 extern time_t aclk_block_until;
 
 extern int aclk_connection_counter;
-extern int disconnect_req;
+extern ACLK_DISCONNECT_ACTION disconnect_req;
 
 void *aclk_main(void *ptr);
 

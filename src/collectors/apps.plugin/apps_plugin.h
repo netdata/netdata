@@ -364,21 +364,26 @@ typedef enum __attribute__((packed)) {
     PDF_MAX
 } PID_FIELD;
 
+typedef struct apps_match {
+    bool starts_with:1;
+    bool ends_with:1;
+    STRING *compare;
+    SIMPLE_PATTERN *pattern;
+} APPS_MATCH;
+
 struct target {
     STRING *id;
     STRING *name;
     STRING *clean_name;
 
     TARGET_TYPE type;
-    union {
-        STRING *compare;
+    APPS_MATCH match;
 #if (PROCESSES_HAVE_UID == 1)
-        uid_t uid;
+    uid_t uid;
 #endif
 #if (PROCESSES_HAVE_GID == 1)
-        gid_t gid;
+    gid_t gid;
 #endif
-    };
 
     kernel_uint_t values[PDF_MAX];
 
@@ -393,11 +398,6 @@ struct target {
 #endif
 
     bool exposed:1;         // if set, we have sent this to netdata
-    bool hidden:1;          // if set, we set the hidden flag on the dimension
-    bool debug_enabled:1;
-    bool ends_with:1;
-    bool starts_with:1;     // if set, the compare string matches only the
-                            // beginning of the command
 
     struct pid_on_target *root_pid; // list of aggregated pids for target debugging
 
@@ -476,7 +476,7 @@ struct pid_stat {
     struct pid_stat *next;
     struct pid_stat *prev;
 
-    struct target *target;          // app_groups.conf targets
+    struct target *target;          // app_groups.conf/tree targets
 
 #if (PROCESSES_HAVE_UID == 1)
     struct target *uid_target;      // uid based targets
@@ -485,9 +485,10 @@ struct pid_stat {
     struct target *gid_target;      // gid based targets
 #endif
 
-    STRING *comm;                   // the command name (short version)
-    STRING *name;                   // a better name, or NULL
-    STRING *cmdline;                // the full command line (or on windows, the full pathname of the program)
+    STRING *comm_orig;              // the command, as-collected
+    STRING *comm;                   // the command, sanitized
+    STRING *name;                   // the command name if any, sanitized
+    STRING *cmdline;                // the full command line of the program
 
 #if defined(OS_WINDOWS)
     COUNTER_DATA perflib[PDF_MAX];
@@ -531,6 +532,8 @@ struct pid_stat {
     bool updated:1;                 // true when the process is currently running
     bool merged:1;                  // true when it has been merged to its parent
     bool keep:1;                    // true when we need to keep this process in memory even after it exited
+    bool is_manager:1;              // true when this pid is a process manager
+    bool is_aggregator:1;           // true when this pid is a process aggregator
 
     bool matched_by_config:1;
 
@@ -540,7 +543,7 @@ struct pid_stat {
 
 #if defined(OS_WINDOWS)
     bool got_info:1;
-    bool assigned_to_target:1;
+    bool got_service:1;
     bool initialized:1;
 #endif
 
@@ -612,6 +615,7 @@ static inline void debug_log_dummy(void) {}
 
 #endif
 bool managed_log(struct pid_stat *p, PID_LOG log, bool status);
+void sanitize_apps_plugin_chart_meta(char *buf);
 
 // ----------------------------------------------------------------------------
 // macro to calculate the incremental rate of a value
@@ -631,7 +635,7 @@ bool managed_log(struct pid_stat *p, PID_LOG log, bool status);
 #define pid_incremental_cpu(type, idx, value) \
     incremental_rate(p->values[idx], p->raw[idx], value, p->type##_collected_usec, p->last_##type##_collected_usec, CPU_TO_NANOSECONDCORES)
 
-void apps_orchestrators_and_aggregators_init(void);
+void apps_managers_and_aggregators_init(void);
 void apps_users_and_groups_init(void);
 void apps_pids_init(void);
 
@@ -651,6 +655,10 @@ uint32_t file_descriptor_find_or_add(const char *name, uint32_t hash);
 
 // --------------------------------------------------------------------------------------------------------------------
 // data collection management
+
+bool pid_match_check(struct pid_stat *p, APPS_MATCH *match);
+APPS_MATCH pid_match_create(const char *comm);
+void pid_match_cleanup(APPS_MATCH *m);
 
 bool collect_data_for_all_pids(void);
 
@@ -674,7 +682,11 @@ struct pid_stat *get_or_allocate_pid_entry(pid_t pid);
 struct pid_stat *find_pid_entry(pid_t pid);
 void del_pid_entry(pid_t pid);
 void update_pid_comm(struct pid_stat *p, const char *comm);
+void update_pid_cmdline(struct pid_stat *p, const char *cmdline);
 
+bool is_process_a_manager(struct pid_stat *p);
+bool is_process_an_aggregator(struct pid_stat *p);
+bool is_process_an_interpreter(struct pid_stat *p);
 
 // --------------------------------------------------------------------------------------------------------------------
 // targets management

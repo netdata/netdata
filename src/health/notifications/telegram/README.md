@@ -38,7 +38,7 @@ Send notifications to Telegram using Netdata's Agent alert notification feature,
 The configuration file name for this integration is `health_alarm_notify.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
@@ -63,7 +63,7 @@ All roles will default to this variable if left unconfigured.
 
 The `DEFAULT_RECIPIENT_CUSTOM` can be edited in the following entries at the bottom of the same file:
 
-```conf
+```text
 role_recipients_telegram[sysadmin]="-49999333324"
 role_recipients_telegram[domainadmin]="-49999333389"
 role_recipients_telegram[dba]="-10099992222"

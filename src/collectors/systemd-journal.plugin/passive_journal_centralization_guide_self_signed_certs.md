@@ -46,9 +46,9 @@ sudo ./systemd-journal-self-signed-certs.sh "server1" "DNS:hostname1" "IP:10.0.0
 
 Where:
 
-   - `server1` is the canonical name of the server. On newer systemd version, this name will be used by `systemd-journal-remote` and Netdata when you view the logs on the dashboard.
-   - `DNS:hostname1` is a DNS name that the server is reachable at. Add `"DNS:xyz"` multiple times to define multiple DNS names for the server.
-   - `IP:10.0.0.1` is an IP that the server is reachable at. Add `"IP:xyz"` multiple times to define multiple IPs for the server.
+- `server1` is the canonical name of the server. On newer systemd version, this name will be used by `systemd-journal-remote` and Netdata when you view the logs on the dashboard.
+- `DNS:hostname1` is a DNS name that the server is reachable at. Add `"DNS:xyz"` multiple times to define multiple DNS names for the server.
+- `IP:10.0.0.1` is an IP that the server is reachable at. Add `"IP:xyz"` multiple times to define multiple IPs for the server.
 
 Repeat this process to create the certificates for all your servers. You can add servers as required, at any time in the future.
 
@@ -150,7 +150,7 @@ sudo apt-get install systemd-journal-remote
 
 Edit `/etc/systemd/journal-upload.conf` and set the IP address and the port of the server, like so:
 
-```conf
+```text
 [Upload]
 URL=https://centralization.server.ip:19532
 ```
@@ -165,7 +165,7 @@ sudo systemctl edit systemd-journal-upload.service
 
 At the top, add:
 
-```conf
+```text
 [Service]
 Restart=always
 ```
@@ -197,7 +197,6 @@ The client should now be pushing logs to the central server.
 Here it is in action, in Netdata:
 
 ![2023-10-18 16-23-05](https://github.com/netdata/netdata/assets/2662304/83bec232-4770-455b-8f1c-46b5de5f93a2)
-
 
 ## Verify it works
 

@@ -6,7 +6,7 @@ platform_map:  # map packaging architectures to docker platforms
   arm64: linux/arm64/v8
   armhf: linux/arm/v7
   armhfp: linux/arm/v7
-  i386: linux/i386
+  i386: linux/386
   x86_64: linux/amd64
 arch_order:  # sort order for per-architecture jobs in CI
   - amd64
@@ -174,7 +174,7 @@ include:
 
   - &fedora
     distro: fedora
-    version: "40"
+    version: "41"
     support_type: Core
     notes: ''
     eol_check: true
@@ -183,11 +183,18 @@ include:
       dnf remove -y json-c-devel
     packages: &fedora_packages
       type: rpm
-      repo_distro: fedora/40
+      repo_distro: fedora/41
       builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
+    test:
+      ebpf-core: true
+  - <<: *fedora
+    version: "40"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/40
     test:
       ebpf-core: true
   - <<: *fedora
@@ -303,6 +310,11 @@ include:
         - arm64
     test:
       ebpf-core: true
+  - <<: *ubuntu
+    version: "24.10"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/oracular
   - <<: *ubuntu
     version: "22.04"
     packages:

@@ -27,7 +27,6 @@ Netdata Cloud organizes and visualizes the following metrics from your Kubernete
 | `k8s.cgroup.net_net`               | Sum of `received` and `sent` bandwidth per second.                                                                                                                                                                                                                                                                                                                                                                                      |
 | `k8s.cgroup.net_packets`           | Sum of `multicast`, `received`, and `sent` packets.                                                                                                                                                                                                                                                                                                                                                                                     |
 
-
 When viewing the [overview of this dashboard](#kubernetes-containers-overview), Netdata presents the above metrics per container, or aggregated based on
 their associated pods.
 

@@ -1,13 +1,3 @@
-<!--
-title: "Install Netdata on offline systems"
-description: "Install the Netdata Agent on offline/air gapped systems to benefit from real-time, per-second monitoring without connecting to the internet."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/offline.md"
-sidebar_label: "Offline systems"
-learn_status: "Published"
-learn_rel_path: "Installation/Installation methods"
-sidebar_position: 50
--->
-
 # Install Netdata on offline systems
 
 Our kickstart install script provides support for installing the Netdata Agent on air-gapped systems which do not have a

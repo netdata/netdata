@@ -6,35 +6,35 @@ This plugin is not an external plugin, but one of Netdata's threads.
 
 In detail, it collects metrics from:
 
--   `/proc/net/dev` (all network interfaces for all their values)
--   `/proc/diskstats` (all disks for all their values)
--   `/proc/mdstat` (status of RAID arrays)
--   `/proc/net/snmp` (total IPv4, TCP and UDP usage)
--   `/proc/net/snmp6` (total IPv6 usage)
--   `/proc/net/netstat` (more IPv4 usage)
--   `/proc/net/wireless` (wireless extension)
--   `/proc/net/stat/nf_conntrack` (connection tracking performance)
--   `/proc/net/stat/synproxy` (synproxy performance)
--   `/proc/net/ip_vs/stats` (IPVS connection statistics)
--   `/proc/stat` (CPU utilization and attributes)
--   `/proc/meminfo` (memory information)
--   `/proc/vmstat` (system performance)
--   `/proc/net/rpc/nfsd` (NFS server statistics for both v3 and v4 NFS servers)
--   `/sys/fs/cgroup` (Control Groups - Linux Containers)
--   `/proc/self/mountinfo` (mount points)
--   `/proc/interrupts` (total and per core hardware interrupts)
--   `/proc/softirqs` (total and per core software interrupts)
--   `/proc/loadavg` (system load and total processes running)
--   `/proc/pressure/{cpu,memory,io}` (pressure stall information)
--   `/proc/sys/kernel/random/entropy_avail` (random numbers pool availability - used in cryptography)
--   `/proc/spl/kstat/zfs/arcstats` (status of ZFS adaptive replacement cache)
--   `/proc/spl/kstat/zfs/pool/state` (state of ZFS pools)
--   `/sys/class/power_supply` (power supply properties)
--   `/sys/class/infiniband` (infiniband interconnect)
--   `/sys/class/drm` (AMD GPUs)
--   `ipc` (IPC semaphores and message queues)
--   `ksm` Kernel Same-Page Merging performance (several files under `/sys/kernel/mm/ksm`).
--   `netdata` (internal Netdata resources utilization)
+- `/proc/net/dev` (all network interfaces for all their values)
+- `/proc/diskstats` (all disks for all their values)
+- `/proc/mdstat` (status of RAID arrays)
+- `/proc/net/snmp` (total IPv4, TCP and UDP usage)
+- `/proc/net/snmp6` (total IPv6 usage)
+- `/proc/net/netstat` (more IPv4 usage)
+- `/proc/net/wireless` (wireless extension)
+- `/proc/net/stat/nf_conntrack` (connection tracking performance)
+- `/proc/net/stat/synproxy` (synproxy performance)
+- `/proc/net/ip_vs/stats` (IPVS connection statistics)
+- `/proc/stat` (CPU utilization and attributes)
+- `/proc/meminfo` (memory information)
+- `/proc/vmstat` (system performance)
+- `/proc/net/rpc/nfsd` (NFS server statistics for both v3 and v4 NFS servers)
+- `/sys/fs/cgroup` (Control Groups - Linux Containers)
+- `/proc/self/mountinfo` (mount points)
+- `/proc/interrupts` (total and per core hardware interrupts)
+- `/proc/softirqs` (total and per core software interrupts)
+- `/proc/loadavg` (system load and total processes running)
+- `/proc/pressure/{cpu,memory,io}` (pressure stall information)
+- `/proc/sys/kernel/random/entropy_avail` (random numbers pool availability - used in cryptography)
+- `/proc/spl/kstat/zfs/arcstats` (status of ZFS adaptive replacement cache)
+- `/proc/spl/kstat/zfs/pool/state` (state of ZFS pools)
+- `/sys/class/power_supply` (power supply properties)
+- `/sys/class/infiniband` (infiniband interconnect)
+- `/sys/class/drm` (AMD GPUs)
+- `ipc` (IPC semaphores and message queues)
+- `ksm` Kernel Same-Page Merging performance (several files under `/sys/kernel/mm/ksm`).
+- `netdata` (internal Netdata resources utilization)
 
 - - -
 
@@ -48,47 +48,47 @@ Hopefully, the Linux kernel provides many metrics that can provide deep insights
 
 ### Monitored disk metrics
 
--   **I/O bandwidth/s (kb/s)**
+- **I/O bandwidth/s (kb/s)**
     The amount of data transferred from and to the disk.
--   **Amount of discarded data (kb/s)**
--   **I/O operations/s**
+- **Amount of discarded data (kb/s)**
+- **I/O operations/s**
     The number of I/O operations completed.
--   **Extended I/O operations/s**
+- **Extended I/O operations/s**
     The number of extended I/O operations completed.
--   **Queued I/O operations**
+- **Queued I/O operations**
     The number of currently queued I/O operations. For traditional disks that execute commands one after another, one of them is being run by the disk and the rest are just waiting in a queue.
--   **Backlog size (time in ms)**
+- **Backlog size (time in ms)**
     The expected duration of the currently queued I/O operations.
--   **Utilization (time percentage)**
+- **Utilization (time percentage)**
     The percentage of time the disk was busy with something. This is a very interesting metric, since for most disks, that execute commands sequentially, **this is the key indication of congestion**. A sequential disk that is 100% of the available time busy, has no time to do anything more, so even if the bandwidth or the number of operations executed by the disk is low, its capacity has been reached.
     Of course, for newer disk technologies (like fusion cards) that are capable to execute multiple commands in parallel, this metric is just meaningless.
--   **Average I/O operation time (ms)**
+- **Average I/O operation time (ms)**
     The average time for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
--   **Average I/O operation time for extended operations (ms)**
+- **Average I/O operation time for extended operations (ms)**
     The average time for extended I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
--   **Average I/O operation size (kb)**
+- **Average I/O operation size (kb)**
     The average amount of data of the completed I/O operations.
--   **Average amount of discarded data (kb)**
+- **Average amount of discarded data (kb)**
     The average amount of data of the completed discard operations.
--   **Average Service Time (ms)**
+- **Average Service Time (ms)**
     The average service time for completed I/O operations. This metric is calculated using the total busy time of the disk and the number of completed operations. If the disk is able to execute multiple parallel operations the reporting average service time will be misleading.
--   **Average Service Time for extended I/O operations (ms)**
+- **Average Service Time for extended I/O operations (ms)**
     The average service time for completed extended I/O operations.
--   **Merged I/O operations/s**
+- **Merged I/O operations/s**
     The Linux kernel is capable of merging I/O operations. So, if two requests to read data from the disk are adjacent, the Linux kernel may merge them to one before giving them to disk. This metric measures the number of operations that have been merged by the Linux kernel.
--   **Merged discard operations/s**
--   **Total I/O time**
+- **Merged discard operations/s**
+- **Total I/O time**
     The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute multiple I/O operations in parallel.
--   **Space usage**
+- **Space usage**
     For mounted disks, Netdata will provide a chart for their space, with 3 dimensions:
-    1.  free
-    2.  used
-    3.  reserved for root
--   **inode usage**
+    1. free
+    2. used
+    3. reserved for root
+- **inode usage**
     For mounted disks, Netdata will provide a chart for their inodes (number of file and directories), with 3 dimensions:
-    1.  free
-    2.  used
-    3.  reserved for root
+    1. free
+    2. used
+    3. reserved for root
 
 ### disk names
 
@@ -100,9 +100,9 @@ By default, Netdata will enable monitoring metrics only when they are not zero. 
 
 Netdata categorizes all block devices in 3 categories:
 
-1.  physical disks (i.e. block devices that do not have child devices and are not partitions)
-2.  virtual disks (i.e. block devices that have child devices - like RAID devices)
-3.  disk partitions (i.e. block devices that are part of a physical disk)
+1. physical disks (i.e. block devices that do not have child devices and are not partitions)
+2. virtual disks (i.e. block devices that have child devices - like RAID devices)
+3. disk partitions (i.e. block devices that are part of a physical disk)
 
 Performance metrics are enabled by default for all disk devices, except partitions and not-mounted virtual disks. Of course, you can enable/disable monitoring any block device by editing the Netdata configuration file.
 
@@ -118,7 +118,7 @@ mv netdata.conf.new netdata.conf
 
 Then edit `netdata.conf` and find the following section. This is the basic plugin configuration.
 
-```
+```text
 [plugin:proc:/proc/diskstats]
   # enable new disks detected at runtime = yes
   # performance metrics for physical disks = auto
@@ -152,25 +152,25 @@ Then edit `netdata.conf` and find the following section. This is the basic plugi
 
 For each virtual disk, physical disk and partition you will have a section like this:
 
-```
+```text
 [plugin:proc:/proc/diskstats:sda]
-	# enable = yes
-	# enable performance metrics = auto
-	# bandwidth = auto
-	# operations = auto
-	# merged operations = auto
-	# i/o time = auto
-	# queued operations = auto
-	# utilization percentage = auto
+ # enable = yes
+ # enable performance metrics = auto
+ # bandwidth = auto
+ # operations = auto
+ # merged operations = auto
+ # i/o time = auto
+ # queued operations = auto
+ # utilization percentage = auto
     # extended operations = auto
-	# backlog = auto
+ # backlog = auto
 ```
 
 For all configuration options:
 
--   `auto` = enable monitoring if the collected values are not zero
--   `yes` = enable monitoring
--   `no` = disable monitoring
+- `auto` = enable monitoring if the collected values are not zero
+- `yes` = enable monitoring
+- `no` = disable monitoring
 
 Of course, to set options, you will have to uncomment them. The comments show the internal defaults.
 
@@ -180,14 +180,14 @@ After saving `/etc/netdata/netdata.conf`, restart your Netdata to apply them.
 
 You can pretty easy disable performance metrics for individual device, for ex.:
 
-```
+```text
 [plugin:proc:/proc/diskstats:sda]
-	enable performance metrics = no
+ enable performance metrics = no
 ```
 
 But sometimes you need disable performance metrics for all devices with the same type, to do it you need to figure out device type from `/proc/diskstats` for ex.:
 
-```
+```text
    7       0 loop0 1651 0 3452 168 0 0 0 0 0 8 168
    7       1 loop1 4955 0 11924 880 0 0 0 0 0 64 880
    7       2 loop2 36 0 216 4 0 0 0 0 0 4 4
@@ -200,7 +200,7 @@ But sometimes you need disable performance metrics for all devices with the same
 All zram devices starts with `251` number and all loop devices starts with `7`.
 So, to disable performance metrics for all loop devices you could add `performance metrics for disks with major 7 = no` to `[plugin:proc:/proc/diskstats]` section.
 
-```
+```text
 [plugin:proc:/proc/diskstats]
        performance metrics for disks with major 7 = no
 ```
@@ -209,34 +209,34 @@ So, to disable performance metrics for all loop devices you could add `performan
 
 ### Monitored RAID array metrics
 
-1.  **Health** Number of failed disks in every array (aggregate chart).
+1. **Health** Number of failed disks in every array (aggregate chart).
 
-2.  **Disks stats**
+2. **Disks stats**
 
--   total (number of devices array ideally would have)
--   inuse (number of devices currently are in use)
+   - total (number of devices array ideally would have)
+   - inuse (number of devices currently are in use)
 
-3.  **Mismatch count**
+3. **Mismatch count**
 
--   unsynchronized blocks
+   - unsynchronized blocks
 
-4.  **Current status**
+4. **Current status**
 
--   resync in percent
--   recovery in percent
--   reshape in percent
--   check in percent
+   - resync in percent
+   - recovery in percent
+   - reshape in percent
+   - check in percent
 
-5.  **Operation status** (if resync/recovery/reshape/check is active)
+5. **Operation status** (if resync/recovery/reshape/check is active)
 
--   finish in minutes
--   speed in megabytes/s
+   - finish in minutes
+   - speed in megabytes/s
 
-6.  **Nonredundant array availability**
+6. **Non-redundant array availability**
 
 #### configuration
 
-```
+```text
 [plugin:proc:/proc/mdstat]
   # faulty devices = yes
   # nonredundant arrays availability = yes
@@ -267,7 +267,7 @@ If your system has more than 50 processors and you would like to see the CPU the
 state charts that are automatically disabled, you can set the following boolean options in the
 `[plugin:proc:/proc/stat]` section.
 
-```conf
+```text
     keep per core files open = yes
     keep cpuidle files open = yes
     core_throttle_count = yes
@@ -311,50 +311,50 @@ each state.
 
 ### Monitored memory metrics
 
--  Amount of memory swapped in/out
--  Amount of memory paged from/to disk
--  Number of memory page faults
--  Number of out of memory kills
--  Number of NUMA events
+- Amount of memory swapped in/out
+- Amount of memory paged from/to disk
+- Number of memory page faults
+- Number of out of memory kills
+- Number of NUMA events
 
 ### Configuration
 
-```conf
+```text
 [plugin:proc:/proc/vmstat]
-	filename to monitor = /proc/vmstat
-	swap i/o = auto
-	disk i/o = yes
-	memory page faults = yes
-	out of memory kills = yes
-	system-wide numa metric summary = auto
+ filename to monitor = /proc/vmstat
+ swap i/o = auto
+ disk i/o = yes
+ memory page faults = yes
+ out of memory kills = yes
+ system-wide numa metric summary = auto
 ```
 
 ## Monitoring Network Interfaces
 
 ### Monitored network interface metrics
 
--   **Physical Network Interfaces Aggregated Bandwidth (kilobits/s)**
+- **Physical Network Interfaces Aggregated Bandwidth (kilobits/s)**
     The amount of data received and sent through all physical interfaces in the system. This is the source of data for the Net Inbound and Net Outbound dials in the System Overview section.
 
--   **Bandwidth (kilobits/s)**
+- **Bandwidth (kilobits/s)**
     The amount of data received and sent through the interface.
 
--   **Packets (packets/s)**
+- **Packets (packets/s)**
     The number of packets received, packets sent, and multicast packets transmitted through the interface.
 
--   **Interface Errors (errors/s)**
+- **Interface Errors (errors/s)**
     The number of errors for the inbound and outbound traffic on the interface.
 
--   **Interface Drops (drops/s)**
+- **Interface Drops (drops/s)**
     The number of packets dropped for the inbound and outbound traffic on the interface.
 
--   **Interface FIFO Buffer Errors (errors/s)**
+- **Interface FIFO Buffer Errors (errors/s)**
     The number of FIFO buffer errors encountered while receiving and transmitting data through the interface.
 
--   **Compressed Packets (packets/s)**
+- **Compressed Packets (packets/s)**
     The number of compressed packets transmitted or received by the device driver.
 
--   **Network Interface Events (events/s)**
+- **Network Interface Events (events/s)**
     The number of packet framing errors, collisions detected on the interface, and carrier losses detected by the device driver.
 
 By default Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though).
@@ -363,7 +363,7 @@ By default Netdata will enable monitoring metrics only when they are not zero. I
 
 The settings for monitoring wireless is in the `[plugin:proc:/proc/net/wireless]` section of your `netdata.conf` file.
 
-```conf
+```text
     status for all interfaces = yes
     quality for all interfaces = yes
     discarded packets for all interfaces = yes
@@ -372,62 +372,62 @@ The settings for monitoring wireless is in the `[plugin:proc:/proc/net/wireless]
 
 You can set the following values for each configuration option:
 
--   `auto` = enable monitoring if the collected values are not zero
--   `yes` = enable monitoring
--   `no` = disable monitoring
+- `auto` = enable monitoring if the collected values are not zero
+- `yes` = enable monitoring
+- `no` = disable monitoring
 
 #### Monitored wireless interface metrics
 
--   **Status**
+- **Status**
     The current state of the interface. This is a device-dependent option.
 
--   **Link**    
-    Overall quality of the link. 
+- **Link**
+    Overall quality of the link.
 
--   **Level**
+- **Level**
     Received signal strength (RSSI), which indicates how strong the received signal is.
-    
--   **Noise**
-    Background noise level.    
-    
--   **Discarded packets**
-    Discarded packets for: Number of packets received with a different NWID or ESSID (`nwid`), unable to decrypt (`crypt`), hardware was not able to properly re-assemble the link layer fragments (`frag`), packets failed to deliver (`retry`), and packets lost in relation with specific wireless operations (`misc`). 
-    
--   **Missed beacon**    
+
+- **Noise**
+    Background noise level.
+
+- **Discarded packets**
+    Discarded packets for: Number of packets received with a different NWID or ESSID (`nwid`), unable to decrypt (`crypt`), hardware was not able to properly re-assemble the link layer fragments (`frag`), packets failed to deliver (`retry`), and packets lost in relation with specific wireless operations (`misc`).
+
+- **Missed beacon**
      Number of periodic beacons from the cell or the access point the interface has missed.
-     
-#### Wireless configuration     
+
+#### Wireless configuration
 
 #### alerts
 
 There are several alerts defined in `health.d/net.conf`.
 
-The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alerts can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a child or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alert with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the [families](/src/health/REFERENCE.md#alert-line-families) line in the alert configuration. For example, if you want to disable the `inbound packets dropped` alert for `eth0`, set `families: !eth0 *` in the alert definition for `template: inbound_packets_dropped`.
+The tricky ones are `inbound packets dropped` and `inbound packets dropped ratio`. They have quite a strict policy so that they warn users about possible issues. These alerts can be annoying for some network configurations. It is especially true for some bonding configurations if an interface is a child or a bonding interface itself. If it is expected to have a certain number of drops on an interface for a certain network configuration, a separate alert with different triggering thresholds can be created or the existing one can be disabled for this specific interface. It can be done with the help of the families line in the alert configuration. For example, if you want to disable the `inbound packets dropped` alert for `eth0`, set `families: !eth0 *` in the alert definition for `template: inbound_packets_dropped`.
 
 #### configuration
 
 Module configuration:
 
-```
+```text
 [plugin:proc:/proc/net/dev]
-  # filename to monitor = /proc/net/dev
-  # path to get virtual interfaces = /sys/devices/virtual/net/%s
-  # path to get net device speed = /sys/class/net/%s/speed
-  # enable new interfaces detected at runtime = auto
-  # bandwidth for all interfaces = auto
-  # packets for all interfaces = auto
-  # errors for all interfaces = auto
-  # drops for all interfaces = auto
-  # fifo for all interfaces = auto
-  # compressed packets for all interfaces = auto
-  # frames, collisions, carrier counters for all interfaces = auto
-  # disable by default interfaces matching = lo fireqos* *-ifb
-  # refresh interface speed every seconds = 10
+    # filename to monitor = /proc/net/dev 
+    # path to get virtual interfaces = /sys/devices/virtual/net/%s
+    # path to get net device speed = /sys/class/net/%s/speed
+    # enable new interfaces detected at runtime = auto
+    # bandwidth for all interfaces = auto
+    # packets for all interfaces = auto
+    # errors for all interfaces = auto
+    # drops for all interfaces = auto
+    # fifo for all interfaces = auto
+    # compressed packets for all interfaces = auto
+    # frames, collisions, carrier counters for all interfaces = auto
+    # disable by default interfaces matching = lo fireqos* *-ifb
+    # refresh interface speed every seconds = 10
 ```
 
 Per interface configuration:
 
-```
+```text
 [plugin:proc:/proc/net/dev:enp0s3]
   # enabled = yes
   # virtual = no
@@ -444,8 +444,6 @@ Per interface configuration:
 
 ![image6](https://cloud.githubusercontent.com/assets/2662304/14253733/53550b16-fa95-11e5-8d9d-4ed171df4735.gif)
 
----
-
 SYNPROXY is a TCP SYN packets proxy. It can be used to protect any TCP server (like a web server) from SYN floods and similar DDos attacks.
 
 SYNPROXY is a netfilter module, in the Linux kernel (since version 3.12). It is optimized to handle millions of packets per second utilizing all CPUs available without any concurrency locking between the connections.
@@ -454,8 +452,8 @@ The net effect of this, is that the real servers will not notice any change duri
 
 Netdata does not enable SYNPROXY. It just uses the SYNPROXY metrics exposed by your kernel, so you will first need to configure it. The hard way is to run iptables SYNPROXY commands directly on the console. An easier way is to use [FireHOL](https://firehol.org/), which, is a firewall manager for iptables. FireHOL can configure SYNPROXY using the following setup guides:
 
--   **[Working with SYNPROXY](https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY)**
--   **[Working with SYNPROXY and traps](https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY-and-traps)**
+- **[Working with SYNPROXY](https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY)**
+- **[Working with SYNPROXY and traps](https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY-and-traps)**
 
 ### Real-time monitoring of Linux Anti-DDoS
 
@@ -463,10 +461,10 @@ Netdata is able to monitor in real-time (per second updates) the operation of th
 
 It visualizes 4 charts:
 
-1.  TCP SYN Packets received on ports operated by SYNPROXY
-2.  TCP Cookies (valid, invalid, retransmits)
-3.  Connections Reopened
-4.  Entries used
+1. TCP SYN Packets received on ports operated by SYNPROXY
+2. TCP Cookies (valid, invalid, retransmits)
+3. Connections Reopened
+4. Entries used
 
 Example image:
 
@@ -483,37 +481,37 @@ battery capacity.
 Depending on the underlying driver, it may provide the following charts
 and metrics:
 
-1.  Capacity: The power supply capacity expressed as a percentage.
+1. Capacity: The power supply capacity expressed as a percentage.
 
-    -   capacity_now
+    - capacity_now
 
-2.  Charge: The charge for the power supply, expressed as amphours.
+2. Charge: The charge for the power supply, expressed as amp-hours.
 
-    -   charge_full_design
-    -   charge_full
-    -   charge_now
-    -   charge_empty
-    -   charge_empty_design
+    - charge_full_design
+    - charge_full
+    - charge_now
+    - charge_empty
+    - charge_empty_design
 
-3.  Energy: The energy for the power supply, expressed as watthours.
+3. Energy: The energy for the power supply, expressed as watthours.
 
-    -   energy_full_design
-    -   energy_full
-    -   energy_now
-    -   energy_empty
-    -   energy_empty_design
+    - energy_full_design
+    - energy_full
+    - energy_now
+    - energy_empty
+    - energy_empty_design
 
-4.  Voltage: The voltage for the power supply, expressed as volts.
+4. Voltage: The voltage for the power supply, expressed as volts.
 
-    -   voltage_max_design
-    -   voltage_max
-    -   voltage_now
-    -   voltage_min
-    -   voltage_min_design
+    - voltage_max_design
+    - voltage_max
+    - voltage_now
+    - voltage_min
+    - voltage_min_design
 
-#### configuration
+### configuration
 
-```
+```text
 [plugin:proc:/sys/class/power_supply]
   # battery capacity = yes
   # battery charge = no
@@ -524,18 +522,18 @@ and metrics:
   # directory to monitor = /sys/class/power_supply
 ```
 
-#### notes
+### notes
 
--   Most drivers provide at least the first chart. Battery powered ACPI
+- Most drivers provide at least the first chart. Battery powered ACPI
     compliant systems (like most laptops) provide all but the third, but do
     not provide all of the metrics for each chart.
 
--   Current, energy, and voltages are reported with a *very* high precision
+- Current, energy, and voltages are reported with a *very* high precision
     by the power_supply framework.  Usually, this is far higher than the
     actual hardware supports reporting, so expect to see changes in these
     charts jump instead of scaling smoothly.
 
--   If `max` or `full` attribute is defined by the driver, but not a
+- If `max` or `full` attribute is defined by the driver, but not a
     corresponding `min` or `empty` attribute, then Netdata will still provide
     the corresponding `min` or `empty`, which will then always read as zero.
     This way, alerts which match on these will still work.
@@ -548,17 +546,17 @@ This module monitors every active Infiniband port. It provides generic counters 
 
 Each port will have its counters metrics monitored, grouped in the following charts:
 
--   **Bandwidth usage**
+- **Bandwidth usage**
     Sent/Received data, in KB/s
 
--   **Packets Statistics**
+- **Packets Statistics**
     Sent/Received packets, in 3 categories: total, unicast and multicast.
 
--  **Errors Statistics**
+- **Errors Statistics**
     Many errors counters are provided, presenting statistics for:
-    - Packets: malformed, sent/received discarded by card/switch, missing resource
-    - Link: downed, recovered, integrity error, minor error
-    - Other events: Tick Wait to send, buffer overrun
+  - Packets: malformed, sent/received discarded by card/switch, missing resource
+  - Link: downed, recovered, integrity error, minor error
+  - Other events: Tick Wait to send, buffer overrun
 
 If your vendor is supported, you'll also get HW-Counters statistics. These being vendor specific, please refer to their documentation.
 
@@ -568,7 +566,7 @@ If your vendor is supported, you'll also get HW-Counters statistics. These being
 
 Default configuration will monitor only enabled infiniband ports, and refresh newly activated or created ports every 30 seconds
 
-```
+```text
 [plugin:proc:/sys/class/infiniband]
   # dirname to monitor = /sys/class/infiniband
   # bandwidth counters = yes
@@ -589,45 +587,46 @@ This module monitors every AMD GPU card discovered at agent startup.
 
 The following charts will be provided:
 
--   **GPU utilization**
--   **GPU memory utilization**
--   **GPU clock frequency**
--   **GPU memory clock frequency**
--   **VRAM memory usage percentage**
--   **VRAM memory usage**
--   **visible VRAM memory usage percentage**
--   **visible VRAM memory usage**
--   **GTT memory usage percentage**
--   **GTT memory usage**
+- **GPU utilization**
+- **GPU memory utilization**
+- **GPU clock frequency**
+- **GPU memory clock frequency**
+- **VRAM memory usage percentage**
+- **VRAM memory usage**
+- **visible VRAM memory usage percentage**
+- **visible VRAM memory usage**
+- **GTT memory usage percentage**
+- **GTT memory usage**
 
 ### configuration
 
 The `drm` path can be configured if it differs from the default:
 
-```
+```text
 [plugin:proc:/sys/class/drm]
   # directory to monitor = /sys/class/drm
 ```
 
-> [!NOTE]  
+> **Note**
+>
 > Temperature, fan speed, voltage and power metrics for AMD GPUs can be monitored using the [Sensors](/src/go/plugin/go.d/modules/sensors/README.md) plugin.
 
 ## IPC
 
 ### Monitored IPC metrics
 
--   **number of messages in message queues**
--   **amount of memory used by message queues**
--   **number of semaphores**
--   **number of semaphore arrays**
--   **number of shared memory segments**
--   **amount of memory used by shared memory segments**
+- **number of messages in message queues**
+- **amount of memory used by message queues**
+- **number of semaphores**
+- **number of semaphore arrays**
+- **number of shared memory segments**
+- **amount of memory used by shared memory segments**
 
 As far as the message queue charts are dynamic, sane limits are applied for the number of dimensions per chart (the limit is configurable).
 
 ### configuration
 
-```
+```text
 [plugin:proc:ipc]
   # message queues = yes
   # semaphore totals = yes
@@ -636,5 +635,3 @@ As far as the message queue charts are dynamic, sane limits are applied for the 
   # shm filename to monitor = /proc/sysvipc/shm
   # max dimensions in memory allowed = 50
 ```
-
-

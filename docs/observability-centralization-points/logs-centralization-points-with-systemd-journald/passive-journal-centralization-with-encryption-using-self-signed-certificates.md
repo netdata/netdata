@@ -26,7 +26,7 @@ This helps to also automate the distribution of the certificates to your servers
 
 We suggest to keep this script and all the involved certificates at the journals centralization server, in the directory `/etc/ssl/systemd-journal`, so that you can make future changes as required. If you prefer to keep the certificate authority and all the certificates at a more secure location, just use the script on that location.
 
-On the server that will issue the certificates (usually the centralizaton server), do the following:
+On the server that will issue the certificates (usually the centralization server), do the following:
 
 ```bash
 # install systemd-journal-remote to add the users and groups required and openssl for the certs
@@ -150,7 +150,7 @@ sudo apt-get install systemd-journal-remote
 
 Edit `/etc/systemd/journal-upload.conf` and set the IP address and the port of the server, like so:
 
-```conf
+```text
 [Upload]
 URL=https://centralization.server.ip:19532
 ```
@@ -165,7 +165,7 @@ sudo systemctl edit systemd-journal-upload.service
 
 At the top, add:
 
-```conf
+```text
 [Service]
 Restart=always
 ```

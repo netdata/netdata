@@ -23,7 +23,7 @@ The expected bandwidth consumption using `zstd` for 1 million samples per second
 
 The order compression algorithms is selected is configured in `stream.conf`, per `[API KEY]`, like this:
 
-```
+```text
     compression algorithms order = zstd lz4 brotli gzip
 ```
 

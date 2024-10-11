@@ -11,7 +11,7 @@ The Dynamic Configuration Manager allows direct configuration of collectors and 
 
 > **Info**
 >
-> To understand what actions users can perform based on their role, refer to the [Role Based Access documentation](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#dynamic-configuration-manager). 
+> To understand what actions users can perform based on their role, refer to the [Role Based Access documentation](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#dynamic-configuration-manager).
 
 ## Collectors
 

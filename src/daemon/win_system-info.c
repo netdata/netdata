@@ -221,32 +221,25 @@ static void netdata_windows_discover_os_version(char *os, size_t length, DWORD b
     }
     // We are not testing older, because it is not supported anymore by Microsoft
 
-    (void)snprintf(os, length, "Microsoft Windows Version %s, Build %d (Name: Windows %s)", versionName, build, version);
-}
-
-static void netdata_windows_os_version(char *out, DWORD length)
-{
-    if (netdata_registry_get_string(out,
-                                    length,
-                                    HKEY_LOCAL_MACHINE,
-                                    "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
-                                    "ProductName"))
-        return;
-
-    (void)snprintf(out, length, "%s", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
+    (void)snprintf(os, length, "Microsoft Windows Version %s, Build %d", version, build);
 }
 
 static void netdata_windows_os_kernel_version(char *out, DWORD length, DWORD build)
 {
-    char version[8];
-    if (!netdata_registry_get_string(version,
-                                    7,
+    DWORD major, minor;
+    if (!netdata_registry_get_dword(&major,
                                     HKEY_LOCAL_MACHINE,
                                     "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
-                                    "CurrentVersion"))
-        version[0] = '\0';
+                                    "CurrentMajorVersionNumber"))
+        major = 0;
 
-    (void)snprintf(out, length, "%s (build: %u)", version, build);
+    if (!netdata_registry_get_dword(&minor,
+                                    HKEY_LOCAL_MACHINE,
+                                    "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                                    "CurrentMinorVersionNumber"))
+        minor = 0;
+
+    (void)snprintf(out, length, "Windows %u.%u.%u Build: %u", major, minor, build, build);
 }
 
 static void netdata_windows_host(struct rrdhost_system_info *systemInfo)
@@ -262,7 +255,6 @@ static void netdata_windows_host(struct rrdhost_system_info *systemInfo)
     (void)rrdhost_set_system_info_variable(
         systemInfo, "NETDATA_HOST_OS_ID_LIKE", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
 
-    netdata_windows_os_version(osVersion, 4095);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION", osVersion);
     (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_HOST_OS_VERSION_ID", osVersion);
 
@@ -307,6 +299,11 @@ static void netdata_windows_container(struct rrdhost_system_info *systemInfo)
         systemInfo, "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE);
 }
 
+static void netdata_windows_install_type(struct rrdhost_system_info *systemInfo)
+{
+    (void)rrdhost_set_system_info_variable(systemInfo, "NETDATA_INSTALL_TYPE", "netdata-installer.exe");
+}
+
 void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo)
 {
     netdata_windows_cloud(systemInfo);
@@ -315,5 +312,6 @@ void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo)
     netdata_windows_get_cpu(systemInfo);
     netdata_windows_get_mem(systemInfo);
     netdata_windows_get_total_disk_size(systemInfo);
+    netdata_windows_install_type(systemInfo);
 }
 #endif

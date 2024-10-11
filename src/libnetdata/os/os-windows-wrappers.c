@@ -58,4 +58,42 @@ bool netdata_registry_get_string(char *out, unsigned int length, void *hKey, cha
     return status;
 }
 
+bool EnableWindowsPrivilege(const char *privilegeName) {
+    HANDLE hToken;
+    LUID luid;
+    TOKEN_PRIVILEGES tkp;
+
+    // Open the process token with appropriate access rights
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken))
+        return false;
+
+    // Lookup the LUID for the specified privilege
+    if (!LookupPrivilegeValue(NULL, privilegeName, &luid)) {
+        CloseHandle(hToken);  // Close the token handle before returning
+        return false;
+    }
+
+    // Set up the TOKEN_PRIVILEGES structure
+    tkp.PrivilegeCount = 1;
+    tkp.Privileges[0].Luid = luid;
+    tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+    // Adjust the token's privileges
+    if (!AdjustTokenPrivileges(hToken, FALSE, &tkp, sizeof(tkp), NULL, NULL)) {
+        CloseHandle(hToken);  // Close the token handle before returning
+        return false;
+    }
+
+    // Check if AdjustTokenPrivileges succeeded
+    if (GetLastError() == ERROR_NOT_ALL_ASSIGNED) {
+        CloseHandle(hToken);  // Close the token handle before returning
+        return false;
+    }
+
+    // Close the handle to the token after success
+    CloseHandle(hToken);
+
+    return true;
+}
+
 #endif

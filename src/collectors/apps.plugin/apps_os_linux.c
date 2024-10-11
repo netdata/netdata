@@ -93,7 +93,7 @@ bool apps_os_read_pid_fds_linux(struct pid_stat *p, void *ptr __maybe_unused) {
         if(unlikely(l == -1)) {
             // cannot read the link
 
-            if(debug_enabled || (p->target && p->target->debug_enabled))
+            if(debug_enabled)
                 netdata_log_error("Cannot read link %s", p->fds[fdid].filename);
 
             if(unlikely(p->fds[fdid].fd < 0)) {
@@ -689,7 +689,7 @@ bool apps_os_read_pid_stat_linux(struct pid_stat *p, void *ptr __maybe_unused) {
         }
     }
 
-    if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
+    if(unlikely(debug_enabled))
         debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=" KERNEL_UINT_FORMAT,
                       netdata_configured_host_prefix, p->pid, pid_stat_comm(p), (p->target)?string2str(p->target->name):"UNSET", p->stat_collected_usec - p->last_stat_collected_usec,
                       p->values[PDF_UTIME],

@@ -28,6 +28,9 @@ static struct proc_module {
 
     {.name = "PerflibThermalZone",  .dim = "PerflibThermalZone", .enabled = CONFIG_BOOLEAN_NO, .func = do_PerflibThermalZone},
 
+    {.name = "PerflibWebService",  .dim = "PerflibWebService",   .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibWebService},
+    {.name = "PerflibMSSQL",  .dim = "PerflibMSSQL", .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibMSSQL},
+
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}
 };

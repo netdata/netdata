@@ -8,9 +8,10 @@ static STRING *get_clean_name(STRING *name) {
     char buf[string_strlen(name) + 1];
     memcpy(buf, string2str(name), string_strlen(name) + 1);
     netdata_fix_chart_name(buf);
-    for (char *d = buf; *d ; d++) {
+
+    for (char *d = buf; *d ; d++)
         if (*d == '.') *d = '_';
-    }
+
     return string_strdupz(buf);
 }
 
@@ -31,38 +32,10 @@ struct target *find_target_by_name(struct target *base, const char *name) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// Tree
-
-static inline STRING *comm_from_cmdline(STRING *comm, STRING *cmdline) {
-    if(!cmdline) return sanitize_chart_meta_string(comm);
-
-    const char *cl = string2str(cmdline);
-    size_t len = string_strlen(cmdline);
-
-    char buf_cmd[len + 1];
-    // if it is enclosed in (), remove the parenthesis
-    if(cl[0] == '(' && cl[len - 1] == ')') {
-        memcpy(buf_cmd, &cl[1], len - 2);
-        buf_cmd[len - 2] = '\0';
-    }
-    else
-        memcpy(buf_cmd, cl, sizeof(buf_cmd));
-
-    char *start = strstr(buf_cmd, string2str(comm));
-    if(start) {
-        char *end = start + string_strlen(comm);
-        while(*end && !isspace((uint8_t)*end) && *end != '/' && *end != '\\') end++;
-        *end = '\0';
-
-        sanitize_chart_meta(start);
-        return string_strdupz(start);
-    }
-
-    return sanitize_chart_meta_string(comm);
-}
+// Process managers and aggregators
 
 struct comm_list {
-    STRING *comm;
+    APPS_MATCH match;
 };
 
 struct managed_list {
@@ -74,6 +47,7 @@ struct managed_list {
 static struct {
     struct managed_list managers;
     struct managed_list aggregators;
+    struct managed_list interpreters;
 } tree = {
     .managers = {
         .array = NULL,
@@ -89,7 +63,7 @@ static struct {
 
 static void managed_list_clear(struct managed_list *list) {
     for(size_t c = 0; c < list->used ; c++)
-        string_freez(list->array[c].comm);
+        pid_match_cleanup(&list->array[c].match);
 
     freez(list->array);
     list->array = NULL;
@@ -100,36 +74,47 @@ static void managed_list_clear(struct managed_list *list) {
 static void managed_list_add(struct managed_list *list, const char *s) {
     if(list->used >= list->size) {
         if(!list->size)
-            list->size = 10;
+            list->size = 16;
         else
             list->size *= 2;
         list->array = reallocz(list->array, sizeof(*list->array) * list->size);
     }
 
-    list->array[list->used++].comm = string_strdupz(s);
+    list->array[list->used++].match = pid_match_create(s);
 }
 
 static STRING *KernelAggregator = NULL;
 
-void apps_orchestrators_and_aggregators_init(void) {
+void apps_managers_and_aggregators_init(void) {
     KernelAggregator = string_strdupz("kernel");
 
     managed_list_clear(&tree.managers);
 #if defined(OS_LINUX)
-    managed_list_add(&tree.managers, "init");               // linux systems
-    managed_list_add(&tree.managers, "systemd");            // lxc containers and host systems (this also catches "systemd --user")
-    managed_list_add(&tree.managers, "containerd-shim");    // docker containers
-    managed_list_add(&tree.managers, "docker-init");        // docker containers
-    managed_list_add(&tree.managers, "dumb-init");          // some docker containers use this
-    managed_list_add(&tree.managers, "gnome-shell");        // gnome user applications
+    managed_list_add(&tree.managers, "init");                       // linux systems
+    managed_list_add(&tree.managers, "systemd");                    // lxc containers and host systems (this also catches "systemd --user")
+    managed_list_add(&tree.managers, "containerd-shim-runc-v2");    // docker containers
+    managed_list_add(&tree.managers, "docker-init");                // docker containers
+    managed_list_add(&tree.managers, "dumb-init");                  // some docker containers use this
+    managed_list_add(&tree.managers, "openrc-run.sh");              // openrc
+    managed_list_add(&tree.managers, "crond");                      // linux crond
+    managed_list_add(&tree.managers, "gnome-shell");                // gnome user applications
+    managed_list_add(&tree.managers, "plasmashell");                // kde user applications
+    managed_list_add(&tree.managers, "xfwm4");                      // xfce4 user applications
 #elif defined(OS_WINDOWS)
-    managed_list_add(&tree.managers, "System");
-    managed_list_add(&tree.managers, "services");
     managed_list_add(&tree.managers, "wininit");
+    managed_list_add(&tree.managers, "services");
+    managed_list_add(&tree.managers, "explorer");
+    managed_list_add(&tree.managers, "System");
 #elif defined(OS_FREEBSD)
     managed_list_add(&tree.managers, "init");
 #elif defined(OS_MACOS)
     managed_list_add(&tree.managers, "launchd");
+#endif
+
+#if defined(OS_WINDOWS)
+    managed_list_add(&tree.managers, "netdata");
+#else
+    managed_list_add(&tree.managers, "spawn-plugins");
 #endif
 
     managed_list_clear(&tree.aggregators);
@@ -140,25 +125,46 @@ void apps_orchestrators_and_aggregators_init(void) {
     managed_list_add(&tree.aggregators, "kernel");
 #elif defined(OS_MACOS)
 #endif
+
+    managed_list_clear(&tree.interpreters);
+    managed_list_add(&tree.interpreters, "python");
+    managed_list_add(&tree.interpreters, "python2");
+    managed_list_add(&tree.interpreters, "python3");
+    managed_list_add(&tree.interpreters, "sh");
+    managed_list_add(&tree.interpreters, "bash");
+    managed_list_add(&tree.interpreters, "node");
+    managed_list_add(&tree.interpreters, "perl");
 }
 
-static inline bool is_orchestrator(struct pid_stat *p) {
+bool is_process_a_manager(struct pid_stat *p) {
     for(size_t c = 0; c < tree.managers.used ; c++) {
-        if(p->comm == tree.managers.array[c].comm)
+        if(pid_match_check(p, &tree.managers.array[c].match))
             return true;
     }
 
     return false;
 }
 
-static inline bool is_aggregator(struct pid_stat *p) {
+bool is_process_an_aggregator(struct pid_stat *p) {
     for(size_t c = 0; c < tree.aggregators.used ; c++) {
-        if(p->comm == tree.aggregators.array[c].comm)
+        if(pid_match_check(p, &tree.aggregators.array[c].match))
             return true;
     }
 
     return false;
 }
+
+bool is_process_an_interpreter(struct pid_stat *p) {
+    for(size_t c = 0; c < tree.interpreters.used ; c++) {
+        if(pid_match_check(p, &tree.interpreters.array[c].match))
+            return true;
+    }
+
+    return false;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// Tree
 
 struct target *get_tree_target(struct pid_stat *p) {
 //    // skip fast all the children that are more than 3 levels down
@@ -166,25 +172,23 @@ struct target *get_tree_target(struct pid_stat *p) {
 //        p = p->parent;
 
     // keep the children of INIT_PID, and process orchestrators
-    while(p->parent && p->parent->pid != INIT_PID && p->parent->pid != 0 && !is_orchestrator(p->parent))
+    while(p->parent && p->parent->pid != INIT_PID && p->parent->pid != 0 && !p->parent->is_manager)
         p = p->parent;
 
     // merge all processes into process aggregators
-    STRING *search_for = string_dup(p->comm);
-    bool aggregator = false;
-    if((p->ppid == 0 && p->pid != INIT_PID) || (p->parent && is_aggregator(p->parent))) {
-        aggregator = true;
+    STRING *search_for = NULL;
+    if((p->ppid == 0 && p->pid != INIT_PID) || (p->parent && p->parent->is_aggregator)) {
         search_for = string_dup(KernelAggregator);
     }
-
-    if(!aggregator) {
+    else {
 #if (PROCESSES_HAVE_COMM_AND_NAME == 1)
-        search_for = sanitize_chart_meta_string(p->name ? p->name : p->comm);
+        search_for = string_dup(p->name ? p->name : p->comm);
 #else
-        search_for = comm_from_cmdline(p->comm, p->cmdline);
+        search_for = string_dup(p->comm);
 #endif
     }
 
+    // find an existing target with the required name
     struct target *w;
     for(w = apps_groups_root_target; w ; w = w->next) {
         if (w->name == search_for) {
@@ -195,8 +199,9 @@ struct target *get_tree_target(struct pid_stat *p) {
 
     w = callocz(sizeof(struct target), 1);
     w->type = TARGET_TYPE_TREE;
-    w->starts_with = w->ends_with = false;
-    w->compare = string_dup(p->comm);
+    w->match.starts_with = w->match.ends_with = false;
+    w->match.compare = string_dup(search_for);
+    w->match.pattern = NULL;
     w->id = search_for;
     w->name = string_dup(search_for);
     w->clean_name = get_clean_name(w->name);
@@ -302,55 +307,15 @@ struct target *apps_groups_root_target = NULL;
 
 // find or create a new target
 // there are targets that are just aggregated to other target (the second argument)
-static struct target *get_apps_groups_target(const char *id, struct target *target, const char *name) {
-    bool tdebug = false, thidden = target ? target->hidden : false, ends_with = false, starts_with = false;
-
-    STRING *id_lookup = NULL;
-    STRING *name_lookup = NULL;
-
-    // extract the options from the id
-    {
-        size_t len = strlen(id);
-        char buf[len + 1];
-        memcpy(buf, id, sizeof(buf));
-
-        if(buf[len - 1] == '*') {
-            buf[--len] = '\0';
-            starts_with = true;
-        }
-
-        const char *nid = buf;
-        while (nid[0] == '-' || nid[0] == '+' || nid[0] == '*') {
-            if (nid[0] == '-') thidden = true;
-            if (nid[0] == '+') tdebug = true;
-            if (nid[0] == '*') ends_with = true;
-            nid++;
-        }
-
-        id_lookup = string_strdupz(nid);
-    }
-
-    // extract the options from the name
-    {
-        size_t len = strlen(name);
-        char buf[len + 1];
-        memcpy(buf, name, sizeof(buf));
-
-        const char *nn = buf;
-        while (nn[0] == '-' || nn[0] == '+') {
-            if (nn[0] == '-') thidden = true;
-            if (nn[0] == '+') tdebug = true;
-            nn++;
-        }
-
-        name_lookup = string_strdupz(nn);
-    }
+static struct target *get_apps_groups_target(const char *comm, struct target *target, const char *name) {
+    APPS_MATCH match = pid_match_create(comm);
+    STRING *name_lookup = string_strdupz(name);
 
     // find if it already exists
     struct target *w, *last = apps_groups_root_target;
     for(w = apps_groups_root_target ; w ; w = w->next) {
-        if(w->id == id_lookup) {
-            string_freez(id_lookup);
+        if(w->id == match.compare) {
+            pid_match_cleanup(&match);
             string_freez(name_lookup);
             return w;
         }
@@ -368,49 +333,37 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
 
     if(target && target->target)
         fatal("Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'",
-              id, string2str(target->id), string2str(target->target->id));
+            comm, string2str(target->id), string2str(target->target->id));
 
     w = callocz(sizeof(struct target), 1);
     w->type = TARGET_TYPE_APP_GROUP;
-    w->compare = string_dup(id_lookup);
-    w->starts_with = starts_with;
-    w->ends_with = ends_with;
-    w->id = string_dup(id_lookup);
+    w->match = match;
+    w->id = string_dup(w->match.compare);
 
     if(unlikely(!target))
         w->name = string_dup(name_lookup); // copy the name
     else
-        w->name = string_dup(id_lookup); // copy the id
+        w->name = string_dup(w->id); // copy the id
 
     // dots are used to distinguish chart type and id in streaming, so we should replace them
     w->clean_name = get_clean_name(w->name);
 
-    if(w->starts_with && w->ends_with)
+    if(w->match.starts_with && w->match.ends_with)
         proc_pid_cmdline_is_needed = true;
 
-    w->hidden = thidden;
-#ifdef NETDATA_INTERNAL_CHECKS
-    w->debug_enabled = tdebug;
-#else
-    if(tdebug)
-        fprintf(stderr, "apps.plugin has been compiled without debugging\n");
-#endif
     w->target = target;
 
     // append it, to maintain the order in apps_groups.conf
     if(last) last->next = w;
     else apps_groups_root_target = w;
 
-    debug_log("ADDING TARGET ID '%s', process name '%s' (%s), aggregated on target '%s', options: %s %s"
+    debug_log("ADDING TARGET ID '%s', process name '%s' (%s), aggregated on target '%s'"
               , string2str(w->id)
-              , string2str(w->compare)
-              , (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
+              , string2str(w->match.compare)
+              , (w->match.starts_with && w->match.ends_with) ? "substring" : ((w->match.starts_with) ? "prefix" : ((w->match.ends_with) ? "suffix" : "exact"))
               , w->target?w->target->name:w->name
-              , (w->hidden)?"hidden":"-"
-              , (w->debug_enabled)?"debug":"-"
     );
 
-    string_freez(id_lookup);
     string_freez(name_lookup);
 
     return w;
@@ -437,30 +390,39 @@ int read_apps_groups_conf(const char *path, const char *file) {
 
     size_t line, lines = procfile_lines(ff);
 
-    bool managers_reset_done = false;
-
     for(line = 0; line < lines ;line++) {
         size_t word, words = procfile_linewords(ff, line);
         if(!words) continue;
 
         char *name = procfile_lineword(ff, line, 0);
-        if(!name || !*name) continue;
+        if(!name || !*name || *name == '#') continue;
 
         if(strcmp(name, "managers") == 0) {
-            if(!managers_reset_done) {
-                managers_reset_done = true;
+            if(words == 2 && strcmp(procfile_lineword(ff, line, 1), "clear") == 0)
                 managed_list_clear(&tree.managers);
-            }
 
-            for(word = 0; word < words ;word++) {
+            for(word = 1; word < words ;word++) {
                 char *s = procfile_lineword(ff, line, word);
                 if (!s || !*s) continue;
                 if (*s == '#') break;
 
-                // is this the first word? skip it
-                if(s == name) continue;
-
                 managed_list_add(&tree.managers, s);
+            }
+
+            // done with managers, proceed to next line
+            continue;
+        }
+
+        if(strcmp(name, "interpreters") == 0) {
+            if(words == 2 && strcmp(procfile_lineword(ff, line, 1), "clear") == 0)
+                managed_list_clear(&tree.interpreters);
+
+            for(word = 1; word < words ;word++) {
+                char *s = procfile_lineword(ff, line, word);
+                if (!s || !*s) continue;
+                if (*s == '#') break;
+
+                managed_list_add(&tree.interpreters, s);
             }
 
             // done with managers, proceed to next line
@@ -471,13 +433,10 @@ int read_apps_groups_conf(const char *path, const char *file) {
         struct target *w = NULL;
 
         // loop through all words, skipping the first one (the name)
-        for(word = 0; word < words ;word++) {
+        for(word = 1; word < words ;word++) {
             char *s = procfile_lineword(ff, line, word);
             if(!s || !*s) continue;
             if(*s == '#') break;
-
-            // is this the first word? skip it
-            if(s == name) continue;
 
             // add this target
             struct target *n = get_apps_groups_target(s, w, name);

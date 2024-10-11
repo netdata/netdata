@@ -9,7 +9,6 @@
 
 To better understand the guidelines and the API behind our External plugins, please have a look at the [Introduction to External plugins](/src/plugins.d/README.md) prior to reading this page.
 
-
 `charts.d.plugin` has been designed so that the actual script that will do data collection will be permanently in
 memory, collecting data with as little overheads as possible
 (i.e. initialize once, repeatedly collect values with minimal overhead).
@@ -21,11 +20,11 @@ By default, `charts.d.plugin` is not included as part of the install when using 
 
 ## Configuration
 
-`charts.d.plugin` itself can be [configured](/docs/netdata-agent/configuration/README.md#edit-netdataconf)using the configuration file `/etc/netdata/charts.d.conf`. This file is also a BASH script.
+`charts.d.plugin` itself can be [configured](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config)using the configuration file `/etc/netdata/charts.d.conf`. This file is also a BASH script.
 
 In this file, you can place statements like this:
 
-```conf
+```text
 enable_all_charts="yes"
 X="yes"
 Y="no"
@@ -121,7 +120,7 @@ Using the above, if the command `mysql` is not available in the system, the `mys
 `fixid()` will get a string and return a properly formatted id for a chart or dimension.
 
 This is an expensive function that should not be used in `X_update()`.
-You can keep the generated id in a BASH associative array to have the values availables in `X_update()`, like this:
+You can keep the generated id in a BASH associative array to have the values available in `X_update()`, like this:
 
 ```sh
 declare -A X_ids=()

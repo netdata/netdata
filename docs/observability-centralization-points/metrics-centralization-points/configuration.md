@@ -58,7 +58,7 @@ Save the file and restart Netdata.
 
 While encrypting the connection between your parent and child nodes is recommended for security, it's not required to get started.
 
-This example uses self-signed certificates. 
+This example uses self-signed certificates.
 
 > **Note**  
 > This section assumes you have read the documentation on [how to edit the Netdata configuration files](/docs/netdata-agent/configuration/README.md).  
@@ -70,7 +70,7 @@ This example uses self-signed certificates.
 2. **Child node**  
    Update `stream.conf` to enable SSL/TLS and allow self-signed certificates. Append ':SSL' to the destination and uncomment 'ssl skip certificate verification'.
 
-    ```conf
+    ```text
     [stream]
         enabled = yes
         destination = 203.0.113.0:SSL
@@ -79,8 +79,6 @@ This example uses self-signed certificates.
     ```
 
 3. Restart the Netdata Agent on both the parent and child nodes, to stream encrypted metrics using TLS/SSL.
-
-
 
 ## Troubleshooting Streaming Connections
 

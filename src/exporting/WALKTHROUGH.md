@@ -37,7 +37,7 @@ This stack will offer you visibility into your application and systems performan
 To begin let's create our container which we will install Netdata on. We need to run a container, forward the necessary
 port that Netdata listens on, and attach a tty so we can interact with the bash shell on the container. But before we do
 this we want name resolution between the two containers to work. In order to accomplish this we will create a
-user-defined network and attach both containers to this network. The first command we should run is: 
+user-defined network and attach both containers to this network. The first command we should run is:
 
 ```sh
 docker network create --driver bridge netdata-tutorial
@@ -90,15 +90,15 @@ We will be installing Prometheus in a container for purpose of demonstration. Wh
 container I would like to walk through the install process and setup on a fresh container. This will allow anyone
 reading to migrate this tutorial to a VM or Server of any sort.
 
-Let's start another container in the same fashion as we did the Netdata container. 
+Let's start another container in the same fashion as we did the Netdata container.
 
 ```sh
 docker run -it --name prometheus --hostname prometheus \
 --network=netdata-tutorial -p 9090:9090  centos:latest '/bin/bash'
-``` 
+```
 
 This should drop you into a shell once again. Once there quickly install your favorite editor as we will be editing
-files later in this tutorial. 
+files later in this tutorial.
 
 ```sh
 yum install vim -y
@@ -137,7 +137,7 @@ point to talk about Prometheus's data model which can be viewed here: <https://p
 As explained we have two key elements in Prometheus metrics. We have the _metric_ and its _labels_. Labels allow for
 granularity between metrics. Let's use our previous example to further explain.
 
-```conf
+```text
 netdata_disk_space_GiB_average{chart="disk_space._run",dimension="avail",family="/run",mount_point="/run",filesystem="tmpfs",mount_root="/"} 0.0298195 1684951093000
 ```
 
@@ -193,7 +193,7 @@ across a section of metrics with the first comments  `# COMMENT homogeneous char
 family "cpu", units "percentage"` followed by the metrics. This is a good start now let us drill down to the specific
 metric we would like to graph.
 
-```conf
+```text
 # COMMENT
 netdata_system_cpu_percentage_average: dimension "system", value is percentage, gauge, dt 1501275951 to 1501275951 inclusive
 netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension="system"} 0.0000000 1501275951000
@@ -256,5 +256,3 @@ deployments automatically register Netdata services into Consul and Prometheus a
 achieved you do not have to think about the monitoring system until Prometheus cannot keep up with your scale. Once this
 happens there are options presented in the Prometheus documentation for solving this. Hope this was helpful, happy
 monitoring.
-
-

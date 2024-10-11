@@ -111,7 +111,7 @@ the following format: `[PROTOCOL:]HOST[%INTERFACE][:PORT][:SSL]`.
 
 To enable TCP streaming to a parent node at `203.0.113.0` on port `20000` and with TLS/SSL encryption: 
 
-```conf
+```text
 [stream]
     destination = tcp:203.0.113.0:20000:SSL
 ```
@@ -125,14 +125,14 @@ The default is a single wildcard `*`, which streams all charts.
 To send only a few charts, list them explicitly, or list a group using a wildcard. To send _only_ the `apps.cpu` chart
 and charts with contexts beginning with `system.`: 
 
-```conf
+```text
 [stream]
     send charts matching = apps.cpu system.*
 ```
 
 To send all but a few charts, use `!` to create a negative match. To send _all_ charts _but_ `apps.cpu`:
 
-```conf
+```text
 [stream]
     send charts matching = !apps.cpu *
 ```
@@ -146,14 +146,14 @@ The default is `*`, which accepts all requests including the `API_KEY`.
 
 To allow from only a specific IP address:
 
-```conf
+```text
 [API_KEY]
     allow from = 203.0.113.10
 ```
 
 To allow all IPs starting with `10.*`, except `10.1.2.3`:
 
-```conf
+```text
 [API_KEY]
     allow from = !10.1.2.3 10.*
 ```
@@ -201,7 +201,7 @@ with the `[MACHINE_GUID]` section.
 For example, the metrics streamed from only the child node with `MACHINE_GUID` are saved in memory, not using the
 default `dbengine` as specified by the `API_KEY`, and alerts are disabled.
 
-```conf
+```text
 [API_KEY]
     enabled = yes
     db = dbengine
@@ -431,7 +431,7 @@ In the following example, the proxy receives metrics from a child node using the
 `66666666-7777-8888-9999-000000000000`, then stores metrics using `dbengine`. It then uses the `API_KEY` of
 `11111111-2222-3333-4444-555555555555` to proxy those same metrics on to a parent node at `203.0.113.0`.
 
-```conf
+```text
 [stream]
     enabled = yes 
     destination = 203.0.113.0
@@ -449,7 +449,7 @@ metrics to any number of permanently-running parent nodes.
 
 On the parent, set the following in `stream.conf`:
 
-```conf
+```text
 [11111111-2222-3333-4444-555555555555]
 	# enable/disable this API key
     enabled = yes
@@ -497,7 +497,7 @@ This replication process ensures data continuity even if child nodes temporarily
 
 Replication is enabled by default in Netdata, but you can customize the replication behavior by modifying the `[API_KEY]` section of the `stream.conf` file. Here's an example configuration:
 
-```conf
+```text
 [11111111-2222-3333-4444-555555555555]
     # Enable replication for all hosts using this api key. Default: yes.
     enable replication = yes

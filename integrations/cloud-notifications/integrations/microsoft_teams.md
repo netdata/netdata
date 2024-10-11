@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/teams.svg" width="150"/>
 
 
-From the Netdata Cloud UI, you can manage your space's notification settings and enable the configuration to deliver notifications to a Microsoft Teams channel.
+You can configure notification delivery to a Microsoft Teams channel from the Netdata Cloud UI.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
@@ -22,37 +22,33 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
 
 ### Prerequisites
 
-To add Microsoft Teams notifications integration to your Netdata Cloud space you will need the following:
+- A Netdata Cloud account
+- Access to the Space as an **Admin**
+- The Space needs to be on a paid plan
+- A [Microsoft Teams Essentials subscription](https://www.microsoft.com/en-sg/microsoft-teams/essentials) or higher. Note that this is a **paid** feature
 
-- A Netdata Cloud account.
-- Access to the Netdata Cloud space as an **Admin**.
-- The Space to be on a paid plan.
-- A [Microsoft Teams Essentials subscription](https://www.microsoft.com/en-sg/microsoft-teams/essentials) or higher. Note that this is a **paid** feature.
+### Microsoft Teams Configuration
 
-### Settings on Microsoft Teams
+1. Navigate to the desired Microsoft Teams channel and hover over the channel name. Click the three dots icon that appears
+2. Select "Workflows" from the options, then choose "Post to a channel when a webhook request is received"
+3. **Configure Workflow Details**
+    - Give your workflow a name, such as "Netdata Alerts"
+    - Select the target team and channel where you will receive notifications
+    - Click "Add workflow"
+4. Once the workflow is created, you will receive a unique Workflow Webhook URL, copy it, in order to add it to your integration configuration in the Netdata Cloud UI
 
-1. **Access the Channel Settings**: Navigate to the desired Microsoft Teams channel and hover over the channel name. Click the three dots (ellipsis) icon that appears.
-2. **Create a New Workflow**: Select "Workflows" from the options, then choose "Post to a channel when a webhook request is received."
-3. **Configure Workflow Details**:
-    - Give your workflow a descriptive name, such as "Netdata Alerts."
-    - Select the target team and channel to receive notifications.
-    - Click "Add workflow."
-4. **Obtain the Webhook URL**:
-    - Once the workflow is created, you will receive a unique Workflow Webhook URL.
-    - Copy this URL, as it will be required to configure Netdata Cloud.
+### Netdata Configuration
 
-### Settings on Netdata Cloud
-
-1. Click on the **Space settings** cog (located above your profile icon).
-2. Click on the **Notification** tab.
-3. Click on the **+ Add configuration** button (near the top-right corner of your screen).
-4. On the **Microsoft Teams** card click on **+ Add**.
-5. A modal will be presented to you to enter the required details to enable the configuration:
-  * **Notification settings** are Netdata specific settings:
-      - Configuration name - you can optionally provide a name for your configuration  you can easily refer to it.
-      - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration.
-      - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only.
-  * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Microsoft Teams:
-      - Microsoft Teams Incoming Webhook URL - the _Incoming Webhook URL_ that was generated earlier.
+1. Click on the **Space settings** cog (located above your profile icon)
+2. Click on the **Alerts & Notifications** tab
+3. Click on the **+ Add configuration** button
+4. Add the Microsoft Teams Integration
+5. A modal will be presented to you to enter the required details to enable the integration:
+    - **Notification settings**
+      - Configuration name (optional): A name for your configuration in order to easily refer to it
+      - Rooms: A list of Rooms for which you want to be notified
+      - Notifications: The notifications which you want to be notified
+    - **Integration configuration**
+      - Microsoft Teams Incoming Webhook URL: The Incoming Webhook URL that you copied earlier.
 
 

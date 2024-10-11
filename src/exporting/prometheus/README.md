@@ -203,7 +203,7 @@ interrupts, QoS classes, statsd synthetic charts, etc.
 
 The default is controlled in `exporting.conf`:
 
-```conf
+```text
 [prometheus:exporter]
 	send names instead of ids = yes | no
 ```
@@ -217,7 +217,7 @@ You can overwrite it from Prometheus, by appending to the URL:
 
 Netdata can filter the metrics it sends to Prometheus with this setting:
 
-```conf
+```text
 [prometheus:exporter]
 	send charts matching = *
 ```
@@ -233,7 +233,7 @@ used.
 
 Netdata sends all metrics prefixed with `netdata_`. You can change this in `netdata.conf`, like this:
 
-```conf
+```text
 [prometheus:exporter]
 	prefix = netdata
 ```

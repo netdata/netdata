@@ -23,7 +23,10 @@ Module: chrony
 
 This collector monitors the system's clock performance and peers activity status
 
+
 It collects metrics by sending UDP packets to chronyd using the Chrony communication protocol v6.
+Additionally, for data collection jobs that connect to localhost Chrony instances, it collects serverstats metrics (NTP packets, command packets received/dropped) by executing the 'chronyc serverstats' command.
+
 
 This collector is supported on all platforms.
 
@@ -80,6 +83,8 @@ Metrics:
 | chrony.ref_measurement_time | ref_measurement_time | seconds |
 | chrony.leap_status | normal, insert_second, delete_second, unsynchronised | status |
 | chrony.activity | online, offline, burst_online, burst_offline, unresolved | sources |
+| chrony.ntp_packets | received, dropped | packets/s |
+| chrony.command_packets | received, dropped | packets/s |
 
 
 
@@ -101,7 +106,7 @@ No action required.
 The configuration file name for this integration is `go.d/chrony.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash

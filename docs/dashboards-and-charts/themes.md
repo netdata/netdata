@@ -12,4 +12,3 @@ tab, and then choose your preferred theme: **Light** or **Dark**.
 **Light**:
 
 ![Light theme](https://github.com/netdata/netdata/assets/70198089/eb0fb8c1-5695-450a-8ba8-a185874e8496)
-

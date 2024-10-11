@@ -1,14 +1,3 @@
-<!--
-title: go.d.plugin
-description: "go.d.plugin is an external plugin for Netdata, responsible for running individual data collectors written in Go."
-custom_edit_url: "/src/go/plugin/go.d/README.md"
-sidebar_label: "go.d.plugin"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Developers/External plugins/go.d.plugin"
-sidebar_position: 1
--->
-
 # go.d.plugin
 
 `go.d.plugin` is a [Netdata](https://github.com/netdata/netdata) external plugin. It is an **orchestrator** for data
@@ -117,6 +106,7 @@ see the appropriate collector readme.
 | [openvpn](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/openvpn)                       |            OpenVPN            |
 | [openvpn_status_log](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/openvpn_status_log) |            OpenVPN            |
 | [pgbouncer](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/pgbouncer)                   |           PgBouncer           |
+| [oracledb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/oracledb)                     |           Oracle DB           |
 | [phpdaemon](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/phpdaemon)                   |           phpDaemon           |
 | [phpfpm](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/phpfpm)                         |            PHP-FPM            |
 | [pihole](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/pihole)                         |            Pi-hole            |

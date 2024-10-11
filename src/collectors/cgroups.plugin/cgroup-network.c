@@ -146,10 +146,11 @@ static void continue_as_child(void) {
     if (child < 0)
         collector_error("fork() failed");
 
-    /* Only the child returns */
     if (child == 0)
+        // the child returns
         return;
 
+    // here is the parent
     for (;;) {
         ret = waitpid(child, &status, WUNTRACED);
         if ((ret == child) && (WIFSTOPPED(status))) {
@@ -159,9 +160,36 @@ static void continue_as_child(void) {
         } else {
             break;
         }
+
+        tinysleep();
     }
 
     /* Return the child's exit code if possible */
+
+#ifdef __SANITIZE_ADDRESS__
+    /*
+     * With sanitization, exiting leads to an infinite loop (100% cpu) here:
+     *
+     * #0  0x00007ffff690ea8b in sched_yield () from /usr/lib/libc.so.6
+     * #1  0x00007ffff792c4a6 in __sanitizer::StopTheWorld (callback=<optimized out>, argument=<optimized out>) at /usr/src/debug/gcc/gcc/libsanitizer/sanitizer_common/sanitizer_stoptheworld_linux_libcdep.cpp:457
+     * #2  0x00007ffff793f6f9 in __lsan::LockStuffAndStopTheWorldCallback (info=<optimized out>, size=<optimized out>, data=0x7fffffffde20) at /usr/src/debug/gcc/gcc/libsanitizer/lsan/lsan_common_linux.cpp:127
+     * #3  0x00007ffff6977909 in dl_iterate_phdr () from /usr/lib/libc.so.6
+     * #4  0x00007ffff793fb24 in __lsan::LockStuffAndStopTheWorld (callback=callback@entry=0x7ffff793d9d0 <__lsan::CheckForLeaksCallback(__sanitizer::SuspendedThreadsList const&, void*)>, argument=argument@entry=0x7fffffffdea0)
+     *     at /usr/src/debug/gcc/gcc/libsanitizer/lsan/lsan_common_linux.cpp:142
+     * #5  0x00007ffff793c965 in __lsan::CheckForLeaks () at /usr/src/debug/gcc/gcc/libsanitizer/lsan/lsan_common.cpp:778
+     * #6  0x00007ffff793cc68 in __lsan::DoLeakCheck () at /usr/src/debug/gcc/gcc/libsanitizer/lsan/lsan_common.cpp:821
+     * #7  0x00007ffff684e340 in __cxa_finalize () from /usr/lib/libc.so.6
+     * #8  0x00007ffff7838c58 in __do_global_dtors_aux () from /usr/lib/libasan.so.8
+     * #9  0x00007fffffffdfe0 in ?? ()
+     *
+     * Probably is something related to switching name spaces.
+     * So, we kill -9 self.
+     *
+     */
+
+    kill(getpid(), SIGKILL);
+#endif
+
     if (WIFEXITED(status)) {
         exit(WEXITSTATUS(status));
     } else if (WIFSIGNALED(status)) {
@@ -494,9 +522,6 @@ cleanup:
 
 #define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
 void call_the_helper(pid_t pid, const char *cgroup) {
-    if(setresuid(0, 0, 0) == -1)
-        collector_error("setresuid(0, 0, 0) failed.");
-
     char command[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
     if(cgroup)
         snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec " PLUGINS_DIR "/cgroup-network-helper.sh --cgroup '%s'", cgroup);
@@ -643,11 +668,16 @@ void usage(void) {
     exit(1);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, const char **argv) {
     pid_t pid = 0;
 
     clocks_init();
+
+    if (setresuid(0, 0, 0) == -1)
+        collector_error("setresuid(0, 0, 0) failed.");
+
     nd_log_initialize_for_external_plugins("cgroup-network");
+    netdata_main_spawn_server_init(NULL, argc, argv);
 
     // since cgroup-network runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
@@ -707,7 +737,7 @@ int main(int argc, char **argv) {
         if(helper) call_the_helper(pid, NULL);
     }
     else if(!strcmp(argv[arg], "--cgroup")) {
-        char *cgroup = argv[arg+1];
+        const char *cgroup = argv[arg+1];
         if(verify_path(cgroup) == -1) {
             collector_error("cgroup '%s' does not exist or is not valid.", cgroup);
             return 1;

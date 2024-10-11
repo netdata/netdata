@@ -1,12 +1,3 @@
-<!--
-title: "Traefik monitoring with Netdata"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/python.d.plugin/traefik/README.md"
-sidebar_label: "traefik-python.d.plugin"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Webapps"
--->
-
 # Traefik collector
 
 Uses the `health` API to provide statistics.

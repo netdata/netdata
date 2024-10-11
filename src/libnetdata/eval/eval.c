@@ -387,29 +387,63 @@ static inline void skip_spaces(const char **string) {
     *string = s;
 }
 
-// what character can appear just after an operator keyword
-// like NOT AND OR ?
-static inline int isoperatorterm_word(const char s) {
-    if(isspace(s) || s == '(' || s == '$' || s == '!' || s == '-' || s == '+' || isdigit(s) || !s)
-        return 1;
+//static inline int old_isoperatorterm_word(const char s) {
+//    if (isspace(s) || s == '(' || s == '$' || s == '!' || s == '-' || s == '+' || isdigit(s) || !s)
+//        return 1;
+//    return 0;
+//}
+//
+//static inline int old_isoperatorterm_symbol(const char s) {
+//    if (old_isoperatorterm_word(s) || isalpha(s))
+//        return 1;
+//    return 0;
+//}
+//
+//// return 1 if the character should never appear in a variable
+//static inline int old_isvariableterm(const char s) {
+//    if (isalnum(s) || s == '.' || s == '_')
+//        return 0;
+//    return 1;
+//}
 
-    return 0;
+static inline bool is_operator_first_symbol_or_space(const char s) {
+    return (
+        isspace((uint8_t)s) || !s ||
+        s == '&' || s == '|' || s == '!' || s == '>' || s == '<' ||
+        s == '=' || s == '+' || s == '-' || s == '*' || s == '/' || s == '?');
+}
+
+// what character can appear just after the operators: NOT, AND, OR
+static inline bool is_valid_after_operator_word(const char s) {
+    bool rc = isspace((uint8_t)s) || s == '(' || s == '$' || s == '!' || s == '-' || s == '+' || isdigit((uint8_t)s) || !s;
+//    bool old = old_isoperatorterm_word(s);
+//    if(rc != old) {
+//        int x = 0;
+//        x++;
+//    }
+    return rc;
 }
 
 // what character can appear just after an operator symbol?
-static inline int isoperatorterm_symbol(const char s) {
-    if(isoperatorterm_word(s) || isalpha(s))
-        return 1;
-
-    return 0;
+static inline bool is_valid_after_operator_symbol(const char s) {
+    bool rc = is_valid_after_operator_word(s) || is_operator_first_symbol_or_space(s);
+//    bool old = old_isoperatorterm_symbol(s);
+//    if(rc != old) {
+//        int x = 0;
+//        x++;
+//    }
+    return rc;
 }
 
-// return 1 if the character should never appear in a variable
-static inline int isvariableterm(const char s) {
-    if(isalnum(s) || s == '.' || s == '_')
-        return 0;
-
-    return 1;
+// return true if the character may appear in a variable name
+static inline bool is_valid_variable_character(const char s) {
+    bool rc = !is_operator_first_symbol_or_space(s) && s != ')' && s != '}';
+//    bool old = !old_isvariableterm(s);
+//    if(rc != old) {
+//        int x = 0;
+//        x++;
+//    }
+    return rc;
 }
 
 // ----------------------------------------------------------------------------
@@ -419,13 +453,14 @@ static inline int parse_and(const char **string) {
     const char *s = *string;
 
     // AND
-    if((s[0] == 'A' || s[0] == 'a') && (s[1] == 'N' || s[1] == 'n') && (s[2] == 'D' || s[2] == 'd') && isoperatorterm_word(s[3])) {
+    if((s[0] == 'A' || s[0] == 'a') && (s[1] == 'N' || s[1] == 'n') && (s[2] == 'D' || s[2] == 'd') &&
+        is_valid_after_operator_word(s[3])) {
         *string = &s[4];
         return 1;
     }
 
     // &&
-    if(s[0] == '&' && s[1] == '&' && isoperatorterm_symbol(s[2])) {
+    if(s[0] == '&' && s[1] == '&' && is_valid_after_operator_symbol(s[2])) {
         *string = &s[2];
         return 1;
     }
@@ -437,13 +472,13 @@ static inline int parse_or(const char **string) {
     const char *s = *string;
 
     // OR
-    if((s[0] == 'O' || s[0] == 'o') && (s[1] == 'R' || s[1] == 'r') && isoperatorterm_word(s[2])) {
+    if((s[0] == 'O' || s[0] == 'o') && (s[1] == 'R' || s[1] == 'r') && is_valid_after_operator_word(s[2])) {
         *string = &s[3];
         return 1;
     }
 
     // ||
-    if(s[0] == '|' && s[1] == '|' && isoperatorterm_symbol(s[2])) {
+    if(s[0] == '|' && s[1] == '|' && is_valid_after_operator_symbol(s[2])) {
         *string = &s[2];
         return 1;
     }
@@ -455,7 +490,7 @@ static inline int parse_greater_than_or_equal(const char **string) {
     const char *s = *string;
 
     // >=
-    if(s[0] == '>' && s[1] == '=' && isoperatorterm_symbol(s[2])) {
+    if(s[0] == '>' && s[1] == '=' && is_valid_after_operator_symbol(s[2])) {
         *string = &s[2];
         return 1;
     }
@@ -467,7 +502,7 @@ static inline int parse_less_than_or_equal(const char **string) {
     const char *s = *string;
 
     // <=
-    if (s[0] == '<' && s[1] == '=' && isoperatorterm_symbol(s[2])) {
+    if (s[0] == '<' && s[1] == '=' && is_valid_after_operator_symbol(s[2])) {
         *string = &s[2];
         return 1;
     }
@@ -479,7 +514,7 @@ static inline int parse_greater(const char **string) {
     const char *s = *string;
 
     // >
-    if(s[0] == '>' && isoperatorterm_symbol(s[1])) {
+    if(s[0] == '>' && is_valid_after_operator_symbol(s[1])) {
         *string = &s[1];
         return 1;
     }
@@ -491,7 +526,7 @@ static inline int parse_less(const char **string) {
     const char *s = *string;
 
     // <
-    if(s[0] == '<' && isoperatorterm_symbol(s[1])) {
+    if(s[0] == '<' && is_valid_after_operator_symbol(s[1])) {
         *string = &s[1];
         return 1;
     }
@@ -503,13 +538,13 @@ static inline int parse_equal(const char **string) {
     const char *s = *string;
 
     // ==
-    if(s[0] == '=' && s[1] == '=' && isoperatorterm_symbol(s[2])) {
+    if(s[0] == '=' && s[1] == '=' && is_valid_after_operator_symbol(s[2])) {
         *string = &s[2];
         return 1;
     }
 
     // =
-    if(s[0] == '=' && isoperatorterm_symbol(s[1])) {
+    if(s[0] == '=' && is_valid_after_operator_symbol(s[1])) {
         *string = &s[1];
         return 1;
     }
@@ -521,13 +556,13 @@ static inline int parse_not_equal(const char **string) {
     const char *s = *string;
 
     // !=
-    if(s[0] == '!' && s[1] == '=' && isoperatorterm_symbol(s[2])) {
+    if(s[0] == '!' && s[1] == '=' && is_valid_after_operator_symbol(s[2])) {
         *string = &s[2];
         return 1;
     }
 
     // <>
-    if(s[0] == '<' && s[1] == '>' && isoperatorterm_symbol(s[2])) {
+    if(s[0] == '<' && s[1] == '>' && is_valid_after_operator_symbol(s[2])) {
         *string = &s[2];
     }
 
@@ -538,7 +573,8 @@ static inline int parse_not(const char **string) {
     const char *s = *string;
 
     // NOT
-    if((s[0] == 'N' || s[0] == 'n') && (s[1] == 'O' || s[1] == 'o') && (s[2] == 'T' || s[2] == 't') && isoperatorterm_word(s[3])) {
+    if((s[0] == 'N' || s[0] == 'n') && (s[1] == 'O' || s[1] == 'o') && (s[2] == 'T' || s[2] == 't') &&
+        is_valid_after_operator_word(s[3])) {
         *string = &s[3];
         return 1;
     }
@@ -555,7 +591,7 @@ static inline int parse_multiply(const char **string) {
     const char *s = *string;
 
     // *
-    if(s[0] == '*' && isoperatorterm_symbol(s[1])) {
+    if(s[0] == '*' && is_valid_after_operator_symbol(s[1])) {
         *string = &s[1];
         return 1;
     }
@@ -567,7 +603,7 @@ static inline int parse_divide(const char **string) {
     const char *s = *string;
 
     // /
-    if(s[0] == '/' && isoperatorterm_symbol(s[1])) {
+    if(s[0] == '/' && is_valid_after_operator_symbol(s[1])) {
         *string = &s[1];
         return 1;
     }
@@ -579,7 +615,7 @@ static inline int parse_minus(const char **string) {
     const char *s = *string;
 
     // -
-    if(s[0] == '-' && isoperatorterm_symbol(s[1])) {
+    if(s[0] == '-' && is_valid_after_operator_symbol(s[1])) {
         *string = &s[1];
         return 1;
     }
@@ -591,7 +627,7 @@ static inline int parse_plus(const char **string) {
     const char *s = *string;
 
     // +
-    if(s[0] == '+' && isoperatorterm_symbol(s[1])) {
+    if(s[0] == '+' && is_valid_after_operator_symbol(s[1])) {
         *string = &s[1];
         return 1;
     }
@@ -646,7 +682,7 @@ static inline int parse_variable(const char **string, char *buffer, size_t len) 
         else {
             // $variable_name
 
-            while (*s && !isvariableterm(*s) && i < len)
+            while (*s && is_valid_variable_character(*s) && i < len)
                 buffer[i++] = *s++;
         }
 
@@ -1219,7 +1255,7 @@ void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable,
             }
 
             if (s) {
-                if (s == s1 && (isalnum((uint8_t)s[len]) || s[len] == '_')) {
+                if (s == s1 && !is_valid_variable_character(s[len])) {
                     // Move past the variable if it's part of a larger word.
                     source_ptr = s + len;
                     continue;

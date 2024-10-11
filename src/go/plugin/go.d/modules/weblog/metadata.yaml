@@ -124,7 +124,7 @@ modules:
               default_value: ""
               required: true
             - name: url_patterns.pattern
-              description: Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format).
+              description: Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).
               default_value: ""
               required: true
             - name: log_type

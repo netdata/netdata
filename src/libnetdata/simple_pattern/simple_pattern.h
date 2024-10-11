@@ -21,6 +21,8 @@ typedef enum __attribute__ ((__packed__)) {
 struct simple_pattern;
 typedef struct simple_pattern SIMPLE_PATTERN;
 
+#define SIMPLE_PATTERN_NO_SEPARATORS (const char *)(0xFFFFFFFF)
+
 // create a simple_pattern from the string given
 // default_mode is used in cases where EXACT matches, without an asterisk,
 // should be considered PREFIX matches.

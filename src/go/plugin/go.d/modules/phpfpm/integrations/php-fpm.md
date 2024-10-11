@@ -95,7 +95,7 @@ Uncomment the `pm.status_path = /status` variable in the `php-fpm` config file.
 The configuration file name for this integration is `go.d/phpfpm.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash

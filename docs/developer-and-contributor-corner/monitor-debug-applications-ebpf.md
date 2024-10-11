@@ -1,13 +1,3 @@
-<!--
-title: "Monitor, troubleshoot, and debug applications with eBPF metrics"
-sidebar_label: "Monitor, troubleshoot, and debug applications with eBPF metrics"
-description: "Use Netdata's built-in eBPF metrics collector to monitor, troubleshoot, and debug your custom application using low-level kernel feedback."
-image: /img/seo/guides/troubleshoot/monitor-debug-applications-ebpf.png
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md
-learn_status: "Published"
-learn_rel_path: "Operations"
--->
-
 # Monitor, troubleshoot, and debug applications with eBPF metrics
 
 When trying to troubleshoot or debug a finicky application, there's no such thing as too much information. At Netdata,
@@ -48,7 +38,7 @@ your application's process name.
 
 Your file should now look like this:
 
-```conf
+```text
 ...
 # -----------------------------------------------------------------------------
 # Custom applications to monitor with apps.plugin and ebpf.plugin
@@ -60,15 +50,14 @@ dev: custom-app
 ...
 ```
 
-Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, to begin seeing metrics for this particular
+Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate method](/docs/netdata-agent/start-stop-restart.md) for your system, to begin seeing metrics for this particular
 group+process. You can also add additional processes to the same group.
 
 You can set up `apps_groups.conf` to more show more precise eBPF metrics for any application or service running on your
 system, even if it's a standard package like Redis, Apache, or any other [application/service Netdata collects
 from](/src/collectors/COLLECTORS.md).
 
-```conf
+```text
 # -----------------------------------------------------------------------------
 # Custom applications to monitor with apps.plugin and ebpf.plugin
 
@@ -99,7 +88,7 @@ sudo ./edit-config ebpf.d.conf
 
 Replace `entry` with `return`:
 
-```conf
+```text
 [global]
     ebpf load mode = return
     disable apps = no
@@ -109,8 +98,7 @@ Replace `entry` with `return`:
     network viewer = yes
 ```
 
-Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
+Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate method](/docs/netdata-agent/start-stop-restart.md) for your system.
 
 ## Get familiar with per-application eBPF metrics and charts
 
@@ -139,7 +127,7 @@ In these charts, you can see first a spike in syscalls to open and close files f
 followed by a similar spike from the Apache benchmark.
 
 > 👋 Don't forget that you can view chart data directly via Netdata's API!
-> 
+>
 > For example, open your browser and navigate to `http://NODE:19999/api/v1/data?chart=apps.file_open`, replacing `NODE`
 > with the IP address or hostname of your Agent. The API returns JSON of that chart's dimensions and metrics, which you
 > can use in other operations.
@@ -245,10 +233,7 @@ Once you've added one or more nodes to a Space in Netdata Cloud, you can see agg
 dashboard under the same **Applications** or **eBPF** sections that you
 find on the local Agent dashboard. Or, [create new dashboards](/docs/dashboards-and-charts/dashboards-tab.md) using eBPF metrics
 from any number of distributed nodes to see how your application interacts with multiple Linux kernels on multiple Linux
-systems. 
+systems.
 
 Now that you can see eBPF metrics in Netdata Cloud, you can [invite your
 team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team) and share your findings with others.
-
-
-

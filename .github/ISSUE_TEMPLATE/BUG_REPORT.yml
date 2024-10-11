@@ -72,6 +72,8 @@ body:
         uname -a; uname -K
         # macOS
         uname -a; sw_vers
+        # Windows (prompt)
+        ver
         ```
         > NOTE: This will be automatically formatted into code, so no need for backticks.
       render: shell

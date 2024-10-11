@@ -1,0 +1,271 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-oracledb
+      plugin_name: go.d.plugin
+      module_name: oracledb
+      monitored_instance:
+        name: Oracle DB
+        link: https://www.oracle.com/database/
+        categories:
+          - data-collection.database-servers
+        icon_filename: oracle.svg
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - database
+        - oracle
+        - sql
+      most_popular: false
+    overview:
+      multi_instance: true
+      data_collection:
+        metrics_description: |
+          This collector monitors the health and performance of Oracle DB servers and collects general statistics, replication and user metrics.
+        method_description: |
+          It establishes a connection to the Oracle DB instance via a TCP or UNIX socket and extracts metrics from the following database tables:
+          
+          - `v$sysmetric`
+          - `v$sysstat`
+          - `v$waitclassmetric`
+          - `v$system_wait_class`
+          - `dba_data_files`
+          - `dba_free_space`
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector can automatically detect Oracle DB instances running on:
+
+            - Localhost, listening on port 1521
+            - Within Docker containers
+
+            > **Note**: Oracle DB requires a username and password. While Netdata can automatically discover Oracle DB instances and create data collection jobs, these jobs will fail unless you provide the correct credentials.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Create a read only user for netdata
+            description: |
+              Follow the official instructions for your oracle RDBMS to create a read-only user for netdata. The operation may follow this approach
+
+              Connect to your Oracle database with an administrative user and execute:
+
+              ```bash
+              CREATE USER netdata IDENTIFIED BY <PASSWORD>;
+
+              GRANT CONNECT TO netdata;
+              GRANT SELECT_CATALOG_ROLE TO netdata;
+              ```
+      configuration:
+        file:
+          name: go.d/oracledb.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: dsn
+              description: Oracle server DSN (Data Source Name). Format is `oracle://username:password@host:port/service?param1=value1&...&paramN=valueN`.
+              default_value: ""
+              required: true
+            - name: timeout
+              description: Query timeout in seconds.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: TCP socket
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: oracle://netdata:secret@127.0.0.1:1521/XE
+            - name: TLS connection (TCPS)
+              description: An example configuration for TLS connection.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: 'oracle://netdata:secret@127.0.0.1:1521/XE?ssl=true&ssl verify=true'
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: oracle://netdata:secret@127.0.0.1:1521/XE
+
+                  - name: remote
+                    dsn: oracle://netdata:secret@203.0.113.0:1521/XE
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: oracledb.sessions
+              description: Sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: session
+            - name: oracledb.average_active_sessions
+              description: Average Active Sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: oracledb.sessions_utilization
+              description: Sessions Limit %
+              unit: percent
+              chart_type: area
+              dimensions:
+                - name: session_limit
+            - name: oracledb.current_logons
+              description: Current Logons
+              unit: logons
+              chart_type: line
+              dimensions:
+                - name: logons
+            - name: oracledb.logons
+              description: Logons
+              unit: logons/s
+              chart_type: line
+              dimensions:
+                - name: logons
+            - name: oracledb.database_wait_time_ratio
+              description: Database Wait Time Ratio
+              unit: percent
+              chart_type: area
+              dimensions:
+                - name: db_wait_time
+            - name: oracledb.sql_service_response_time
+              description: SQL Service Response Time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: sql_resp_time
+            - name: oracledb.enqueue_timeouts
+              description: Enqueue Timeouts
+              unit: timeouts/s
+              chart_type: line
+              dimensions:
+                - name: enqueue
+            - name: oracledb.disk_io
+              description: Disk IO
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: written
+            - name: oracledb.disk_iops
+              description: Disk IOPS
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: oracledb.sorts
+              description: Sorts
+              unit: sorts/s
+              chart_type: line
+              dimensions:
+                - name: memory
+                - name: disk
+            - name: oracledb.table_scans
+              description: Table Scans
+              unit: scans/s
+              chart_type: line
+              dimensions:
+                - name: short_table
+                - name: long_table
+            - name: oracledb.cache_hit_ratio
+              description: Cache Hit Ratio
+              unit: percent
+              chart_type: line
+              dimensions:
+                - name: buffer
+                - name: cursor
+                - name: library
+                - name: row
+            - name: oracledb.global_cache_blocks
+              description: Global Cache Blocks
+              unit: blocks/s
+              chart_type: line
+              dimensions:
+                - name: corrupted
+                - name: lost
+            - name: oracledb.activity
+              description: Activities
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: parse
+                - name: execute
+                - name: user_commits
+                - name: user_rollbacks
+        - name: tablespace
+          description: These metrics refer to the Tablespace.
+          labels:
+            - name: tablespace
+              description: Tablespace name.
+          metrics:
+            - name: oracledb.tablespace_utilization
+              description: Tablespace Utilization
+              unit: percent
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: oracledb.tablespace_usage
+              description: Tablespace Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: avail
+                - name: used
+        - name: wait class
+          description: These metrics refer to the [Wait Class](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/classes-of-wait-events.html).
+          labels:
+            - name: wait_class
+              description: '[Wait Class name](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/classes-of-wait-events.html).'
+          metrics:
+            - name: oracledb.wait_class_wait_time
+              description: Wait Class Wait Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: wait_time

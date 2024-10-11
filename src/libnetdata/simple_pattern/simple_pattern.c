@@ -78,18 +78,21 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
 
     if(unlikely(!list || !*list)) return root;
 
-    char isseparator[256] = {
-            [' '] = 1       // space
-            , ['\t'] = 1    // tab
-            , ['\r'] = 1    // carriage return
-            , ['\n'] = 1    // new line
-            , ['\f'] = 1    // form feed
-            , ['\v'] = 1    // vertical tab
+    bool isseparator[256] = {
+              [' ']  = true    // space
+            , ['\t'] = true    // tab
+            , ['\r'] = true    // carriage return
+            , ['\n'] = true    // new line
+            , ['\f'] = true    // form feed
+            , ['\v'] = true    // vertical tab
     };
 
-    if (unlikely(separators && *separators)) {
-        memset(&isseparator[0], 0, sizeof(isseparator));
-        while(*separators) isseparator[(unsigned char)*separators++] = 1;
+    if (unlikely(separators == SIMPLE_PATTERN_NO_SEPARATORS))
+        memset(isseparator, false, sizeof(isseparator));
+
+    else if (unlikely(separators && *separators)) {
+        memset(isseparator, false, sizeof(isseparator));
+        while(*separators) isseparator[(unsigned char)*separators++] = true;
     }
 
     char *buf = mallocz(strlen(list) + 1);

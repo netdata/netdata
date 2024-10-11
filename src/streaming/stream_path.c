@@ -24,6 +24,8 @@ static void stream_path_clear(STREAM_PATH *p) {
     p->first_time_t = 0;
     p->capabilities = 0;
     p->flags = STREAM_PATH_FLAG_NONE;
+    p->start_time = 0;
+    p->shutdown_time = 0;
 }
 
 static void rrdhost_stream_path_clear_unsafe(RRDHOST *host, bool destroy) {
@@ -96,6 +98,21 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
 
     rrdhost_retention(host, 0, false, &p.first_time_t, NULL);
 
+    return p;
+}
+
+STREAM_PATH rrdhost_stream_path_fetch(RRDHOST *host) {
+    STREAM_PATH p = { 0 };
+
+    spinlock_lock(&host->rrdpush.path.spinlock);
+    for (size_t i = 0; i < host->rrdpush.path.used; i++) {
+        STREAM_PATH *tmp_path = &host->rrdpush.path.array[i];
+        if(UUIDeq(host->host_id, tmp_path->host_id)) {
+            p = *tmp_path;
+            break;
+        }
+    }
+    spinlock_unlock(&host->rrdpush.path.spinlock);
     return p;
 }
 
@@ -220,6 +237,8 @@ static bool parse_single_path(json_object *jobj, const char *path, STREAM_PATH *
     JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "hops", p->hops, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "since", p->since, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_t", p->first_time_t, error, true);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "start_time", p->start_time, error, true);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "shutdown_time", p->shutdown_time, error, true);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "flags", STREAM_PATH_FLAGS_2id_one, p->flags, error, true);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "capabilities", stream_capabilities_parse_one, p->capabilities, error, true);
 

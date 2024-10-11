@@ -36,7 +36,7 @@ So,
 
 You can select the database mode by editing `netdata.conf` and setting:
 
-```conf
+```text
 [db]
   # dbengine (default), ram (the default if dbengine not available), alloc, none
   mode = dbengine

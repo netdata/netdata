@@ -1,1 +1,6 @@
 update_every: 123
+relabel:
+  - chip: "ok"
+    sensors:
+      - name: "ok"
+        label: "ok"

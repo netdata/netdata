@@ -10,8 +10,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-
-	"github.com/facebook/time/ntp/chrony"
 )
 
 //go:embed "config_schema.json"
@@ -31,9 +29,9 @@ func New() *Chrony {
 			Address: "127.0.0.1:323",
 			Timeout: confopt.Duration(time.Second),
 		},
-		charts:             charts.Copy(),
-		addStatsChartsOnce: &sync.Once{},
-		newClient:          newChronyClient,
+		charts:                   charts.Copy(),
+		addServerStatsChartsOnce: &sync.Once{},
+		newConn:                  newChronyConn,
 	}
 }
 
@@ -43,24 +41,18 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type (
-	Chrony struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Chrony struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts             *module.Charts
-		addStatsChartsOnce *sync.Once
+	charts                   *module.Charts
+	addServerStatsChartsOnce *sync.Once
 
-		client    chronyClient
-		newClient func(c Config) (chronyClient, error)
-	}
-	chronyClient interface {
-		Tracking() (*chrony.ReplyTracking, error)
-		Activity() (*chrony.ReplyActivity, error)
-		ServerStats() (*serverStats, error)
-		Close()
-	}
-)
+	exec chronyBinary
+
+	conn    chronyConn
+	newConn func(c Config) (chronyConn, error)
+}
 
 func (c *Chrony) Configuration() any {
 	return c.Config
@@ -70,6 +62,11 @@ func (c *Chrony) Init() error {
 	if err := c.validateConfig(); err != nil {
 		c.Errorf("config validation: %v", err)
 		return err
+	}
+
+	var err error
+	if c.exec, err = c.initChronycBinary(); err != nil {
+		c.Warningf("chronyc binary init failed: %v (serverstats metrics collection is disabled)", err)
 	}
 
 	return nil
@@ -105,8 +102,8 @@ func (c *Chrony) Collect() map[string]int64 {
 }
 
 func (c *Chrony) Cleanup() {
-	if c.client != nil {
-		c.client.Close()
-		c.client = nil
+	if c.conn != nil {
+		c.conn.close()
+		c.conn = nil
 	}
 }

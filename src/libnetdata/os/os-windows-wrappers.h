@@ -14,5 +14,7 @@ bool netdata_registry_get_dword(unsigned int *out, void *hKey, char *subKey, cha
 long netdata_registry_get_string_from_open_key(char *out, unsigned int length, void *lKey, char *name);
 bool netdata_registry_get_string(char *out, unsigned int length, void *hKey, char *subKey, char *name);
 
+bool EnableWindowsPrivilege(const char *privilegeName);
+
 #endif // OS_WINDOWS
 #endif //NETDATA_OS_WINDOWS_WRAPPERS_H

@@ -12,6 +12,8 @@
 int do_proc_meminfo(int update_every, usec_t dt) {
     (void)dt;
 
+    static bool swap_configured = false;
+
     static procfile *ff = NULL;
     static int do_ram = -1
             , do_swap = -1
@@ -235,7 +237,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     // http://calimeroteknik.free.fr/blag/?article20/really-used-memory-on-gnu-linux
     // KReclaimable includes SReclaimable, it was added in kernel v4.20
-    unsigned long long reclaimable = KReclaimable > 0 ? KReclaimable : SReclaimable;
+    unsigned long long reclaimable = inside_lxc_container ? 0 : (KReclaimable > 0 ? KReclaimable : SReclaimable);
     unsigned long long MemCached = Cached + reclaimable - Shmem;
     unsigned long long MemUsed = MemTotal - MemFree - MemCached - Buffers;
     // The Linux kernel doesn't report ZFS ARC usage as cache memory (the ARC is included in the total used system memory)
@@ -257,6 +259,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     if (SwapTotal && (do_swap == CONFIG_BOOLEAN_YES || do_swap == CONFIG_BOOLEAN_AUTO)) {
         do_swap = CONFIG_BOOLEAN_YES;
         common_mem_swap(SwapFree * 1024, SwapUsed * 1024, update_every);
+        swap_configured = true;
 
         {
             static RRDSET *st_mem_swap_cached = NULL;
@@ -313,7 +316,13 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             rrddim_set_by_pointer(st_mem_zswap, rd_zswapped, Zswapped);
             rrdset_done(st_mem_zswap);
         }
+    } else {
+        if (swap_configured) {
+            common_mem_swap(SwapFree * 1024, SwapUsed * 1024, update_every);
+            swap_configured = false;
+        }
     }
+
 
     if (arl_hwcorrupted->flags & ARL_ENTRY_FLAG_FOUND &&
         (do_hwcorrupt == CONFIG_BOOLEAN_YES || do_hwcorrupt == CONFIG_BOOLEAN_AUTO)) {
