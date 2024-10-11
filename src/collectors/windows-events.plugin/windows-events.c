@@ -240,7 +240,7 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
 
     facets_register_key_name(
             facets, WEVT_FIELD_CHANNEL,
-            FACET_KEY_OPTION_FTS);
+            rq->default_facet | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
             facets, WEVT_FIELD_PROVIDER,

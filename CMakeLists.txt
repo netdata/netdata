@@ -1764,7 +1764,7 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 target_link_libraries(libnetdata PUBLIC
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
-        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;bcrypt;ole32;wevtapi>"
+        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;bcrypt;wevtapi>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 
@@ -1816,7 +1816,7 @@ if(OS_WINDOWS)
                 set(WEVT_RES_OBJECT "${CMAKE_BINARY_DIR}/wevt_netdata_res.o")
 
                 set(WEVT_DLL_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.dll")
-                set(WEVT_INSTALL_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_install.bat")
+                set(WEVT_ETW_INSTALL_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_install.bat")
 
                 if(HAVE_ETW)
                         add_custom_command(
@@ -1846,8 +1846,6 @@ if(OS_WINDOWS)
                 # Create a custom target for the DLL
                 add_custom_target(wevt_netdata ALL DEPENDS ${WEVT_DLL_FILE})
 
-                target_include_directories(libnetdata PRIVATE "${CMAKE_BINARY_DIR}")
-
                 set_source_files_properties(src/libnetdata/log/nd_log-to-windows-events.c PROPERTIES
                         OBJECT_DEPENDS "${WEVT_MC_H_FILE}")
 
@@ -1857,7 +1855,7 @@ if(OS_WINDOWS)
                 endif()
 
                 # Install the wevt_netdata DLL
-                install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}" "${WEVT_INSTALL_SCRIPT}"
+                install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}" "${WEVT_ETW_INSTALL_SCRIPT}"
                         COMPONENT wevt_netdata_dll
                         DESTINATION "${BINDIR}")
         endif()
