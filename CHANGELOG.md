@@ -6,11 +6,17 @@
 
 **Merged pull requests:**
 
+- Simplify sentence on cloud notification integrations [\#18750](https://github.com/netdata/netdata/pull/18750) ([Ancairon](https://github.com/Ancairon))
+- Regenerate integrations.js [\#18749](https://github.com/netdata/netdata/pull/18749) ([netdatabot](https://github.com/netdatabot))
+- fix\(freebsd.plugin\): fix sysctl arcstats.p fails on FreeBSD 14 [\#18748](https://github.com/netdata/netdata/pull/18748) ([ilyam8](https://github.com/ilyam8))
+- fix\(python.d.plugin\): fix plugin exit if no python found [\#18747](https://github.com/netdata/netdata/pull/18747) ([ilyam8](https://github.com/ilyam8))
 - Fix crash on agent initialization [\#18746](https://github.com/netdata/netdata/pull/18746) ([stelfrag](https://github.com/stelfrag))
+- Fix issues with Cloud Notification Integrations metadata [\#18745](https://github.com/netdata/netdata/pull/18745) ([Ancairon](https://github.com/Ancairon))
 - fix\(apps.plugin\): fix debug msg spam on macOS/freeBSD [\#18743](https://github.com/netdata/netdata/pull/18743) ([ilyam8](https://github.com/ilyam8))
 - docs\(apps.plugin\): fix prefix/suffix pattern example [\#18742](https://github.com/netdata/netdata/pull/18742) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d/nvme\): add model\_number label [\#18741](https://github.com/netdata/netdata/pull/18741) ([ilyam8](https://github.com/ilyam8))
 - sanitizers should not remove trailing underscores [\#18738](https://github.com/netdata/netdata/pull/18738) ([ktsaou](https://github.com/ktsaou))
+- Remove CR \(windows.plugin\) [\#18737](https://github.com/netdata/netdata/pull/18737) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add `ilert` cloud notification integration [\#18736](https://github.com/netdata/netdata/pull/18736) ([car12o](https://github.com/car12o))
 - fix\(go.d/sensors\): fix parsing power accuracy [\#18735](https://github.com/netdata/netdata/pull/18735) ([ilyam8](https://github.com/ilyam8))
 - apps.plugin; allow parents to identify the children [\#18734](https://github.com/netdata/netdata/pull/18734) ([ktsaou](https://github.com/ktsaou))
@@ -425,9 +431,6 @@
 - go.d megacli: add bbu capacity degradation % [\#18211](https://github.com/netdata/netdata/pull/18211) ([ilyam8](https://github.com/ilyam8))
 - Port memcached collector to Go [\#18209](https://github.com/netdata/netdata/pull/18209) ([Ancairon](https://github.com/Ancairon))
 - Bump k8s.io/client-go from 0.30.2 to 0.30.3 in /src/go [\#18208](https://github.com/netdata/netdata/pull/18208) ([dependabot[bot]](https://github.com/apps/dependabot))
-- docs: simplify "Disk Requirements and Retention" [\#18205](https://github.com/netdata/netdata/pull/18205) ([ilyam8](https://github.com/ilyam8))
-- do not rely on the queued flag to queue a context [\#18198](https://github.com/netdata/netdata/pull/18198) ([ktsaou](https://github.com/ktsaou))
-- Do not include REMOVED status in the alert snapshot [\#18197](https://github.com/netdata/netdata/pull/18197) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
