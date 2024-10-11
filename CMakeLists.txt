@@ -1790,7 +1790,6 @@ if(OS_WINDOWS)
                 set(HAVE_WEL False)
         endif()
 
-
         if(RUN_UNDER_CLION)
                 # for some reason, under clion it finds the wrong windres
                 set (WINDRES_EXECUTABLE windres)
@@ -1852,12 +1851,17 @@ if(OS_WINDOWS)
                 if(HAVE_ETW)
                         set_source_files_properties(src/libnetdata/log/nd_log-to-windows-events.c PROPERTIES
                                 OBJECT_DEPENDS "${WEVT_MAN_H_FILE}")
-                endif()
 
-                # Install the wevt_netdata DLL
-                install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}" "${WEVT_ETW_INSTALL_SCRIPT}"
-                        COMPONENT wevt_netdata_dll
-                        DESTINATION "${BINDIR}")
+                        install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}" "${WEVT_ETW_INSTALL_SCRIPT}"
+                                COMPONENT wevt_netdata_dll
+                                DESTINATION "${BINDIR}")
+                else()
+                        # do not install the manifest in this case
+                        # the nsi installer will skip registering the ETW publisher
+                        install(FILES "${WEVT_DLL_FILE}"
+                                COMPONENT wevt_netdata_dll
+                                DESTINATION "${BINDIR}")
+                endif()
         endif()
 endif()
 

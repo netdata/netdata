@@ -281,10 +281,32 @@ Section "Install Netdata"
 
         Call NetdataUninstallRegistry
 
-        ; Step 1: Copy wevt_netdata.dll to %SystemRoot%\System32
-        SetOutPath "$SYSDIR"
-        File "$INSTDIR\usr\bin\wevt_netdata.dll"
-        ; Retry mechanism for failed copy due to Event Viewer access
+        ; Check if manifest file exists before running ETW setup
+        IfFileExists "$INSTDIR\usr\bin\wevt_netdata_manifest.xml" ManifestExists ManifestNotExists
+
+ManifestExists:
+    ; Check if certutil is available
+    nsExec::ExecToStack 'where certutil'
+    Pop $R0
+    StrCmp $R0 "" NoCertUtil FoundCertUtil
+
+    NoCertUtil:
+        DetailPrint "certutil not found, assuming files are different."
+        Goto CopyDLL
+
+    FoundCertUtil:
+        ; Calculate hash of the existing DLL
+        nsExec::ExecToStack 'certutil -hashfile "$SYSDIR\wevt_netdata.dll" MD5'
+        Pop $R0
+
+        ; Calculate hash of the new DLL
+        nsExec::ExecToStack 'certutil -hashfile "$INSTDIR\usr\bin\wevt_netdata.dll" MD5'
+        Pop $R1
+
+        StrCmp $R0 $R1 NoNeedToCopy
+
+    CopyDLL:
+        DetailPrint "Files differ or certutil not available, copying new DLL."
         RetryCopyDLL:
         ClearErrors
         CopyFiles /SILENT "$INSTDIR\usr\bin\wevt_netdata.dll" "$SYSDIR"
@@ -294,24 +316,19 @@ Section "Install Netdata"
             IfMsgBox RETRY RetryCopyDLL
             IfMsgBox CANCEL Quit
 
-        ContinueCopy:
+    NoNeedToCopy:
+        DetailPrint "Files are identical, no need to copy."
 
-        ; Step 2: Copy wevt_netdata_manifest.xml to %SystemRoot%\System32
-        File "$INSTDIR\usr\bin\wevt_netdata_manifest.xml"
-
-        ; Step 3: Set access permissions for wevt_netdata.dll
+    ContinueCopy:
+        ; Set access permissions for wevt_netdata.dll
         nsExec::ExecToLog 'icacls "$SYSDIR\wevt_netdata.dll" /grant "NT SERVICE\EventLog":R'
-        pop $0
-        ${If} $0 != 0
-            DetailPrint "Warning: Failed to set permissions for the Event Log Resources DLL."
-        ${EndIf}
-
-        ; Step 4: Install and register the manifest
         nsExec::ExecToLog 'wevtutil im "$SYSDIR\wevt_netdata_manifest.xml" "/mf:$SYSDIR\wevt_netdata.dll" "/rf:$SYSDIR\wevt_netdata.dll"'
-        pop $0
-        ${If} $0 != 0
-            DetailPrint "Warning: Failed to install the Event Log Publisher manifest."
-        ${EndIf}
+        Goto Done
+
+ManifestNotExists:
+    DetailPrint "Manifest not found, skipping ETW configuration."
+
+Done:
 
         StrLen $0 $cloudToken
         StrLen $1 $cloudRooms
@@ -357,15 +374,24 @@ Section "Uninstall"
 	    DetailPrint "Warning: Failed to delete Netdata service."
         ${EndIf}
 
-        ; Unregister event manifest and DLL
+        ; Check if the manifest exists before uninstalling it
+        IfFileExists "$SYSDIR\wevt_netdata_manifest.xml" ManifestExistsForUninstall ManifestNotExistsForUninstall
+
+ManifestExistsForUninstall:
         nsExec::ExecToLog 'wevtutil um "$SYSDIR\wevt_netdata_manifest.xml"'
         pop $0
         ${If} $0 != 0
-            DetailPrint "Warning: Failed to uninstall the Event Log manifest."
+            DetailPrint "Warning: Failed to uninstall the event manifest."
         ${EndIf}
+        Goto DoneUninstall
 
-        ; https://nsis.sourceforge.io/Reference/RMDir
-	RMDir /r /REBOOTOK "$INSTDIR"
+ManifestNotExistsForUninstall:
+        DetailPrint "Manifest not found, skipping manifest uninstall."
+
+DoneUninstall:
+
+        ; Remove files
+        RMDir /r /REBOOTOK "$INSTDIR"
 
         DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata"
 SectionEnd

@@ -126,8 +126,8 @@ bool wel_replace_program_with_wevt_netdata_dll(wchar_t *str, size_t size) {
 static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider, DWORD defaultMaxSize) {
     // Build the registry path: SYSTEM\CurrentControlSet\Services\EventLog\<LogName>\<SourceName>
     wchar_t key[MAX_PATH];
-    if(!channel)
-        swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls", provider);
+    if(!provider)
+        swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls", channel);
     else
         swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls\\%ls", channel, provider);
 
@@ -212,6 +212,9 @@ bool nd_log_init_windows(void) {
         return false;
 #endif
 
+//    if(!nd_log.eventlog.etw && !wel_add_to_registry(NETDATA_WEL_CHANNEL_NAME_W, NULL, 50 * 1024 * 1024))
+//        return false;
+
     // Loop through each source and add it to the registry
     for(size_t i = 0; i < _NDLS_MAX; i++) {
         nd_log.sources[i].source = i;
@@ -241,7 +244,8 @@ bool nd_log_init_windows(void) {
         }
 
         if(!nd_log.eventlog.etw) {
-            if(!wel_add_to_registry(NETDATA_CHANNEL_NAME_W, sub_channel, defaultMaxSize)) return false;
+            if(!wel_add_to_registry(NETDATA_WEL_CHANNEL_NAME_W, sub_channel, defaultMaxSize))
+                return false;
 
             // when not using a manifest, each source is a provider
             nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, sub_channel);

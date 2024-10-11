@@ -172,35 +172,35 @@ int main(int argc, const char **argv) {
                  "\r\n"
                  "                <!-- Define the provider sub-channels -->\r\n"
                  "                <channels>\r\n"
-                 "                    <channel name=\"" NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_DAEMON "\"\r\n"
+                 "                    <channel name=\"" NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_DAEMON "\"\r\n"
                  "                             symbol=\"CHANNEL_DAEMON\"\r\n"
                  "                             type=\"Operational\"\r\n"
                  "                             message=\"$(string.Channel.Daemon)\"\r\n"
                  "                             enabled=\"true\"\r\n"
                  "                             />\r\n"
                  "\r\n"
-                 "                    <channel name=\"" NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_COLLECTORS "\"\r\n"
+                 "                    <channel name=\"" NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_COLLECTORS "\"\r\n"
                  "                             symbol=\"CHANNEL_COLLECTORS\"\r\n"
                  "                             type=\"Operational\"\r\n"
                  "                             message=\"$(string.Channel.Collectors)\"\r\n"
                  "                             enabled=\"true\"\r\n"
                  "                             />\r\n"
                  "\r\n"
-                 "                    <channel name=\"" NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_ACCESS "\"\r\n"
+                 "                    <channel name=\"" NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_ACCESS "\"\r\n"
                  "                             symbol=\"CHANNEL_ACCESS\"\r\n"
                  "                             type=\"Operational\"\r\n"
                  "                             message=\"$(string.Channel.Access)\"\r\n"
                  "                             enabled=\"true\"\r\n"
                  "                             />\r\n"
                  "\r\n"
-                 "                    <channel name=\"" NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_HEALTH "\"\r\n"
+                 "                    <channel name=\"" NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_HEALTH "\"\r\n"
                  "                             symbol=\"CHANNEL_HEALTH\"\r\n"
                  "                             type=\"Operational\"\r\n"
                  "                             message=\"$(string.Channel.Health)\"\r\n"
                  "                             enabled=\"true\"\r\n"
                  "                             />\r\n"
                  "\r\n"
-                 "                    <channel name=\"" NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_ACLK "\"\r\n"
+                 "                    <channel name=\"" NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_ACLK "\"\r\n"
                  "                             symbol=\"CHANNEL_ACLK\"\r\n"
                  "                             type=\"Operational\"\r\n"
                  "                             message=\"$(string.Channel.Aclk)\"\r\n"
@@ -418,32 +418,32 @@ int main(int argc, const char **argv) {
                 switch(src) {
                     case NDLS_COLLECTORS:
                         src_txt = "COLLECTORS";
-                        channel = NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_COLLECTORS;
+                        channel = NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_COLLECTORS;
                         break;
 
                     case NDLS_ACCESS:
                         src_txt = "ACCESS";
-                        channel = NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_ACCESS;
+                        channel = NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_ACCESS;
                         break;
 
                     case NDLS_HEALTH:
                         src_txt = "HEALTH";
-                        channel = NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_HEALTH;
+                        channel = NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_HEALTH;
                         break;
 
                     case NDLS_DEBUG:
                         src_txt = "DEBUG";
-                        channel = NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_DAEMON;
+                        channel = NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_DAEMON;
                         break;
 
                     case NDLS_DAEMON:
                         src_txt = "DAEMON";
-                        channel = NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_DAEMON;
+                        channel = NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_DAEMON;
                         break;
 
                     case NDLS_ACLK:
                         src_txt = "ACLK";
-                        channel = NETDATA_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_ACLK;
+                        channel = NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_ACLK;
                         break;
 
                     default:
