@@ -2085,12 +2085,6 @@ int netdata_main(int argc, char **argv) {
         health_set_silencers_filename();
         health_initialize_global_silencers();
 
-//        // --------------------------------------------------------------------
-//        // Initialize ML configuration
-//
-//        delta_startup_time("initialize ML");
-//        ml_init();
-
         // --------------------------------------------------------------------
         // setup process signals
 
