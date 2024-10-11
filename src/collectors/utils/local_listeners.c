@@ -106,6 +106,8 @@ int main(int argc, char **argv) {
             .comm = false,
             .namespaces = true,
             .tcp_info = false,
+            .no_mnl = false,
+            .report = false,
 
             .max_errors = 10,
             .max_concurrent_namespaces = 10,
@@ -157,6 +159,9 @@ int main(int argc, char **argv) {
                     "\n"
                     " Option 'debug' enables all sources and all directions and provides\n"
                     " a full dump of current sockets.\n"
+                    "\n"
+                    " Option 'report' reports timings per step while collecting and processing\n"
+                    " system information.\n"
                     "\n"
                     " DIRECTION DETECTION\n"
                     " The program detects the direction of the sockets using these rules:\n"
@@ -285,6 +290,14 @@ int main(int argc, char **argv) {
             ls.config.namespaces = positive;
             // fprintf(stderr, "%s namespaces\n", positive ? "enabling" : "disabling");
         }
+        else if (strcmp("mnl", s) == 0) {
+            ls.config.no_mnl = !positive;
+            // fprintf(stderr, "%s mnl\n", positive ? "enabling" : "disabling");
+        }
+        else if (strcmp("report", s) == 0) {
+            ls.config.report = positive;
+            // fprintf(stderr, "%s report\n", positive ? "enabling" : "disabling");
+        }
         else {
             fprintf(stderr, "Unknown parameter %s\n", s);
             exit(1);
@@ -310,6 +323,28 @@ int main(int argc, char **argv) {
         unsigned long long total  = user + system;
 
         fprintf(stderr, "CPU Usage %llu user, %llu system, %llu total, %zu namespaces, %zu nl requests (without namespaces)\n", user, system, total, ls.stats.namespaces_found, ls.stats.mnl_sends);
+    }
+
+    if(ls.config.report) {
+        fprintf(stderr, "\nTIMINGS REPORT:\n");
+        char buf[100];
+        usec_t total_ut = 0;
+        for(size_t i = 0; i < _countof(ls.timings) ;i++) {
+            if (!ls.timings[i].end_ut) continue;
+            usec_t dt_ut = ls.timings[i].end_ut - ls.timings[i].start_ut;
+            total_ut += dt_ut;
+        }
+
+        for(size_t i = 0; i < _countof(ls.timings) ;i++) {
+            if(!ls.timings[i].end_ut) continue;
+            usec_t dt_ut = ls.timings[i].end_ut - ls.timings[i].start_ut;
+            double percent = (100.0 * (double)dt_ut) / (double)total_ut;
+            duration_snprintf(buf, sizeof(buf), (int64_t)dt_ut, "us", true);
+            fprintf(stderr, "%20s: %6.2f%% %s\n", ls.timings[i].name, percent, buf);
+        }
+
+        duration_snprintf(buf, sizeof(buf), (int64_t)total_ut, "us", true);
+        fprintf(stderr, "%20s: %6.2f%% %s\n", "TOTAL", 100.0, buf);
     }
 
     return 0;
