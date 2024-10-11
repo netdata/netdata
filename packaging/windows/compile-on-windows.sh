@@ -1,16 +1,70 @@
 #!/bin/bash
 
-PATH="${PATH}:$(cygpath -u -a 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64'):$(cygpath -u -a 'C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\bin\Hostx64\x64')"
+PATH="${PATH}:$(cygpath -u -a 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64'):$(cygpath -u -a 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.41.34120\bin\Hostx64\x64')"
 
-find /c/Program\ Files\ \(x86\)/ -name mc.exe
-find /c/Program\ Files\ \(x86\)/ -name rc.exe
-find /c/Program\ Files\ \(x86\)/ -name link.exe
+# Versions of MC.EXE in github CI
+# C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages\microsoft.windows.sdk.buildtools\10.0.22621.3233\bin\10.0.22621.0\arm64\mc.exe
+# C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages\microsoft.windows.sdk.buildtools\10.0.22621.3233\bin\10.0.22621.0\x64\mc.exe
+# C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages\microsoft.windows.sdk.buildtools\10.0.22621.3233\bin\10.0.22621.0\x86\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.17763.0\arm64\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.17763.0\x64\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.17763.0\x86\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\arm64\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x86\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.20348.0\arm64\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.20348.0\x64\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.20348.0\x86\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.22000.0\arm64\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.22000.0\x64\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.22000.0\x86\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\arm64\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\mc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x86\mc.exe
 
-find /c/Program\ Files/ -name mc.exe
-find /c/Program\ Files/ -name rc.exe
-find /c/Program\ Files/ -name link.exe
+# Versions of RC.EXE in github CI
+# C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages\microsoft.windows.sdk.buildtools\10.0.22621.3233\bin\10.0.22621.0\arm64\rc.exe
+# C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages\microsoft.windows.sdk.buildtools\10.0.22621.3233\bin\10.0.22621.0\x64\rc.exe
+# C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages\microsoft.windows.sdk.buildtools\10.0.22621.3233\bin\10.0.22621.0\x86\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.17763.0\arm64\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.17763.0\x64\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.17763.0\x86\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\arm64\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x86\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.20348.0\arm64\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.20348.0\x64\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.20348.0\x86\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.22000.0\arm64\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.22000.0\x64\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.22000.0\x86\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\arm64\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\rc.exe
+# C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x86\rc.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\SDK\ScopeCppSDK\vc15\SDK\bin\rc.exe
 
-exit 1
+# Versions of LINK.EXE in github CI
+# C:\Program Files (x86)\Microsoft SDKs\UWPNuGetPackages\runtime.win10-arm64.microsoft.net.native.compiler\2.2.12-rel-31116-00\tools\arm64\ilc\tools\link\link.exe
+# C:\Program Files (x86)\Windows Kits\10\Tools\sdv\bin\interceptor\link.exe
+# C:\Program Files (x86)\Windows Kits\10\Tools\sdv\smv\bin\link.exe
+# C:\Program Files\Git\usr\bin\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\SDK\ScopeCppSDK\vc15\VC\bin\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.29.30133\bin\HostX64\arm\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.29.30133\bin\HostX64\arm64\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.29.30133\bin\HostX64\x64\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.29.30133\bin\HostX64\x86\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.29.30133\bin\HostX86\arm\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.29.30133\bin\HostX86\arm64\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.29.30133\bin\HostX86\x64\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.29.30133\bin\HostX86\x86\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.41.34120\bin\Hostx64\arm\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.41.34120\bin\Hostx64\arm64\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.41.34120\bin\Hostx64\x64\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.41.34120\bin\Hostx64\x86\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.41.34120\bin\Hostx86\arm\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.41.34120\bin\Hostx86\arm64\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.41.34120\bin\Hostx86\x64\link.exe
+# C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.41.34120\bin\Hostx86\x86\link.exe
 
 REPO_ROOT="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
