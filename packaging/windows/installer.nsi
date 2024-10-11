@@ -314,7 +314,7 @@ ManifestExists:
         RetryPrompt:
             MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Failed to copy wevt_netdata.dll because the Event Viewer is using the log. Please close the Event Viewer and press Retry."
             StrCmp $R0 IDRETRY RetryCopyDLL
-            StrCmp $R0 IDCANCEL Quit
+            StrCmp $R0 IDCANCEL ExitInstall
 
     NoNeedToCopy:
         DetailPrint "Files are identical, no need to copy."
@@ -327,9 +327,13 @@ ManifestExists:
 
 ManifestNotExists:
     DetailPrint "Manifest not found, skipping ETW configuration."
+    Goto Done
+
+ExitInstall:
+    ; Use Abort to stop the installation and clean up
+    Abort
 
 Done:
-
         StrLen $0 $cloudToken
         StrLen $1 $cloudRooms
         ${If} $0 == 0
