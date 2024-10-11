@@ -196,7 +196,7 @@ static inline int netdata_claim_prepare_data(char *out, size_t length)
                     aRoom,
                     proxyLabel,
                     proxyValue,
-                    (insecure) ? "YES" : "NO"
+                    (insecure) ? "yes" : "no"
                     );
 }
 
