@@ -312,9 +312,9 @@ ManifestExists:
         CopyFiles /SILENT "$INSTDIR\usr\bin\wevt_netdata.dll" "$SYSDIR"
         IfErrors RetryPrompt ContinueCopy
         RetryPrompt:
-            MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Failed to copy the Event Log Resources DLL, probably because it is in use. Please close the Event Viewer (or any other program using the Event Log) and press retry."
-            IfMsgBox RETRY RetryCopyDLL
-            IfMsgBox CANCEL Quit
+            MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Failed to copy wevt_netdata.dll because the Event Viewer is using the log. Please close the Event Viewer and press Retry."
+            StrCmp $R0 IDRETRY RetryCopyDLL
+            StrCmp $R0 IDCANCEL Quit
 
     NoNeedToCopy:
         DetailPrint "Files are identical, no need to copy."
