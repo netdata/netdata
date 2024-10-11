@@ -149,7 +149,7 @@ static void netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_thrown", windows_shared_buffer);
             if (!p->st_clrexception_thrown) {
                 p->st_clrexception_thrown = rrdset_create_localhost("netframework"
-                                                                    , windows_shared_buffer, NULL
+                                                                    , id, NULL
                                                                     , "exceptions"
                                                                     , "netframework.clrexception_thrown"
                                                                     , "Thrown exceptions"
@@ -185,7 +185,7 @@ static void netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_filters", windows_shared_buffer);
             if (!p->st_clrexception_filters) {
                 p->st_clrexception_filters = rrdset_create_localhost("netframework"
-                                                                    , windows_shared_buffer, NULL
+                                                                    , id, NULL
                                                                     , "exceptions"
                                                                     , "netframework.clrexception_filters"
                                                                     , "Thrown exceptions filters"
@@ -221,7 +221,7 @@ static void netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_finallys", windows_shared_buffer);
             if (!p->st_clrexception_finallys) {
                 p->st_clrexception_finallys = rrdset_create_localhost("netframework"
-                                                                      , windows_shared_buffer, NULL
+                                                                      , id, NULL
                                                                       , "exceptions"
                                                                       , "netframework.clrexception_finallys"
                                                                       , "Executed finally blocks"
@@ -257,7 +257,7 @@ static void netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_throw_to_catch_depth", windows_shared_buffer);
             if (!p->st_clrexception_total_catch_depth) {
                 p->st_clrexception_total_catch_depth = rrdset_create_localhost("netframework"
-                                                                               , windows_shared_buffer, NULL
+                                                                               , id, NULL
                                                                                , "exceptions"
                                                                                , "netframework.clrexception_throw_to_catch_depth"
                                                                                , "Traversed stack frames"
@@ -315,7 +315,7 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_com_callable_wrappers", windows_shared_buffer);
             if (!p->st_clrinterop_com_callable_wrappers) {
                 p->st_clrinterop_com_callable_wrappers = rrdset_create_localhost("netframework"
-                                                                                 , windows_shared_buffer, NULL
+                                                                                 , id, NULL
                                                                                  , "interop"
                                                                                  , "netframework.clrinterop_com_callable_wrappers"
                                                                                  , "COM callable wrappers (CCW)"
@@ -351,7 +351,7 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_interop_marshalling", windows_shared_buffer);
             if (!p->st_clrinterop_marshalling) {
                 p->st_clrinterop_marshalling = rrdset_create_localhost("netframework"
-                                                                       , windows_shared_buffer, NULL
+                                                                       , id, NULL
                                                                        , "interop"
                                                                        , "netframework.clrinterop_interop_marshallings"
                                                                        , "Arguments and return values marshallings"
@@ -387,7 +387,7 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_interop_stubs_created", windows_shared_buffer);
             if (!p->st_clrinterop_interop_stubs_created) {
                 p->st_clrinterop_interop_stubs_created = rrdset_create_localhost("netframework"
-                                                                                 , windows_shared_buffer, NULL
+                                                                                 , id, NULL
                                                                                  , "interop"
                                                                                  , "netframework.clrinterop_interop_stubs_created"
                                                                                  , "Created stubs"
@@ -445,17 +445,17 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_methods", windows_shared_buffer);
             if (!p->st_clrjit_methods) {
                 p->st_clrjit_methods = rrdset_create_localhost("netframework"
-                                                                                 , windows_shared_buffer, NULL
-                                                                                 , "jit"
-                                                                                 , "netframework.clrjit_methods"
-                                                                                 , "JIT-compiled methods"
-                                                                                 , "methods/s"
-                                                                                 , PLUGIN_WINDOWS_NAME
-                                                                                 , "PerflibNetFramework"
-                                                                                 , PRIO_NETFRAMEWORK_CLR_JIT_METHODS
-                                                                                 , update_every
-                                                                                 , RRDSET_TYPE_LINE
-                                                                                 );
+                                                               , id, NULL
+                                                               , "jit"
+                                                               , "netframework.clrjit_methods"
+                                                               , "JIT-compiled methods"
+                                                               , "methods/s"
+                                                               , PLUGIN_WINDOWS_NAME
+                                                               , "PerflibNetFramework"
+                                                               , PRIO_NETFRAMEWORK_CLR_JIT_METHODS
+                                                               , update_every
+                                                               , RRDSET_TYPE_LINE
+                                                               );
 
                 snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrjit_methods_total", windows_shared_buffer);
                 p->rd_clrjit_methods  = rrddim_add(p->st_clrjit_methods,
@@ -482,7 +482,7 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_time", windows_shared_buffer);
             if (!p->st_clrjit_time) {
                 p->st_clrjit_time = rrdset_create_localhost("netframework"
-                                                            , windows_shared_buffer, NULL
+                                                            , id, NULL
                                                             , "jit"
                                                             , "netframework.clrjit_time"
                                                             , "Time spent in JIT compilation"
@@ -521,7 +521,7 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_standard_failures", windows_shared_buffer);
             if (!p->st_clrjit_standard_failures) {
                 p->st_clrjit_standard_failures = rrdset_create_localhost("netframework"
-                                                                         , windows_shared_buffer, NULL
+                                                                         , id, NULL
                                                                          , "jit"
                                                                          , "netframework.clrjit_standard_failures"
                                                                          , "JIT compiler failures"
@@ -557,7 +557,7 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_il_bytes", windows_shared_buffer);
             if (!p->st_clrjit_il_bytes) {
                 p->st_clrjit_il_bytes = rrdset_create_localhost("netframework"
-                                                                , windows_shared_buffer, NULL
+                                                                , id, NULL
                                                                 , "jit"
                                                                 , "netframework.clrjit_il_bytes"
                                                                 , "Compiled Microsoft intermediate language (MSIL) bytes"
@@ -615,7 +615,7 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_loader_heap_size", windows_shared_buffer);
             if (!p->st_clrloading_heap_size) {
                 p->st_clrloading_heap_size = rrdset_create_localhost("netframework"
-                                                                     , windows_shared_buffer, NULL
+                                                                     , id, NULL
                                                                      , "loading"
                                                                      , "netframework.clrloading_loader_heap_size"
                                                                      , "Memory committed by class loader"
@@ -651,7 +651,7 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_appdomains_loaded", windows_shared_buffer);
             if (!p->st_clrloading_app_domains_loaded) {
                 p->st_clrloading_app_domains_loaded = rrdset_create_localhost("netframework"
-                                                                              , windows_shared_buffer, NULL
+                                                                              , id, NULL
                                                                               , "loading"
                                                                               , "netframework.clrloading_appdomains_loaded"
                                                                               , "Loaded application domains"
@@ -687,7 +687,7 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_appdomains_unloaded", windows_shared_buffer);
                 if (!p->st_clrloading_app_domains_unloaded) {
                     p->st_clrloading_app_domains_unloaded = rrdset_create_localhost("netframework"
-                                                                                    , windows_shared_buffer, NULL
+                                                                                    , id, NULL
                                                                                     , "loading"
                                                                                     , "netframework.clrloading_appdomains_unloaded"
                                                                                     , "Unloaded application domains"
@@ -723,7 +723,7 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_assemblies_loaded", windows_shared_buffer);
             if (!p->st_clrloading_assemblies_loaded) {
                 p->st_clrloading_assemblies_loaded = rrdset_create_localhost("netframework"
-                                                                             , windows_shared_buffer, NULL
+                                                                             , id, NULL
                                                                              , "loading"
                                                                              , "netframework.clrloading_assemblies_loaded"
                                                                              , "Loaded assemblies"
@@ -759,7 +759,7 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_classes_loaded", windows_shared_buffer);
             if (!p->st_clrloading_classes_loaded) {
                 p->st_clrloading_classes_loaded = rrdset_create_localhost("netframework"
-                                                                          , windows_shared_buffer, NULL
+                                                                          , id, NULL
                                                                           , "loading"
                                                                           , "netframework.clrloading_classes_loaded"
                                                                           , "Loaded classes in all assemblies"
@@ -795,7 +795,7 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_class_load_failure", windows_shared_buffer);
             if (!p->st_clrloading_class_load_failure) {
                 p->st_clrloading_class_load_failure = rrdset_create_localhost("netframework"
-                                                                              , windows_shared_buffer, NULL
+                                                                              , id, NULL
                                                                               , "loading"
                                                                               , "netframework.clrloading_class_load_failures"
                                                                               , "Class load failures"
