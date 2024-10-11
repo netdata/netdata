@@ -46,6 +46,24 @@ struct net_framework_instances {
     RRDSET *st_clrjit_il_bytes;
     RRDDIM *rd_clrjit_il_bytes;
 
+    RRDSET *st_clrloading_heap_size;
+    RRDDIM *rd_clrloading_heap_size;
+
+    RRDSET *st_clrloading_app_domains_loaded;
+    RRDDIM *rd_clrloading_app_domains_loaded;
+
+    RRDSET *st_clrloading_app_domains_unloaded;
+    RRDDIM *rd_clrloading_app_domains_unloaded;
+
+    RRDSET *st_clrloading_assemblies_loaded;
+    RRDDIM *rd_clrloading_assemblies_loaded;
+
+    RRDSET *st_clrloading_classes_loaded;
+    RRDDIM *rd_clrloading_classes_loaded;
+
+    RRDSET *st_clrloading_class_load_failure;
+    RRDDIM *rd_clrloading_class_load_failure;
+
     COUNTER_DATA NETFrameworkCLRExceptionThrown;
     COUNTER_DATA NETFrameworkCLRExceptionFilters;
     COUNTER_DATA NETFrameworkCLRExceptionFinallys;
@@ -60,6 +78,13 @@ struct net_framework_instances {
     COUNTER_DATA NETFrameworkCLRJITFrequencyTime;
     COUNTER_DATA NETFrameworkCLRJITStandardFailures;
     COUNTER_DATA NETFrameworkCLRJITIlBytes;
+
+    COUNTER_DATA NETFrameworkCLRLoadingHeapSize;
+    COUNTER_DATA NETFrameworkCLRLoadingAppDomainsLoaded;
+    COUNTER_DATA NETFrameworkCLRLoadingAppDomainsUnloaded;
+    COUNTER_DATA NETFrameworkCLRLoadingAssembliesLoaded;
+    COUNTER_DATA NETFrameworkCLRLoadingClassesLoaded;
+    COUNTER_DATA NETFrameworkCLRLoadingClassLoadFailure;
 };
 
 static inline void initialize_net_framework_processes_keys(struct net_framework_instances *p) {
@@ -77,6 +102,13 @@ static inline void initialize_net_framework_processes_keys(struct net_framework_
     p->NETFrameworkCLRJITFrequencyTime.key = "IL Bytes Jitted / sec";
     p->NETFrameworkCLRJITStandardFailures.key = "Standard Jit Failures";
     p->NETFrameworkCLRJITIlBytes.key = "# of IL Bytes Jitted";
+
+    p->NETFrameworkCLRLoadingHeapSize.key = "Bytes in Loader Heap";
+    p->NETFrameworkCLRLoadingAppDomainsLoaded.key = "Rate of appdomains";
+    p->NETFrameworkCLRLoadingAppDomainsUnloaded.key = "Total appdomains unloaded";
+    p->NETFrameworkCLRLoadingAssembliesLoaded.key = "Total Assemblies";
+    p->NETFrameworkCLRLoadingClassesLoaded.key = "Total Classes Loaded";
+    p->NETFrameworkCLRLoadingClassLoadFailure.key = "Total # of Load Failures";
 }
 
 void dict_net_framework_processes_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -563,6 +595,7 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
                                           PERF_OBJECT_TYPE *pObjectType,
                                           int update_every)
 {
+    char id[RRD_ID_LENGTH_MAX + 1];
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for(LONG i = 0; i < pObjectType->NumInstances ; i++) {
         pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
@@ -574,6 +607,225 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
 
         if(strcasecmp(windows_shared_buffer, "_Global_") == 0)
             continue;
+
+        netdata_fix_chart_name(windows_shared_buffer);
+        struct net_framework_instances *p = dictionary_set(processes, windows_shared_buffer, NULL, sizeof(*p));
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLoadingHeapSize)) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_loader_heap_size", windows_shared_buffer);
+            if (!p->st_clrloading_heap_size) {
+                p->st_clrloading_heap_size = rrdset_create_localhost("netframework"
+                                                                     , windows_shared_buffer, NULL
+                                                                     , "loading"
+                                                                     , "netframework.clrloading_loader_heap_size"
+                                                                     , "Memory committed by class loader"
+                                                                     , "bytes"
+                                                                     , PLUGIN_WINDOWS_NAME
+                                                                     , "PerflibNetFramework"
+                                                                     , PRIO_NETFRAMEWORK_CLR_LOADING_HEAP_SIZE
+                                                                     , update_every
+                                                                     , RRDSET_TYPE_LINE
+                                                                     );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrloading_loader_heap_size_bytes", windows_shared_buffer);
+                p->rd_clrloading_heap_size  = rrddim_add(p->st_clrloading_heap_size,
+                                                        id,
+                                                        "committed",
+                                                        1,
+                                                        1,
+                                                        RRD_ALGORITHM_ABSOLUTE);
+
+                rrdlabels_add(p->st_clrloading_heap_size->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrloading_heap_size,
+                                  p->rd_clrloading_heap_size,
+                                  (collected_number)p->NETFrameworkCLRLoadingHeapSize.current.Data);
+            rrdset_done(p->st_clrloading_heap_size);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLoadingAppDomainsLoaded)) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_appdomains_loaded", windows_shared_buffer);
+            if (!p->st_clrloading_app_domains_loaded) {
+                p->st_clrloading_app_domains_loaded = rrdset_create_localhost("netframework"
+                                                                              , windows_shared_buffer, NULL
+                                                                              , "loading"
+                                                                              , "netframework.clrloading_appdomains_loaded"
+                                                                              , "Loaded application domains"
+                                                                              , "domain/s"
+                                                                              , PLUGIN_WINDOWS_NAME
+                                                                              , "PerflibNetFramework"
+                                                                              , PRIO_NETFRAMEWORK_CLR_LOADING_APP_DOMAINS_LOADED
+                                                                              , update_every
+                                                                              , RRDSET_TYPE_LINE
+                                                                              );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrloading_appdomains_loaded_total", windows_shared_buffer);
+                p->rd_clrloading_app_domains_loaded  = rrddim_add(p->st_clrloading_app_domains_loaded,
+                                                                 id,
+                                                                 "loaded",
+                                                                 1,
+                                                                 1,
+                                                                 RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_clrloading_app_domains_loaded->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrloading_app_domains_loaded,
+                                  p->rd_clrloading_app_domains_loaded,
+                                  (collected_number)p->NETFrameworkCLRLoadingAppDomainsLoaded.current.Data);
+            rrdset_done(p->st_clrloading_app_domains_loaded);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLoadingAppDomainsUnloaded)) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_appdomains_unloaded", windows_shared_buffer);
+                if (!p->st_clrloading_app_domains_unloaded) {
+                    p->st_clrloading_app_domains_unloaded = rrdset_create_localhost("netframework"
+                                                                                    , windows_shared_buffer, NULL
+                                                                                    , "loading"
+                                                                                    , "netframework.clrloading_appdomains_unloaded"
+                                                                                    , "Unloaded application domains"
+                                                                                    , "domain/s"
+                                                                                    , PLUGIN_WINDOWS_NAME
+                                                                                    , "PerflibNetFramework"
+                                                                                    , PRIO_NETFRAMEWORK_CLR_LOADING_APP_DOMAINS_UNLOADED
+                                                                                    , update_every
+                                                                                    , RRDSET_TYPE_LINE
+                                                                                    );
+
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrloading_appdomains_unloaded_total", windows_shared_buffer);
+                    p->rd_clrloading_app_domains_unloaded  = rrddim_add(p->st_clrloading_app_domains_unloaded,
+                                                                       id,
+                                                                       "unloaded",
+                                                                       1,
+                                                                       1,
+                                                                       RRD_ALGORITHM_INCREMENTAL);
+
+                    rrdlabels_add(p->st_clrloading_app_domains_unloaded->rrdlabels,
+                                  "process",
+                                  windows_shared_buffer,
+                                  RRDLABEL_SRC_AUTO);
+                }
+
+                rrddim_set_by_pointer(p->st_clrloading_app_domains_unloaded,
+                                      p->rd_clrloading_app_domains_unloaded,
+                                      (collected_number)p->NETFrameworkCLRLoadingAppDomainsUnloaded.current.Data);
+                rrdset_done(p->st_clrloading_app_domains_unloaded);
+            }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLoadingAssembliesLoaded)) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_assemblies_loaded", windows_shared_buffer);
+            if (!p->st_clrloading_assemblies_loaded) {
+                p->st_clrloading_assemblies_loaded = rrdset_create_localhost("netframework"
+                                                                             , windows_shared_buffer, NULL
+                                                                             , "loading"
+                                                                             , "netframework.clrloading_assemblies_loaded"
+                                                                             , "Loaded assemblies"
+                                                                             , "assemblies/s"
+                                                                             , PLUGIN_WINDOWS_NAME
+                                                                             , "PerflibNetFramework"
+                                                                             , PRIO_NETFRAMEWORK_CLR_LOADING_ASSEMBLIES_LOADED
+                                                                             , update_every
+                                                                             , RRDSET_TYPE_LINE
+                                                                             );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrloading_assemblies_loaded_total", windows_shared_buffer);
+                p->rd_clrloading_assemblies_loaded  = rrddim_add(p->st_clrloading_assemblies_loaded,
+                                                                id,
+                                                                "loaded",
+                                                                1,
+                                                                1,
+                                                                RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_clrloading_assemblies_loaded->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrloading_assemblies_loaded,
+                                  p->rd_clrloading_assemblies_loaded,
+                                  (collected_number)p->NETFrameworkCLRLoadingAssembliesLoaded.current.Data);
+            rrdset_done(p->st_clrloading_assemblies_loaded);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLoadingClassesLoaded)) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_classes_loaded", windows_shared_buffer);
+            if (!p->st_clrloading_classes_loaded) {
+                p->st_clrloading_classes_loaded = rrdset_create_localhost("netframework"
+                                                                          , windows_shared_buffer, NULL
+                                                                          , "loading"
+                                                                          , "netframework.clrloading_classes_loaded"
+                                                                          , "Loaded classes in all assemblies"
+                                                                          , "classes/s"
+                                                                          , PLUGIN_WINDOWS_NAME
+                                                                          , "PerflibNetFramework"
+                                                                          , PRIO_NETFRAMEWORK_CLR_LOADING_CLASSES_LOADED
+                                                                          , update_every
+                                                                          , RRDSET_TYPE_LINE
+                                                                          );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrloading_classes_loaded_total", windows_shared_buffer);
+                p->rd_clrloading_classes_loaded  = rrddim_add(p->st_clrloading_classes_loaded,
+                                                                 id,
+                                                             "loaded",
+                                                             1,
+                                                             1,
+                                                             RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_clrloading_classes_loaded->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrloading_classes_loaded,
+                                  p->rd_clrloading_classes_loaded,
+                                  (collected_number)p->NETFrameworkCLRLoadingClassesLoaded.current.Data);
+            rrdset_done(p->st_clrloading_classes_loaded);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLoadingClassLoadFailure)) {
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_class_load_failure", windows_shared_buffer);
+            if (!p->st_clrloading_class_load_failure) {
+                p->st_clrloading_class_load_failure = rrdset_create_localhost("netframework"
+                                                                              , windows_shared_buffer, NULL
+                                                                              , "loading"
+                                                                              , "netframework.clrloading_class_load_failures"
+                                                                              , "Class load failures"
+                                                                              , "failures/s"
+                                                                              , PLUGIN_WINDOWS_NAME
+                                                                              , "PerflibNetFramework"
+                                                                              , PRIO_NETFRAMEWORK_CLR_LOADING_CLASS_LOAD_FAILURE
+                                                                              , update_every
+                                                                              , RRDSET_TYPE_LINE
+                                                                              );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrloading_class_load_failures_total", windows_shared_buffer);
+                p->rd_clrloading_class_load_failure  = rrddim_add(p->st_clrloading_class_load_failure,
+                                                                 id,
+                                                                 "class_load",
+                                                                 1,
+                                                                 1,
+                                                                 RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_clrloading_class_load_failure->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrloading_class_load_failure,
+                                  p->rd_clrloading_class_load_failure,
+                                  (collected_number)p->NETFrameworkCLRLoadingClassLoadFailure.current.Data);
+            rrdset_done(p->st_clrloading_class_load_failure);
+        }
     }
 }
 
