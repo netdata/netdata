@@ -40,7 +40,7 @@ static int connect_to_spawn_server(const char *path, bool log) {
 
     if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
         if(log)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Cannot connect() to spawn server.");
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Cannot connect() to spawn server on path '%s'.", path);
         close(sock);
         return -1;
     }
@@ -351,6 +351,8 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
     }
 
     pid_t pid = fork();
+    gettid_uncached(); // make sure the logger logs valid pids
+
     if (pid < 0) {
         // fork failed
 
