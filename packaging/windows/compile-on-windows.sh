@@ -1,5 +1,17 @@
 #!/bin/bash
 
+PATH="${PATH}:$(cygpath -u -a 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64'):$(cygpath -u -a 'C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\bin\Hostx64\x64')"
+
+find /c/Program\ Files\ \(x86\)/ -name mc.exe
+find /c/Program\ Files\ \(x86\)/ -name rc.exe
+find /c/Program\ Files\ \(x86\)/ -name link.exe
+
+find /c/Program\ Files/ -name mc.exe
+find /c/Program\ Files/ -name rc.exe
+find /c/Program\ Files/ -name link.exe
+
+exit 1
+
 REPO_ROOT="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 
