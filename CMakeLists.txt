@@ -1790,7 +1790,6 @@ if(OS_WINDOWS)
                 set(HAVE_WEL False)
         endif()
 
-
         if(RUN_UNDER_CLION)
                 # for some reason, under clion it finds the wrong windres
                 set (WINDRES_EXECUTABLE windres)
