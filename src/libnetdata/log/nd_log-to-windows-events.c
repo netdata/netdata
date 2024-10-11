@@ -2,14 +2,12 @@
 
 #include "nd_log-internals.h"
 
-#if defined(OS_WINDOWS)
+#if defined(OS_WINDOWS) && (defined(HAVE_ETW) || defined(HAVE_WEL))
 #include <windows.h>
 #include <winevt.h>
 #include <evntprov.h>
 #include <wchar.h>
 #include <guiddef.h>
-
-static bool use_etw = true;
 
 // --------------------------------------------------------------------------------------------------------------------
 // construct an event id
@@ -20,7 +18,7 @@ static bool use_etw = true;
 // include the common definitions with the message resources and manifest generator
 #include "nd_log-to-windows-common.h"
 
-#if (USE_ETW == 1)
+#if defined(HAVE_ETW)
 // we need the manifest, only in ETW mode
 
 // eliminate compiler warnings and load manifest generated header
@@ -167,7 +165,7 @@ static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider,
     return true;
 }
 
-#if (USE_ETW == 1)
+#if defined(HAVE_ETW)
 static void etw_set_source_meta(struct nd_log_source *source, USHORT channelID, const EVENT_DESCRIPTOR *ed) {
     // It turns out that the keyword varies per only per channel!
     // so, to log with the right keyword, Task, Opcode we copy the ids from the header
@@ -196,8 +194,8 @@ static bool etw_register_provider(void) {
 }
 #endif
 
-bool nd_log_wevents_init(void) {
-    if(nd_log.wevents.initialized)
+bool nd_log_init_windows(void) {
+    if(nd_log.eventlog.initialized)
         return true;
 
     // validate we have the right keys
@@ -209,11 +207,9 @@ bool nd_log_wevents_init(void) {
             !check_event_id(NDLS_DEBUG, NDLP_ALERT, MSGID_ACCESS_FORWARDER_USER, MC_DEBUG_ALERT_ACCESS_FORWARDER_USER))
        return false;
 
-#if (USE_ETW == 1)
-    if(!etw_register_provider())
-        use_etw = false;
-#else
-    use_etw = false;
+#if defined(HAVE_ETW)
+    if(nd_log.eventlog.etw && !etw_register_provider())
+        return false;
 #endif
 
     // Loop through each source and add it to the registry
@@ -244,7 +240,7 @@ bool nd_log_wevents_init(void) {
                 break;
         }
 
-        if(!use_etw) {
+        if(!nd_log.eventlog.etw) {
             if(!wel_add_to_registry(NETDATA_CHANNEL_NAME_W, sub_channel, defaultMaxSize)) return false;
 
             // when not using a manifest, each source is a provider
@@ -254,7 +250,7 @@ bool nd_log_wevents_init(void) {
         }
     }
 
-    if(!use_etw) {
+    if(!nd_log.eventlog.etw) {
         // Map the unset ones to NDLS_DAEMON
         for (size_t i = 0; i < _NDLS_MAX; i++) {
             if (!nd_log.sources[i].hEventLog)
@@ -262,8 +258,18 @@ bool nd_log_wevents_init(void) {
         }
     }
 
-    nd_log.wevents.initialized = true;
+    nd_log.eventlog.initialized = true;
     return true;
+}
+
+bool nd_log_init_etw(void) {
+    nd_log.eventlog.etw = true;
+    return nd_log_init_windows();
+}
+
+bool nd_log_init_wel(void) {
+    nd_log.eventlog.etw = false;
+    return nd_log_init_windows();
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -285,7 +291,7 @@ static struct {
     wchar_t *buf;
 } fields_buffers[_NDF_MAX] = { 0 };
 
-#if (USE_ETW == 1)
+#if defined(HAVE_ETW)
 static EVENT_DATA_DESCRIPTOR etw_eventData[_NDF_MAX - 1];
 #endif
 
@@ -314,7 +320,7 @@ __attribute__((constructor)) void wevents_initialize_buffers(void) {
 #define is_field_set(fields, fields_max, field) ((field) < (fields_max) && (fields)[field].entry.set)
 
 static const char *get_field_value_unsafe(struct log_field *fields, ND_LOG_FIELD_ID i, size_t fields_max, BUFFER **tmp) {
-    if(!is_field_set(fields, fields_max, i) || !fields[i].wevents)
+    if(!is_field_set(fields, fields_max, i) || !fields[i].eventlog)
         return "";
 
     static char number_str[MAX(MAX(UINT64_MAX_LENGTH, DOUBLE_MAX_LENGTH), UUID_STR_LEN)];
@@ -378,7 +384,9 @@ static void etw_replace_percent_with_unicode(wchar_t *s, size_t size) {
     // Traverse the string, replacing '%' with the Unicode fullwidth percent sign
     for (size_t i = 0; i < original_len && i < size - 1; i++) {
         if (s[i] == L'%') {
-            s[i] = 0xFF05;  // Replace '%' with fullwidth percent sign '％'
+            // s[i] = 0xFF05;  // Replace '%' with fullwidth percent sign '％'
+            // s[i] = 0x29BC; // ⦼
+            s[i] = 0x2105; // ℅
         }
     }
 
@@ -390,14 +398,14 @@ static void wevt_generate_all_fields_unsafe(struct log_field *fields, size_t fie
     for (size_t i = 0; i < fields_max; i++) {
         fields_buffers[i].buf[0] = L'\0';
 
-        if (!fields[i].entry.set || !fields[i].wevents)
+        if (!fields[i].entry.set || !fields[i].eventlog)
             continue;
 
         const char *s = get_field_value_unsafe(fields, i, fields_max, tmp);
         if (s && *s) {
             utf8_to_utf16(fields_buffers[i].buf, (int) fields_buffers[i].size, s, -1);
 
-            if(use_etw)
+            if(nd_log.eventlog.etw)
                 // UNBELIEVABLE! they do recursive parameter expansion in ETW...
                 etw_replace_percent_with_unicode(fields_buffers[i].buf, fields_buffers[i].size);
         }
@@ -419,8 +427,8 @@ static bool has_user_role_permissions(struct log_field *fields, size_t fields_ma
     return false;
 }
 
-bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
-    if (!nd_log.wevents.initialized)
+static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
+    if (!nd_log.eventlog.initialized)
         return false;
 
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
@@ -499,8 +507,8 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
     // with a manifest    => Task from the manifest is used (wCategory ignored)
 
     BOOL rc;
-#if (USE_ETW == 1)
-    if (use_etw) {
+#if defined(HAVE_ETW)
+    if (nd_log.eventlog.etw) {
         // metadata based logging - ETW
 
         for (size_t i = 1; i < _NDF_MAX; i++)
@@ -531,5 +539,17 @@ bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, s
 
     return rc == TRUE;
 }
+
+#if defined(HAVE_ETW)
+bool nd_logger_etw(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
+    return nd_logger_windows(source, fields, fields_max);
+}
+#endif
+
+#if defined(HAVE_WEL)
+bool nd_logger_wel(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
+    return nd_logger_windows(source, fields, fields_max);
+}
+#endif
 
 #endif

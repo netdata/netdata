@@ -41,9 +41,14 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
             }
             break;
 
-#if defined(OS_WINDOWS)
-        case NDLM_WEVENTS:
-            if(unlikely(!nd_log.wevents.initialized)) {
+#if defined(OS_WINDOWS) && (defined(HAVE_ETW) || defined(HAVE_WEL))
+#if defined(HAVE_ETW)
+        case NDLM_ETW:
+#endif
+#if defined(HAVE_WEL)
+        case NDLM_WEL:
+#endif
+            if(unlikely(!nd_log.eventlog.initialized)) {
                 output = NDLM_FILE;
                 *fpp = stderr;
                 *spinlock = &nd_log.std_error.spinlock;
@@ -132,8 +137,9 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
     }
 
 #if defined(OS_WINDOWS)
-    if(output == NDLM_WEVENTS) {
-        if(!nd_logger_wevents(source, fields, fields_max)) {
+#if defined(HAVE_ETW)
+    if(output == NDLM_ETW) {
+        if(!nd_logger_etw(source, fields, fields_max)) {
             // we can't log to windows events, let's log to stderr
             if(spinlock)
                 spinlock_unlock(spinlock);
@@ -146,6 +152,23 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
                 spinlock_lock(spinlock);
         }
     }
+#endif
+#if defined(HAVE_WEL)
+    if(output == NDLM_WEL) {
+        if(!nd_logger_wel(source, fields, fields_max)) {
+            // we can't log to windows events, let's log to stderr
+            if(spinlock)
+                spinlock_unlock(spinlock);
+
+            output = NDLM_FILE;
+            spinlock = &nd_log.std_error.spinlock;
+            fp = stderr;
+
+            if(spinlock)
+                spinlock_lock(spinlock);
+        }
+    }
+#endif
 #endif
 
     if(output == NDLM_SYSLOG)

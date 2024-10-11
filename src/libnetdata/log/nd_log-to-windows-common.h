@@ -7,8 +7,6 @@
 #define WIDEN2(x) L ## x
 #define WIDEN(x) WIDEN2(x)
 
-#define USE_ETW 1
-
 #define NETDATA_ETW_PROVIDER_GUID_STR       "{96c5ca72-9bd8-4634-81e5-000014e7da7a}"
 #define NETDATA_ETW_PROVIDER_GUID_STR_W     WIDEN(NETDATA_ETW_PROVIDER_GUID)
 

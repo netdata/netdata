@@ -40,18 +40,30 @@ typedef enum  __attribute__((__packed__)) {
     NDLM_STDERR,
     NDLM_FILE,
 #if defined(OS_WINDOWS)
-    NDLM_WEVENTS,
+#if defined(HAVE_ETW)
+    NDLM_ETW,
+#endif
+#if defined(HAVE_WEL)
+    NDLM_WEL,
+#endif
 #endif
 } ND_LOG_METHOD;
 
 // all the log methods are finally mapped to these
-#if defined(OS_WINDOWS)
-#define IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(ndlo) ((ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || (ndlo) == NDLM_STDERR || (ndlo) == NDLM_WEVENTS)
-#define IS_FINAL_LOG_METHOD(ndlo) ((ndlo) == NDLM_FILE || (ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || (ndlo) == NDLM_WEVENTS)
+#if defined(HAVE_ETW)
+#define ETW_CONDITION(ndlo) ((ndlo) == NDLM_ETW)
 #else
-#define IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(ndlo) ((ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || (ndlo) == NDLM_STDERR)
-#define IS_FINAL_LOG_METHOD(ndlo) ((ndlo) == NDLM_FILE || (ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG)
+#define ETW_CONDITION(ndlo) (false)
 #endif
+
+#if defined(HAVE_WEL)
+#define WEL_CONDITION(ndlo) ((ndlo) == NDLM_WEL)
+#else
+#define WEL_CONDITION(ndlo) (false)
+#endif
+
+#define IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(ndlo) ((ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || (ndlo) == NDLM_STDERR || ETW_CONDITION(ndlo) || WEL_CONDITION(ndlo))
+#define IS_FINAL_LOG_METHOD(ndlo) ((ndlo) == NDLM_FILE || (ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || ETW_CONDITION(ndlo) || WEL_CONDITION(ndlo))
 
 ND_LOG_METHOD nd_log_method2id(const char *method);
 const char *nd_log_id2method(ND_LOG_METHOD method);
@@ -64,9 +76,17 @@ typedef enum __attribute__((__packed__)) {
     NDLF_LOGFMT,
     NDLF_JSON,
 #if defined(OS_WINDOWS)
-    NDLF_WEVENTS,
+#if defined(HAVE_ETW)
+    NDLF_ETW, // Event Tracing for Windows
+#endif
+#if defined(HAVE_WEL)
+    NDLF_WEL, // Windows Event Log
+#endif
 #endif
 } ND_LOG_FORMAT;
+
+#define ETW_NAME "etw"
+#define WEL_NAME "wel"
 
 const char *nd_log_id2format(ND_LOG_FORMAT format);
 ND_LOG_FORMAT nd_log_format2id(const char *format);
@@ -127,8 +147,9 @@ struct nd_log {
     } syslog;
 
     struct {
+        bool etw; // when set use etw, otherwise wel
         bool initialized;
-    } wevents;
+    } eventlog;
 
     struct {
         SPINLOCK spinlock;
@@ -150,7 +171,7 @@ typedef const char *(*annotator_t)(struct log_field *lf);
 struct log_field {
     const char *journal;
     const char *logfmt;
-    const char *wevents;
+    const char *eventlog;
     annotator_t annotator;
     struct log_stack_entry entry;
 };
@@ -216,8 +237,14 @@ bool nd_logger_file(FILE *fp, ND_LOG_FORMAT format, struct log_field *fields, si
 // output to windows events log
 
 #if defined(OS_WINDOWS)
-bool nd_log_wevents_init(void);
-bool nd_logger_wevents(struct nd_log_source *source, struct log_field *fields, size_t fields_max);
+#if defined(HAVE_ETW)
+bool nd_log_init_etw(void);
+bool nd_logger_etw(struct nd_log_source *source, struct log_field *fields, size_t fields_max);
+#endif
+#if defined(HAVE_WEL)
+bool nd_log_init_wel(void);
+bool nd_logger_wel(struct nd_log_source *source, struct log_field *fields, size_t fields_max);
+#endif
 #endif
 
 #endif //NETDATA_ND_LOG_INTERNALS_H

@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# add Windows SDK and Visual Studio to the path
+PATH="${PATH}:$(cygpath -u -a 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64'):$(cygpath -u -a 'C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\bin\Hostx64\x64')"
+
 # On MSYS2, install these dependencies to build netdata:
 install_dependencies() {
     pacman -S \

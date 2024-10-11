@@ -36,8 +36,14 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
             else if(strcmp(name, "journal") == 0)
                 ls->format = NDLF_JOURNAL;
 #if defined(OS_WINDOWS)
-            else if(strcmp(name, "wevents") == 0)
-                ls->format = NDLF_WEVENTS;
+#if defined(HAVE_ETW)
+            else if(strcmp(name, ETW_NAME) == 0)
+                ls->format = NDLF_ETW;
+#endif
+#if defined(HAVE_WEL)
+                else if(strcmp(name, WEL_NAME) == 0)
+                ls->format = NDLF_WEL;
+#endif
 #endif
             else if(strcmp(name, "level") == 0 && value && *value)
                 ls->min_priority = nd_log_priority2id(value);
@@ -87,10 +93,18 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
         ls->filename = NULL;
     }
 #if defined(OS_WINDOWS)
-    else if(strcmp(output, "wevents") == 0) {
-        ls->method = NDLM_WEVENTS;
+#if defined(HAVE_ETW)
+    else if(strcmp(output, ETW_NAME) == 0) {
+        ls->method = NDLM_ETW;
         ls->filename = NULL;
     }
+#endif
+#if defined(HAVE_WEL)
+        else if(strcmp(output, WEL_NAME) == 0) {
+        ls->method = NDLM_WEL;
+        ls->filename = NULL;
+    }
+#endif
 #endif
     else if(strcmp(output, "syslog") == 0) {
         ls->method = NDLM_SYSLOG;

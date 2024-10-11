@@ -851,7 +851,11 @@ static void log_init(void) {
 #if defined(OS_LINUX)
     os_default_method = is_stderr_connected_to_journal() /* || nd_log_journal_socket_available() */ ? "journal" : NULL;
 #elif defined(OS_WINDOWS)
-    os_default_method = "wevents";
+#if defined(HAVE_ETW)
+    os_default_method = "etw";
+#elif defined(HAVE_WEL)
+    os_default_method = "wel";
+#endif
 #endif
 
 #if defined(OS_WINDOWS)
