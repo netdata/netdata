@@ -2,7 +2,7 @@
 [% include 'overview/collector.md' %]
 [% elif entry.integration_type == 'exporter' %]
 [% include 'overview/exporter.md' %]
-[% elif entry.integration_type == 'notification' %]
+[% elif entry.integration_type == 'agent_notification' %]
 [% include 'overview/notification.md' %]
 [% elif entry.integration_type == 'authentication' %]
 [% include 'overview/authentication.md' %]

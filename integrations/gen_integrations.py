@@ -40,8 +40,11 @@ EXPORTER_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'exporting', True),
 ]
 
-NOTIFICATION_SOURCES = [
+AGENT_NOTIFICATION_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'health' / 'notifications', True),
+]
+
+CLOUD_NOTIFICATION_SOURCES = [
     (AGENT_REPO, INTEGRATIONS_PATH / 'cloud-notifications' / 'metadata.yaml', False),
 ]
 
@@ -64,8 +67,13 @@ EXPORTER_RENDER_KEYS = [
     'troubleshooting',
 ]
 
-NOTIFICATION_RENDER_KEYS = [
+AGENT_NOTIFICATION_RENDER_KEYS = [
     'overview',
+    'setup',
+    'troubleshooting',
+]
+
+CLOUD_NOTIFICATION_RENDER_KEYS = [
     'setup',
     'troubleshooting',
 ]
@@ -122,8 +130,13 @@ EXPORTER_VALIDATOR = Draft7Validator(
     registry=registry,
 )
 
-NOTIFICATION_VALIDATOR = Draft7Validator(
-    {'$ref': './notification.json#'},
+AGENT_NOTIFICATION_VALIDATOR = Draft7Validator(
+    {'$ref': './agent_notification.json#'},
+    registry=registry,
+)
+
+CLOUD_NOTIFICATION_VALIDATOR = Draft7Validator(
+    {'$ref': './cloud_notification.json#'},
     registry=registry,
 )
 
@@ -354,7 +367,7 @@ def load_exporters():
     return ret
 
 
-def _load_notification_file(file, repo):
+def _load_agent_notification_file(file, repo):
     debug(f'Loading { file }.')
     data = load_yaml(file)
 
@@ -362,13 +375,13 @@ def _load_notification_file(file, repo):
         return []
 
     try:
-        NOTIFICATION_VALIDATOR.validate(data)
+        AGENT_NOTIFICATION_VALIDATOR.validate(data)
     except ValidationError:
         warn(f'Failed to validate { file } against the schema.', file)
         return []
 
     if 'id' in data:
-        data['integration_type'] = 'notification'
+        data['integration_type'] = 'agent_notification'
         data['_src_path'] = file
         data['_repo'] = repo
         data['_index'] = 0
@@ -378,7 +391,7 @@ def _load_notification_file(file, repo):
         ret = []
 
         for idx, item in enumerate(data):
-            item['integration_type'] = 'notification'
+            item['integration_type'] = 'agent_notification'
             item['_src_path'] = file
             item['_repo'] = repo
             item['_index'] = idx
@@ -387,17 +400,64 @@ def _load_notification_file(file, repo):
         return ret
 
 
-def load_notifications():
+
+def _load_cloud_notification_file(file, repo):
+    debug(f'Loading { file }.')
+    data = load_yaml(file)
+
+    if not data:
+        return []
+
+    try:
+        CLOUD_NOTIFICATION_VALIDATOR.validate(data)
+    except ValidationError:
+        warn(f'Failed to validate { file } against the schema.', file)
+        return []
+
+    if 'id' in data:
+        data['integration_type'] = 'cloud_notification'
+        data['_src_path'] = file
+        data['_repo'] = repo
+        data['_index'] = 0
+
+        return [data]
+    else:
+        ret = []
+
+        for idx, item in enumerate(data):
+            item['integration_type'] = 'cloud_notification'
+            item['_src_path'] = file
+            item['_repo'] = repo
+            item['_index'] = idx
+            ret.append(item)
+
+        return ret
+
+
+def load_agent_notifications():
     ret = []
 
-    for repo, path, match in NOTIFICATION_SOURCES:
+    for repo, path, match in AGENT_NOTIFICATION_SOURCES:
         if match and path.exists() and path.is_dir():
             for file in path.glob(METADATA_PATTERN):
-                ret.extend(_load_notification_file(file, repo))
+                ret.extend(_load_agent_notification_file(file, repo))
         elif not match and path.exists() and path.is_file():
-            ret.extend(_load_notification_file(path, repo))
+            ret.extend(_load_agent_notification_file(path, repo))
 
     return ret
+
+def load_cloud_notifications():
+    ret = []
+
+    for repo, path, match in CLOUD_NOTIFICATION_SOURCES:
+        if match and path.exists() and path.is_dir():
+            for file in path.glob(METADATA_PATTERN):
+                ret.extend(_load_cloud_notification_file(file, repo))
+        elif not match and path.exists() and path.is_file():
+            ret.extend(_load_cloud_notification_file(path, repo))
+
+    return ret
+
 
 def _load_authentication_file(file, repo):
     debug(f'Loading { file }.')
@@ -670,7 +730,7 @@ def render_exporters(categories, exporters, ids):
     return exporters, clean_exporters, ids
 
 
-def render_notifications(categories, notifications, ids):
+def render_agent_notifications(categories, notifications, ids):
     debug('Sorting notifications.')
 
     sort_integrations(notifications)
@@ -686,7 +746,51 @@ def render_notifications(categories, notifications, ids):
 
         clean_item = deepcopy(item)
 
-        for key in NOTIFICATION_RENDER_KEYS:
+        for key in AGENT_NOTIFICATION_RENDER_KEYS:
+            if key in item.keys():
+                template = get_jinja_env().get_template(f'{ key }.md')
+                data = template.render(entry=item, clean=False)
+
+                clean_data = template.render(entry=item, clean=True)
+
+                if 'variables' in item['meta']:
+                    template = get_jinja_env().from_string(data)
+                    data = template.render(variables=item['meta']['variables'], clean=False)
+                    template = get_jinja_env().from_string(clean_data)
+                    clean_data = template.render(variables=item['meta']['variables'], clean=True)
+            else:
+                data = ''
+                clean_data = ''
+
+            item[key] = data
+            clean_item[key] = clean_data
+
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
+
+        clean_notifications.append(clean_item)
+
+    return notifications, clean_notifications, ids
+
+
+
+def render_cloud_notifications(categories, notifications, ids):
+    debug('Sorting notifications.')
+
+    sort_integrations(notifications)
+
+    debug('Checking notification ids.')
+
+    notifications, ids = dedupe_integrations(notifications, ids)
+
+    clean_notifications = []
+
+    for item in notifications:
+        item['edit_link'] = make_edit_link(item)
+
+        clean_item = deepcopy(item)
+
+        for key in CLOUD_NOTIFICATION_RENDER_KEYS:
             if key in item.keys():
                 template = get_jinja_env().get_template(f'{ key }.md')
                 data = template.render(entry=item, clean=False)
@@ -777,20 +881,22 @@ def main():
     collectors = load_collectors()
     deploy = load_deploy()
     exporters = load_exporters()
-    notifications = load_notifications()
+    agent_notifications = load_agent_notifications()
+    cloud_notifications = load_cloud_notifications()
     authentications = load_authentications()
 
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
     deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
     exporters, clean_exporters, ids = render_exporters(categories, exporters, ids)
-    notifications, clean_notifications, ids = render_notifications(categories, notifications, ids)
+    agent_notifications, clean_agent_notifications, ids = render_agent_notifications(categories, agent_notifications, ids)
+    cloud_notifications, clean_cloud_notifications, ids = render_cloud_notifications(categories, cloud_notifications, ids)
     authentications, clean_authentications, ids = render_authentications(categories, authentications, ids)
 
 
-    integrations = collectors + deploy + exporters + notifications + authentications
+    integrations = collectors + deploy + exporters + agent_notifications + cloud_notifications + authentications
     render_integrations(categories, integrations)
 
-    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_notifications + clean_authentications
+    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications + clean_cloud_notifications + clean_authentications
     render_json(categories, clean_integrations)
 
 
