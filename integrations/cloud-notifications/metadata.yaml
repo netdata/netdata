@@ -758,7 +758,7 @@
 
 - id: "notify-cloud-ilert"
   meta:
-    name: "Ilert"
+    name: "ilert"
     link: "https://www.ilert.com/"
     categories:
       - notify.cloud
