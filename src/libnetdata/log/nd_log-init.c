@@ -115,7 +115,7 @@ void nd_log_initialize_for_external_plugins(const char *name) {
 #endif
 
         case NDLM_SYSLOG:
-            nd_log_syslog_init();
+            nd_log_init_syslog();
             break;
 
         default:
@@ -148,7 +148,7 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
 
     switch(e->method) {
         case NDLM_SYSLOG:
-            nd_log_syslog_init();
+            nd_log_init_syslog();
             break;
 
         case NDLM_JOURNAL:
@@ -267,6 +267,8 @@ void nd_log_reopen_log_files(bool log) {
 
     nd_log.std_output.initialized = false;
     nd_log.std_error.initialized = false;
+    nd_log.journal_direct.initialized = false;
+    nd_log.journal.initialized = false;
     nd_log_initialize();
 
     if(log)
@@ -274,10 +276,12 @@ void nd_log_reopen_log_files(bool log) {
 }
 
 void nd_log_reopen_log_files_for_spawn_server(void) {
+    gettid_uncached();
+
     if(nd_log.syslog.initialized) {
         closelog();
         nd_log.syslog.initialized = false;
-        nd_log_syslog_init();
+        nd_log_init_syslog();
     }
 
     if(nd_log.journal_direct.initialized) {

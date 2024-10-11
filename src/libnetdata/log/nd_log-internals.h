@@ -217,7 +217,8 @@ void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_max);
 // --------------------------------------------------------------------------------------------------------------------
 // output to syslog
 
-void nd_log_syslog_init(void);
+void nd_log_init_syslog(void);
+void nd_log_reset_syslog(void);
 bool nd_logger_syslog(int priority, ND_LOG_FORMAT format, struct log_field *fields, size_t fields_max);
 
 // --------------------------------------------------------------------------------------------------------------------

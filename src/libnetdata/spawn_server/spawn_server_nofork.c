@@ -59,6 +59,7 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
 
     // close all open file descriptors of the parent, but keep ours
     os_close_all_non_std_open_fds_except(rq->fds, 4, 0);
+    nd_log_reopen_log_files_for_spawn_server();
 
     // set the process name
     os_setproctitle("spawn-child", server->argc, server->argv);
@@ -363,7 +364,6 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
     else if (pid == 0) {
         // the child
 
-        gettid_uncached(); // make sure the logger logs valid pids
         spawn_server_run_child(server, rq);
         exit(63);
     }
@@ -984,22 +984,24 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
 }
 
 static void replace_stdio_with_dev_null() {
+    // we cannot log in this function - the logger is not yet initialized after fork()
+
     int dev_null_fd = open("/dev/null", O_RDWR);
     if (dev_null_fd == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to open /dev/null: %s", strerror(errno));
+        // nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to open /dev/null: %s", strerror(errno));
         return;
     }
 
     // Redirect stdin (fd 0)
     if (dup2(dev_null_fd, STDIN_FILENO) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to redirect stdin to /dev/null: %s", strerror(errno));
+        // nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to redirect stdin to /dev/null: %s", strerror(errno));
         close(dev_null_fd);
         return;
     }
 
     // Redirect stdout (fd 1)
     if (dup2(dev_null_fd, STDOUT_FILENO) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to redirect stdout to /dev/null: %s", strerror(errno));
+        // nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to redirect stdout to /dev/null: %s", strerror(errno));
         close(dev_null_fd);
         return;
     }
@@ -1070,7 +1072,6 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     pid_t pid = fork();
     if (pid == 0) {
         // the child - the spawn server
-        gettid_uncached(); // make sure the logger logs valid pids
 
         {
             char buf[15];

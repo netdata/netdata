@@ -2,7 +2,7 @@
 
 #include "nd_log-internals.h"
 
-void nd_log_syslog_init(void) {
+void nd_log_init_syslog(void) {
     if(nd_log.syslog.initialized)
         return;
 
