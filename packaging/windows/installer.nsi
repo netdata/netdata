@@ -281,6 +281,38 @@ Section "Install Netdata"
 
         Call NetdataUninstallRegistry
 
+        ; Step 1: Copy wevt_netdata.dll to %SystemRoot%\System32
+        SetOutPath "$SYSDIR"
+        File "$INSTDIR\usr\bin\wevt_netdata.dll"
+        ; Retry mechanism for failed copy due to Event Viewer access
+        RetryCopyDLL:
+        ClearErrors
+        CopyFiles /SILENT "$INSTDIR\usr\bin\wevt_netdata.dll" "$SYSDIR"
+        IfErrors RetryPrompt ContinueCopy
+        RetryPrompt:
+            MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Failed to copy the Event Log Resources DLL, probably because it is in use. Please close the Event Viewer (or any other program using the Event Log) and press retry."
+            IfMsgBox RETRY RetryCopyDLL
+            IfMsgBox CANCEL Quit
+
+        ContinueCopy:
+
+        ; Step 2: Copy wevt_netdata_manifest.xml to %SystemRoot%\System32
+        File "$INSTDIR\usr\bin\wevt_netdata_manifest.xml"
+
+        ; Step 3: Set access permissions for wevt_netdata.dll
+        nsExec::ExecToLog 'icacls "$SYSDIR\wevt_netdata.dll" /grant "NT SERVICE\EventLog":R'
+        pop $0
+        ${If} $0 != 0
+            DetailPrint "Warning: Failed to set permissions for the Event Log Resources DLL."
+        ${EndIf}
+
+        ; Step 4: Install and register the manifest
+        nsExec::ExecToLog 'wevtutil im "$SYSDIR\wevt_netdata_manifest.xml" "/mf:$SYSDIR\wevt_netdata.dll" "/rf:$SYSDIR\wevt_netdata.dll"'
+        pop $0
+        ${If} $0 != 0
+            DetailPrint "Warning: Failed to install the Event Log Publisher manifest."
+        ${EndIf}
+
         StrLen $0 $cloudToken
         StrLen $1 $cloudRooms
         ${If} $0 == 0
@@ -325,9 +357,15 @@ Section "Uninstall"
 	    DetailPrint "Warning: Failed to delete Netdata service."
         ${EndIf}
 
-        # https://nsis.sourceforge.io/Reference/RMDir
+        ; Unregister event manifest and DLL
+        nsExec::ExecToLog 'wevtutil um "$SYSDIR\wevt_netdata_manifest.xml"'
+        pop $0
+        ${If} $0 != 0
+            DetailPrint "Warning: Failed to uninstall the Event Log manifest."
+        ${EndIf}
+
+        ; https://nsis.sourceforge.io/Reference/RMDir
 	RMDir /r /REBOOTOK "$INSTDIR"
 
         DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata"
 SectionEnd
-
