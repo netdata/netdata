@@ -31,8 +31,10 @@ WTEMP_BAT="$(cygpath -w -a "$temp_bat")"
 
 # Filter out any paths that refer to MSYS and only keep paths starting with /c/
 # because link.exe exists also in msys...
+echo "PATH=${PATH}"
 OLD_PATH="${PATH}"
 PATH="$(echo "$PATH" | tr ':' '\n' | grep '^/c/' | tr '\n' ';'):/c/windows/system32"
+echo "NEW PATH=${PATH}"
 
 # Execute the temporary batch file
 echo
