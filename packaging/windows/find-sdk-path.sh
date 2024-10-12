@@ -83,7 +83,7 @@ find_visual_studio_tools() {
     fi
 
     # Visual Studio editions we want to check
-    editions=("Community" "Enterprise" "Professional")
+    editions=("Enterprise" "Professional" "Community")
     available_editions=()
 
     # Loop through each edition and check for tools

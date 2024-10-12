@@ -1769,31 +1769,8 @@ target_link_libraries(libnetdata PUBLIC
         "${SYSTEMD_LDFLAGS}")
 
 if(OS_WINDOWS)
-        # Check for ETW tools: mc, rc, and link
-        find_program(MC_EXECUTABLE mc)
-        find_program(RC_EXECUTABLE rc)
-        find_program(LINK_EXECUTABLE link)
-
-        if (MC_EXECUTABLE AND RC_EXECUTABLE AND LINK_EXECUTABLE)
-                set(HAVE_ETW True)
-        else()
-                set(HAVE_ETW False)
-        endif()
-
-        # Check for WEL tools: windmc and windrc
-        find_program(WINDMC_EXECUTABLE windmc)
-        find_program(WINDRES_EXECUTABLE windres)
-
-        if (WINDMC_EXECUTABLE AND WINDRES_EXECUTABLE)
-                set(HAVE_WEL True)
-        else()
-                set(HAVE_WEL False)
-        endif()
-
-        if(RUN_UNDER_CLION)
-                # for some reason, under clion it finds the wrong windres
-                set (WINDRES_EXECUTABLE windres)
-        endif()
+        set(HAVE_ETW True)
+        set(HAVE_WEL True)
 
         # Output the results for debugging purposes
         message(STATUS "Have Event Tracing for Windows (ETW): ${HAVE_ETW}")
@@ -1817,7 +1794,12 @@ if(OS_WINDOWS)
                 set(WEVT_DLL_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.dll")
                 set(WEVT_ETW_INSTALL_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_install.bat")
 
+                # we compile ${WEVT_GEN_BIN_FILE}, which generates the manifest, the .mc,
+                # and the headers required for compiling libnetdata/logs
+
                 if(HAVE_ETW)
+                        # ETW method also supports WEL
+                        # but it requires Microsoft tools mc, rc, and link
                         add_custom_command(
                                 OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_MAN_H_FILE}" "${WEVT_DLL_FILE}"
                                 COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
@@ -1828,14 +1810,15 @@ if(OS_WINDOWS)
                                 COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
                         )
                 else()
+                        # WEL method can be built with windmc, windres and the normal linker
                         add_custom_command(
                                 OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_DLL_FILE}"
                                 COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
                                 COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
                                 COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
-                                COMMAND "${WINDMC_EXECUTABLE}" -r "${CMAKE_BINARY_DIR}" -h "${CMAKE_BINARY_DIR}" ${WEVT_MC_FILE}
+                                COMMAND windmc -r "${CMAKE_BINARY_DIR}" -h "${CMAKE_BINARY_DIR}" ${WEVT_MC_FILE}
                                 COMMAND echo "1 2004" "wevt_netdata_manifest.xml" >> "${WEVT_RC_FILE}"
-                                COMMAND "${WINDRES_EXECUTABLE}" ${WEVT_RC_FILE} -o ${WEVT_RES_OBJECT}
+                                COMMAND windres ${WEVT_RC_FILE} -o ${WEVT_RES_OBJECT}
                                 COMMAND ${CMAKE_LINKER} -dll --entry 0 -nostdlib -o ${WEVT_DLL_FILE} ${WEVT_RES_OBJECT}
                                 DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
                                 COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
