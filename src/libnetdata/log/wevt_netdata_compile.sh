@@ -24,13 +24,25 @@ cat << EOF > "$temp_bat"
 call "$(cygpath -w -a "$SCRIPT_DIR/wevt_netdata_compile.bat")" "$(cygpath -w -a "$src_dir")" "$(cygpath -w -a "$dest_dir")"
 EOF
 
-grep call <"$temp_bat"
+# show the batch file
+cat "$temp_bat"
+
+WTEMP_BAT="$(cygpath -w -a "$temp_bat")"
+
+# Filter out any paths that refer to MSYS and only keep paths starting with /c/
+# because link.exe exists also in msys...
+OLD_PATH="${PATH}"
+PATH="$(echo "$PATH" | tr ':' '\n' | grep '^/c/' | tr '\n' ';'):/c/windows/system32"
 
 # Execute the temporary batch file
-cmd.exe //c "$(cygpath -w -a "$temp_bat")"
+echo
+echo "Executing Windows Batch File..."
+cmd.exe //c "${WTEMP_BAT}"
 
 # Capture the exit status
 exit_status=$?
+
+PATH="${OLD_PATH}"
 
 # Remove the temporary batch file
 rm "$temp_bat"

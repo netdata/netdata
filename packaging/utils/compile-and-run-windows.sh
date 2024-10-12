@@ -2,7 +2,7 @@
 
 # add Windows SDK and Visual Studio to the path
 mylocation=$(dirname "${0}")
-PATH="$("${mylocation}/../windows/find-sdk-path.sh" --sdk):$("${mylocation}/../windows/find-sdk-path.sh" --visualstudio):${PATH}"
+PATH="${PATH}:$("${mylocation}/../windows/find-sdk-path.sh" --sdk):$("${mylocation}/../windows/find-sdk-path.sh" --visualstudio)"
 
 # On MSYS2, install these dependencies to build netdata:
 install_dependencies() {
@@ -74,6 +74,11 @@ then
       ${NULL}
 fi
 
+ninja -v -C "${build}" || ninja -v -C "${build}" -j 1
+
+echo "Stopping service Netdata"
+sc stop "Netdata" || echo "Failed"
+
 ninja -v -C "${build}" install || ninja -v -C "${build}" -j 1
 
 # register the event log publisher
@@ -82,9 +87,6 @@ cmd.exe //c "$(cygpath -w -a "/opt/netdata/usr/bin/wevt_netdata_install.bat")"
 #echo
 #echo "Compile with:"
 #echo "ninja -v -C \"${build}\" install || ninja -v -C \"${build}\" -j 1"
-
-echo "Stopping service Netdata"
-sc stop "Netdata" || echo "Failed"
 
 echo "starting netdata..."
 # enable JIT debug with gdb

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 mylocation=$(dirname "${0}")
-PATH="$("${mylocation}/../windows/find-sdk-path.sh" --sdk):$("${mylocation}/../windows/find-sdk-path.sh" --visualstudio):${PATH}"
+PATH="${PATH}:$("${mylocation}/../windows/find-sdk-path.sh" --sdk):$("${mylocation}/../windows/find-sdk-path.sh" --visualstudio)"
 # PATH="${PATH}:$(cygpath -u -a 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64'):$(cygpath -u -a 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.41.34120\bin\Hostx64\x64')"
 
 # Versions of MC.EXE in github CI

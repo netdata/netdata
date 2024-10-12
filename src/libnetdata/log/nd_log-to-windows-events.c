@@ -8,6 +8,7 @@
 #include <evntprov.h>
 #include <wchar.h>
 #include <guiddef.h>
+#include <wctype.h>
 
 // --------------------------------------------------------------------------------------------------------------------
 // construct an event id
@@ -387,7 +388,7 @@ static void etw_replace_percent_with_unicode(wchar_t *s, size_t size) {
 
     // Traverse the string, replacing '%' with the Unicode fullwidth percent sign
     for (size_t i = 0; i < original_len && i < size - 1; i++) {
-        if (s[i] == L'%') {
+        if (s[i] == L'%' && iswdigit(s[i + 1])) {
             // s[i] = 0xFF05;  // Replace '%' with fullwidth percent sign '％'
             // s[i] = 0x29BC; // ⦼
             s[i] = 0x2105; // ℅
