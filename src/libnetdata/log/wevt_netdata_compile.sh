@@ -1,5 +1,7 @@
 #!/bin/bash
 
+mylocation=$(dirname "${0}")
+
 # Check if both parameters are provided
 if [ $# -ne 2 ]; then
     echo "Error: Incorrect number of parameters."
@@ -21,30 +23,17 @@ temp_bat=$(mktemp --suffix=.bat)
 # Use cygpath directly within the heredoc
 cat << EOF > "$temp_bat"
 @echo off
+set "PATH=%SYSTEMROOT%;$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --sdk -w);$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --visualstudio -w)"
 call "$(cygpath -w -a "$SCRIPT_DIR/wevt_netdata_compile.bat")" "$(cygpath -w -a "$src_dir")" "$(cygpath -w -a "$dest_dir")"
 EOF
-
-# show the batch file
-cat "$temp_bat"
-
-WTEMP_BAT="$(cygpath -w -a "$temp_bat")"
-
-# Filter out any paths that refer to MSYS and only keep paths starting with /c/
-# because link.exe exists also in msys...
-echo "PATH=${PATH}"
-OLD_PATH="${PATH}"
-PATH="$(echo "$PATH" | tr ':' '\n' | grep '^/c/' | tr '\n' ';'):/c/windows/system32"
-echo "NEW PATH=${PATH}"
 
 # Execute the temporary batch file
 echo
 echo "Executing Windows Batch File..."
-cmd.exe //c "${WTEMP_BAT}"
-
-# Capture the exit status
+echo
+cat "$temp_bat"
+cmd.exe //c "$(cygpath -w -a "$temp_bat")"
 exit_status=$?
-
-PATH="${OLD_PATH}"
 
 # Remove the temporary batch file
 rm "$temp_bat"

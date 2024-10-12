@@ -20,70 +20,67 @@ display_help() {
 # Function to find tools in the Windows SDK
 find_sdk_tools() {
     sdk_base_path="/c/Program Files (x86)/Windows Kits/10/bin"
-    echo "DEBUG: Checking for SDK installations in: \"$sdk_base_path\"" >&2
 
     if [ ! -d "$sdk_base_path" ]; then
         echo "ERROR: SDK base path \"$sdk_base_path\" does not exist. No SDK installations found." >&2
-        echo "/usr/bin"
+        echo "$system_root"
         return 1
     fi
 
-    echo "DEBUG: SDK base path exists: \"$sdk_base_path\"" >&2
+    echo "SDK base path exists: \"$sdk_base_path\"" >&2
 
     # Find all SDK versions
     sdk_versions=($(ls "$sdk_base_path" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$"))
-    echo "DEBUG: Found SDK versions: ${sdk_versions[@]}" >&2
+    echo "Found SDK versions: ${sdk_versions[@]}" >&2
 
     if [ ${#sdk_versions[@]} -eq 0 ]; then
         echo "ERROR: No valid Windows SDK versions found in \"$sdk_base_path\"." >&2
-        echo "/usr/bin"
+        echo "$system_root"
         return 1
     fi
-
-    # Print all SDK versions
-    echo "INFO: SDK Versions Installed: ${sdk_versions[@]}" >&2
 
     # Sort versions and pick the latest
     sorted_versions=$(printf '%s\n' "${sdk_versions[@]}" | sort -V)
     latest_sdk_version=$(echo "$sorted_versions" | tail -n 1)
     sdk_tool_path="$sdk_base_path/$latest_sdk_version/x64"
 
-    echo "DEBUG: Latest SDK version: \"$latest_sdk_version\"" >&2
-    echo "DEBUG: Checking tool path: \"$sdk_tool_path\"" >&2
+    echo "Latest SDK version: \"$latest_sdk_version\"" >&2
 
     if [ ! -d "$sdk_tool_path" ]; then
         echo "ERROR: Tool path \"$sdk_tool_path\" does not exist." >&2
-        echo "/usr/bin"
+        echo "$system_root"
         return 1
     fi
 
     # Check if required tools exist
     tools=("mc.exe" "rc.exe")
     for tool in "${tools[@]}"; do
-        echo "DEBUG: Checking for $tool in \"$sdk_tool_path\"" >&2
         if [ ! -f "$sdk_tool_path/$tool" ]; then
             echo "ERROR: $tool not found in \"$sdk_tool_path\"" >&2
-            echo "/usr/bin"
+            echo "$system_root"
             return 1
+        else
+            echo "$tool found in \"$sdk_tool_path\"" >&2
         fi
     done
 
-    echo "DEBUG: All required tools found in \"$sdk_tool_path\"" >&2
+    echo >&2
+    echo "DONE: All required tools found in \"$sdk_tool_path\"" >&2
+    echo >&2
+
     echo "$sdk_tool_path"
 }
 
 # Function to find tools in Visual Studio
 find_visual_studio_tools() {
     studio_base_path="/c/Program Files/Microsoft Visual Studio/2022"
-    echo "DEBUG: Checking for Visual Studio installations in: \"$studio_base_path\"" >&2
+    echo "Checking for Visual Studio installations in: \"$studio_base_path\"" >&2
 
     if [ ! -d "$studio_base_path" ]; then
         echo "ERROR: Visual Studio base path \"$studio_base_path\" does not exist. No Visual Studio installations found." >&2
-        echo "/usr/bin"
+        echo "$system_root"
         return 1
     fi
-
-    echo "DEBUG: Visual Studio base path exists: \"$studio_base_path\"" >&2
 
     # Visual Studio editions we want to check
     editions=("Community" "Enterprise" "Professional")
@@ -94,21 +91,20 @@ find_visual_studio_tools() {
         edition_path="$studio_base_path/$edition/VC/Tools/MSVC"
         if [ -d "$edition_path" ]; then
             available_editions+=("$edition")
-            echo "DEBUG: Checking edition: $edition in $studio_base_path" >&2
+            echo "Checking edition: $edition in $studio_base_path" >&2
 
             # Find all MSVC versions and sort them
             msvc_versions=($(ls "$edition_path" | sort -V))
-            echo "DEBUG: Found MSVC versions in $edition: ${msvc_versions[@]}" >&2
+            echo "Found MSVC versions in $edition: ${msvc_versions[@]}" >&2
 
             if [ ${#msvc_versions[@]} -gt 0 ]; then
                 latest_msvc_version=$(echo "${msvc_versions[@]}" | tail -n 1)
                 vs_tool_path="$edition_path/$latest_msvc_version/bin/Hostx64/x64"
 
-                echo "DEBUG: Latest MSVC version: \"$latest_msvc_version\" in $edition" >&2
-                echo "DEBUG: Checking tool path: \"$vs_tool_path\"" >&2
+                echo "Latest MSVC version: \"$latest_msvc_version\" in $edition" >&2
 
                 if [ ! -d "$vs_tool_path" ]; then
-                    echo "ERROR: Tool path \"$vs_tool_path\" does not exist." >&2
+                    echo "WARNING: Tool path \"$vs_tool_path\" does not exist." >&2
                     continue
                 fi
 
@@ -117,29 +113,34 @@ find_visual_studio_tools() {
                 missing_tool=0
 
                 for tool in "${tools[@]}"; do
-                    echo "DEBUG: Checking for $tool in \"$vs_tool_path\"" >&2
                     if [ ! -f "$vs_tool_path/$tool" ]; then
-                        echo "ERROR: $tool not found in \"$vs_tool_path\" for $edition" >&2
+                        echo "WARNING: $tool not found in \"$vs_tool_path\" for $edition" >&2
                         missing_tool=1
+                    else
+                      echo "$tool found in \"$vs_tool_path\"" >&2
                     fi
                 done
 
                 if [ $missing_tool -eq 0 ]; then
-                    echo "DEBUG: All required tools found in \"$vs_tool_path\"" >&2
+                    echo >&2
+                    echo "All required tools found in \"$vs_tool_path\"" >&2
+                    echo >&2
+
                     echo "$vs_tool_path"
                     return 0
+                else
+                  echo "WARNING: skipping edition '$edition', directory does not exist." >&2
                 fi
+            else
+              echo "WARNING: skipping edition '$edition', MSVC directory does not exist." >&2
             fi
+        else
+          echo "WARNING: skipping edition '$edition', directory does not exist." >&2
         fi
     done
 
-    echo "INFO: Available Visual Studio Editions: ${available_editions[@]}" >&2
-    if [ ${#available_editions[@]} -eq 0 ]; then
-        echo "ERROR: No valid Visual Studio editions found in \"$studio_base_path\"." >&2
-    fi
-
-    echo "ERROR: Required tools not found in any Visual Studio installation." >&2
-    echo "/usr/bin"
+    echo "ERROR: No valid Visual Studio editions found in \"$studio_base_path\"." >&2
+    echo "$system_root"
     return 1
 }
 
@@ -152,8 +153,9 @@ fi
 
 eval set -- "$TEMP"
 
-search_mode=""
+search_mode="sdk"
 windows_format=0
+system_root="/usr/bin"
 
 # Process getopt options
 while true; do
@@ -167,6 +169,7 @@ while true; do
             shift
             ;;
         -w|--windows)
+            system_root="%SYSTEMROOT%"
             windows_format=1
             shift
             ;;
@@ -198,7 +201,7 @@ else
 fi
 
 # If a valid path is found, output it
-if [ "$tool_path" != "/usr/bin" ]; then
+if [ "$tool_path" != "$system_root" ]; then
     if [ "$windows_format" -eq 1 ]; then
         windows_tool_path=$(convert_to_windows_format "$tool_path")
         echo "$windows_tool_path"
@@ -206,7 +209,7 @@ if [ "$tool_path" != "/usr/bin" ]; then
         echo "$tool_path"
     fi
 else
-    echo "/usr/bin"
+    echo "$system_root"
     exit 1
 fi
 
