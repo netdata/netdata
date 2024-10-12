@@ -37,6 +37,7 @@ typedef enum __attribute__((packed)) {
     FACET_KEY_OPTION_TRANSFORM_VIEW = (1 << 10), // when registering the transformation, do it only at the view, not on all data
     FACET_KEY_OPTION_EXPANDED_FILTER = (1 << 11), // the presentation should have this filter expanded by default
     FACET_KEY_OPTION_PRETTY_XML     = (1 << 12), // instruct the UI to parse this as an XML document
+    FACET_KEY_OPTION_HIDDEN         = (1 << 13), // do not include this field in the response
 } FACET_KEY_OPTIONS;
 
 typedef enum __attribute__((packed)) {

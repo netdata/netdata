@@ -8,6 +8,8 @@
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
 
+#define EVENT_DATA_HIDDEN_FIELD_FOR_FTS "__EVENT_DATA_HIDDEN_FIELD_FOR_FTS__"
+
 #define WEVT_ALWAYS_VISIBLE_KEYS                NULL
 
 #define WEVT_KEYS_EXCLUDED_FROM_FACETS          \
@@ -25,6 +27,8 @@ static bool plugin_should_exit = false;
     "|" WEVT_FIELD_TASK                         \
     "|" WEVT_FIELD_USER                         \
     ""
+
+#define query_has_fts(lqs) ((lqs)->rq.query != NULL)
 
 static inline WEVT_QUERY_STATUS check_stop(const bool *cancelled, const usec_t *stop_monotonic_ut) {
     if(cancelled && __atomic_load_n(cancelled, __ATOMIC_RELAXED)) {
@@ -299,6 +303,11 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             facets, WEVT_FIELD_KEYWORDS "ID",
             FACET_KEY_OPTION_NONE);
 
+    if(query_has_fts(lqs))
+        facets_register_key_name(
+                facets, EVENT_DATA_HIDDEN_FIELD_FOR_FTS,
+                FACET_KEY_OPTION_HIDDEN | FACET_KEY_OPTION_FTS);
+
     facets_register_dynamic_key_name(
         facets, WEVT_FIELD_MESSAGE,
         FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_VISIBLE,
@@ -488,6 +497,13 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
         bytes += len;
         facets_add_key_value_length(
             facets, WEVT_FIELD_TASK "ID", sizeof(WEVT_FIELD_TASK) + 2 - 1, str, len);
+    }
+
+    if((log->type & WEVT_QUERY_EVENT_DATA) && log->ops.event_data) {
+        bytes += buffer_strlen(log->ops.event_data);
+        facets_add_key_value_length(
+            facets, EVENT_DATA_HIDDEN_FIELD_FOR_FTS, sizeof(EVENT_DATA_HIDDEN_FIELD_FOR_FTS) - 1,
+            buffer_tostring(log->ops.event_data), buffer_strlen(log->ops.event_data));
     }
 
     wevt_facets_register_bin_data(log, facets, ev);
@@ -860,7 +876,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
     usec_t ended_ut = started_ut;
     usec_t duration_ut, max_duration_ut = 0;
 
-    WEVT_LOG *log = wevt_openlog6(lqs->rq.query == NULL ? WEVT_QUERY_NORMAL : WEVT_QUERY_FTS);
+    WEVT_LOG *log = wevt_openlog6(query_has_fts(lqs) ? WEVT_QUERY_FTS : WEVT_QUERY_NORMAL);
     if(!log) {
         // release the files
         for(size_t f = 0; f < files_used ;f++)
@@ -1180,7 +1196,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         struct {
             const char *func;
         } array[] = {
-            { "windows-events after:-8640000 before:0 last:200 source:All" },
+            { "windows-events query:Tsaousis after:-8640000 before:0 last:200 source:All" },
             //{ "windows-events after:-86400 before:0 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,JM3OPW3kHn6,H106l8MXSSr,HREiMN.4Ahu,ClaDGnYSQE7,ApYltST_icg,PtkRm91M0En data_only:false slice:true source:All" },
             //{ "windows-events after:1726055370 before:1726056270 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,LT.Xp9I9tiP,No4kPTQbS.g,LQ2LQzfE8EG,PtkRm91M0En,JM3OPW3kHn6,ClaDGnYSQE7,H106l8MXSSr,HREiMN.4Ahu data_only:false source:All HytMJ9kj82B:BlC24d5JBBV,PtVoyIuX.MU,HMj1B38kHTv KeCITtVD5AD:PY1JtCeWwSe,O9kz5J37nNl,JZoJURadhDb" },
             // { "windows-events after:1725636012 before:1726240812 direction:backward last:200 facets:HdUoSYab5wV,Cq2r7mRUv4a,LAnVlsIQfeD,BnPLNbA5VWT,KeCITtVD5AD,HytMJ9kj82B,JM3OPW3kHn6,H106l8MXSSr,HREiMN.4Ahu,ClaDGnYSQE7,ApYltST_icg,PtkRm91M0En data_only:false source:All PtkRm91M0En:LDzHbP5libb" },

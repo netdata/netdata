@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "windows-events.h"
 #include <sddl.h>  // For SID string conversion
 
@@ -156,6 +158,8 @@ static inline void append_evt_xml(BUFFER *b, LPCWSTR xmlData, const char *separa
 }
 
 void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator) {
+    if(ev->Type == EvtVarTypeNull) return;
+
     if (ev->Type & EVT_VARIANT_TYPE_ARRAY) {
         for (DWORD i = 0; i < ev->Count; i++) {
             switch (ev->Type & EVT_VARIANT_TYPE_MASK) {
