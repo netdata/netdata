@@ -1464,6 +1464,7 @@ set(WINDOWS_EVENTS_PLUGIN_FILES
         src/collectors/windows-events.plugin/windows-events-fields-cache.h
         src/collectors/windows-events.plugin/windows-events-query-builder.c
         src/collectors/windows-events.plugin/windows-events-query-builder.h
+        src/collectors/windows-events.plugin/windows-events-query-evt-variant.c
 )
 
 set(WINDOWS_PLUGIN_FILES

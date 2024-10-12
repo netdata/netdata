@@ -131,6 +131,8 @@ bool wevt_get_message_unicode(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE
 bool wevt_get_event_utf8(TXT_UNICODE *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
 bool wevt_get_xml_utf8(TXT_UNICODE *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
 
+void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator);
+
 static inline void wevt_variant_cleanup(WEVT_VARIANT *v) {
     freez(v->data);
 }

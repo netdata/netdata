@@ -43,48 +43,36 @@ void sid_cache_init(void) {
     simple_hashtable_init_SID(&sid_globals.hashtable, 100);
 }
 
-static bool update_user(SID_VALUE *found, TXT_UTF8 *dst) {
-    if(found && found->user) {
-        txt_utf8_resize(dst, found->user_len + 1, false);
-        memcpy(dst->data, found->user, found->user_len + 1);
-        dst->used = found->user_len + 1;
-        return true;
-    }
-
-    txt_utf8_resize(dst, 1, false);
-    dst->data[0] = '\0';
-    dst->used = 1;
-    return false;
-}
-
-static void lookup_user(PSID *sid, TXT_UTF8 *dst) {
+static const char *lookup_user(PSID *sid) {
     static __thread wchar_t account_unicode[256];
     static __thread wchar_t domain_unicode[256];
+    static __thread char tmp[512 + 2];
+
     DWORD account_name_size = sizeof(account_unicode) / sizeof(account_unicode[0]);
     DWORD domain_name_size = sizeof(domain_unicode) / sizeof(domain_unicode[0]);
     SID_NAME_USE sid_type;
 
-    txt_utf8_resize(dst, 1024, false);
-
     if (LookupAccountSidW(NULL, sid, account_unicode, &account_name_size, domain_unicode, &domain_name_size, &sid_type)) {
         const char *user = account2utf8(account_unicode);
         const char *domain = domain2utf8(domain_unicode);
-        dst->used = snprintfz(dst->data, dst->size, "%s\\%s", domain, user) + 1;
+        snprintfz(tmp, sizeof(tmp), "%s\\%s", domain, user);
     }
     else {
         wchar_t *sid_string = NULL;
         if (ConvertSidToStringSidW(sid, &sid_string)) {
             const char *user = account2utf8(sid_string);
-            dst->used = snprintfz(dst->data, dst->size, "%s", user) + 1;
+            snprintfz(tmp, sizeof(tmp), "%s", user);
         }
         else
-            dst->used = snprintfz(dst->data, dst->size, "[invalid]") + 1;
+            snprintfz(tmp, sizeof(tmp), "[invalid]");
     }
+
+    return tmp;
 }
 
-bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst) {
+SID_VALUE *lookup_or_convert_user_id_to_name_lookup(PSID sid) {
     if(!sid || !IsValidSid(sid))
-        return update_user(NULL, dst);
+        return NULL;
 
     size_t size = GetLengthSid(sid);
 
@@ -98,21 +86,50 @@ bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst) {
     spinlock_lock(&sid_globals.spinlock);
     SID_VALUE *found = simple_hashtable_get_SID(&sid_globals.hashtable, &tmp->key, tmp_key_size);
     spinlock_unlock(&sid_globals.spinlock);
-    if(found) return update_user(found, dst);
+    if(found) return found;
 
     // allocate the SID_VALUE
     found = mallocz(tmp_size);
     memcpy(found, buf, tmp_size);
 
     // lookup the user
-    lookup_user(sid, dst);
-    found->user = strdupz(dst->data);
-    found->user_len = dst->used - 1;
+    found->user = strdupz(lookup_user(sid));
+    found->user_len = strlen(found->user);
 
     // add it to the cache
     spinlock_lock(&sid_globals.spinlock);
     simple_hashtable_set_SID(&sid_globals.hashtable, &found->key, tmp_key_size, found);
     spinlock_unlock(&sid_globals.spinlock);
 
-    return update_user(found, dst);
+    return found;
+}
+
+bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst) {
+    SID_VALUE *found = lookup_or_convert_user_id_to_name_lookup(sid);
+
+    if(found && found->user) {
+        txt_utf8_resize(dst, found->user_len + 1, false);
+        memcpy(dst->data, found->user, found->user_len + 1);
+        dst->used = found->user_len + 1;
+        return true;
+    }
+
+    txt_utf8_resize(dst, 1, false);
+    dst->data[0] = '\0';
+    dst->used = 1;
+    return false;
+}
+
+bool buffer_sid_to_name(PSID sid, BUFFER *dst, const char *prefix) {
+    SID_VALUE *found = lookup_or_convert_user_id_to_name_lookup(sid);
+
+    if(found && found->user) {
+        if(prefix && *prefix)
+            buffer_strcat(dst, prefix);
+
+        buffer_fast_strcat(dst, found->user, found->user_len);
+        return true;
+    }
+
+    return false;
 }

@@ -416,9 +416,8 @@ static bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev) {
         wevt_get_opcode(log, ev, h);
         wevt_get_keywords(log, ev, h);
 
-//        if(log->type & WEVT_QUERY_EVENT_DATA) {
-//            EVT_VARIANT *event_data = &content[FIELD_EVENT_DATA];
-//        }
+        if(log->type & WEVT_QUERY_EVENT_DATA)
+            evt_variant_to_buffer(log->ops.event_data, &content[FIELD_EVENT_DATA], "|");
     }
 
     ret = true;
