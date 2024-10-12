@@ -30,8 +30,8 @@ find_sdk_tools() {
     echo "SDK base path exists: \"$sdk_base_path\"" >&2
 
     # Find all SDK versions
-    sdk_versions=($(ls "$sdk_base_path" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$"))
-    echo "Found SDK versions: ${sdk_versions[@]}" >&2
+    sdk_versions=($(ls "$sdk_base_path" | grep -E "^[0-9]+\..*$"))
+    echo "Found SDK versions: ${sdk_versions[*]}" >&2
 
     if [ ${#sdk_versions[@]} -eq 0 ]; then
         echo "ERROR: No valid Windows SDK versions found in \"$sdk_base_path\"." >&2
@@ -94,10 +94,11 @@ find_visual_studio_tools() {
             echo "Checking edition: $edition in $studio_base_path" >&2
 
             # Find all MSVC versions and sort them
-            msvc_versions=($(ls "$edition_path" | sort -V))
-            echo "Found MSVC versions in $edition: ${msvc_versions[@]}" >&2
+            msvc_versions=($(ls "$edition_path" | grep -E "^[0-9]+\..*$"))
+            echo "Found MSVC versions in $edition: ${msvc_versions[*]}" >&2
 
             if [ ${#msvc_versions[@]} -gt 0 ]; then
+                sorted_versions=$(printf '%s\n' "${msvc_versions[@]}" | sort -V)
                 latest_msvc_version=$(echo "${msvc_versions[@]}" | tail -n 1)
                 vs_tool_path="$edition_path/$latest_msvc_version/bin/Hostx64/x64"
 
