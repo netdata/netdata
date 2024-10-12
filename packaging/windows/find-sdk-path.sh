@@ -31,7 +31,7 @@ find_sdk_tools() {
 
   # Find all SDK versions
   sdk_versions=()
-  mapfile -t sdk_versions < <(find "$sdk_base_path" -prune -print | tr ' ' '\n' | grep -E "^[0-9]+\..*$")
+  mapfile -t sdk_versions < <(find "$sdk_base_path" -prune -print | tr ' ' '\n' | grep -E "^$sdk_base_path/[0-9]+\..*$")
   echo "Found SDK versions: ${sdk_versions[*]}" >&2
 
   if [ ${#sdk_versions[@]} -eq 0 ]; then
@@ -96,7 +96,7 @@ find_visual_studio_tools() {
 
       # Find all MSVC versions and sort them
       msvc_versions=()
-      mapfile -t msvc_versions < <(find "$edition_path" -prune -print | tr ' ' '\n' | grep -E "^[0-9]+\..*$")
+      mapfile -t msvc_versions < <(find "$edition_path" -prune -print | tr ' ' '\n' | grep -E "^$edition_path[0-9]+\..*$")
       echo "Found MSVC versions in $edition: ${msvc_versions[*]}" >&2
 
       if [ ${#msvc_versions[@]} -gt 0 ]; then
