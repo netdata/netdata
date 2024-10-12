@@ -41,6 +41,16 @@ typedef struct {
 
 struct provider_meta_handle;
 
+typedef enum __attribute__((packed)) {
+    WEVT_QUERY_BASIC        = (1 << 0),
+    WEVT_QUERY_EXTENDED     = (1 << 1),
+    WEVT_QUERY_EVENT_DATA   = (1 << 2),
+} WEVT_QUERY_TYPE;
+
+#define WEVT_QUERY_RETENTION  WEVT_QUERY_BASIC
+#define WEVT_QUERY_NORMAL    (WEVT_QUERY_BASIC | WEVT_QUERY_EXTENDED)
+#define WEVT_QUERY_FTS       (WEVT_QUERY_BASIC | WEVT_QUERY_EXTENDED | WEVT_QUERY_EVENT_DATA)
+
 typedef struct wevt_log {
     struct {
         DWORD size;
@@ -52,6 +62,8 @@ typedef struct wevt_log {
     EVT_HANDLE hQuery;
     EVT_HANDLE hRenderContext;
     struct provider_meta_handle *publisher;
+
+    WEVT_QUERY_TYPE type;
 
     struct {
         // temp buffer used for rendering event log messages
@@ -85,6 +97,8 @@ typedef struct wevt_log {
         TXT_UTF8 opcode;
         TXT_UTF8 task;
         TXT_UTF8 xml;
+
+        BUFFER *event_data;
     } ops;
 
     struct {
@@ -102,7 +116,7 @@ typedef struct wevt_log {
 
 } WEVT_LOG;
 
-WEVT_LOG *wevt_openlog6(void);
+WEVT_LOG *wevt_openlog6(WEVT_QUERY_TYPE type);
 void wevt_closelog6(WEVT_LOG *log);
 
 bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, const wchar_t *query, EVT_RETENTION *retention);
@@ -110,7 +124,7 @@ bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, const wchar_t
 bool wevt_query(WEVT_LOG *log, LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS direction);
 void wevt_query_done(WEVT_LOG *log);
 
-bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full);
+bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev);
 
 bool wevt_get_message_unicode(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags);
 

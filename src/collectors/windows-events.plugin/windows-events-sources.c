@@ -414,7 +414,7 @@ void wevt_sources_scan(void) {
             goto cleanup;
         }
 
-        WEVT_LOG *log = wevt_openlog6();
+        WEVT_LOG *log = wevt_openlog6(WEVT_QUERY_RETENTION);
         if(!log) goto cleanup;
 
         while (true) {

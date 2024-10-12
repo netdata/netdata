@@ -559,7 +559,7 @@ static WEVT_QUERY_STATUS wevt_query_backward(
 
     facets_rows_begin(facets);
     WEVT_EVENT e;
-    while (status == WEVT_OK && wevt_get_next_event(log, &e, true)) {
+    while (status == WEVT_OK && wevt_get_next_event(log, &e)) {
         usec_t msg_ut = e.created_ns / NSEC_PER_USEC;
 
         if(unlikely(!msg_ut)) {
@@ -673,7 +673,7 @@ static WEVT_QUERY_STATUS wevt_query_forward(
 
     facets_rows_begin(facets);
     WEVT_EVENT e;
-    while (status == WEVT_OK && wevt_get_next_event(log, &e, true)) {
+    while (status == WEVT_OK && wevt_get_next_event(log, &e)) {
         usec_t msg_ut = e.created_ns / NSEC_PER_USEC;
 
         if(unlikely(!msg_ut)) {
@@ -860,7 +860,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
     usec_t ended_ut = started_ut;
     usec_t duration_ut, max_duration_ut = 0;
 
-    WEVT_LOG *log = wevt_openlog6();
+    WEVT_LOG *log = wevt_openlog6(lqs->rq.query == NULL ? WEVT_QUERY_NORMAL : WEVT_QUERY_FTS);
     if(!log) {
         // release the files
         for(size_t f = 0; f < files_used ;f++)
