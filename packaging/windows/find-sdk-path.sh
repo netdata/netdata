@@ -99,7 +99,7 @@ find_visual_studio_tools() {
 
       if [ ${#msvc_versions[@]} -gt 0 ]; then
         sorted_versions=$(printf '%s\n' "${msvc_versions[@]}" | sort -V)
-        latest_msvc_version=$(echo "${msvc_versions[@]}" | tail -n 1)
+        latest_msvc_version=$(echo "${sorted_versions[@]}" | tail -n 1)
         vs_tool_path="$edition_path/$latest_msvc_version/bin/Hostx64/x64"
 
         echo "Latest MSVC version: \"$latest_msvc_version\" in $edition" >&2
