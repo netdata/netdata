@@ -1,6 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
+echo PATH=%PATH%
+
 if "%~1"=="" (
     echo Error: Missing .mc file path.
     goto :usage

@@ -2,7 +2,7 @@
 
 # add Windows SDK and Visual Studio to the path
 mylocation=$(dirname "${0}")
-PATH="${PATH}:$("${mylocation}/../windows/find-sdk-path.sh" --sdk):$("${mylocation}/../windows/find-sdk-path.sh" --visualstudio)"
+PATH="$("${mylocation}/../windows/find-sdk-path.sh" --sdk):$("${mylocation}/../windows/find-sdk-path.sh" --visualstudio):${PATH}"
 
 # On MSYS2, install these dependencies to build netdata:
 install_dependencies() {
