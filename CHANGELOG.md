@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- SPAWN SERVER: close all open fds on callback [\#18764](https://github.com/netdata/netdata/pull/18764) ([ktsaou](https://github.com/ktsaou))
+- Adjust option \(Windows claim\) [\#18763](https://github.com/netdata/netdata/pull/18763) ([thiagoftsm](https://github.com/thiagoftsm))
+- local-listeners without libmnl [\#18759](https://github.com/netdata/netdata/pull/18759) ([ktsaou](https://github.com/ktsaou))
+- fix\(proc.plugin/zfs\): fix arcstats.pm [\#18758](https://github.com/netdata/netdata/pull/18758) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/sd/net\_listeners\): exit if local-listeners constantly times out [\#18757](https://github.com/netdata/netdata/pull/18757) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18756](https://github.com/netdata/netdata/pull/18756) ([netdatabot](https://github.com/netdatabot))
+- Update metadata.yaml [\#18755](https://github.com/netdata/netdata/pull/18755) ([Ancairon](https://github.com/Ancairon))
+- Add Ubuntu 24.10 and Fedora 41 to CI. [\#18753](https://github.com/netdata/netdata/pull/18753) ([Ferroin](https://github.com/Ferroin))
 - Simplify sentence on cloud notification integrations [\#18750](https://github.com/netdata/netdata/pull/18750) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#18749](https://github.com/netdata/netdata/pull/18749) ([netdatabot](https://github.com/netdatabot))
 - fix\(freebsd.plugin\): fix sysctl arcstats.p fails on FreeBSD 14 [\#18748](https://github.com/netdata/netdata/pull/18748) ([ilyam8](https://github.com/ilyam8))
@@ -425,12 +433,6 @@
 - go.d drop using cancelreader [\#18219](https://github.com/netdata/netdata/pull/18219) ([ilyam8](https://github.com/ilyam8))
 - Support IPV6 when establishing MQTT connection to the cloud [\#18217](https://github.com/netdata/netdata/pull/18217) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18216](https://github.com/netdata/netdata/pull/18216) ([netdatabot](https://github.com/netdatabot))
-- go.d chrony fix client read/write timeout [\#18215](https://github.com/netdata/netdata/pull/18215) ([ilyam8](https://github.com/ilyam8))
-- dont install test bash scripts by default [\#18214](https://github.com/netdata/netdata/pull/18214) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18212](https://github.com/netdata/netdata/pull/18212) ([netdatabot](https://github.com/netdatabot))
-- go.d megacli: add bbu capacity degradation % [\#18211](https://github.com/netdata/netdata/pull/18211) ([ilyam8](https://github.com/ilyam8))
-- Port memcached collector to Go [\#18209](https://github.com/netdata/netdata/pull/18209) ([Ancairon](https://github.com/Ancairon))
-- Bump k8s.io/client-go from 0.30.2 to 0.30.3 in /src/go [\#18208](https://github.com/netdata/netdata/pull/18208) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
