@@ -286,28 +286,53 @@ WEL does not have the problem ETW has with the percent character `%`, so Netdata
 
 ## Differences between ETW and WEL
 
-### Publishers
-Publisher names must be unique across the system, for both ETW and WEL together.
+There are key differences between ETW and WEL.
 
-To define a Publisher:
+### Publishers and Providers
+**Publishers** are collections of ETW Providers. A Publisher is implied by a manifest file,
+each of which is considered a Publisher, and each manifest file can define multiple **Providers** in it.
+Other than that there is no entity related to **Publishers** in the system.
 
-- ETW requires a manifest coupled with a messages resources DLL and must be registered via `wevtutil` (handled by our Windows installer automatically).
-- WEL requires some registry entries and a messages resource DLL (handled by Netdata automatically).
+**Publishers** are not defined for WEL.
+
+**Providers** are the applications or modules logging. Provider names must be unique across the system,
+for ETW and WEL together.
+
+To define a **Provider**:
+
+- ETW requires a **Publisher** manifest coupled with resources DLLs and must be registered
+  via `wevtutil` (handled by the Netdata Windows installer automatically).
+- WEL requires some registry entries and a message resources DLL (handled by Netdata automatically on startup).
+
+The Provider appears as `Source` in the Event Viewer, for both WEL and ETW.
 
 ### Channels
-- **Channels** for WEL are collections of Publishers.
-- **Channels** for ETW slice a single Publisher logs into sub-categories.
+- **Channels** for WEL are collections of WEL Providers, (each WEL Provider is a single Stream of logs).
+- **Channels** for ETW slice the logs of each Provider into multiple Streams.
+
+WEL Channels cannot have the same name as ETW Providers. This is why Netdata's ETW provider is
+called `Netdata`, and WEL channel is called `NetdataWEL`.
+
+Despite the fact that ETW **Publishers** and WEL **Channels** are both collections of Providers,
+they are not similar. In ETW a Publisher is a collection on the publisher's Providers, but in WEL
+a Channel may include independent WEL Providers (e.g. the "Applications" Channel). Additionally,
+WEL Channels cannot include ETW Providers.
 
 ### Retention
-- Retention in ETW is defined per Channel (Publisher sub-category).
-- Retention in WEL is defined per Publisher.
+Retention is always defined per Stream.
+
+- Retention in ETW is defined per ETW Channel (ETW Provider Stream).
+- Retention in WEL is defined per WEL Provider (each WEL Provider is a single Stream).
 
 ### Messages Formatting
-- ETW supports recursive fields expansion, and therefore `%N` in fields is expanded recursively (or replaced with an error message if expansion fails). Netdata replaces `%N` with `℅N`.
+- ETW supports recursive fields expansion, and therefore `%N` in fields is expanded recursively
+  (or replaced with an error message if expansion fails). Netdata replaces `%N` with `℅N` to stop
+  recursive expansion (since `%N` cannot be logged otherwise).
 - WEL performs a single field expansion, and therefore the `%` character in fields is never expanded. 
 
 ### Usability
 
-- ETW names all the fields and allows multiple datatypes per field, enabling log consumers to know what each field means and its datatype.
-- WEL uses a simple string table for fields, and consumers need to map string fields based on their index.
-
+- ETW names all the fields and allows multiple datatypes per field, enabling log consumers to know
+  what each field means and its datatype.
+- WEL uses a simple string table for fields, and consumers need to map these string fields based on
+  their index.
