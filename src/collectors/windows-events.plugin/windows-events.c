@@ -123,12 +123,13 @@ static void wevt_lazy_loading_event_and_xml(struct wevt_bin_data *d, FACET_ROW *
                    "Event Record ID of row does not match the bin data associated with it");
 #endif
 
+    // the message needs the xml
     EvtFormatMessage_Xml_utf8(&d->log->ops.unicode, d->provider, d->hEvent, &d->log->ops.xml);
     EvtFormatMessage_Event_utf8(&d->log->ops.unicode, d->provider, d->hEvent, &d->log->ops.event);
     d->rendered = true;
 }
 
-static void wevt_render_xml(
+static void wevt_lazy_load_xml(
         FACETS *facets,
         BUFFER *json_array,
         FACET_ROW_KEY_VALUE *rkv __maybe_unused,
@@ -145,7 +146,7 @@ static void wevt_render_xml(
     buffer_json_add_array_item_string(json_array, d->log->ops.xml.data);
 }
 
-static void wevt_render_message(
+static void wevt_lazy_load_message(
         FACETS *facets,
         BUFFER *json_array,
         FACET_ROW_KEY_VALUE *rkv __maybe_unused,
@@ -296,25 +297,32 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             facets, WEVT_FIELD_KEYWORDS "ID",
             FACET_KEY_OPTION_NONE);
 
+    facets_register_dynamic_key_name(
+        facets,
+        WEVT_FIELD_MESSAGE,
+        FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_VISIBLE,
+        wevt_lazy_load_message,
+        NULL);
+
+    facets_register_dynamic_key_name(
+        facets,
+        WEVT_FIELD_XML,
+        FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_PRETTY_XML,
+        wevt_lazy_load_xml,
+        NULL);
+
     if(query_has_fts(lqs)) {
         facets_register_key_name(
-                facets, WEVT_FIELD_MESSAGE,
-                FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_VISIBLE);
+                facets, WEVT_FIELD_EVENT_MESSAGE_HIDDEN,
+            FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_HIDDEN | FACET_KEY_OPTION_NEVER_FACET);
 
         facets_register_key_name(
-                facets, WEVT_FIELD_XML,
-                FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_PRETTY_XML);
-    }
-    else {
-        facets_register_dynamic_key_name(
-                facets, WEVT_FIELD_MESSAGE,
-                FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_VISIBLE,
-                wevt_render_message, NULL);
+                facets, WEVT_FIELD_EVENT_XML_HIDDEN,
+                FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_HIDDEN | FACET_KEY_OPTION_NEVER_FACET);
 
-        facets_register_dynamic_key_name(
-                facets, WEVT_FIELD_XML,
-                FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_PRETTY_XML,
-                wevt_render_xml, NULL);
+        facets_register_key_name(
+            facets, WEVT_FIELD_EVENT_DATA_HIDDEN,
+            FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_HIDDEN | FACET_KEY_OPTION_NEVER_FACET);
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -359,7 +367,7 @@ static const char *source_to_str(TXT_UTF8 *txt) {
 #endif
 
 static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUERY_SOURCE *src, usec_t *msg_ut __maybe_unused, WEVT_EVENT *ev) {
-    size_t len, bytes = log->ops.content.used;
+    size_t len, bytes = log->ops.raw.system.used + log->ops.raw.user.used;
 
     if(log->ops.provider.used > 1) {
         bytes += log->ops.provider.used * 2; // unicode is double
@@ -491,22 +499,31 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
             facets, WEVT_FIELD_TASK "ID", sizeof(WEVT_FIELD_TASK) + 2 - 1, str, len);
     }
 
-    if((log->type & WEVT_QUERY_EVENT_DATA) && log->ops.event_data) {
+    if(log->type & WEVT_QUERY_EVENT_DATA) {
+        // the query has full text-search
         if(log->ops.event.used > 1) {
             bytes += log->ops.event.used;
             facets_add_key_value_length(
-                    facets, WEVT_FIELD_MESSAGE, sizeof(WEVT_FIELD_MESSAGE) - 1,
+                    facets, WEVT_FIELD_EVENT_MESSAGE_HIDDEN, sizeof(WEVT_FIELD_EVENT_MESSAGE_HIDDEN) - 1,
                     log->ops.event.data, log->ops.event.used - 1);
         }
+
         if(log->ops.xml.used > 1) {
             bytes += log->ops.xml.used;
             facets_add_key_value_length(
-                    facets, WEVT_FIELD_XML, sizeof(WEVT_FIELD_XML) - 1,
+                    facets, WEVT_FIELD_EVENT_XML_HIDDEN, sizeof(WEVT_FIELD_EVENT_XML_HIDDEN) - 1,
                     log->ops.xml.data, log->ops.xml.used - 1);
         }
+
+        if(log->ops.event_data->len) {
+            bytes += log->ops.event_data->len;
+            facets_add_key_value_length(
+                facets, WEVT_FIELD_EVENT_DATA_HIDDEN, sizeof(WEVT_FIELD_EVENT_DATA_HIDDEN) - 1,
+                buffer_tostring(log->ops.event_data), buffer_strlen(log->ops.event_data));
+        }
     }
-    else
-        wevt_facets_register_bin_data(log, facets, ev);
+
+    wevt_facets_register_bin_data(log, facets, ev);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     facets_add_key_value(facets, "z_level_source", source_to_str(&log->ops.level));

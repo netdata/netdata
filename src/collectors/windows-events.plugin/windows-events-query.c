@@ -320,30 +320,39 @@ static void wevt_get_keyword(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE
 // --------------------------------------------------------------------------------------------------------------------
 // Fetching Events
 
+static inline bool wEvtRender(WEVT_LOG *log, EVT_HANDLE context, WEVT_VARIANT *raw) {
+    DWORD bytes_used = 0, property_count = 0;
+    if (!EvtRender(context, log->hEvent, EvtRenderEventValues, raw->size, raw->data, &bytes_used, &property_count)) {
+        // information exceeds the allocated space
+        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "EvtRender() failed, hRenderSystemContext: 0x%lx, hEvent: 0x%lx, content: 0x%lx, size: %zu, extended info: %s",
+                   (uintptr_t)context, (uintptr_t)log->hEvent, (uintptr_t)raw->data, raw->size,
+                   EvtGetExtendedStatus_utf8());
+            return false;
+        }
+
+        wevt_variant_resize(raw, bytes_used);
+        if (!EvtRender(context, log->hEvent, EvtRenderEventValues, raw->size, raw->data, &bytes_used, &property_count)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "EvtRender() failed, after bytes_used increase, extended info: %s",
+                   EvtGetExtendedStatus_utf8());
+            return false;
+        }
+    }
+    raw->used = bytes_used;
+    raw->count = property_count;
+
+    return true;
+}
+
 static bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev) {
     bool ret = false;
 
-    // obtain the information from selected events
-    DWORD bytes_used = 0, property_count = 0;
-    if (!EvtRender(log->hRenderContext, log->hEvent, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
-        // information exceeds the allocated space
-        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, hRenderContext: 0x%lx, hEvent: 0x%lx, content: 0x%lx, size: %zu, extended info: %s",
-                   (uintptr_t)log->hRenderContext, (uintptr_t)log->hEvent, (uintptr_t)log->ops.content.data, log->ops.content.size,
-                   EvtGetExtendedStatus_utf8());
-            goto cleanup;
-        }
+    if(!wEvtRender(log, log->hRenderSystemContext, &log->ops.raw.system))
+        goto cleanup;
 
-        wevt_variant_resize(&log->ops.content, bytes_used);
-        if (!EvtRender(log->hRenderContext, log->hEvent, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, after bytes_used increase, extended info: %s",
-                   EvtGetExtendedStatus_utf8());
-            goto cleanup;
-        }
-    }
-    log->ops.content.used = bytes_used;
-
-    EVT_VARIANT *content = log->ops.content.data;
+    EVT_VARIANT *content = log->ops.raw.system.data;
 
     ev->id          = wevt_field_get_uint64(&content[EvtSystemEventRecordId]);
     ev->event_id    = wevt_field_get_uint16(&content[EvtSystemEventID]);
@@ -376,9 +385,17 @@ static bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev) {
         wevt_get_opcode(log, ev, p);
         wevt_get_keyword(log, ev, p);
 
-        if(log->type & WEVT_QUERY_EVENT_DATA) {
-            EvtFormatMessage_Xml_utf8(&log->ops.unicode, log->provider, log->hEvent, &log->ops.xml);
+        if(log->type & WEVT_QUERY_EVENT_DATA && wEvtRender(log, log->hRenderUserContext, &log->ops.raw.user)) {
+#if (ON_FTS_PRELOAD_MESSAGE == 1)
             EvtFormatMessage_Event_utf8(&log->ops.unicode, log->provider, log->hEvent, &log->ops.event);
+#endif
+#if (ON_FTS_PRELOAD_XML == 1)
+            EvtFormatMessage_Xml_utf8(&log->ops.unicode, log->provider, log->hEvent, &log->ops.xml);
+#endif
+#if (ON_FTS_PRELOAD_EVENT_DATA == 1)
+            for(size_t i = 0; i < log->ops.raw.user.count ;i++)
+                evt_variant_to_buffer(log->ops.event_data, &log->ops.raw.user.data[i], " ||| ");
+#endif
         }
     }
 
@@ -392,7 +409,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
     DWORD size = (log->type & WEVT_QUERY_EXTENDED) ? BATCH_NEXT_EVENT : 1;
     DWORD max_failures = 10;
 
-    fatal_assert(log && log->hQuery && log->hRenderContext);
+    fatal_assert(log && log->hQuery && log->hRenderSystemContext);
 
     while(max_failures > 0) {
         if (log->batch.used >= log->batch.size) {
@@ -454,10 +471,32 @@ static void wevt_event_done(WEVT_LOG *log) {
         log->hEvent = NULL;
     }
 
+    log->ops.channel.src = TXT_SOURCE_UNKNOWN;
+    log->ops.provider.src = TXT_SOURCE_UNKNOWN;
+    log->ops.computer.src = TXT_SOURCE_UNKNOWN;
+    log->ops.user.src = TXT_SOURCE_UNKNOWN;
+
+    log->ops.event.src = TXT_SOURCE_UNKNOWN;
     log->ops.level.src = TXT_SOURCE_UNKNOWN;
     log->ops.keywords.src = TXT_SOURCE_UNKNOWN;
     log->ops.opcode.src = TXT_SOURCE_UNKNOWN;
     log->ops.task.src = TXT_SOURCE_UNKNOWN;
+    log->ops.xml.src = TXT_SOURCE_UNKNOWN;
+
+    log->ops.channel.used = 0;
+    log->ops.provider.used = 0;
+    log->ops.computer.used = 0;
+    log->ops.user.used = 0;
+
+    log->ops.event.used = 0;
+    log->ops.level.used = 0;
+    log->ops.keywords.used = 0;
+    log->ops.opcode.used = 0;
+    log->ops.task.used = 0;
+    log->ops.xml.used = 0;
+
+    if(log->ops.event_data)
+        log->ops.event_data->len = 0;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -511,29 +550,44 @@ WEVT_LOG *wevt_openlog6(WEVT_QUERY_TYPE type) {
     log->type = type;
 
     // create the system render
-    log->hRenderContext = EvtCreateRenderContext(0, NULL, EvtRenderContextSystem);
-    if (!log->hRenderContext) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed, extended info: %s",
+    log->hRenderSystemContext = EvtCreateRenderContext(0, NULL, EvtRenderContextSystem);
+    if (!log->hRenderSystemContext) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "EvtCreateRenderContext() on system context failed, extended info: %s",
                EvtGetExtendedStatus_utf8());
-        freez(log);
-        log = NULL;
         goto cleanup;
     }
 
-    if(type & WEVT_QUERY_EVENT_DATA)
-        log->ops.event_data = buffer_create(4096, NULL);
+    if(type & WEVT_QUERY_EVENT_DATA) {
+        log->hRenderUserContext = EvtCreateRenderContext(0, NULL, EvtRenderContextUser);
+        if (!log->hRenderUserContext) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "EvtCreateRenderContext failed, on user context failed, extended info: %s",
+                   EvtGetExtendedStatus_utf8());
+            goto cleanup;
+        }
 
-    cleanup:
+        log->ops.event_data = buffer_create(4096, NULL);
+    }
+
     return log;
+
+cleanup:
+    wevt_closelog6(log);
+    return NULL;
 }
 
 void wevt_closelog6(WEVT_LOG *log) {
     wevt_query_done(log);
 
-    if (log->hRenderContext)
-        EvtClose(log->hRenderContext);
+    if (log->hRenderSystemContext)
+        EvtClose(log->hRenderSystemContext);
 
-    wevt_variant_cleanup(&log->ops.content);
+    if (log->hRenderUserContext)
+        EvtClose(log->hRenderUserContext);
+
+    wevt_variant_cleanup(&log->ops.raw.system);
+    wevt_variant_cleanup(&log->ops.raw.user);
     txt_unicode_cleanup(&log->ops.unicode);
     txt_utf8_cleanup(&log->ops.channel);
     txt_utf8_cleanup(&log->ops.provider);

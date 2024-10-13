@@ -32,6 +32,7 @@ typedef struct {
     EVT_VARIANT	*data;
     size_t size;
     size_t used;
+    size_t count;
 } WEVT_VARIANT;
 
 typedef struct {
@@ -64,15 +65,19 @@ typedef struct wevt_log {
 
     EVT_HANDLE hEvent;
     EVT_HANDLE hQuery;
-    EVT_HANDLE hRenderContext;
+    EVT_HANDLE hRenderSystemContext;
+    EVT_HANDLE hRenderUserContext;
     struct provider_meta_handle *provider;
 
     WEVT_QUERY_TYPE type;
 
     struct {
-        // temp buffer used for rendering event log messages
-        // never use directly
-        WEVT_VARIANT content;
+        struct {
+            // temp buffer used for rendering event log messages
+            // never use directly
+            WEVT_VARIANT system;
+            WEVT_VARIANT user;
+        } raw;
 
         // temp buffer used for fetching and converting UNICODE and UTF-8
         // every string operation overwrites it, multiple times per event log entry
@@ -91,11 +96,10 @@ typedef struct wevt_log {
 
         TXT_UTF8 channel;
         TXT_UTF8 provider;
-        TXT_UTF8 source;
         TXT_UTF8 computer;
         TXT_UTF8 user;
 
-        TXT_UTF8 event;
+        TXT_UTF8 event; // the message to be shown to the user
         TXT_UTF8 level;
         TXT_UTF8 keywords;
         TXT_UTF8 opcode;

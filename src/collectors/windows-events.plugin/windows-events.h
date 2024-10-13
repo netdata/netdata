@@ -132,6 +132,11 @@ typedef enum {
 #include "windows-events-fields-cache.h"
 #include "windows-events-query.h"
 
+// enable or disable preloading on full-text-search
+#define ON_FTS_PRELOAD_MESSAGE      1
+#define ON_FTS_PRELOAD_XML          0
+#define ON_FTS_PRELOAD_EVENT_DATA   1
+
 #define WEVT_FUNCTION_DESCRIPTION    "View, search and analyze the Microsoft Windows Events log."
 #define WEVT_FUNCTION_NAME           "windows-events"
 
@@ -158,6 +163,9 @@ typedef enum {
 #define WEVT_FIELD_THREADID             "ThreadID"
 #define WEVT_FIELD_XML                  "XML"
 #define WEVT_FIELD_MESSAGE              "Message"
+#define WEVT_FIELD_EVENT_DATA_HIDDEN    "__HIDDEN__EVENT__DATA__"
+#define WEVT_FIELD_EVENT_MESSAGE_HIDDEN "__HIDDEN__MESSAGE__DATA__"
+#define WEVT_FIELD_EVENT_XML_HIDDEN     "__HIDDEN__XML__DATA__"
 
 // functions needed by LQS
 
