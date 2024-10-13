@@ -1458,8 +1458,8 @@ set(WINDOWS_EVENTS_PLUGIN_FILES
         src/collectors/windows-events.plugin/windows-events-unicode.h
         src/collectors/windows-events.plugin/windows-events-xml.c
         src/collectors/windows-events.plugin/windows-events-xml.h
-        src/collectors/windows-events.plugin/windows-events-publishers.c
-        src/collectors/windows-events.plugin/windows-events-publishers.h
+        src/collectors/windows-events.plugin/windows-events-providers.c
+        src/collectors/windows-events.plugin/windows-events-providers.h
         src/collectors/windows-events.plugin/windows-events-fields-cache.c
         src/collectors/windows-events.plugin/windows-events-fields-cache.h
         src/collectors/windows-events.plugin/windows-events-query-builder.c

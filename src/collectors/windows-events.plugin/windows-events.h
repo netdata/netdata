@@ -128,7 +128,7 @@ typedef enum {
 #include "windows-events-unicode.h"
 #include "windows-events-sid.h"
 #include "windows-events-xml.h"
-#include "windows-events-publishers.h"
+#include "windows-events-providers.h"
 #include "windows-events-fields-cache.h"
 #include "windows-events-query.h"
 

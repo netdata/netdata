@@ -19,7 +19,7 @@ static bool plugin_should_exit = false;
 
 #define WEVT_KEYS_INCLUDED_IN_FACETS            \
     "|" WEVT_FIELD_COMPUTER                     \
-    "|" WEVT_FIELD_PROVIDER                     \
+    "|" WEVT_FIELD_PROVIDER                    \
     "|" WEVT_FIELD_SOURCE                       \
     "|" WEVT_FIELD_LEVEL                        \
     "|" WEVT_FIELD_KEYWORDS                     \
@@ -73,7 +73,7 @@ struct wevt_bin_data {
     WEVT_EVENT ev;
     WEVT_LOG *log;
     EVT_HANDLE hEvent;
-    PROVIDER_META_HANDLE *publisher;
+    PROVIDER_META_HANDLE *provider;
 };
 
 static void wevt_cleanup_bin_data(void *data) {
@@ -82,7 +82,7 @@ static void wevt_cleanup_bin_data(void *data) {
     if(d->hEvent)
         EvtClose(d->hEvent);
 
-    publisher_release(d->publisher);
+    provider_release(d->provider);
     freez(d);
 }
 
@@ -90,11 +90,11 @@ static inline void wevt_facets_register_bin_data(WEVT_LOG *log, FACETS *facets, 
     struct wevt_bin_data *d = mallocz(sizeof(struct wevt_bin_data));
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    internal_fatal(strcmp(log->ops.provider.data, publisher_get_name(log->publisher)) != 0,
-                   "Publisher name mismatch in data!");
+    internal_fatal(strcmp(log->ops.provider.data, provider_get_name(log->provider)) != 0,
+                   "Provider name mismatch in data!");
 
-    internal_fatal(!UUIDeq(ev->provider, publisher_get_uuid(log->publisher)),
-                   "Publisher UUID mismatch in data!");
+    internal_fatal(!UUIDeq(ev->provider, provider_get_uuid(log->provider)),
+                   "Provider UUID mismatch in data!");
 #endif
 
     d->ev = *ev;
@@ -104,8 +104,8 @@ static inline void wevt_facets_register_bin_data(WEVT_LOG *log, FACETS *facets, 
     // take the bookmark
     d->hEvent = log->hEvent; log->hEvent = NULL;
 
-    // dup the publisher
-    d->publisher = publisher_dup(log->publisher);
+    // dup the provider
+    d->provider = provider_dup(log->provider);
 
     facets_row_bin_data_set(facets, wevt_cleanup_bin_data, d);
 }
@@ -115,8 +115,8 @@ static void wevt_lazy_loading_event_and_xml(struct wevt_bin_data *d, FACET_ROW *
 
 #ifdef NETDATA_INTERNAL_CHECKS
     const FACET_ROW_KEY_VALUE *provider_rkv = dictionary_get(row->dict, WEVT_FIELD_PROVIDER);
-    internal_fatal(!provider_rkv || strcmp(buffer_tostring(provider_rkv->wb), publisher_get_name(d->publisher)) != 0,
-                   "Publisher of row does not match the bin data associated with it");
+    internal_fatal(!provider_rkv || strcmp(buffer_tostring(provider_rkv->wb), provider_get_name(d->provider)) != 0,
+                   "Provider of row does not match the bin data associated with it");
 
     uint64_t event_record_id = UINT64_MAX;
     const FACET_ROW_KEY_VALUE *event_record_id_rkv = dictionary_get(row->dict, WEVT_FIELD_EVENTRECORDID);
@@ -126,8 +126,8 @@ static void wevt_lazy_loading_event_and_xml(struct wevt_bin_data *d, FACET_ROW *
                    "Event Record ID of row does not match the bin data associated with it");
 #endif
 
-    wevt_get_xml_utf8(&d->log->ops.unicode, d->publisher, d->hEvent, &d->log->ops.xml);
-    wevt_get_event_utf8(&d->log->ops.unicode, d->publisher, d->hEvent, &d->log->ops.event);
+    EvtFormatMessage_Xml_utf8(&d->log->ops.unicode, d->provider, d->hEvent, &d->log->ops.xml);
+    EvtFormatMessage_Event_utf8(&d->log->ops.unicode, d->provider, d->hEvent, &d->log->ops.event);
     d->rendered = true;
 }
 
@@ -347,8 +347,8 @@ static const char *source_to_str(TXT_UTF8 *txt) {
         case TXT_SOURCE_EVENT_LOG:
             return "event-log";
 
-        case TXT_SOURCE_PUBLISHER:
-            return "publisher";
+        case TXT_SOURCE_PROVIDER:
+            return "provider";
 
         case TXT_SOURCE_FIELD_CACHE:
             return "fields-cache";
@@ -365,8 +365,8 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
     if(log->ops.provider.used > 1) {
         bytes += log->ops.provider.used * 2; // unicode is double
         facets_add_key_value_length(
-            facets, WEVT_FIELD_PROVIDER, sizeof(WEVT_FIELD_PROVIDER) - 1,
-            log->ops.provider.data, log->ops.provider.used - 1);
+                facets, WEVT_FIELD_PROVIDER, sizeof(WEVT_FIELD_PROVIDER) - 1,
+                log->ops.provider.data, log->ops.provider.used - 1);
     }
 
     if(log->ops.source.used > 1) {
@@ -477,7 +477,7 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
 
     {
         static __thread char str[UINT64_HEX_MAX_LENGTH];
-        len = print_uint64_hex_full(str, ev->keywords);
+        len = print_uint64_hex_full(str, ev->keyword);
         bytes += len;
         facets_add_key_value_length(
             facets, WEVT_FIELD_KEYWORDS "ID", sizeof(WEVT_FIELD_KEYWORDS) + 2 - 1, str, len);
@@ -1174,7 +1174,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // initialization
 
     wevt_sources_init();
-    publisher_cache_init();
+    provider_cache_init();
     sid_cache_init();
     field_cache_init();
 

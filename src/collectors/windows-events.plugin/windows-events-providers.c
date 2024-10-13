@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "windows-events-publishers.h"
+#include "windows-events-providers.h"
 
-#define MAX_OPEN_HANDLES_PER_PUBLISHER 5
+#define MAX_OPEN_HANDLES_PER_PROVIDER 5
 
-struct publisher;
+struct provider;
 
 // typedef as PROVIDER_META_HANDLE in include file
 struct provider_meta_handle {
     pid_t owner;                        // the owner of the handle, or zero
     uint32_t locks;                     // the number of locks the owner has on this handle
     EVT_HANDLE hMetadata;               // the handle
-    struct publisher *publisher;        // a pointer back to the publisher
+    struct provider *provider;        // a pointer back to the provider
 
     // double linked list
     PROVIDER_META_HANDLE *prev;
@@ -32,77 +32,77 @@ struct provider_list {
     struct provider_data *array;        // the array of entries, sorted (for binary search)
 };
 
-typedef struct publisher_key {
+typedef struct provider_key {
     ND_UUID uuid;                       // the Provider GUID
-    DWORD len;                          // the length of the provider name
-    const wchar_t *wname;               // the Provider wide-string name (UTF-16)
-} PUBLISHER_KEY;
+    DWORD len;                          // the length of the Provider Name
+    const wchar_t *wname;               // the Provider wide-string Name (UTF-16)
+} PROVIDER_KEY;
 
-typedef struct publisher {
-    PUBLISHER_KEY key;
-    const char *name;                   // the Provider name (UTF-8)
+typedef struct provider {
+    PROVIDER_KEY key;
+    const char *name;                   // the Provider Name (UTF-8)
     uint32_t total_handles;             // the number of handles allocated
     uint32_t available_handles;         // the number of available handles
     uint32_t deleted_handles;           // the number of deleted handles
     PROVIDER_META_HANDLE *handles;      // a double linked list of all the handles
 
-    struct provider_list keywords;
+    struct provider_list keyword;
     struct provider_list tasks;
     struct provider_list opcodes;
     struct provider_list levels;
-} PUBLISHER;
+} PROVIDER;
 
-// A hashtable implementation for publishers
-// using the provider GUID as key and PUBLISHER as value
-#define SIMPLE_HASHTABLE_NAME _PUBLISHER
-#define SIMPLE_HASHTABLE_VALUE_TYPE PUBLISHER
-#define SIMPLE_HASHTABLE_KEY_TYPE PUBLISHER_KEY
-#define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION publisher_value_to_key
-#define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION publisher_cache_compar
+// A hashtable implementation for Providers
+// using the Provider GUID as key and PROVIDER as value
+#define SIMPLE_HASHTABLE_NAME _PROVIDER
+#define SIMPLE_HASHTABLE_VALUE_TYPE PROVIDER
+#define SIMPLE_HASHTABLE_KEY_TYPE PROVIDER_KEY
+#define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION provider_value_to_key
+#define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION provider_cache_compar
 #define SIMPLE_HASHTABLE_SAMPLE_IMPLEMENTATION 1
 #include "libnetdata/simple_hashtable.h"
 
 static struct {
     SPINLOCK spinlock;
-    uint32_t total_publishers;
+    uint32_t total_providers;
     uint32_t total_handles;
     uint32_t deleted_handles;
-    struct simple_hashtable_PUBLISHER hashtable;
-    ARAL *aral_publishers;
+    struct simple_hashtable_PROVIDER hashtable;
+    ARAL *aral_providers;
     ARAL *aral_handles;
 } pbc = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
 };
 
-static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *dst, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id);
+static void provider_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *dst, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id);
 
-const char *publisher_get_name(PROVIDER_META_HANDLE *p) {
-    return (p && p->publisher && p->publisher->name) ? p->publisher->name : "__UNKNOWN PUBLISHER__";
+const char *provider_get_name(PROVIDER_META_HANDLE *p) {
+    return (p && p->provider && p->provider->name) ? p->provider->name : "__UNKNOWN PROVIDER__";
 }
 
-ND_UUID publisher_get_uuid(PROVIDER_META_HANDLE *p) {
-    return (p && p->publisher) ? p->publisher->key.uuid : UUID_ZERO;
+ND_UUID provider_get_uuid(PROVIDER_META_HANDLE *p) {
+    return (p && p->provider) ? p->provider->key.uuid : UUID_ZERO;
 }
 
-static inline PUBLISHER_KEY *publisher_value_to_key(PUBLISHER *p) {
+static inline PROVIDER_KEY *provider_value_to_key(PROVIDER *p) {
     return &p->key;
 }
 
-static inline bool publisher_cache_compar(PUBLISHER_KEY *a, PUBLISHER_KEY *b) {
+static inline bool provider_cache_compar(PROVIDER_KEY *a, PROVIDER_KEY *b) {
     return a->len == b->len && UUIDeq(a->uuid, b->uuid) && memcmp(a->wname, b->wname, a->len) == 0;
 }
 
-void publisher_cache_init(void) {
-    simple_hashtable_init_PUBLISHER(&pbc.hashtable, 100000);
-    pbc.aral_publishers = aral_create("wevt_publishers", sizeof(PUBLISHER), 0, 4096, NULL, NULL, NULL, false, true);
+void provider_cache_init(void) {
+    simple_hashtable_init_PROVIDER(&pbc.hashtable, 100000);
+    pbc.aral_providers = aral_create("wevt_providers", sizeof(PROVIDER), 0, 4096, NULL, NULL, NULL, false, true);
     pbc.aral_handles = aral_create("wevt_handles", sizeof(PROVIDER_META_HANDLE), 0, 4096, NULL, NULL, NULL, false, true);
 }
 
-PROVIDER_META_HANDLE *publisher_get(ND_UUID uuid, LPCWSTR providerName) {
+PROVIDER_META_HANDLE *provider_get(ND_UUID uuid, LPCWSTR providerName) {
     if(!providerName || !providerName[0])
         return NULL;
 
-    PUBLISHER_KEY key = {
+    PROVIDER_KEY key = {
             .uuid = uuid,
             .len = wcslen(providerName),
             .wname = providerName,
@@ -111,20 +111,20 @@ PROVIDER_META_HANDLE *publisher_get(ND_UUID uuid, LPCWSTR providerName) {
 
     spinlock_lock(&pbc.spinlock);
 
-    SIMPLE_HASHTABLE_SLOT_PUBLISHER *slot =
-            simple_hashtable_get_slot_PUBLISHER(&pbc.hashtable, hash, &key, true);
+    SIMPLE_HASHTABLE_SLOT_PROVIDER *slot =
+            simple_hashtable_get_slot_PROVIDER(&pbc.hashtable, hash, &key, true);
 
     bool load_it = false;
-    PUBLISHER *p = SIMPLE_HASHTABLE_SLOT_DATA(slot);
+    PROVIDER *p = SIMPLE_HASHTABLE_SLOT_DATA(slot);
     if(!p) {
-        p = aral_callocz(pbc.aral_publishers);
+        p = aral_callocz(pbc.aral_providers);
         p->key.uuid = key.uuid;
         p->key.len = key.len;
         p->key.wname = wcsdup(key.wname);
         p->name = strdupz(provider2utf8(key.wname));
-        simple_hashtable_set_slot_PUBLISHER(&pbc.hashtable, slot, hash, p);
+        simple_hashtable_set_slot_PROVIDER(&pbc.hashtable, slot, hash, p);
         load_it = true;
-        pbc.total_publishers++;
+        pbc.total_providers++;
     }
 
     pid_t me = gettid_cached();
@@ -138,7 +138,7 @@ PROVIDER_META_HANDLE *publisher_get(ND_UUID uuid, LPCWSTR providerName) {
 
     if(!h) {
         h = aral_callocz(pbc.aral_handles);
-        h->publisher = p;
+        h->provider = p;
         h->hMetadata = EvtOpenPublisherMetadata(
                 NULL,          // Local machine
                 providerName,  // Provider name
@@ -168,10 +168,10 @@ PROVIDER_META_HANDLE *publisher_get(ND_UUID uuid, LPCWSTR providerName) {
         WEVT_VARIANT property = { 0 };
         TXT_UNICODE unicode = { 0 };
 
-        publisher_load_list(h, &content, &property, &unicode, &p->keywords, EvtPublisherMetadataKeywords);
-        publisher_load_list(h, &content, &property, &unicode, &p->levels, EvtPublisherMetadataLevels);
-        publisher_load_list(h, &content, &property, &unicode, &p->opcodes, EvtPublisherMetadataOpcodes);
-        publisher_load_list(h, &content, &property, &unicode, &p->tasks, EvtPublisherMetadataTasks);
+        provider_load_list(h, &content, &property, &unicode, &p->keyword, EvtPublisherMetadataKeywords);
+        provider_load_list(h, &content, &property, &unicode, &p->levels, EvtPublisherMetadataLevels);
+        provider_load_list(h, &content, &property, &unicode, &p->opcodes, EvtPublisherMetadataOpcodes);
+        provider_load_list(h, &content, &property, &unicode, &p->tasks, EvtPublisherMetadataTasks);
 
         txt_unicode_cleanup(&unicode);
         wevt_variant_cleanup(&content);
@@ -183,28 +183,28 @@ PROVIDER_META_HANDLE *publisher_get(ND_UUID uuid, LPCWSTR providerName) {
     return h;
 }
 
-EVT_HANDLE publisher_handle(PROVIDER_META_HANDLE *h) {
+EVT_HANDLE provider_handle(PROVIDER_META_HANDLE *h) {
     return h ? h->hMetadata : NULL;
 }
 
-PROVIDER_META_HANDLE *publisher_dup(PROVIDER_META_HANDLE *h) {
+PROVIDER_META_HANDLE *provider_dup(PROVIDER_META_HANDLE *h) {
     if(h) h->locks++;
     return h;
 }
 
-void publisher_release(PROVIDER_META_HANDLE *h) {
+void provider_release(PROVIDER_META_HANDLE *h) {
     if(!h) return;
     pid_t me = gettid_cached();
     fatal_assert(h->owner == me);
     fatal_assert(h->locks > 0);
     if(--h->locks == 0) {
-        PUBLISHER *p = h->publisher;
+        PROVIDER *p = h->provider;
 
         spinlock_lock(&pbc.spinlock);
         h->owner = 0;
 
-        if(++p->available_handles > MAX_OPEN_HANDLES_PER_PUBLISHER) {
-            // there are multiple handles on this publisher
+        if(++p->available_handles > MAX_OPEN_HANDLES_PER_PROVIDER) {
+            // there are multiple handles on this provider
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->handles, h, prev, next);
 
             if(h->hMetadata)
@@ -231,7 +231,7 @@ void publisher_release(PROVIDER_META_HANDLE *h) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// load publisher lists
+// load provider lists
 
 static bool wevt_get_property_from_array(WEVT_VARIANT *property, EVT_HANDLE handle, DWORD dwIndex, EVT_PUBLISHER_METADATA_PROPERTY_ID PropertyId) {
     DWORD used = 0;
@@ -274,7 +274,7 @@ static int compare_ascending(const void *a, const void *b) {
 //    return 0;
 //}
 
-static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *dst, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id) {
+static void provider_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *dst, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id) {
     if(!h || !h->hMetadata) return;
 
     EVT_PUBLISHER_METADATA_PROPERTY_ID name_id, message_id, value_id;
@@ -289,7 +289,7 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
             value_id = EvtPublisherMetadataLevelValue;
             value_bits = 32;
             compare_func = compare_ascending;
-            is_valid = is_valid_publisher_level;
+            is_valid = is_valid_provider_level;
             break;
 
         case EvtPublisherMetadataOpcodes:
@@ -297,7 +297,7 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
             message_id = EvtPublisherMetadataOpcodeMessageID;
             value_id = EvtPublisherMetadataOpcodeValue;
             value_bits = 32;
-            is_valid = is_valid_publisher_opcode;
+            is_valid = is_valid_provider_opcode;
             compare_func = compare_ascending;
             break;
 
@@ -306,7 +306,7 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
             message_id = EvtPublisherMetadataTaskMessageID;
             value_id = EvtPublisherMetadataTaskValue;
             value_bits = 32;
-            is_valid = is_valid_publisher_task;
+            is_valid = is_valid_provider_task;
             compare_func = compare_ascending;
             break;
 
@@ -315,7 +315,7 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
             message_id = EvtPublisherMetadataKeywordMessageID;
             value_id = EvtPublisherMetadataKeywordValue;
             value_bits = 64;
-            is_valid = is_valid_publisher_keywords;
+            is_valid = is_valid_provider_keyword;
             compare_func = NULL;
             break;
 
@@ -396,7 +396,7 @@ static void publisher_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, 
             uint32_t messageID = wevt_field_get_uint32(property->data);
 
             if (messageID != (uint32_t)-1) {
-                if (wevt_get_message_unicode(dst, hMetadata, NULL, messageID, EvtFormatMessageId)) {
+                if (EvtFormatMessage_utf16(dst, hMetadata, NULL, messageID, EvtFormatMessageId)) {
                     size_t len;
                     d->name = unicode2utf8_strdupz(dst->data, &len);
                     d->len = len;
@@ -435,7 +435,7 @@ cleanup:
 // lookup functions
 
 // lookup bitmap metdata (returns a comma separated list of strings)
-static bool publisher_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
+static bool provider_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
     if(!(value & l->mask) || !l->total || !l->array || l->exceeds_data_type)
         return false;
 
@@ -466,7 +466,7 @@ static bool publisher_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, ui
 
             memcpy(&dst->data[dst->used], s, slen);
             dst->used += slen;
-            dst->src = TXT_SOURCE_PUBLISHER;
+            dst->src = TXT_SOURCE_PROVIDER;
             added++;
         }
     }
@@ -481,7 +481,7 @@ static bool publisher_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, ui
 }
 
 //// lookup a single value (returns its string)
-//static bool publisher_value_metadata_linear(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
+//static bool provider_value_metadata_linear(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
 //    if(value < l->min || value > l->max || !l->total || !l->array || l->exceeds_data_type)
 //        return false;
 //
@@ -498,7 +498,7 @@ static bool publisher_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, ui
 //
 //            memcpy(dst->data, s, slen);
 //            dst->used = slen;
-//            dst->src = TXT_SOURCE_PUBLISHER;
+//            dst->src = TXT_SOURCE_PROVIDER;
 //
 //            break;
 //        }
@@ -514,11 +514,11 @@ static bool publisher_bitmap_metadata(TXT_UTF8 *dst, struct provider_list *l, ui
 //    return (dst->used > 0);
 //}
 
-static bool publisher_value_metadata(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
+static bool provider_value_metadata(TXT_UTF8 *dst, struct provider_list *l, uint64_t value) {
     if(value < l->min || value > l->max || !l->total || !l->array || l->exceeds_data_type)
         return false;
 
-    // if(l->total < 3) return publisher_value_metadata_linear(dst, l, value);
+    // if(l->total < 3) return provider_value_metadata_linear(dst, l, value);
 
     dst->used = 0;
 
@@ -540,7 +540,7 @@ static bool publisher_value_metadata(TXT_UTF8 *dst, struct provider_list *l, uin
                 memcpy(dst->data, s, slen);
                 dst->used = slen;
                 dst->data[dst->used++] = 0;
-                dst->src = TXT_SOURCE_PUBLISHER;
+                dst->src = TXT_SOURCE_PROVIDER;
             }
             break;
         }
@@ -560,38 +560,38 @@ static bool publisher_value_metadata(TXT_UTF8 *dst, struct provider_list *l, uin
 // --------------------------------------------------------------------------------------------------------------------
 // public API to lookup metadata
 
-bool publisher_keywords_cacheable(PROVIDER_META_HANDLE *h) {
-    return h && !h->publisher->keywords.exceeds_data_type;
+bool provider_keyword_cacheable(PROVIDER_META_HANDLE *h) {
+    return h && !h->provider->keyword.exceeds_data_type;
 }
 
-bool publisher_tasks_cacheable(PROVIDER_META_HANDLE *h) {
-    return h && !h->publisher->tasks.exceeds_data_type;
+bool provider_tasks_cacheable(PROVIDER_META_HANDLE *h) {
+    return h && !h->provider->tasks.exceeds_data_type;
 }
 
-bool is_useful_publisher_for_levels(PROVIDER_META_HANDLE *h) {
-    return h && !h->publisher->levels.exceeds_data_type;
+bool is_useful_provider_for_levels(PROVIDER_META_HANDLE *h) {
+    return h && !h->provider->levels.exceeds_data_type;
 }
 
-bool publisher_opcodes_cacheable(PROVIDER_META_HANDLE *h) {
-    return h && !h->publisher->opcodes.exceeds_data_type;
+bool provider_opcodes_cacheable(PROVIDER_META_HANDLE *h) {
+    return h && !h->provider->opcodes.exceeds_data_type;
 }
 
-bool publisher_get_keywords(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
+bool provider_get_keywords(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
     if(!h) return false;
-    return publisher_bitmap_metadata(dst, &h->publisher->keywords, value);
+    return provider_bitmap_metadata(dst, &h->provider->keyword, value);
 }
 
-bool publisher_get_level(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
+bool provider_get_level(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
     if(!h) return false;
-    return publisher_value_metadata(dst, &h->publisher->levels, value);
+    return provider_value_metadata(dst, &h->provider->levels, value);
 }
 
-bool publisher_get_task(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
+bool provider_get_task(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
     if(!h) return false;
-    return publisher_value_metadata(dst, &h->publisher->tasks, value);
+    return provider_value_metadata(dst, &h->provider->tasks, value);
 }
 
-bool publisher_get_opcode(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
+bool provider_get_opcode(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value) {
     if(!h) return false;
-    return publisher_value_metadata(dst, &h->publisher->opcodes, value);
+    return provider_value_metadata(dst, &h->provider->opcodes, value);
 }

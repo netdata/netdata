@@ -11,12 +11,12 @@ typedef struct wevt_event {
     uint64_t id;                        // EventRecordId (unique and sequential per channel)
     uint8_t  version;
     uint8_t  level;                     // The severity of event
-    uint8_t  opcode;                    // we receive this as 8bit, but publishers use 32bit
+    uint8_t  opcode;                    // we receive this as 8bit, but providers use 32bit
     uint16_t event_id;                  // This is the template that defines the message to be shown
     uint16_t task;
     uint32_t process_id;
     uint32_t thread_id;
-    uint64_t keywords;                  // Categorization of the event
+    uint64_t keyword;                  // Categorization of the event
     ND_UUID  provider;
     ND_UUID  correlation_activity_id;
     nsec_t   created_ns;
@@ -61,7 +61,7 @@ typedef struct wevt_log {
     EVT_HANDLE hEvent;
     EVT_HANDLE hQuery;
     EVT_HANDLE hRenderContext;
-    struct provider_meta_handle *publisher;
+    struct provider_meta_handle *provider;
 
     WEVT_QUERY_TYPE type;
 
@@ -126,10 +126,10 @@ void wevt_query_done(WEVT_LOG *log);
 
 bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev);
 
-bool wevt_get_message_unicode(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags);
+bool EvtFormatMessage_utf16(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags);
 
-bool wevt_get_event_utf8(TXT_UNICODE *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
-bool wevt_get_xml_utf8(TXT_UNICODE *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
+bool EvtFormatMessage_Event_utf8(TXT_UNICODE *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
+bool EvtFormatMessage_Xml_utf8(TXT_UNICODE *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
 
 void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator);
 
@@ -238,42 +238,42 @@ static inline bool wevt_get_uuid_by_type(EVT_VARIANT *ev, ND_UUID *dst) {
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-severity-levels
-static inline bool is_valid_publisher_level(uint64_t level, bool strict) {
+static inline bool is_valid_provider_level(uint64_t level, bool strict) {
     if(strict)
-        // when checking if the name is publisher independent
+        // when checking if the name is provider independent
         return level >= 16 && level <= 255;
     else
-        // when checking acceptable values in publisher manifests
+        // when checking acceptable values in provider manifests
         return level <= 255;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-tasks-and-opcodes
-static inline bool is_valid_publisher_opcode(uint64_t opcode, bool strict) {
+static inline bool is_valid_provider_opcode(uint64_t opcode, bool strict) {
     if(strict)
-        // when checking if the name is publisher independent
+        // when checking if the name is provider independent
         return opcode >= 10 && opcode <= 239;
     else
-        // when checking acceptable values in publisher manifests
+        // when checking acceptable values in provider manifests
         return opcode <= 255;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-tasks-and-opcodes
-static inline bool is_valid_publisher_task(uint64_t task, bool strict) {
+static inline bool is_valid_provider_task(uint64_t task, bool strict) {
     if(strict)
-        // when checking if the name is publisher independent
+        // when checking if the name is provider independent
         return task > 0 && task <= 0xFFFF;
     else
-        // when checking acceptable values in publisher manifests
+        // when checking acceptable values in provider manifests
         return task <= 0xFFFF;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-keywords-used-to-classify-types-of-events
-static inline bool is_valid_publisher_keywords(uint64_t keyword, bool strict) {
+static inline bool is_valid_provider_keyword(uint64_t keyword, bool strict) {
     if(strict)
-        // when checking if the name is publisher independent
+        // when checking if the name is provider independent
         return keyword > 0 && keyword <= 0x0000FFFFFFFFFFFF;
     else
-        // when checking acceptable values in publisher manifests
+        // when checking acceptable values in provider manifests
         return true;
 }
 
