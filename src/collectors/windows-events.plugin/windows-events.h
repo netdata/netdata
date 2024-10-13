@@ -167,6 +167,7 @@ typedef enum {
 #define WEVT_FIELD_THREADID             "ThreadID"
 #define WEVT_FIELD_XML                  "XML"
 #define WEVT_FIELD_MESSAGE              "Message"
+#define WEVT_FIELD_EVENTS_API           "EventsAPI"
 #define WEVT_FIELD_EVENT_DATA_HIDDEN    "__HIDDEN__EVENT__DATA__"
 #define WEVT_FIELD_EVENT_MESSAGE_HIDDEN "__HIDDEN__MESSAGE__DATA__"
 #define WEVT_FIELD_EVENT_XML_HIDDEN     "__HIDDEN__XML__DATA__"

@@ -258,6 +258,11 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
+        facets, WEVT_FIELD_EVENTS_API,
+        rq->default_facet |
+            FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
             facets, WEVT_FIELD_LEVEL,
             rq->default_facet | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_EXPANDED_FILTER);
 
@@ -366,6 +371,22 @@ static const char *source_to_str(TXT_UTF8 *txt) {
 }
 #endif
 
+static const char *events_api_to_str(WEVT_PROVIDER_PLATFORM platform) {
+    switch(platform) {
+        case WEVT_PLATFORM_WEL:
+            return "Windows Events Log";
+
+        case WEVT_PLATFORM_ETW:
+            return "Events Tracing for Windows";
+
+        case WEVT_PLATFORM_TL:
+            return "TraceLogging";
+
+        default:
+            return "Unknown";
+    }
+}
+
 static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUERY_SOURCE *src, usec_t *msg_ut __maybe_unused, WEVT_EVENT *ev) {
     size_t len, bytes = log->ops.raw.system.used + log->ops.raw.user.used;
 
@@ -447,6 +468,12 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
         facets_add_key_value_length(
             facets, WEVT_FIELD_EVENTID, sizeof(WEVT_FIELD_EVENTID) - 1,
             event_id_str, len);
+    }
+
+    {
+        const char *s = events_api_to_str(ev->platform);
+        facets_add_key_value_length(
+            facets, WEVT_FIELD_EVENTS_API, sizeof(WEVT_FIELD_EVENTS_API) - 1, s, strlen(s));
     }
 
     if(ev->process_id) {
