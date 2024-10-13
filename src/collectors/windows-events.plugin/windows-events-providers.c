@@ -11,7 +11,7 @@ struct provider_meta_handle {
     pid_t owner;                        // the owner of the handle, or zero
     uint32_t locks;                     // the number of locks the owner has on this handle
     EVT_HANDLE hMetadata;               // the handle
-    struct provider *provider;        // a pointer back to the provider
+    struct provider *provider;          // a pointer back to the provider
 
     // double linked list
     PROVIDER_META_HANDLE *prev;
@@ -45,6 +45,8 @@ typedef struct provider {
     uint32_t available_handles;         // the number of available handles
     uint32_t deleted_handles;           // the number of deleted handles
     PROVIDER_META_HANDLE *handles;      // a double linked list of all the handles
+
+    WEVT_PROVIDER_PLATFORM platform;
 
     struct provider_list keyword;
     struct provider_list tasks;
@@ -96,6 +98,61 @@ void provider_cache_init(void) {
     simple_hashtable_init_PROVIDER(&pbc.hashtable, 100000);
     pbc.aral_providers = aral_create("wevt_providers", sizeof(PROVIDER), 0, 4096, NULL, NULL, NULL, false, true);
     pbc.aral_handles = aral_create("wevt_handles", sizeof(PROVIDER_META_HANDLE), 0, 4096, NULL, NULL, NULL, false, true);
+}
+
+static bool provider_property_get(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id) {
+    DWORD bufferUsed = 0;
+
+    if(!EvtGetPublisherMetadataProperty(h->hMetadata, property_id, 0, 0, NULL, &bufferUsed)) {
+        DWORD status = GetLastError();
+        if (status != ERROR_INSUFFICIENT_BUFFER) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetPublisherMetadataProperty() failed");
+            goto cleanup;
+        }
+    }
+
+    wevt_variant_resize(content, bufferUsed);
+    if (!EvtGetPublisherMetadataProperty(h->hMetadata, property_id, 0, content->size, content->data, &bufferUsed)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetPublisherMetadataProperty() failed after resize");
+        goto cleanup;
+    }
+
+    return true;
+
+cleanup:
+    return false;
+}
+
+static bool provider_string_property_exists(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id) {
+    if(!provider_property_get(h, content, property_id))
+        return false;
+
+    if(content->data->Type != EvtVarTypeString)
+        return false;
+
+    if(!content->data->StringVal[0])
+        return false;
+
+    return true;
+}
+
+static void provider_detect_platform(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content) {
+    if(UUIDiszero(h->provider->key.uuid))
+        h->provider->platform = WEVT_PLATFORM_WEL;
+    else if(h->hMetadata) {
+        if (provider_string_property_exists(h, content, EvtPublisherMetadataMessageFilePath) ||
+            provider_string_property_exists(h, content, EvtPublisherMetadataResourceFilePath) ||
+            provider_string_property_exists(h, content, EvtPublisherMetadataParameterFilePath))
+            h->provider->platform = WEVT_PLATFORM_ETW;
+        else
+            // The provider cannot be opened, does not have any resource files (message, resource, parameter)
+            h->provider->platform = WEVT_PLATFORM_TL;
+    }
+    else h->provider->platform = WEVT_PLATFORM_ETW;
+}
+
+WEVT_PROVIDER_PLATFORM provider_get_platform(PROVIDER_META_HANDLE *p) {
+    return p->provider->platform;
 }
 
 PROVIDER_META_HANDLE *provider_get(ND_UUID uuid, LPCWSTR providerName) {
@@ -168,6 +225,7 @@ PROVIDER_META_HANDLE *provider_get(ND_UUID uuid, LPCWSTR providerName) {
         WEVT_VARIANT property = { 0 };
         TXT_UNICODE unicode = { 0 };
 
+        provider_detect_platform(h, &content);
         provider_load_list(h, &content, &property, &unicode, &p->keyword, EvtPublisherMetadataKeywords);
         provider_load_list(h, &content, &property, &unicode, &p->levels, EvtPublisherMetadataLevels);
         provider_load_list(h, &content, &property, &unicode, &p->opcodes, EvtPublisherMetadataOpcodes);
@@ -326,23 +384,11 @@ static void provider_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, W
 
     EVT_HANDLE hMetadata = h->hMetadata;
     EVT_HANDLE hArray = NULL;
-    DWORD bufferUsed = 0;
     DWORD itemCount = 0;
 
     // Get the metadata array for the list (e.g., opcodes, tasks, or levels)
-    if (!EvtGetPublisherMetadataProperty(hMetadata, property_id, 0, 0, NULL, &bufferUsed)) {
-        DWORD status = GetLastError();
-        if (status != ERROR_INSUFFICIENT_BUFFER) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetPublisherMetadataProperty() failed");
-            goto cleanup;
-        }
-    }
-
-    wevt_variant_resize(content, bufferUsed);
-    if (!EvtGetPublisherMetadataProperty(hMetadata, property_id, 0, content->size, content->data, &bufferUsed)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetPublisherMetadataProperty() failed after resize");
+    if(!provider_property_get(h, content, property_id))
         goto cleanup;
-    }
 
     // Get the number of items (e.g., levels, tasks, or opcodes)
     hArray = content->data->EvtHandleVal;

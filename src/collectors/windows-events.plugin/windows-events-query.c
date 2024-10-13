@@ -6,56 +6,6 @@ static void wevt_event_done(WEVT_LOG *log);
 
 static uint64_t wevt_log_file_size(const wchar_t *channel);
 
-#define FIELD_RECORD_NUMBER                 (0)
-#define FIELD_EVENT_ID                      (1)
-#define FIELD_LEVEL                         (2)
-#define FIELD_OPCODE                        (3)
-#define FIELD_KEYWORDS                      (4)
-#define FIELD_VERSION                       (5)
-#define FIELD_TASK                          (6)
-#define FIELD_PROCESS_ID                    (7)
-#define FIELD_THREAD_ID                     (8)
-#define FIELD_TIME_CREATED                  (9)
-#define FIELD_CHANNEL                       (10)
-#define FIELD_COMPUTER_NAME                 (11)
-#define FIELD_PROVIDER_NAME                 (12)
-#define FIELD_EVENT_SOURCE_NAME             (13)
-#define FIELD_PROVIDER_GUID                 (14)
-#define FIELD_CORRELATION_ACTIVITY_ID       (15)
-#define FIELD_USER_ID                       (16)
-#define FIELD_EVENT_DATA                    (17)
-
-// These are the fields we extract from the logs
-
-static const wchar_t *RENDER_ITEMS[] = {
-    L"/Event/System/EventRecordID",
-    L"/Event/System/EventID",
-    L"/Event/System/Level",
-    L"/Event/System/Opcode",
-    L"/Event/System/Keywords",
-    L"/Event/System/Version",
-    L"/Event/System/Task",
-    L"/Event/System/Execution/@ProcessID",
-    L"/Event/System/Execution/@ThreadID",
-    L"/Event/System/TimeCreated/@SystemTime",
-    L"/Event/System/Channel",
-    L"/Event/System/Computer",
-    L"/Event/System/Provider/@Name",
-    L"/Event/System/Provider/@EventSourceName",
-    L"/Event/System/Provider/@Guid",
-    L"/Event/System/Correlation/@ActivityID",
-    L"/Event/System/Security/@UserID",
-};
-
-static const wchar_t *RENDER_ITEMS_FTS[_countof(RENDER_ITEMS) + 1];
-
-__attribute__((constructor)) void wevt_initialize_RENDER_ITEMS_FTS(void) {
-    for(size_t i = 0; i < _countof(RENDER_ITEMS) ;i++)
-        RENDER_ITEMS_FTS[i] = RENDER_ITEMS[i];
-
-    RENDER_ITEMS_FTS[_countof(RENDER_ITEMS)] = L"/Event/EventData";
-}
-
 // --------------------------------------------------------------------------------------------------------------------
 
 static const char *EvtGetExtendedStatus_utf8(void) {
@@ -341,12 +291,12 @@ static uint64_t wevt_keyword_handle_reserved(uint64_t value, TXT_UTF8 *dst) {
 static void wevt_get_keyword(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
     TXT_UTF8 *dst = &log->ops.keywords;
 
-    if(ev->keyword == WEVT_KEYWORD_NONE) {
+    if(ev->keywords == WEVT_KEYWORD_NONE) {
         txt_utf8_set(dst, WEVT_KEYWORD_NAME_NONE, sizeof(WEVT_KEYWORD_NAME_NONE) - 1);
         dst->src = TXT_SOURCE_HARDCODED;
     }
 
-    uint64_t value = wevt_keyword_handle_reserved(ev->keyword, dst);
+    uint64_t value = wevt_keyword_handle_reserved(ev->keywords, dst);
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageKeyword;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_KEYWORD;
@@ -360,11 +310,11 @@ static void wevt_get_keyword(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE
         // the provider did not provide any info and the description is still empty.
         // the system returns 1 keyword, the highest bit, not a list
         // so, when we call the system, we pass the original value (ev->keywords)
-        wevt_get_field_from_cache(log, ev->keyword, h, dst, &ev->provider, cache_type, flags);
+        wevt_get_field_from_cache(log, ev->keywords, h, dst, &ev->provider, cache_type, flags);
     }
 
     txt_utf8_set_hex_if_empty(
-            dst, WEVT_PREFIX_KEYWORDS, sizeof(WEVT_PREFIX_KEYWORDS) - 1, ev->keyword);
+            dst, WEVT_PREFIX_KEYWORDS, sizeof(WEVT_PREFIX_KEYWORDS) - 1, ev->keywords);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -395,36 +345,41 @@ static bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev) {
 
     EVT_VARIANT *content = log->ops.content.data;
 
-    ev->id          = wevt_field_get_uint64(&content[FIELD_RECORD_NUMBER]);
-    ev->event_id    = wevt_field_get_uint16(&content[FIELD_EVENT_ID]);
-    ev->level       = wevt_field_get_uint8(&content[FIELD_LEVEL]);
-    ev->opcode      = wevt_field_get_uint8(&content[FIELD_OPCODE]);
-    ev->keyword    = wevt_field_get_uint64_hex(&content[FIELD_KEYWORDS]);
-    ev->version     = wevt_field_get_uint8(&content[FIELD_VERSION]);
-    ev->task        = wevt_field_get_uint16(&content[FIELD_TASK]);
-    ev->process_id  = wevt_field_get_uint32(&content[FIELD_PROCESS_ID]);
-    ev->thread_id   = wevt_field_get_uint32(&content[FIELD_THREAD_ID]);
-    ev->created_ns  = wevt_field_get_filetime_to_ns(&content[FIELD_TIME_CREATED]);
+    ev->id          = wevt_field_get_uint64(&content[EvtSystemEventRecordId]);
+    ev->event_id    = wevt_field_get_uint16(&content[EvtSystemEventID]);
+    ev->level       = wevt_field_get_uint8(&content[EvtSystemLevel]);
+    ev->opcode      = wevt_field_get_uint8(&content[EvtSystemOpcode]);
+    ev->keywords    = wevt_field_get_uint64_hex(&content[EvtSystemKeywords]);
+    ev->version     = wevt_field_get_uint8(&content[EvtSystemVersion]);
+    ev->task        = wevt_field_get_uint16(&content[EvtSystemTask]);
+    ev->qualifiers  = wevt_field_get_uint16(&content[EvtSystemQualifiers]);
+    ev->process_id  = wevt_field_get_uint32(&content[EvtSystemProcessID]);
+    ev->thread_id   = wevt_field_get_uint32(&content[EvtSystemThreadID]);
+    ev->created_ns  = wevt_field_get_filetime_to_ns(&content[EvtSystemTimeCreated]);
 
     if(log->type & WEVT_QUERY_EXTENDED) {
-        wevt_field_get_string_utf8(&content[FIELD_CHANNEL], &log->ops.channel);
-        wevt_field_get_string_utf8(&content[FIELD_COMPUTER_NAME], &log->ops.computer);
-        wevt_field_get_string_utf8(&content[FIELD_PROVIDER_NAME], &log->ops.provider);
-        wevt_field_get_string_utf8(&content[FIELD_EVENT_SOURCE_NAME], &log->ops.source);
-        wevt_get_uuid_by_type(&content[FIELD_PROVIDER_GUID], &ev->provider);
-        wevt_get_uuid_by_type(&content[FIELD_CORRELATION_ACTIVITY_ID], &ev->correlation_activity_id);
-        wevt_field_get_sid(&content[FIELD_USER_ID], &log->ops.user);
+        wevt_field_get_string_utf8(&content[EvtSystemChannel], &log->ops.channel);
+        wevt_field_get_string_utf8(&content[EvtSystemComputer], &log->ops.computer);
+        wevt_field_get_string_utf8(&content[EvtSystemProviderName], &log->ops.provider);
+        wevt_get_uuid_by_type(&content[EvtSystemProviderGuid], &ev->provider);
+        wevt_get_uuid_by_type(&content[EvtSystemActivityID], &ev->activity_id);
+        wevt_get_uuid_by_type(&content[EvtSystemRelatedActivityID], &ev->related_activity_id);
+        wevt_field_get_sid(&content[EvtSystemUserID], &log->ops.user);
 
-        PROVIDER_META_HANDLE *h = log->provider =
-                                          provider_get(ev->provider, content[FIELD_PROVIDER_NAME].StringVal);
+        PROVIDER_META_HANDLE *p = log->provider =
+                provider_get(ev->provider, content[EvtSystemProviderName].StringVal);
 
-        wevt_get_level(log, ev, h);
-        wevt_get_task(log, ev, h);
-        wevt_get_opcode(log, ev, h);
-        wevt_get_keyword(log, ev, h);
+        ev->platform = provider_get_platform(p);
 
-        if(log->type & WEVT_QUERY_EVENT_DATA)
-            evt_variant_to_buffer(log->ops.event_data, &content[FIELD_EVENT_DATA], "|");
+        wevt_get_level(log, ev, p);
+        wevt_get_task(log, ev, p);
+        wevt_get_opcode(log, ev, p);
+        wevt_get_keyword(log, ev, p);
+
+        if(log->type & WEVT_QUERY_EVENT_DATA) {
+            EvtFormatMessage_Xml_utf8(&log->ops.unicode, log->provider, log->hEvent, &log->ops.xml);
+            EvtFormatMessage_Event_utf8(&log->ops.unicode, log->provider, log->hEvent, &log->ops.event);
+        }
     }
 
     ret = true;
@@ -552,23 +507,11 @@ void wevt_query_done(WEVT_LOG *log) {
 // Log management
 
 WEVT_LOG *wevt_openlog6(WEVT_QUERY_TYPE type) {
-    const wchar_t **items;
-    size_t items_count;
-
-    if(type & WEVT_QUERY_EVENT_DATA) {
-        items = RENDER_ITEMS_FTS;
-        items_count = _countof(RENDER_ITEMS_FTS);
-    }
-    else {
-        items = RENDER_ITEMS;
-        items_count = _countof(RENDER_ITEMS);
-    }
-
     WEVT_LOG *log = callocz(1, sizeof(*log));
     log->type = type;
 
     // create the system render
-    log->hRenderContext = EvtCreateRenderContext(items_count, items, EvtRenderContextValues);
+    log->hRenderContext = EvtCreateRenderContext(0, NULL, EvtRenderContextSystem);
     if (!log->hRenderContext) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed, extended info: %s",
                EvtGetExtendedStatus_utf8());
@@ -594,7 +537,6 @@ void wevt_closelog6(WEVT_LOG *log) {
     txt_unicode_cleanup(&log->ops.unicode);
     txt_utf8_cleanup(&log->ops.channel);
     txt_utf8_cleanup(&log->ops.provider);
-    txt_utf8_cleanup(&log->ops.source);
     txt_utf8_cleanup(&log->ops.computer);
     txt_utf8_cleanup(&log->ops.user);
 

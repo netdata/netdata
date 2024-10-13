@@ -147,7 +147,6 @@ typedef enum {
 #define WEVT_FIELD_COMPUTER             "Computer"
 #define WEVT_FIELD_CHANNEL              "Channel"
 #define WEVT_FIELD_PROVIDER             "Provider"
-#define WEVT_FIELD_SOURCE               "Source"
 #define WEVT_FIELD_EVENTRECORDID        "EventRecordID"
 #define WEVT_FIELD_EVENTID              "EventID"
 #define WEVT_FIELD_LEVEL                "Level"

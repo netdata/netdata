@@ -8,8 +8,6 @@
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
 
-#define EVENT_DATA_HIDDEN_FIELD_FOR_FTS "__EVENT_DATA_HIDDEN_FIELD_FOR_FTS__"
-
 #define WEVT_ALWAYS_VISIBLE_KEYS                NULL
 
 #define WEVT_KEYS_EXCLUDED_FROM_FACETS          \
@@ -19,8 +17,7 @@ static bool plugin_should_exit = false;
 
 #define WEVT_KEYS_INCLUDED_IN_FACETS            \
     "|" WEVT_FIELD_COMPUTER                     \
-    "|" WEVT_FIELD_PROVIDER                    \
-    "|" WEVT_FIELD_SOURCE                       \
+    "|" WEVT_FIELD_PROVIDER                     \
     "|" WEVT_FIELD_LEVEL                        \
     "|" WEVT_FIELD_KEYWORDS                     \
     "|" WEVT_FIELD_OPCODE                       \
@@ -251,10 +248,6 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             rq->default_facet | FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
-            facets, WEVT_FIELD_SOURCE,
-            rq->default_facet | FACET_KEY_OPTION_FTS);
-
-    facets_register_key_name(
             facets, WEVT_FIELD_USER,
             rq->default_facet | FACET_KEY_OPTION_FTS);
 
@@ -303,20 +296,26 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             facets, WEVT_FIELD_KEYWORDS "ID",
             FACET_KEY_OPTION_NONE);
 
-    if(query_has_fts(lqs))
+    if(query_has_fts(lqs)) {
         facets_register_key_name(
-                facets, EVENT_DATA_HIDDEN_FIELD_FOR_FTS,
-                FACET_KEY_OPTION_HIDDEN | FACET_KEY_OPTION_FTS);
+                facets, WEVT_FIELD_MESSAGE,
+                FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_VISIBLE);
 
-    facets_register_dynamic_key_name(
-        facets, WEVT_FIELD_MESSAGE,
-        FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_VISIBLE,
-        wevt_render_message, NULL);
+        facets_register_key_name(
+                facets, WEVT_FIELD_XML,
+                FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_PRETTY_XML);
+    }
+    else {
+        facets_register_dynamic_key_name(
+                facets, WEVT_FIELD_MESSAGE,
+                FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_MAIN_TEXT | FACET_KEY_OPTION_VISIBLE,
+                wevt_render_message, NULL);
 
-    facets_register_dynamic_key_name(
-            facets, WEVT_FIELD_XML,
-            FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_PRETTY_XML,
-            wevt_render_xml, NULL);
+        facets_register_dynamic_key_name(
+                facets, WEVT_FIELD_XML,
+                FACET_KEY_OPTION_NEVER_FACET | FACET_KEY_OPTION_PRETTY_XML,
+                wevt_render_xml, NULL);
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     facets_register_key_name(
@@ -367,13 +366,6 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
         facets_add_key_value_length(
                 facets, WEVT_FIELD_PROVIDER, sizeof(WEVT_FIELD_PROVIDER) - 1,
                 log->ops.provider.data, log->ops.provider.used - 1);
-    }
-
-    if(log->ops.source.used > 1) {
-        bytes += log->ops.source.used * 2;
-        facets_add_key_value_length(
-            facets, WEVT_FIELD_SOURCE, sizeof(WEVT_FIELD_SOURCE) - 1,
-            log->ops.source.data, log->ops.source.used - 1);
     }
 
     if(log->ops.channel.used > 1) {
@@ -477,7 +469,7 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
 
     {
         static __thread char str[UINT64_HEX_MAX_LENGTH];
-        len = print_uint64_hex_full(str, ev->keyword);
+        len = print_uint64_hex_full(str, ev->keywords);
         bytes += len;
         facets_add_key_value_length(
             facets, WEVT_FIELD_KEYWORDS "ID", sizeof(WEVT_FIELD_KEYWORDS) + 2 - 1, str, len);
@@ -500,13 +492,21 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
     }
 
     if((log->type & WEVT_QUERY_EVENT_DATA) && log->ops.event_data) {
-        bytes += buffer_strlen(log->ops.event_data);
-        facets_add_key_value_length(
-            facets, EVENT_DATA_HIDDEN_FIELD_FOR_FTS, sizeof(EVENT_DATA_HIDDEN_FIELD_FOR_FTS) - 1,
-            buffer_tostring(log->ops.event_data), buffer_strlen(log->ops.event_data));
+        if(log->ops.event.used > 1) {
+            bytes += log->ops.event.used;
+            facets_add_key_value_length(
+                    facets, WEVT_FIELD_MESSAGE, sizeof(WEVT_FIELD_MESSAGE) - 1,
+                    log->ops.event.data, log->ops.event.used - 1);
+        }
+        if(log->ops.xml.used > 1) {
+            bytes += log->ops.xml.used;
+            facets_add_key_value_length(
+                    facets, WEVT_FIELD_XML, sizeof(WEVT_FIELD_XML) - 1,
+                    log->ops.xml.data, log->ops.xml.used - 1);
+        }
     }
-
-    wevt_facets_register_bin_data(log, facets, ev);
+    else
+        wevt_facets_register_bin_data(log, facets, ev);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     facets_add_key_value(facets, "z_level_source", source_to_str(&log->ops.level));

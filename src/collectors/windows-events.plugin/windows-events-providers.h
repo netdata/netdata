@@ -3,6 +3,13 @@
 #ifndef NETDATA_WINDOWS_EVENTS_PROVIDERS_H
 #define NETDATA_WINDOWS_EVENTS_PROVIDERS_H
 
+typedef enum __attribute__((packed)) {
+    WEVT_PLATFORM_UNKNOWN = 0,
+    WEVT_PLATFORM_WEL,
+    WEVT_PLATFORM_ETW,
+    WEVT_PLATFORM_TL,
+} WEVT_PROVIDER_PLATFORM;
+
 #include "windows-events.h"
 
 struct provider_meta_handle;
@@ -27,5 +34,6 @@ bool provider_get_keywords(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t valu
 bool provider_get_level(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value);
 bool provider_get_task(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value);
 bool provider_get_opcode(TXT_UTF8 *dst, PROVIDER_META_HANDLE *h, uint64_t value);
+WEVT_PROVIDER_PLATFORM provider_get_platform(PROVIDER_META_HANDLE *p);
 
 #endif //NETDATA_WINDOWS_EVENTS_PROVIDERS_H

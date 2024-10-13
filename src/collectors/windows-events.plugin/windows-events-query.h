@@ -4,6 +4,7 @@
 #define NETDATA_WINDOWS_EVENTS_QUERY_H
 
 #include "libnetdata/libnetdata.h"
+#include "windows-events.h"
 
 #define BATCH_NEXT_EVENT 500
 
@@ -14,12 +15,15 @@ typedef struct wevt_event {
     uint8_t  opcode;                    // we receive this as 8bit, but providers use 32bit
     uint16_t event_id;                  // This is the template that defines the message to be shown
     uint16_t task;
+    uint16_t qualifiers;
     uint32_t process_id;
     uint32_t thread_id;
-    uint64_t keyword;                  // Categorization of the event
+    uint64_t keywords;                  // Categorization of the event
     ND_UUID  provider;
-    ND_UUID  correlation_activity_id;
+    ND_UUID  activity_id;
+    ND_UUID  related_activity_id;
     nsec_t   created_ns;
+    WEVT_PROVIDER_PLATFORM platform;
 } WEVT_EVENT;
 
 #define WEVT_EVENT_EMPTY (WEVT_EVENT){ .id = 0, .created_ns = 0, }
