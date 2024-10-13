@@ -144,10 +144,14 @@ typedef enum {
 #define WINDOWS_EVENTS_DEFAULT_TIMEOUT 600
 #define WINDOWS_EVENTS_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
 #define WINDOWS_EVENTS_PROGRESS_EVERY_UT (250 * USEC_PER_MS)
-
 #define FUNCTION_PROGRESS_EVERY_ROWS (2000)
 #define FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS (1000)
 #define ANCHOR_DELTA_UT (10 * USEC_PER_SEC)
+
+// run providers release every 5 mins
+#define WINDOWS_EVENTS_RELEASE_PROVIDERS_HANDLES_EVERY_UT (5 * 60 * USEC_PER_SEC)
+// release idle handles that are older than 5 mins
+#define WINDOWS_EVENTS_RELEASE_IDLE_PROVIDER_HANDLES_TIME_UT (5 * 60 * USEC_PER_SEC)
 
 #define WEVT_FIELD_COMPUTER             "Computer"
 #define WEVT_FIELD_CHANNEL              "Channel"

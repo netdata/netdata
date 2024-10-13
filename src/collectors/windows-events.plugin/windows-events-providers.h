@@ -20,6 +20,8 @@ void provider_release(PROVIDER_META_HANDLE *h);
 EVT_HANDLE provider_handle(PROVIDER_META_HANDLE *h);
 PROVIDER_META_HANDLE *provider_dup(PROVIDER_META_HANDLE *h);
 
+void providers_release_unused_handles(void);
+
 const char *provider_get_name(PROVIDER_META_HANDLE *p);
 ND_UUID provider_get_uuid(PROVIDER_META_HANDLE *p);
 

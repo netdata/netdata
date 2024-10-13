@@ -1265,6 +1265,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     const usec_t step_ut = 100 * USEC_PER_MS;
     usec_t send_newline_ut = 0;
     usec_t since_last_scan_ut = WINDOWS_EVENTS_SCAN_EVERY_USEC * 2; // something big to trigger scanning at start
+    usec_t since_last_providers_release_ut = 0;
     const bool tty = isatty(fileno(stdout)) == 1;
 
     heartbeat_t hb;
@@ -1276,7 +1277,13 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
             since_last_scan_ut = 0;
         }
 
+        if(since_last_providers_release_ut > WINDOWS_EVENTS_RELEASE_PROVIDERS_HANDLES_EVERY_UT) {
+            providers_release_unused_handles();
+            since_last_providers_release_ut = 0;
+        }
+
         usec_t dt_ut = heartbeat_next(&hb, step_ut);
+        since_last_providers_release_ut += dt_ut;
         since_last_scan_ut += dt_ut;
         send_newline_ut += dt_ut;
 

@@ -13,6 +13,8 @@ struct provider_meta_handle {
     EVT_HANDLE hMetadata;               // the handle
     struct provider *provider;          // a pointer back to the provider
 
+    usec_t created_monotonic_ut;        // the monotonic timestamp this handle was created
+
     // double linked list
     PROVIDER_META_HANDLE *prev;
     PROVIDER_META_HANDLE *next;
@@ -196,6 +198,7 @@ PROVIDER_META_HANDLE *provider_get(ND_UUID uuid, LPCWSTR providerName) {
     if(!h) {
         h = aral_callocz(pbc.aral_handles);
         h->provider = p;
+        h->created_monotonic_ut = now_monotonic_usec();
         h->hMetadata = EvtOpenPublisherMetadata(
                 NULL,          // Local machine
                 providerName,  // Provider name
@@ -250,6 +253,49 @@ PROVIDER_META_HANDLE *provider_dup(PROVIDER_META_HANDLE *h) {
     return h;
 }
 
+static void provider_meta_handle_delete(PROVIDER_META_HANDLE *h) {
+    PROVIDER *p = h->provider;
+
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->handles, h, prev, next);
+
+    if(h->hMetadata)
+        EvtClose(h->hMetadata);
+
+    aral_freez(pbc.aral_handles, h);
+
+    fatal_assert(pbc.total_handles && p->total_handles && p->available_handles);
+
+    pbc.total_handles--;
+    p->total_handles--;
+
+    pbc.deleted_handles++;
+    p->deleted_handles++;
+
+    p->available_handles--;
+}
+
+void providers_release_unused_handles(void) {
+    usec_t now_ut = now_monotonic_usec();
+
+    spinlock_lock(&pbc.spinlock);
+    for(size_t i = 0; i < pbc.hashtable.size ; i++) {
+        SIMPLE_HASHTABLE_SLOT_PROVIDER *slot = &pbc.hashtable.hashtable[i];
+        PROVIDER *p = SIMPLE_HASHTABLE_SLOT_DATA(slot);
+        if(!p) continue;
+
+        PROVIDER_META_HANDLE *h = p->handles;
+        while(h) {
+            PROVIDER_META_HANDLE *next = h->next;
+
+            if(!h->locks && (now_ut - h->created_monotonic_ut) >= WINDOWS_EVENTS_RELEASE_IDLE_PROVIDER_HANDLES_TIME_UT)
+                provider_meta_handle_delete(h);
+
+            h = next;
+        }
+    }
+    spinlock_unlock(&pbc.spinlock);
+}
+
 void provider_release(PROVIDER_META_HANDLE *h) {
     if(!h) return;
     pid_t me = gettid_cached();
@@ -262,21 +308,8 @@ void provider_release(PROVIDER_META_HANDLE *h) {
         h->owner = 0;
 
         if(++p->available_handles > MAX_OPEN_HANDLES_PER_PROVIDER) {
-            // there are multiple handles on this provider
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->handles, h, prev, next);
-
-            if(h->hMetadata)
-                EvtClose(h->hMetadata);
-
-            aral_freez(pbc.aral_handles, h);
-
-            pbc.total_handles--;
-            p->total_handles--;
-
-            pbc.deleted_handles++;
-            p->deleted_handles++;
-
-            p->available_handles--;
+            // there are too many idle handles on this provider
+            provider_meta_handle_delete(h);
         }
         else if(h->next) {
             // it is not the last, put it at the end
