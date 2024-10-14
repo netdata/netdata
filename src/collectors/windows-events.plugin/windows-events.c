@@ -327,7 +327,7 @@ static const char *source_to_str(TXT_UTF8 *txt) {
 }
 #endif
 
-static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUERY_SOURCE *src, usec_t *msg_ut __maybe_unused, WEVT_EVENT *ev) {
+static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, usec_t *msg_ut __maybe_unused, WEVT_EVENT *ev) {
     size_t len, bytes = log->ops.content.used;
 
     if(log->ops.provider.used > 1) {
@@ -349,12 +349,6 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
         facets_add_key_value_length(
             facets, WEVT_FIELD_CHANNEL, sizeof(WEVT_FIELD_CHANNEL) - 1,
             log->ops.channel.data, log->ops.channel.used - 1);
-    }
-    else {
-        bytes += src->fullname_len * 2;
-        facets_add_key_value_length(
-            facets, WEVT_FIELD_CHANNEL, sizeof(WEVT_FIELD_CHANNEL) - 1,
-            src->fullname, src->fullname_len);
     }
 
     {
@@ -510,7 +504,6 @@ static void send_progress_update(LOGS_QUERY_STATUS *lqs, size_t current_row_coun
 
 static WEVT_QUERY_STATUS wevt_query_backward(
         WEVT_LOG *log, BUFFER *wb __maybe_unused, FACETS *facets,
-        LOGS_QUERY_SOURCE *src,
         LOGS_QUERY_STATUS *lqs)
 {
     usec_t start_ut = lqs->query.start_ut;
@@ -519,9 +512,6 @@ static WEVT_QUERY_STATUS wevt_query_backward(
 
 //    lqs->c.query_file.start_ut = start_ut;
 //    lqs->c.query_file.stop_ut = stop_ut;
-
-    if(!wevt_query(log, channel2unicode(src->fullname), lqs->c.query, EvtQueryReverseDirection))
-        return WEVT_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
     usec_t latest_msg_ut = 0; // the biggest timestamp we have seen so far
@@ -563,7 +553,7 @@ static WEVT_QUERY_STATUS wevt_query_backward(
 //                                             facets_row_candidate_to_keep(facets, msg_ut));
 //
 //        if(sample == SAMPLING_FULL) {
-            bytes += wevt_process_event(log, facets, src, &msg_ut, &e);
+            bytes += wevt_process_event(log, facets, &msg_ut, &e);
 
             // make sure each line gets a unique timestamp
             if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
@@ -624,7 +614,6 @@ static WEVT_QUERY_STATUS wevt_query_backward(
 
 static WEVT_QUERY_STATUS wevt_query_forward(
         WEVT_LOG *log, BUFFER *wb __maybe_unused, FACETS *facets,
-        LOGS_QUERY_SOURCE *src,
         LOGS_QUERY_STATUS *lqs)
 {
     usec_t start_ut = lqs->query.start_ut;
@@ -633,9 +622,6 @@ static WEVT_QUERY_STATUS wevt_query_forward(
 
 //    lqs->c.query_file.start_ut = start_ut;
 //    lqs->c.query_file.stop_ut = stop_ut;
-
-    if(!wevt_query(log, channel2unicode(src->fullname), lqs->c.query, EvtQueryForwardDirection))
-        return WEVT_FAILED_TO_SEEK;
 
     size_t errors_no_timestamp = 0;
     usec_t latest_msg_ut = 0; // the biggest timestamp we have seen so far
@@ -677,7 +663,7 @@ static WEVT_QUERY_STATUS wevt_query_forward(
 //                                             facets_row_candidate_to_keep(facets, msg_ut));
 //
 //        if(sample == SAMPLING_FULL) {
-            bytes += wevt_process_event(log, facets, src, &msg_ut, &e);
+            bytes += wevt_process_event(log, facets, &msg_ut, &e);
 
             // make sure each line gets a unique timestamp
             if(unlikely(msg_ut >= last_usec_from && msg_ut <= last_usec_to))
@@ -736,224 +722,37 @@ static WEVT_QUERY_STATUS wevt_query_forward(
     return status;
 }
 
-static WEVT_QUERY_STATUS wevt_query_one_channel(
-        WEVT_LOG *log,
-        BUFFER *wb, FACETS *facets,
-        LOGS_QUERY_SOURCE *src,
-        LOGS_QUERY_STATUS *lqs) {
-
-    errno_clear();
-
-    WEVT_QUERY_STATUS status;
-    if(lqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD)
-        status = wevt_query_forward(log, wb, facets, src, lqs);
-    else
-        status = wevt_query_backward(log, wb, facets, src, lqs);
-
-    return status;
-}
-
-static bool source_is_mine(LOGS_QUERY_SOURCE *src, LOGS_QUERY_STATUS *lqs) {
-    if((lqs->rq.source_type == WEVTS_NONE && !lqs->rq.sources) || (src->source_type & lqs->rq.source_type) ||
-       (lqs->rq.sources && simple_pattern_matches(lqs->rq.sources, string2str(src->source)))) {
-
-        if(!src->msg_last_ut)
-            // the file is not scanned yet, or the timestamps have not been updated,
-            // so we don't know if it can contribute or not - let's add it.
-            return true;
-
-        usec_t anchor_delta = ANCHOR_DELTA_UT;
-        usec_t first_ut = src->msg_first_ut - anchor_delta;
-        usec_t last_ut = src->msg_last_ut + anchor_delta;
-
-        if(last_ut >= lqs->rq.after_ut && first_ut <= lqs->rq.before_ut)
-            return true;
-    }
-
-    return false;
-}
-
 static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs __maybe_unused) {
     // make sure the sources list is updated
     wevt_sources_scan();
 
-    lqs->c.query = wevt_generate_query_no_xpath(lqs, wb);
-    if(!lqs->c.query)
-        return rrd_call_function_error(wb, "failed to generate query", HTTP_RESP_INTERNAL_SERVER_ERROR);
-
     FACETS *facets = lqs->facets;
-
-    WEVT_QUERY_STATUS status = WEVT_NO_CHANNEL_MATCHED;
-
-    lqs->c.files_matched = 0;
-    lqs->c.file_working = 0;
-    lqs->c.rows_useful = 0;
-    lqs->c.rows_read = 0;
-    lqs->c.bytes_read = 0;
-
-    size_t files_used = 0;
-    size_t files_max = dictionary_entries(wevt_sources);
-    const DICTIONARY_ITEM *file_items[files_max];
-
-    // count the files
-    bool files_are_newer = false;
-    LOGS_QUERY_SOURCE *src;
-    dfe_start_read(wevt_sources, src) {
-        if(!source_is_mine(src, lqs))
-            continue;
-
-        file_items[files_used++] = dictionary_acquired_item_dup(wevt_sources, src_dfe.item);
-
-        if(src->msg_last_ut > lqs->rq.if_modified_since)
-            files_are_newer = true;
-
-        lqs->c.progress.entries.total += src->entries;
-    }
-    dfe_done(jf);
-
-    lqs->c.files_matched = files_used;
-
-    if(lqs->rq.if_modified_since && !files_are_newer) {
-        // release the files
-        for(size_t f = 0; f < files_used ;f++)
-            dictionary_acquired_item_release(wevt_sources, file_items[f]);
-
-        return rrd_call_function_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
-    }
-
-    // sort the files, so that they are optimal for facets
-    if(files_used >= 2) {
-        if (lqs->rq.direction == FACETS_ANCHOR_DIRECTION_BACKWARD)
-            qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *),
-                  wevt_sources_dict_items_backward_compar);
-        else
-            qsort(file_items, files_used, sizeof(const DICTIONARY_ITEM *),
-                  wevt_sources_dict_items_forward_compar);
-    }
-
-    bool partial = false;
-    usec_t query_started_ut = now_monotonic_usec();
-    usec_t started_ut = query_started_ut;
-    usec_t ended_ut = started_ut;
-    usec_t duration_ut, max_duration_ut = 0;
 
     WEVT_LOG *log = wevt_openlog6();
     if(!log) {
-        // release the files
-        for(size_t f = 0; f < files_used ;f++)
-            dictionary_acquired_item_release(wevt_sources, file_items[f]);
-
         netdata_log_error("WINDOWS EVENTS: cannot open windows event log");
         return rrd_call_function_error(wb, "cannot open windows events log", HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
 
-    // sampling_query_init(lqs, facets);
+    if(!wevt_xpath_query_build(lqs))
+        return rrd_call_function_error(wb, "no useful logs, not modified", HTTP_RESP_NOT_MODIFIED);
 
-    buffer_json_member_add_array(wb, "_channels");
-    for(size_t f = 0; f < files_used ;f++) {
-        const char *fullname = dictionary_acquired_item_name(file_items[f]);
-        src = dictionary_acquired_item_value(file_items[f]);
-
-        if(!source_is_mine(src, lqs))
-            continue;
-
-        started_ut = ended_ut;
-
-        // do not even try to do the query if we expect it to pass the timeout
-        if(ended_ut + max_duration_ut * 3 >= *lqs->stop_monotonic_ut) {
-            partial = true;
-            status = WEVT_TIMED_OUT;
-            break;
-        }
-
-        lqs->c.file_working++;
-
-        size_t rows_useful = lqs->c.rows_useful;
-        size_t rows_read = lqs->c.rows_read;
-        size_t bytes_read = lqs->c.bytes_read;
-        size_t matches_setup_ut = lqs->c.matches_setup_ut;
-
-        // sampling_file_init(lqs, src);
-
-        lqs->c.progress.entries.current_query_total = src->entries;
-        WEVT_QUERY_STATUS tmp_status = wevt_query_one_channel(log, wb, facets, src, lqs);
-
-        rows_useful = lqs->c.rows_useful - rows_useful;
-        rows_read = lqs->c.rows_read - rows_read;
-        bytes_read = lqs->c.bytes_read - bytes_read;
-        matches_setup_ut = lqs->c.matches_setup_ut - matches_setup_ut;
-
-        ended_ut = now_monotonic_usec();
-        duration_ut = ended_ut - started_ut;
-
-        if(duration_ut > max_duration_ut)
-            max_duration_ut = duration_ut;
-
-        buffer_json_add_array_item_object(wb); // channel source
-        {
-            // information about the file
-            buffer_json_member_add_string(wb, "_name", fullname);
-            buffer_json_member_add_uint64(wb, "_source_type", src->source_type);
-            buffer_json_member_add_string(wb, "_source", string2str(src->source));
-            buffer_json_member_add_uint64(wb, "_msg_first_ut", src->msg_first_ut);
-            buffer_json_member_add_uint64(wb, "_msg_last_ut", src->msg_last_ut);
-
-            // information about the current use of the file
-            buffer_json_member_add_uint64(wb, "duration_ut", ended_ut - started_ut);
-            buffer_json_member_add_uint64(wb, "rows_read", rows_read);
-            buffer_json_member_add_uint64(wb, "rows_useful", rows_useful);
-            buffer_json_member_add_double(wb, "rows_per_second", (double) rows_read / (double) duration_ut * (double) USEC_PER_SEC);
-            buffer_json_member_add_uint64(wb, "bytes_read", bytes_read);
-            buffer_json_member_add_double(wb, "bytes_per_second", (double) bytes_read / (double) duration_ut * (double) USEC_PER_SEC);
-            buffer_json_member_add_uint64(wb, "duration_matches_ut", matches_setup_ut);
-
-            // if(lqs->rq.sampling) {
-            //     buffer_json_member_add_object(wb, "_sampling");
-            //     {
-            //         buffer_json_member_add_uint64(wb, "sampled", lqs->c.samples_per_file.sampled);
-            //         buffer_json_member_add_uint64(wb, "unsampled", lqs->c.samples_per_file.unsampled);
-            //         buffer_json_member_add_uint64(wb, "estimated", lqs->c.samples_per_file.estimated);
-            //     }
-            //     buffer_json_object_close(wb); // _sampling
-            // }
-        }
-        buffer_json_object_close(wb); // channel source
-
-        bool stop = false;
-        switch(tmp_status) {
-            case WEVT_OK:
-            case WEVT_NO_CHANNEL_MATCHED:
-                status = (status == WEVT_OK) ? WEVT_OK : tmp_status;
-                break;
-
-            case WEVT_FAILED_TO_OPEN:
-            case WEVT_FAILED_TO_SEEK:
-                partial = true;
-                if(status == WEVT_NO_CHANNEL_MATCHED)
-                    status = tmp_status;
-                break;
-
-            case WEVT_CANCELLED:
-            case WEVT_TIMED_OUT:
-                partial = true;
-                stop = true;
-                status = tmp_status;
-                break;
-
-            case WEVT_NOT_MODIFIED:
-                internal_fatal(true, "this should never be returned here");
-                break;
-        }
-
-        if(stop)
-            break;
+    if(!wevt_query(log, NULL, lqs->c.query_unicode,
+            lqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD ? EvtQueryForwardDirection : EvtQueryReverseDirection)) {
+        netdata_log_error("WINDOWS EVENTS: cannot execute Xpath query");
+        return rrd_call_function_error(wb, "cannot execute Xpath query", HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
-    buffer_json_array_close(wb); // _channels
 
-    // release the files
-    for(size_t f = 0; f < files_used ;f++)
-        dictionary_acquired_item_release(wevt_sources, file_items[f]);
+    WEVT_QUERY_STATUS status;
+    if(lqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD)
+        status = wevt_query_forward(log, wb, facets, lqs);
+    else
+        status = wevt_query_backward(log, wb, facets, lqs);
 
+    // sampling_query_init(lqs, facets);
+    // sampling_file_init(lqs, src);
+
+    bool partial = false;
     switch (status) {
         case WEVT_OK:
             if(lqs->rq.if_modified_since && !lqs->c.rows_useful)
@@ -961,20 +760,11 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
             break;
 
         case WEVT_TIMED_OUT:
-        case WEVT_NO_CHANNEL_MATCHED:
+            partial = true;
             break;
 
         case WEVT_CANCELLED:
             return rrd_call_function_error(wb, "client closed connection", HTTP_RESP_CLIENT_CLOSED_REQUEST);
-
-        case WEVT_NOT_MODIFIED:
-            return rrd_call_function_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
-
-        case WEVT_FAILED_TO_OPEN:
-            return rrd_call_function_error(wb, "failed to open event log", HTTP_RESP_INTERNAL_SERVER_ERROR);
-
-        case WEVT_FAILED_TO_SEEK:
-            return rrd_call_function_error(wb, "failed to execute event log query", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
         default:
             return rrd_call_function_error(wb, "unknown status", HTTP_RESP_INTERNAL_SERVER_ERROR);
@@ -1123,6 +913,8 @@ void function_windows_events(const char *transaction, char *function, usec_t *st
     pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
 
+    buffer_free(lqs->c.query);
+    freez(lqs->c.query_unicode);
     lqs_cleanup(lqs);
 }
 
