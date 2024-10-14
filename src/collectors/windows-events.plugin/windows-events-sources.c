@@ -137,8 +137,6 @@
 //    }
 //};
 
-#include "libnetdata/template-enum.h"
-
 ENUM_STR_MAP_DEFINE(WEVT_SOURCE_TYPE) = {
     { .id = WEVTS_ALL,                      .name = WEVT_SOURCE_ALL_NAME },
     { .id = WEVTS_ADMIN,                    .name = WEVT_SOURCE_ALL_ADMIN_NAME },
