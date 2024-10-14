@@ -85,6 +85,85 @@ static bool check_claim_param(const char *s) {
     return true;
 }
 
+static bool agent_can_be_claimed(void) {
+    CLOUD_STATUS status = cloud_status();
+    switch(status) {
+        case CLOUD_STATUS_AVAILABLE:
+        case CLOUD_STATUS_OFFLINE:
+        case CLOUD_STATUS_INDIRECT:
+            return true;
+
+        case CLOUD_STATUS_BANNED:
+        case CLOUD_STATUS_ONLINE:
+            return false;
+    }
+}
+
+typedef enum {
+    CLAIM_RESP_INFO,
+    CLAIM_RESP_ERROR,
+    CLAIM_RESP_ACTION_OK,
+    CLAIM_RESP_ACTION_FAILED,
+} CLAIM_RESPONSE;
+
+static void claim_add_user_info_command(BUFFER *wb) {
+    const char *filename = netdata_random_session_id_get_filename();
+    CLEAN_BUFFER *os_cmd = buffer_create(0, NULL);
+
+    const char *os_filename;
+    const char *os_prefix;
+    const char *os_quote;
+    const char *os_message;
+
+#if defined(OS_WINDOWS)
+    char win_path[MAX_PATH];
+    cygwin_conv_path(CCP_POSIX_TO_WIN_A, filename, win_path, sizeof(win_path));
+    os_filename = win_path;
+    os_prefix = "more";
+    os_message = "We need to verify this Windows server is yours. So, open a Command Prompt on this server to run the command. It will give you a UUID. Copy and paste this UUID to this box:";
+#else
+    os_filename = filename;
+    os_prefix = "sudo cat";
+    os_message = "We need to verify this server is yours. SSH to this server and run this command. It will give you a UUID. Copy and paste this UUID to this box:";
+#endif
+
+    // add quotes only when the filename has a space
+    if(strchr(os_filename, ' '))
+        os_quote = "\"";
+    else
+        os_quote = "";
+
+    buffer_sprintf(os_cmd, "%s %s%s%s", os_prefix, os_quote, os_filename, os_quote);
+
+    buffer_json_member_add_string(wb, "key_filename", os_filename);
+    buffer_json_member_add_string(wb, "cmd", buffer_tostring(os_cmd));
+    buffer_json_member_add_string(wb, "help", os_message);
+}
+
+static int claim_json_response(BUFFER *wb, CLAIM_RESPONSE response, const char *msg) {
+    time_t now_s = now_realtime_sec();
+    buffer_reset(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    if(response != CLAIM_RESP_INFO) {
+        // this is not an info, so it needs a status report
+        buffer_json_member_add_boolean(wb, "success", response == CLAIM_RESP_ACTION_OK ? true : false);
+        buffer_json_member_add_string_or_empty(wb, "message", msg ? msg : "");
+    }
+
+    buffer_json_cloud_status(wb, now_s);
+
+    if(response != CLAIM_RESP_ACTION_OK) {
+        buffer_json_member_add_boolean(wb, "can_be_claimed", agent_can_be_claimed());
+        claim_add_user_info_command(wb);
+    }
+
+    buffer_json_agents_v2(wb, NULL, now_s, false, false);
+    buffer_json_finalize(wb);
+
+    return (response == CLAIM_RESP_ERROR) ? HTTP_RESP_BAD_REQUEST : HTTP_RESP_OK;
+}
+
 int api_v2_claim(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
     char *key = NULL;
     char *token = NULL;
@@ -110,103 +189,36 @@ int api_v2_claim(RRDHOST *host __maybe_unused, struct web_client *w, char *url) 
     }
 
     BUFFER *wb = w->response.data;
-    buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
-    time_t now_s = now_realtime_sec();
-    CLOUD_STATUS status = buffer_json_cloud_status(wb, now_s);
-
-    bool can_be_claimed = false;
-    switch(status) {
-        case CLOUD_STATUS_AVAILABLE:
-        case CLOUD_STATUS_OFFLINE:
-        case CLOUD_STATUS_INDIRECT:
-            can_be_claimed = true;
-            break;
-
-        case CLOUD_STATUS_BANNED:
-        case CLOUD_STATUS_ONLINE:
-            can_be_claimed = false;
-            break;
-    }
-
-    buffer_json_member_add_boolean(wb, "can_be_claimed", can_be_claimed);
+    CLAIM_RESPONSE response = CLAIM_RESP_INFO;
+    const char *msg = NULL;
+    bool can_be_claimed = agent_can_be_claimed();
 
     if(can_be_claimed && key) {
         if(!netdata_random_session_id_matches(key)) {
-            buffer_reset(wb);
-            buffer_strcat(wb, "invalid key");
             netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
-            return HTTP_RESP_FORBIDDEN;
+            return claim_json_response(wb, CLAIM_RESP_ERROR, "invalid key");
         }
 
         if(!token || !base_url || !check_claim_param(token) || !check_claim_param(base_url) || (rooms && !check_claim_param(rooms))) {
-            buffer_reset(wb);
-            buffer_strcat(wb, "invalid parameters");
             netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
-            return HTTP_RESP_BAD_REQUEST;
+            return claim_json_response(wb, CLAIM_RESP_ERROR, "invalid parameters");
         }
 
         netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
 
-        bool success = false;
-        const char *msg;
         if(claim_agent(base_url, token, rooms, cloud_config_proxy_get(), cloud_config_insecure_get())) {
             msg = "ok";
-            success = true;
             can_be_claimed = false;
-            status = claim_reload_and_wait_online();
+            claim_reload_and_wait_online();
+            response = CLAIM_RESP_ACTION_OK;
         }
-        else
+        else {
             msg = claim_agent_failure_reason_get();
-
-        // our status may have changed
-        // refresh the status in our output
-        buffer_flush(wb);
-        buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-        now_s = now_realtime_sec();
-        buffer_json_cloud_status(wb, now_s);
-
-        // and this is the status of the claiming command we run
-        buffer_json_member_add_boolean(wb, "success", success);
-        buffer_json_member_add_string_or_empty(wb, "message", msg);
+            response = CLAIM_RESP_ACTION_FAILED;
+        }
     }
 
-    if(can_be_claimed) {
-        const char *filename = netdata_random_session_id_get_filename();
-        CLEAN_BUFFER *buffer = buffer_create(0, NULL);
-
-        const char *os_filename;
-        const char *os_prefix;
-        const char *os_quote;
-        const char *os_message;
-
-#if defined(OS_WINDOWS)
-        char win_path[MAX_PATH];
-        cygwin_conv_path(CCP_POSIX_TO_WIN_A, filename, win_path, sizeof(win_path));
-        os_filename = win_path;
-        os_prefix = "more";
-        os_message = "We need to verify this Windows server is yours. So, open a Command Prompt on this server to run the command. It will give you a UUID. Copy and paste this UUID to this box:";
-#else
-        os_filename = filename;
-        os_prefix = "sudo cat";
-        os_message = "We need to verify this server is yours. SSH to this server and run this command. It will give you a UUID. Copy and paste this UUID to this box:";
-#endif
-
-        // add quotes only when the filename has a space
-        if(strchr(os_filename, ' '))
-            os_quote = "\"";
-        else
-            os_quote = "";
-
-        buffer_sprintf(buffer, "%s %s%s%s", os_prefix, os_quote, os_filename, os_quote);
-        buffer_json_member_add_string(wb, "key_filename", os_filename);
-        buffer_json_member_add_string(wb, "cmd", buffer_tostring(buffer));
-        buffer_json_member_add_string(wb, "help", os_message);
-    }
-
-    buffer_json_agents_v2(wb, NULL, now_s, false, false);
-    buffer_json_finalize(wb);
-
-    return HTTP_RESP_OK;
+    return claim_json_response(wb, response, msg);
 }
+
