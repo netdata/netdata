@@ -101,7 +101,7 @@ func (a *Apcupsd) collectStatus(mx map[string]int64, resp []byte) error {
 		mx["timeleft"] = int64(*st.timeleft * 60 * precision) // to seconds
 	}
 	if st.nompower != nil && st.loadpct != nil {
-		mx["load"] = int64(*st.nompower * *st.loadpct / 100)
+		mx["load"] = int64(*st.nompower * *st.loadpct)
 	}
 	if st.battdate != "" {
 		if v, err := battdateSecondsAgo(st.battdate); err != nil {
