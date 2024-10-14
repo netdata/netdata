@@ -29,6 +29,7 @@ def cleanup():
         if "integrations" in str(element) and not "metadata.yaml" in str(element):
             shutil.rmtree(element)
 
+
 def generate_category_from_name(category_fragment, category_array):
     """
     Takes a category ID in splitted form ("." as delimiter) and the array of the categories, and returns the proper category name that Learn expects.
@@ -46,7 +47,7 @@ def generate_category_from_name(category_fragment, category_array):
                 try:
                     # print("equals")
                     # print(fragment, category_fragment[i+1])
-                    dummy_id = dummy_id + "." + category_fragment[i+1]
+                    dummy_id = dummy_id + "." + category_fragment[i + 1]
                     # print(dummy_id)
                 except IndexError:
                     return category_name.split("/", 1)[1]
@@ -141,7 +142,7 @@ def create_overview(integration, filename, overview_key_name="overview"):
             return f"""{first_overview_part}{rest_overview_part}
 """
     else:
-       return f"""# {integration['meta']['name']}
+        return f"""# {integration['meta']['name']}
 
 <img src="https://netdata.cloud/img/{filename}" width="150"/>
 """
@@ -156,7 +157,8 @@ def build_readme_from_integration(integration, mode=''):
             meta_yaml = integration['edit_link'].replace("blob", "edit")
             sidebar_label = integration['meta']['monitored_instance']['name']
             learn_rel_path = generate_category_from_name(
-                integration['meta']['monitored_instance']['categories'][0].split("."), categories).replace("Data Collection", "Collecting Metrics")
+                integration['meta']['monitored_instance']['categories'][0].split("."), categories).replace(
+                "Data Collection", "Collecting Metrics")
             most_popular = integration['meta']['most_popular']
 
             # build the markdown string
@@ -258,7 +260,7 @@ endmeta-->
 
         except Exception as e:
             print("Exception in notification md construction", e, integration['id'])
-    
+
     elif mode == 'cloud-notification':
         try:
             # initiate the variables for the notification method
@@ -404,7 +406,7 @@ def write_to_file(path, md, meta_yaml, sidebar_label, community, mode='default')
     elif mode == 'agent-notification':
         # add custom_edit_url as the md file, so we can have uniqueness in the ingest script
         # afterwards the ingest will replace this metadata with meta_yaml
-        
+
         md = add_custom_edit_url(md, meta_yaml, sidebar_label, mode='agent-notification')
 
         finalpath = f'{path}/README.md'
@@ -431,7 +433,7 @@ def write_to_file(path, md, meta_yaml, sidebar_label, community, mode='default')
         md = add_custom_edit_url(md, meta_yaml, sidebar_label, mode='cloud-authentication')
 
         finalpath = f'{path}/integrations/{name}.md'
-        
+
         try:
             clean_and_write(
                 md,
@@ -470,7 +472,6 @@ cleanup()
 
 categories, integrations = read_integrations_js('integrations/integrations.js')
 
-
 # Iterate through every integration
 for integration in integrations:
 
@@ -495,22 +496,21 @@ for integration in integrations:
             meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
                 integration, mode='agent-notification')
             path = build_path(meta_yaml)
-            write_to_file(path, md, meta_yaml, sidebar_label, community,  mode='agent-notification')
+            write_to_file(path, md, meta_yaml, sidebar_label, community, mode='agent-notification')
 
-        
+
         elif integration['integration_type'] == "cloud_notification":
 
             meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
                 integration, mode='cloud-notification')
             path = build_path(meta_yaml)
-            write_to_file(path, md, meta_yaml, sidebar_label, community,  mode='cloud-notification')
+            write_to_file(path, md, meta_yaml, sidebar_label, community, mode='cloud-notification')
 
         elif integration['integration_type'] == "authentication":
 
             meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
                 integration, mode='authentication')
             path = build_path(meta_yaml)
-            write_to_file(path, md, meta_yaml, sidebar_label, community,  mode='authentication')
-
+            write_to_file(path, md, meta_yaml, sidebar_label, community, mode='authentication')
 
 make_symlinks(symlink_dict)
