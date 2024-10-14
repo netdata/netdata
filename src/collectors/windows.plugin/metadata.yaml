@@ -278,7 +278,7 @@ modules:
       plugin_name: windows.plugin
       module_name: PerflibWebService
       monitored_instance:
-        name: IIS (Internet Information Services) statistics
+        name: IIS
         link: "https://www.iis.net/"
         categories:
           - data-collection.windows-systems
