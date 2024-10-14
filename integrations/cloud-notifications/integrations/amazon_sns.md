@@ -9,12 +9,7 @@ endmeta-->
 
 # Amazon SNS
 
-
 <img src="https://netdata.cloud/img/awssns.png" width="150"/>
-
-
-You can configure notification delivery to AWS SNS from the Netdata Cloud UI.
-
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 

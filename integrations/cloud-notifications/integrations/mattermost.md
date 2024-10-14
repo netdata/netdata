@@ -9,12 +9,7 @@ endmeta-->
 
 # Mattermost
 
-
 <img src="https://netdata.cloud/img/mattermost.png" width="150"/>
-
-
-You can configure notification delivery to Mattermost from the Netdata Cloud UI.
-
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
