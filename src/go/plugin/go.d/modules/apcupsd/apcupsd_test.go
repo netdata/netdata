@@ -144,7 +144,7 @@ func TestApcupsd_Collect(t *testing.T) {
 				"input_voltage_max":                 23920,
 				"input_voltage_min":                 23400,
 				"itemp":                             3279,
-				"load":                              5500,
+				"load":                              5580,
 				"load_percent":                      930,
 				"output_voltage":                    23660,
 				"output_voltage_nominal":            23000,
