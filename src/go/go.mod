@@ -12,7 +12,7 @@ require (
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/axiomhq/hyperloglog v0.1.0
 	github.com/blang/semver/v4 v4.0.0
-	github.com/bmatcuk/doublestar/v4 v4.6.1
+	github.com/bmatcuk/doublestar/v4 v4.7.1
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.5.0
@@ -42,11 +42,11 @@ require (
 	github.com/prometheus/common v0.60.0
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/redis/go-redis/v9 v9.6.1
-	github.com/sijms/go-ora/v2 v2.8.20
+	github.com/sijms/go-ora/v2 v2.8.22
 	github.com/stretchr/testify v1.9.0
 	github.com/tidwall/gjson v1.18.0
 	github.com/valyala/fastjson v1.6.4
-	github.com/vmware/govmomi v0.43.0
+	github.com/vmware/govmomi v0.44.1
 	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/net v0.30.0
 	golang.org/x/text v0.19.0
