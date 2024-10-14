@@ -257,42 +257,15 @@ Function NetdataUninstallRegistry
         end:
 FunctionEnd
 
-Section "Install Netdata"
-	SetOutPath $INSTDIR
-	SetCompress off
-
-	File /r "C:\msys64\opt\netdata\*.*"
-
-	ClearErrors
-        nsExec::ExecToLog '$SYSDIR\sc.exe create Netdata binPath= "$INSTDIR\usr\bin\netdata.exe" start= delayed-auto'
-        pop $0
-        ${If} $0 != 0
-	    DetailPrint "Warning: Failed to create Netdata service."
-        ${EndIf}
-
-	ClearErrors
-        nsExec::ExecToLog '$SYSDIR\sc.exe description Netdata "Real-time system monitoring service"'
-        pop $0
-        ${If} $0 != 0
-	    DetailPrint "Warning: Failed to add Netdata service description."
-        ${EndIf}
-
-        WriteUninstaller "$INSTDIR\Uninstall.exe"
-
-        Call NetdataUninstallRegistry
-
-        ; Check if manifest file exists before running ETW setup
-        IfFileExists "$INSTDIR\usr\bin\wevt_netdata_manifest.xml" ManifestExists ManifestNotExists
-
-ManifestExists:
-    ; Check if certutil is available
-    nsExec::ExecToStack 'where certutil'
-    Pop $R0
-    StrCmp $R0 "" NoCertUtil FoundCertUtil
+Function InstallDLL
+        ; Check if certutil is available
+        nsExec::ExecToStack 'where certutil'
+        Pop $R0
+        StrCmp $R0 "" NoCertUtil FoundCertUtil
 
     NoCertUtil:
         DetailPrint "certutil not found, assuming files are different."
-        Goto CopyDLL
+        Goto RetryCopyDLL
 
     FoundCertUtil:
         ; Calculate hash of the existing DLL
@@ -303,38 +276,75 @@ ManifestExists:
         nsExec::ExecToStack 'certutil -hashfile "$INSTDIR\usr\bin\wevt_netdata.dll" MD5'
         Pop $R1
 
-        StrCmp $R0 $R1 NoNeedToCopy
+        StrCmp $R0 $R1 End
 
-    CopyDLL:
-        DetailPrint "Files differ or certutil not available, copying new DLL."
-        CopyFiles /SILENT "$INSTDIR\usr\bin\wevt_netdata_manifest.xml" "$SYSDIR"
-        RetryCopyDLL:
+    RetryCopyDLL:
         ClearErrors
         CopyFiles /SILENT "$INSTDIR\usr\bin\wevt_netdata.dll" "$SYSDIR"
         IfErrors RetryPrompt ContinueCopy
-        RetryPrompt:
-            MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Failed to copy wevt_netdata.dll because the Event Viewer is using the log. Please close the Event Viewer and press Retry."
-            StrCmp $R0 IDRETRY RetryCopyDLL
-            StrCmp $R0 IDCANCEL ExitInstall
 
-    NoNeedToCopy:
-        DetailPrint "Files are identical, no need to copy."
+    RetryPrompt:
+        MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Failed to copy wevt_netdata.dll probably because it is in use. Please close the Event Viewer (or other Event Log applications) and press Retry."
+        StrCmp $R0 IDRETRY RetryCopyDLL
+        StrCmp $R0 IDCANCEL ExitInstall
 
-    ContinueCopy:
-        ; Set access permissions for wevt_netdata.dll
+        Goto End
+
+    ExitInstall:
+        Abort
+
+    End:
         nsExec::ExecToLog 'icacls "$SYSDIR\wevt_netdata.dll" /grant "NT SERVICE\EventLog":R'
+FunctionEnd
+
+Function InstallManifest
+    IfFileExists "$INSTDIR\usr\bin\wevt_netdata_manifest.xml" RetryCopyManifest End
+
+    RetryCopyManifest:
+        ClearErrors
+        CopyFiles /SILENT "$INSTDIR\usr\bin\wevt_netdata_manifest.xml" "$SYSDIR"
+        IfErrors RetryPrompt ContinueCopy
+
+    RetryPrompt:
+        MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Failed to copy wevt_netdata_manifest.xml."
+        StrCmp $R0 IDRETRY RetryCopyManifest
+        StrCmp $R0 IDCANCEL ExitInstall
+
         nsExec::ExecToLog 'wevtutil im "$SYSDIR\wevt_netdata_manifest.xml" "/mf:$SYSDIR\wevt_netdata.dll" "/rf:$SYSDIR\wevt_netdata.dll"'
-        Goto Done
+        Goto End
 
-ManifestNotExists:
-    DetailPrint "Manifest not found, skipping ETW configuration."
-    Goto Done
+    ExitInstall:
+        Abort
 
-ExitInstall:
-    ; Use Abort to stop the installation and clean up
-    Abort
+    End:
+FunctionEnd
 
-Done:
+Section "Install Netdata"
+        SetOutPath $INSTDIR
+        SetCompress off
+
+        File /r "C:\msys64\opt\netdata\*.*"
+
+        ClearErrors
+        nsExec::ExecToLog '$SYSDIR\sc.exe create Netdata binPath= "$INSTDIR\usr\bin\netdata.exe" start= delayed-auto'
+        pop $0
+        ${If} $0 != 0
+        DetailPrint "Warning: Failed to create Netdata service."
+        ${EndIf}
+
+        ClearErrors
+        nsExec::ExecToLog '$SYSDIR\sc.exe description Netdata "Real-time system monitoring service"'
+        pop $0
+        ${If} $0 != 0
+        DetailPrint "Warning: Failed to add Netdata service description."
+        ${EndIf}
+
+        WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+        Call NetdataUninstallRegistry
+        Call InstallDLL
+        Call InstallManifest
+
         StrLen $0 $cloudToken
         StrLen $1 $cloudRooms
         ${If} $0 == 0
