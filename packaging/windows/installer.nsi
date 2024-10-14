@@ -307,6 +307,7 @@ ManifestExists:
 
     CopyDLL:
         DetailPrint "Files differ or certutil not available, copying new DLL."
+        CopyFiles /SILENT "$INSTDIR\usr\bin\wevt_netdata_manifest.xml" "$SYSDIR"
         RetryCopyDLL:
         ClearErrors
         CopyFiles /SILENT "$INSTDIR\usr\bin\wevt_netdata.dll" "$SYSDIR"
