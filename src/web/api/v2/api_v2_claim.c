@@ -203,13 +203,13 @@ static int api_claim(uint8_t version, struct web_client *w, char *url) {
     if(can_be_claimed && key) {
         if(!netdata_random_session_id_matches(key)) {
             netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
-            if(version < 3) claim_txt_response(wb, "invalid key");
+            if(version < 3) return claim_txt_response(wb, "invalid key");
             return claim_json_response(wb, CLAIM_RESP_ERROR, "invalid key");
         }
 
         if(!token || !base_url || !check_claim_param(token) || !check_claim_param(base_url) || (rooms && !check_claim_param(rooms))) {
             netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
-            if(version < 3) claim_txt_response(wb, "invalid parameters");
+            if(version < 3) return claim_txt_response(wb, "invalid parameters");
             return claim_json_response(wb, CLAIM_RESP_ERROR, "invalid parameters");
         }
 
