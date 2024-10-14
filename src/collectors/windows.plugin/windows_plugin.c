@@ -13,23 +13,25 @@ static struct proc_module {
 } win_modules[] = {
 
     // system metrics
-    {.name = "GetSystemUptime",     .dim = "GetSystemUptime",    .enabled = CONFIG_BOOLEAN_YES, .func = do_GetSystemUptime},
-    {.name = "GetSystemRAM",        .dim = "GetSystemRAM",       .enabled = CONFIG_BOOLEAN_YES, .func = do_GetSystemRAM},
+    {.name = "GetSystemUptime",     .dim = "GetSystemUptime",      .enabled = CONFIG_BOOLEAN_YES, .func = do_GetSystemUptime},
+    {.name = "GetSystemRAM",        .dim = "GetSystemRAM",         .enabled = CONFIG_BOOLEAN_YES, .func = do_GetSystemRAM},
 
     // the same is provided by PerflibProcessor, with more detailed analysis
-    //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",     .enabled = CONFIG_BOOLEAN_YES, .func = do_GetSystemCPU},
+    //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",       .enabled = CONFIG_BOOLEAN_YES, .func = do_GetSystemCPU},
 
-    {.name = "PerflibProcesses",    .dim = "PerflibProcesses",   .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibProcesses},
-    {.name = "PerflibProcessor",    .dim = "PerflibProcessor",   .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibProcessor},
-    {.name = "PerflibMemory",       .dim = "PerflibMemory",      .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibMemory},
-    {.name = "PerflibStorage",      .dim = "PerflibStorage",     .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibStorage},
-    {.name = "PerflibNetwork",      .dim = "PerflibNetwork",     .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibNetwork},
-    {.name = "PerflibObjects",      .dim = "PerflibObjects",     .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibObjects},
+    {.name = "PerflibProcesses",    .dim = "PerflibProcesses",     .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibProcesses},
+    {.name = "PerflibProcessor",    .dim = "PerflibProcessor",     .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibProcessor},
+    {.name = "PerflibMemory",       .dim = "PerflibMemory",        .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibMemory},
+    {.name = "PerflibStorage",      .dim = "PerflibStorage",       .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibStorage},
+    {.name = "PerflibNetwork",      .dim = "PerflibNetwork",       .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibNetwork},
+    {.name = "PerflibObjects",      .dim = "PerflibObjects",       .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibObjects},
 
-    {.name = "PerflibThermalZone",  .dim = "PerflibThermalZone", .enabled = CONFIG_BOOLEAN_NO, .func = do_PerflibThermalZone},
+    {.name = "PerflibThermalZone",  .dim = "PerflibThermalZone",   .enabled = CONFIG_BOOLEAN_NO, .func = do_PerflibThermalZone},
 
-    {.name = "PerflibWebService",  .dim = "PerflibWebService",   .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibWebService},
-    {.name = "PerflibMSSQL",  .dim = "PerflibMSSQL", .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibMSSQL},
+    {.name = "PerflibWebService",  .dim = "PerflibWebService",     .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibWebService},
+    {.name = "PerflibMSSQL",  .dim = "PerflibMSSQL",               .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibMSSQL},
+
+    {.name = "PerflibNetFramework",  .dim = "PerflibNetFramework", .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibNetFramework},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}
