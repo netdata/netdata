@@ -27,39 +27,21 @@
         "keywords": {
           "$ref": "./shared.json#/$defs/keywords"
         },
-        "overview": {
+        "global_setup": {
           "type": "object",
-          "description": "General information about the notification method.",
+          "description": "Flags that show which global setup sections are relevant for this notification method.",
           "properties": {
-            "notification_description": {
-              "type": "string",
-              "description": "General description of what the notification method does."
+            "severity_filtering": {
+              "type": "boolean"
             },
-            "notification_limitations": {
-              "type": "string",
-              "description": "Explanation of any limitations of the notification method."
+            "http_proxy": {
+              "type": "boolean"
             }
           },
           "required": [
-            "notification_description",
-            "notification_limitations"
+            "severity_filtering",
+            "http_proxy"
           ]
-        },
-        "global_setup": {
-            "type": "object",
-            "description": "Flags that show which global setup sections are relevant for this notification method.",
-            "properties": {
-                "severity_filtering": {
-                    "type": "boolean"
-                },
-                "http_proxy": {
-                    "type": "boolean"
-                }
-            },
-            "required": [
-                "severity_filtering",
-                "http_proxy"
-            ]
         },
         "setup": {
           "oneOf": [
@@ -79,7 +61,6 @@
         "id",
         "meta",
         "keywords",
-        "overview",
         "setup"
       ]
     }
