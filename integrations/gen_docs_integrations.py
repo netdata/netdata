@@ -1,7 +1,7 @@
 import json
+import re
 import shutil
 from pathlib import Path
-import re
 
 # Dictionary responsible for making the symbolic links at the end of the script's run.
 symlink_dict = {}
@@ -125,26 +125,26 @@ def read_integrations_js(path_to_file):
 
 def create_overview(integration, filename, overview_key_name="overview"):
     # empty overview_key_name to have only image on overview
-    if len(overview_key_name) > 0:
-        split = re.split(r'(#.*\n)', integration[overview_key_name], 1)
+    if not overview_key_name:
+        return f"""# {integration['meta']['name']}
 
-        first_overview_part = split[1]
-        rest_overview_part = split[2]
+<img src="https://netdata.cloud/img/{filename}" width="150"/>
+"""
 
-        if len(filename) > 0:
-            return f"""{first_overview_part}
+    split = re.split(r'(#.*\n)', integration[overview_key_name], 1)
+
+    first_overview_part = split[1]
+    rest_overview_part = split[2]
+
+    if not filename:
+        return f"""{first_overview_part}{rest_overview_part}
+"""
+
+    return f"""{first_overview_part}
 
 <img src="https://netdata.cloud/img/{filename}" width="150"/>
 
 {rest_overview_part}
-"""
-        else:
-            return f"""{first_overview_part}{rest_overview_part}
-"""
-    else:
-        return f"""# {integration['meta']['name']}
-
-<img src="https://netdata.cloud/img/{filename}" width="150"/>
 """
 
 
