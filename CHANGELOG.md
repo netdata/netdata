@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Bump github.com/bmatcuk/doublestar/v4 from 4.6.1 to 4.7.1 in /src/go [\#18768](https://github.com/netdata/netdata/pull/18768) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/sijms/go-ora/v2 from 2.8.20 to 2.8.22 in /src/go [\#18767](https://github.com/netdata/netdata/pull/18767) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/vmware/govmomi from 0.43.0 to 0.44.1 in /src/go [\#18766](https://github.com/netdata/netdata/pull/18766) ([dependabot[bot]](https://github.com/apps/dependabot))
 - SPAWN SERVER: close all open fds on callback [\#18764](https://github.com/netdata/netdata/pull/18764) ([ktsaou](https://github.com/ktsaou))
 - Adjust option \(Windows claim\) [\#18763](https://github.com/netdata/netdata/pull/18763) ([thiagoftsm](https://github.com/thiagoftsm))
 - local-listeners without libmnl [\#18759](https://github.com/netdata/netdata/pull/18759) ([ktsaou](https://github.com/ktsaou))
@@ -277,7 +280,6 @@
 - go.d boinc [\#18398](https://github.com/netdata/netdata/pull/18398) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/boinc [\#18397](https://github.com/netdata/netdata/pull/18397) ([ilyam8](https://github.com/ilyam8))
 - fix warnings in Dockerfile [\#18395](https://github.com/netdata/netdata/pull/18395) ([NicolasCARPi](https://github.com/NicolasCARPi))
-- Use existing ACLK event loop for cloud queries [\#18218](https://github.com/netdata/netdata/pull/18218) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.47.4](https://github.com/netdata/netdata/tree/v1.47.4) (2024-10-09)
 
@@ -431,8 +433,6 @@
 - go.d fix netdata dir path on win under msys [\#18221](https://github.com/netdata/netdata/pull/18221) ([ilyam8](https://github.com/ilyam8))
 - Port Tomcat collector to Go [\#18220](https://github.com/netdata/netdata/pull/18220) ([Ancairon](https://github.com/Ancairon))
 - go.d drop using cancelreader [\#18219](https://github.com/netdata/netdata/pull/18219) ([ilyam8](https://github.com/ilyam8))
-- Support IPV6 when establishing MQTT connection to the cloud [\#18217](https://github.com/netdata/netdata/pull/18217) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#18216](https://github.com/netdata/netdata/pull/18216) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
