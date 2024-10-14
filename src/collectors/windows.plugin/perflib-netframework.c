@@ -146,8 +146,8 @@ static void netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock,
         struct net_framework_instances *p = dictionary_set(processes, windows_shared_buffer, NULL, sizeof(*p));
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRExceptionThrown)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_thrown", windows_shared_buffer);
             if (!p->st_clrexception_thrown) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_thrown", windows_shared_buffer);
                 p->st_clrexception_thrown = rrdset_create_localhost("netframework"
                                                                     , id, NULL
                                                                     , "exceptions"
@@ -182,8 +182,8 @@ static void netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock,
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRExceptionFilters)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_filters", windows_shared_buffer);
             if (!p->st_clrexception_filters) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_filters", windows_shared_buffer);
                 p->st_clrexception_filters = rrdset_create_localhost("netframework"
                                                                     , id, NULL
                                                                     , "exceptions"
@@ -218,8 +218,8 @@ static void netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock,
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRExceptionFinallys)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_finallys", windows_shared_buffer);
             if (!p->st_clrexception_finallys) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_finallys", windows_shared_buffer);
                 p->st_clrexception_finallys = rrdset_create_localhost("netframework"
                                                                       , id, NULL
                                                                       , "exceptions"
@@ -254,8 +254,8 @@ static void netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock,
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRExceptionTotalCatchDepth)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_throw_to_catch_depth", windows_shared_buffer);
             if (!p->st_clrexception_total_catch_depth) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_throw_to_catch_depth", windows_shared_buffer);
                 p->st_clrexception_total_catch_depth = rrdset_create_localhost("netframework"
                                                                                , id, NULL
                                                                                , "exceptions"
@@ -312,8 +312,8 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock,
         struct net_framework_instances *p = dictionary_set(processes, windows_shared_buffer, NULL, sizeof(*p));
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRInteropCOMCallableWrappers)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_com_callable_wrappers", windows_shared_buffer);
             if (!p->st_clrinterop_com_callable_wrappers) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_com_callable_wrappers", windows_shared_buffer);
                 p->st_clrinterop_com_callable_wrappers = rrdset_create_localhost("netframework"
                                                                                  , id, NULL
                                                                                  , "interop"
@@ -348,8 +348,8 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock,
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRInteropMarshalling)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_interop_marshalling", windows_shared_buffer);
             if (!p->st_clrinterop_marshalling) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_interop_marshalling", windows_shared_buffer);
                 p->st_clrinterop_marshalling = rrdset_create_localhost("netframework"
                                                                        , id, NULL
                                                                        , "interop"
@@ -384,8 +384,8 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock,
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRInteropStubsCreated)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_interop_stubs_created", windows_shared_buffer);
             if (!p->st_clrinterop_interop_stubs_created) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_interop_stubs_created", windows_shared_buffer);
                 p->st_clrinterop_interop_stubs_created = rrdset_create_localhost("netframework"
                                                                                  , id, NULL
                                                                                  , "interop"
@@ -442,8 +442,8 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock,
         struct net_framework_instances *p = dictionary_set(processes, windows_shared_buffer, NULL, sizeof(*p));
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRJITMethods)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_methods", windows_shared_buffer);
             if (!p->st_clrjit_methods) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_methods", windows_shared_buffer);
                 p->st_clrjit_methods = rrdset_create_localhost("netframework"
                                                                , id, NULL
                                                                , "jit"
@@ -479,8 +479,8 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock,
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRJITFrequencyTime) &&
             perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRJITPercentTime)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_time", windows_shared_buffer);
             if (!p->st_clrjit_time) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_time", windows_shared_buffer);
                 p->st_clrjit_time = rrdset_create_localhost("netframework"
                                                             , id, NULL
                                                             , "jit"
@@ -518,8 +518,8 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock,
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRJITStandardFailures)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_standard_failures", windows_shared_buffer);
             if (!p->st_clrjit_standard_failures) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_standard_failures", windows_shared_buffer);
                 p->st_clrjit_standard_failures = rrdset_create_localhost("netframework"
                                                                          , id, NULL
                                                                          , "jit"
@@ -554,8 +554,8 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock,
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRJITIlBytes)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_il_bytes", windows_shared_buffer);
             if (!p->st_clrjit_il_bytes) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_il_bytes", windows_shared_buffer);
                 p->st_clrjit_il_bytes = rrdset_create_localhost("netframework"
                                                                 , id, NULL
                                                                 , "jit"
@@ -612,8 +612,8 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
         struct net_framework_instances *p = dictionary_set(processes, windows_shared_buffer, NULL, sizeof(*p));
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLoadingHeapSize)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_loader_heap_size", windows_shared_buffer);
             if (!p->st_clrloading_heap_size) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_loader_heap_size", windows_shared_buffer);
                 p->st_clrloading_heap_size = rrdset_create_localhost("netframework"
                                                                      , id, NULL
                                                                      , "loading"
@@ -648,8 +648,8 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLoadingAppDomainsLoaded)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_appdomains_loaded", windows_shared_buffer);
             if (!p->st_clrloading_app_domains_loaded) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_appdomains_loaded", windows_shared_buffer);
                 p->st_clrloading_app_domains_loaded = rrdset_create_localhost("netframework"
                                                                               , id, NULL
                                                                               , "loading"
@@ -684,8 +684,8 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLoadingAppDomainsUnloaded)) {
-                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_appdomains_unloaded", windows_shared_buffer);
                 if (!p->st_clrloading_app_domains_unloaded) {
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_appdomains_unloaded", windows_shared_buffer);
                     p->st_clrloading_app_domains_unloaded = rrdset_create_localhost("netframework"
                                                                                     , id, NULL
                                                                                     , "loading"
@@ -720,8 +720,8 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
             }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLoadingAssembliesLoaded)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_assemblies_loaded", windows_shared_buffer);
             if (!p->st_clrloading_assemblies_loaded) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_assemblies_loaded", windows_shared_buffer);
                 p->st_clrloading_assemblies_loaded = rrdset_create_localhost("netframework"
                                                                              , id, NULL
                                                                              , "loading"
@@ -756,8 +756,8 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLoadingClassesLoaded)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_classes_loaded", windows_shared_buffer);
             if (!p->st_clrloading_classes_loaded) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_classes_loaded", windows_shared_buffer);
                 p->st_clrloading_classes_loaded = rrdset_create_localhost("netframework"
                                                                           , id, NULL
                                                                           , "loading"
@@ -792,8 +792,8 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock,
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLoadingClassLoadFailure)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_class_load_failure", windows_shared_buffer);
             if (!p->st_clrloading_class_load_failure) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_class_load_failure", windows_shared_buffer);
                 p->st_clrloading_class_load_failure = rrdset_create_localhost("netframework"
                                                                               , id, NULL
                                                                               , "loading"
