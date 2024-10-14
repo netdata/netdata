@@ -4,7 +4,6 @@ import json
 import os
 import re
 import sys
-
 from copy import deepcopy
 from pathlib import Path
 
@@ -40,8 +39,11 @@ EXPORTER_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'exporting', True),
 ]
 
-NOTIFICATION_SOURCES = [
+AGENT_NOTIFICATION_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'health' / 'notifications', True),
+]
+
+CLOUD_NOTIFICATION_SOURCES = [
     (AGENT_REPO, INTEGRATIONS_PATH / 'cloud-notifications' / 'metadata.yaml', False),
 ]
 
@@ -64,8 +66,13 @@ EXPORTER_RENDER_KEYS = [
     'troubleshooting',
 ]
 
-NOTIFICATION_RENDER_KEYS = [
+AGENT_NOTIFICATION_RENDER_KEYS = [
     'overview',
+    'setup',
+    'troubleshooting',
+]
+
+CLOUD_NOTIFICATION_RENDER_KEYS = [
     'setup',
     'troubleshooting',
 ]
@@ -85,18 +92,18 @@ DEBUG = os.environ.get('DEBUG', False)
 
 def debug(msg):
     if GITHUB_ACTIONS:
-        print(f':debug:{ msg }')
+        print(f':debug:{msg}')
     elif DEBUG:
-        print(f'>>> { msg }')
+        print(f'>>> {msg}')
     else:
         pass
 
 
 def warn(msg, path):
     if GITHUB_ACTIONS:
-        print(f':warning file={ path }:{ msg }')
+        print(f':warning file={path}:{msg}')
     else:
-        print(f'!!! WARNING:{ path }:{ msg }')
+        print(f'!!! WARNING:{path}:{msg}')
 
 
 def retrieve_from_filesystem(uri):
@@ -122,8 +129,13 @@ EXPORTER_VALIDATOR = Draft7Validator(
     registry=registry,
 )
 
-NOTIFICATION_VALIDATOR = Draft7Validator(
-    {'$ref': './notification.json#'},
+AGENT_NOTIFICATION_VALIDATOR = Draft7Validator(
+    {'$ref': './agent_notification.json#'},
+    registry=registry,
+)
+
+CLOUD_NOTIFICATION_VALIDATOR = Draft7Validator(
+    {'$ref': './cloud_notification.json#'},
     registry=registry,
 )
 
@@ -209,19 +221,19 @@ def load_yaml(src):
     yaml = YAML(typ='safe')
 
     if not src.is_file():
-        warn(f'{ src } is not a file.', src)
+        warn(f'{src} is not a file.', src)
         return False
 
     try:
         contents = src.read_text()
     except (IOError, OSError):
-        warn(f'Failed to read { src }.', src)
+        warn(f'Failed to read {src}.', src)
         return False
 
     try:
         data = yaml.load(contents)
     except YAMLError:
-        warn(f'Failed to parse { src } as YAML.', src)
+        warn(f'Failed to parse {src} as YAML.', src)
         return False
 
     return data
@@ -236,7 +248,7 @@ def load_categories():
     try:
         CATEGORY_VALIDATOR.validate(categories)
     except ValidationError:
-        warn(f'Failed to validate { CATEGORIES_FILE } against the schema.', CATEGORIES_FILE)
+        warn(f'Failed to validate {CATEGORIES_FILE} against the schema.', CATEGORIES_FILE)
         sys.exit(1)
 
     return categories
@@ -248,7 +260,7 @@ def load_collectors():
     entries = get_collector_metadata_entries()
 
     for repo, path in entries:
-        debug(f'Loading { path }.')
+        debug(f'Loading {path}.')
         data = load_yaml(path)
 
         if not data:
@@ -257,7 +269,7 @@ def load_collectors():
         try:
             COLLECTOR_VALIDATOR.validate(data)
         except ValidationError:
-            warn(f'Failed to validate { path } against the schema.', path)
+            warn(f'Failed to validate {path} against the schema.', path)
             continue
 
         for idx, item in enumerate(data['modules']):
@@ -273,7 +285,7 @@ def load_collectors():
 
 def _load_deploy_file(file, repo):
     ret = []
-    debug(f'Loading { file }.')
+    debug(f'Loading {file}.')
     data = load_yaml(file)
 
     if not data:
@@ -282,7 +294,7 @@ def _load_deploy_file(file, repo):
     try:
         DEPLOY_VALIDATOR.validate(data)
     except ValidationError:
-        warn(f'Failed to validate { file } against the schema.', file)
+        warn(f'Failed to validate {file} against the schema.', file)
         return []
 
     for idx, item in enumerate(data):
@@ -309,7 +321,7 @@ def load_deploy():
 
 
 def _load_exporter_file(file, repo):
-    debug(f'Loading { file }.')
+    debug(f'Loading {file}.')
     data = load_yaml(file)
 
     if not data:
@@ -318,7 +330,7 @@ def _load_exporter_file(file, repo):
     try:
         EXPORTER_VALIDATOR.validate(data)
     except ValidationError:
-        warn(f'Failed to validate { file } against the schema.', file)
+        warn(f'Failed to validate {file} against the schema.', file)
         return []
 
     if 'id' in data:
@@ -354,21 +366,21 @@ def load_exporters():
     return ret
 
 
-def _load_notification_file(file, repo):
-    debug(f'Loading { file }.')
+def _load_agent_notification_file(file, repo):
+    debug(f'Loading {file}.')
     data = load_yaml(file)
 
     if not data:
         return []
 
     try:
-        NOTIFICATION_VALIDATOR.validate(data)
+        AGENT_NOTIFICATION_VALIDATOR.validate(data)
     except ValidationError:
-        warn(f'Failed to validate { file } against the schema.', file)
+        warn(f'Failed to validate {file} against the schema.', file)
         return []
 
     if 'id' in data:
-        data['integration_type'] = 'notification'
+        data['integration_type'] = 'agent_notification'
         data['_src_path'] = file
         data['_repo'] = repo
         data['_index'] = 0
@@ -378,7 +390,7 @@ def _load_notification_file(file, repo):
         ret = []
 
         for idx, item in enumerate(data):
-            item['integration_type'] = 'notification'
+            item['integration_type'] = 'agent_notification'
             item['_src_path'] = file
             item['_repo'] = repo
             item['_index'] = idx
@@ -387,20 +399,67 @@ def _load_notification_file(file, repo):
         return ret
 
 
-def load_notifications():
+def _load_cloud_notification_file(file, repo):
+    debug(f'Loading {file}.')
+    data = load_yaml(file)
+
+    if not data:
+        return []
+
+    try:
+        CLOUD_NOTIFICATION_VALIDATOR.validate(data)
+    except ValidationError:
+        warn(f'Failed to validate {file} against the schema.', file)
+        return []
+
+    if 'id' in data:
+        data['integration_type'] = 'cloud_notification'
+        data['_src_path'] = file
+        data['_repo'] = repo
+        data['_index'] = 0
+
+        return [data]
+    else:
+        ret = []
+
+        for idx, item in enumerate(data):
+            item['integration_type'] = 'cloud_notification'
+            item['_src_path'] = file
+            item['_repo'] = repo
+            item['_index'] = idx
+            ret.append(item)
+
+        return ret
+
+
+def load_agent_notifications():
     ret = []
 
-    for repo, path, match in NOTIFICATION_SOURCES:
+    for repo, path, match in AGENT_NOTIFICATION_SOURCES:
         if match and path.exists() and path.is_dir():
             for file in path.glob(METADATA_PATTERN):
-                ret.extend(_load_notification_file(file, repo))
+                ret.extend(_load_agent_notification_file(file, repo))
         elif not match and path.exists() and path.is_file():
-            ret.extend(_load_notification_file(path, repo))
+            ret.extend(_load_agent_notification_file(path, repo))
 
     return ret
 
+
+def load_cloud_notifications():
+    ret = []
+
+    for repo, path, match in CLOUD_NOTIFICATION_SOURCES:
+        if match and path.exists() and path.is_dir():
+            for file in path.glob(METADATA_PATTERN):
+                ret.extend(_load_cloud_notification_file(file, repo))
+        elif not match and path.exists() and path.is_file():
+            ret.extend(_load_cloud_notification_file(path, repo))
+
+    return ret
+
+
 def _load_authentication_file(file, repo):
-    debug(f'Loading { file }.')
+    debug(f'Loading {file}.')
     data = load_yaml(file)
 
     if not data:
@@ -409,7 +468,7 @@ def _load_authentication_file(file, repo):
     try:
         AUTHENTICATION_VALIDATOR.validate(data)
     except ValidationError:
-        warn(f'Failed to validate { file } against the schema.', file)
+        warn(f'Failed to validate {file} against the schema.', file)
         return []
 
     if 'id' in data:
@@ -453,13 +512,13 @@ def make_id(meta):
     else:
         instance_name = '000_unknown'
 
-    return f'{ meta["plugin_name"] }-{ meta["module_name"] }-{ instance_name }'
+    return f'{meta["plugin_name"]}-{meta["module_name"]}-{instance_name}'
 
 
 def make_edit_link(item):
     item_path = item['_src_path'].relative_to(REPO_PATH)
 
-    return f'https://github.com/{ item["_repo"] }/blob/master/{ item_path }'
+    return f'https://github.com/{item["_repo"]}/blob/master/{item_path}'
 
 
 def sort_integrations(integrations):
@@ -474,7 +533,9 @@ def dedupe_integrations(integrations, ids):
     for i in integrations:
         if ids.get(i['id'], False):
             first_path, first_index = ids[i['id']]
-            warn(f'Duplicate integration ID found at { i["_src_path"] } index { i["_index"] } (original definition at { first_path } index { first_index }), ignoring that integration.', i['_src_path'])
+            warn(
+                f'Duplicate integration ID found at {i["_src_path"]} index {i["_index"]} (original definition at {first_path} index {first_index}), ignoring that integration.',
+                i['_src_path'])
         else:
             tmp_integrations.append(i)
             ids[i['id']] = (i['_src_path'], i['_index'])
@@ -504,7 +565,7 @@ def render_collectors(categories, collectors, ids):
     idmap = {i['id']: i for i in collectors}
 
     for item in collectors:
-        debug(f'Processing { item["id"] }.')
+        debug(f'Processing {item["id"]}.')
 
         item['edit_link'] = make_edit_link(item)
 
@@ -516,7 +577,7 @@ def render_collectors(categories, collectors, ids):
             res_id = make_id(res)
 
             if res_id not in idmap.keys():
-                warn(f'Could not find related integration { res_id }, ignoring it.', item['_src_path'])
+                warn(f'Could not find related integration {res_id}, ignoring it.', item['_src_path'])
                 continue
 
             related.append({
@@ -532,17 +593,19 @@ def render_collectors(categories, collectors, ids):
         actual_cats = item_cats & valid_cats
 
         if bogus_cats:
-            warn(f'Ignoring invalid categories: { ", ".join(bogus_cats) }', item["_src_path"])
+            warn(f'Ignoring invalid categories: {", ".join(bogus_cats)}', item["_src_path"])
 
         if not item_cats:
             item['meta']['monitored_instance']['categories'] = list(default_cats)
-            warn(f'{ item["id"] } does not list any caregories, adding it to: { default_cats }', item["_src_path"])
+            warn(f'{item["id"]} does not list any caregories, adding it to: {default_cats}', item["_src_path"])
         else:
-            item['meta']['monitored_instance']['categories'] =  [x for x in item['meta']['monitored_instance']['categories'] if x in list(actual_cats)]
+            item['meta']['monitored_instance']['categories'] = [x for x in
+                                                                item['meta']['monitored_instance']['categories'] if
+                                                                x in list(actual_cats)]
 
         for scope in item['metrics']['scopes']:
             if scope['name'] == 'global':
-                scope['name'] = f'{ item["meta"]["monitored_instance"]["name"] } instance'
+                scope['name'] = f'{item["meta"]["monitored_instance"]["name"]} instance'
 
         for cfg_example in item['setup']['configuration']['examples']['list']:
             if 'folding' not in cfg_example:
@@ -552,7 +615,7 @@ def render_collectors(categories, collectors, ids):
 
         for key in COLLECTOR_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{ key }.md')
+                template = get_jinja_env().get_template(f'{key}.md')
                 data = template.render(entry=item, related=related, clean=False)
                 clean_data = template.render(entry=item, related=related, clean=True)
 
@@ -589,7 +652,7 @@ def render_deploy(distros, categories, deploy, ids):
     template = get_jinja_env().get_template('platform_info.md')
 
     for item in deploy:
-        debug(f'Processing { item["id"] }.')
+        debug(f'Processing {item["id"]}.')
         item['edit_link'] = make_edit_link(item)
         clean_item = deepcopy(item)
 
@@ -646,7 +709,7 @@ def render_exporters(categories, exporters, ids):
 
         for key in EXPORTER_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{ key }.md')
+                template = get_jinja_env().get_template(f'{key}.md')
                 data = template.render(entry=item, clean=False)
                 clean_data = template.render(entry=item, clean=True)
 
@@ -670,7 +733,7 @@ def render_exporters(categories, exporters, ids):
     return exporters, clean_exporters, ids
 
 
-def render_notifications(categories, notifications, ids):
+def render_agent_notifications(categories, notifications, ids):
     debug('Sorting notifications.')
 
     sort_integrations(notifications)
@@ -686,9 +749,52 @@ def render_notifications(categories, notifications, ids):
 
         clean_item = deepcopy(item)
 
-        for key in NOTIFICATION_RENDER_KEYS:
+        for key in AGENT_NOTIFICATION_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{ key }.md')
+                template = get_jinja_env().get_template(f'{key}.md')
+                data = template.render(entry=item, clean=False)
+
+                clean_data = template.render(entry=item, clean=True)
+
+                if 'variables' in item['meta']:
+                    template = get_jinja_env().from_string(data)
+                    data = template.render(variables=item['meta']['variables'], clean=False)
+                    template = get_jinja_env().from_string(clean_data)
+                    clean_data = template.render(variables=item['meta']['variables'], clean=True)
+            else:
+                data = ''
+                clean_data = ''
+
+            item[key] = data
+            clean_item[key] = clean_data
+
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
+
+        clean_notifications.append(clean_item)
+
+    return notifications, clean_notifications, ids
+
+
+def render_cloud_notifications(categories, notifications, ids):
+    debug('Sorting notifications.')
+
+    sort_integrations(notifications)
+
+    debug('Checking notification ids.')
+
+    notifications, ids = dedupe_integrations(notifications, ids)
+
+    clean_notifications = []
+
+    for item in notifications:
+        item['edit_link'] = make_edit_link(item)
+
+        clean_item = deepcopy(item)
+
+        for key in CLOUD_NOTIFICATION_RENDER_KEYS:
+            if key in item.keys():
+                template = get_jinja_env().get_template(f'{key}.md')
                 data = template.render(entry=item, clean=False)
                 clean_data = template.render(entry=item, clean=True)
 
@@ -729,9 +835,9 @@ def render_authentications(categories, authentications, ids):
         clean_item = deepcopy(item)
 
         for key in AUTHENTICATION_RENDER_KEYS:
-            
+
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{ key }.md')
+                template = get_jinja_env().get_template(f'{key}.md')
                 data = template.render(entry=item, clean=False)
                 clean_data = template.render(entry=item, clean=True)
 
@@ -746,7 +852,7 @@ def render_authentications(categories, authentications, ids):
 
             item[key] = data
             clean_item[key] = clean_data
-            
+
         for k in ['_src_path', '_repo', '_index']:
             del item[k], clean_item[k]
 
@@ -777,20 +883,23 @@ def main():
     collectors = load_collectors()
     deploy = load_deploy()
     exporters = load_exporters()
-    notifications = load_notifications()
+    agent_notifications = load_agent_notifications()
+    cloud_notifications = load_cloud_notifications()
     authentications = load_authentications()
 
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
     deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
     exporters, clean_exporters, ids = render_exporters(categories, exporters, ids)
-    notifications, clean_notifications, ids = render_notifications(categories, notifications, ids)
+    agent_notifications, clean_agent_notifications, ids = render_agent_notifications(categories, agent_notifications,
+                                                                                     ids)
+    cloud_notifications, clean_cloud_notifications, ids = render_cloud_notifications(categories, cloud_notifications,
+                                                                                     ids)
     authentications, clean_authentications, ids = render_authentications(categories, authentications, ids)
 
-
-    integrations = collectors + deploy + exporters + notifications + authentications
+    integrations = collectors + deploy + exporters + agent_notifications + cloud_notifications + authentications
     render_integrations(categories, integrations)
 
-    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_notifications + clean_authentications
+    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications + clean_cloud_notifications + clean_authentications
     render_json(categories, clean_integrations)
 
 

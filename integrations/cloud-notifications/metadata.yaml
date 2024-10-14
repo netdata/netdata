@@ -11,9 +11,6 @@
     - mobile-app
     - phone
     - personal-notifications
-  overview:
-    notification_description: "You can configure notification delivery to the Netdata Mobile Application from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -44,9 +41,6 @@
   keywords:
     - discord
     - community
-  overview:
-    notification_description: "You can configure notification delivery to your Discord server from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -85,9 +79,6 @@
     icon_filename: "pagerduty.png"
   keywords:
     - pagerduty
-  overview:
-    notification_description: "You can configure notification delivery to PagerDuty from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -127,9 +118,6 @@
     icon_filename: "slack.png"
   keywords:
     - slack
-  overview:
-    notification_description: "You can configure notification delivery to Slack from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -175,9 +163,6 @@
   keywords:
     - opsgenie
     - atlassian
-  overview:
-    notification_description: "You can configure notification delivery to Opsgenie from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -215,9 +200,6 @@
     icon_filename: "mattermost.png"
   keywords:
     - mattermost
-  overview:
-    notification_description: "You can configure notification delivery to Mattermost from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -260,9 +242,6 @@
     icon_filename: "rocketchat.png"
   keywords:
     - rocketchat
-  overview:
-    notification_description: "You can configure notification delivery to RocketChat from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -306,9 +285,6 @@
     icon_filename: "awssns.png"
   keywords:
     - awssns
-  overview:
-    notification_description: "You can configure notification delivery to AWS SNS from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -351,9 +327,6 @@
   keywords:
     - microsoft
     - teams
-  overview:
-    notification_description: "You can configure notification delivery to a Microsoft Teams channel from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -396,9 +369,6 @@
     icon_filename: "telegram.svg"
   keywords:
     - Telegram
-  overview:
-    notification_description: "You can configure notification delivery to Telegram from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -441,9 +411,6 @@
     icon_filename: "splunk-black.svg"
   keywords:
     - Splunk
-  overview:
-    notification_description: "You can configure notification delivery to Splunk from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -479,9 +446,6 @@
     - VictorOps
     - Splunk
     - On-Call
-  overview:
-    notification_description: "You can configure notification delivery to Splunk On-Call/VictorOps from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -515,9 +479,6 @@
   keywords:
     - generic webhooks
     - webhooks
-  overview:
-    notification_description: "You can configure notification delivery to a webhook using a predefined schema from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
@@ -765,9 +726,6 @@
     icon_filename: "ilert.svg"
   keywords:
     - ilert
-  overview:
-    notification_description: "You can configure notification delivery to ilert from the Netdata Cloud UI."
-    notification_limitations: ""
   setup:
     description: |
       ### Prerequisites
