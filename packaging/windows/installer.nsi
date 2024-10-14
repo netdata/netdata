@@ -265,7 +265,7 @@ Function InstallDLL
 
     NoCertUtil:
         DetailPrint "certutil not found, assuming files are different."
-        Goto RetryCopyDLL
+        Goto CopyDLL
 
     FoundCertUtil:
         ; Calculate hash of the existing DLL
@@ -276,40 +276,44 @@ Function InstallDLL
         nsExec::ExecToStack 'certutil -hashfile "$INSTDIR\usr\bin\wevt_netdata.dll" MD5'
         Pop $R1
 
-        StrCmp $R0 $R1 End
+        StrCmp $R0 $R1 SetPermissions
 
-    RetryCopyDLL:
+    CopyDLL:
         ClearErrors
         CopyFiles /SILENT "$INSTDIR\usr\bin\wevt_netdata.dll" "$SYSDIR"
-        IfErrors RetryPrompt ContinueCopy
+        IfErrors RetryPrompt SetPermissions
 
     RetryPrompt:
         MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Failed to copy wevt_netdata.dll probably because it is in use. Please close the Event Viewer (or other Event Log applications) and press Retry."
-        StrCmp $R0 IDRETRY RetryCopyDLL
+        StrCmp $R0 IDRETRY CopyDLL
         StrCmp $R0 IDCANCEL ExitInstall
 
+        Goto End
+
+    SetPermissions:
+        nsExec::ExecToLog 'icacls "$SYSDIR\wevt_netdata.dll" /grant "NT SERVICE\EventLog":R'
         Goto End
 
     ExitInstall:
         Abort
 
     End:
-        nsExec::ExecToLog 'icacls "$SYSDIR\wevt_netdata.dll" /grant "NT SERVICE\EventLog":R'
 FunctionEnd
 
 Function InstallManifest
-    IfFileExists "$INSTDIR\usr\bin\wevt_netdata_manifest.xml" RetryCopyManifest End
+    IfFileExists "$INSTDIR\usr\bin\wevt_netdata_manifest.xml" CopyManifest End
 
-    RetryCopyManifest:
+    CopyManifest:
         ClearErrors
         CopyFiles /SILENT "$INSTDIR\usr\bin\wevt_netdata_manifest.xml" "$SYSDIR"
-        IfErrors RetryPrompt ContinueCopy
+        IfErrors RetryPrompt InstallManifest
 
     RetryPrompt:
         MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Failed to copy wevt_netdata_manifest.xml."
-        StrCmp $R0 IDRETRY RetryCopyManifest
+        StrCmp $R0 IDRETRY CopyManifest
         StrCmp $R0 IDCANCEL ExitInstall
 
+    InstallManifest:
         nsExec::ExecToLog 'wevtutil im "$SYSDIR\wevt_netdata_manifest.xml" "/mf:$SYSDIR\wevt_netdata.dll" "/rf:$SYSDIR\wevt_netdata.dll"'
         Goto End
 
