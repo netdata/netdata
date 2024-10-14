@@ -9,6 +9,9 @@ typedef struct {
 } SID_KEY;
 
 typedef struct {
+    // IMPORTANT:
+    // This is malloc'd ! You have to manually set fields to zero.
+
     const char *account;
     const char *domain;
     const char *full;
@@ -67,13 +70,23 @@ static void lookup_user(SID_VALUE *sv) {
         sv->account = strdupz(account); sv->account_len = strlen(sv->account);
         sv->full = strdupz(tmp); sv->full_len = strlen(sv->full);
     }
+    else {
+        sv->domain = NULL;
+        sv->account = NULL;
+        sv->full = NULL;
+        sv->domain_len = 0;
+        sv->account_len = 0;
+        sv->full_len = 0;
+    }
 
-    {
-        wchar_t *sid_string = NULL;
-        if (ConvertSidToStringSidW(sv->key.sid, &sid_string)) {
-            sv->sid_str = strdupz(account2utf8(sid_string));
-            sv->sid_str_len = strlen(sv->sid_str);
-        }
+    wchar_t *sid_string = NULL;
+    if (ConvertSidToStringSidW(sv->key.sid, &sid_string)) {
+        sv->sid_str = strdupz(account2utf8(sid_string));
+        sv->sid_str_len = strlen(sv->sid_str);
+    }
+    else {
+        sv->sid_str = NULL;
+        sv->sid_str_len = 0;
     }
 }
 
