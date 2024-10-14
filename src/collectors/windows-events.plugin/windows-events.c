@@ -423,7 +423,7 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
             uuid_str, sizeof(uuid_str) - 1);
     }
 
-    {
+    if(ev->qualifiers) {
         static __thread char qualifiers[UINT64_HEX_MAX_LENGTH];
         len = print_uint64_hex(qualifiers, ev->qualifiers);
         bytes += len;
@@ -441,7 +441,7 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
             event_record_id_str, len);
     }
 
-    {
+    if(ev->version) {
         static __thread char version[UINT64_MAX_LENGTH];
         len = print_uint64(version, ev->version);
         bytes += len;
