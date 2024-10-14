@@ -29,14 +29,27 @@ For more information check [this discussion](https://github.com/netdata/netdata/
 
 ## Events Sources
 
-The plugin automatically detects the available providers.
+The plugin automatically detects all the available channels and offers a list of "Event Channels".
 
-IMAGE_OF_SOURCES
+IMAGE_OF_EVENT_CHANNELS
 
-The plugin, by default, merges all event sources together, to provide a unified view of all log messages available.
+By default, it aggregates events from all event channels, providing a unified systems view of all events.
 
-> To improve query performance, we recommend selecting the relevant logs source, before doing more analysis on the
-> logs.
+> To improve query performance, we recommend selecting the relevant event channels, before doing more
+> analysis on the events.
+
+In the list of events channels, several shortcuts are added, aggregating events according to various attributes:
+
+- `All`, aggregates events from all available channels. This provides a holistic view of all events in the system. 
+- `All-Admin`, `All-Operational`, `All-Analytic` and `All-Debug` aggregates events from channels marked `Admin`, `Operational`, `Analytic` and `Debug`, respectively.
+- `All-Windows`, aggregates events from `Application`, `Security`, `System` and `Setup`.
+- `All-Enabled` and `All-Disabled` aggregates events from channels depending on their status.
+- `All-Forwarded` aggregates events from channels owned by `Microsoft-Windows-EventCollector`.
+- `All-Classic` aggregates events from channels using the Classic Event Log API.
+- `All-Of-X`, where `X` is a provider name, is offered for all providers having more than a channel.
+- `All-In-X`, where `X` is `Backup-Mode`, `Overwrite-Mode`, `StopWhenFull-Mode` and `RetainAndBackup-Mode`, aggregate events based on their channel retention policy.
+
+Channels that are configured but are not queryable, and channels that do not have any events in them, are automatically excluded from the channels list.
 
 ## Event Fields
 

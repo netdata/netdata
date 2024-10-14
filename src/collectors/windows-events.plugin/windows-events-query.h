@@ -30,9 +30,9 @@ typedef struct wevt_event {
 
 typedef struct {
     EVT_VARIANT	*data;
-    size_t size;
-    size_t used;
-    size_t count;
+    DWORD size;
+    DWORD used;
+    DWORD count;
 } WEVT_VARIANT;
 
 typedef struct {
@@ -154,6 +154,10 @@ static inline void wevt_variant_resize(WEVT_VARIANT *v, size_t required_size) {
     wevt_variant_cleanup(v);
     v->size = compute_new_size(v->size, required_size);
     v->data = mallocz(v->size);
+}
+
+static inline void wevt_variant_count_from_used(WEVT_VARIANT *v) {
+    v->count = v->used / sizeof(*v->data);
 }
 
 static inline uint8_t wevt_field_get_uint8(EVT_VARIANT *ev) {

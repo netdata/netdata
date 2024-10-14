@@ -905,8 +905,20 @@ static WEVT_QUERY_STATUS wevt_query_one_channel(
 }
 
 static bool source_is_mine(LOGS_QUERY_SOURCE *src, LOGS_QUERY_STATUS *lqs) {
-    if((lqs->rq.source_type == WEVTS_NONE && !lqs->rq.sources) || (src->source_type & lqs->rq.source_type) ||
-       (lqs->rq.sources && simple_pattern_matches(lqs->rq.sources, string2str(src->source)))) {
+    if(
+        // no source is requested
+        (lqs->rq.source_type == WEVTS_NONE && !lqs->rq.sources) ||
+
+        // matches our internal source types
+        (src->source_type & lqs->rq.source_type) ||
+
+        // matches the source name
+        (lqs->rq.sources && src->source && simple_pattern_matches(lqs->rq.sources, string2str(src->source))) ||
+
+        // matches the provider (providers start with a special prefix to avoid mix and match)
+        (lqs->rq.sources && src->provider && simple_pattern_matches(lqs->rq.sources, string2str(src->provider)))
+
+        ) {
 
         if(!src->msg_last_ut)
             // the file is not scanned yet, or the timestamps have not been updated,

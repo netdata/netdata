@@ -256,7 +256,8 @@ struct lqs_extension {
 #define LQS_SOURCE_TYPE             WEVT_SOURCE_TYPE
 #define LQS_SOURCE_TYPE_ALL         WEVTS_ALL
 #define LQS_SOURCE_TYPE_NONE        WEVTS_NONE
-#define LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value) wevt_internal_source_type(value)
+#define LQS_PARAMETER_SOURCE_NAME   "Event Channels" // this is how it is shown to users
+#define LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value) WEVT_SOURCE_TYPE_2id_one(value)
 #define LQS_FUNCTION_SOURCE_TO_JSON_ARRAY(wb) wevt_sources_to_json_array(wb)
 #include "libnetdata/facets/logs_query_status.h"
 

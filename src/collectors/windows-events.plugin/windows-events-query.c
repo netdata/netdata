@@ -326,7 +326,7 @@ static inline bool wEvtRender(WEVT_LOG *log, EVT_HANDLE context, WEVT_VARIANT *r
         // information exceeds the allocated space
         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "EvtRender() failed, hRenderSystemContext: 0x%lx, hEvent: 0x%lx, content: 0x%lx, size: %zu, extended info: %s",
+                   "EvtRender() failed, hRenderSystemContext: 0x%lx, hEvent: 0x%lx, content: 0x%lx, size: %u, extended info: %s",
                    (uintptr_t)context, (uintptr_t)log->hEvent, (uintptr_t)raw->data, raw->size,
                    EvtGetExtendedStatus_utf8());
             return false;

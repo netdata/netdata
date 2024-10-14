@@ -137,40 +137,33 @@
 //    }
 //};
 
+#include "libnetdata/template-enum.h"
+
+ENUM_STR_MAP_DEFINE(WEVT_SOURCE_TYPE) = {
+    { .id = WEVTS_ALL,                      .name = WEVT_SOURCE_ALL_NAME },
+    { .id = WEVTS_ADMIN,                    .name = WEVT_SOURCE_ALL_ADMIN_NAME },
+    { .id = WEVTS_OPERATIONAL,              .name = WEVT_SOURCE_ALL_OPERATIONAL_NAME },
+    { .id = WEVTS_ANALYTIC,                 .name = WEVT_SOURCE_ALL_ANALYTIC_NAME },
+    { .id = WEVTS_DEBUG,                    .name = WEVT_SOURCE_ALL_DEBUG_NAME },
+    { .id = WEVTS_WINDOWS,                  .name = WEVT_SOURCE_ALL_WINDOWS_NAME },
+    { .id = WEVTS_ENABLED,                  .name = WEVT_SOURCE_ALL_ENABLED_NAME },
+    { .id = WEVTS_DISABLED,                 .name = WEVT_SOURCE_ALL_DISABLED_NAME },
+    { .id = WEVTS_FORWARDED,                .name = WEVT_SOURCE_ALL_FORWARDED_NAME },
+    { .id = WEVTS_CLASSIC,                  .name = WEVT_SOURCE_ALL_CLASSIC_NAME },
+    { .id = WEVTS_BACKUP_MODE,              .name = WEVT_SOURCE_ALL_BACKUP_MODE_NAME },
+    { .id = WEVTS_OVERWRITE_MODE,           .name = WEVT_SOURCE_ALL_OVERWRITE_MODE_NAME },
+    { .id = WEVTS_STOP_WHEN_FULL_MODE,      .name = WEVT_SOURCE_ALL_STOP_WHEN_FULL_MODE_NAME },
+    { .id = WEVTS_RETAIN_AND_BACKUP_MODE,   .name = WEVT_SOURCE_ALL_RETAIN_AND_BACKUP_MODE_NAME },
+
+    // terminator
+    { . id = 0, .name = NULL }
+};
+
+BITMAP_STR_DEFINE_FUNCTIONS(WEVT_SOURCE_TYPE, WEVTS_NONE, "");
+
 DICTIONARY *wevt_sources = NULL;
 DICTIONARY *used_hashes_registry = NULL;
 static usec_t wevt_session = 0;
-
-WEVT_SOURCE_TYPE wevt_internal_source_type(const char *value) {
-    if(strcmp(value, WEVT_SOURCE_ALL_NAME) == 0)
-        return WEVTS_ALL;
-
-    if(strcmp(value, WEVT_SOURCE_ALL_ADMIN_NAME) == 0)
-        return WEVTS_ADMIN;
-
-    if(strcmp(value, WEVT_SOURCE_ALL_OPERATIONAL_NAME) == 0)
-        return WEVTS_OPERATIONAL;
-
-    if(strcmp(value, WEVT_SOURCE_ALL_ANALYTIC_NAME) == 0)
-        return WEVTS_ANALYTIC;
-
-    if(strcmp(value, WEVT_SOURCE_ALL_DEBUG_NAME) == 0)
-        return WEVTS_DEBUG;
-
-    if(strcmp(value, WEVT_SOURCE_ALL_DIAGNOSTIC_NAME) == 0)
-        return WEVTS_DIAGNOSTIC;
-
-    if(strcmp(value, WEVT_SOURCE_ALL_TRACING_NAME) == 0)
-        return WEVTS_TRACING;
-
-    if(strcmp(value, WEVT_SOURCE_ALL_PERFORMANCE_NAME) == 0)
-        return WEVTS_PERFORMANCE;
-
-    if(strcmp(value, WEVT_SOURCE_ALL_WINDOWS_NAME) == 0)
-        return WEVTS_WINDOWS;
-
-    return WEVTS_NONE;
-}
 
 void wevt_sources_del_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     LOGS_QUERY_SOURCE *src = value;
@@ -265,7 +258,14 @@ int wevt_sources_dict_items_forward_compar(const void *a, const void *b) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+typedef enum {
+        wevt_source_type_internal,
+        wevt_source_type_provider,
+        wevt_source_type_channel,
+} wevt_source_type;
+
 struct wevt_source {
+    wevt_source_type type;
     usec_t first_ut;
     usec_t last_ut;
     size_t count;
@@ -278,6 +278,15 @@ static int wevt_source_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry
     BUFFER *wb = data;
 
     const char *name = dictionary_acquired_item_name(item);
+
+    if(s->count == 1 && strncmp(name, WEVT_SOURCE_ALL_OF_PROVIDER_PREFIX, sizeof(WEVT_SOURCE_ALL_OF_PROVIDER_PREFIX) - 1) == 0)
+        // do not include "All-Of-X" when there is only 1 channel
+        return 0;
+
+    bool default_selected = (s->type == wevt_source_type_channel);
+    if(default_selected && (strcmp(name, "NetdataWEL") == 0 || strcmp(name, "Netdata/Access") == 0))
+        // do not select Netdata Access logs by default
+        default_selected = false;
 
     buffer_json_add_array_item_object(wb);
     {
@@ -300,6 +309,7 @@ static int wevt_source_to_json_array_cb(const DICTIONARY_ITEM *item, void *entry
         buffer_json_member_add_string(wb, "name", name);
         buffer_json_member_add_string(wb, "pill", size_for_humans);
         buffer_json_member_add_string(wb, "info", info);
+        buffer_json_member_add_boolean(wb, "default_selected", default_selected);
     }
     buffer_json_object_close(wb); // options object
 
@@ -337,61 +347,142 @@ void wevt_sources_to_json_array(BUFFER *wb) {
         t.size = src->size;
         t.entries = src->entries;
 
-        dictionary_set(dict, WEVT_SOURCE_ALL_NAME, &t, sizeof(t));
+        src->source_type |= WEVTS_ALL;
+        t.type = wevt_source_type_internal;
+        for(size_t i = 0; WEVT_SOURCE_TYPE_names[i].name ;i++) {
+            if(src->source_type & WEVT_SOURCE_TYPE_names[i].id)
+                dictionary_set(dict, WEVT_SOURCE_TYPE_names[i].name, &t, sizeof(t));
+        }
 
-        if(src->source_type & WEVTS_ADMIN)
-            dictionary_set(dict, WEVT_SOURCE_ALL_ADMIN_NAME, &t, sizeof(t));
+        if(src->provider) {
+            t.type = wevt_source_type_provider;
+            dictionary_set(dict, string2str(src->provider), &t, sizeof(t));
+        }
 
-        if(src->source_type & WEVTS_OPERATIONAL)
-            dictionary_set(dict, WEVT_SOURCE_ALL_OPERATIONAL_NAME, &t, sizeof(t));
-
-        if(src->source_type & WEVTS_ANALYTIC)
-            dictionary_set(dict, WEVT_SOURCE_ALL_ANALYTIC_NAME, &t, sizeof(t));
-
-        if(src->source_type & WEVTS_DEBUG)
-            dictionary_set(dict, WEVT_SOURCE_ALL_DEBUG_NAME, &t, sizeof(t));
-
-        if(src->source_type & WEVTS_DIAGNOSTIC)
-            dictionary_set(dict, WEVT_SOURCE_ALL_DIAGNOSTIC_NAME, &t, sizeof(t));
-
-        if(src->source_type & WEVTS_TRACING)
-            dictionary_set(dict, WEVT_SOURCE_ALL_TRACING_NAME, &t, sizeof(t));
-
-        if(src->source_type & WEVTS_PERFORMANCE)
-            dictionary_set(dict, WEVT_SOURCE_ALL_PERFORMANCE_NAME, &t, sizeof(t));
-
-        if(src->source_type & WEVTS_WINDOWS)
-            dictionary_set(dict, WEVT_SOURCE_ALL_WINDOWS_NAME, &t, sizeof(t));
-
-        if(src->source)
+        if(src->source) {
+            t.type = wevt_source_type_channel;
             dictionary_set(dict, string2str(src->source), &t, sizeof(t));
+        }
     }
     dfe_done(jf);
 
     dictionary_sorted_walkthrough_read(dict, wevt_source_to_json_array_cb, wb);
 }
 
-static bool check_and_remove_suffix(char *name, size_t len, const char *suffix) {
-    char s[strlen(suffix) + 2];
-    s[0] = '/';
-    memcpy(&s[1], suffix, sizeof(s) - 1);
-    size_t slen = sizeof(s) - 1;
-
-    if(slen + 1 >= len) return false;
-
-    char *match = &name[len - slen];
-    if(strcasecmp(match, s) == 0) {
-        *match = '\0';
-        return true;
+static bool ndEvtGetChannelConfigProperty(EVT_HANDLE hChannelConfig, WEVT_VARIANT *pr, EVT_CHANNEL_CONFIG_PROPERTY_ID id) {
+    if (!EvtGetChannelConfigProperty(hChannelConfig, id, 0, pr->size, pr->data, &pr->used)) {
+        DWORD status = GetLastError();
+        if (ERROR_INSUFFICIENT_BUFFER == status) {
+            wevt_variant_resize(pr, pr->used);
+            if(!EvtGetChannelConfigProperty(hChannelConfig, id, 0, pr->size, pr->data, &pr->used)) {
+                pr->used = 0;
+                pr->count = 0;
+                return false;
+            }
+        }
     }
 
-    s[0] = '-';
-    if(strcasecmp(match, s) == 0) {
-        *match = '\0';
-        return true;
+    wevt_variant_count_from_used(pr);
+    return true;
+}
+
+WEVT_SOURCE_TYPE categorize_channel(const wchar_t *channel_path, const char **provider, WEVT_VARIANT *property) {
+    EVT_HANDLE hChannelConfig = NULL;
+    WEVT_SOURCE_TYPE result = WEVTS_ALL;
+
+    // Open the channel configuration
+    hChannelConfig = EvtOpenChannelConfig(NULL, channel_path, 0);
+    if (!hChannelConfig)
+        goto cleanup;
+
+    if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelConfigType) &
+       property->count &&
+       property->data[0].Type == EvtVarTypeUInt32) {
+        switch (property->data[0].UInt32Val) {
+            case EvtChannelTypeAdmin:
+                result |= WEVTS_ADMIN;
+                break;
+
+            case EvtChannelTypeOperational:
+                result |= WEVTS_OPERATIONAL;
+                break;
+
+            case EvtChannelTypeAnalytic:
+                result |= WEVTS_ANALYTIC;
+                break;
+
+            case EvtChannelTypeDebug:
+                result |= WEVTS_DEBUG;
+                break;
+
+            default:
+                break;
+        }
     }
 
-    return false;
+    if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelConfigClassicEventlog) &&
+       property->count &&
+       property->data[0].Type == EvtVarTypeBoolean &&
+       property->data[0].BooleanVal)
+        result |= WEVTS_CLASSIC;
+
+    if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelConfigOwningPublisher) &&
+       property->count &&
+       property->data[0].Type == EvtVarTypeString) {
+        *provider = provider2utf8(property->data[0].StringVal);
+        if(wcscasecmp(property->data[0].StringVal, L"Microsoft-Windows-EventCollector") == 0)
+            result |= WEVTS_FORWARDED;
+    }
+    else
+        *provider = NULL;
+
+    if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelConfigEnabled) &&
+       property->count &&
+       property->data[0].Type == EvtVarTypeBoolean) {
+        if(property->data[0].BooleanVal)
+            result |= WEVTS_ENABLED;
+        else
+            result |= WEVTS_DISABLED;
+    }
+
+    bool got_retention = false;
+    bool retained = false;
+    if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelLoggingConfigRetention) &&
+       property->count &&
+       property->data[0].Type == EvtVarTypeBoolean) {
+        got_retention = true;
+        retained = property->data[0].BooleanVal;
+    }
+
+    bool got_auto_backup = false;
+    bool auto_backup = false;
+    if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelLoggingConfigAutoBackup) &&
+       property->count &&
+       property->data[0].Type == EvtVarTypeBoolean) {
+        got_auto_backup = true;
+        auto_backup = property->data[0].BooleanVal;
+    }
+
+    if(got_retention && got_auto_backup) {
+        if(!retained) {
+            if(auto_backup)
+                result |= WEVTS_BACKUP_MODE;
+            else
+                result |= WEVTS_OVERWRITE_MODE;
+        }
+        else {
+            if(auto_backup)
+                result |= WEVTS_STOP_WHEN_FULL_MODE;
+            else
+                result |= WEVTS_RETAIN_AND_BACKUP_MODE;
+        }
+    }
+
+cleanup:
+    if (hChannelConfig)
+        EvtClose(hChannelConfig);
+
+    return result;
 }
 
 void wevt_sources_scan(void) {
@@ -400,8 +491,9 @@ void wevt_sources_scan(void) {
     EVT_HANDLE hChannelEnum = NULL;
 
     if(spinlock_trylock(&spinlock)) {
-        const usec_t now_monotonic_ut = now_monotonic_usec();
+        const usec_t started_ut = now_monotonic_usec();
 
+        WEVT_VARIANT property = { 0 };
         DWORD dwChannelBufferSize = 0;
         DWORD dwChannelBufferUsed = 0;
         DWORD status = ERROR_SUCCESS;
@@ -438,32 +530,26 @@ void wevt_sources_scan(void) {
             if(!wevt_channel_retention(log, channel, NULL, &retention))
                 continue;
 
+            LOGS_QUERY_SOURCE *found = dictionary_get(wevt_sources, channel2utf8(channel));
+            if(found) {
+                // we just need to update its retention
+
+                found->last_scan_monotonic_ut = now_monotonic_usec();
+                found->msg_first_id = retention.first_event.id;
+                found->msg_last_id = retention.last_event.id;
+                found->msg_first_ut = retention.first_event.created_ns / NSEC_PER_USEC;
+                found->msg_last_ut = retention.last_event.created_ns / NSEC_PER_USEC;
+                found->size = retention.size_bytes;
+                continue;
+            }
+
             const char *name = channel2utf8(channel);
             const char *fullname = strdupz(name);
+            const char *provider;
 
-            WEVT_SOURCE_TYPE sources = WEVTS_ALL;
-            size_t len = strlen(fullname);
-            if(check_and_remove_suffix((char *)name, len, "Admin"))
-                sources |= WEVTS_ADMIN;
-            else if(check_and_remove_suffix((char *)name, len, "Operational"))
-                sources |= WEVTS_OPERATIONAL;
-            else if(check_and_remove_suffix((char *)name, len, "Analytic"))
-                sources |= WEVTS_ANALYTIC;
-            else if(check_and_remove_suffix((char *)name, len, "Debug") ||
-                    check_and_remove_suffix((char *)name, len, "Verbose"))
-                sources |= WEVTS_DEBUG;
-            else if(check_and_remove_suffix((char *)name, len, "Diagnostic"))
-                sources |= WEVTS_DIAGNOSTIC;
-            else if(check_and_remove_suffix((char *)name, len, "Trace") ||
-                    check_and_remove_suffix((char *)name, len, "Tracing"))
-                sources |= WEVTS_TRACING;
-            else if(check_and_remove_suffix((char *)name, len, "Performance") ||
-                    check_and_remove_suffix((char *)name, len, "Perf"))
-                sources |= WEVTS_PERFORMANCE;
-
+            WEVT_SOURCE_TYPE sources = categorize_channel(channel, &provider, &property);
             char *slash = strchr(name, '/');
-            if(slash)
-                *slash = '\0';
+            if(slash) *slash = '\0';
 
             if(strcasecmp(name, "Application") == 0)
                 sources |= WEVTS_WINDOWS;
@@ -485,8 +571,26 @@ void wevt_sources_scan(void) {
                 .msg_last_ut = retention.last_event.created_ns / NSEC_PER_USEC,
                 .size = retention.size_bytes,
                 .source_type = sources,
-                .source = string_strdupz(name),
+                .source = string_strdupz(fullname),
             };
+
+            if(strncmp(fullname, "Netdata", 7) == 0)
+                // WEL based providers of Netdata are named NetdataX
+                provider = "Netdata";
+
+            if(provider && *provider) {
+                char buf[sizeof(WEVT_SOURCE_ALL_OF_PROVIDER_PREFIX) + strlen(provider)]; // sizeof() includes terminator
+                snprintf(buf, sizeof(buf), WEVT_SOURCE_ALL_OF_PROVIDER_PREFIX "%s", provider);
+
+                if(trim_all(buf) != NULL) {
+                    for (size_t i = 0; i < sizeof(buf) - 1; i++) {
+                        // remove character that may interfere with our parsing
+                        if (isspace((uint8_t) buf[i]) || buf[i] == '%' || buf[i] == '+' || buf[i] == '|' || buf[i] == ':')
+                            buf[i] = '_';
+                    }
+                    src.provider = string_strdupz(buf);
+                }
+            }
 
             dictionary_set(wevt_sources, src.fullname, &src, sizeof(src));
         }
@@ -519,13 +623,21 @@ void wevt_sources_scan(void) {
         LOGS_QUERY_SOURCE *src;
         dfe_start_write(wevt_sources, src)
         {
-            if(src->last_scan_monotonic_ut < now_monotonic_ut)
+            if(src->last_scan_monotonic_ut < started_ut) {
+                src->msg_first_id = 0;
+                src->msg_last_id = 0;
+                src->msg_first_ut = 0;
+                src->msg_last_ut = 0;
+                src->size = 0;
                 dictionary_del(wevt_sources, src->fullname);
+            }
         }
         dfe_done(src);
         dictionary_garbage_collect(wevt_sources);
 
         spinlock_unlock(&spinlock);
+
+        wevt_variant_cleanup(&property);
     }
 
 cleanup:

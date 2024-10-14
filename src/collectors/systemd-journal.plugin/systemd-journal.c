@@ -85,6 +85,7 @@ struct lqs_extension {
 #define LQS_SOURCE_TYPE             SD_JOURNAL_FILE_SOURCE_TYPE
 #define LQS_SOURCE_TYPE_ALL         SDJF_ALL
 #define LQS_SOURCE_TYPE_NONE        SDJF_NONE
+#define LQS_PARAMETER_SOURCE_NAME   "Journal Sources" // this is how it is shown to users
 #define LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value) get_internal_source_type(value)
 #define LQS_FUNCTION_SOURCE_TO_JSON_ARRAY(wb) available_journal_file_sources_to_json_array(wb)
 #include "libnetdata/facets/logs_query_status.h"
