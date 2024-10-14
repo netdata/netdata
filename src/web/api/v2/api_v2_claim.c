@@ -164,7 +164,13 @@ static int claim_json_response(BUFFER *wb, CLAIM_RESPONSE response, const char *
     return (response == CLAIM_RESP_ERROR) ? HTTP_RESP_BAD_REQUEST : HTTP_RESP_OK;
 }
 
-int api_v2_claim(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+static int claim_txt_response(BUFFER *wb, const char *msg) {
+    buffer_reset(wb);
+    buffer_strcat(wb, msg);
+    return HTTP_RESP_BAD_REQUEST;
+}
+
+static int api_claim(uint8_t version, struct web_client *w, char *url) {
     char *key = NULL;
     char *token = NULL;
     char *rooms = NULL;
@@ -197,11 +203,13 @@ int api_v2_claim(RRDHOST *host __maybe_unused, struct web_client *w, char *url) 
     if(can_be_claimed && key) {
         if(!netdata_random_session_id_matches(key)) {
             netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
+            if(version < 3) claim_txt_response(wb, "invalid key");
             return claim_json_response(wb, CLAIM_RESP_ERROR, "invalid key");
         }
 
         if(!token || !base_url || !check_claim_param(token) || !check_claim_param(base_url) || (rooms && !check_claim_param(rooms))) {
             netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
+            if(version < 3) claim_txt_response(wb, "invalid parameters");
             return claim_json_response(wb, CLAIM_RESP_ERROR, "invalid parameters");
         }
 
@@ -222,3 +230,10 @@ int api_v2_claim(RRDHOST *host __maybe_unused, struct web_client *w, char *url) 
     return claim_json_response(wb, response, msg);
 }
 
+int api_v2_claim(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_claim(2, w, url);
+}
+
+int api_v3_claim(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    return api_claim(3, w, url);
+}
