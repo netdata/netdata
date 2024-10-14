@@ -97,7 +97,9 @@ typedef struct wevt_log {
         TXT_UTF8 channel;
         TXT_UTF8 provider;
         TXT_UTF8 computer;
-        TXT_UTF8 user;
+        TXT_UTF8 account;
+        TXT_UTF8 domain;
+        TXT_UTF8 sid;
 
         TXT_UTF8 event; // the message to be shown to the user
         TXT_UTF8 level;
@@ -204,16 +206,17 @@ static inline bool wevt_field_get_string_utf8(EVT_VARIANT *ev, TXT_UTF8 *dst) {
     return wevt_str_wchar_to_utf8(dst, ev->StringVal, -1);
 }
 
-bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst);
-
-static inline bool wevt_field_get_sid(EVT_VARIANT *ev, TXT_UTF8 *dst) {
+bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str);
+static inline bool wevt_field_get_sid(EVT_VARIANT *ev, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str) {
     if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull) {
-        wevt_utf8_empty(dst);
+        wevt_utf8_empty(dst_account);
+        wevt_utf8_empty(dst_domain);
+        wevt_utf8_empty(dst_sid_str);
         return false;
     }
 
     fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeSid);
-    return wevt_convert_user_id_to_name(ev->SidVal, dst);
+    return wevt_convert_user_id_to_name(ev->SidVal, dst_account, dst_domain, dst_sid_str);
 }
 
 static inline uint64_t wevt_field_get_filetime_to_ns(EVT_VARIANT *ev) {

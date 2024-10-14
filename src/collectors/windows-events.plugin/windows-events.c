@@ -22,7 +22,9 @@ static bool plugin_should_exit = false;
     "|" WEVT_FIELD_KEYWORDS                     \
     "|" WEVT_FIELD_OPCODE                       \
     "|" WEVT_FIELD_TASK                         \
-    "|" WEVT_FIELD_USER                         \
+    "|" WEVT_FIELD_ACCOUNT                      \
+    "|" WEVT_FIELD_DOMAIN                       \
+    "|" WEVT_FIELD_SID                          \
     ""
 
 #define query_has_fts(lqs) ((lqs)->rq.query != NULL)
@@ -249,7 +251,15 @@ static void wevt_register_fields(LOGS_QUERY_STATUS *lqs) {
             rq->default_facet | FACET_KEY_OPTION_VISIBLE | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
-            facets, WEVT_FIELD_USER,
+            facets, WEVT_FIELD_ACCOUNT,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_DOMAIN,
+            rq->default_facet | FACET_KEY_OPTION_FTS);
+
+    facets_register_key_name(
+            facets, WEVT_FIELD_SID,
             rq->default_facet | FACET_KEY_OPTION_FTS);
 
     facets_register_key_name(
@@ -374,10 +384,10 @@ static const char *source_to_str(TXT_UTF8 *txt) {
 static const char *events_api_to_str(WEVT_PROVIDER_PLATFORM platform) {
     switch(platform) {
         case WEVT_PLATFORM_WEL:
-            return "Windows Events Log";
+            return "Windows Event Log";
 
         case WEVT_PLATFORM_ETW:
-            return "Events Tracing for Windows";
+            return "Event Tracing for Windows";
 
         case WEVT_PLATFORM_TL:
             return "TraceLogging";
@@ -388,7 +398,57 @@ static const char *events_api_to_str(WEVT_PROVIDER_PLATFORM platform) {
 }
 
 static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUERY_SOURCE *src, usec_t *msg_ut __maybe_unused, WEVT_EVENT *ev) {
+    static __thread char uuid_str[UUID_STR_LEN];
+
     size_t len, bytes = log->ops.raw.system.used + log->ops.raw.user.used;
+
+    if(!UUIDiszero(ev->provider)) {
+        uuid_unparse_lower(ev->provider.uuid, uuid_str);
+        facets_add_key_value_length(
+            facets, WEVT_FIELD_PROVIDER_GUID, sizeof(WEVT_FIELD_PROVIDER_GUID) - 1,
+            uuid_str, sizeof(uuid_str) - 1);
+    }
+
+    if(!UUIDiszero(ev->activity_id)) {
+        uuid_unparse_lower(ev->activity_id.uuid, uuid_str);
+        facets_add_key_value_length(
+            facets, WEVT_FIELD_ACTIVITY_ID, sizeof(WEVT_FIELD_ACTIVITY_ID) - 1,
+            uuid_str, sizeof(uuid_str) - 1);
+    }
+
+    if(!UUIDiszero(ev->related_activity_id)) {
+        uuid_unparse_lower(ev->related_activity_id.uuid, uuid_str);
+        facets_add_key_value_length(
+            facets, WEVT_FIELD_RELATED_ACTIVITY_ID, sizeof(WEVT_FIELD_RELATED_ACTIVITY_ID) - 1,
+            uuid_str, sizeof(uuid_str) - 1);
+    }
+
+    {
+        static __thread char qualifiers[UINT64_HEX_MAX_LENGTH];
+        len = print_uint64_hex(qualifiers, ev->qualifiers);
+        bytes += len;
+        facets_add_key_value_length(
+            facets, WEVT_FIELD_QUALIFIERS, sizeof(WEVT_FIELD_QUALIFIERS) - 1,
+            qualifiers, len);
+    }
+
+    {
+        static __thread char event_record_id_str[UINT64_MAX_LENGTH];
+        len = print_uint64(event_record_id_str, ev->id);
+        bytes += len;
+        facets_add_key_value_length(
+            facets, WEVT_FIELD_EVENTRECORDID, sizeof(WEVT_FIELD_EVENTRECORDID) - 1,
+            event_record_id_str, len);
+    }
+
+    {
+        static __thread char version[UINT64_MAX_LENGTH];
+        len = print_uint64(version, ev->version);
+        bytes += len;
+        facets_add_key_value_length(
+            facets, WEVT_FIELD_VERSION, sizeof(WEVT_FIELD_VERSION) - 1,
+            version, len);
+    }
 
     if(log->ops.provider.used > 1) {
         bytes += log->ops.provider.used * 2; // unicode is double
@@ -408,15 +468,6 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
         facets_add_key_value_length(
             facets, WEVT_FIELD_CHANNEL, sizeof(WEVT_FIELD_CHANNEL) - 1,
             src->fullname, src->fullname_len);
-    }
-
-    {
-        static __thread char event_record_id_str[UINT64_MAX_LENGTH];
-        len = print_uint64(event_record_id_str, ev->id);
-        bytes += len;
-        facets_add_key_value_length(
-            facets, WEVT_FIELD_EVENTRECORDID, sizeof(WEVT_FIELD_EVENTRECORDID) - 1,
-            event_record_id_str, len);
     }
 
     if(log->ops.level.used > 1) {
@@ -454,11 +505,28 @@ static inline size_t wevt_process_event(WEVT_LOG *log, FACETS *facets, LOGS_QUER
                 log->ops.task.data, log->ops.task.used - 1);
     }
 
-    if(log->ops.user.used > 1) {
-        bytes += log->ops.user.used * 2;
+    if(log->ops.account.used > 1) {
+        bytes += log->ops.account.used * 2;
         facets_add_key_value_length(
-            facets, WEVT_FIELD_USER, sizeof(WEVT_FIELD_USER) - 1,
-            log->ops.user.data, log->ops.user.used - 1);
+            facets,
+            WEVT_FIELD_ACCOUNT, sizeof(WEVT_FIELD_ACCOUNT) - 1,
+            log->ops.account.data, log->ops.account.used - 1);
+    }
+
+    if(log->ops.domain.used > 1) {
+        bytes += log->ops.domain.used * 2;
+        facets_add_key_value_length(
+            facets,
+            WEVT_FIELD_DOMAIN, sizeof(WEVT_FIELD_DOMAIN) - 1,
+            log->ops.domain.data, log->ops.domain.used - 1);
+    }
+
+    if(log->ops.sid.used > 1) {
+        bytes += log->ops.sid.used * 2;
+        facets_add_key_value_length(
+            facets,
+            WEVT_FIELD_SID, sizeof(WEVT_FIELD_SID) - 1,
+            log->ops.sid.data, log->ops.sid.used - 1);
     }
 
     {

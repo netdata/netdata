@@ -373,7 +373,7 @@ static bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev) {
         wevt_get_uuid_by_type(&content[EvtSystemProviderGuid], &ev->provider);
         wevt_get_uuid_by_type(&content[EvtSystemActivityID], &ev->activity_id);
         wevt_get_uuid_by_type(&content[EvtSystemRelatedActivityID], &ev->related_activity_id);
-        wevt_field_get_sid(&content[EvtSystemUserID], &log->ops.user);
+        wevt_field_get_sid(&content[EvtSystemUserID], &log->ops.account, &log->ops.domain, &log->ops.sid);
 
         PROVIDER_META_HANDLE *p = log->provider =
                 provider_get(ev->provider, content[EvtSystemProviderName].StringVal);
@@ -474,7 +474,9 @@ static void wevt_event_done(WEVT_LOG *log) {
     log->ops.channel.src = TXT_SOURCE_UNKNOWN;
     log->ops.provider.src = TXT_SOURCE_UNKNOWN;
     log->ops.computer.src = TXT_SOURCE_UNKNOWN;
-    log->ops.user.src = TXT_SOURCE_UNKNOWN;
+    log->ops.account.src = TXT_SOURCE_UNKNOWN;
+    log->ops.domain.src = TXT_SOURCE_UNKNOWN;
+    log->ops.sid.src = TXT_SOURCE_UNKNOWN;
 
     log->ops.event.src = TXT_SOURCE_UNKNOWN;
     log->ops.level.src = TXT_SOURCE_UNKNOWN;
@@ -486,7 +488,9 @@ static void wevt_event_done(WEVT_LOG *log) {
     log->ops.channel.used = 0;
     log->ops.provider.used = 0;
     log->ops.computer.used = 0;
-    log->ops.user.used = 0;
+    log->ops.account.used = 0;
+    log->ops.domain.used = 0;
+    log->ops.sid.used = 0;
 
     log->ops.event.used = 0;
     log->ops.level.used = 0;
@@ -592,7 +596,9 @@ void wevt_closelog6(WEVT_LOG *log) {
     txt_utf8_cleanup(&log->ops.channel);
     txt_utf8_cleanup(&log->ops.provider);
     txt_utf8_cleanup(&log->ops.computer);
-    txt_utf8_cleanup(&log->ops.user);
+    txt_utf8_cleanup(&log->ops.account);
+    txt_utf8_cleanup(&log->ops.domain);
+    txt_utf8_cleanup(&log->ops.sid);
 
     txt_utf8_cleanup(&log->ops.event);
     txt_utf8_cleanup(&log->ops.level);

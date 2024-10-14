@@ -113,7 +113,7 @@ static inline void append_filetime(BUFFER *b, FILETIME *ft, const char *separato
 }
 
 static inline void append_sid(BUFFER *b, PSID sid, const char *separator) {
-    buffer_sid_to_name(sid, b, separator);
+    buffer_sid_to_sid_str_and_name(sid, b, separator);
 }
 
 static inline void append_sbyte(BUFFER *b, INT8 n, const char *separator) {
