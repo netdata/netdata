@@ -9,12 +9,7 @@ endmeta-->
 
 # RocketChat
 
-
 <img src="https://netdata.cloud/img/rocketchat.png" width="150"/>
-
-
-You can configure notification delivery to RocketChat from the Netdata Cloud UI.
-
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
