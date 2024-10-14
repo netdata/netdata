@@ -401,8 +401,6 @@ def write_to_file(path, md, meta_yaml, sidebar_label, community, mode='default')
             )
         except FileNotFoundError as e:
             print("Exception in writing to file", e)
-
-
     elif mode == 'agent-notification':
         # add custom_edit_url as the md file, so we can have uniqueness in the ingest script
         # afterwards the ingest will replace this metadata with meta_yaml
@@ -497,7 +495,6 @@ for integration in integrations:
                 integration, mode='agent-notification')
             path = build_path(meta_yaml)
             write_to_file(path, md, meta_yaml, sidebar_label, community, mode='agent-notification')
-
 
         elif integration['integration_type'] == "cloud_notification":
 
