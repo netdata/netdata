@@ -9,12 +9,7 @@ endmeta-->
 
 # Discord
 
-
 <img src="https://netdata.cloud/img/discord.png" width="150"/>
-
-
-You can configure notification delivery to your Discord server from the Netdata Cloud UI.
-
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 

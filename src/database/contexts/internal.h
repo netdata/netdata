@@ -39,25 +39,26 @@ typedef enum __attribute__ ((__packed__)) {
     RRD_FLAG_UPDATED        = (1 << 2), // this object has updates to propagate
     RRD_FLAG_ARCHIVED       = (1 << 3), // this object is not currently being collected
     RRD_FLAG_OWN_LABELS     = (1 << 4), // this instance has its own labels - not linked to an RRDSET
-    RRD_FLAG_LIVE_RETENTION = (1 << 5), // we have got live retention from the database
-    RRD_FLAG_QUEUED_FOR_HUB = (1 << 6), // this context is currently queued to be dispatched to hub
-    RRD_FLAG_QUEUED_FOR_PP  = (1 << 7), // this context is currently queued to be post-processed
-    RRD_FLAG_HIDDEN         = (1 << 8), // don't expose this to the hub or the API
+    RRD_FLAG_DEMAND_LABELS  = (1 << 5), // this instance should load labels on demand
+    RRD_FLAG_LIVE_RETENTION = (1 << 6), // we have got live retention from the database
+    RRD_FLAG_QUEUED_FOR_HUB = (1 << 7), // this context is currently queued to be dispatched to hub
+    RRD_FLAG_QUEUED_FOR_PP  = (1 << 8), // this context is currently queued to be post-processed
+    RRD_FLAG_HIDDEN         = (1 << 9), // don't expose this to the hub or the API
 
-    RRD_FLAG_UPDATE_REASON_TRIGGERED               = (1 << 9),  // the update was triggered by the child object
-    RRD_FLAG_UPDATE_REASON_LOAD_SQL                = (1 << 10), // this object has just been loaded from SQL
-    RRD_FLAG_UPDATE_REASON_NEW_OBJECT              = (1 << 11), // this object has just been created
-    RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT          = (1 << 12), // we received an update on this object
-    RRD_FLAG_UPDATE_REASON_CHANGED_LINKING         = (1 << 13), // an instance or a metric switched RRDSET or RRDDIM
-    RRD_FLAG_UPDATE_REASON_CHANGED_METADATA        = (1 << 14), // this context or instance changed uuid, name, units, title, family, chart type, priority, update every, rrd changed flags
-    RRD_FLAG_UPDATE_REASON_ZERO_RETENTION          = (1 << 15), // this object has no retention
-    RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T    = (1 << 16), // this object changed its oldest time in the db
-    RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T     = (1 << 17), // this object change its latest time in the db
-    RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED = (1 << 18), // this object has stopped being collected
-    RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED = (1 << 19), // this object has started being collected
-    RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD      = (1 << 20), // this context belongs to a host that just disconnected
-    RRD_FLAG_UPDATE_REASON_UNUSED                  = (1 << 21), // this context is not used anymore
-    RRD_FLAG_UPDATE_REASON_DB_ROTATION             = (1 << 22), // this context changed because of a db rotation
+    RRD_FLAG_UPDATE_REASON_TRIGGERED               = (1 << 10), // the update was triggered by the child object
+    RRD_FLAG_UPDATE_REASON_LOAD_SQL                = (1 << 11), // this object has just been loaded from SQL
+    RRD_FLAG_UPDATE_REASON_NEW_OBJECT              = (1 << 12), // this object has just been created
+    RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT          = (1 << 13), // we received an update on this object
+    RRD_FLAG_UPDATE_REASON_CHANGED_LINKING         = (1 << 14), // an instance or a metric switched RRDSET or RRDDIM
+    RRD_FLAG_UPDATE_REASON_CHANGED_METADATA        = (1 << 15), // this context or instance changed uuid, name, units, title, family, chart type, priority, update every, rrd changed flags
+    RRD_FLAG_UPDATE_REASON_ZERO_RETENTION          = (1 << 16), // this object has no retention
+    RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T    = (1 << 17), // this object changed its oldest time in the db
+    RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T     = (1 << 18), // this object change its latest time in the db
+    RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED = (1 << 19), // this object has stopped being collected
+    RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED = (1 << 20), // this object has started being collected
+    RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD      = (1 << 21), // this context belongs to a host that just disconnected
+    RRD_FLAG_UPDATE_REASON_UNUSED                  = (1 << 22), // this context is not used anymore
+    RRD_FLAG_UPDATE_REASON_DB_ROTATION             = (1 << 23), // this context changed because of a db rotation
 
     RRD_FLAG_MERGED_COLLECTED_RI_TO_RC             = (1 << 29),
 
@@ -354,6 +355,7 @@ static inline void rrdcontext_release(RRDCONTEXT_ACQUIRED *rca) {
 
 // ----------------------------------------------------------------------------
 // Forward definitions
+void load_instance_labels_on_demand(nd_uuid_t *uuid, void *data);
 
 void rrdcontext_recalculate_context_retention(RRDCONTEXT *rc, RRD_FLAGS reason, bool worker_jobs);
 void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool worker_jobs);

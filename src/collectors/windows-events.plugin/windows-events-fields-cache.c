@@ -53,16 +53,16 @@ void field_cache_init(void) {
 static inline bool should_zero_provider(WEVT_FIELD_TYPE type, uint64_t value) {
     switch(type) {
         case WEVT_FIELD_TYPE_LEVEL:
-            return !is_valid_publisher_level(value, true);
+            return !is_valid_provider_level(value, true);
 
-        case WEVT_FIELD_TYPE_KEYWORDS:
-            return !is_valid_publisher_keywords(value, true);
+        case WEVT_FIELD_TYPE_KEYWORD:
+            return !is_valid_provider_keyword(value, true);
 
         case WEVT_FIELD_TYPE_OPCODE:
-            return !is_valid_publisher_opcode(value, true);
+            return !is_valid_provider_opcode(value, true);
 
         case WEVT_FIELD_TYPE_TASK:
-            return !is_valid_publisher_task(value, true);
+            return !is_valid_provider_task(value, true);
 
         default:
             return false;

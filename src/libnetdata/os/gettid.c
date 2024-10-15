@@ -31,3 +31,8 @@ pid_t gettid_cached(void) {
 
     return gettid_cached_tid;
 }
+
+pid_t gettid_uncached(void) {
+    gettid_cached_tid = 0;
+    return gettid_cached();
+}

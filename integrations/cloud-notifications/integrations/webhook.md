@@ -9,12 +9,7 @@ endmeta-->
 
 # Webhook
 
-
 <img src="https://netdata.cloud/img/webhook.svg" width="150"/>
-
-
-You can configure notification delivery to a webhook using a predefined schema from the Netdata Cloud UI.
-
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 

@@ -41,6 +41,7 @@
 
 #define BITMAP_STR_DEFINE_FUNCTIONS_EXTERN(type)                                                                   \
     type type ## _2id_one(const char *str);                                                                        \
+    const char *type##_2str_one(type id);                                                                          \
     const char *type##_2json(BUFFER *wb, const char *key, type id);
 
 #define BITMAP_STR_DEFINE_FUNCTIONS(type, def, def_str)                                                             \
@@ -55,6 +56,16 @@
         }                                                                                                           \
                                                                                                                     \
         return def;                                                                                                 \
+    }                                                                                                               \
+                                                                                                                    \
+    const char *type##_2str_one(type id)                                                                            \
+    {                                                                                                               \
+        for (size_t i = 0; type ## _names[i].name; i++) {                                                           \
+            if (id == type ## _names[i].id)                                                                         \
+                return type ## _names[i].name;                                                                      \
+        }                                                                                                           \
+                                                                                                                    \
+        return def_str;                                                                                             \
     }                                                                                                               \
                                                                                                                     \
     const char *type##_2json(BUFFER *wb, const char *key, type id)                                                  \

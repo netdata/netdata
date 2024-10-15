@@ -4,6 +4,7 @@
 #define NETDATA_WINDOWS_EVENTS_QUERY_H
 
 #include "libnetdata/libnetdata.h"
+#include "windows-events.h"
 
 #define BATCH_NEXT_EVENT 500
 
@@ -11,23 +12,27 @@ typedef struct wevt_event {
     uint64_t id;                        // EventRecordId (unique and sequential per channel)
     uint8_t  version;
     uint8_t  level;                     // The severity of event
-    uint8_t  opcode;                    // we receive this as 8bit, but publishers use 32bit
+    uint8_t  opcode;                    // we receive this as 8bit, but providers use 32bit
     uint16_t event_id;                  // This is the template that defines the message to be shown
     uint16_t task;
+    uint16_t qualifiers;
     uint32_t process_id;
     uint32_t thread_id;
     uint64_t keywords;                  // Categorization of the event
     ND_UUID  provider;
-    ND_UUID  correlation_activity_id;
+    ND_UUID  activity_id;
+    ND_UUID  related_activity_id;
     nsec_t   created_ns;
+    WEVT_PROVIDER_PLATFORM platform;
 } WEVT_EVENT;
 
 #define WEVT_EVENT_EMPTY (WEVT_EVENT){ .id = 0, .created_ns = 0, }
 
 typedef struct {
     EVT_VARIANT	*data;
-    size_t size;
-    size_t used;
+    DWORD size;
+    DWORD used;
+    DWORD count;
 } WEVT_VARIANT;
 
 typedef struct {
@@ -41,6 +46,16 @@ typedef struct {
 
 struct provider_meta_handle;
 
+typedef enum __attribute__((packed)) {
+    WEVT_QUERY_BASIC        = (1 << 0),
+    WEVT_QUERY_EXTENDED     = (1 << 1),
+    WEVT_QUERY_EVENT_DATA   = (1 << 2),
+} WEVT_QUERY_TYPE;
+
+#define WEVT_QUERY_RETENTION  WEVT_QUERY_BASIC
+#define WEVT_QUERY_NORMAL    (WEVT_QUERY_BASIC | WEVT_QUERY_EXTENDED)
+#define WEVT_QUERY_FTS       (WEVT_QUERY_BASIC | WEVT_QUERY_EXTENDED | WEVT_QUERY_EVENT_DATA)
+
 typedef struct wevt_log {
     struct {
         DWORD size;
@@ -50,13 +65,19 @@ typedef struct wevt_log {
 
     EVT_HANDLE hEvent;
     EVT_HANDLE hQuery;
-    EVT_HANDLE hRenderContext;
-    struct provider_meta_handle *publisher;
+    EVT_HANDLE hRenderSystemContext;
+    EVT_HANDLE hRenderUserContext;
+    struct provider_meta_handle *provider;
+
+    WEVT_QUERY_TYPE type;
 
     struct {
-        // temp buffer used for rendering event log messages
-        // never use directly
-        WEVT_VARIANT content;
+        struct {
+            // temp buffer used for rendering event log messages
+            // never use directly
+            WEVT_VARIANT system;
+            WEVT_VARIANT user;
+        } raw;
 
         // temp buffer used for fetching and converting UNICODE and UTF-8
         // every string operation overwrites it, multiple times per event log entry
@@ -75,16 +96,19 @@ typedef struct wevt_log {
 
         TXT_UTF8 channel;
         TXT_UTF8 provider;
-        TXT_UTF8 source;
         TXT_UTF8 computer;
-        TXT_UTF8 user;
+        TXT_UTF8 account;
+        TXT_UTF8 domain;
+        TXT_UTF8 sid;
 
-        TXT_UTF8 event;
+        TXT_UTF8 event; // the message to be shown to the user
         TXT_UTF8 level;
         TXT_UTF8 keywords;
         TXT_UTF8 opcode;
         TXT_UTF8 task;
         TXT_UTF8 xml;
+
+        BUFFER *event_data;
     } ops;
 
     struct {
@@ -102,7 +126,7 @@ typedef struct wevt_log {
 
 } WEVT_LOG;
 
-WEVT_LOG *wevt_openlog6(void);
+WEVT_LOG *wevt_openlog6(WEVT_QUERY_TYPE type);
 void wevt_closelog6(WEVT_LOG *log);
 
 bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, const wchar_t *query, EVT_RETENTION *retention);
@@ -110,12 +134,14 @@ bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, const wchar_t
 bool wevt_query(WEVT_LOG *log, LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS direction);
 void wevt_query_done(WEVT_LOG *log);
 
-bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full);
+bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev);
 
-bool wevt_get_message_unicode(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags);
+bool EvtFormatMessage_utf16(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags);
 
-bool wevt_get_event_utf8(WEVT_LOG *log, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
-bool wevt_get_xml_utf8(WEVT_LOG *log, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
+bool EvtFormatMessage_Event_utf8(TXT_UNICODE *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
+bool EvtFormatMessage_Xml_utf8(TXT_UNICODE *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
+
+void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator);
 
 static inline void wevt_variant_cleanup(WEVT_VARIANT *v) {
     freez(v->data);
@@ -128,6 +154,10 @@ static inline void wevt_variant_resize(WEVT_VARIANT *v, size_t required_size) {
     wevt_variant_cleanup(v);
     v->size = compute_new_size(v->size, required_size);
     v->data = mallocz(v->size);
+}
+
+static inline void wevt_variant_count_from_used(WEVT_VARIANT *v) {
+    v->count = v->used / sizeof(*v->data);
 }
 
 static inline uint8_t wevt_field_get_uint8(EVT_VARIANT *ev) {
@@ -180,16 +210,17 @@ static inline bool wevt_field_get_string_utf8(EVT_VARIANT *ev, TXT_UTF8 *dst) {
     return wevt_str_wchar_to_utf8(dst, ev->StringVal, -1);
 }
 
-bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst);
-
-static inline bool wevt_field_get_sid(EVT_VARIANT *ev, TXT_UTF8 *dst) {
+bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str);
+static inline bool wevt_field_get_sid(EVT_VARIANT *ev, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str) {
     if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull) {
-        wevt_utf8_empty(dst);
+        wevt_utf8_empty(dst_account);
+        wevt_utf8_empty(dst_domain);
+        wevt_utf8_empty(dst_sid_str);
         return false;
     }
 
     fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeSid);
-    return wevt_convert_user_id_to_name(ev->SidVal, dst);
+    return wevt_convert_user_id_to_name(ev->SidVal, dst_account, dst_domain, dst_sid_str);
 }
 
 static inline uint64_t wevt_field_get_filetime_to_ns(EVT_VARIANT *ev) {
@@ -222,42 +253,42 @@ static inline bool wevt_get_uuid_by_type(EVT_VARIANT *ev, ND_UUID *dst) {
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-severity-levels
-static inline bool is_valid_publisher_level(uint64_t level, bool strict) {
+static inline bool is_valid_provider_level(uint64_t level, bool strict) {
     if(strict)
-        // when checking if the name is publisher independent
+        // when checking if the name is provider independent
         return level >= 16 && level <= 255;
     else
-        // when checking acceptable values in publisher manifests
+        // when checking acceptable values in provider manifests
         return level <= 255;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-tasks-and-opcodes
-static inline bool is_valid_publisher_opcode(uint64_t opcode, bool strict) {
+static inline bool is_valid_provider_opcode(uint64_t opcode, bool strict) {
     if(strict)
-        // when checking if the name is publisher independent
+        // when checking if the name is provider independent
         return opcode >= 10 && opcode <= 239;
     else
-        // when checking acceptable values in publisher manifests
+        // when checking acceptable values in provider manifests
         return opcode <= 255;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-tasks-and-opcodes
-static inline bool is_valid_publisher_task(uint64_t task, bool strict) {
+static inline bool is_valid_provider_task(uint64_t task, bool strict) {
     if(strict)
-        // when checking if the name is publisher independent
+        // when checking if the name is provider independent
         return task > 0 && task <= 0xFFFF;
     else
-        // when checking acceptable values in publisher manifests
+        // when checking acceptable values in provider manifests
         return task <= 0xFFFF;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/wes/defining-keywords-used-to-classify-types-of-events
-static inline bool is_valid_publisher_keywords(uint64_t keyword, bool strict) {
+static inline bool is_valid_provider_keyword(uint64_t keyword, bool strict) {
     if(strict)
-        // when checking if the name is publisher independent
+        // when checking if the name is provider independent
         return keyword > 0 && keyword <= 0x0000FFFFFFFFFFFF;
     else
-        // when checking acceptable values in publisher manifests
+        // when checking acceptable values in provider manifests
         return true;
 }
 

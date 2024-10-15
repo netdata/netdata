@@ -40,7 +40,7 @@ static int connect_to_spawn_server(const char *path, bool log) {
 
     if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
         if(log)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Cannot connect() to spawn server.");
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Cannot connect() to spawn server on path '%s'.", path);
         close(sock);
         return -1;
     }
@@ -56,6 +56,10 @@ static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
     close(server->sock); server->sock = -1;
     if(server->pipe[0] != -1) { close(server->pipe[0]); server->pipe[0] = -1; }
     if(server->pipe[1] != -1) { close(server->pipe[1]); server->pipe[1] = -1; }
+
+    // close all open file descriptors of the parent, but keep ours
+    os_close_all_non_std_open_fds_except(rq->fds, 4, 0);
+    nd_log_reopen_log_files_for_spawn_server();
 
     // set the process name
     os_setproctitle("spawn-child", server->argc, server->argv);
@@ -980,22 +984,24 @@ static bool spawn_server_create_listening_socket(SPAWN_SERVER *server) {
 }
 
 static void replace_stdio_with_dev_null() {
+    // we cannot log in this function - the logger is not yet initialized after fork()
+
     int dev_null_fd = open("/dev/null", O_RDWR);
     if (dev_null_fd == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to open /dev/null: %s", strerror(errno));
+        // nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to open /dev/null: %s", strerror(errno));
         return;
     }
 
     // Redirect stdin (fd 0)
     if (dup2(dev_null_fd, STDIN_FILENO) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to redirect stdin to /dev/null: %s", strerror(errno));
+        // nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to redirect stdin to /dev/null: %s", strerror(errno));
         close(dev_null_fd);
         return;
     }
 
     // Redirect stdout (fd 1)
     if (dup2(dev_null_fd, STDOUT_FILENO) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to redirect stdout to /dev/null: %s", strerror(errno));
+        // nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to redirect stdout to /dev/null: %s", strerror(errno));
         close(dev_null_fd);
         return;
     }

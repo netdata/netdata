@@ -85,13 +85,12 @@ docker logs netdata 2>&1 | grep [[ entry.meta.module_name ]]
 
 [% endif %]
 [% endif %]
-[% elif entry.integration_type == 'notification' %]
-[% if 'cloud-notifications' in entry._src_path|string %]
+[% elif entry.integration_type == 'cloud_notification' %]
 [% if entry.troubleshooting.problems.list %]
 ## Troubleshooting
 
 [% endif %]
-[% else %]
+[% elif entry.integration_type == 'agent_notification' %]
 ## Troubleshooting
 
 ### Test Notification
@@ -114,7 +113,6 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 
 Note that this will test _all_ alert mechanisms for the selected role.
 
-[% endif %]
 [% elif entry.integration_type == 'exporter' %]
 [% if entry.troubleshooting.problems.list %]
 ## Troubleshooting

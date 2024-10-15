@@ -5,6 +5,10 @@
 
 #include "libnetdata/libnetdata.h"
 
+#ifndef _countof
+#define _countof(x) (sizeof(x) / sizeof(*(x)))
+#endif
+
 #ifdef HAVE_LIBMNL
 #include <linux/rtnetlink.h>
 #include <linux/inet_diag.h>
@@ -80,6 +84,8 @@ struct local_sockets_config {
     bool uid;
     bool namespaces;
     bool tcp_info;
+    bool no_mnl;
+    bool report;
 
     size_t max_errors;
     size_t max_concurrent_namespaces;
@@ -91,6 +97,12 @@ struct local_sockets_config {
 
     // internal use
     uint64_t net_ns_inode;
+};
+
+struct timing_work {
+    usec_t start_ut;
+    usec_t end_ut;
+    const char *name;
 };
 
 typedef struct local_socket_state {
@@ -107,11 +119,14 @@ typedef struct local_socket_state {
         size_t errors_encountered;
     } stats;
 
+    size_t timings_idx;
+    struct timing_work timings[20];
+
     bool spawn_server_is_mine;
     SPAWN_SERVER *spawn_server;
 
 #ifdef HAVE_LIBMNL
-    bool use_nl;
+    bool use_mnl;
     struct mnl_socket *nl;
     uint16_t tmp_protocol;
 #endif
@@ -671,26 +686,28 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
 #ifdef HAVE_LIBMNL
 
 static inline void local_sockets_libmnl_init(LS_STATE *ls) {
+    if(ls->config.no_mnl) return;
+
     ls->nl = mnl_socket_open(NETLINK_INET_DIAG);
     if (ls->nl == NULL) {
         local_sockets_log(ls, "cannot open libmnl netlink socket");
-        ls->use_nl = false;
+        ls->use_mnl = false;
     }
     else if (mnl_socket_bind(ls->nl, 0, MNL_SOCKET_AUTOPID) < 0) {
         local_sockets_log(ls, "cannot bind libmnl netlink socket");
         mnl_socket_close(ls->nl);
         ls->nl = NULL;
-        ls->use_nl = false;
+        ls->use_mnl = false;
     }
     else
-        ls->use_nl = true;
+        ls->use_mnl = true;
 }
 
 static inline void local_sockets_libmnl_cleanup(LS_STATE *ls) {
     if(ls->nl) {
         mnl_socket_close(ls->nl);
         ls->nl = NULL;
-        ls->use_nl = false;
+        ls->use_mnl = false;
     }
 }
 
@@ -1009,7 +1026,7 @@ static inline void local_sockets_init(LS_STATE *ls) {
     memset(&ls->stats, 0, sizeof(ls->stats));
 
 #ifdef HAVE_LIBMNL
-    ls->use_nl = false;
+    ls->use_mnl = false;
     ls->nl = NULL;
     ls->tmp_protocol = 0;
     local_sockets_libmnl_init(ls);
@@ -1072,10 +1089,10 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
 
 static inline void local_sockets_do_family_protocol(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
 #ifdef HAVE_LIBMNL
-    if(ls->nl && ls->use_nl) {
-        ls->use_nl = local_sockets_libmnl_get_sockets(ls, family, protocol);
+    if(!ls->config.no_mnl && ls->nl && ls->use_mnl) {
+        ls->use_mnl = local_sockets_libmnl_get_sockets(ls, family, protocol);
 
-        if(ls->use_nl)
+        if(ls->use_mnl)
             return;
     }
 #endif
@@ -1083,35 +1100,64 @@ static inline void local_sockets_do_family_protocol(LS_STATE *ls, const char *fi
     local_sockets_read_proc_net_x(ls, filename, family, protocol);
 }
 
+static inline void local_sockets_track_time(LS_STATE *ls, const char *name) {
+    if(!ls->config.report || ls->timings_idx >= _countof(ls->timings))
+        return;
+
+    usec_t now_ut = now_monotonic_usec();
+
+    if(ls->timings_idx == 0 && !ls->timings[0].start_ut) {
+        ls->timings[0].start_ut = now_ut;
+        ls->timings[0].name = name;
+    }
+    else if(ls->timings_idx + 1 < _countof(ls->timings)) {
+        ls->timings[ls->timings_idx].end_ut = now_ut;
+        ls->timings_idx++;
+        ls->timings[ls->timings_idx].start_ut = now_ut;
+        ls->timings[ls->timings_idx].name = name;
+    }
+    else if(ls->timings_idx + 1 == _countof(ls->timings)) {
+        ls->timings[ls->timings_idx].end_ut = now_ut;
+        ls->timings_idx++; // out of bounds
+    }
+}
+
 static inline void local_sockets_read_all_system_sockets(LS_STATE *ls) {
     char path[FILENAME_MAX + 1];
 
     if(ls->config.namespaces) {
+        local_sockets_track_time(ls, "read_namespaces");
         snprintfz(path, sizeof(path), "%s/proc/self/ns/net", ls->config.host_prefix);
         local_sockets_read_proc_inode_link(ls, path, &ls->proc_self_net_ns_inode, "net");
+
     }
 
     if(ls->config.cmdline || ls->config.comm || ls->config.pid || ls->config.namespaces) {
+        local_sockets_track_time(ls, "read_proc_pids");
         snprintfz(path, sizeof(path), "%s/proc", ls->config.host_prefix);
         local_sockets_find_all_sockets_in_proc(ls, path);
     }
 
     if(ls->config.tcp4) {
+        local_sockets_track_time(ls, "read_tcp4");
         snprintfz(path, sizeof(path), "%s/proc/net/tcp", ls->config.host_prefix);
         local_sockets_do_family_protocol(ls, path, AF_INET, IPPROTO_TCP);
     }
 
     if(ls->config.udp4) {
+        local_sockets_track_time(ls, "read_udp4");
         snprintfz(path, sizeof(path), "%s/proc/net/udp", ls->config.host_prefix);
         local_sockets_do_family_protocol(ls, path, AF_INET, IPPROTO_UDP);
     }
 
     if(ls->config.tcp6) {
+        local_sockets_track_time(ls, "read_tcp6");
         snprintfz(path, sizeof(path), "%s/proc/net/tcp6", ls->config.host_prefix);
         local_sockets_do_family_protocol(ls, path, AF_INET6, IPPROTO_TCP);
     }
 
     if(ls->config.udp6) {
+        local_sockets_track_time(ls, "read_udp6");
         snprintfz(path, sizeof(path), "%s/proc/net/udp6", ls->config.host_prefix);
         local_sockets_do_family_protocol(ls, path, AF_INET6, IPPROTO_UDP);
     }
@@ -1291,7 +1337,7 @@ struct local_sockets_namespace_worker {
     uint64_t inode;
 };
 
-static inline void *local_sockets_get_namespace_sockets(void *arg) {
+static inline void *local_sockets_get_namespace_sockets_worker(void *arg) {
     struct local_sockets_namespace_worker *data = arg;
     LS_STATE *ls = data->ls;
     const uint64_t inode = data->inode;
@@ -1358,8 +1404,10 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
         workers_data[last_thread].ls = ls;
         workers_data[last_thread].inode = inode;
         workers[last_thread] = nd_thread_create(
-            "local-sockets-worker", NETDATA_THREAD_OPTION_JOINABLE,
-            local_sockets_get_namespace_sockets, &workers_data[last_thread]);
+            "local-sockets-worker",
+            NETDATA_THREAD_OPTION_JOINABLE,
+            local_sockets_get_namespace_sockets_worker,
+            &workers_data[last_thread]);
 
         spinlock_lock(&ls->spinlock);
     }
@@ -1376,24 +1424,35 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
 // --------------------------------------------------------------------------------------------------------------------
 
 static inline void local_sockets_process(LS_STATE *ls) {
+    ls->timings_idx = 0;
+    local_sockets_track_time(ls, "init");
+
     // initialize our hashtables
     local_sockets_init(ls);
+
+    local_sockets_track_time(ls, "all_sockets");
 
     // read all sockets from /proc
     local_sockets_read_all_system_sockets(ls);
 
     // check all socket namespaces
-    if(ls->config.namespaces)
+    if(ls->config.namespaces) {
+        local_sockets_track_time(ls, "switch_namespaces");
         local_sockets_namespaces(ls);
+    }
 
     // detect the directions of the sockets
-    if(ls->config.inbound || ls->config.outbound || ls->config.local)
+    if(ls->config.inbound || ls->config.outbound || ls->config.local) {
+        local_sockets_track_time(ls, "detect_direction");
         local_sockets_detect_directions(ls);
+    }
 
     // call the callback for each socket
+    local_sockets_track_time(ls, "output");
     local_sockets_foreach_local_socket_call_cb(ls);
 
     // free all memory
+    local_sockets_track_time(ls, "cleanup");
     local_sockets_cleanup(ls);
 }
 

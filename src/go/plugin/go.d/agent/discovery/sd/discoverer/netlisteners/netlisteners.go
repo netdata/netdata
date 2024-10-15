@@ -84,6 +84,9 @@ type (
 		cache      map[uint64]*cacheItem // [target.Hash]
 
 		started chan struct{}
+
+		successRuns int64
+		timeoutRuns int64
 	}
 	cacheItem struct {
 		lastSeenTime time.Time
@@ -118,7 +121,7 @@ func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup
 			return
 		case <-tk.C:
 			if err := d.discoverLocalListeners(ctx, in); err != nil {
-				d.Warning(err)
+				d.Error(err)
 				return
 			}
 		}
@@ -128,11 +131,19 @@ func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup
 func (d *Discoverer) discoverLocalListeners(ctx context.Context, in chan<- []model.TargetGroup) error {
 	bs, err := d.ll.discover(ctx)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
+		if errors.Is(err, context.DeadlineExceeded) {
+			// there is no point in continuing pointless attempts/use cpu
+			// https://github.com/netdata/netdata/discussions/18751#discussioncomment-10908472
+			if d.timeoutRuns++; d.timeoutRuns > 5 && d.successRuns == 0 {
+				return err
+			}
+			d.Warning(err)
 			return nil
 		}
 		return err
 	}
+
+	d.successRuns++
 
 	tgts, err := d.parseLocalListeners(bs)
 	if err != nil {
