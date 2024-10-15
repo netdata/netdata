@@ -74,7 +74,7 @@ Netdata scales effortlessly from a single server to thousands, even in complex, 
   Netdata Agents can be linked to together (in parent-child relationships), to build observability centralization points within your infrastructure, allowing you to control data replication and retention at multiple levels.
 
 - :fire: **Fully Automated Powerful Visualization**<br/>
-  Using the NIDL (Nodes, Instances, Dimensions & Labels) data model, the Netdata Agent enables the creation of fully automated dashboards, providing corellated visualization of all metrics, allowing you to understand any dataset at first sight, but also to filter, slice and dice the data directly on the dashboards, without the need to learn a query language.
+  Using the NIDL (Nodes, Instances, Dimensions & Labels) data model, the Netdata Agent enables the creation of fully automated dashboards, providing correlated visualization of all metrics, allowing you to understand any dataset at first sight, but also to filter, slice and dice the data directly on the dashboards, without the need to learn a query language.
 
   <small>Note: the Netdata UI is closed-source, but free to use with Netdata Agents and Netdata Cloud.</small>
 

@@ -313,7 +313,7 @@ typedef struct {
 } ml_training_thread_t;
 
 typedef struct {
-    bool enable_anomaly_detection;
+    int enable_anomaly_detection;
 
     unsigned max_train_samples;
     unsigned min_train_samples;
