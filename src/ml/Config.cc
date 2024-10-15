@@ -19,7 +19,7 @@ static T clamp(const T& Value, const T& Min, const T& Max) {
 void ml_config_load(ml_config_t *cfg) {
     const char *config_section_ml = CONFIG_SECTION_ML;
 
-    bool enable_anomaly_detection = config_get_boolean(config_section_ml, "enabled", true);
+    int enable_anomaly_detection = config_get_boolean_ondemand(config_section_ml, "enabled", CONFIG_BOOLEAN_AUTO);
 
     /*
      * Read values
@@ -139,4 +139,10 @@ void ml_config_load(ml_config_t *cfg) {
     cfg->suppression_threshold = suppression_threshold;
 
     cfg->enable_statistics_charts = enable_statistics_charts;
+
+    if (cfg->enable_anomaly_detection == CONFIG_BOOLEAN_AUTO && default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
+        Cfg.enable_anomaly_detection = 0;
+        config_set_boolean(config_section_ml, "enabled", CONFIG_BOOLEAN_NO);
+        return;
+    }
 }
