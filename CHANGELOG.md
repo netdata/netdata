@@ -6,16 +6,22 @@
 
 **Merged pull requests:**
 
+- fix\(go.d/apcupsd\): fix ups\_load value divided by 100 [\#18780](https://github.com/netdata/netdata/pull/18780) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/sd/netlisteners\): fix exec deadline exceeded check [\#18774](https://github.com/netdata/netdata/pull/18774) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18771](https://github.com/netdata/netdata/pull/18771) ([netdatabot](https://github.com/netdatabot))
 - Bump github.com/bmatcuk/doublestar/v4 from 4.6.1 to 4.7.1 in /src/go [\#18768](https://github.com/netdata/netdata/pull/18768) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/sijms/go-ora/v2 from 2.8.20 to 2.8.22 in /src/go [\#18767](https://github.com/netdata/netdata/pull/18767) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/vmware/govmomi from 0.43.0 to 0.44.1 in /src/go [\#18766](https://github.com/netdata/netdata/pull/18766) ([dependabot[bot]](https://github.com/apps/dependabot))
 - SPAWN SERVER: close all open fds on callback [\#18764](https://github.com/netdata/netdata/pull/18764) ([ktsaou](https://github.com/ktsaou))
 - Adjust option \(Windows claim\) [\#18763](https://github.com/netdata/netdata/pull/18763) ([thiagoftsm](https://github.com/thiagoftsm))
+- NetFramework \(Part I\) [\#18762](https://github.com/netdata/netdata/pull/18762) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix storing of repeat field [\#18760](https://github.com/netdata/netdata/pull/18760) ([stelfrag](https://github.com/stelfrag))
 - local-listeners without libmnl [\#18759](https://github.com/netdata/netdata/pull/18759) ([ktsaou](https://github.com/ktsaou))
 - fix\(proc.plugin/zfs\): fix arcstats.pm [\#18758](https://github.com/netdata/netdata/pull/18758) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/sd/net\_listeners\): exit if local-listeners constantly times out [\#18757](https://github.com/netdata/netdata/pull/18757) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18756](https://github.com/netdata/netdata/pull/18756) ([netdatabot](https://github.com/netdatabot))
 - Update metadata.yaml [\#18755](https://github.com/netdata/netdata/pull/18755) ([Ancairon](https://github.com/Ancairon))
+-  Remove the overview section from cloud notif. integrations [\#18754](https://github.com/netdata/netdata/pull/18754) ([Ancairon](https://github.com/Ancairon))
 - Add Ubuntu 24.10 and Fedora 41 to CI. [\#18753](https://github.com/netdata/netdata/pull/18753) ([Ferroin](https://github.com/Ferroin))
 - Simplify sentence on cloud notification integrations [\#18750](https://github.com/netdata/netdata/pull/18750) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#18749](https://github.com/netdata/netdata/pull/18749) ([netdatabot](https://github.com/netdatabot))
@@ -427,12 +433,6 @@
 - Fix up CMake feature handling for Windows. [\#18229](https://github.com/netdata/netdata/pull/18229) ([Ferroin](https://github.com/Ferroin))
 - Improve windows agent [\#18227](https://github.com/netdata/netdata/pull/18227) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update libbpf \(1.45.0\) [\#18226](https://github.com/netdata/netdata/pull/18226) ([thiagoftsm](https://github.com/thiagoftsm))
-- Regenerate integrations.js [\#18225](https://github.com/netdata/netdata/pull/18225) ([netdatabot](https://github.com/netdatabot))
-- Update Cloud MSTeam documentation [\#18224](https://github.com/netdata/netdata/pull/18224) ([car12o](https://github.com/car12o))
-- Add code signing for Windows executables. [\#18222](https://github.com/netdata/netdata/pull/18222) ([Ferroin](https://github.com/Ferroin))
-- go.d fix netdata dir path on win under msys [\#18221](https://github.com/netdata/netdata/pull/18221) ([ilyam8](https://github.com/ilyam8))
-- Port Tomcat collector to Go [\#18220](https://github.com/netdata/netdata/pull/18220) ([Ancairon](https://github.com/Ancairon))
-- go.d drop using cancelreader [\#18219](https://github.com/netdata/netdata/pull/18219) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
