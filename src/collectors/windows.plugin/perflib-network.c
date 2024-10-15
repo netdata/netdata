@@ -532,24 +532,37 @@ struct network_interface {
         RRDDIM *rd_received;
         RRDDIM *rd_outbound;
     } errors;
+
+    struct {
+        COUNTER_DATA length;
+        RRDSET *st;
+        RRDDIM *rd;
+    } queue;
 };
 
 static DICTIONARY *physical_interfaces = NULL, *virtual_interfaces = NULL;
 
-static void network_interface_init(struct network_interface *ni) {
-    ni->packets.received.key = "Packets Received/sec";
-    ni->packets.sent.key = "Packets Sent/sec";
+static void network_interface_init(struct network_interface *d) {
+    d->packets.received.key = "Packets Received/sec";
+    d->packets.sent.key = "Packets Sent/sec";
+    d->traffic.received.key = "Bytes Received/sec";
+    d->traffic.sent.key = "Bytes Sent/sec";
+    d->speed.current_bandwidth.key = "Current Bandwidth";
+    d->discards.received.key = "Packets Received Discarded";
+    d->discards.outbound.key = "Packets Outbound Discarded";
+    d->errors.received.key = "Packets Received Errors";
+    d->errors.outbound.key = "Packets Outbound Errors";
+    d->queue.length.key = "Output Queue Length";
+}
 
-    ni->traffic.received.key = "Bytes Received/sec";
-    ni->traffic.sent.key = "Bytes Sent/sec";
-
-    ni->speed.current_bandwidth.key = "Current Bandwidth";
-
-    ni->discards.received.key = "Packets Received Discarded";
-    ni->discards.outbound.key = "Packets Outbound Discarded";
-
-    ni->errors.received.key = "Packets Received Errors";
-    ni->errors.outbound.key = "Packets Outbound Errors";
+static void network_interface_cleanup(struct network_interface *d) {
+    rrdvar_chart_variable_release(d->traffic.st, d->traffic.chart_var_speed);
+    rrdset_is_obsolete___safe_from_collector_thread(d->packets.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->traffic.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->speed.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->discards.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->errors.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->queue.st);
 }
 
 void dict_interface_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -773,6 +786,33 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
             rrddim_set_by_pointer(d->discards.st, d->discards.rd_outbound, (collected_number)d->discards.outbound.current.Data);
             rrdset_done(d->discards.st);
         }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->queue.length)) {
+            if (unlikely(!d->queue.st)) {
+                d->queue.st = rrdset_create_localhost(
+                        "net_queue_length",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.queue_length",
+                        "Interface Output Queue Length",
+                        "packets",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 5,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->queue.st, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->queue.st, windows_shared_buffer, physical);
+
+                d->queue.rd = rrddim_add(d->queue.st, "length", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(d->queue.st, d->queue.rd, (collected_number)d->queue.length.current.Data);
+            rrdset_done(d->queue.st);
+        }
     }
 
     if(physical) {
@@ -808,10 +848,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
         struct network_interface *d;
         dfe_start_write(dict, d) {
             if(d->last_collected < now_ut) {
-                rrdvar_chart_variable_release(d->traffic.st, d->traffic.chart_var_speed);
-                rrdset_is_obsolete___safe_from_collector_thread(d->packets.st);
-                rrdset_is_obsolete___safe_from_collector_thread(d->traffic.st);
-                rrdset_is_obsolete___safe_from_collector_thread(d->speed.st);
+                network_interface_cleanup(d);
                 dictionary_del(dict, d_dfe.name);
             }
         }
