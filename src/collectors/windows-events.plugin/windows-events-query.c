@@ -2,48 +2,13 @@
 
 #include "windows-events.h"
 
+static void wevt_event_done(WEVT_LOG *log);
+
 static uint64_t wevt_log_file_size(const wchar_t *channel);
 
-#define FIELD_RECORD_NUMBER                 (0)
-#define FIELD_EVENT_ID                      (1)
-#define FIELD_LEVEL                         (2)
-#define FIELD_OPCODE                        (3)
-#define FIELD_KEYWORDS                      (4)
-#define FIELD_VERSION                       (5)
-#define FIELD_TASK                          (6)
-#define FIELD_PROCESS_ID                    (7)
-#define FIELD_THREAD_ID                     (8)
-#define FIELD_TIME_CREATED                  (9)
-#define FIELD_CHANNEL                       (10)
-#define FIELD_COMPUTER_NAME                 (11)
-#define FIELD_PROVIDER_NAME                 (12)
-#define FIELD_EVENT_SOURCE_NAME             (13)
-#define FIELD_PROVIDER_GUID                 (14)
-#define FIELD_CORRELATION_ACTIVITY_ID       (15)
-#define FIELD_USER_ID                       (16)
+// --------------------------------------------------------------------------------------------------------------------
 
-// These are the fields we extract from the logs
-static const wchar_t *RENDER_ITEMS[] = {
-    L"/Event/System/EventRecordID",
-    L"/Event/System/EventID",
-    L"/Event/System/Level",
-    L"/Event/System/Opcode",
-    L"/Event/System/Keywords",
-    L"/Event/System/Version",
-    L"/Event/System/Task",
-    L"/Event/System/Execution/@ProcessID",
-    L"/Event/System/Execution/@ThreadID",
-    L"/Event/System/TimeCreated/@SystemTime",
-    L"/Event/System/Channel",
-    L"/Event/System/Computer",
-    L"/Event/System/Provider/@Name",
-    L"/Event/System/Provider/@EventSourceName",
-    L"/Event/System/Provider/@Guid",
-    L"/Event/System/Correlation/@ActivityID",
-    L"/Event/System/Security/@UserID",
-};
-
-static const char *wevt_extended_status(void) {
+static const char *EvtGetExtendedStatus_utf8(void) {
     static __thread wchar_t wbuf[4096];
     static __thread char buf[4096];
     DWORD wbuf_used = 0;
@@ -62,7 +27,9 @@ static const char *wevt_extended_status(void) {
     return buf;
 }
 
-bool wevt_get_message_unicode(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags) {
+// --------------------------------------------------------------------------------------------------------------------
+
+bool EvtFormatMessage_utf16(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags) {
     dst->used = 0;
 
     DWORD size = 0;
@@ -107,55 +74,43 @@ cleanup:
     return false;
 }
 
-static bool wevt_get_field_from_events_log(
-    WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent,
-    TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS flags) {
+static bool EvtFormatMessage_utf8(
+        TXT_UNICODE *tmp, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent,
+        TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS flags) {
 
     dst->src = TXT_SOURCE_EVENT_LOG;
 
-    if(wevt_get_message_unicode(&log->ops.unicode, publisher_handle(p), hEvent, 0, flags))
-        return wevt_str_unicode_to_utf8(dst, &log->ops.unicode);
+    if(EvtFormatMessage_utf16(tmp, provider_handle(p), hEvent, 0, flags))
+        return wevt_str_unicode_to_utf8(dst, tmp);
 
     wevt_utf8_empty(dst);
     return false;
 }
 
-bool wevt_get_event_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
-    return wevt_get_field_from_events_log(log, p, hEvent, dst, EvtFormatMessageEvent);
+bool EvtFormatMessage_Event_utf8(TXT_UNICODE *tmp, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
+    return EvtFormatMessage_utf8(tmp, p, hEvent, dst, EvtFormatMessageEvent);
 }
 
-bool wevt_get_xml_utf8(WEVT_LOG *log, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
-    return wevt_get_field_from_events_log(log, p, hEvent, dst, EvtFormatMessageXml);
+bool EvtFormatMessage_Xml_utf8(TXT_UNICODE *tmp, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
+    return EvtFormatMessage_utf8(tmp, p, hEvent, dst, EvtFormatMessageXml);
 }
 
-static inline void wevt_event_done(WEVT_LOG *log) {
-    if (log->publisher) {
-        publisher_release(log->publisher);
-        log->publisher = NULL;
-    }
-
-    if (log->hEvent) {
-        EvtClose(log->hEvent);
-        log->hEvent = NULL;
-    }
-
-    log->ops.level.src = TXT_SOURCE_UNKNOWN;
-    log->ops.keywords.src = TXT_SOURCE_UNKNOWN;
-    log->ops.opcode.src = TXT_SOURCE_UNKNOWN;
-    log->ops.task.src = TXT_SOURCE_UNKNOWN;
-}
+// --------------------------------------------------------------------------------------------------------------------
 
 static void wevt_get_field_from_cache(
-    WEVT_LOG *log, uint64_t value, PROVIDER_META_HANDLE *h,
-    TXT_UTF8 *dst, const ND_UUID *provider,
-    WEVT_FIELD_TYPE cache_type, EVT_FORMAT_MESSAGE_FLAGS flags) {
+        WEVT_LOG *log, uint64_t value, PROVIDER_META_HANDLE *h,
+        TXT_UTF8 *dst, const ND_UUID *provider,
+        WEVT_FIELD_TYPE cache_type, EVT_FORMAT_MESSAGE_FLAGS flags) {
 
     if (field_cache_get(cache_type, provider, value, dst))
         return;
 
-    wevt_get_field_from_events_log(log, h, log->hEvent, dst, flags);
+    EvtFormatMessage_utf8(&log->ops.unicode, h, log->hEvent, dst, flags);
     field_cache_set(cache_type, provider, value, dst);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// Level
 
 #define SET_LEN_AND_RETURN(constant) *len = sizeof(constant) - 1; return constant
 
@@ -179,9 +134,9 @@ static void wevt_get_level(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageLevel;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_LEVEL;
-    bool is_publisher = is_valid_publisher_level(value, true);
+    bool is_provider = is_valid_provider_level(value, true);
 
-    if(!is_publisher) {
+    if(!is_provider) {
         size_t len;
         const char *hardcoded = wevt_level_hardcoded(value, &len);
         if(hardcoded) {
@@ -189,12 +144,12 @@ static void wevt_get_level(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *
             dst->src = TXT_SOURCE_HARDCODED;
         }
         else {
-            // since this is not a publisher value
+            // since this is not a provider value
             // we expect to get the system description of it
             wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
         }
     }
-    else if (!publisher_get_level(dst, h, value)) {
+    else if (!provider_get_level(dst, h, value)) {
         // not found in the manifest, get it from the cache
         wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
     }
@@ -202,6 +157,9 @@ static void wevt_get_level(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *
     txt_utf8_set_numeric_if_empty(
             dst, WEVT_PREFIX_LEVEL, sizeof(WEVT_PREFIX_LEVEL) - 1, ev->level);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// Opcode
 
 static inline const char *wevt_opcode_hardcoded(uint64_t opcode, size_t *len) {
     switch(opcode) {
@@ -228,9 +186,9 @@ static void wevt_get_opcode(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE 
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageOpcode;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_OPCODE;
-    bool is_publisher = is_valid_publisher_opcode(value, true);
+    bool is_provider = is_valid_provider_opcode(value, true);
 
-    if(!is_publisher) {
+    if(!is_provider) {
         size_t len;
         const char *hardcoded = wevt_opcode_hardcoded(value, &len);
         if(hardcoded) {
@@ -238,12 +196,12 @@ static void wevt_get_opcode(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE 
             dst->src = TXT_SOURCE_HARDCODED;
         }
         else {
-            // since this is not a publisher value
+            // since this is not a provider value
             // we expect to get the system description of it
             wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
         }
     }
-    else if (!publisher_get_opcode(dst, h, value)) {
+    else if (!provider_get_opcode(dst, h, value)) {
         // not found in the manifest, get it from the cache
         wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
     }
@@ -251,6 +209,9 @@ static void wevt_get_opcode(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE 
     txt_utf8_set_numeric_if_empty(
             dst, WEVT_PREFIX_OPCODE, sizeof(WEVT_PREFIX_OPCODE) - 1, ev->opcode);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// Task
 
 static const char *wevt_task_hardcoded(uint64_t task, size_t *len) {
     switch(task) {
@@ -267,9 +228,9 @@ static void wevt_get_task(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageTask;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_TASK;
-    bool is_publisher = is_valid_publisher_task(value, true);
+    bool is_provider = is_valid_provider_task(value, true);
 
-    if(!is_publisher) {
+    if(!is_provider) {
         size_t len;
         const char *hardcoded = wevt_task_hardcoded(value, &len);
         if(hardcoded) {
@@ -277,12 +238,12 @@ static void wevt_get_task(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h
             dst->src = TXT_SOURCE_HARDCODED;
         }
         else {
-            // since this is not a publisher value
+            // since this is not a provider value
             // we expect to get the system description of it
             wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
         }
     }
-    else if (!publisher_get_task(dst, h, value)) {
+    else if (!provider_get_task(dst, h, value)) {
         // not found in the manifest, get it from the cache
         wevt_get_field_from_cache(log, value, h, dst, &ev->provider, cache_type, flags);
     }
@@ -291,9 +252,12 @@ static void wevt_get_task(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h
             dst, WEVT_PREFIX_TASK, sizeof(WEVT_PREFIX_TASK) - 1, ev->task);
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// Keyword
+
 #define SET_BITS(msk, txt) { .mask = msk, .name = txt, .len = sizeof(txt) - 1, }
 
-static uint64_t wevt_keywords_handle_reserved(uint64_t value, TXT_UTF8 *dst) {
+static uint64_t wevt_keyword_handle_reserved(uint64_t value, TXT_UTF8 *dst) {
     struct {
         uint64_t mask;
         const char *name;
@@ -324,7 +288,7 @@ static uint64_t wevt_keywords_handle_reserved(uint64_t value, TXT_UTF8 *dst) {
     return value & 0x0000FFFFFFFFFFFF;
 }
 
-static void wevt_get_keywords(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
+static void wevt_get_keyword(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h) {
     TXT_UTF8 *dst = &log->ops.keywords;
 
     if(ev->keywords == WEVT_KEYWORD_NONE) {
@@ -332,18 +296,18 @@ static void wevt_get_keywords(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDL
         dst->src = TXT_SOURCE_HARDCODED;
     }
 
-    uint64_t value = wevt_keywords_handle_reserved(ev->keywords, dst);
+    uint64_t value = wevt_keyword_handle_reserved(ev->keywords, dst);
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageKeyword;
-    WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_KEYWORDS;
+    WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_KEYWORD;
 
     if(!value && dst->used <= 1) {
         // no hardcoded info in the buffer, make it None
         txt_utf8_set(dst, WEVT_KEYWORD_NAME_NONE, sizeof(WEVT_KEYWORD_NAME_NONE) - 1);
         dst->src = TXT_SOURCE_HARDCODED;
     }
-    else if (value && !publisher_get_keywords(dst, h, value) && dst->used <= 1) {
-        // the publisher did not provide any info and the description is still empty.
+    else if (value && !provider_get_keywords(dst, h, value) && dst->used <= 1) {
+        // the provider did not provide any info and the description is still empty.
         // the system returns 1 keyword, the highest bit, not a list
         // so, when we call the system, we pass the original value (ev->keywords)
         wevt_get_field_from_cache(log, ev->keywords, h, dst, &ev->provider, cache_type, flags);
@@ -353,57 +317,86 @@ static void wevt_get_keywords(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDL
             dst, WEVT_PREFIX_KEYWORDS, sizeof(WEVT_PREFIX_KEYWORDS) - 1, ev->keywords);
 }
 
-bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
-    bool ret = false;
+// --------------------------------------------------------------------------------------------------------------------
+// Fetching Events
 
-    // obtain the information from selected events
+static inline bool wEvtRender(WEVT_LOG *log, EVT_HANDLE context, WEVT_VARIANT *raw) {
     DWORD bytes_used = 0, property_count = 0;
-    if (!EvtRender(log->hRenderContext, log->hEvent, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
+    if (!EvtRender(context, log->hEvent, EvtRenderEventValues, raw->size, raw->data, &bytes_used, &property_count)) {
         // information exceeds the allocated space
         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, hRenderContext: 0x%lx, hEvent: 0x%lx, content: 0x%lx, size: %zu, extended info: %s",
-                   (uintptr_t)log->hRenderContext, (uintptr_t)log->hEvent, (uintptr_t)log->ops.content.data, log->ops.content.size, wevt_extended_status());
-            goto cleanup;
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "EvtRender() failed, hRenderSystemContext: 0x%lx, hEvent: 0x%lx, content: 0x%lx, size: %u, extended info: %s",
+                   (uintptr_t)context, (uintptr_t)log->hEvent, (uintptr_t)raw->data, raw->size,
+                   EvtGetExtendedStatus_utf8());
+            return false;
         }
 
-        wevt_variant_resize(&log->ops.content, bytes_used);
-        if (!EvtRender(log->hRenderContext, log->hEvent, EvtRenderEventValues, log->ops.content.size, log->ops.content.data, &bytes_used, &property_count)) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtRender() failed, after bytes_used increase, extended info: %s",
-                   wevt_extended_status());
-            goto cleanup;
+        wevt_variant_resize(raw, bytes_used);
+        if (!EvtRender(context, log->hEvent, EvtRenderEventValues, raw->size, raw->data, &bytes_used, &property_count)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "EvtRender() failed, after bytes_used increase, extended info: %s",
+                   EvtGetExtendedStatus_utf8());
+            return false;
         }
     }
-    log->ops.content.used = bytes_used;
+    raw->used = bytes_used;
+    raw->count = property_count;
 
-    EVT_VARIANT *content = log->ops.content.data;
+    return true;
+}
 
-    ev->id          = wevt_field_get_uint64(&content[FIELD_RECORD_NUMBER]);
-    ev->event_id    = wevt_field_get_uint16(&content[FIELD_EVENT_ID]);
-    ev->level       = wevt_field_get_uint8(&content[FIELD_LEVEL]);
-    ev->opcode      = wevt_field_get_uint8(&content[FIELD_OPCODE]);
-    ev->keywords    = wevt_field_get_uint64_hex(&content[FIELD_KEYWORDS]);
-    ev->version     = wevt_field_get_uint8(&content[FIELD_VERSION]);
-    ev->task        = wevt_field_get_uint16(&content[FIELD_TASK]);
-    ev->process_id  = wevt_field_get_uint32(&content[FIELD_PROCESS_ID]);
-    ev->thread_id   = wevt_field_get_uint32(&content[FIELD_THREAD_ID]);
-    ev->created_ns  = wevt_field_get_filetime_to_ns(&content[FIELD_TIME_CREATED]);
+static bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev) {
+    bool ret = false;
 
-    if(full) {
-        wevt_field_get_string_utf8(&content[FIELD_CHANNEL], &log->ops.channel);
-        wevt_field_get_string_utf8(&content[FIELD_COMPUTER_NAME], &log->ops.computer);
-        wevt_field_get_string_utf8(&content[FIELD_PROVIDER_NAME], &log->ops.provider);
-        wevt_field_get_string_utf8(&content[FIELD_EVENT_SOURCE_NAME], &log->ops.source);
-        wevt_get_uuid_by_type(&content[FIELD_PROVIDER_GUID], &ev->provider);
-        wevt_get_uuid_by_type(&content[FIELD_CORRELATION_ACTIVITY_ID], &ev->correlation_activity_id);
-        wevt_field_get_sid(&content[FIELD_USER_ID], &log->ops.user);
+    if(!wEvtRender(log, log->hRenderSystemContext, &log->ops.raw.system))
+        goto cleanup;
 
-        PROVIDER_META_HANDLE *h = log->publisher =
-            publisher_get(ev->provider, content[FIELD_PROVIDER_NAME].StringVal);
+    EVT_VARIANT *content = log->ops.raw.system.data;
 
-        wevt_get_level(log, ev, h);
-        wevt_get_task(log, ev, h);
-        wevt_get_opcode(log, ev, h);
-        wevt_get_keywords(log, ev, h);
+    ev->id          = wevt_field_get_uint64(&content[EvtSystemEventRecordId]);
+    ev->event_id    = wevt_field_get_uint16(&content[EvtSystemEventID]);
+    ev->level       = wevt_field_get_uint8(&content[EvtSystemLevel]);
+    ev->opcode      = wevt_field_get_uint8(&content[EvtSystemOpcode]);
+    ev->keywords    = wevt_field_get_uint64_hex(&content[EvtSystemKeywords]);
+    ev->version     = wevt_field_get_uint8(&content[EvtSystemVersion]);
+    ev->task        = wevt_field_get_uint16(&content[EvtSystemTask]);
+    ev->qualifiers  = wevt_field_get_uint16(&content[EvtSystemQualifiers]);
+    ev->process_id  = wevt_field_get_uint32(&content[EvtSystemProcessID]);
+    ev->thread_id   = wevt_field_get_uint32(&content[EvtSystemThreadID]);
+    ev->created_ns  = wevt_field_get_filetime_to_ns(&content[EvtSystemTimeCreated]);
+
+    if(log->type & WEVT_QUERY_EXTENDED) {
+        wevt_field_get_string_utf8(&content[EvtSystemChannel], &log->ops.channel);
+        wevt_field_get_string_utf8(&content[EvtSystemComputer], &log->ops.computer);
+        wevt_field_get_string_utf8(&content[EvtSystemProviderName], &log->ops.provider);
+        wevt_get_uuid_by_type(&content[EvtSystemProviderGuid], &ev->provider);
+        wevt_get_uuid_by_type(&content[EvtSystemActivityID], &ev->activity_id);
+        wevt_get_uuid_by_type(&content[EvtSystemRelatedActivityID], &ev->related_activity_id);
+        wevt_field_get_sid(&content[EvtSystemUserID], &log->ops.account, &log->ops.domain, &log->ops.sid);
+
+        PROVIDER_META_HANDLE *p = log->provider =
+                provider_get(ev->provider, content[EvtSystemProviderName].StringVal);
+
+        ev->platform = provider_get_platform(p);
+
+        wevt_get_level(log, ev, p);
+        wevt_get_task(log, ev, p);
+        wevt_get_opcode(log, ev, p);
+        wevt_get_keyword(log, ev, p);
+
+        if(log->type & WEVT_QUERY_EVENT_DATA && wEvtRender(log, log->hRenderUserContext, &log->ops.raw.user)) {
+#if (ON_FTS_PRELOAD_MESSAGE == 1)
+            EvtFormatMessage_Event_utf8(&log->ops.unicode, log->provider, log->hEvent, &log->ops.event);
+#endif
+#if (ON_FTS_PRELOAD_XML == 1)
+            EvtFormatMessage_Xml_utf8(&log->ops.unicode, log->provider, log->hEvent, &log->ops.xml);
+#endif
+#if (ON_FTS_PRELOAD_EVENT_DATA == 1)
+            for(size_t i = 0; i < log->ops.raw.user.count ;i++)
+                evt_variant_to_buffer(log->ops.event_data, &log->ops.raw.user.data[i], " ||| ");
+#endif
+        }
     }
 
     ret = true;
@@ -412,11 +405,11 @@ cleanup:
     return ret;
 }
 
-bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
-    DWORD size = full ? BATCH_NEXT_EVENT : 1;
+bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev) {
+    DWORD size = (log->type & WEVT_QUERY_EXTENDED) ? BATCH_NEXT_EVENT : 1;
     DWORD max_failures = 10;
 
-    fatal_assert(log && log->hQuery && log->hRenderContext);
+    fatal_assert(log && log->hQuery && log->hRenderSystemContext);
 
     while(max_failures > 0) {
         if (log->batch.used >= log->batch.size) {
@@ -433,7 +426,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
                 if(size == 1) {
                     nd_log(NDLS_COLLECTORS, NDLP_ERR,
                            "EvtNext() failed, hQuery: 0x%lx, size: %zu, extended info: %s",
-                           (uintptr_t)log->hQuery, (size_t)size, wevt_extended_status());
+                           (uintptr_t)log->hQuery, (size_t)size, EvtGetExtendedStatus_utf8());
                     return false;
                 }
 
@@ -455,7 +448,7 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
         log->batch.hEvents[log->batch.used] = NULL;
         log->batch.used++;
 
-        if(wevt_get_next_event_one(log, ev, full))
+        if(wevt_get_next_event_one(log, ev))
             return true;
         else {
             log->query_stats.failed_count++;
@@ -465,6 +458,69 @@ bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev, bool full) {
     }
 
     return false;
+}
+
+static void wevt_event_done(WEVT_LOG *log) {
+    if (log->provider) {
+        provider_release(log->provider);
+        log->provider = NULL;
+    }
+
+    if (log->hEvent) {
+        EvtClose(log->hEvent);
+        log->hEvent = NULL;
+    }
+
+    log->ops.channel.src = TXT_SOURCE_UNKNOWN;
+    log->ops.provider.src = TXT_SOURCE_UNKNOWN;
+    log->ops.computer.src = TXT_SOURCE_UNKNOWN;
+    log->ops.account.src = TXT_SOURCE_UNKNOWN;
+    log->ops.domain.src = TXT_SOURCE_UNKNOWN;
+    log->ops.sid.src = TXT_SOURCE_UNKNOWN;
+
+    log->ops.event.src = TXT_SOURCE_UNKNOWN;
+    log->ops.level.src = TXT_SOURCE_UNKNOWN;
+    log->ops.keywords.src = TXT_SOURCE_UNKNOWN;
+    log->ops.opcode.src = TXT_SOURCE_UNKNOWN;
+    log->ops.task.src = TXT_SOURCE_UNKNOWN;
+    log->ops.xml.src = TXT_SOURCE_UNKNOWN;
+
+    log->ops.channel.used = 0;
+    log->ops.provider.used = 0;
+    log->ops.computer.used = 0;
+    log->ops.account.used = 0;
+    log->ops.domain.used = 0;
+    log->ops.sid.used = 0;
+
+    log->ops.event.used = 0;
+    log->ops.level.used = 0;
+    log->ops.keywords.used = 0;
+    log->ops.opcode.used = 0;
+    log->ops.task.used = 0;
+    log->ops.xml.used = 0;
+
+    if(log->ops.event_data)
+        log->ops.event_data->len = 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// Query management
+
+bool wevt_query(WEVT_LOG *log, LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS direction) {
+    wevt_query_done(log);
+    log->log_stats.queries_count++;
+
+    EVT_HANDLE hQuery = EvtQuery(NULL, channel, query, EvtQueryChannelPath | (direction & (EvtQueryReverseDirection | EvtQueryForwardDirection)) | EvtQueryTolerateQueryErrors);
+    if (!hQuery) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, query: %s | extended info: %s",
+               query2utf8(query), EvtGetExtendedStatus_utf8());
+
+        log->log_stats.queries_failed++;
+        return false;
+    }
+
+    log->hQuery = hQuery;
+    return true;
 }
 
 void wevt_query_done(WEVT_LOG *log) {
@@ -490,19 +546,59 @@ void wevt_query_done(WEVT_LOG *log) {
     log->query_stats.failed_count = 0;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// Log management
+
+WEVT_LOG *wevt_openlog6(WEVT_QUERY_TYPE type) {
+    WEVT_LOG *log = callocz(1, sizeof(*log));
+    log->type = type;
+
+    // create the system render
+    log->hRenderSystemContext = EvtCreateRenderContext(0, NULL, EvtRenderContextSystem);
+    if (!log->hRenderSystemContext) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "EvtCreateRenderContext() on system context failed, extended info: %s",
+               EvtGetExtendedStatus_utf8());
+        goto cleanup;
+    }
+
+    if(type & WEVT_QUERY_EVENT_DATA) {
+        log->hRenderUserContext = EvtCreateRenderContext(0, NULL, EvtRenderContextUser);
+        if (!log->hRenderUserContext) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "EvtCreateRenderContext failed, on user context failed, extended info: %s",
+                   EvtGetExtendedStatus_utf8());
+            goto cleanup;
+        }
+
+        log->ops.event_data = buffer_create(4096, NULL);
+    }
+
+    return log;
+
+cleanup:
+    wevt_closelog6(log);
+    return NULL;
+}
+
 void wevt_closelog6(WEVT_LOG *log) {
     wevt_query_done(log);
 
-    if (log->hRenderContext)
-        EvtClose(log->hRenderContext);
+    if (log->hRenderSystemContext)
+        EvtClose(log->hRenderSystemContext);
 
-    wevt_variant_cleanup(&log->ops.content);
+    if (log->hRenderUserContext)
+        EvtClose(log->hRenderUserContext);
+
+    wevt_variant_cleanup(&log->ops.raw.system);
+    wevt_variant_cleanup(&log->ops.raw.user);
     txt_unicode_cleanup(&log->ops.unicode);
     txt_utf8_cleanup(&log->ops.channel);
     txt_utf8_cleanup(&log->ops.provider);
-    txt_utf8_cleanup(&log->ops.source);
     txt_utf8_cleanup(&log->ops.computer);
-    txt_utf8_cleanup(&log->ops.user);
+    txt_utf8_cleanup(&log->ops.account);
+    txt_utf8_cleanup(&log->ops.domain);
+    txt_utf8_cleanup(&log->ops.sid);
 
     txt_utf8_cleanup(&log->ops.event);
     txt_utf8_cleanup(&log->ops.level);
@@ -510,8 +606,14 @@ void wevt_closelog6(WEVT_LOG *log) {
     txt_utf8_cleanup(&log->ops.opcode);
     txt_utf8_cleanup(&log->ops.task);
     txt_utf8_cleanup(&log->ops.xml);
+
+    buffer_free(log->ops.event_data);
+
     freez(log);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// Retention
 
 bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, const wchar_t *query, EVT_RETENTION *retention) {
     bool ret = false;
@@ -525,15 +627,15 @@ bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, const wchar_t
     if (!log->hQuery) {
         if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() for retention failed, channel '%s' not found, cannot get retention, extended info: %s",
-                   channel2utf8(channel), wevt_extended_status());
+                   channel2utf8(channel), EvtGetExtendedStatus_utf8());
         else
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() for retention on channel '%s' failed, cannot get retention, extended info: %s",
-                   channel2utf8(channel), wevt_extended_status());
+                   channel2utf8(channel), EvtGetExtendedStatus_utf8());
 
         goto cleanup;
     }
 
-    if (!wevt_get_next_event(log, &retention->first_event, false))
+    if (!wevt_get_next_event(log, &retention->first_event))
         goto cleanup;
 
     if (!retention->first_event.id) {
@@ -548,15 +650,15 @@ bool wevt_channel_retention(WEVT_LOG *log, const wchar_t *channel, const wchar_t
     if (!log->hQuery) {
         if (GetLastError() == ERROR_EVT_CHANNEL_NOT_FOUND)
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() for retention failed, channel '%s' not found, extended info: %s",
-                   channel2utf8(channel), wevt_extended_status());
+                   channel2utf8(channel), EvtGetExtendedStatus_utf8());
         else
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() for retention on channel '%s' failed, extended info: %s",
-                   channel2utf8(channel), wevt_extended_status());
+                   channel2utf8(channel), EvtGetExtendedStatus_utf8());
 
         goto cleanup;
     }
 
-    if (!wevt_get_next_event(log, &retention->last_event, false) || retention->last_event.id == 0) {
+    if (!wevt_get_next_event(log, &retention->last_event) || retention->last_event.id == 0) {
         // no data in eventlog
         retention->last_event = retention->first_event;
     }
@@ -582,24 +684,6 @@ cleanup:
     return ret;
 }
 
-WEVT_LOG *wevt_openlog6(void) {
-    size_t RENDER_ITEMS_count = (sizeof(RENDER_ITEMS) / sizeof(const wchar_t *));
-
-    WEVT_LOG *log = callocz(1, sizeof(*log));
-
-    // create the system render
-    log->hRenderContext = EvtCreateRenderContext(RENDER_ITEMS_count, RENDER_ITEMS, EvtRenderContextValues);
-    if (!log->hRenderContext) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtCreateRenderContext failed, extended info: %s", wevt_extended_status());
-        freez(log);
-        log = NULL;
-        goto cleanup;
-    }
-
-cleanup:
-    return log;
-}
-
 static uint64_t wevt_log_file_size(const wchar_t *channel) {
     EVT_HANDLE hLog = NULL;
     EVT_VARIANT evtVariant;
@@ -610,14 +694,14 @@ static uint64_t wevt_log_file_size(const wchar_t *channel) {
     hLog = EvtOpenLog(NULL, channel, EvtOpenChannelPath);
     if (!hLog) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtOpenLog() on channel '%s' failed, extended info: %s",
-               channel2utf8(channel), wevt_extended_status());
+               channel2utf8(channel), EvtGetExtendedStatus_utf8());
         goto cleanup;
     }
 
     // Get the file size of the log
     if (!EvtGetLogInfo(hLog, EvtLogFileSize, sizeof(evtVariant), &evtVariant, &bufferUsed)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetLogInfo() on channel '%s' failed, extended info: %s",
-               channel2utf8(channel), wevt_extended_status());
+               channel2utf8(channel), EvtGetExtendedStatus_utf8());
         goto cleanup;
     }
 
@@ -629,21 +713,4 @@ cleanup:
         EvtClose(hLog);
 
     return file_size;
-}
-
-bool wevt_query(WEVT_LOG *log, LPCWSTR channel, LPCWSTR query, EVT_QUERY_FLAGS direction) {
-    wevt_query_done(log);
-    log->log_stats.queries_count++;
-
-    EVT_HANDLE hQuery = EvtQuery(NULL, channel, query, EvtQueryChannelPath | (direction & (EvtQueryReverseDirection | EvtQueryForwardDirection)) | EvtQueryTolerateQueryErrors);
-    if (!hQuery) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtQuery() failed, query: %s | extended info: %s",
-               query2utf8(query), wevt_extended_status());
-
-        log->log_stats.queries_failed++;
-        return false;
-    }
-
-    log->hQuery = hQuery;
-    return true;
 }

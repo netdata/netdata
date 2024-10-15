@@ -17,7 +17,6 @@
 #define LQS_PARAMETER_IF_MODIFIED_SINCE "if_modified_since"
 #define LQS_PARAMETER_DATA_ONLY "data_only"
 #define LQS_PARAMETER_SOURCE "__logs_sources" // this must never conflict with user fields
-#define LQS_PARAMETER_SOURCE_NAME "Logs Sources" // this is how it is shown to users
 #define LQS_PARAMETER_INFO "info"
 #define LQS_PARAMETER_SLICE "slice"
 #define LQS_PARAMETER_DELTA "delta"

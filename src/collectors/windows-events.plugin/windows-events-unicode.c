@@ -5,7 +5,7 @@
 inline void utf82unicode(wchar_t *dst, size_t dst_size, const char *src) {
     if (src) {
         // Convert from UTF-8 to wide char (UTF-16)
-        if (MultiByteToWideChar(CP_UTF8, 0, src, -1, dst, (int)dst_size) == 0)
+        if (utf8_to_utf16(dst, dst_size, src, -1) == 0)
             wcsncpy(dst, L"[failed conv.]", dst_size - 1);
     }
     else
@@ -41,7 +41,7 @@ char *unicode2utf8_strdupz(const wchar_t *src, size_t *utf8_len) {
 
 wchar_t *channel2unicode(const char *utf8str) {
     static __thread wchar_t buffer[1024];
-    utf82unicode(buffer, sizeof(buffer) / sizeof(wchar_t), utf8str);
+    utf82unicode(buffer, _countof(buffer), utf8str);
     return buffer;
 }
 
@@ -66,6 +66,12 @@ char *domain2utf8(const wchar_t *domain) {
 char *query2utf8(const wchar_t *query) {
     static __thread char buffer[16384];
     unicode2utf8(buffer, sizeof(buffer), query);
+    return buffer;
+}
+
+char *provider2utf8(const wchar_t *provider) {
+    static __thread char buffer[256];
+    unicode2utf8(buffer, sizeof(buffer), provider);
     return buffer;
 }
 
