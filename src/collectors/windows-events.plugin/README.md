@@ -7,7 +7,7 @@
 The Windows Events plugin by Netdata makes viewing, exploring and analyzing Windows Events simple and
 efficient.
 
-IMAGE
+![image](https://github.com/user-attachments/assets/71a1ab1d-5b7b-477e-a4e6-a30275a5710b)
 
 ## Key features
 
@@ -30,8 +30,6 @@ For more information check [this discussion](https://github.com/netdata/netdata/
 ## Events Sources
 
 The plugin automatically detects all the available channels and offers a list of "Event Channels".
-
-IMAGE_OF_EVENT_CHANNELS
 
 By default, it aggregates events from all event channels, providing a unified systems view of all events.
 
