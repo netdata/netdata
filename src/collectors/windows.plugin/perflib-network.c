@@ -538,6 +538,31 @@ struct network_interface {
         RRDSET *st;
         RRDDIM *rd;
     } queue;
+
+    struct {
+        COUNTER_DATA connections;
+        RRDSET *st;
+        RRDDIM *rd;
+    } chimney;
+
+    struct {
+        COUNTER_DATA connections;
+        COUNTER_DATA packets;
+        COUNTER_DATA exceptions;
+        COUNTER_DATA average_packet_size;
+
+        RRDSET *st_connections;
+        RRDDIM *rd_connections;
+
+        RRDSET *st_packets;
+        RRDDIM *rd_packets;
+
+        RRDSET *st_exceptions;
+        RRDDIM *rd_exceptions;
+
+        RRDSET *st_average_packet_size;
+        RRDDIM *rd_average_packet_size;
+    } rsc;
 };
 
 static DICTIONARY *physical_interfaces = NULL, *virtual_interfaces = NULL;
@@ -553,6 +578,11 @@ static void network_interface_init(struct network_interface *d) {
     d->errors.received.key = "Packets Received Errors";
     d->errors.outbound.key = "Packets Outbound Errors";
     d->queue.length.key = "Output Queue Length";
+    d->chimney.connections.key = "Offloaded Connections";
+    d->rsc.connections.key = "TCP Active RSC Connections";
+    d->rsc.packets.key = "TCP RSC Coalesced Packets/sec";
+    d->rsc.exceptions.key = "TCP RSC Exceptions/sec";
+    d->rsc.average_packet_size.key = "TCP RSC Average Packet Size";
 }
 
 static void network_interface_cleanup(struct network_interface *d) {
@@ -563,6 +593,11 @@ static void network_interface_cleanup(struct network_interface *d) {
     rrdset_is_obsolete___safe_from_collector_thread(d->discards.st);
     rrdset_is_obsolete___safe_from_collector_thread(d->errors.st);
     rrdset_is_obsolete___safe_from_collector_thread(d->queue.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->chimney.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->rsc.st_connections);
+    rrdset_is_obsolete___safe_from_collector_thread(d->rsc.st_packets);
+    rrdset_is_obsolete___safe_from_collector_thread(d->rsc.st_exceptions);
+    rrdset_is_obsolete___safe_from_collector_thread(d->rsc.st_average_packet_size);
 }
 
 void dict_interface_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -812,6 +847,141 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
 
             rrddim_set_by_pointer(d->queue.st, d->queue.rd, (collected_number)d->queue.length.current.Data);
             rrdset_done(d->queue.st);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->rsc.connections)) {
+            if (unlikely(!d->rsc.st_connections)) {
+                d->rsc.st_connections = rrdset_create_localhost(
+                        "net_rsc_connections",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.rsc_connections",
+                        "Active TCP Connections Offloaded by RSC",
+                        "connections",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 6,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->rsc.st_connections, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->rsc.st_connections, windows_shared_buffer, physical);
+
+                d->rsc.rd_connections = rrddim_add(d->rsc.st_connections, "connections", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(d->rsc.st_connections, d->rsc.rd_connections, (collected_number)d->rsc.connections.current.Data);
+            rrdset_done(d->rsc.st_connections);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->rsc.packets)) {
+            if (unlikely(!d->rsc.st_packets)) {
+                d->rsc.st_packets = rrdset_create_localhost(
+                        "net_rsc_packets",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.rsc_packets",
+                        "TCP RSC Coalesced Packets",
+                        "packets/s",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 7,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->rsc.st_packets, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->rsc.st_packets, windows_shared_buffer, physical);
+
+                d->rsc.rd_packets = rrddim_add(d->rsc.st_packets, "packets", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(d->rsc.st_packets, d->rsc.rd_packets, (collected_number)d->rsc.packets.current.Data);
+            rrdset_done(d->rsc.st_packets);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->rsc.exceptions)) {
+            if (unlikely(!d->rsc.st_exceptions)) {
+                d->rsc.st_exceptions = rrdset_create_localhost(
+                        "net_rsc_exceptions",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.rsc_exceptions",
+                        "TCP RSC Exceptions",
+                        "exceptions/s",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 8,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->rsc.st_exceptions, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->rsc.st_exceptions, windows_shared_buffer, physical);
+
+                d->rsc.rd_exceptions = rrddim_add(d->rsc.st_exceptions, "exceptions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(d->rsc.st_exceptions, d->rsc.rd_exceptions, (collected_number)d->rsc.exceptions.current.Data);
+            rrdset_done(d->rsc.st_exceptions);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->rsc.average_packet_size)) {
+            if (unlikely(!d->rsc.st_average_packet_size)) {
+                d->rsc.st_average_packet_size = rrdset_create_localhost(
+                        "net_rsc_average_packet_size",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.rsc_average_packet_size",
+                        "TCP RSC Average Packet Size",
+                        "bytes",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 9,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->rsc.st_average_packet_size, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->rsc.st_average_packet_size, windows_shared_buffer, physical);
+
+                d->rsc.rd_average_packet_size = rrddim_add(d->rsc.st_average_packet_size, "average", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(d->rsc.st_average_packet_size, d->rsc.rd_average_packet_size, (collected_number)d->rsc.average_packet_size.current.Data);
+            rrdset_done(d->rsc.st_average_packet_size);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->chimney.connections)) {
+            if (unlikely(!d->chimney.st)) {
+                d->chimney.st = rrdset_create_localhost(
+                        "net_chimney_connections",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.chimney_connections",
+                        "Active TCP Connections Offloaded with Chimney",
+                        "connections",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 10,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->chimney.st, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->chimney.st, windows_shared_buffer, physical);
+
+                d->chimney.rd = rrddim_add(d->chimney.st, "connections", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(d->chimney.st, d->chimney.rd, (collected_number)d->chimney.connections.current.Data);
+            rrdset_done(d->chimney.st);
         }
     }
 
