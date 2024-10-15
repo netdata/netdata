@@ -1,6 +1,6 @@
 # ML Configuration
 
-Netdata's [Machine Learning](/src/ml/README.md) capabilities are enabled by default if `db = dbengine`
+Netdata's [Machine Learning](/src/ml/README.md) capabilities are enabled by default if the [Database mode](/src/database/README.md) is set to `db = dbengine`
 
 To enable or disable Machine Learning capabilities on a node:
 
