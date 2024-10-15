@@ -252,6 +252,8 @@ static struct netdev {
 // ----------------------------------------------------------------------------
 
 static void netdev_charts_release(struct netdev *d) {
+    rrdvar_chart_variable_release(d->st_bandwidth, d->chart_var_speed);
+
     if(d->st_bandwidth) rrdset_is_obsolete___safe_from_collector_thread(d->st_bandwidth);
     if(d->st_packets) rrdset_is_obsolete___safe_from_collector_thread(d->st_packets);
     if(d->st_errors) rrdset_is_obsolete___safe_from_collector_thread(d->st_errors);

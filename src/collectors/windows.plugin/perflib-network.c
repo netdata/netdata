@@ -486,6 +486,7 @@ static bool do_network_protocol(PERF_DATA_BLOCK *pDataBlock, int update_every, s
 // network interfaces
 
 struct network_interface {
+    usec_t last_collected;
     bool collected_metadata;
 
     struct {
@@ -498,6 +499,8 @@ struct network_interface {
     } packets;
 
     struct {
+        const RRDVAR_ACQUIRED *chart_var_speed;
+
         COUNTER_DATA received;
         COUNTER_DATA sent;
 
@@ -505,6 +508,12 @@ struct network_interface {
         RRDDIM *rd_received;
         RRDDIM *rd_sent;
     } traffic;
+
+    struct {
+        COUNTER_DATA current_bandwidth;
+        RRDSET *st;
+        RRDDIM *rd;
+    } speed;
 };
 
 static DICTIONARY *physical_interfaces = NULL, *virtual_interfaces = NULL;
@@ -515,6 +524,8 @@ static void network_interface_init(struct network_interface *ni) {
 
     ni->traffic.received.key = "Bytes Received/sec";
     ni->traffic.sent.key = "Bytes Sent/sec";
+
+    ni->speed.current_bandwidth.key = "Current Bandwidth";
 }
 
 void dict_interface_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -543,8 +554,8 @@ static bool is_physical_interface(const char *name) {
     return d ? true : false;
 }
 
-static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, bool physical) {
-    DICTIONARY *dict = physical_interfaces;
+static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, bool physical, usec_t now_ut) {
+    DICTIONARY *dict = physical ? physical_interfaces : virtual_interfaces;
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, physical ? "Network Interface" : "Network Adapter");
     if(!pObjectType) return false;
@@ -567,6 +578,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
             continue;
 
         struct network_interface *d = dictionary_set(dict, windows_shared_buffer, NULL, sizeof(*d));
+        d->last_collected = now_ut;
 
         if(!d->collected_metadata) {
             // TODO - get metadata about the network interface
@@ -577,7 +589,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->traffic.sent)) {
 
             if(d->traffic.received.current.Data == 0 && d->traffic.sent.current.Data == 0)
-                // this interface has not received or sent any traffic
+                // this interface has not received or sent any traffic yet
                 continue;
 
             if (unlikely(!d->traffic.st)) {
@@ -601,6 +613,9 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
 
                 d->traffic.rd_received = rrddim_add(d->traffic.st, "received", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 d->traffic.rd_sent = rrddim_add(d->traffic.st, "sent", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+
+                d->traffic.chart_var_speed = rrdvar_chart_variable_add_and_acquire(d->traffic.st, "nic_speed_max");
+                rrdvar_chart_variable_set(d->traffic.st, d->traffic.chart_var_speed, NAN);
             }
 
             total_received += d->traffic.received.current.Data;
@@ -641,6 +656,37 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
             rrddim_set_by_pointer(d->packets.st, d->packets.rd_sent, (collected_number)d->packets.sent.current.Data);
             rrdset_done(d->packets.st);
         }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->speed.current_bandwidth)) {
+            if(unlikely(!d->speed.st)) {
+                d->speed.st = rrdset_create_localhost(
+                        "net_speed"
+                        , windows_shared_buffer
+                        , NULL
+                        , windows_shared_buffer
+                        , "net.speed"
+                        , "Interface Speed"
+                        , "kilobits/s"
+                        , PLUGIN_WINDOWS_NAME
+                        , "PerflibNetwork"
+                        , NETDATA_CHART_PRIO_FIRST_NET_IFACE + 3
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rrdset_flag_set(d->speed.st, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->traffic.st, windows_shared_buffer, physical);
+
+                d->speed.rd = rrddim_add(d->speed.st, "speed",  NULL,  1, BITS_IN_A_KILOBIT, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(d->speed.st, d->speed.rd, (collected_number)d->speed.current_bandwidth.current.Data);
+            rrdset_done(d->speed.st);
+
+            rrdvar_chart_variable_set(d->traffic.st, d->traffic.chart_var_speed,
+                                      (NETDATA_DOUBLE)d->speed.current_bandwidth.current.Data / BITS_IN_A_KILOBIT);
+        }
     }
 
     if(physical) {
@@ -671,6 +717,22 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
         rrdset_done(st);
     }
 
+    // cleanup
+    {
+        struct network_interface *d;
+        dfe_start_write(dict, d) {
+            if(d->last_collected < now_ut) {
+                rrdvar_chart_variable_release(d->traffic.st, d->traffic.chart_var_speed);
+                rrdset_is_obsolete___safe_from_collector_thread(d->packets.st);
+                rrdset_is_obsolete___safe_from_collector_thread(d->traffic.st);
+                rrdset_is_obsolete___safe_from_collector_thread(d->speed.st);
+                dictionary_del(dict, d_dfe.name);
+            }
+        }
+        dfe_done(d);
+        dictionary_garbage_collect(dict);
+    }
+
     return true;
 }
 
@@ -689,8 +751,9 @@ int do_PerflibNetwork(int update_every, usec_t dt __maybe_unused) {
     PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
     if(!pDataBlock) return -1;
 
-    do_network_interface(pDataBlock, update_every, true);
-    do_network_interface(pDataBlock, update_every, false);
+    usec_t now_ut = now_monotonic_usec();
+    do_network_interface(pDataBlock, update_every, true, now_ut);
+    do_network_interface(pDataBlock, update_every, false, now_ut);
 
     struct network_protocol *tcp4 = NULL, *tcp6 = NULL;
     for(size_t i = 0; networks[i].protocol ;i++) {

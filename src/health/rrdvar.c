@@ -93,7 +93,7 @@ void rrdvar_host_variable_set(RRDHOST *host, const RRDVAR_ACQUIRED *rva, NETDATA
 // CUSTOM CHART VARIABLES
 
 const RRDVAR_ACQUIRED *rrdvar_chart_variable_add_and_acquire(RRDSET *st, const char *name) {
-    if(unlikely(!st->rrdvars)) return NULL;
+    if(unlikely(!st || !st->rrdvars)) return NULL;
 
     STRING *name_string = rrdvar_name_to_string(name);
     const RRDVAR_ACQUIRED *rs = rrdvar_add_and_acquire(st->rrdvars, name_string, NAN);
@@ -102,7 +102,7 @@ const RRDVAR_ACQUIRED *rrdvar_chart_variable_add_and_acquire(RRDSET *st, const c
 }
 
 void rrdvar_chart_variable_set(RRDSET *st, const RRDVAR_ACQUIRED *rva, NETDATA_DOUBLE value) {
-    if(unlikely(!st->rrdvars || !rva)) return;
+    if(unlikely(!st || !st->rrdvars || !rva)) return;
 
     RRDVAR *rv = dictionary_acquired_item_value((const DICTIONARY_ITEM *)rva);
     if(rv->value != value) {
