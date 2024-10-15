@@ -140,6 +140,10 @@ int configure_sqlite_database(sqlite3 *database, int target_version, const char 
     if (init_database_batch(database, list, description))
         return 1;
 
+    snprintfz(buf, sizeof(buf) - 1, "PRAGMA optimize=0x10002");
+    if (init_database_batch(database, list, description))
+        return 1;
+
     return 0;
 }
 
@@ -338,7 +342,6 @@ void sql_close_database(sqlite3 *database, const char *database_name)
     if (unlikely(!database))
         return;
 
-    (void) db_execute(database, "PRAGMA analysis_limit=10000");
     (void) db_execute(database, "PRAGMA optimize");
 
     netdata_log_info("%s: Closing sqlite database", database_name);
