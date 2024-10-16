@@ -1,34 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-    <Package Name="Netdata Agent Installer"
+	<Package Name="Netdata Agent Installer"
              Manufacturer="Netdata Inc."
              Version="2.0.0.0"
-             UpgradeCode="0d949b90-a54d-4aae-9616-e15fbc410530" />
-	
-	<MediaTemplate EmbedCab="yes" />
-	
-	<MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
-	
-	<Feature Id="Main">
-		<ComponentGroupRef Id="NetdataComponents" />
-		<ComponentRef Id="WevtManifestComponent" />
-		<ComponentRef Id="WevtDllComponent" />
-		<!-- ComponentRef Id="NetdataService" /-->
-	</Feature>
+             UpgradeCode="0d949b90-a54d-4aae-9616-e15fbc410530"  InstallerVersion="200">
+		
+		<MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
 
-	<StandardDirectory Id="ProgramFilesFolder">
-		<Directory Id="INSTALLFOLDER" Name="Netdata Agent">
-			<Directory Id="USRDIR" Name="usr">
-				<Directory Id="USRBINDIR" Name="bin" />
-			</Directory>
-		</Directory>
-	</StandardDirectory>
-
-	<StandardDirectory Id="SystemFolder">
-	</StandardDirectory>
+		<Feature Id="Main">
+			<ComponentGroupRef Id="NetdataComponents" />
+			<ComponentRef Id="WevtManifestComponent" />
+			<ComponentRef Id="WevtDllComponent" />
+			<!-- ComponentRef Id="NetdataService" /-->
+		</Feature>
+	</Package>
 
 	<Fragment>
+		<StandardDirectory Id="ProgramFilesFolder">
+			<Directory Id="INSTALLFOLDER" Name="Netdata Agent">
+				<Directory Id="USRDIR" Name="usr">
+					<Directory Id="USRBINDIR" Name="bin" />
+				</Directory>
+			</Directory>
+		</StandardDirectory>
+
+		<StandardDirectory Id="SystemFolder">
+		</StandardDirectory>
+		
 		<!-- All the files except for the ones we need to handle specially -->
 		<ComponentGroup Id="NetdataComponents" Directory="INSTALLFOLDER">
 			<Files Include="C:\msys64\opt\netdata\**">
