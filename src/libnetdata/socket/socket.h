@@ -194,7 +194,7 @@ void poll_events(LISTEN_SOCKETS *sockets
 #define INET6_ADDRSTRLEN 46
 #endif
 
-typedef struct socket_peers {
+typedef struct {
     struct {
         char ip[INET6_ADDRSTRLEN];
         int port;

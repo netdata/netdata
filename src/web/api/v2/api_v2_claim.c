@@ -97,6 +97,8 @@ static bool agent_can_be_claimed(void) {
         case CLOUD_STATUS_ONLINE:
             return false;
     }
+
+    return false;
 }
 
 typedef enum {
