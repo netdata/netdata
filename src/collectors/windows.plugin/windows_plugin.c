@@ -25,7 +25,7 @@ static struct proc_module {
     {.name = "PerflibStorage",      .dim = "PerflibStorage",       .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibStorage},
     {.name = "PerflibNetwork",      .dim = "PerflibNetwork",       .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibNetwork},
     {.name = "PerflibObjects",      .dim = "PerflibObjects",       .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibObjects},
-    {.name = "PerflibHyperV",       .dim = "PerflibHyperV",      .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibHyperV},
+    {.name = "PerflibHyperV",       .dim = "PerflibHyperV",        .enabled = CONFIG_BOOLEAN_YES, .func = do_PerflibHyperV},
 
     {.name = "PerflibThermalZone",  .dim = "PerflibThermalZone",   .enabled = CONFIG_BOOLEAN_NO, .func = do_PerflibThermalZone},
 
