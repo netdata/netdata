@@ -26,7 +26,7 @@ def cleanup():
         if "integrations" in str(element) and not "metadata.yaml" in str(element):
             shutil.rmtree(element)
     for element in Path("integrations/logs").glob('**/*/'):
-        if "integrations" in str(element) and not "metadata.yaml" in str(element):
+        if "integrations" in str(element) and "metadata.yaml" not in str(element):
             shutil.rmtree(element)
     for element in Path("integrations/cloud-authentication").glob('**/*/'):
         if "integrations" in str(element) and not "metadata.yaml" in str(element):
