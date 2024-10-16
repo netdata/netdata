@@ -285,8 +285,8 @@ void journal_file_update_header(const char *filename, struct journal_file *jf) {
             if(dash_seqnum) {
                 const char *dash_first_msg_ut = strchr(dash_seqnum + 1, '-');
                 if(dash_first_msg_ut) {
-                    const char *dot_journal = strstr(dash_first_msg_ut + 1, ".journal");
-                    if(dot_journal) {
+                    const char *dot_journal = NULL;
+                    if(is_journal_file(filename, -1, &dot_journal) && dot_journal && dot_journal > dash_first_msg_ut) {
                         if(dash_seqnum - at - 1 == 32 &&
                             dash_first_msg_ut - dash_seqnum - 1 == 16 &&
                             dot_journal - dash_first_msg_ut - 1 == 16) {
@@ -392,7 +392,7 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
 
                 char *e = strchr(s, '@');
                 if(!e)
-                    e = strstr(s, ".journal");
+                    is_journal_file(s, -1, (const char **)&e);
 
                 if(e) {
                     const char *d = s;
@@ -572,10 +572,39 @@ static void files_registry_delete_cb(const DICTIONARY_ITEM *item, void *value, v
     string_freez(jf->source);
 }
 
-void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, const char *dirname, int depth) {
-    static const char *ext = ".journal";
-    static const ssize_t ext_len = sizeof(".journal") - 1;
+#define EXT_DOT_JOURNAL ".journal"
+#define EXT_DOT_JOURNAL_TILDA ".journal~"
 
+static struct {
+    const char *ext;
+    ssize_t len;
+} valid_journal_extension[] = {
+    { .ext = EXT_DOT_JOURNAL, .len = sizeof(EXT_DOT_JOURNAL) - 1 },
+    { .ext = EXT_DOT_JOURNAL_TILDA, .len = sizeof(EXT_DOT_JOURNAL_TILDA) - 1 },
+};
+
+bool is_journal_file(const char *filename, ssize_t len, const char **start_of_extension) {
+    if(len < 0)
+        len = (ssize_t)strlen(filename);
+
+    for(size_t i = 0; i < _countof(valid_journal_extension) ;i++) {
+        const char *ext = valid_journal_extension[i].ext;
+        ssize_t elen = valid_journal_extension[i].len;
+
+        if(len > elen && strcmp(filename + len - elen, ext) == 0) {
+            if(start_of_extension)
+                *start_of_extension = filename + len - elen;
+            return true;
+        }
+    }
+
+    if(start_of_extension)
+        *start_of_extension = NULL;
+
+    return false;
+}
+
+void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, const char *dirname, int depth) {
     if (depth > VAR_LOG_JOURNAL_MAX_DEPTH)
         return;
 
@@ -605,7 +634,7 @@ void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, con
         if (entry->d_type == DT_DIR) {
             journal_directory_scan_recursively(files, dirs, full_path, depth++);
         }
-        else if (entry->d_type == DT_REG && len > ext_len && strcmp(full_path + len - ext_len, ext) == 0) {
+        else if (entry->d_type == DT_REG && is_journal_file(full_path, len, NULL)) {
             if(files)
                 dictionary_set(files, full_path, NULL, 0);
 
@@ -623,7 +652,7 @@ void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, con
                     journal_directory_scan_recursively(files, dirs, resolved_path, depth++);
                 }
             }
-            else if(S_ISREG(info.st_mode) && len > ext_len && strcmp(full_path + len - ext_len, ext) == 0) {
+            else if(S_ISREG(info.st_mode) && is_journal_file(full_path, len, NULL)) {
                 if(files)
                     dictionary_set(files, full_path, NULL, 0);
 
