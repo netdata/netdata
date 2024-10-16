@@ -2,7 +2,7 @@
 
 > **Info**
 >
-> A Netdata Cloud paid subscription is required.
+> Netdata Cloud paid subscription is required.
 
 The Dynamic Configuration Manager allows direct configuration of collectors and alerts through the Netdata UI. This feature allows users to:
 
