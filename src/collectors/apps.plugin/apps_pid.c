@@ -327,15 +327,11 @@ static bool is_filename(const char *s) {
         (*s == '/' && s[1] == '/' && isalpha((uint8_t)s[2]) && s[3] == '/')) {      // windows native "//x/"
 
         WCHAR ws[FILENAME_MAX];
-        int wlen = MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
-        if (wlen <= 0 || (size_t)wlen > sizeof(ws) / sizeof(*ws)) {
-            return false; // Failed to convert UTF-8 to UTF-16
+        if(utf8_to_utf16(ws, _countof(ws), s, -1) > 0) {
+            DWORD attributes = GetFileAttributesW(ws);
+            if (attributes != INVALID_FILE_ATTRIBUTES)
+                return true;
         }
-
-        MultiByteToWideChar(CP_UTF8, 0, s, -1, ws, wlen);
-        DWORD attributes = GetFileAttributesW(ws);
-        if (attributes != INVALID_FILE_ATTRIBUTES)
-            return true;
     }
 #endif
 

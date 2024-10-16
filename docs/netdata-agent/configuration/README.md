@@ -1,5 +1,9 @@
 # Netdata Agent Configuration
 
+> **Info**
+>
+> Netdata Cloud lets you configure Agents on the fly. Check the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) documentation for details.
+
 The main Netdata Agent configuration is `netdata.conf`.
 
 ## The Netdata config directory

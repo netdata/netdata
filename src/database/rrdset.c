@@ -732,6 +732,8 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
 }
 
 inline void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
+    if(!st) return;
+
     rrdset_pluginsd_receive_unslot(st);
 
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {

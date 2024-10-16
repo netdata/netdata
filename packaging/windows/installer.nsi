@@ -257,29 +257,97 @@ Function NetdataUninstallRegistry
         end:
 FunctionEnd
 
+Function InstallDLL
+        ; Check if certutil is available
+        nsExec::ExecToStack 'where certutil'
+        Pop $R0
+        StrCmp $R0 "" NoCertUtil FoundCertUtil
+
+    NoCertUtil:
+        DetailPrint "certutil not found, assuming files are different."
+        Goto CopyDLL
+
+    FoundCertUtil:
+        ; Calculate hash of the existing DLL
+        nsExec::ExecToStack 'certutil -hashfile "$SYSDIR\wevt_netdata.dll" MD5'
+        Pop $R0
+
+        ; Calculate hash of the new DLL
+        nsExec::ExecToStack 'certutil -hashfile "$INSTDIR\usr\bin\wevt_netdata.dll" MD5'
+        Pop $R1
+
+        StrCmp $R0 $R1 SetPermissions
+
+    CopyDLL:
+        ClearErrors
+        CopyFiles /SILENT "$INSTDIR\usr\bin\wevt_netdata.dll" "$SYSDIR"
+        IfErrors RetryPrompt SetPermissions
+
+    RetryPrompt:
+        MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Failed to copy wevt_netdata.dll probably because it is in use. Please close the Event Viewer (or other Event Log applications) and press Retry."
+        StrCmp $R0 IDRETRY CopyDLL
+        StrCmp $R0 IDCANCEL ExitInstall
+
+        Goto End
+
+    SetPermissions:
+        nsExec::ExecToLog 'icacls "$SYSDIR\wevt_netdata.dll" /grant "NT SERVICE\EventLog":R'
+        Goto End
+
+    ExitInstall:
+        Abort
+
+    End:
+FunctionEnd
+
+Function InstallManifest
+    IfFileExists "$INSTDIR\usr\bin\wevt_netdata_manifest.xml" CopyManifest End
+
+    CopyManifest:
+        ClearErrors
+        CopyFiles /SILENT "$INSTDIR\usr\bin\wevt_netdata_manifest.xml" "$SYSDIR"
+        IfErrors RetryPrompt InstallManifest
+
+    RetryPrompt:
+        MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Failed to copy wevt_netdata_manifest.xml."
+        StrCmp $R0 IDRETRY CopyManifest
+        StrCmp $R0 IDCANCEL ExitInstall
+
+    InstallManifest:
+        nsExec::ExecToLog 'wevtutil im "$SYSDIR\wevt_netdata_manifest.xml" "/mf:$SYSDIR\wevt_netdata.dll" "/rf:$SYSDIR\wevt_netdata.dll"'
+        Goto End
+
+    ExitInstall:
+        Abort
+
+    End:
+FunctionEnd
+
 Section "Install Netdata"
-	SetOutPath $INSTDIR
-	SetCompress off
+        SetOutPath $INSTDIR
+        SetCompress off
 
-	File /r "C:\msys64\opt\netdata\*.*"
+        File /r "C:\msys64\opt\netdata\*.*"
 
-	ClearErrors
+        ClearErrors
         nsExec::ExecToLog '$SYSDIR\sc.exe create Netdata binPath= "$INSTDIR\usr\bin\netdata.exe" start= delayed-auto'
         pop $0
         ${If} $0 != 0
-	    DetailPrint "Warning: Failed to create Netdata service."
+        DetailPrint "Warning: Failed to create Netdata service."
         ${EndIf}
 
-	ClearErrors
+        ClearErrors
         nsExec::ExecToLog '$SYSDIR\sc.exe description Netdata "Real-time system monitoring service"'
         pop $0
         ${If} $0 != 0
-	    DetailPrint "Warning: Failed to add Netdata service description."
+        DetailPrint "Warning: Failed to add Netdata service description."
         ${EndIf}
 
         WriteUninstaller "$INSTDIR\Uninstall.exe"
 
         Call NetdataUninstallRegistry
+        Call InstallDLL
+        Call InstallManifest
 
         StrLen $0 $cloudToken
         StrLen $1 $cloudRooms
@@ -325,9 +393,24 @@ Section "Uninstall"
 	    DetailPrint "Warning: Failed to delete Netdata service."
         ${EndIf}
 
-        # https://nsis.sourceforge.io/Reference/RMDir
-	RMDir /r /REBOOTOK "$INSTDIR"
+        ; Check if the manifest exists before uninstalling it
+        IfFileExists "$SYSDIR\wevt_netdata_manifest.xml" ManifestExistsForUninstall ManifestNotExistsForUninstall
+
+ManifestExistsForUninstall:
+        nsExec::ExecToLog 'wevtutil um "$SYSDIR\wevt_netdata_manifest.xml"'
+        pop $0
+        ${If} $0 != 0
+            DetailPrint "Warning: Failed to uninstall the event manifest."
+        ${EndIf}
+        Goto DoneUninstall
+
+ManifestNotExistsForUninstall:
+        DetailPrint "Manifest not found, skipping manifest uninstall."
+
+DoneUninstall:
+
+        ; Remove files
+        RMDir /r /REBOOTOK "$INSTDIR"
 
         DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata"
 SectionEnd
-

@@ -6,4 +6,6 @@
 [% include 'overview/notification.md' %]
 [% elif entry.integration_type == 'authentication' %]
 [% include 'overview/authentication.md' %]
+[% elif entry.integration_type == 'logs' %]
+[% include 'overview/logs.md' %]
 [% endif %]

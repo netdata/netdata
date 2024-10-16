@@ -523,14 +523,10 @@ static char *wchar_to_utf8(WCHAR *s) {
 
 static char *ansi_to_utf8(LPCSTR str) {
     static __thread WCHAR unicode[PATH_MAX];
-    static __thread int unicode_size = sizeof(unicode) / sizeof(*unicode);
 
     // Step 1: Convert ANSI string (LPSTR) to wide string (UTF-16)
-    int wideLength = MultiByteToWideChar(CP_ACP, 0, str, -1, NULL, 0);
-    if (wideLength == 0 || wideLength > unicode_size)
-        return NULL;
-
-    MultiByteToWideChar(CP_ACP, 0, str, -1, unicode, wideLength);
+    size_t count = any_to_utf16(CP_ACP, unicode, _countof(unicode), str, -1);
+    if (!count) return NULL;
 
     return wchar_to_utf8(unicode);
 }

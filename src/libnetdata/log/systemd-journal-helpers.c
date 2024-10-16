@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "journal.h"
+#include "systemd-journal-helpers.h"
 
 bool is_path_unix_socket(const char *path) {
     // Check if the path is valid

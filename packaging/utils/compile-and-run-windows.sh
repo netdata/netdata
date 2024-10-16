@@ -70,14 +70,19 @@ then
       ${NULL}
 fi
 
+ninja -v -C "${build}" || ninja -v -C "${build}" -j 1
+
+echo "Stopping service Netdata"
+sc stop "Netdata" || echo "Failed"
+
 ninja -v -C "${build}" install || ninja -v -C "${build}" -j 1
+
+# register the event log publisher
+cmd.exe //c "$(cygpath -w -a "/opt/netdata/usr/bin/wevt_netdata_install.bat")"
 
 #echo
 #echo "Compile with:"
 #echo "ninja -v -C \"${build}\" install || ninja -v -C \"${build}\" -j 1"
-
-echo "Stopping service Netdata"
-sc stop "Netdata" || echo "Failed"
 
 echo "starting netdata..."
 # enable JIT debug with gdb
