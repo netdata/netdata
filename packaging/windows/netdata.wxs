@@ -3,10 +3,10 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
          xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
     <Package Name="Netdata Agent Installer"
-           Manufacturer="Netdata Inc."
-           Version="2.0.0.0"
-           UpgradeCode="0d949b90-a54d-4aae-9616-e15fbc410530"
-                     Compressed="no">
+        Manufacturer="Netdata Inc."
+        Version="2.0.0.0"
+        UpgradeCode="0d949b90-a54d-4aae-9616-e15fbc410530"
+        Compressed="no">
 
         <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
 
@@ -18,6 +18,12 @@
     </Package>
 
     <Fragment>
+        <Property Id="TOKEN" Value=" " />
+        <Property Id="ROOMS" Value=" " />
+        <Property Id="INSECURE" Value="no" />
+        <Property Id="PROXY" Value=" " />
+        <Property Id="URL" Value="https://app.netdata.cloud" />
+
         <StandardDirectory Id="ProgramFiles64Folder">
             <Directory Id="INSTALLFOLDER" Name="Netdata Agent">
                 <Directory Id="USRDIR" Name="usr">
@@ -52,6 +58,8 @@
                 </File>
             </Component>
         </ComponentGroup>
+
+        <CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand="NetdataClaim.exe /T [TOKEN] /R '[ROOMS]' /U [URL] /I [INSECURE] /P [PROXY]" Execute="deferred" Return="ignore" Impersonate="no"/>
 
         <Component Id="NetdataService" Directory="USRBINDIR">
             <File Id="NetdataExe" Name="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
