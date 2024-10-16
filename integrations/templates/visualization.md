@@ -1,3 +1,0 @@
-## Visualization
-
-[[ entry.visualization.description ]]

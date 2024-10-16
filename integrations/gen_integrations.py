@@ -83,10 +83,7 @@ CLOUD_NOTIFICATION_RENDER_KEYS = [
 
 LOGS_RENDER_KEYS = [
     'overview',
-    'visualization',
-    'key_features',
-    'prerequisites',
-    'log_sources',
+    'setup',
 ]
 
 AUTHENTICATION_RENDER_KEYS = [

@@ -33,70 +33,64 @@
                         "description": {
                             "type": "string",
                             "description": "General description of what the integration does."
+                        },
+                        "visualization": {
+                            "type": "object",
+                            "properties": {
+                                "description": {
+                                    "type": "string",
+                                    "description": "How the user can access the data provided by the integration"
+                                }
+                            },
+                            "required": [
+                                "description"
+                            ]
+                        },
+                        "key_features": {
+                            "type": "object",
+                            "properties": {
+                                "description": {
+                                    "type": "string",
+                                    "description": "The key features of the integration."
+                                }
+                            },
+                            "required": [
+                                "description"
+                            ]
                         }
                     },
                     "required": [
-                        "description"
+                        "description",
+                        "visualization",
+                        "key_features"
                     ]
                 },
-                "visualization": {
+                "setup": {
                     "type": "object",
                     "properties": {
-                        "description": {
-                            "type": "string",
-                            "description": "How the user can access the data provided by the integration"
-                        }
-                    },
-                    "required": [
-                        "description"
-                    ]
-                },
-                "key_features": {
-                    "type": "object",
-                    "properties": {
-                        "description": {
-                            "type": "string",
-                            "description": "The key features of the integration."
-                        }
-                    },
-                    "required": [
-                        "description"
-                    ]
-                },
-                "prerequisites": {
-                    "type": "object",
-                    "properties": {
-                        "description": {
-                            "type": "string",
-                            "description": "Prerequisites of getting the integration working. For Log Functions only a Netdata account should be needed."
-                        }
-                    },
-                    "required": [
-                        "description"
-                    ]
-                },
-                "log_sources": {
-                    "type": "object",
-                    "properties": {
-                        "description": {
-                            "type": "string",
-                            "description": "Log Sources of the integration."
-                        }
-                    },
-                    "required": [
-                        "description"
-                    ]
+                        "prerequisites": {
+                            "type": "object",
+                            "properties": {
+                                "description": {
+                                    "type": "string",
+                                    "description": "Prerequisites of getting the integration working. For Log Functions only a Netdata account should be needed."
+                                }
+                            },
+                            "required": [
+                                "description"
+                            ]
+                        },
+                        "required": [
+                            "prerequisites"
+                        ]
+                    }
                 }
             },
             "required": [
                 "id",
                 "meta",
                 "keywords",
-                "overview",
-                "visualization",
-                "key_features",
-                "prerequisites",
-                "log_sources"
+                "overview"
             ]
         }
     }

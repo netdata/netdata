@@ -319,22 +319,9 @@ endmeta-->
 
 {create_overview(integration, integration['meta']['icon_filename'])}"""
 
-            if integration['visualization']:
+            if integration['setup']:
                 md += f"""
-{integration['visualization']}
-"""
-
-            if integration['key_features']:
-                md += f"""
-{integration['key_features']}
-"""
-            if integration['prerequisites']:
-                md += f"""
-{integration['prerequisites']}
-"""
-            if integration['log_sources']:
-                md += f"""
-{integration['log_sources']}
+{integration['setup']}
 """
 
         except Exception as e:
