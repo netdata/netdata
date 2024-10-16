@@ -1,57 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-	<Package Name="Netdata Agent Installer"
-             Manufacturer="Netdata Inc."
-             Version="2.0.0.0"
-             UpgradeCode="0d949b90-a54d-4aae-9616-e15fbc410530"  InstallerVersion="200">
-		
-		<MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+         xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+    <Package Name="Netdata Agent Installer"
+           Manufacturer="Netdata Inc."
+           Version="2.0.0.0"
+           UpgradeCode="0d949b90-a54d-4aae-9616-e15fbc410530"
+                     Compressed="no">
 
-		<Feature Id="Main">
-			<ComponentGroupRef Id="NetdataComponents" />
-			<ComponentRef Id="WevtManifestComponent" />
-			<ComponentRef Id="WevtDllComponent" />
-			<!-- ComponentRef Id="NetdataService" /-->
-		</Feature>
-	</Package>
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
 
-	<Fragment>
-		<StandardDirectory Id="ProgramFilesFolder">
-			<Directory Id="INSTALLFOLDER" Name="Netdata Agent">
-				<Directory Id="USRDIR" Name="usr">
-					<Directory Id="USRBINDIR" Name="bin" />
-				</Directory>
-			</Directory>
-		</StandardDirectory>
+        <Feature Id="Main">
+            <ComponentGroupRef Id="NetdataComponents" />
+            <ComponentGroupRef Id="WevtComponents" />
+            <ComponentRef Id="NetdataService" />
+        </Feature>
+    </Package>
 
-		<StandardDirectory Id="SystemFolder">
-		</StandardDirectory>
-		
-		<!-- All the files except for the ones we need to handle specially -->
-		<ComponentGroup Id="NetdataComponents" Directory="INSTALLFOLDER">
-			<Files Include="C:\msys64\opt\netdata\**">
-				<Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata.exe" />
-				<Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" />
-				<Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
-			</Files>
-		</ComponentGroup>
+    <Fragment>
+        <StandardDirectory Id="ProgramFiles64Folder">
+            <Directory Id="INSTALLFOLDER" Name="Netdata Agent">
+                <Directory Id="USRDIR" Name="usr">
+                    <Directory Id="USRBINDIR" Name="bin" />
+                </Directory>
+            </Directory>
+        </StandardDirectory>
 
-		<!-- Install wevt manifest file -->
-		<Component Id="WevtManifestComponent" Directory="SystemFolder" Guid="*">
-			<File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" KeyPath="yes" />
-		</Component>
+        <StandardDirectory Id="System64Folder">
+        </StandardDirectory>
 
-		<!-- Install wevt dll file -->
-		<Component Id="WevtDllComponent" Directory="SystemFolder" Guid="*">
-			<File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" KeyPath="yes" />
-		</Component>
+        <!-- All the files except for the ones we need to handle specially -->
+        <ComponentGroup Id="NetdataComponents" Directory="INSTALLFOLDER">
+            <Files Include="C:\msys64\opt\netdata\**">
+                <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata.exe" />
+                <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" />
+                <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
+            </Files>
+        </ComponentGroup>
 
-		<!-- Comment out once it's ready:
-        <Component Id="NetdataService" Directory="USRBINDIR" Guid="*">
+        <!-- Install wevt manifest/dll files -->
+        <ComponentGroup Id="WevtComponents" Directory="System64Folder">
+            <Component>
+                <File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
+                    <Permission User="NT SERVICE\EventLog" Read="yes" />
+                </File>
+            </Component>
+
+            <Component>
+                <File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml">
+              <util:EventManifest ResourceFile="[#WevtDll]" MessageFile="[#WevtDll]" />
+                </File>
+            </Component>
+        </ComponentGroup>
+
+        <Component Id="NetdataService" Directory="USRBINDIR">
             <File Id="NetdataExe" Name="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
 
-            <ServiceInstall Id="NetdataServiceInstaller"
+            <ServiceInstall Id="InstallService"
                             Name="Netdata"
                             DisplayName="Netdata Agent"
                             Description="Netdata is distributed, real-time, performance and health monitoring for systems and applications."
@@ -59,13 +64,13 @@
                             Start="auto"
                             ErrorControl="normal" />
 
-            <ServiceControl Id="StartService"
+            <ServiceControl Id="ControlService"
                             Start="install"
                             Stop="both"
                             Remove="uninstall"
                             Name="Netdata"
                             Wait="yes" />
         </Component>
-    -->
-	</Fragment>
+    </Fragment>
 </Wix>
+
