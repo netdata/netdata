@@ -47,6 +47,10 @@ CLOUD_NOTIFICATION_SOURCES = [
     (AGENT_REPO, INTEGRATIONS_PATH / 'cloud-notifications' / 'metadata.yaml', False),
 ]
 
+LOGS_SOURCES = [
+    (AGENT_REPO, INTEGRATIONS_PATH / 'logs' / 'metadata.yaml', False),
+]
+
 AUTHENTICATION_SOURCES = [
     (AGENT_REPO, INTEGRATIONS_PATH / 'cloud-authentication' / 'metadata.yaml', False),
 ]
@@ -75,6 +79,14 @@ AGENT_NOTIFICATION_RENDER_KEYS = [
 CLOUD_NOTIFICATION_RENDER_KEYS = [
     'setup',
     'troubleshooting',
+]
+
+LOGS_RENDER_KEYS = [
+    'overview',
+    'visualization',
+    'key_features',
+    'prerequisites',
+    'log_sources',
 ]
 
 AUTHENTICATION_RENDER_KEYS = [
@@ -136,6 +148,11 @@ AGENT_NOTIFICATION_VALIDATOR = Draft7Validator(
 
 CLOUD_NOTIFICATION_VALIDATOR = Draft7Validator(
     {'$ref': './cloud_notification.json#'},
+    registry=registry,
+)
+
+LOGS_VALIDATOR = Draft7Validator(
+    {'$ref': './logs.json#'},
     registry=registry,
 )
 
@@ -399,6 +416,19 @@ def _load_agent_notification_file(file, repo):
         return ret
 
 
+def load_agent_notifications():
+    ret = []
+
+    for repo, path, match in AGENT_NOTIFICATION_SOURCES:
+        if match and path.exists() and path.is_dir():
+            for file in path.glob(METADATA_PATTERN):
+                ret.extend(_load_agent_notification_file(file, repo))
+        elif not match and path.exists() and path.is_file():
+            ret.extend(_load_agent_notification_file(path, repo))
+
+    return ret
+
+
 def _load_cloud_notification_file(file, repo):
     debug(f'Loading {file}.')
     data = load_yaml(file)
@@ -432,19 +462,6 @@ def _load_cloud_notification_file(file, repo):
         return ret
 
 
-def load_agent_notifications():
-    ret = []
-
-    for repo, path, match in AGENT_NOTIFICATION_SOURCES:
-        if match and path.exists() and path.is_dir():
-            for file in path.glob(METADATA_PATTERN):
-                ret.extend(_load_agent_notification_file(file, repo))
-        elif not match and path.exists() and path.is_file():
-            ret.extend(_load_agent_notification_file(path, repo))
-
-    return ret
-
-
 def load_cloud_notifications():
     ret = []
 
@@ -454,6 +471,52 @@ def load_cloud_notifications():
                 ret.extend(_load_cloud_notification_file(file, repo))
         elif not match and path.exists() and path.is_file():
             ret.extend(_load_cloud_notification_file(path, repo))
+
+    return ret
+
+
+def _load_logs_file(file, repo):
+    debug(f'Loading {file}.')
+    data = load_yaml(file)
+
+    if not data:
+        return []
+
+    try:
+        LOGS_VALIDATOR.validate(data)
+    except ValidationError:
+        warn(f'Failed to validate {file} against the schema.', file)
+        return []
+
+    if 'id' in data:
+        data['integration_type'] = 'logs'
+        data['_src_path'] = file
+        data['_repo'] = repo
+        data['_index'] = 0
+
+        return [data]
+    else:
+        ret = []
+
+        for idx, item in enumerate(data):
+            item['integration_type'] = 'logs'
+            item['_src_path'] = file
+            item['_repo'] = repo
+            item['_index'] = idx
+            ret.append(item)
+
+        return ret
+
+
+def load_logs():
+    ret = []
+
+    for repo, path, match in LOGS_SOURCES:
+        if match and path.exists() and path.is_dir():
+            for file in path.glob(METADATA_PATTERN):
+                ret.extend(_load_logs_file(file, repo))
+        elif not match and path.exists() and path.is_file():
+            ret.extend(_load_logs_file(path, repo))
 
     return ret
 
@@ -818,6 +881,48 @@ def render_cloud_notifications(categories, notifications, ids):
     return notifications, clean_notifications, ids
 
 
+def render_logs(categories, logs, ids):
+    debug('Sorting logs.')
+
+    sort_integrations(logs)
+
+    debug('Checking log ids.')
+
+    logs, ids = dedupe_integrations(logs, ids)
+
+    clean_logs = []
+
+    for item in logs:
+        item['edit_link'] = make_edit_link(item)
+
+        clean_item = deepcopy(item)
+
+        for key in LOGS_RENDER_KEYS:
+            if key in item.keys():
+                template = get_jinja_env().get_template(f'{key}.md')
+                data = template.render(entry=item, clean=False)
+                clean_data = template.render(entry=item, clean=True)
+
+                if 'variables' in item['meta']:
+                    template = get_jinja_env().from_string(data)
+                    data = template.render(variables=item['meta']['variables'], clean=False)
+                    template = get_jinja_env().from_string(clean_data)
+                    clean_data = template.render(variables=item['meta']['variables'], clean=True)
+            else:
+                data = ''
+                clean_data = ''
+
+            item[key] = data
+            clean_item[key] = clean_data
+
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
+
+        clean_logs.append(clean_item)
+
+    return logs, clean_logs, ids
+
+
 def render_authentications(categories, authentications, ids):
     debug('Sorting authentications.')
 
@@ -885,21 +990,21 @@ def main():
     exporters = load_exporters()
     agent_notifications = load_agent_notifications()
     cloud_notifications = load_cloud_notifications()
+    logs = load_logs()
     authentications = load_authentications()
 
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
     deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
     exporters, clean_exporters, ids = render_exporters(categories, exporters, ids)
-    agent_notifications, clean_agent_notifications, ids = render_agent_notifications(categories, agent_notifications,
-                                                                                     ids)
-    cloud_notifications, clean_cloud_notifications, ids = render_cloud_notifications(categories, cloud_notifications,
-                                                                                     ids)
+    agent_notifications, clean_agent_notifications, ids = render_agent_notifications(categories, agent_notifications,ids)
+    cloud_notifications, clean_cloud_notifications, ids = render_cloud_notifications(categories, cloud_notifications,ids)
+    logs, clean_logs, ids = render_logs(categories, logs,ids)
     authentications, clean_authentications, ids = render_authentications(categories, authentications, ids)
 
-    integrations = collectors + deploy + exporters + agent_notifications + cloud_notifications + authentications
+    integrations = collectors + deploy + exporters + agent_notifications + cloud_notifications + logs + authentications
     render_integrations(categories, integrations)
 
-    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications + clean_cloud_notifications + clean_authentications
+    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications + clean_cloud_notifications + clean_logs + clean_authentications
     render_json(categories, clean_integrations)
 
 
