@@ -1,148 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_LOG_H
-#define NETDATA_LOG_H 1
+#ifndef NETDATA_ND_LOG_H
+#define NETDATA_ND_LOG_H 1
 
 # ifdef __cplusplus
 extern "C" {
 # endif
 
 #include "../libnetdata.h"
+#include "nd_log-common.h"
 
 #define ND_LOG_DEFAULT_THROTTLE_LOGS 1000
 #define ND_LOG_DEFAULT_THROTTLE_PERIOD 60
-
-typedef enum  __attribute__((__packed__)) {
-    NDLS_UNSET = 0,   // internal use only
-    NDLS_ACCESS,      // access.log
-    NDLS_ACLK,        // aclk.log
-    NDLS_COLLECTORS,  // collector.log
-    NDLS_DAEMON,      // error.log
-    NDLS_HEALTH,      // health.log
-    NDLS_DEBUG,       // debug.log
-
-    // terminator
-    _NDLS_MAX,
-} ND_LOG_SOURCES;
-
-typedef enum __attribute__((__packed__)) {
-    NDLP_EMERG      = LOG_EMERG,
-    NDLP_ALERT      = LOG_ALERT,
-    NDLP_CRIT       = LOG_CRIT,
-    NDLP_ERR        = LOG_ERR,
-    NDLP_WARNING    = LOG_WARNING,
-    NDLP_NOTICE     = LOG_NOTICE,
-    NDLP_INFO       = LOG_INFO,
-    NDLP_DEBUG      = LOG_DEBUG,
-} ND_LOG_FIELD_PRIORITY;
-
-typedef enum __attribute__((__packed__)) {
-    // KEEP THESE IN THE SAME ORDER AS in thread_log_fields (log.c)
-    // so that it easy to audit for missing fields
-
-    NDF_STOP = 0,
-    NDF_TIMESTAMP_REALTIME_USEC,                // the timestamp of the log message - added automatically
-    NDF_SYSLOG_IDENTIFIER,                      // the syslog identifier of the application - added automatically
-    NDF_LOG_SOURCE,                             // DAEMON, COLLECTORS, HEALTH, ACCESS, ACLK - set at the log call
-    NDF_PRIORITY,                               // the syslog priority (severity) - set at the log call
-    NDF_ERRNO,                                  // the ERRNO at the time of the log call - added automatically
-#if defined(OS_WINDOWS)
-    NDF_WINERROR,                               // Windows GetLastError()
-#endif
-    NDF_INVOCATION_ID,                          // the INVOCATION_ID of Netdata - added automatically
-    NDF_LINE,                                   // the source code file line number - added automatically
-    NDF_FILE,                                   // the source code filename - added automatically
-    NDF_FUNC,                                   // the source code function - added automatically
-    NDF_TID,                                    // the thread ID of the thread logging - added automatically
-    NDF_THREAD_TAG,                             // the thread tag of the thread logging - added automatically
-    NDF_MESSAGE_ID,                             // for specific events
-    NDF_MODULE,                                 // for internal plugin module, all other get the NDF_THREAD_TAG
-
-    NDF_NIDL_NODE,                              // the node / rrdhost currently being worked
-    NDF_NIDL_INSTANCE,                          // the instance / rrdset currently being worked
-    NDF_NIDL_CONTEXT,                           // the context of the instance currently being worked
-    NDF_NIDL_DIMENSION,                         // the dimension / rrddim currently being worked
-
-    // web server, aclk and stream receiver
-    NDF_SRC_TRANSPORT,                          // the transport we received the request, one of: http, https, pluginsd
-
-    // Netdata Cloud Related
-    NDF_ACCOUNT_ID,
-    NDF_USER_NAME,
-    NDF_USER_ROLE,
-    NDF_USER_ACCESS,
-
-    // web server and stream receiver
-    NDF_SRC_IP,                                 // the streaming / web server source IP
-    NDF_SRC_PORT,                               // the streaming / web server source Port
-    NDF_SRC_FORWARDED_HOST,
-    NDF_SRC_FORWARDED_FOR,
-    NDF_SRC_CAPABILITIES,                       // the stream receiver capabilities
-
-    // stream sender (established links)
-    NDF_DST_TRANSPORT,                          // the transport we send the request, one of: http, https
-    NDF_DST_IP,                                 // the destination streaming IP
-    NDF_DST_PORT,                               // the destination streaming Port
-    NDF_DST_CAPABILITIES,                       // the destination streaming capabilities
-
-    // web server, aclk and stream receiver
-    NDF_REQUEST_METHOD,                         // for http like requests, the http request method
-    NDF_RESPONSE_CODE,                          // for http like requests, the http response code, otherwise a status string
-
-    // web server (all), aclk (queries)
-    NDF_CONNECTION_ID,                          // the web server connection ID
-    NDF_TRANSACTION_ID,                         // the web server and API transaction ID
-    NDF_RESPONSE_SENT_BYTES,                    // for http like requests, the response bytes
-    NDF_RESPONSE_SIZE_BYTES,                    // for http like requests, the uncompressed response size
-    NDF_RESPONSE_PREPARATION_TIME_USEC,         // for http like requests, the preparation time
-    NDF_RESPONSE_SENT_TIME_USEC,                // for http like requests, the time to send the response back
-    NDF_RESPONSE_TOTAL_TIME_USEC,               // for http like requests, the total time to complete the response
-
-    // health alerts
-    NDF_ALERT_ID,
-    NDF_ALERT_UNIQUE_ID,
-    NDF_ALERT_EVENT_ID,
-    NDF_ALERT_TRANSITION_ID,
-    NDF_ALERT_CONFIG_HASH,
-    NDF_ALERT_NAME,
-    NDF_ALERT_CLASS,
-    NDF_ALERT_COMPONENT,
-    NDF_ALERT_TYPE,
-    NDF_ALERT_EXEC,
-    NDF_ALERT_RECIPIENT,
-    NDF_ALERT_DURATION,
-    NDF_ALERT_VALUE,
-    NDF_ALERT_VALUE_OLD,
-    NDF_ALERT_STATUS,
-    NDF_ALERT_STATUS_OLD,
-    NDF_ALERT_SOURCE,
-    NDF_ALERT_UNITS,
-    NDF_ALERT_SUMMARY,
-    NDF_ALERT_INFO,
-    NDF_ALERT_NOTIFICATION_REALTIME_USEC,
-    // NDF_ALERT_FLAGS,
-
-    // put new items here
-    // leave the request URL and the message last
-
-    NDF_REQUEST,                                // the request we are currently working on
-    NDF_MESSAGE,                                // the log message, if any
-
-    // terminator
-    _NDF_MAX,
-} ND_LOG_FIELD_ID;
-
-typedef enum __attribute__((__packed__)) {
-    NDFT_UNSET = 0,
-    NDFT_TXT,
-    NDFT_STR,
-    NDFT_BFR,
-    NDFT_U64,
-    NDFT_I64,
-    NDFT_DBL,
-    NDFT_UUID,
-    NDFT_CALLBACK,
-} ND_LOG_STACK_FIELD_TYPE;
 
 void errno_clear(void);
 void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting);
@@ -154,9 +23,9 @@ void chown_open_file(int fd, uid_t uid, gid_t gid);
 void nd_log_chown_log_files(uid_t uid, gid_t gid);
 void nd_log_set_flood_protection(size_t logs, time_t period);
 void nd_log_initialize_for_external_plugins(const char *name);
-void nd_log_reopen_log_files_for_spawn_server(void);
+void nd_log_reopen_log_files_for_spawn_server(const char *name);
 bool nd_log_journal_socket_available(void);
-ND_LOG_FIELD_ID nd_log_field_id_by_name(const char *field, size_t len);
+ND_LOG_FIELD_ID nd_log_field_id_by_journal_name(const char *field, size_t len);
 int nd_log_priority2id(const char *priority);
 const char *nd_log_id2priority(ND_LOG_FIELD_PRIORITY priority);
 const char *nd_log_method_for_external_plugins(const char *s);
@@ -306,4 +175,4 @@ void netdata_logger_fatal( const char *file, const char *function, unsigned long
 }
 # endif
 
-#endif /* NETDATA_LOG_H */
+#endif /* NETDATA_ND_LOG_H */

@@ -52,7 +52,7 @@
             detailed_description: |
               You can then have different recipients per role, by editing DEFAULT_RECIPIENT_TWILIO with the recipient's number you want, in the following entries at the bottom of the same file:
 
-              ```conf
+              ```text
               role_recipients_twilio[sysadmin]="+15555555555"
               role_recipients_twilio[domainadmin]="+15555555556"
               role_recipients_twilio[dba]="+15555555557"

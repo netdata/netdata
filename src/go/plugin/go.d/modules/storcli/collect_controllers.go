@@ -33,6 +33,10 @@ type (
 			ControllerStatus string      `json:"Controller Status"`
 			BBUStatus        *storNumber `json:"BBU Status"`
 		} `json:"Status"`
+		HwCfg struct {
+			TemperatureSensorForROC string `json:"Temperature Sensor for ROC"`
+			ROCTemperatureC         int    `json:"ROC temperature(Degree Celsius)"`
+		} `json:"HwCfg"`
 		BBUInfo []struct {
 			Model string `json:"Model"`
 			State string `json:"State"`
@@ -119,10 +123,15 @@ func (s *StorCli) collectMpt3sasControllersInfo(mx map[string]int64, resp *contr
 		for _, st := range []string{"healthy", "unhealthy"} {
 			mx[px+"health_status_"+st] = 0
 		}
-		if strings.ToLower(cntrl.Status.ControllerStatus) == "ok" {
+
+		if strings.EqualFold(cntrl.Status.ControllerStatus, "ok") {
 			mx[px+"health_status_healthy"] = 1
 		} else {
 			mx[px+"health_status_unhealthy"] = 1
+		}
+
+		if strings.EqualFold(cntrl.HwCfg.TemperatureSensorForROC, "present") {
+			mx[px+"roc_temperature_celsius"] = int64(cntrl.HwCfg.ROCTemperatureC)
 		}
 	}
 

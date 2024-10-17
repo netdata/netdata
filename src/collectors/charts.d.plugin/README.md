@@ -24,7 +24,7 @@ By default, `charts.d.plugin` is not included as part of the install when using 
 
 In this file, you can place statements like this:
 
-```conf
+```text
 enable_all_charts="yes"
 X="yes"
 Y="no"

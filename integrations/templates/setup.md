@@ -1,4 +1,14 @@
 ## Setup
+[% if entry.integration_type == 'logs' %]
+
+## Prerequisites
+
+[[ entry.setup.prerequisites.description]]
+
+## Configuration
+
+There is no configuration needed for this integration.
+[% else %]
 
 [% if entry.setup.description %]
 [[ entry.setup.description ]]
@@ -44,7 +54,7 @@ Configuration for this specific integration is located in the `[[ entry.setup.co
 [% include 'setup/sample-netdata-config.md' %]
 [% endif %]
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
@@ -104,5 +114,6 @@ There are no configuration options.
 [% else%]
 There are no configuration examples.
 
+[% endif %]
 [% endif %]
 [% endif %]

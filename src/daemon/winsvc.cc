@@ -74,7 +74,7 @@ static HANDLE CreateEventHandle(const char *msg)
 
     if (!h)
     {
-        netdata_service_log(msg);
+        netdata_service_log("%s", msg);
 
         if (!ReportSvcStatus(SERVICE_STOPPED, GetLastError(), 1000, 0))
         {
@@ -219,7 +219,11 @@ static bool update_path() {
 
 int main(int argc, char *argv[])
 {
+#if defined(OS_WINDOWS) && defined(RUN_UNDER_CLION)
+    bool tty = true;
+#else
     bool tty = isatty(fileno(stdin)) == 1;
+#endif
 
     if (!update_path()) {
         return 1;

@@ -98,7 +98,7 @@ modules:
               default_value: 2
               required: false
             - name: collect_databases_matching
-              description: Databases selector. Determines which database metrics will be collected. Syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#simple-patterns-matcher).
+              description: Databases selector. Determines which database metrics will be collected. Syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher).
               default_value: ""
               required: false
             - name: max_db_tables

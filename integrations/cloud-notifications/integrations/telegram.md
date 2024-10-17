@@ -9,12 +9,7 @@ endmeta-->
 
 # Telegram
 
-
 <img src="https://netdata.cloud/img/telegram.svg" width="150"/>
-
-
-From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on Telegram.
-
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
@@ -22,35 +17,33 @@ From the Cloud interface, you can manage your space's notification settings and 
 
 ### Prerequisites
 
-To add Telegram notification you need:
-
 - A Netdata Cloud account
-- Access to the space as an **Admin**
+- Access to the Space as an **Admin**
 - The Space needs to be on a paid plan
-- The Telegram bot token, chat ID and _optionally_ the topic ID
+- The Telegram bot token, chat ID and optionally the topic ID
 
-### Steps
-
-1. Click on the **Space settings** cog (located above your profile icon)
-2. Click on the **Notification** tab
-3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
-4. On the **Telegram** card click on **+ Add**
-5. A modal will be presented to you to enter the required details to enable the configuration:
-  - **Notification settings** are Netdata specific settings
-      - Configuration name - you can optionally provide a name for your configuration  you can easily refer to it
-      - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
-      - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-  - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Telegram:
-      - Bot Token - the token of your bot
-      - Chat ID - the chat id where your bot will deliver messages to
-      - Topic ID - the identifier of the chat topic to which your bot will send messages. If omitted or 0, messages will be sent to the General topic. If topics are not supported, messages will be sent to the chat.
-
-### Getting the Telegram bot token, chat ID and topic ID
+### Telegram Configuration
 
 - Bot token: To create one bot, contact the [@BotFather](https://t.me/BotFather) bot and send the command `/newbot` and follow the instructions. **Start a conversation with your bot or invite it into the group where you want it to send notifications**.
 - To get the chat ID you have two options:
     - Contact the [@myidbot](https://t.me/myidbot) bot and send the `/getid` command to get your personal chat ID, or invite it into a group and use the `/getgroupid` command to get the group chat ID.
     - Alternatively, you can get the chat ID directly from the bot API. Send your bot a command in the chat you want to use, then check `https://api.telegram.org/bot{YourBotToken}/getUpdates`, eg. `https://api.telegram.org/bot111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5/getUpdates`
 - To get the topic ID, the easiest way is this: Post a message to that topic, then right-click on it and select `Copy Message Link`. Paste it on a scratchpad and notice that it has the following structure `https://t.me/c/XXXXXXXXXX/YY/ZZ`. The topic ID is `YY` (integer).
+
+### Netdata Configuration
+
+1. Click on the **Space settings** cog (located above your profile icon)
+2. Click on the **Alerts & Notifications** tab
+3. Click on the **+ Add configuration** button
+4. Add the Telegram Integration
+5. A modal will be presented to you to enter the required details to enable the integration:
+    - **Notification settings**
+      - Configuration name (optional): A name for your configuration in order to easily refer to it
+      - Rooms: A list of Rooms for which you want to be notified
+      - Notifications: The notifications which you want to be notified
+    - **Integration configuration**
+      - Bot Token: The token of your bot
+      - Chat ID: The chat id where your bot will deliver messages to
+      - Topic ID: The identifier of the chat topic to which your bot will send messages. If omitted or 0, messages will be sent to the General topic. If topics are not supported, messages will be sent to the chat.
 
 

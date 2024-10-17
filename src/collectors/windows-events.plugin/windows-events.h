@@ -128,9 +128,14 @@ typedef enum {
 #include "windows-events-unicode.h"
 #include "windows-events-sid.h"
 #include "windows-events-xml.h"
-#include "windows-events-publishers.h"
+#include "windows-events-providers.h"
 #include "windows-events-fields-cache.h"
 #include "windows-events-query.h"
+
+// enable or disable preloading on full-text-search
+#define ON_FTS_PRELOAD_MESSAGE      1
+#define ON_FTS_PRELOAD_XML          0
+#define ON_FTS_PRELOAD_EVENT_DATA   1
 
 #define WEVT_FUNCTION_DESCRIPTION    "View, search and analyze the Microsoft Windows Events log."
 #define WEVT_FUNCTION_NAME           "windows-events"
@@ -139,26 +144,40 @@ typedef enum {
 #define WINDOWS_EVENTS_DEFAULT_TIMEOUT 600
 #define WINDOWS_EVENTS_SCAN_EVERY_USEC (5 * 60 * USEC_PER_SEC)
 #define WINDOWS_EVENTS_PROGRESS_EVERY_UT (250 * USEC_PER_MS)
-
 #define FUNCTION_PROGRESS_EVERY_ROWS (2000)
 #define FUNCTION_DATA_ONLY_CHECK_EVERY_ROWS (1000)
 #define ANCHOR_DELTA_UT (10 * USEC_PER_SEC)
 
+// run providers release every 5 mins
+#define WINDOWS_EVENTS_RELEASE_PROVIDERS_HANDLES_EVERY_UT (5 * 60 * USEC_PER_SEC)
+// release idle handles that are older than 5 mins
+#define WINDOWS_EVENTS_RELEASE_IDLE_PROVIDER_HANDLES_TIME_UT (5 * 60 * USEC_PER_SEC)
+
 #define WEVT_FIELD_COMPUTER             "Computer"
 #define WEVT_FIELD_CHANNEL              "Channel"
 #define WEVT_FIELD_PROVIDER             "Provider"
-#define WEVT_FIELD_SOURCE               "Source"
+#define WEVT_FIELD_PROVIDER_GUID        "ProviderGUID"
 #define WEVT_FIELD_EVENTRECORDID        "EventRecordID"
+#define WEVT_FIELD_VERSION              "Version"
+#define WEVT_FIELD_QUALIFIERS           "Qualifiers"
 #define WEVT_FIELD_EVENTID              "EventID"
 #define WEVT_FIELD_LEVEL                "Level"
 #define WEVT_FIELD_KEYWORDS             "Keywords"
 #define WEVT_FIELD_OPCODE               "Opcode"
-#define WEVT_FIELD_USER                 "User"
+#define WEVT_FIELD_ACCOUNT              "UserAccount"
+#define WEVT_FIELD_DOMAIN               "UserDomain"
+#define WEVT_FIELD_SID                  "UserSID"
 #define WEVT_FIELD_TASK                 "Task"
 #define WEVT_FIELD_PROCESSID            "ProcessID"
 #define WEVT_FIELD_THREADID             "ThreadID"
+#define WEVT_FIELD_ACTIVITY_ID          "ActivityID"
+#define WEVT_FIELD_RELATED_ACTIVITY_ID  "RelatedActivityID"
 #define WEVT_FIELD_XML                  "XML"
 #define WEVT_FIELD_MESSAGE              "Message"
+#define WEVT_FIELD_EVENTS_API           "EventsAPI"
+#define WEVT_FIELD_EVENT_DATA_HIDDEN    "__HIDDEN__EVENT__DATA__"
+#define WEVT_FIELD_EVENT_MESSAGE_HIDDEN "__HIDDEN__MESSAGE__DATA__"
+#define WEVT_FIELD_EVENT_XML_HIDDEN     "__HIDDEN__XML__DATA__"
 
 // functions needed by LQS
 
@@ -237,7 +256,8 @@ struct lqs_extension {
 #define LQS_SOURCE_TYPE             WEVT_SOURCE_TYPE
 #define LQS_SOURCE_TYPE_ALL         WEVTS_ALL
 #define LQS_SOURCE_TYPE_NONE        WEVTS_NONE
-#define LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value) wevt_internal_source_type(value)
+#define LQS_PARAMETER_SOURCE_NAME   "Event Channels" // this is how it is shown to users
+#define LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value) WEVT_SOURCE_TYPE_2id_one(value)
 #define LQS_FUNCTION_SOURCE_TO_JSON_ARRAY(wb) wevt_sources_to_json_array(wb)
 #include "libnetdata/facets/logs_query_status.h"
 

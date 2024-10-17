@@ -111,7 +111,7 @@ for the parent node and all of its children.
 To configure the database engine, look for the `page cache size MB` and `dbengine multihost disk space MB` settings in
 the `[db]` section of your `netdata.conf`.
 
-```conf
+```text
 [db]
     dbengine page cache size MB = 32
     dbengine multihost disk space MB = 256

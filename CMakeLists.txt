@@ -448,10 +448,20 @@ int main() {
 
 check_cxx_source_compiles("
 int main() {
-        __atomic_load_8(nullptr, 0);
+        int test;
+        __atomic_load_n(&test, 0);
         return 0;
 }
 " HAVE_BUILTIN_ATOMICS)
+
+check_cxx_source_compiles("
+#include <stdint.h>
+int main(void) {
+        uint64_t a;
+        __sync_add_and_fetch(&a, 1);
+        return 0;
+}
+" ARCH_SUPPORTS_64BIT_ATOMICS)
 
 check_c_source_compiles("
 void my_printf(char const *s, ...) __attribute__((format(gnu_printf, 1, 2)));
@@ -661,10 +671,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/libnetdata.h
         src/libnetdata/locks/locks.c
         src/libnetdata/locks/locks.h
-        src/libnetdata/log/journal.c
-        src/libnetdata/log/journal.h
-        src/libnetdata/log/log.c
-        src/libnetdata/log/log.h
+        src/libnetdata/log/systemd-journal-helpers.c
+        src/libnetdata/log/systemd-journal-helpers.h
+        src/libnetdata/log/nd_log.c
+        src/libnetdata/log/nd_log.h
         src/libnetdata/os/os.c
         src/libnetdata/os/os.h
         src/libnetdata/simple_hashtable.h
@@ -813,6 +823,25 @@ set(LIBNETDATA_FILES
         src/libnetdata/sanitizers/sanitizers-functions.h
         src/libnetdata/sanitizers/sanitizers-pluginsd.c
         src/libnetdata/sanitizers/sanitizers-pluginsd.h
+        src/libnetdata/log/nd_log-internals.c
+        src/libnetdata/log/nd_log-internals.h
+        src/libnetdata/log/nd_log_limit.c
+        src/libnetdata/log/nd_log_limit.h
+        src/libnetdata/log/nd_log-config.c
+        src/libnetdata/log/nd_log-init.c
+        src/libnetdata/log/nd_log-to-syslog.c
+        src/libnetdata/log/nd_log-to-systemd-journal.c
+        src/libnetdata/log/nd_log-annotators.c
+        src/libnetdata/log/nd_log-field-formatters.c
+        src/libnetdata/log/nd_log-format-logfmt.c
+        src/libnetdata/log/nd_log-format-json.c
+        src/libnetdata/log/nd_log-to-file.c
+        src/libnetdata/log/nd_log-to-windows-events.c
+        src/libnetdata/string/utf8.c
+        src/libnetdata/spawn_server/log-forwarder.c
+        src/libnetdata/spawn_server/log-forwarder.h
+        src/libnetdata/log/nd_log-common.h
+        src/libnetdata/log/nd_log-to-windows-common.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1430,12 +1459,13 @@ set(WINDOWS_EVENTS_PLUGIN_FILES
         src/collectors/windows-events.plugin/windows-events-unicode.h
         src/collectors/windows-events.plugin/windows-events-xml.c
         src/collectors/windows-events.plugin/windows-events-xml.h
-        src/collectors/windows-events.plugin/windows-events-publishers.c
-        src/collectors/windows-events.plugin/windows-events-publishers.h
+        src/collectors/windows-events.plugin/windows-events-providers.c
+        src/collectors/windows-events.plugin/windows-events-providers.h
         src/collectors/windows-events.plugin/windows-events-fields-cache.c
         src/collectors/windows-events.plugin/windows-events-fields-cache.h
         src/collectors/windows-events.plugin/windows-events-query-builder.c
         src/collectors/windows-events.plugin/windows-events-query-builder.h
+        src/collectors/windows-events.plugin/windows-events-query-evt-variant.c
 )
 
 set(WINDOWS_PLUGIN_FILES
@@ -1446,11 +1476,13 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetSystemCPU.c
         src/collectors/windows.plugin/perflib-rrd.c
         src/collectors/windows.plugin/perflib-rrd.h
+        src/collectors/windows.plugin/perflib-mssql.c
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
         src/collectors/windows.plugin/perflib-thermalzone.c
         src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
+        src/collectors/windows.plugin/perflib-netframework.c
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
         src/collectors/windows.plugin/perflib-web-service.c
@@ -1678,6 +1710,8 @@ if(ENABLE_H2O)
 
         target_compile_options(h2o PUBLIC -DH2O_USE_LIBUV=0)
         target_link_libraries(h2o PRIVATE PkgConfig::TLS)
+        target_compile_definitions(h2o PRIVATE
+                "$<$<NOT:$<BOOL:${ARCH_SUPPORTS_64BIT_ATOMICS}>>:H2O_NO_64BIT_ATOMICS>")
 endif()
 
 #
@@ -1733,9 +1767,89 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 target_link_libraries(libnetdata PUBLIC
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
-        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;bcrypt>"
+        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;bcrypt;wevtapi>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
+
+if(OS_WINDOWS)
+        set(HAVE_ETW True)
+        set(HAVE_WEL True)
+
+        # Output the results for debugging purposes
+        message(STATUS "Have Event Tracing for Windows (ETW): ${HAVE_ETW}")
+        message(STATUS "Have Windows Event Log (WEL): ${HAVE_WEL}")
+
+        if(HAVE_WEL OR HAVE_ETW)
+                # Define the source and generated file paths
+                set(WEVT_GEN_SRC_H_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/nd_log-to-windows-common.h")
+                set(WEVT_GEN_SRC_C_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_mc_generate.c")
+                set(WEVT_GEN_BIN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_mc_generate")
+
+                set(WEVT_BUILD_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_compile.sh")
+
+                set(WEVT_MC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.mc")
+                set(WEVT_MAN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_manifest.xml")
+                set(WEVT_RC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.rc")
+                set(WEVT_MC_H_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.h")
+                set(WEVT_MAN_H_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_manifest.h")
+                set(WEVT_RES_OBJECT "${CMAKE_BINARY_DIR}/wevt_netdata_res.o")
+
+                set(WEVT_DLL_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.dll")
+                set(WEVT_ETW_INSTALL_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_install.bat")
+
+                # we compile ${WEVT_GEN_BIN_FILE}, which generates the manifest, the .mc,
+                # and the headers required for compiling libnetdata/logs
+
+                if(HAVE_ETW)
+                        # ETW method also supports WEL
+                        # but it requires Microsoft tools mc, rc, and link
+                        add_custom_command(
+                                OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_MAN_H_FILE}" "${WEVT_DLL_FILE}"
+                                COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
+                                COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
+                                COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
+                                COMMAND "${WEVT_BUILD_SCRIPT}" "${CMAKE_SOURCE_DIR}/src/libnetdata/log" "${CMAKE_BINARY_DIR}"
+                                DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
+                                COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
+                        )
+                else()
+                        # WEL method can be built with windmc, windres and the normal linker
+                        add_custom_command(
+                                OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_DLL_FILE}"
+                                COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
+                                COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
+                                COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
+                                COMMAND windmc -r "${CMAKE_BINARY_DIR}" -h "${CMAKE_BINARY_DIR}" ${WEVT_MC_FILE}
+                                COMMAND echo "1 2004" "wevt_netdata_manifest.xml" >> "${WEVT_RC_FILE}"
+                                COMMAND windres ${WEVT_RC_FILE} -o ${WEVT_RES_OBJECT}
+                                COMMAND ${CMAKE_LINKER} -dll --entry 0 -nostdlib -o ${WEVT_DLL_FILE} ${WEVT_RES_OBJECT}
+                                DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
+                                COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
+                        )
+                endif()
+
+                # Create a custom target for the DLL
+                add_custom_target(wevt_netdata ALL DEPENDS ${WEVT_DLL_FILE})
+
+                set_source_files_properties(src/libnetdata/log/nd_log-to-windows-events.c PROPERTIES
+                        OBJECT_DEPENDS "${WEVT_MC_H_FILE}")
+
+                if(HAVE_ETW)
+                        set_source_files_properties(src/libnetdata/log/nd_log-to-windows-events.c PROPERTIES
+                                OBJECT_DEPENDS "${WEVT_MAN_H_FILE}")
+
+                        install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}" "${WEVT_ETW_INSTALL_SCRIPT}"
+                                COMPONENT wevt_netdata_dll
+                                DESTINATION "${BINDIR}")
+                else()
+                        # do not install the manifest in this case
+                        # the nsi installer will skip registering the ETW publisher
+                        install(FILES "${WEVT_DLL_FILE}"
+                                COMPONENT wevt_netdata_dll
+                                DESTINATION "${BINDIR}")
+                endif()
+        endif()
+endif()
 
 # ebpf
 if(ENABLE_PLUGIN_EBPF)
@@ -1912,8 +2026,7 @@ if(ENABLE_PLUGIN_APPS)
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
 
     target_link_libraries(apps.plugin libnetdata ${CAP_LIBRARIES}
-            "$<$<BOOL:${OS_WINDOWS}>:Version>"
-            "$<$<BOOL:${OS_WINDOWS}>:ntdll>")
+            "$<$<BOOL:${OS_WINDOWS}>:Version;ntdll>")
 
     target_include_directories(apps.plugin PRIVATE ${CAP_INCLUDE_DIRS})
     target_compile_options(apps.plugin PRIVATE ${CAP_CFLAGS_OTHER})
@@ -2345,7 +2458,7 @@ add_executable(netdata
 
 if(OS_WINDOWS)
         add_executable(NetdataClaim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
-        target_link_libraries(NetdataClaim shell32;gdi32;msftedit)
+        target_link_libraries(NetdataClaim shell32 gdi32 msftedit)
         target_compile_options(NetdataClaim PUBLIC -mwindows)
 endif()
 
@@ -2389,7 +2502,10 @@ set(SYSTEMD_CAT_NATIVE_FILES src/libnetdata/log/systemd-cat-native.c
                              src/libnetdata/log/systemd-cat-native.h)
 
 add_executable(systemd-cat-native ${SYSTEMD_CAT_NATIVE_FILES})
-target_link_libraries(systemd-cat-native libnetdata)
+target_link_libraries(systemd-cat-native
+        libnetdata
+        "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
+)
 
 install(TARGETS systemd-cat-native
         COMPONENT netdata

@@ -138,6 +138,12 @@ modules:
                 - name: healthy
                 - name: unhealthy
                 - name: na
+            - name: storcli.controller_roc_temperature
+              description: Controller ROC temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
         - name: physical drive
           description: These metrics refer to the Physical Drive.
           labels:

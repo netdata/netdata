@@ -38,7 +38,7 @@ Send notifications to Rocket.Chat using Netdata's Agent alert notification featu
 The configuration file name for this integration is `health_alarm_notify.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
@@ -62,7 +62,7 @@ The following options can be defined for this notification
 All roles will default to this variable if left unconfigured.
 
 The `DEFAULT_RECIPIENT_ROCKETCHAT` can be edited in the following entries at the bottom of the same file:
-```conf
+```text
 role_recipients_rocketchat[sysadmin]="systems"
 role_recipients_rocketchat[domainadmin]="domains"
 role_recipients_rocketchat[dba]="databases systems"

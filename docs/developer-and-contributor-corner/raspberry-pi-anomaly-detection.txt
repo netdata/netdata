@@ -27,7 +27,7 @@ Next, open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuratio
 from within the [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory). Scroll down to the
 `[plugin:python.d]` section to pass in the `-ppython3` command option. 
 
-```conf
+```text
 [plugin:python.d]
     # update every = 1
     command options = -ppython3

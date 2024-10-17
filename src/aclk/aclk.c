@@ -285,6 +285,7 @@ static void puback_callback(uint16_t packet_id)
 
 void aclk_graceful_disconnect(mqtt_wss_client client);
 
+bool schedule_node_update = false;
 /* Keeps connection alive and handles all network communications.
  * Returns on error or when netdata is shutting down.
  * @param client instance of mqtt_wss_client
@@ -309,6 +310,7 @@ static int handle_connection(mqtt_wss_client client)
                     break;
                 case ACLK_PING_TIMEOUT:
                     reason = "ping timeout";
+                    schedule_node_update = true;
                     break;
                 case ACLK_RELOAD_CONF:
                     reason = "reclaim";
@@ -800,6 +802,11 @@ void *aclk_main(void *ptr)
     do {
         if (aclk_attempt_to_connect(mqttwss_client))
             goto exit_full;
+
+        if (schedule_node_update) {
+            schedule_node_state_update(localhost, 0);
+            schedule_node_update = false;
+        }
 
         if (handle_connection(mqttwss_client)) {
             last_disconnect_time = now_realtime_sec();

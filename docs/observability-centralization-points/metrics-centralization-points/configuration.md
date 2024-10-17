@@ -70,7 +70,7 @@ This example uses self-signed certificates.
 2. **Child node**  
    Update `stream.conf` to enable SSL/TLS and allow self-signed certificates. Append ':SSL' to the destination and uncomment 'ssl skip certificate verification'.
 
-    ```conf
+    ```text
     [stream]
         enabled = yes
         destination = 203.0.113.0:SSL

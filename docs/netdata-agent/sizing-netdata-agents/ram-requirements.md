@@ -14,7 +14,7 @@ This number can be lowered by limiting the number of database tier or switching 
 
 The general formula, with the default configuration of database tiers, is:
 
-```txt
+```text
 memory = UNIQUE_METRICS x 16KiB + CONFIGURED_CACHES
 ```
 
@@ -22,7 +22,7 @@ The default `CONFIGURED_CACHES` is 32MiB.
 
 For 1 million concurrently collected time-series (independently of their data collection frequency), the memory required is:
 
-```txt
+```text
 UNIQUE_METRICS = 1000000
 CONFIGURED_CACHES = 32MiB
 

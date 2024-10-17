@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/modules/sensors/lmsensors"
 )
@@ -485,6 +486,10 @@ func (s *Sensors) addCharts(charts *module.Charts, chipUniqueName, chipSysDevice
 		return
 	}
 
+	if lbl := s.relabel(chipUniqueName, snName); lbl != "" {
+		snLabel = lbl
+	}
+
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, chipUniqueName, snName)
 		chart.ID = cleanChartId(chart.ID)
@@ -514,6 +519,31 @@ func (s *Sensors) removeSensorChart(px string) {
 			return
 		}
 	}
+}
+
+func (s *Sensors) relabel(chipUniqueName, snName string) string {
+	for _, rv := range s.Relabel {
+		if rv.Chip == "" {
+			return ""
+		}
+
+		mr, err := matcher.NewSimplePatternsMatcher(rv.Chip)
+		if err != nil {
+			s.Debugf("failed to create simple pattern matcher from '%s': %v", rv.Chip, err)
+			return ""
+		}
+
+		if !mr.MatchString(chipUniqueName) {
+			return ""
+		}
+
+		for _, sv := range rv.Sensors {
+			if sv.Name == snName {
+				return sv.Label
+			}
+		}
+	}
+	return ""
 }
 
 func cleanChartId(id string) string {

@@ -1,12 +1,3 @@
-<!--
-title: "Running Netdata behind H2O"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md"
-sidebar_label: "Running Netdata behind H2O"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration/Secure your nodes"
--->
-
 # Running Netdata behind H2O
 
 [H2O](https://h2o.examp1e.net/) is a new generation HTTP server that provides quicker response to users with less CPU utilization when compared to older generation of web servers.
@@ -141,27 +132,27 @@ For more information on using basic authentication with H2O, see [their official
 
 If your H2O server is on `localhost`, you can use this to ensure external access is only possible through H2O:
 
-```txt
+```text
 [web]
     bind to = 127.0.0.1 ::1
 ```
 
 You can also use a unix domain socket. This will provide faster communication between H2O and Netdata as well:
 
-```txt
+```text
 [web]
     bind to = unix:/run/netdata/netdata.sock
 ```
 
 In the H2O configuration, use a line like the following to connect to Netdata via the unix socket:
 
-```txt
+```text
 proxy.reverse.url http://[unix:/run/netdata/netdata.sock]
 ```
 
 If your H2O server is not on localhost, you can set:
 
-```txt
+```text
 [web]
     bind to = *
     allow connections from = IP_OF_H2O_SERVER
@@ -177,7 +168,7 @@ the connection IP address.
 H2O logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting
 this in `/etc/netdata/netdata.conf`:
 
-```txt
+```text
 [logs]
     access = off
 ```

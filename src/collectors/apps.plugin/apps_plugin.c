@@ -177,7 +177,8 @@ void print_process_tree(struct pid_stat *root, struct pid_stat *parent, int dept
                string2str(children[i]->target->name),
                string2str(children[i]->cmdline));
 #else
-        printf("[%d] %s [%s]: %s\n", children[i]->pid,
+        printf("[%d] orig: '%s' new: '%s' [target: %s]: cmdline: %s\n", children[i]->pid,
+               string2str(children[i]->comm_orig),
                string2str(children[i]->comm),
                string2str(children[i]->target->name),
                string2str(children[i]->cmdline));
@@ -703,7 +704,7 @@ int main(int argc, char **argv) {
     }
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-    procfile_adaptive_initial_allocation = 1;
+    procfile_set_adaptive_allocation(true, 0, 0, 0);
     os_get_system_HZ();
     os_get_system_cpus_uncached();
     apps_managers_and_aggregators_init(); // before parsing args!

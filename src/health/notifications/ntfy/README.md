@@ -39,7 +39,7 @@ You can send alerts to an ntfy server using Netdata's Agent alert notification f
 The configuration file name for this integration is `health_alarm_notify.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
@@ -67,7 +67,7 @@ You can define multiple recipient URLs like this: `https://SERVER1/TOPIC1` `http
 All roles will default to this variable if left unconfigured.
 
 You can then have different servers and/or topics per role, by editing DEFAULT_RECIPIENT_NTFY with the server-topic combination you want, in the following entries at the bottom of the same file:
-```conf
+```text
 role_recipients_ntfy[sysadmin]="https://SERVER1/TOPIC1"
 role_recipients_ntfy[domainadmin]="https://SERVER2/TOPIC2"
 role_recipients_ntfy[dba]="https://SERVER3/TOPIC3"

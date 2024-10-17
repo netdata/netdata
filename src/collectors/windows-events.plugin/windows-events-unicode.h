@@ -9,7 +9,7 @@
 
 typedef enum __attribute__((packed)) {
     TXT_SOURCE_UNKNOWN = 0,
-    TXT_SOURCE_PUBLISHER,
+    TXT_SOURCE_PROVIDER,
     TXT_SOURCE_FIELD_CACHE,
     TXT_SOURCE_EVENT_LOG,
     TXT_SOURCE_HARDCODED,
@@ -177,6 +177,7 @@ char *channel2utf8(const wchar_t *channel);
 wchar_t *channel2unicode(const char *utf8str);
 
 char *query2utf8(const wchar_t *query);
+char *provider2utf8(const wchar_t *provider);
 
 char *unicode2utf8_strdupz(const wchar_t *src, size_t *utf8_len);
 

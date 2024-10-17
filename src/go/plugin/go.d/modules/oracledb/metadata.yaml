@@ -69,7 +69,7 @@ modules:
               ```
       configuration:
         file:
-          name: go.d/oracle.conf
+          name: go.d/oracledb.conf
         options:
           description: |
             The following options can be defined globally: update_every, autodetection_retry.

@@ -15,13 +15,13 @@ To get started archiving metrics to TimescaleDB right away, check out Mahlon's [
 repository](https://github.com/mahlonsmith/netdata-timescale-relay) on GitHub. Please be aware that backends subsystem
 was removed and Netdata configuration should be moved to the new `exporting.conf` configuration file. Use
 
-```conf
+```text
 [json:my_instance]
 ```
 
 in `exporting.conf` instead of
 
-```conf
+```text
 [backend]
     type = json
 ```

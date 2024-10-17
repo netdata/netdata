@@ -120,6 +120,8 @@ modules:
           labels:
             - name: device
               description: NVMe device name
+            - name: model_number
+              description: NVMe device model
           metrics:
             - name: nvme.device_estimated_endurance_perc
               description: Estimated endurance

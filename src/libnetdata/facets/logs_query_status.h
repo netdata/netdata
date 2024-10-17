@@ -16,7 +16,7 @@
 #define LQS_PARAMETER_DIRECTION "direction"
 #define LQS_PARAMETER_IF_MODIFIED_SINCE "if_modified_since"
 #define LQS_PARAMETER_DATA_ONLY "data_only"
-#define LQS_PARAMETER_SOURCE "source"
+#define LQS_PARAMETER_SOURCE "__logs_sources" // this must never conflict with user fields
 #define LQS_PARAMETER_INFO "info"
 #define LQS_PARAMETER_SLICE "slice"
 #define LQS_PARAMETER_DELTA "delta"
@@ -350,59 +350,10 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
     JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_QUERY, rq->query, error, false);
     JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_HISTOGRAM, rq->histogram, error, false);
 
-    json_object *sources;
-    if (json_object_object_get_ex(jobj, LQS_PARAMETER_SOURCE, &sources)) {
-        if (json_object_get_type(sources) != json_type_array) {
-            buffer_sprintf(error, "member '%s' is not an array", LQS_PARAMETER_SOURCE);
-            // nd_log(NDLS_COLLECTORS, NDLP_ERR, "POST payload: '%s' is not an array", LQS_PARAMETER_SOURCE);
-            return false;
-        }
-
-        buffer_json_member_add_array(wb, LQS_PARAMETER_SOURCE);
-
-        CLEAN_BUFFER *sources_list = buffer_create(0, NULL);
-
-        rq->source_type = LQS_SOURCE_TYPE_NONE;
-
-        size_t sources_len = json_object_array_length(sources);
-        for (size_t i = 0; i < sources_len; i++) {
-            json_object *src = json_object_array_get_idx(sources, i);
-
-            if (json_object_get_type(src) != json_type_string) {
-                buffer_sprintf(error, "sources array item %zu is not a string", i);
-                // nd_log(NDLS_COLLECTORS, NDLP_ERR, "POST payload: sources array item %zu is not a string", i);
-                return false;
-            }
-
-            const char *value = json_object_get_string(src);
-            buffer_json_add_array_item_string(wb, value);
-
-            LQS_SOURCE_TYPE t = LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value);
-            if(t != LQS_SOURCE_TYPE_NONE) {
-                rq->source_type |= t;
-                value = NULL;
-            }
-            else {
-                // else, match the source, whatever it is
-                if(buffer_strlen(sources_list))
-                    buffer_putc(sources_list, '|');
-
-                buffer_strcat(sources_list, value);
-            }
-        }
-
-        if(buffer_strlen(sources_list)) {
-            simple_pattern_free(rq->sources);
-            rq->sources = simple_pattern_create(buffer_tostring(sources_list), "|", SIMPLE_PATTERN_EXACT, false);
-        }
-
-        buffer_json_array_close(wb); // source
-    }
-
     json_object *fcts;
     if (json_object_object_get_ex(jobj, LQS_PARAMETER_FACETS, &fcts)) {
-        if (json_object_get_type(sources) != json_type_array) {
-            buffer_sprintf(error, "member '%s' is not an array", LQS_PARAMETER_FACETS);
+        if (json_object_get_type(fcts) != json_type_array) {
+            buffer_sprintf(error, "member '%s' is not an array.", LQS_PARAMETER_FACETS);
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "POST payload: '%s' is not an array", LQS_PARAMETER_FACETS);
             return false;
         }
@@ -440,11 +391,22 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
 
         buffer_json_member_add_object(wb, "selections");
 
+        CLEAN_BUFFER *sources_list = buffer_create(0, NULL);
+
         json_object_object_foreach(selections, key, val) {
+            if(strcmp(key, "query") == 0) continue;
+
             if (json_object_get_type(val) != json_type_array) {
                 buffer_sprintf(error, "selection '%s' is not an array", key);
                 // nd_log(NDLS_COLLECTORS, NDLP_ERR, "POST payload: selection '%s' is not an array", key);
                 return false;
+            }
+
+            bool is_source = false;
+            if(strcmp(key, LQS_PARAMETER_SOURCE) == 0) {
+                // reset the sources, so that only what the user selects will be shown
+                is_source = true;
+                rq->source_type = LQS_SOURCE_TYPE_NONE;
             }
 
             buffer_json_member_add_array(wb, key);
@@ -461,15 +423,38 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, const char 
 
                 const char *value = json_object_get_string(value_obj);
 
-                // Call facets_register_facet_id_filter for each value
-                facets_register_facet_filter(
-                    facets, key, value, FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_REORDER);
+                if(is_source) {
+                    // processing sources
+                    LQS_SOURCE_TYPE t = LQS_FUNCTION_GET_INTERNAL_SOURCE_TYPE(value);
+                    if(t != LQS_SOURCE_TYPE_NONE) {
+                        rq->source_type |= t;
+                        value = NULL;
+                    }
+                    else {
+                        // else, match the source, whatever it is
+                        if(buffer_strlen(sources_list))
+                            buffer_putc(sources_list, '|');
+
+                        buffer_strcat(sources_list, value);
+                    }
+                }
+                else {
+                    // Call facets_register_facet_id_filter for each value
+                    facets_register_facet_filter(
+                        facets, key, value, FACET_KEY_OPTION_FACET | FACET_KEY_OPTION_FTS | FACET_KEY_OPTION_REORDER);
+
+                    rq->filters++;
+                }
 
                 buffer_json_add_array_item_string(wb, value);
-                rq->filters++;
             }
 
             buffer_json_array_close(wb); // key
+        }
+
+        if(buffer_strlen(sources_list)) {
+            simple_pattern_free(rq->sources);
+            rq->sources = simple_pattern_create(buffer_tostring(sources_list), "|", SIMPLE_PATTERN_EXACT, false);
         }
 
         buffer_json_object_close(wb); // selections
@@ -686,8 +671,8 @@ static inline void lqs_info_response(BUFFER *wb, FACETS *facets) {
     {
         buffer_json_add_array_item_object(wb);
         {
-            buffer_json_member_add_string(wb, "id", "source");
-            buffer_json_member_add_string(wb, "name", "source");
+            buffer_json_member_add_string(wb, "id", LQS_PARAMETER_SOURCE);
+            buffer_json_member_add_string(wb, "name", LQS_PARAMETER_SOURCE_NAME);
             buffer_json_member_add_string(wb, "help", "Select the logs source to query");
             buffer_json_member_add_string(wb, "type", "multiselect");
             buffer_json_member_add_array(wb, "options");

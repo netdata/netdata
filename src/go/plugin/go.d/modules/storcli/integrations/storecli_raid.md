@@ -80,6 +80,7 @@ Metrics:
 | storcli.controller_health_status | healthy, unhealthy | status |
 | storcli.controller_status | optimal, degraded, partially_degraded, failed | status |
 | storcli.controller_bbu_status | healthy, unhealthy, na | status |
+| storcli.controller_roc_temperature | temperature | Celsius |
 
 ### Per physical drive
 
@@ -149,7 +150,7 @@ No action required.
 The configuration file name for this integration is `go.d/storcli.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash

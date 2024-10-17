@@ -9,33 +9,28 @@ endmeta-->
 
 # Netdata Mobile App
 
-
 <img src="https://netdata.cloud/img/netdata.png" width="150"/>
-
-
-From the Netdata Cloud UI, you can manage your user notification settings and enable the configuration to deliver notifications on the Netdata Mobile Application.
-
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup
 
 ### Prerequisites
+
 - A Netdata Cloud account
-- You need to have the Netdata Mobile Application installed on your [Android](https://play.google.com/store/apps/details?id=cloud.netdata.android&pli=1) or [iOS](https://apps.apple.com/in/app/netdata-mobile/id6474659622) phone.
+- You need to have the Netdata Mobile App installed on your [Android](https://play.google.com/store/apps/details?id=cloud.netdata.android&pli=1) or [iOS](https://apps.apple.com/in/app/netdata-mobile/id6474659622) phone.
 
-### Netdata Mobile App Configuration
-Steps to login to the Netdata Mobile Application to receive alert and reachability and alert notifications:
-1. Download the Netdata Mobile Application from [Google Play Store](https://play.google.com/store/apps/details?id=cloud.netdata.android&pli=1) or the [iOS App Store](https://apps.apple.com/in/app/netdata-mobile/id6474659622)
-2. Open the App and Choose the Sign In Option
-  - Sign In with Email Address: Enter the Email Address of your registered Netdata Cloud Account and Click on the Verification link received by Email on your mobile device.
-  - Sign In with QR Code: Scan the QR Code from your `Netdata Cloud` UI under **User Settings** --> **Notifications** --> **Mobile App Notifications** --> **Show QR Code**
-3. Start receiving alert and reachability notifications for your **Space(s)** on a **Paid Subscription plan**
+### Netdata Mobile App Configuration and device linking
 
-### Netdata Configuration Steps
-1. Click on the **User settings** on the bottom left of your screen (your profile icon)
-2. Click on the **Notifications** tab
-3. Enable **Mobile App Notifications** if disabled (Enabled by default)
-4. Use the **Show QR Code** Option to login to your mobile device by scanning the **QR Code**
+In order to login to the Netdata Mobile App
+
+1. Download the Netdata Mobile App from [Google Play Store](https://play.google.com/store/apps/details?id=cloud.netdata.android&pli=1) or the [iOS App Store](https://apps.apple.com/in/app/netdata-mobile/id6474659622)
+2. Open the App and Choose your Sign-in option
+  - Email Address: Enter the email address of your registered Netdata Cloud account and click on the verification link received by email on your mobile device.
+  - Sign-in with QR Code: Scan the QR code from the Netdata Cloud UI under **Profile Picture** --> **Settings** --> **Notifications** --> **Mobile App Notifications** --> **Show QR Code**
+
+### Netdata Configuration
+
+After linking your device, enable the toggle for **Mobile App Notifications** under the same settings panel.
 
 

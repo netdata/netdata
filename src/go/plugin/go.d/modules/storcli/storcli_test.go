@@ -205,6 +205,7 @@ func TestStorCli_Collect(t *testing.T) {
 			wantMetrics: map[string]int64{
 				"cntrl_0_health_status_healthy":   1,
 				"cntrl_0_health_status_unhealthy": 0,
+				"cntrl_0_roc_temperature_celsius": 44,
 			},
 		},
 		"err on exec": {

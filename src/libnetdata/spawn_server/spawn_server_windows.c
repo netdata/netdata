@@ -40,11 +40,18 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, c
         server->name = strdupz(name);
     else
         server->name = strdupz("unnamed");
+
+    server->log_forwarder = log_forwarder_start();
+
     return server;
 }
 
 void spawn_server_destroy(SPAWN_SERVER *server) {
     if (server) {
+        if (server->log_forwarder) {
+            log_forwarder_stop(server->log_forwarder);
+            server->log_forwarder = NULL;
+        }
         freez((void *)server->name);
         freez(server);
     }
@@ -136,13 +143,13 @@ int set_fd_blocking(int fd) {
 //    }
 //}
 
-SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
+SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_unused, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
 
     if (type != SPAWN_INSTANCE_TYPE_EXEC)
         return NULL;
 
-    int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 };
+    int pipe_stdin[2] = { -1, -1 }, pipe_stdout[2] = { -1, -1 }, pipe_stderr[2] = { -1, -1 };
 
     errno_clear();
 
@@ -166,12 +173,21 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
         goto cleanup;
     }
 
+    if (pipe(pipe_stderr) == -1) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot create stderr pipe() for request No %zu, command: %s",
+               instance->request_id, command);
+        goto cleanup;
+    }
+
     // Ensure pipes are in blocking mode
     if (set_fd_blocking(pipe_stdin[PIPE_READ]) == -1 || set_fd_blocking(pipe_stdin[PIPE_WRITE]) == -1 ||
-        set_fd_blocking(pipe_stdout[PIPE_READ]) == -1 || set_fd_blocking(pipe_stdout[PIPE_WRITE]) == -1) {
+        set_fd_blocking(pipe_stdout[PIPE_READ]) == -1 || set_fd_blocking(pipe_stdout[PIPE_WRITE]) == -1 ||
+        set_fd_blocking(pipe_stderr[PIPE_READ]) == -1 || set_fd_blocking(pipe_stderr[PIPE_WRITE]) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: Failed to set blocking I/O on pipes for request No %zu, command: %s",
                instance->request_id, command);
+        goto cleanup;
     }
 
     // do not run multiple times this section
@@ -181,9 +197,9 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     // Convert POSIX file descriptors to Windows handles
     HANDLE stdin_read_handle = (HANDLE)_get_osfhandle(pipe_stdin[PIPE_READ]);
     HANDLE stdout_write_handle = (HANDLE)_get_osfhandle(pipe_stdout[PIPE_WRITE]);
-    HANDLE stderr_handle = (HANDLE)_get_osfhandle(stderr_fd);
+    HANDLE stderr_write_handle = (HANDLE)_get_osfhandle(pipe_stderr[PIPE_WRITE]);
 
-    if (stdin_read_handle == INVALID_HANDLE_VALUE || stdout_write_handle == INVALID_HANDLE_VALUE || stderr_handle == INVALID_HANDLE_VALUE) {
+    if (stdin_read_handle == INVALID_HANDLE_VALUE || stdout_write_handle == INVALID_HANDLE_VALUE || stderr_write_handle == INVALID_HANDLE_VALUE) {
         spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: Invalid handle value(s) for request No %zu, command: %s",
@@ -194,7 +210,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     // Set handle inheritance
     if (!SetHandleInformation(stdin_read_handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT) ||
         !SetHandleInformation(stdout_write_handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT) ||
-        !SetHandleInformation(stderr_handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT)) {
+        !SetHandleInformation(stderr_write_handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT)) {
         spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: Cannot set handle(s) inheritance for request No %zu, command: %s",
@@ -210,18 +226,18 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     si.dwFlags = STARTF_USESTDHANDLES;
     si.hStdInput = stdin_read_handle;
     si.hStdOutput = stdout_write_handle;
-    si.hStdError = stderr_handle;
+    si.hStdError = stderr_write_handle;
 
     // Retrieve the current environment block
     char* env_block = GetEnvironmentStrings();
 //    print_environment_block(env_block);
 
-    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+    nd_log(NDLS_COLLECTORS, NDLP_INFO,
            "SPAWN PARENT: Running request No %zu, command: '%s'",
            instance->request_id, command);
 
-    int fds[3] = { pipe_stdin[PIPE_READ], pipe_stdout[PIPE_WRITE], stderr_fd };
-    os_close_all_non_std_open_fds_except(fds, 3, CLOSE_RANGE_CLOEXEC);
+    int fds_to_keep_open[] = { pipe_stdin[PIPE_READ], pipe_stdout[PIPE_WRITE], pipe_stderr[PIPE_WRITE] };
+    os_close_all_non_std_open_fds_except(fds_to_keep_open, 3, CLOSE_RANGE_CLOEXEC);
 
     // Spawn the process
     errno_clear();
@@ -247,6 +263,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     // Close unused pipe ends
     close(pipe_stdin[PIPE_READ]); pipe_stdin[PIPE_READ] = -1;
     close(pipe_stdout[PIPE_WRITE]); pipe_stdout[PIPE_WRITE] = -1;
+    close(pipe_stderr[PIPE_WRITE]); pipe_stderr[PIPE_WRITE] = -1;
 
     // Store process information in instance
     instance->dwProcessId = pi.dwProcessId;
@@ -256,9 +273,15 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     // Convert handles to POSIX file descriptors
     instance->write_fd = pipe_stdin[PIPE_WRITE];
     instance->read_fd = pipe_stdout[PIPE_READ];
+    instance->stderr_fd = pipe_stderr[PIPE_READ];
+
+    // Add stderr_fd to the log forwarder
+    log_forwarder_add_fd(server->log_forwarder, instance->stderr_fd);
+    log_forwarder_annotate_fd_name(server->log_forwarder, instance->stderr_fd, command);
+    log_forwarder_annotate_fd_pid(server->log_forwarder, instance->stderr_fd, spawn_server_instance_pid(instance));
 
     errno_clear();
-    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+    nd_log(NDLS_COLLECTORS, NDLP_INFO,
            "SPAWN PARENT: created process for request No %zu, pid %d (winpid %d), command: %s",
            instance->request_id, (int)instance->child_pid, (int)pi.dwProcessId, command);
 
@@ -269,6 +292,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     if (pipe_stdin[PIPE_WRITE] >= 0) close(pipe_stdin[PIPE_WRITE]);
     if (pipe_stdout[PIPE_READ] >= 0) close(pipe_stdout[PIPE_READ]);
     if (pipe_stdout[PIPE_WRITE] >= 0) close(pipe_stdout[PIPE_WRITE]);
+    if (pipe_stderr[PIPE_READ] >= 0) close(pipe_stderr[PIPE_READ]);
+    if (pipe_stderr[PIPE_WRITE] >= 0) close(pipe_stderr[PIPE_WRITE]);
     freez(instance);
     return NULL;
 }
@@ -314,7 +339,7 @@ static void TerminateChildProcesses(SPAWN_INSTANCE *si) {
             if (pe.th32ParentProcessID == si->dwProcessId) {
                 HANDLE hChildProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pe.th32ProcessID);
                 if (hChildProcess) {
-                    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                    nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                            "SPAWN PARENT: killing subprocess %u of request No %zu, pid %d (winpid %u)",
                            pe.th32ProcessID, si->request_id, (int)si->child_pid, si->dwProcessId);
 
@@ -378,6 +403,12 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     // to have them, to avoid abnormal shutdown of the plugins
     if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
+    if(si->stderr_fd != -1) {
+        if(!log_forwarder_del_and_close_fd(server->log_forwarder, si->stderr_fd))
+            close(si->stderr_fd);
+
+        si->stderr_fd = -1;
+    }
 
     errno_clear();
     if(TerminateProcess(si->process_handle, STATUS_CONTROL_C_EXIT) == 0)
@@ -394,6 +425,12 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
     if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
+    if(si->stderr_fd != -1) {
+        if(!log_forwarder_del_and_close_fd(server->log_forwarder, si->stderr_fd))
+            close(si->stderr_fd);
+
+        si->stderr_fd = -1;
+    }
 
     // wait for the process to end
     WaitForSingleObject(si->process_handle, INFINITE);
@@ -404,7 +441,7 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 
     char *err = GetErrorString(exit_code);
 
-    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+    nd_log(NDLS_COLLECTORS, NDLP_INFO,
            "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), exited with code %u (0x%x): %s",
            si->request_id, (int)si->child_pid, si->dwProcessId,
            (unsigned)exit_code, (unsigned)exit_code, err ? err : "(no reason text)");

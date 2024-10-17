@@ -55,7 +55,7 @@ need to view metrics and troubleshoot issues with Netdata Cloud.
 Open `netdata.conf` with `./edit-config netdata.conf`. Scroll down to the `[web]` section, and find the `mode =
 static-threaded` setting, and change it to `none`.
 
-```conf
+```text
 [web]
     mode = none
 ```
@@ -74,9 +74,9 @@ If you are using Netdata with Docker, make sure to set the `NETDATA_HEALTHCHECK_
 If your organization has a private administration and management LAN, you can bind Netdata on this network interface on all your servers.
 This is done in `Netdata.conf` with these settings:
 
-```txt
+```text
 [web]
- bind to = 10.1.1.1:19999 localhost:19999
+    bind to = 10.1.1.1:19999 localhost:19999
 ```
 
 You can bind Netdata to multiple IPs and ports. If you use hostnames, Netdata will resolve them and use all the IPs
@@ -109,7 +109,7 @@ By default, this setting is `localhost *`. This setting allows connections from 
 connections, using the `*` wildcard. You can change this setting using Netdata's [simple
 patterns](/src/libnetdata/simple_pattern/README.md).
 
-```conf
+```text
 [web]
     # Allow only localhost connections
     allow connections from = localhost
@@ -124,7 +124,7 @@ patterns](/src/libnetdata/simple_pattern/README.md).
 The `allow connections from` setting is global and restricts access to the dashboard, badges, streaming, API, and
 `netdata.conf`, but you can also set each of those access lists more granularly if you choose:
 
-```conf
+```text
 [web]
     allow connections from = localhost *
     allow dashboard from = localhost *

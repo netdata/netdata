@@ -1,12 +1,3 @@
-<!--
-title: "Log"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/log/README.md
-sidebar_label: "Log"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Developers/libnetdata"
--->
-
 # Netdata Logging
 
 This document describes how Netdata generates its own logs, not how Netdata manages and queries logs databases.
@@ -26,14 +17,15 @@ For each log source, Netdata supports the following output methods:
 
 - **off**, to disable this log source
 - **journal**, to send the logs to systemd-journal.
+- **etw**, to send the logs to Event Tracing for Windows (ETW).
+- **wel**, to send the logs to the Windows Event Log (WEL).
 - **syslog**, to send the logs to syslog.
 - **system**, to send the output to `stderr` or `stdout` depending on the log source.
 - **stdout**, to write the logs to Netdata's `stdout`.
 - **stderr**, to write the logs to Netdata's `stderr`.
 - **filename**, to send the logs to a file.
 
-For `daemon` and `collector` the default is `journal` when systemd-journal is available.
-To decide if systemd-journal is available, Netdata checks:
+On Linux, when systemd-journal is available, the default is `journal` for `daemon` and `collector` and `filename` for the rest. To decide if systemd-journal is available, Netdata checks:
 
 1. `stderr` is connected to systemd-journald
 2. `/run/systemd/journal/socket` exists
@@ -41,12 +33,15 @@ To decide if systemd-journal is available, Netdata checks:
 
 If any of the above is detected, Netdata will select `journal` for `daemon` and `collector` sources.
 
-All other sources default to a file.
+On Windows, the default is `etw` and if that is not available it falls back to `wel`. The availability of `etw` is decided at compile time.
 
 ## Log formats
 
 | Format  | Description                                                                                            |
 |---------|--------------------------------------------------------------------------------------------------------|
+| journal | journald-specific log format. Automatically selected when logging to systemd-journal.                  |
+| etw     | Event Tracing for Windows specific format. Structured logging in Event Viewer.                         |
+| wel     | Windows Event Log specific format. Basic field-based logging in Event Viewer.                          |
 | journal | journald-specific log format. Automatically selected when logging to systemd-journal.                  |
 | logfmt  | logs data as a series of key/value pairs. The default when logging to any output other than `journal`. |
 | json    | logs data in JSON format.                                                                              |
@@ -65,6 +60,9 @@ Each time Netdata logs, it assigns a priority to the log. It can be one of this 
 | notice    | something that does not affect the operation of Netdata, but the user should notice.   |
 | info      | the default log level about information the user should know.                          |
 | debug     | these are more verbose logs that can be ignored.                                       |
+
+For `etw` these are mapped to `Verbose`, `Informational`, `Warning`, `Error` and `Critical`.
+For `wel` these are mapped to `Informational`, `Warning`, `Error`.
 
 ## Logs Configuration
 
@@ -117,66 +115,69 @@ Sending a `SIGHUP` to Netdata, will instruct it to re-open all its log files.
 <details>
 <summary>All fields exposed by Netdata</summary>
 
-|                journal                 |             logfmt             |              json              |                                                Description                                                |
-|:--------------------------------------:|:------------------------------:|:------------------------------:|:---------------------------------------------------------------------------------------------------------:|
-|      `_SOURCE_REALTIME_TIMESTAMP`      |             `time`             |             `time`             |                                        the timestamp of the event                                         |
-|          `SYSLOG_IDENTIFIER`           |             `comm`             |             `comm`             |                                       the program logging the event                                       |
-|            `ND_LOG_SOURCE`             |            `source`            |            `source`            |                                  one of the [log sources](#log-sources)                                   |
-|         `PRIORITY`<br/>numeric         |        `level`<br/>text        |      `level`<br/>numeric       |                                   one of the [log levels](#log-levels)                                    |
-|                `ERRNO`                 |            `errno`             |            `errno`             |                                       the numeric value of `errno`                                        |
-|            `INVOCATION_ID`             |               -                |               -                | a unique UUID of the Netdata session, reset on every Netdata restart, inherited by systemd when available |
-|              `CODE_LINE`               |               -                |               -                |                         the line number of of the source code logging this event                          |
-|              `CODE_FILE`               |               -                |               -                |                            the filename of the source code logging this event                             |
-|            `CODE_FUNCTION`             |               -                |               -                |                          the function name of the source code logging this event                          |
-|                 `TID`                  |             `tid`              |             `tid`              |                              the thread id of the thread logging this event                               |
-|              `THREAD_TAG`              |            `thread`            |            `thread`            |                                 the name of the thread logging this event                                 |
-|              `MESSAGE_ID`              |            `msg_id`            |            `msg_id`            |                                      see [message IDs](#message-ids)                                      |
-|              `ND_MODULE`               |            `module`            |            `module`            |                                   the Netdata module logging this event                                   |
-|             `ND_NIDL_NODE`             |             `node`             |             `node`             |                             the hostname of the node the event is related to                              |
-|           `ND_NIDL_INSTANCE`           |           `instance`           |           `instance`           |                             the instance of the node the event is related to                              |
-|           `ND_NIDL_CONTEXT`            |           `context`            |           `context`            |    the context the event is related to (this is usually the chart name, as shown on netdata dashboards    |
-|          `ND_NIDL_DIMENSION`           |          `dimension`           |          `dimension`           |                                   the dimension the event is related to                                   |
-|           `ND_SRC_TRANSPORT`           |        `src_transport`         |        `src_transport`         |                  when the event happened during a request, this is the request transport                  |
-|              `ND_SRC_IP`               |            `src_ip`            |            `src_ip`            |          when the event happened during an inbound request, this is the IP the request came from          |
-|             `ND_SRC_PORT`              |           `src_port`           |           `src_port`           |         when the event happened during an inbound request, this is the port the request came from         |
-|        `ND_SRC_FORWARDED_HOST`         |      `src_forwarded_host`      |      `src_forwarded_host`      |                            the contents of the HTTP header `X-Forwarded-Host`                             |
-|         `ND_SRC_FORWARDED_FOR`         |      `src_forwarded_for`       |      `src_forwarded_for`       |                             the contents of the HTTP header `X-Forwarded-For`                             |
-|         `ND_SRC_CAPABILITIES`          |       `src_capabilities`       |       `src_capabilities`       |          when the request came from a child, this is the communication capabilities of the child          |
-|           `ND_DST_TRANSPORT`           |        `dst_transport`         |        `dst_transport`         |        when the event happened during an outbound request, this is the outbound request transport         |
-|              `ND_DST_IP`               |            `dst_ip`            |            `dst_ip`            |        when the event happened during an outbound request, this is the IP the request destination         |
-|             `ND_DST_PORT`              |           `dst_port`           |           `dst_port`           |       when the event happened during an outbound request, this is the port the request destination        |
-|         `ND_DST_CAPABILITIES`          |       `dst_capabilities`       |       `dst_capabilities`       |          when the request goes to a parent, this is the communication capabilities of the parent          |
-|          `ND_REQUEST_METHOD`           |          `req_method`          |          `req_method`          |      when the event happened during an inbound request, this is the method the request was received       |
-|           `ND_RESPONSE_CODE`           |             `code`             |             `code`             |                         when responding to a request, this this the response code                         |
-|           `ND_CONNECTION_ID`           |             `conn`             |             `conn`             |            when there is a connection id for an inbound connection, this is the connection id             |
-|          `ND_TRANSACTION_ID`           |         `transaction`          |         `transaction`          |                               the transaction id (UUID) of all API requests                               |
-|        `ND_RESPONSE_SENT_BYTES`        |          `sent_bytes`          |          `sent_bytes`          |                                    the bytes we sent to API responses                                     |
-|        `ND_RESPONSE_SIZE_BYTES`        |          `size_bytes`          |          `size_bytes`          |                                the uncompressed bytes of the API responses                                |
-|      `ND_RESPONSE_PREP_TIME_USEC`      |           `prep_ut`            |           `prep_ut`            |                                   the time needed to prepare a response                                   |
-|      `ND_RESPONSE_SENT_TIME_USEC`      |           `sent_ut`            |           `sent_ut`            |                                    the time needed to send a response                                     |
-|     `ND_RESPONSE_TOTAL_TIME_USEC`      |           `total_ut`           |           `total_ut`           |                               the total time needed to complete a response                                |
-|             `ND_ALERT_ID`              |           `alert_id`           |           `alert_id`           |                                   the alert id this event is related to                                   |
-|          `ND_ALERT_EVENT_ID`           |        `alert_event_id`        |        `alert_event_id`        |                          a sequential number of the alert transition (per host)                           |
-|          `ND_ALERT_UNIQUE_ID`          |       `alert_unique_id`        |       `alert_unique_id`        |                          a sequential number of the alert transition (per alert)                          |
-|        `ND_ALERT_TRANSITION_ID`        |     `alert_transition_id`      |     `alert_transition_id`      |                                 the unique UUID of this alert transition                                  |
-|           `ND_ALERT_CONFIG`            |         `alert_config`         |         `alert_config`         |                                    the alert configuration hash (UUID)                                    |
-|            `ND_ALERT_NAME`             |            `alert`             |            `alert`             |                                              the alert name                                               |
-|            `ND_ALERT_CLASS`            |         `alert_class`          |         `alert_class`          |                                         the alert classification                                          |
-|          `ND_ALERT_COMPONENT`          |       `alert_component`        |       `alert_component`        |                                            the alert component                                            |
-|            `ND_ALERT_TYPE`             |          `alert_type`          |          `alert_type`          |                                              the alert type                                               |
-|            `ND_ALERT_EXEC`             |          `alert_exec`          |          `alert_exec`          |                                      the alert notification program                                       |
-|          `ND_ALERT_RECIPIENT`          |       `alert_recipient`        |       `alert_recipient`        |                                          the alert recipient(s)                                           |
-|            `ND_ALERT_VALUE`            |         `alert_value`          |         `alert_value`          |                                          the current alert value                                          |
-|          `ND_ALERT_VALUE_OLD`          |       `alert_value_old`        |       `alert_value_old`        |                                         the previous alert value                                          |
-|           `ND_ALERT_STATUS`            |         `alert_status`         |         `alert_status`         |                                         the current alert status                                          |
-|         `ND_ALERT_STATUS_OLD`          |       `alert_value_old`        |       `alert_value_old`        |                                         the previous alert value                                          |
-|            `ND_ALERT_UNITS`            |         `alert_units`          |         `alert_units`          |                                          the units of the alert                                           |
-|           `ND_ALERT_SUMMARY`           |        `alert_summary`         |        `alert_summary`         |                                       the summary text of the alert                                       |
-|            `ND_ALERT_INFO`             |          `alert_info`          |          `alert_info`          |                                        the info text of the alert                                         |
-|          `ND_ALERT_DURATION`           |        `alert_duration`        |        `alert_duration`        |                             the duration the alert was in its previous state                              |
-| `ND_ALERT_NOTIFICATION_TIMESTAMP_USEC` | `alert_notification_timestamp` | `alert_notification_timestamp` |                           the timestamp the notification delivery is scheduled                            |
-|              `ND_REQUEST`              |           `request`            |           `request`            |                             the full request during which the event happened                              |
-|               `MESSAGE`                |             `msg`              |             `msg`              |                                             the event message                                             |
+|               `journal`                |      `logfmt` and `json`       |             `etw`             | `wel` | Description                                                                                               |
+|:--------------------------------------:|:------------------------------:|:-----------------------------:|:-----:|:----------------------------------------------------------------------------------------------------------|
+|      `_SOURCE_REALTIME_TIMESTAMP`      |             `time`             |          `Timestamp`          |   1   | the timestamp of the event                                                                                |
+|          `SYSLOG_IDENTIFIER`           |             `comm`             |           `Program`           |   2   | the program logging the event                                                                             |
+|            `ND_LOG_SOURCE`             |            `source`            |      `NetdataLogSource`       |   3   | one of the [log sources](#log-sources)                                                                    |
+|         `PRIORITY`<br/>numeric         |        `level`<br/>text        |       `Level`<br/>text        |   4   | one of the [log levels](#log-levels)                                                                      |
+|                `ERRNO`                 |            `errno`             |          `UnixErrno`          |   5   | the numeric value of `errno`                                                                              |
+|            `INVOCATION_ID`             |               -                |        `InvocationID`         |   7   | a unique UUID of the Netdata session, reset on every Netdata restart, inherited by systemd when available |
+|              `CODE_LINE`               |               -                |          `CodeLine`           |   8   | the line number of of the source code logging this event                                                  |
+|              `CODE_FILE`               |               -                |          `CodeFile`           |   9   | the filename of the source code logging this event                                                        |
+|            `CODE_FUNCTION`             |               -                |        `CodeFunction`         |  10   | the function name of the source code logging this event                                                   |
+|                 `TID`                  |             `tid`              |          `ThreadID`           |  11   | the thread id of the thread logging this event                                                            |
+|              `THREAD_TAG`              |            `thread`            |         `ThreadName`          |  12   | the name of the thread logging this event                                                                 |
+|              `MESSAGE_ID`              |            `msg_id`            |          `MessageID`          |  13   | see [message IDs](#message-ids)                                                                           |
+|              `ND_MODULE`               |            `module`            |           `Module`            |  14   | the Netdata module logging this event                                                                     |
+|             `ND_NIDL_NODE`             |             `node`             |            `Node`             |  15   | the hostname of the node the event is related to                                                          |
+|           `ND_NIDL_INSTANCE`           |           `instance`           |          `Instance`           |  16   | the instance of the node the event is related to                                                          |
+|           `ND_NIDL_CONTEXT`            |           `context`            |           `Context`           |  17   | the context the event is related to (this is usually the chart name, as shown on netdata dashboards       |
+|          `ND_NIDL_DIMENSION`           |          `dimension`           |          `Dimension`          |  18   | the dimension the event is related to                                                                     |
+|           `ND_SRC_TRANSPORT`           |        `src_transport`         |       `SourceTransport`       |  19   | when the event happened during a request, this is the request transport                                   |
+|              `ND_SRC_IP`               |            `src_ip`            |          `SourceIP`           |  24   | when the event happened during an inbound request, this is the IP the request came from                   |
+|             `ND_SRC_PORT`              |           `src_port`           |         `SourcePort`          |  25   | when the event happened during an inbound request, this is the port the request came from                 |
+|        `ND_SRC_FORWARDED_HOST`         |      `src_forwarded_host`      |     `SourceForwardedHost`     |  26   | the contents of the HTTP header `X-Forwarded-Host`                                                        |
+|         `ND_SRC_FORWARDED_FOR`         |      `src_forwarded_for`       |     `SourceForwardedFor`      |  27   | the contents of the HTTP header `X-Forwarded-For`                                                         |
+|         `ND_SRC_CAPABILITIES`          |       `src_capabilities`       |     `SourceCapabilities`      |  28   | when the request came from a child, this is the communication capabilities of the child                   |
+|           `ND_DST_TRANSPORT`           |        `dst_transport`         |    `DestinationTransport`     |  29   | when the event happened during an outbound request, this is the outbound request transport                |
+|              `ND_DST_IP`               |            `dst_ip`            |        `DestinationIP`        |  30   | when the event happened during an outbound request, this is the IP the request destination                |
+|             `ND_DST_PORT`              |           `dst_port`           |       `DestinationPort`       |  31   | when the event happened during an outbound request, this is the port the request destination              |
+|         `ND_DST_CAPABILITIES`          |       `dst_capabilities`       |   `DestinationCapabilities`   |  32   | when the request goes to a parent, this is the communication capabilities of the parent                   |
+|          `ND_REQUEST_METHOD`           |          `req_method`          |        `RequestMethod`        |  33   | when the event happened during an inbound request, this is the method the request was received            |
+|           `ND_RESPONSE_CODE`           |             `code`             |        `ResponseCode`         |  34   | when responding to a request, this this the response code                                                 |
+|           `ND_CONNECTION_ID`           |             `conn`             |        `ConnectionID`         |  35   | when there is a connection id for an inbound connection, this is the connection id                        |
+|          `ND_TRANSACTION_ID`           |         `transaction`          |        `TransactionID`        |  36   | the transaction id (UUID) of all API requests                                                             |
+|        `ND_RESPONSE_SENT_BYTES`        |          `sent_bytes`          |      `ResponseSentBytes`      |  37   | the bytes we sent to API responses                                                                        |
+|        `ND_RESPONSE_SIZE_BYTES`        |          `size_bytes`          |      `ResponseSizeBytes`      |  38   | the uncompressed bytes of the API responses                                                               |
+|      `ND_RESPONSE_PREP_TIME_USEC`      |           `prep_ut`            | `ResponsePreparationTimeUsec` |  39   | the time needed to prepare a response                                                                     |
+|      `ND_RESPONSE_SENT_TIME_USEC`      |           `sent_ut`            |    `ResponseSentTimeUsec`     |  40   | the time needed to send a response                                                                        |
+|     `ND_RESPONSE_TOTAL_TIME_USEC`      |           `total_ut`           |    `ResponseTotalTimeUsec`    |  41   | the total time needed to complete a response                                                              |
+|             `ND_ALERT_ID`              |           `alert_id`           |           `AlertID`           |  42   | the alert id this event is related to                                                                     |
+|          `ND_ALERT_EVENT_ID`           |        `alert_event_id`        |        `AlertEventID`         |  44   | a sequential number of the alert transition (per host)                                                    |
+|          `ND_ALERT_UNIQUE_ID`          |       `alert_unique_id`        |        `AlertUniqueID`        |  43   | a sequential number of the alert transition (per alert)                                                   |
+|        `ND_ALERT_TRANSITION_ID`        |     `alert_transition_id`      |      `AlertTransitionID`      |  45   | the unique UUID of this alert transition                                                                  |
+|           `ND_ALERT_CONFIG`            |         `alert_config`         |         `AlertConfig`         |  46   | the alert configuration hash (UUID)                                                                       |
+|            `ND_ALERT_NAME`             |            `alert`             |          `AlertName`          |  47   | the alert name                                                                                            |
+|            `ND_ALERT_CLASS`            |         `alert_class`          |         `AlertClass`          |  48   | the alert classification                                                                                  |
+|          `ND_ALERT_COMPONENT`          |       `alert_component`        |       `AlertComponent`        |  49   | the alert component                                                                                       |
+|            `ND_ALERT_TYPE`             |          `alert_type`          |          `AlertType`          |  50   | the alert type                                                                                            |
+|            `ND_ALERT_EXEC`             |          `alert_exec`          |          `AlertExec`          |  51   | the alert notification program                                                                            |
+|          `ND_ALERT_RECIPIENT`          |       `alert_recipient`        |       `AlertRecipient`        |  52   | the alert recipient(s)                                                                                    |
+|            `ND_ALERT_VALUE`            |         `alert_value`          |         `AlertValue`          |  54   | the current alert value                                                                                   |
+|          `ND_ALERT_VALUE_OLD`          |       `alert_value_old`        |        `AlertOldValue`        |  55   | the previous alert value                                                                                  |
+|           `ND_ALERT_STATUS`            |         `alert_status`         |         `AlertStatus`         |  56   | the current alert status                                                                                  |
+|         `ND_ALERT_STATUS_OLD`          |       `alert_value_old`        |       `AlertOldStatus`        |  57   | the previous alert status                                                                                 |
+|            `ND_ALERT_UNITS`            |         `alert_units`          |         `AlertUnits`          |  59   | the units of the alert                                                                                    |
+|           `ND_ALERT_SUMMARY`           |        `alert_summary`         |        `AlertSummary`         |  60   | the summary text of the alert                                                                             |
+|            `ND_ALERT_INFO`             |          `alert_info`          |          `AlertInfo`          |  61   | the info text of the alert                                                                                |
+|          `ND_ALERT_DURATION`           |        `alert_duration`        |        `AlertDuration`        |  53   | the duration the alert was in its previous state                                                          |
+| `ND_ALERT_NOTIFICATION_TIMESTAMP_USEC` | `alert_notification_timestamp` |  `AlertNotificationTimeUsec`  |  62   | the timestamp the notification delivery is scheduled                                                      |
+|              `ND_REQUEST`              |           `request`            |           `Request`           |  63   | the full request during which the event happened                                                          |
+|               `MESSAGE`                |             `msg`              |           `Message`           |  64   | the event message                                                                                         |
+
+For `wel` (Windows Event Logs), all logs have an array of 64 fields strings, and their index number provides their meaning.
+For `etw` (Event Tracing for Windows), Netdata logs in a structured way, and field names are available.
 
 </details>
 
@@ -221,3 +222,117 @@ journalctl -u netdata --namespace=netdata
 # All netdata logs, the newest entries are displayed first  
 journalctl -u netdata --namespace=netdata -r
 ```
+
+## Using Event Tracing for Windows (ETW)
+
+ETW requires the publisher `Netdata` to be registered. Our Windows installer does this automatically.
+
+Registering the publisher is done via a manifest (`%SystemRoot%\System32\wevt_netdata_manifest.xml`)
+and its messages resources DLL (`%SystemRoot%\System32\wevt_netdata.dll`).
+
+If needed, the publisher can be registered and unregistered manually using these commands:
+
+```bat
+REM register the Netdata publisher
+wevtutil im "%SystemRoot%\System32\wevt_netdata_manifest.xml" "/mf:%SystemRoot%\System32\wevt_netdata.dll" "/rf:%SystemRoot%\System32\wevt_netdata.dll"
+
+REM unregister the Netdata publisher
+wevtutil um "%SystemRoot%\System32\wevt_netdata_manifest.xml"
+```
+
+The structure of the logs are as follows:
+
+  - Publisher `Netdata`
+    - Channel `Netdata/Daemon`: general messages about the Netdata service
+    - Channel `Netdata/Collector`: general messages about Netdata external plugins
+    - Channel `Netdata/Health`: alert transitions and general messages generated by Netdata's health engine
+    - Channel `Netdata/Access`: all accesses to Netdata APIs
+    - Channel `Netdata/Aclk`: for cloud connectivity tracing (disabled by default)
+
+Retention can be configured per Channel via the Event Viewer. Netdata does not set a default, so the system default is used.
+
+> **IMPORTANT**<br/>
+> Event Tracing for Windows (ETW) does not allow logging the percentage character `%`.
+> The `%` followed by a number, is recursively used for fields expansion and ETW has not
+> provided any way to escape the character for preventing further expansion.<br/>
+> <br/>
+> To work around this limitation, Netdata replaces all `%` which are followed by a number, with `℅`
+> (the Unicode character `care of`). Visually, they look similar, but when copying IPv6 addresses
+> or URLs from the logs, you have to be careful to manually replace `℅` with `%` before using them.
+
+## Using Windows Event Logs (WEL)
+
+WEL has a different logs structure and unfortunately WEL and ETW need to use different names if they are to be used
+concurrently.
+
+For WEL, Netdata logs as follows:
+
+  - Channel `NetdataWEL` (unfortunately `Netdata` cannot be used, it conflicts with the ETW Publisher name)
+      - Publisher `NetdataDaemon`: general messages about the Netdata service
+      - Publisher `NetdataCollector`: general messages about Netdata external plugins
+      - Publisher `NetdataHealth`: alert transitions and general messages generated by Netdata's health engine
+      - Publisher `NetdataAccess`: all accesses to Netdata APIs
+      - Publisher `NetdataAclk`: for cloud connectivity tracing (disabled by default)
+
+Publishers must have unique names system-wide, so we had to prefix them with `Netdata`.
+
+Retention can be configured per Publisher via the Event Viewer or the Registry.
+Netdata sets by default 20MiB for all of them, except `NetdataAclk` (5MiB) and `NetdataAccess` (35MiB),
+for a total of 100MiB.
+
+For WEL some registry entries are needed. Netdata automatically takes care of them when it starts.
+
+WEL does not have the problem ETW has with the percent character `%`, so Netdata logs it as-is.
+
+## Differences between ETW and WEL
+
+There are key differences between ETW and WEL.
+
+### Publishers and Providers
+**Publishers** are collections of ETW Providers. A Publisher is implied by a manifest file,
+each of which is considered a Publisher, and each manifest file can define multiple **Providers** in it.
+Other than that there is no entity related to **Publishers** in the system.
+
+**Publishers** are not defined for WEL.
+
+**Providers** are the applications or modules logging. Provider names must be unique across the system,
+for ETW and WEL together.
+
+To define a **Provider**:
+
+- ETW requires a **Publisher** manifest coupled with resources DLLs and must be registered
+  via `wevtutil` (handled by the Netdata Windows installer automatically).
+- WEL requires some registry entries and a message resources DLL (handled by Netdata automatically on startup).
+
+The Provider appears as `Source` in the Event Viewer, for both WEL and ETW.
+
+### Channels
+- **Channels** for WEL are collections of WEL Providers, (each WEL Provider is a single Stream of logs).
+- **Channels** for ETW slice the logs of each Provider into multiple Streams.
+
+WEL Channels cannot have the same name as ETW Providers. This is why Netdata's ETW provider is
+called `Netdata`, and WEL channel is called `NetdataWEL`.
+
+Despite the fact that ETW **Publishers** and WEL **Channels** are both collections of Providers,
+they are not similar. In ETW a Publisher is a collection on the publisher's Providers, but in WEL
+a Channel may include independent WEL Providers (e.g. the "Applications" Channel). Additionally,
+WEL Channels cannot include ETW Providers.
+
+### Retention
+Retention is always defined per Stream.
+
+- Retention in ETW is defined per ETW Channel (ETW Provider Stream).
+- Retention in WEL is defined per WEL Provider (each WEL Provider is a single Stream).
+
+### Messages Formatting
+- ETW supports recursive fields expansion, and therefore `%N` in fields is expanded recursively
+  (or replaced with an error message if expansion fails). Netdata replaces `%N` with `℅N` to stop
+  recursive expansion (since `%N` cannot be logged otherwise).
+- WEL performs a single field expansion, and therefore the `%` character in fields is never expanded. 
+
+### Usability
+
+- ETW names all the fields and allows multiple datatypes per field, enabling log consumers to know
+  what each field means and its datatype.
+- WEL uses a simple string table for fields, and consumers need to map these string fields based on
+  their index.

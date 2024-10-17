@@ -90,7 +90,7 @@ sudo ./edit-config netdata.conf
 Create a new `[host labels]` section defining a new host label and its value for the system in question. Make sure not
 to violate any of the [host label naming rules](/docs/netdata-agent/configuration/common-configuration-changes.md#organize-nodes-with-host-labels).
 
-```conf
+```text
 [host labels]
     type = webserver
     location = us-seattle
@@ -154,7 +154,7 @@ alerts to them.
 
 For example, let's use configuration example from earlier:
 
-```conf
+```text
 [host labels]
     type = webserver
     location = us-seattle
@@ -201,7 +201,7 @@ If you have enabled any metrics exporting via our experimental [exporters](/src/
 labels you created manually are sent to the destination database alongside metrics. You can change this behavior by
 editing `exporting.conf`, and you can even send automatically-generated labels on with exported metrics.
 
-```conf
+```text
 [exporting:global]
 enabled = yes
 send configured labels = yes
@@ -210,7 +210,7 @@ send automatic labels = no
 
 You can also change this behavior per exporting connection:
 
-```conf
+```text
 [opentsdb:my_instance3]
 enabled = yes
 destination = localhost:4242

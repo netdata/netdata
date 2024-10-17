@@ -19,7 +19,7 @@
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Timeout for executing the binary, specified in seconds.",
+        "description": "The maximum duration, in seconds, to wait for an `nvidia-smi` command to complete.",
         "type": "number",
         "minimum": 0.5,
         "default": 10
@@ -47,7 +47,7 @@
       "ui:help": "If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable."
     },
     "timeout": {
-      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+      "ui:help": "This setting applies differently based on the collector's mode. **Loop Mode:** In loop mode, the timeout primarily determines how long to wait for the initial `nvidia-smi` execution. If the initial query takes longer than the timeout, the collector may report an error. For systems with multiple GPUs, the initial load time can sometimes be significant (e.g., 5-10 seconds). **Regular Mode:** If the collector is in regular mode, the timeout specifies how long to wait for each individual `nvidia-smi` execution."
     },
     "loop_mode": {
       "ui:help": "In loop mode, `nvidia-smi` will repeatedly query GPU data at specified intervals, defined by the `-l SEC` or `--loop=SEC` parameter, rather than just running the query once. This enables ongoing performance tracking by putting the application to sleep between queries."

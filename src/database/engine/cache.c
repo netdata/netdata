@@ -1786,7 +1786,7 @@ PGC *pgc_create(const char *name,
                 sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
                 0,
                 16384,
-                aral_statistics(pgc_section_pages_aral),
+                aral_get_statistics(pgc_section_pages_aral),
                 NULL, NULL, false, false);
     }
 #endif
@@ -1797,7 +1797,7 @@ PGC *pgc_create(const char *name,
 }
 
 struct aral_statistics *pgc_aral_statistics(void) {
-    return aral_statistics(pgc_section_pages_aral);
+    return aral_get_statistics(pgc_section_pages_aral);
 }
 
 size_t pgc_aral_structures(void) {

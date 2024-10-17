@@ -37,7 +37,7 @@ Send notifications to Pushbullet using Netdata's Agent alert notification featur
 The configuration file name for this integration is `health_alarm_notify.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
@@ -63,7 +63,7 @@ You can define multiple entries like this: user1@email.com user2@email.com.
 All roles will default to this variable if left unconfigured.
 
 The `DEFAULT_RECIPIENT_PUSHBULLET` can be edited in the following entries at the bottom of the same file:
-```conf
+```text
 role_recipients_pushbullet[sysadmin]="user1@email.com"
 role_recipients_pushbullet[domainadmin]="user2@mail.com"
 role_recipients_pushbullet[dba]="#channel1"

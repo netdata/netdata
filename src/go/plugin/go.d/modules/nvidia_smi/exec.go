@@ -34,7 +34,7 @@ func newNvidiaSmiBinary(path string, cfg Config, log *logger.Logger) (nvidiaSmiB
 		Logger:             log,
 		binPath:            path,
 		updateEvery:        cfg.UpdateEvery,
-		firstSampleTimeout: time.Second * 3,
+		firstSampleTimeout: cfg.Timeout.Duration(),
 	}
 
 	if err := smi.run(); err != nil {

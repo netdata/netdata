@@ -10,14 +10,23 @@
 
 int procfile_open_flags = O_RDONLY | O_CLOEXEC;
 
-int procfile_adaptive_initial_allocation = 0;
-
 // if adaptive allocation is set, these store the
 // max values we have seen so far
-size_t procfile_max_lines = PFLINES_INCREASE_STEP;
-size_t procfile_max_words = PFWORDS_INCREASE_STEP;
-size_t procfile_max_allocation = PROCFILE_INCREMENT_BUFFER;
+static bool procfile_adaptive_initial_allocation = false;
+static size_t procfile_max_lines = PFLINES_INCREASE_STEP;
+static size_t procfile_max_words = PFWORDS_INCREASE_STEP;
+static size_t procfile_max_allocation = PROCFILE_INCREMENT_BUFFER;
 
+void procfile_set_adaptive_allocation(bool enable, size_t bytes, size_t lines, size_t words) {
+    procfile_adaptive_initial_allocation = enable;
+
+    if(bytes > procfile_max_allocation)
+        procfile_max_allocation = bytes;
+    if(lines > procfile_max_lines)
+        procfile_max_lines = lines;
+    if(words > procfile_max_words)
+        procfile_max_words = words;
+}
 
 // ----------------------------------------------------------------------------
 
@@ -59,6 +68,8 @@ static inline void procfile_words_add(procfile *ff, char *str) {
 
         ff->words = fw = reallocz(fw, sizeof(pfwords) + (fw->size + wanted) * sizeof(char *));
         fw->size += wanted;
+        ff->stats.memory += wanted * sizeof(char *);
+        ff->stats.resizes++;
     }
 
     fw->words[fw->len++] = str;
@@ -92,7 +103,7 @@ static inline void procfile_words_free(pfwords *fw) {
 // An array of lines
 
 NEVERNULL
-static inline size_t *procfile_lines_add(procfile *ff) {
+static inline uint32_t *procfile_lines_add(procfile *ff) {
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ":   adding line %d at word %d", fl->len, first_word);
 
     pflines *fl = ff->lines;
@@ -104,6 +115,8 @@ static inline size_t *procfile_lines_add(procfile *ff) {
 
         ff->lines = fl = reallocz(fl, sizeof(pflines) + (fl->size + wanted) * sizeof(ffline));
         fl->size += wanted;
+        ff->stats.memory += wanted * sizeof(ffline);
+        ff->stats.resizes++;
     }
 
     ffline *ffl = &fl->lines[fl->len++];
@@ -168,7 +181,7 @@ static void procfile_parser(procfile *ff) {
     char quote = 0;                     // the quote character - only when in quoted string
     size_t opened = 0;                  // counts the number of open parenthesis
 
-    size_t *line_words = procfile_lines_add(ff);
+    uint32_t *line_words = procfile_lines_add(ff);
 
     while(s < e) {
         PF_CHAR_TYPE ct = separators[(unsigned char)(*s)];
@@ -279,6 +292,8 @@ static void procfile_parser(procfile *ff) {
 }
 
 procfile *procfile_readall(procfile *ff) {
+    if(!ff) return NULL;
+
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.", ff->filename);
 
     ff->len = 0;    // zero the used size
@@ -295,9 +310,12 @@ procfile *procfile_readall(procfile *ff) {
             netdata_log_debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s' by %zu bytes.", procfile_filename(ff), wanted);
             ff = reallocz(ff, sizeof(procfile) + ff->size + wanted);
             ff->size += wanted;
+            ff->stats.memory += wanted;
+            ff->stats.resizes++;
         }
 
-        netdata_log_debug(D_PROCFILE, "Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
+        // netdata_log_info("Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
+        ff->stats.reads++;
         r = read(ff->fd, &ff->data[s], ff->size - s);
         if(unlikely(r == -1)) {
             if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
@@ -306,6 +324,9 @@ procfile *procfile_readall(procfile *ff) {
             procfile_close(ff);
             return NULL;
         }
+
+        if((ssize_t)ff->stats.max_read_size < r)
+            ff->stats.max_read_size = r;
 
         ff->len += r;
     }
@@ -328,6 +349,17 @@ procfile *procfile_readall(procfile *ff) {
         if(unlikely(ff->lines->len > procfile_max_lines)) procfile_max_lines = ff->lines->len;
         if(unlikely(ff->words->len > procfile_max_words)) procfile_max_words = ff->words->len;
     }
+
+    if(ff->stats.max_source_bytes < ff->len)
+        ff->stats.max_source_bytes = ff->len;
+
+    if(ff->stats.max_lines < ff->lines->len)
+        ff->stats.max_lines = ff->lines->len;
+
+    if(ff->stats.max_words < ff->words->len)
+        ff->stats.max_words = ff->words->len;
+
+    ff->stats.total_read_bytes += ff->len;
 
     // netdata_log_debug(D_PROCFILE, "File '%s' updated.", ff->filename);
     return ff;
@@ -433,9 +465,17 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
     ff->size = size;
     ff->len = 0;
     ff->flags = flags;
+    ff->stats.opens = 1;
+    ff->stats.reads = ff->stats.resizes = 0;
+    ff->stats.max_lines = ff->stats.max_words = ff->stats.max_source_bytes = 0;
+    ff->stats.total_read_bytes = ff->stats.max_read_size = 0;
 
     ff->lines = procfile_lines_create();
     ff->words = procfile_words_create();
+
+    ff->stats.memory = sizeof(procfile) + size +
+                       (sizeof(pflines) + ff->lines->size * sizeof(ffline)) +
+                       (sizeof(pfwords) + ff->words->size * sizeof(char *));
 
     procfile_set_separators(ff, separators);
 
@@ -456,6 +496,7 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
         procfile_close(ff);
         return NULL;
     }
+    ff->stats.opens++;
 
     // netdata_log_info("PROCFILE: opened '%s' on fd %d", filename, ff->fd);
 
@@ -483,7 +524,7 @@ void procfile_print(procfile *ff) {
     for(l = 0; likely(l < lines) ;l++) {
         size_t words = procfile_linewords(ff, l);
 
-        netdata_log_debug(D_PROCFILE, " line %zu starts at word %zu and has %zu words", l, ff->lines->lines[l].first, ff->lines->lines[l].words);
+        netdata_log_debug(D_PROCFILE, " line %zu starts at word %zu and has %zu words", l, (size_t)ff->lines->lines[l].first, (size_t)ff->lines->lines[l].words);
 
         size_t w;
         for(w = 0; likely(w < words) ;w++) {

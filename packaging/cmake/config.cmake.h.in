@@ -169,6 +169,8 @@
 #cmakedefine HAVE_LIBYAML
 #cmakedefine HAVE_LIBMNL
 
+#cmakedefine HAVE_WEL
+#cmakedefine HAVE_ETW
 #cmakedefine RUN_UNDER_CLION
 
 // /* Enable GNU extensions on systems that have them.  */

@@ -34,6 +34,13 @@ func New() *Sensors {
 
 type Config struct {
 	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
+	Relabel     []struct {
+		Chip    string `yaml:"chip" json:"chip"`
+		Sensors []struct {
+			Name  string `yaml:"name" json:"name"`
+			Label string `yaml:"label" json:"label"`
+		} `yaml:"sensors,omitempty" json:"sensors"`
+	} `yaml:"relabel,omitempty" json:"relabel"`
 }
 
 type (

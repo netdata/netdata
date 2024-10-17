@@ -574,9 +574,6 @@ void detect_veth_interfaces_spawn(pid_t pid) {
 
 #define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
 void call_the_helper(pid_t pid, const char *cgroup) {
-    if(setresuid(0, 0, 0) == -1)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "setresuid(0, 0, 0) failed.");
-
     char command[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
     if(cgroup)
         snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec " PLUGINS_DIR "/cgroup-network-helper.sh --cgroup '%s'", cgroup);
@@ -721,6 +718,10 @@ int main(int argc, const char **argv) {
     pid_t pid = 0;
 
     clocks_init();
+
+    if (setresuid(0, 0, 0) == -1)
+        collector_error("setresuid(0, 0, 0) failed.");
+
     nd_log_initialize_for_external_plugins("cgroup-network");
     spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC | SPAWN_SERVER_OPTION_CALLBACK, NULL, spawn_callback, argc, argv);
 

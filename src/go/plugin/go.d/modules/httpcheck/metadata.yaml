@@ -94,7 +94,7 @@ modules:
               default_value: ""
               required: true
             - name: headers_match.value
-              description: "The [pattern](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format) to match against the value of the specified header."
+              description: "The [pattern](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format) to match against the value of the specified header."
               default_value: ""
               required: false
             - name: cookie_file
@@ -188,7 +188,7 @@ modules:
                       - 200
                       - 204
             - name: With `header_match`
-              description: Example configurations with `header_match`. See the value [pattern](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format) syntax.
+              description: Example configurations with `header_match`. See the value [pattern](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format) syntax.
               config: |
                 jobs:
                     # The "X-Robots-Tag" header must be present in the HTTP response header,

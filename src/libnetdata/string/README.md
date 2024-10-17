@@ -1,12 +1,3 @@
-<!--
-title: "String"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/string/README.md
-sidebar_label: "String"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Developers/libnetdata"
--->
-
 # STRING
 
 STRING provides a way to allocate and free text strings, while de-duplicating them.

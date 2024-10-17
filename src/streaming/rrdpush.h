@@ -10,6 +10,11 @@
 #include "database/rrd.h"
 #include "stream_capabilities.h"
 
+// When a child disconnects this is the maximum we will wait
+// before we update the cloud that the child is offline
+#define MAX_CHILD_DISC_DELAY (30000)
+#define MAX_CHILD_DISC_TOLERANCE (125 / 100)
+
 #define CONNECTED_TO_SIZE 100
 #define CBUFFER_INITIAL_SIZE (16 * 1024)
 #define THREAD_BUFFER_INITIAL_SIZE (CBUFFER_INITIAL_SIZE / 2)
@@ -596,7 +601,7 @@ static inline const char *rrdhost_dyncfg_status_to_string(RRDHOST_DYNCFG_STATUS 
     }
 }
 
-typedef struct rrdhost_status {
+typedef struct {
     RRDHOST *host;
     time_t now;
 

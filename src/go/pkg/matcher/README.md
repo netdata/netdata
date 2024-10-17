@@ -1,11 +1,3 @@
-<!--
-title: "matcher"
-custom_edit_url: "/src/go/plugin/go.d/pkg/matcher/README.md"
-sidebar_label: "matcher"
-learn_status: "Published"
-learn_rel_path: "Developers/External plugins/go.d.plugin/Helper Packages"
--->
-
 # matcher
 ## Supported Format
 

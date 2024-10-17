@@ -7,8 +7,6 @@
 
 #define RRDVAR_MAX_LENGTH 1024
 
-int rrdvar_fix_name(char *variable);
-
 #include "database/rrd.h"
 
 STRING *rrdvar_name_to_string(const char *name);
@@ -19,7 +17,7 @@ void rrdvar_host_variable_set(RRDHOST *host, const RRDVAR_ACQUIRED *rva, NETDATA
 int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTIONARY_ITEM *item, void *rrdvar, void *data), void *data);
 
 #define rrdvar_host_variable_release(host, rva) rrdvar_release((host)->rrdvars, rva)
-#define rrdvar_chart_variable_release(st, rva) rrdvar_release((st)->rrdvars, rva)
+#define rrdvar_chart_variable_release(st, rva) do { if(st) rrdvar_release((st)->rrdvars, rva); } while(0)
 void rrdvar_release(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva);
 
 NETDATA_DOUBLE rrdvar2number(const RRDVAR_ACQUIRED *rva);

@@ -6,6 +6,14 @@ static inline void common_mem_swap(uint64_t free_bytes, uint64_t used_bytes, int
     static RRDSET *st_system_swap = NULL;
     static RRDDIM *rd_free = NULL, *rd_used = NULL;
 
+    if (free_bytes == 0 && used_bytes == 0 && st_system_swap) {
+        rrdset_is_obsolete___safe_from_collector_thread(st_system_swap);
+        st_system_swap = NULL;
+        rd_free = NULL;
+        rd_used = NULL;
+        return;
+    }
+
     if(unlikely(!st_system_swap)) {
         st_system_swap = rrdset_create_localhost(
             "mem"

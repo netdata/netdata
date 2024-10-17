@@ -167,7 +167,7 @@ struct slabinfo *read_file_slabinfo() {
     slabdebug("   Read %lu lines from procfile", (unsigned long)lines);
     for(l = 2; l < lines; l++) {
         if (unlikely(procfile_linewords(ff, l) < 14)) {
-            slabdebug("    Line %zu has only %zu words, skipping", l, procfile_linewords(ff,l));
+            slabdebug("    Line %zu has only %zu words, skipping", l, (size_t)procfile_linewords(ff,l));
             continue;
         }
 

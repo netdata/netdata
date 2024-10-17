@@ -486,6 +486,7 @@ static bool do_network_protocol(PERF_DATA_BLOCK *pDataBlock, int update_every, s
 // network interfaces
 
 struct network_interface {
+    usec_t last_collected;
     bool collected_metadata;
 
     struct {
@@ -498,6 +499,8 @@ struct network_interface {
     } packets;
 
     struct {
+        const RRDVAR_ACQUIRED *chart_var_speed;
+
         COUNTER_DATA received;
         COUNTER_DATA sent;
 
@@ -505,16 +508,96 @@ struct network_interface {
         RRDDIM *rd_received;
         RRDDIM *rd_sent;
     } traffic;
+
+    struct {
+        COUNTER_DATA current_bandwidth;
+        RRDSET *st;
+        RRDDIM *rd;
+    } speed;
+
+    struct {
+        COUNTER_DATA received;
+        COUNTER_DATA outbound;
+
+        RRDSET *st;
+        RRDDIM *rd_received;
+        RRDDIM *rd_outbound;
+    } discards;
+
+    struct {
+        COUNTER_DATA received;
+        COUNTER_DATA outbound;
+
+        RRDSET *st;
+        RRDDIM *rd_received;
+        RRDDIM *rd_outbound;
+    } errors;
+
+    struct {
+        COUNTER_DATA length;
+        RRDSET *st;
+        RRDDIM *rd;
+    } queue;
+
+    struct {
+        COUNTER_DATA connections;
+        RRDSET *st;
+        RRDDIM *rd;
+    } chimney;
+
+    struct {
+        COUNTER_DATA connections;
+        COUNTER_DATA packets;
+        COUNTER_DATA exceptions;
+        COUNTER_DATA average_packet_size;
+
+        RRDSET *st_connections;
+        RRDDIM *rd_connections;
+
+        RRDSET *st_packets;
+        RRDDIM *rd_packets;
+
+        RRDSET *st_exceptions;
+        RRDDIM *rd_exceptions;
+
+        RRDSET *st_average_packet_size;
+        RRDDIM *rd_average_packet_size;
+    } rsc;
 };
 
 static DICTIONARY *physical_interfaces = NULL, *virtual_interfaces = NULL;
 
-static void network_interface_init(struct network_interface *ni) {
-    ni->packets.received.key = "Packets Received/sec";
-    ni->packets.sent.key = "Packets Sent/sec";
+static void network_interface_init(struct network_interface *d) {
+    d->packets.received.key = "Packets Received/sec";
+    d->packets.sent.key = "Packets Sent/sec";
+    d->traffic.received.key = "Bytes Received/sec";
+    d->traffic.sent.key = "Bytes Sent/sec";
+    d->speed.current_bandwidth.key = "Current Bandwidth";
+    d->discards.received.key = "Packets Received Discarded";
+    d->discards.outbound.key = "Packets Outbound Discarded";
+    d->errors.received.key = "Packets Received Errors";
+    d->errors.outbound.key = "Packets Outbound Errors";
+    d->queue.length.key = "Output Queue Length";
+    d->chimney.connections.key = "Offloaded Connections";
+    d->rsc.connections.key = "TCP Active RSC Connections";
+    d->rsc.packets.key = "TCP RSC Coalesced Packets/sec";
+    d->rsc.exceptions.key = "TCP RSC Exceptions/sec";
+    d->rsc.average_packet_size.key = "TCP RSC Average Packet Size";
+}
 
-    ni->traffic.received.key = "Bytes Received/sec";
-    ni->traffic.sent.key = "Bytes Sent/sec";
+static void network_interface_cleanup(struct network_interface *d) {
+    rrdvar_chart_variable_release(d->traffic.st, d->traffic.chart_var_speed);
+    rrdset_is_obsolete___safe_from_collector_thread(d->packets.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->traffic.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->speed.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->discards.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->errors.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->queue.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->chimney.st);
+    rrdset_is_obsolete___safe_from_collector_thread(d->rsc.st_connections);
+    rrdset_is_obsolete___safe_from_collector_thread(d->rsc.st_packets);
+    rrdset_is_obsolete___safe_from_collector_thread(d->rsc.st_exceptions);
+    rrdset_is_obsolete___safe_from_collector_thread(d->rsc.st_average_packet_size);
 }
 
 void dict_interface_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -543,8 +626,8 @@ static bool is_physical_interface(const char *name) {
     return d ? true : false;
 }
 
-static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, bool physical) {
-    DICTIONARY *dict = physical_interfaces;
+static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, bool physical, usec_t now_ut) {
+    DICTIONARY *dict = physical ? physical_interfaces : virtual_interfaces;
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, physical ? "Network Interface" : "Network Adapter");
     if(!pObjectType) return false;
@@ -567,6 +650,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
             continue;
 
         struct network_interface *d = dictionary_set(dict, windows_shared_buffer, NULL, sizeof(*d));
+        d->last_collected = now_ut;
 
         if(!d->collected_metadata) {
             // TODO - get metadata about the network interface
@@ -577,7 +661,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->traffic.sent)) {
 
             if(d->traffic.received.current.Data == 0 && d->traffic.sent.current.Data == 0)
-                // this interface has not received or sent any traffic
+                // this interface has not received or sent any traffic yet
                 continue;
 
             if (unlikely(!d->traffic.st)) {
@@ -601,6 +685,9 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
 
                 d->traffic.rd_received = rrddim_add(d->traffic.st, "received", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 d->traffic.rd_sent = rrddim_add(d->traffic.st, "sent", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+
+                d->traffic.chart_var_speed = rrdvar_chart_variable_add_and_acquire(d->traffic.st, "nic_speed_max");
+                rrdvar_chart_variable_set(d->traffic.st, d->traffic.chart_var_speed, NAN);
             }
 
             total_received += d->traffic.received.current.Data;
@@ -631,7 +718,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
 
                 rrdset_flag_set(d->packets.st, RRDSET_FLAG_DETAIL);
 
-                add_interface_labels(d->traffic.st, windows_shared_buffer, physical);
+                add_interface_labels(d->packets.st, windows_shared_buffer, physical);
 
                 d->packets.rd_received = rrddim_add(d->packets.st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->packets.rd_sent = rrddim_add(d->packets.st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -640,6 +727,261 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
             rrddim_set_by_pointer(d->packets.st, d->packets.rd_received, (collected_number)d->packets.received.current.Data);
             rrddim_set_by_pointer(d->packets.st, d->packets.rd_sent, (collected_number)d->packets.sent.current.Data);
             rrdset_done(d->packets.st);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->speed.current_bandwidth)) {
+            if(unlikely(!d->speed.st)) {
+                d->speed.st = rrdset_create_localhost(
+                        "net_speed"
+                        , windows_shared_buffer
+                        , NULL
+                        , windows_shared_buffer
+                        , "net.speed"
+                        , "Interface Speed"
+                        , "kilobits/s"
+                        , PLUGIN_WINDOWS_NAME
+                        , "PerflibNetwork"
+                        , NETDATA_CHART_PRIO_FIRST_NET_IFACE + 10
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rrdset_flag_set(d->speed.st, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->speed.st, windows_shared_buffer, physical);
+
+                d->speed.rd = rrddim_add(d->speed.st, "speed",  NULL,  1, BITS_IN_A_KILOBIT, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(d->speed.st, d->speed.rd, (collected_number)d->speed.current_bandwidth.current.Data);
+            rrdset_done(d->speed.st);
+
+            rrdvar_chart_variable_set(d->traffic.st, d->traffic.chart_var_speed,
+                                      (NETDATA_DOUBLE)d->speed.current_bandwidth.current.Data / BITS_IN_A_KILOBIT);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->errors.received) &&
+           perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->errors.outbound)) {
+
+            if (unlikely(!d->errors.st)) {
+                d->errors.st = rrdset_create_localhost(
+                        "net_errors",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.errors",
+                        "Interface Errors",
+                        "errors/s",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 3,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->errors.st, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->errors.st, windows_shared_buffer, physical);
+
+                d->errors.rd_received = rrddim_add(d->errors.st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->errors.rd_outbound = rrddim_add(d->errors.st, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(d->errors.st, d->errors.rd_received, (collected_number)d->errors.received.current.Data);
+            rrddim_set_by_pointer(d->errors.st, d->errors.rd_outbound, (collected_number)d->errors.outbound.current.Data);
+            rrdset_done(d->errors.st);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->discards.received) &&
+           perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->discards.outbound)) {
+
+            if (unlikely(!d->discards.st)) {
+                d->discards.st = rrdset_create_localhost(
+                        "net_drops",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.drops",
+                        "Interface Drops",
+                        "drops/s",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 4,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->discards.st, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->discards.st, windows_shared_buffer, physical);
+
+                d->discards.rd_received = rrddim_add(d->discards.st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->discards.rd_outbound = rrddim_add(d->discards.st, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(d->discards.st, d->discards.rd_received, (collected_number)d->discards.received.current.Data);
+            rrddim_set_by_pointer(d->discards.st, d->discards.rd_outbound, (collected_number)d->discards.outbound.current.Data);
+            rrdset_done(d->discards.st);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->queue.length)) {
+            if (unlikely(!d->queue.st)) {
+                d->queue.st = rrdset_create_localhost(
+                        "net_queue_length",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.queue_length",
+                        "Interface Output Queue Length",
+                        "packets",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 5,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->queue.st, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->queue.st, windows_shared_buffer, physical);
+
+                d->queue.rd = rrddim_add(d->queue.st, "length", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(d->queue.st, d->queue.rd, (collected_number)d->queue.length.current.Data);
+            rrdset_done(d->queue.st);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->rsc.connections)) {
+            if (unlikely(!d->rsc.st_connections)) {
+                d->rsc.st_connections = rrdset_create_localhost(
+                        "net_rsc_connections",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.rsc_connections",
+                        "Active TCP Connections Offloaded by RSC",
+                        "connections",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 6,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->rsc.st_connections, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->rsc.st_connections, windows_shared_buffer, physical);
+
+                d->rsc.rd_connections = rrddim_add(d->rsc.st_connections, "connections", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(d->rsc.st_connections, d->rsc.rd_connections, (collected_number)d->rsc.connections.current.Data);
+            rrdset_done(d->rsc.st_connections);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->rsc.packets)) {
+            if (unlikely(!d->rsc.st_packets)) {
+                d->rsc.st_packets = rrdset_create_localhost(
+                        "net_rsc_packets",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.rsc_packets",
+                        "TCP RSC Coalesced Packets",
+                        "packets/s",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 7,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->rsc.st_packets, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->rsc.st_packets, windows_shared_buffer, physical);
+
+                d->rsc.rd_packets = rrddim_add(d->rsc.st_packets, "packets", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(d->rsc.st_packets, d->rsc.rd_packets, (collected_number)d->rsc.packets.current.Data);
+            rrdset_done(d->rsc.st_packets);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->rsc.exceptions)) {
+            if (unlikely(!d->rsc.st_exceptions)) {
+                d->rsc.st_exceptions = rrdset_create_localhost(
+                        "net_rsc_exceptions",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.rsc_exceptions",
+                        "TCP RSC Exceptions",
+                        "exceptions/s",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 8,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->rsc.st_exceptions, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->rsc.st_exceptions, windows_shared_buffer, physical);
+
+                d->rsc.rd_exceptions = rrddim_add(d->rsc.st_exceptions, "exceptions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(d->rsc.st_exceptions, d->rsc.rd_exceptions, (collected_number)d->rsc.exceptions.current.Data);
+            rrdset_done(d->rsc.st_exceptions);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->rsc.average_packet_size)) {
+            if (unlikely(!d->rsc.st_average_packet_size)) {
+                d->rsc.st_average_packet_size = rrdset_create_localhost(
+                        "net_rsc_average_packet_size",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.rsc_average_packet_size",
+                        "TCP RSC Average Packet Size",
+                        "bytes",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 9,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->rsc.st_average_packet_size, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->rsc.st_average_packet_size, windows_shared_buffer, physical);
+
+                d->rsc.rd_average_packet_size = rrddim_add(d->rsc.st_average_packet_size, "average", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(d->rsc.st_average_packet_size, d->rsc.rd_average_packet_size, (collected_number)d->rsc.average_packet_size.current.Data);
+            rrdset_done(d->rsc.st_average_packet_size);
+        }
+
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->chimney.connections)) {
+            if (unlikely(!d->chimney.st)) {
+                d->chimney.st = rrdset_create_localhost(
+                        "net_chimney_connections",
+                        windows_shared_buffer,
+                        NULL,
+                        windows_shared_buffer,
+                        "net.chimney_connections",
+                        "Active TCP Connections Offloaded with Chimney",
+                        "connections",
+                        PLUGIN_WINDOWS_NAME,
+                        "PerflibNetwork",
+                        NETDATA_CHART_PRIO_FIRST_NET_IFACE + 10,
+                        update_every,
+                        RRDSET_TYPE_LINE);
+
+                rrdset_flag_set(d->chimney.st, RRDSET_FLAG_DETAIL);
+
+                add_interface_labels(d->chimney.st, windows_shared_buffer, physical);
+
+                d->chimney.rd = rrddim_add(d->chimney.st, "connections", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(d->chimney.st, d->chimney.rd, (collected_number)d->chimney.connections.current.Data);
+            rrdset_done(d->chimney.st);
         }
     }
 
@@ -671,6 +1013,19 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
         rrdset_done(st);
     }
 
+    // cleanup
+    {
+        struct network_interface *d;
+        dfe_start_write(dict, d) {
+            if(d->last_collected < now_ut) {
+                network_interface_cleanup(d);
+                dictionary_del(dict, d_dfe.name);
+            }
+        }
+        dfe_done(d);
+        dictionary_garbage_collect(dict);
+    }
+
     return true;
 }
 
@@ -689,8 +1044,9 @@ int do_PerflibNetwork(int update_every, usec_t dt __maybe_unused) {
     PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
     if(!pDataBlock) return -1;
 
-    do_network_interface(pDataBlock, update_every, true);
-    do_network_interface(pDataBlock, update_every, false);
+    usec_t now_ut = now_monotonic_usec();
+    do_network_interface(pDataBlock, update_every, true, now_ut);
+    do_network_interface(pDataBlock, update_every, false, now_ut);
 
     struct network_protocol *tcp4 = NULL, *tcp6 = NULL;
     for(size_t i = 0; networks[i].protocol ;i++) {

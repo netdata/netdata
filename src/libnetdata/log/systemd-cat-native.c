@@ -11,7 +11,9 @@
 #include <machine/endian.h>
 #endif
 
-static inline void log_message_to_stderr(BUFFER *msg) {
+bool verbose = false;
+
+static inline void log_message_to_stderr(BUFFER *msg, const char *scope) {
     CLEAN_BUFFER *tmp = buffer_create(0, NULL);
 
     for(size_t i = 0; i < msg->len ;i++) {
@@ -24,13 +26,13 @@ static inline void log_message_to_stderr(BUFFER *msg) {
         }
     }
 
-    fprintf(stderr, "SENDING: %s\n", buffer_tostring(tmp));
+    fprintf(stderr, "SENDING %s: %s\n", scope, buffer_tostring(tmp));
 }
 
 static inline buffered_reader_ret_t get_next_line(struct buffered_reader *reader, BUFFER *line, int timeout_ms) {
     while(true) {
         if(unlikely(!buffered_reader_next_line(reader, line))) {
-            buffered_reader_ret_t ret = buffered_reader_read_timeout(reader, STDIN_FILENO, timeout_ms, false);
+            buffered_reader_ret_t ret = buffered_reader_read_timeout(reader, STDIN_FILENO, timeout_ms, verbose);
             if(unlikely(ret != BUFFERED_READER_READ_OK))
                 return ret;
 
@@ -126,7 +128,7 @@ static inline void buffer_memcat_replacing_newlines(BUFFER *wb, const char *src,
 // ----------------------------------------------------------------------------
 // log to a systemd-journal-remote
 
-#ifdef HAVE_CURL
+#ifdef HAVE_LIBCURL
 #include <curl/curl.h>
 
 #ifndef HOST_NAME_MAX
@@ -203,8 +205,8 @@ static void journal_remote_complete_event(BUFFER *msg, usec_t *monotonic_ut) {
 
     buffer_sprintf(msg,
                    ""
-                   "__REALTIME_TIMESTAMP=%llu\n"
-                   "__MONOTONIC_TIMESTAMP=%llu\n"
+                   "__REALTIME_TIMESTAMP=%"PRIu64"\n"
+                   "__MONOTONIC_TIMESTAMP=%"PRIu64"\n"
                    "_MACHINE_ID=%s\n"
                    "_BOOT_ID=%s\n"
                    "_HOSTNAME=%s\n"
@@ -226,7 +228,8 @@ static void journal_remote_complete_event(BUFFER *msg, usec_t *monotonic_ut) {
 
 static CURLcode journal_remote_send_buffer(CURL* curl, BUFFER *msg) {
 
-    // log_message_to_stderr(msg);
+    if(verbose)
+        log_message_to_stderr(msg, "REMOTE");
 
     struct upload_data upload = {0};
 
@@ -260,8 +263,8 @@ static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, 
 
     global_boot_id[0] = '\0';
     char buffer[1024];
-    if(read_file(BOOT_ID_PATH, buffer, sizeof(buffer)) == 0) {
-        uuid_t uuid;
+    if(read_txt_file(BOOT_ID_PATH, buffer, sizeof(buffer)) == 0) {
+        nd_uuid_t uuid;
         if(uuid_parse_flexi(buffer, uuid) == 0)
             uuid_unparse_lower_compact(uuid, global_boot_id);
         else
@@ -270,13 +273,13 @@ static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, 
 
     if(global_boot_id[0] == '\0') {
         fprintf(stderr, "WARNING: cannot read '%s'. Will generate a random _BOOT_ID.\n", BOOT_ID_PATH);
-        uuid_t uuid;
+        nd_uuid_t uuid;
         uuid_generate_random(uuid);
         uuid_unparse_lower_compact(uuid, global_boot_id);
     }
 
-    if(read_file(MACHINE_ID_PATH, buffer, sizeof(buffer)) == 0) {
-        uuid_t uuid;
+    if(read_txt_file(MACHINE_ID_PATH, buffer, sizeof(buffer)) == 0) {
+        nd_uuid_t uuid;
         if(uuid_parse_flexi(buffer, uuid) == 0)
             uuid_unparse_lower_compact(uuid, global_machine_id);
         else
@@ -285,13 +288,13 @@ static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, 
 
     if(global_machine_id[0] == '\0') {
         fprintf(stderr, "WARNING: cannot read '%s'. Will generate a random _MACHINE_ID.\n", MACHINE_ID_PATH);
-        uuid_t uuid;
+        nd_uuid_t uuid;
         uuid_generate_random(uuid);
         uuid_unparse_lower_compact(uuid, global_boot_id);
     }
 
     if(global_stream_id[0] == '\0') {
-        uuid_t uuid;
+        nd_uuid_t uuid;
         uuid_generate_random(uuid);
         uuid_unparse_lower_compact(uuid, global_stream_id);
     }
@@ -456,10 +459,11 @@ static int help(void) {
             "Usage:\n"
             "\n"
             "   %s\n"
+            "          [--verbose|-v]\n"
             "          [--newline=STRING]\n"
             "          [--log-as-netdata|-N]\n"
             "          [--namespace=NAMESPACE] [--socket=PATH]\n"
-#ifdef HAVE_CURL
+#ifdef HAVE_LIBCURL
             "          [--url=URL [--key=FILENAME] [--cert=FILENAME] [--trust=FILENAME|all]]\n"
 #endif
             "\n"
@@ -488,7 +492,7 @@ static int help(void) {
             "    the log destination. Only log fields defined by Netdata are accepted.\n"
             "    If the environment variables expected by Netdata are not found, it\n"
             "    falls back to stderr logging in logfmt format.\n"
-#ifdef HAVE_CURL
+#ifdef HAVE_LIBCURL
             "\n"
             "  * Log to a systemd-journal-remote TCP socket, enabled with --url=URL\n"
             "\n"
@@ -585,15 +589,16 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
     ND_LOG_STACK_PUSH(lgs);
     lgs_reset(lgs);
 
+    ND_LOG_SOURCES source = NDLS_HEALTH;
+    ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
     size_t fields_added = 0;
     size_t messages_logged = 0;
-    ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
 
     while(get_next_line(&reader, line, timeout_ms) == BUFFERED_READER_READ_OK) {
         if(!line->len) {
             // an empty line - we are done for this message
 
-            nd_log(NDLS_HEALTH, priority,
+            nd_log(source, priority,
                    "added %zu fields", // if the user supplied a MESSAGE, this will be ignored
                    fields_added);
 
@@ -606,7 +611,7 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
             if(equal) {
                 const char *field = line->buffer;
                 size_t field_len = equal - line->buffer;
-                ND_LOG_FIELD_ID id = nd_log_field_id_by_name(field, field_len);
+                ND_LOG_FIELD_ID id = nd_log_field_id_by_journal_name(field, field_len);
                 if(id != NDF_STOP) {
                     const char *value = ++equal;
 
@@ -625,7 +630,7 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
                     struct log_stack_entry backup = lgs[NDF_MESSAGE];
                     lgs[NDF_MESSAGE] = ND_LOG_FIELD_TXT(NDF_MESSAGE, NULL);
 
-                    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                    nd_log(source, NDLP_ERR,
                            "Field '%.*s' is not a Netdata field. Ignoring it.",
                            (int)field_len, field);
 
@@ -636,7 +641,7 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
                 struct log_stack_entry backup = lgs[NDF_MESSAGE];
                 lgs[NDF_MESSAGE] = ND_LOG_FIELD_TXT(NDF_MESSAGE, NULL);
 
-                nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                nd_log(source, NDLP_ERR,
                        "Line does not contain an = sign; ignoring it: %s",
                        line->buffer);
 
@@ -648,7 +653,7 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
     }
 
     if(fields_added) {
-        nd_log(NDLS_HEALTH, priority, "added %zu fields", fields_added);
+        nd_log(source, priority, "added %zu fields", fields_added);
         messages_logged++;
     }
 
@@ -659,7 +664,8 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
 // log to a local systemd-journald
 
 static bool journal_local_send_buffer(int fd, BUFFER *msg) {
-    // log_message_to_stderr(msg);
+    if(verbose)
+        log_message_to_stderr(msg, "LOCAL");
 
     bool ret = journal_direct_send(fd, msg->buffer, msg->len);
     if (!ret)
@@ -720,6 +726,13 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
     }
 
 cleanup:
+    if(verbose) {
+        if(failed_messages)
+            fprintf(stderr, "%zu messages failed to be logged\n", failed_messages);
+        if(!messages_logged)
+            fprintf(stderr, "No messages were logged!\n");
+    }
+
     return !failed_messages && messages_logged ? 0 : 1;
 }
 
@@ -727,12 +740,12 @@ int main(int argc, char *argv[]) {
     clocks_init();
     nd_log_initialize_for_external_plugins(argv[0]);
 
-    int timeout_ms = -1; // wait forever
+    int timeout_ms = 0; // wait forever
     bool log_as_netdata = false;
     const char *newline = NULL;
     const char *namespace = NULL;
     const char *socket = getenv("NETDATA_SYSTEMD_JOURNAL_PATH");
-#ifdef HAVE_CURL
+#ifdef HAVE_LIBCURL
     const char *url = NULL;
     const char *key = NULL;
     const char *cert = NULL;
@@ -746,6 +759,9 @@ int main(int argc, char *argv[]) {
         if(strcmp(k, "--help") == 0 || strcmp(k, "-h") == 0)
             return help();
 
+        else if(strcmp(k, "--verbose") == 0 || strcmp(k, "-v") == 0)
+            verbose = true;
+
         else if(strcmp(k, "--log-as-netdata") == 0 || strcmp(k, "-N") == 0)
             log_as_netdata = true;
 
@@ -758,7 +774,7 @@ int main(int argc, char *argv[]) {
         else if(strncmp(k, "--newline=", 10) == 0)
             newline = &k[10];
 
-#ifdef HAVE_CURL
+#ifdef HAVE_LIBCURL
         else if (strncmp(k, "--url=", 6) == 0)
             url = &k[6];
 
@@ -780,7 +796,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-#ifdef HAVE_CURL
+#ifdef HAVE_LIBCURL
     if(log_as_netdata && url) {
         fprintf(stderr, "Cannot log to a systemd-journal-remote URL as Netdata. "
                         "Please either give --url or --log-as-netdata, not both.\n");
@@ -804,7 +820,7 @@ int main(int argc, char *argv[]) {
     if(log_as_netdata)
         return log_input_as_netdata(newline, timeout_ms);
 
-#ifdef HAVE_CURL
+#ifdef HAVE_LIBCURL
     if(url) {
         if(url && namespace && *namespace)
             snprintfz(global_namespace, sizeof(global_namespace), "_NAMESPACE=%s\n", namespace);

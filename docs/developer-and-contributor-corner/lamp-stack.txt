@@ -124,7 +124,7 @@ sudo nano /etc/php/7.4/fpm/pool.d/www.conf
 
 Find the line that reads `;pm.status_path = /status` and remove the `;` so it looks like this:
 
-```conf
+```text
 pm.status_path = /status
 ```
 

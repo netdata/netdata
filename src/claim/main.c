@@ -14,11 +14,13 @@
 LPWSTR token = NULL;
 LPWSTR room = NULL;
 LPWSTR proxy = NULL;
+LPWSTR url = NULL;
 LPWSTR *argv = NULL;
 
 char *aToken = NULL;
 char *aRoom = NULL;
 char *aProxy = NULL;
+char *aURL = NULL;
 int insecure = 0;
 
 LPWSTR netdata_claim_get_formatted_message(LPWSTR pMessage, ...)
@@ -89,6 +91,13 @@ int nd_claim_parse_args(int argc, LPWSTR *argv)
             }
         }
 
+        if(wcscasecmp(L"/U", argv[i]) == 0) {
+            if (argc <= i + 1)
+                continue;
+            i++;
+            url = argv[i];
+        }
+
         if(wcscasecmp(L"/I", argv[i]) == 0) {
             if (argc <= i + 1)
                 continue;
@@ -142,6 +151,15 @@ static int netdata_claim_prepare_strings()
 
         netdata_claim_convert_str(aProxy, proxy, length - 1);
     }
+
+    if (url) {
+        length = wcslen(url) + 1;
+        aURL = calloc(sizeof(char), length - 1);
+        if (!aURL)
+            return -1;
+
+        netdata_claim_convert_str(aURL, url, length - 1);
+    }
     return 0;
 }
 
@@ -157,6 +175,9 @@ static void netdata_claim_exit_callback(int signal)
     if (aProxy)
         free(aProxy);
 
+    if (aURL)
+        free(aURL);
+
     if (argv)
         LocalFree(argv);
 }
@@ -165,14 +186,17 @@ static inline int netdata_claim_prepare_data(char *out, size_t length)
 {
     char *proxyLabel = (aProxy) ? "proxy = " : "#    proxy = ";
     char *proxyValue = (aProxy) ? aProxy : "";
+
+    char *urlValue = (aURL) ? aURL : "https://app.netdata.cloud";
     return snprintf(out,
                     length,
-                    "[global]\n    url = https://app.netdata.cloud\n    token = %s\n    rooms = %s\n    %s%s\n    insecure = %s",
+                    "[global]\n    url = %s\n    token = %s\n    rooms = %s\n    %s%s\n    insecure = %s",
+                    urlValue,
                     aToken,
                     aRoom,
                     proxyLabel,
                     proxyValue,
-                    (insecure) ? "YES" : "NO"
+                    (insecure) ? "yes" : "no"
                     );
 }
 

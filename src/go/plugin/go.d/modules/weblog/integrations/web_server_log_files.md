@@ -162,7 +162,7 @@ No action required.
 The configuration file name for this integration is `go.d/web_log.conf`.
 
 
-You can edit the configuration file using the `edit-config` script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
@@ -216,7 +216,7 @@ Notes:
 | exclude_path | Path to exclude. | *.gz | no |
 | url_patterns | List of URL patterns. | [] | no |
 | url_patterns.name | Used as a dimension name. |  | yes |
-| url_patterns.pattern | Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/matcher#supported-format). |  | yes |
+| url_patterns.pattern | Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format). |  | yes |
 | log_type | Log parser type. | auto | no |
 | csv_config | CSV log parser config. |  | no |
 | csv_config.delimiter | CSV field delimiter. | , | no |
