@@ -6,35 +6,6 @@
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static const char *protocol_name(LOCAL_SOCKET *n) {
-    if(n->local.family == AF_INET) {
-        if(n->local.protocol == IPPROTO_TCP)
-            return "TCP";
-        else if(n->local.protocol == IPPROTO_UDP)
-            return "UDP";
-        else
-            return "UNKNOWN_IPV4";
-    }
-    else if(is_local_socket_ipv46(n)) {
-        if (n->local.protocol == IPPROTO_TCP)
-            return "TCP46";
-        else if(n->local.protocol == IPPROTO_UDP)
-            return "UDP46";
-        else
-            return "UNKNOWN_IPV46";
-    }
-    else if(n->local.family == AF_INET6) {
-        if (n->local.protocol == IPPROTO_TCP)
-            return "TCP6";
-        else if(n->local.protocol == IPPROTO_UDP)
-            return "UDP6";
-        else
-            return "UNKNOWN_IPV6";
-    }
-    else
-        return "UNKNOWN";
-}
-
 static void print_local_listeners(LS_STATE *ls __maybe_unused, const LOCAL_SOCKET *nn, void *data __maybe_unused) {
     LOCAL_SOCKET *n = (LOCAL_SOCKET *)nn;
 
@@ -54,38 +25,7 @@ static void print_local_listeners(LS_STATE *ls __maybe_unused, const LOCAL_SOCKE
         ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
     }
 
-    printf("%s|%s|%u|%s\n", protocol_name(n), local_address, n->local.port, string2str(n->cmdline));
-}
-
-static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, const LOCAL_SOCKET *nn, void *data __maybe_unused) {
-    LOCAL_SOCKET *n = (LOCAL_SOCKET *)nn;
-
-    char local_address[INET6_ADDRSTRLEN];
-    char remote_address[INET6_ADDRSTRLEN];
-
-    if(n->local.family == AF_INET) {
-        ipv4_address_to_txt(n->local.ip.ipv4, local_address);
-        ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
-    }
-    else if(n->local.family == AF_INET6) {
-        ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
-        ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
-    }
-
-    printf("%s, direction=%s%s%s%s%s pid=%d, state=0x%0x, ns=%"PRIu64", local=%s[:%u], remote=%s[:%u], uid=%u, comm=%s\n",
-           protocol_name(n),
-           (n->direction & SOCKET_DIRECTION_LISTEN) ? "LISTEN," : "",
-           (n->direction & SOCKET_DIRECTION_INBOUND) ? "INBOUND," : "",
-           (n->direction & SOCKET_DIRECTION_OUTBOUND) ? "OUTBOUND," : "",
-           (n->direction & (SOCKET_DIRECTION_LOCAL_INBOUND|SOCKET_DIRECTION_LOCAL_OUTBOUND)) ? "LOCAL," : "",
-           (n->direction == 0) ? "NONE," : "",
-           n->pid,
-           (unsigned int)n->state,
-           n->net_ns_inode,
-           local_address, n->local.port,
-           remote_address, n->remote.port,
-           n->uid,
-           n->comm);
+    printf("%s|%s|%u|%s\n", local_sockets_protocol_name(n), local_address, n->local.port, string2str(n->cmdline));
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -244,7 +184,7 @@ int main(int argc, char **argv) {
             ls.config.uid = true;
             ls.config.procfile = false;
             ls.config.max_errors = SIZE_MAX;
-            ls.config.cb = print_local_listeners_debug;
+            ls.config.cb = local_listeners_print_socket;
 
             debug = true;
         }
