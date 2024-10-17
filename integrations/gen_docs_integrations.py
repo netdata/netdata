@@ -90,10 +90,10 @@ def add_custom_edit_url(markdown_string, meta_yaml_link, sidebar_label_string, m
     elif mode == 'agent-notification':
         path_to_md_file = meta_yaml_link.replace("metadata.yaml", "README")
 
-    elif mode == 'logs':
-        path_to_md_file = meta_yaml_link.replace("metadata.yaml", "README")
-
     elif mode == 'cloud-authentication':
+        path_to_md_file = meta_yaml_link.replace("metadata.yaml", f'integrations/{clean_string(sidebar_label_string)}')
+
+    elif mode == 'logs':
         path_to_md_file = meta_yaml_link.replace("metadata.yaml", f'integrations/{clean_string(sidebar_label_string)}')
 
     output = markdown_string.replace(
@@ -454,6 +454,8 @@ def write_to_file(path, md, meta_yaml, sidebar_label, community, mode='default')
             print("Exception in writing to file", e)
     elif mode == 'logs':
 
+        # for logs we generate them near their metadata.yaml
+
         name = clean_string(integration['meta']['name'])
 
         if not Path(f'{path}/integrations').exists():
@@ -462,7 +464,10 @@ def write_to_file(path, md, meta_yaml, sidebar_label, community, mode='default')
         # proper_edit_name = meta_yaml.replace(
         #     "metadata.yaml", f'integrations/{clean_string(sidebar_label)}.md\"')
 
+        
         md = add_custom_edit_url(md, meta_yaml, sidebar_label, mode='logs')
+
+        
 
         finalpath = f'{path}/integrations/{name}.md'
 
@@ -471,7 +476,6 @@ def write_to_file(path, md, meta_yaml, sidebar_label, community, mode='default')
                 md,
                 Path(finalpath)
             )
-
         except FileNotFoundError as e:
             print("Exception in writing to file", e)
     elif mode == 'authentication':
