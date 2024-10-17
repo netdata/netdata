@@ -4,11 +4,17 @@
 
 #if defined(SPAWN_SERVER_VERSION_NOFORK)
 
+// the child's output pipe, reading side
 int spawn_server_instance_read_fd(SPAWN_INSTANCE *si) { return si->read_fd; }
+
+// the child's input pipe, writing side
 int spawn_server_instance_write_fd(SPAWN_INSTANCE *si) { return si->write_fd; }
+
 void spawn_server_instance_read_fd_unset(SPAWN_INSTANCE *si) { si->read_fd = -1; }
 void spawn_server_instance_write_fd_unset(SPAWN_INSTANCE *si) { si->write_fd = -1; }
 pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si) { return si->child_pid; }
+
+pid_t spawn_server_pid(SPAWN_SERVER *server) { return server->server_pid; }
 
 #ifdef __APPLE__
 #include <crt_externs.h>
@@ -773,36 +779,36 @@ static void spawn_server_process_sigchld(void) {
 
         if(WIFEXITED(status)) {
             if(WEXITSTATUS(status))
-                nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                     "SPAWN SERVER: child with pid %d (request %zu) exited with exit code %d: %s",
                     pid, request_id, WEXITSTATUS(status), rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = true;
         }
         else if(WIFSIGNALED(status)) {
             if(WCOREDUMP(status))
-                nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                     "SPAWN SERVER: child with pid %d (request %zu) coredump'd due to signal %d: %s",
                     pid, request_id, WTERMSIG(status), rq ? rq->cmdline : "[request not found]");
             else
-                nd_log(NDLS_COLLECTORS, NDLP_INFO,
+                nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                     "SPAWN SERVER: child with pid %d (request %zu) killed by signal %d: %s",
                     pid, request_id, WTERMSIG(status), rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = true;
         }
         else if(WIFSTOPPED(status)) {
-            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                 "SPAWN SERVER: child with pid %d (request %zu) stopped due to signal %d: %s",
                 pid, request_id, WSTOPSIG(status), rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = false;
         }
         else if(WIFCONTINUED(status)) {
-            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                 "SPAWN SERVER: child with pid %d (request %zu) continued due to signal %d: %s",
                 pid, request_id, SIGCONT, rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = false;
         }
         else {
-            nd_log(NDLS_COLLECTORS, NDLP_INFO,
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                 "SPAWN SERVER: child with pid %d (request %zu) reports unhandled status: %s",
                 pid, request_id, rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = false;
@@ -882,7 +888,7 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
 
         if (fds[1].revents & (POLLHUP|POLLERR)) {
             // Pipe has been closed (parent has exited)
-            nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "SPAWN SERVER: Parent process has exited");
+            nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "SPAWN SERVER: Parent process closed socket (exited?)");
             break;
         }
 
@@ -1095,6 +1101,8 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: server sent pid %d but we have created %d.", sr.started.pid, server->server_pid);
             goto cleanup;
         }
+
+        nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "SPAWN SERVER: server created on pid %d", server->server_pid);
 
         return server;
     }
