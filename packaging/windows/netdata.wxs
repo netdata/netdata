@@ -9,6 +9,8 @@
         Compressed="no">
 
         <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+        <Icon Id="NetdataIcon.ico" SourceFile="NetdataWhite.ico"/>
+        <Property Id="ARPPRODUCTICON" Value="NetdataIcon.ico" />
 
         <Feature Id="Main">
             <ComponentGroupRef Id="NetdataComponents" />
