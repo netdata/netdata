@@ -409,14 +409,94 @@ static inline const char *local_sockets_address_space(const struct socket_endpoi
         return "public";
 }
 
-// --------------------------------------------------------------------------------------------------------------------
+static inline void ipv6_address_to_txt(const struct in6_addr *in6_addr, char *dst) {
+    struct sockaddr_in6 sa = { 0 };
+
+    sa.sin6_family = AF_INET6;
+    sa.sin6_port = htons(0);
+    sa.sin6_addr = *in6_addr;
+
+    // Convert to human-readable format
+    if (inet_ntop(AF_INET6, &(sa.sin6_addr), dst, INET6_ADDRSTRLEN) == NULL)
+        *dst = '\0';
+}
+
+static inline void ipv4_address_to_txt(uint32_t ip, char *dst) {
+    uint8_t octets[4];
+    octets[0] = ip & 0xFF;
+    octets[1] = (ip >> 8) & 0xFF;
+    octets[2] = (ip >> 16) & 0xFF;
+    octets[3] = (ip >> 24) & 0xFF;
+    sprintf(dst, "%u.%u.%u.%u", octets[0], octets[1], octets[2], octets[3]);
+}
 
 static inline bool is_local_socket_ipv46(const LOCAL_SOCKET *n) {
     return n->local.family == AF_INET6 &&
-            n->direction == SOCKET_DIRECTION_LISTEN &&
-            local_sockets_is_zero_address(&n->local) &&
-            n->ipv6ony.checked &&
-            n->ipv6ony.ipv46;
+           n->direction == SOCKET_DIRECTION_LISTEN &&
+           local_sockets_is_zero_address(&n->local) &&
+           n->ipv6ony.checked &&
+           n->ipv6ony.ipv46;
+}
+
+static inline const char *local_sockets_protocol_name(LOCAL_SOCKET *n) {
+    if(n->local.family == AF_INET) {
+        if(n->local.protocol == IPPROTO_TCP)
+            return "TCP";
+        else if(n->local.protocol == IPPROTO_UDP)
+            return "UDP";
+        else
+            return "UNKNOWN_IPV4";
+    }
+    else if(is_local_socket_ipv46(n)) {
+        if (n->local.protocol == IPPROTO_TCP)
+            return "TCP46";
+        else if(n->local.protocol == IPPROTO_UDP)
+            return "UDP46";
+        else
+            return "UNKNOWN_IPV46";
+    }
+    else if(n->local.family == AF_INET6) {
+        if (n->local.protocol == IPPROTO_TCP)
+            return "TCP6";
+        else if(n->local.protocol == IPPROTO_UDP)
+            return "UDP6";
+        else
+            return "UNKNOWN_IPV6";
+    }
+    else
+        return "UNKNOWN";
+}
+
+static inline void local_listeners_print_socket(LS_STATE *ls __maybe_unused, const LOCAL_SOCKET *nn, void *data __maybe_unused) {
+    LOCAL_SOCKET *n = (LOCAL_SOCKET *)nn;
+
+    char local_address[INET6_ADDRSTRLEN];
+    char remote_address[INET6_ADDRSTRLEN];
+
+    if(n->local.family == AF_INET) {
+        ipv4_address_to_txt(n->local.ip.ipv4, local_address);
+        ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
+    }
+    else if(n->local.family == AF_INET6) {
+        ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
+        ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
+    }
+
+    printf("%s, direction=%s%s%s%s%s pid=%d, state=0x%0x, ns=%"PRIu64", local=%s[:%u], remote=%s[:%u], uid=%u, inode=%"PRIu64", comm=%s\n",
+        local_sockets_protocol_name(n),
+           (n->direction & SOCKET_DIRECTION_LISTEN) ? "LISTEN," : "",
+           (n->direction & SOCKET_DIRECTION_INBOUND) ? "INBOUND," : "",
+           (n->direction & SOCKET_DIRECTION_OUTBOUND) ? "OUTBOUND," : "",
+           (n->direction & (SOCKET_DIRECTION_LOCAL_INBOUND|SOCKET_DIRECTION_LOCAL_OUTBOUND)) ? "LOCAL," : "",
+           (n->direction == 0) ? "NONE," : "",
+           n->pid,
+           (unsigned int)n->state,
+           n->net_ns_inode,
+           local_address, n->local.port,
+           remote_address, n->remote.port,
+           n->uid,
+           n->inode,
+           n->comm);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -550,6 +630,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
             if(!local_sockets_read_proc_inode_link(ls, filename, &inode, "socket"))
                 continue;
 
+            // fprintf(stderr, "%d: PID %d is using socket inode %"PRIu64"\n", gettid_uncached(), pid, inode);
             SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl = simple_hashtable_get_slot_PID_SOCKET(&ls->pid_sockets_hashtable, inode, &inode, true);
             struct pid_socket *ps = SIMPLE_HASHTABLE_SLOT_DATA(sl);
             if(!ps || (ps->pid == 1 && pid != 1)) {
@@ -610,6 +691,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
 
                 ps->cmdline = cmdline_trimmed ? strdupz(cmdline_trimmed) : NULL;
                 simple_hashtable_set_slot_PID_SOCKET(&ls->pid_sockets_hashtable, sl, inode, ps);
+                // fprintf(stderr, "%d: PID %d indexed for using socket inode %"PRIu64"\n", gettid_uncached(), pid, inode);
             }
         }
 
@@ -672,11 +754,15 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
         if(ps->uid != UID_UNSET && n->uid == UID_UNSET)
             n->uid = ps->uid;
 
-        if(ps->cmdline)
+        if(ps->cmdline) {
+            if(n->cmdline) string_freez(n->cmdline);
             n->cmdline = string_strdupz(ps->cmdline);
+        }
 
         strncpyz(n->comm, ps->comm, sizeof(n->comm) - 1);
     }
+//    else
+//        fprintf(stderr, "%d: No PID found for inode %"PRIu64"\n", gettid_uncached(), n->inode);
 
     // --- index it -----------------------------------------------------------------------------------------------
 
@@ -1483,25 +1569,14 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
 
         spinlock_lock(&ls->spinlock);
 
-        SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ls->sockets_hashtable, buf.inode, &buf, true);
-        LOCAL_SOCKET *n = SIMPLE_HASHTABLE_SLOT_DATA(sl);
-        if(n) {
+        if(!local_sockets_add_socket(ls, &buf)) {
+            // fprintf(stderr, "Failed to add duplicate namespace socket inode %"PRIu64"\n", buf.inode);
             string_freez(buf.cmdline);
-
-//            local_sockets_log(ls,
-//                              "ns inode %" PRIu64" (comm: '%s', pid: %u, ns: %"PRIu64") already exists in hashtable (comm: '%s', pid: %u, ns: %"PRIu64") - ignoring duplicate",
-//                              buf.inode, buf.comm, buf.pid, buf.net_ns_inode, n->comm, n->pid, n->net_ns_inode);
-
             if(ls->config.report)
                 __atomic_add_fetch(&ls->stats.namespaces_sockets_existing, 1, __ATOMIC_RELAXED);
         }
         else {
-            n = aral_mallocz(ls->local_socket_aral);
-            memcpy(n, &buf, sizeof(*n));
-            simple_hashtable_set_slot_LOCAL_SOCKET(&ls->sockets_hashtable, sl, n->inode, n);
-
-            local_sockets_index_listening_port(ls, n);
-
+            // fprintf(stderr, "Added namespace socket inode %"PRIu64"\n", buf.inode);
             if(ls->config.report)
                 __atomic_add_fetch(&ls->stats.namespaces_sockets_new, 1, __ATOMIC_RELAXED);
         }
@@ -1738,27 +1813,6 @@ static inline void local_sockets_process(LS_STATE *ls) {
     // free all memory
     local_sockets_track_time(ls, "cleanup");
     local_sockets_cleanup(ls);
-}
-
-static inline void ipv6_address_to_txt(const struct in6_addr *in6_addr, char *dst) {
-    struct sockaddr_in6 sa = { 0 };
-
-    sa.sin6_family = AF_INET6;
-    sa.sin6_port = htons(0);
-    sa.sin6_addr = *in6_addr;
-
-    // Convert to human-readable format
-    if (inet_ntop(AF_INET6, &(sa.sin6_addr), dst, INET6_ADDRSTRLEN) == NULL)
-        *dst = '\0';
-}
-
-static inline void ipv4_address_to_txt(uint32_t ip, char *dst) {
-    uint8_t octets[4];
-    octets[0] = ip & 0xFF;
-    octets[1] = (ip >> 8) & 0xFF;
-    octets[2] = (ip >> 16) & 0xFF;
-    octets[3] = (ip >> 24) & 0xFF;
-    sprintf(dst, "%u.%u.%u.%u", octets[0], octets[1], octets[2], octets[3]);
 }
 
 #endif //NETDATA_LOCAL_SOCKETS_H
