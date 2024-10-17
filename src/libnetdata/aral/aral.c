@@ -799,6 +799,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
         aral_delete_leftover_files(ar->config.name, directory_name, file);
     }
 
+    errno_clear();
     internal_error(true,
                    "ARAL: '%s' "
                    "element size %zu (requested %zu bytes), "

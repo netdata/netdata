@@ -19,9 +19,8 @@ typedef struct {
 // An array of lines
 
 typedef struct {
-    size_t words;   // how many words this line has
-    size_t first;   // the id of the first word of this line
-                    // in the words array
+    uint32_t words; // how many words this line has
+    uint32_t first; // the id of the first word of this line in the words array
 } ffline;
 
 typedef struct {
@@ -35,7 +34,7 @@ typedef struct {
 // The procfile
 
 #define PROCFILE_FLAG_DEFAULT             0x00000000 // To store inside `collector.log`
-#define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001 // Do not store nothing
+#define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001 // Do not log anything
 #define PROCFILE_FLAG_ERROR_ON_ERROR_LOG  0x00000002 // Store inside `error.log`
 
 typedef enum __attribute__ ((__packed__)) procfile_separator {
@@ -47,7 +46,22 @@ typedef enum __attribute__ ((__packed__)) procfile_separator {
     PF_CHAR_IS_CLOSE
 } PF_CHAR_TYPE;
 
+struct procfile_stats {
+    size_t opens;
+    size_t reads;
+    size_t resizes;
+    size_t memory;
+    size_t total_read_bytes;
+    size_t max_source_bytes;
+    size_t max_lines;
+    size_t max_words;
+    size_t max_read_size;
+};
+
+
 typedef struct procfile {
+    // this structure is malloc'd (you need to initialize it at procfile_open()
+
     char *filename;                 // not populated until procfile_filename() is called
     uint32_t flags;
     int fd;                         // the file descriptor
@@ -56,6 +70,7 @@ typedef struct procfile {
     pflines *lines;
     pfwords *words;
     PF_CHAR_TYPE separators[256];
+    struct procfile_stats stats;
     char data[];                    // allocated buffer to keep file contents
 } procfile;
 
@@ -85,8 +100,8 @@ char *procfile_filename(procfile *ff);
 // set to the O_XXXX flags, to have procfile_open and procfile_reopen use them when opening proc files
 extern int procfile_open_flags;
 
-// set this to 1, to have procfile adapt its initial buffer allocation to the max allocation used so far
-extern int procfile_adaptive_initial_allocation;
+// call this with true and the expected initial sizes to allow procfile learn the sizes needed
+void procfile_set_adaptive_allocation(bool enable, size_t bytes, size_t lines, size_t words);
 
 // return the number of lines present
 #define procfile_lines(ff) ((ff)->lines->len)

@@ -49,60 +49,6 @@ static int connect_to_spawn_server(const char *path, bool log) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// the child created by the spawn server
-
-static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
-    // close the server sockets;
-    close(server->sock); server->sock = -1;
-    if(server->pipe[0] != -1) { close(server->pipe[0]); server->pipe[0] = -1; }
-    if(server->pipe[1] != -1) { close(server->pipe[1]); server->pipe[1] = -1; }
-
-    // close all open file descriptors of the parent, but keep ours
-    os_close_all_non_std_open_fds_except(rq->fds, 4, 0);
-    nd_log_reopen_log_files_for_spawn_server();
-
-    // set the process name
-    os_setproctitle("spawn-child", server->argc, server->argv);
-
-    // get the fds from the request
-    int stdin_fd = rq->fds[0];
-    int stdout_fd = rq->fds[1];
-    int stderr_fd = rq->fds[2];
-    int custom_fd = rq->fds[3]; (void)custom_fd;
-
-    // change stdio fds to the ones in the request
-    if (dup2(stdin_fd, STDIN_FILENO) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: cannot dup2(%d) stdin of request No %zu: %s",
-            stdin_fd, rq->request_id, rq->cmdline);
-        exit(EXIT_FAILURE);
-    }
-    if (dup2(stdout_fd, STDOUT_FILENO) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: cannot dup2(%d) stdin of request No %zu: %s",
-            stdout_fd, rq->request_id, rq->cmdline);
-        exit(EXIT_FAILURE);
-    }
-    if (dup2(stderr_fd, STDERR_FILENO) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: cannot dup2(%d) stderr of request No %zu: %s",
-            stderr_fd, rq->request_id, rq->cmdline);
-        exit(EXIT_FAILURE);
-    }
-
-    // close the excess fds
-    close(stdin_fd); stdin_fd = rq->fds[0] = STDIN_FILENO;
-    close(stdout_fd); stdout_fd = rq->fds[1] = STDOUT_FILENO;
-    close(stderr_fd); stderr_fd = rq->fds[2] = STDERR_FILENO;
-
-    // overwrite the process environment
-    environ = (char **)rq->envp;
-
-    // run the callback and return its code
-    exit(server->cb(rq));
-}
-
-// --------------------------------------------------------------------------------------------------------------------
 // Encoding and decoding of spawn server request argv type of data
 
 // Function to encode argv or envp
@@ -364,8 +310,54 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
     else if (pid == 0) {
         // the child
 
-        spawn_server_run_child(server, rq);
-        exit(63);
+        // close the server sockets;
+        close(server->sock); server->sock = -1;
+        if(server->pipe[0] != -1) { close(server->pipe[0]); server->pipe[0] = -1; }
+        if(server->pipe[1] != -1) { close(server->pipe[1]); server->pipe[1] = -1; }
+
+        // set the process name
+        os_setproctitle("spawn-callback", server->argc, server->argv);
+
+        // close all open file descriptors of the parent, but keep ours
+        os_close_all_non_std_open_fds_except(rq->fds, 4, 0);
+        nd_log_reopen_log_files_for_spawn_server("spawn-callback");
+
+        // get the fds from the request
+        int stdin_fd = rq->fds[0];
+        int stdout_fd = rq->fds[1];
+        int stderr_fd = rq->fds[2];
+        int custom_fd = rq->fds[3]; (void)custom_fd;
+
+        // change stdio fds to the ones in the request
+        if (dup2(stdin_fd, STDIN_FILENO) == -1) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: cannot dup2(%d) stdin of request No %zu: %s",
+                   stdin_fd, rq->request_id, rq->cmdline);
+            exit(EXIT_FAILURE);
+        }
+        if (dup2(stdout_fd, STDOUT_FILENO) == -1) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: cannot dup2(%d) stdin of request No %zu: %s",
+                   stdout_fd, rq->request_id, rq->cmdline);
+            exit(EXIT_FAILURE);
+        }
+        if (dup2(stderr_fd, STDERR_FILENO) == -1) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: cannot dup2(%d) stderr of request No %zu: %s",
+                   stderr_fd, rq->request_id, rq->cmdline);
+            exit(EXIT_FAILURE);
+        }
+
+        // close the excess fds
+        close(stdin_fd); stdin_fd = rq->fds[0] = STDIN_FILENO;
+        close(stdout_fd); stdout_fd = rq->fds[1] = STDOUT_FILENO;
+        close(stderr_fd); stderr_fd = rq->fds[2] = STDERR_FILENO;
+
+        // overwrite the process environment
+        environ = (char **)rq->envp;
+
+        // run the callback and return its code
+        exit(server->cb(rq));
     }
 
     // the parent
@@ -834,7 +826,7 @@ static void posix_unmask_sigchld_on_thread(void) {
                "SPAWN SERVER: cannot unmask SIGCHLD");
 }
 
-static void spawn_server_event_loop(SPAWN_SERVER *server) {
+static int spawn_server_event_loop(SPAWN_SERVER *server) {
     int pipe_fd = server->pipe[1];
     close(server->pipe[0]); server->pipe[0] = -1;
 
@@ -847,13 +839,13 @@ static void spawn_server_event_loop(SPAWN_SERVER *server) {
     sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
     if (sigaction(SIGCHLD, &sa, NULL) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: sigaction() failed for SIGCHLD");
-        exit(1);
+        return 1;
     }
 
     sa.sa_handler = spawn_server_sigterm_handler;
     if (sigaction(SIGTERM, &sa, NULL) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: sigaction() failed for SIGTERM");
-        exit(1);
+        return 1;
     }
 
     struct status_report sr = {
@@ -864,7 +856,7 @@ static void spawn_server_event_loop(SPAWN_SERVER *server) {
     };
     if (write(pipe_fd, &sr, sizeof(sr)) != sizeof(sr)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: failed to write initial status report.");
-        exit(1);
+        return 1;
     }
 
     struct pollfd fds[2];
@@ -927,7 +919,7 @@ static void spawn_server_event_loop(SPAWN_SERVER *server) {
         // nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: all %zu children finished", killed);
     }
 
-    exit(1);
+    return 0;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1073,16 +1065,14 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
     if (pid == 0) {
         // the child - the spawn server
 
-        {
-            char buf[15];
-            snprintfz(buf, sizeof(buf), "spawn-%s", server->name);
-            os_setproctitle(buf, server->argc, server->argv);
-        }
+        char buf[16];
+        snprintfz(buf, sizeof(buf), "spawn-%s", server->name);
+        os_setproctitle(buf, server->argc, server->argv);
 
         replace_stdio_with_dev_null();
         os_close_all_non_std_open_fds_except((int[]){ server->sock, server->pipe[1] }, 2, 0);
-        nd_log_reopen_log_files_for_spawn_server();
-        spawn_server_event_loop(server);
+        nd_log_reopen_log_files_for_spawn_server(buf);
+        exit(spawn_server_event_loop(server));
     }
     else if (pid > 0) {
         // the parent
