@@ -6,13 +6,20 @@
 
 **Merged pull requests:**
 
+- Windows fixes \(chart labels and warnings\) [\#18796](https://github.com/netdata/netdata/pull/18796) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#18794](https://github.com/netdata/netdata/pull/18794) ([netdatabot](https://github.com/netdatabot))
+- Add ref to dyncfg [\#18793](https://github.com/netdata/netdata/pull/18793) ([Ancairon](https://github.com/Ancairon))
+- systemd-journal; support querying archived files [\#18792](https://github.com/netdata/netdata/pull/18792) ([ktsaou](https://github.com/ktsaou))
+- Ιmplementation to add logs integrations [\#18791](https://github.com/netdata/netdata/pull/18791) ([Ancairon](https://github.com/Ancairon))
 - Fix broken claiming via kickstart on some systems. [\#18789](https://github.com/netdata/netdata/pull/18789) ([Ferroin](https://github.com/Ferroin))
+- Fix atomic builtins test that currently fails for llvm+compiler\_rt when gcc is not present [\#18788](https://github.com/netdata/netdata/pull/18788) ([StormBytePP](https://github.com/StormBytePP))
 - fix\(netdata-updater.sh\): ensure `--non-interactive` flag is passed during self-update [\#18786](https://github.com/netdata/netdata/pull/18786) ([ilyam8](https://github.com/ilyam8))
 - Windows Network Interfaces Charts and Alerts [\#18785](https://github.com/netdata/netdata/pull/18785) ([ktsaou](https://github.com/ktsaou))
 - Document ML enabled `auto` [\#18784](https://github.com/netdata/netdata/pull/18784) ([stelfrag](https://github.com/stelfrag))
 - Bump github.com/redis/go-redis/v9 from 9.6.1 to 9.6.2 in /src/go [\#18783](https://github.com/netdata/netdata/pull/18783) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Update README.md, fix a typo [\#18781](https://github.com/netdata/netdata/pull/18781) ([BobConanDev](https://github.com/BobConanDev))
 - fix\(go.d/apcupsd\): fix ups\_load value divided by 100 [\#18780](https://github.com/netdata/netdata/pull/18780) ([ilyam8](https://github.com/ilyam8))
+- unify claiming response json [\#18777](https://github.com/netdata/netdata/pull/18777) ([ktsaou](https://github.com/ktsaou))
 - fix\(go.d/sd/netlisteners\): fix exec deadline exceeded check [\#18774](https://github.com/netdata/netdata/pull/18774) ([ilyam8](https://github.com/ilyam8))
 - Sqlite upgrade to version 3.46.1 [\#18772](https://github.com/netdata/netdata/pull/18772) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18771](https://github.com/netdata/netdata/pull/18771) ([netdatabot](https://github.com/netdatabot))
@@ -428,11 +435,6 @@
 - Update Installer Code \(Services\) [\#18253](https://github.com/netdata/netdata/pull/18253) ([thiagoftsm](https://github.com/thiagoftsm))
 - Don’t install netdata-updater code on Windows. [\#18251](https://github.com/netdata/netdata/pull/18251) ([Ferroin](https://github.com/Ferroin))
 - Add trigger to clean up chart labels and charts [\#18248](https://github.com/netdata/netdata/pull/18248) ([stelfrag](https://github.com/stelfrag))
-- Update README.md [\#18246](https://github.com/netdata/netdata/pull/18246) ([Steve8291](https://github.com/Steve8291))
-- Bump github.com/tidwall/gjson from 1.17.1 to 1.17.3 in /src/go [\#18244](https://github.com/netdata/netdata/pull/18244) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Fix OS detection messages in CMake. [\#18243](https://github.com/netdata/netdata/pull/18243) ([Ferroin](https://github.com/Ferroin))
-- Clean up unneeded depencdencies. [\#18242](https://github.com/netdata/netdata/pull/18242) ([Ferroin](https://github.com/Ferroin))
-- Update node info payload [\#18240](https://github.com/netdata/netdata/pull/18240) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
