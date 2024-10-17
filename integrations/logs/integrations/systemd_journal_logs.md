@@ -1,5 +1,5 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/integrations/logs/README.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/integrations/logs/integrations/systemd_journal_logs.md"
 meta_yaml: "https://github.com/netdata/netdata/edit/master/integrations/logs/metadata.yaml"
 sidebar_label: "Systemd Journal Logs"
 learn_status: "Published"
