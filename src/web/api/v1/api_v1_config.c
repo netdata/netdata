@@ -46,12 +46,12 @@ int api_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused)
     else {
         DYNCFG_CMDS c = dyncfg_cmds2id(action);
         if(!id || !*id || !dyncfg_is_valid_id(id)) {
-            rrd_call_function_error(w->response.data, "invalid id given", HTTP_RESP_BAD_REQUEST);
+            rrd_call_function_error(w->response.data, "Invalid id", HTTP_RESP_BAD_REQUEST);
             return HTTP_RESP_BAD_REQUEST;
         }
 
         if(c == DYNCFG_CMD_NONE) {
-            rrd_call_function_error(w->response.data, "invalid action given", HTTP_RESP_BAD_REQUEST);
+            rrd_call_function_error(w->response.data, "Invalid action", HTTP_RESP_BAD_REQUEST);
             return HTTP_RESP_BAD_REQUEST;
         }
 
@@ -68,7 +68,7 @@ int api_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused)
             }
 
             if(!add_name || !*add_name || !dyncfg_is_valid_id(add_name)) {
-                rrd_call_function_error(w->response.data, "invalid name given", HTTP_RESP_BAD_REQUEST);
+                rrd_call_function_error(w->response.data, "Invalid name", HTTP_RESP_BAD_REQUEST);
                 return HTTP_RESP_BAD_REQUEST;
             }
             snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " %s %s %s", id, dyncfg_id2cmd_one(c), add_name);
