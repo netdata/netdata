@@ -80,7 +80,7 @@ struct sockets_stats {
     } max;
 };
 
-static void local_socket_to_json_array(struct sockets_stats *st, LOCAL_SOCKET *n, uint64_t proc_self_net_ns_inode, bool aggregated) {
+static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOCKET *n, uint64_t proc_self_net_ns_inode, bool aggregated) {
     if(n->direction == SOCKET_DIRECTION_NONE)
         return;
 
@@ -156,7 +156,7 @@ static void local_socket_to_json_array(struct sockets_stats *st, LOCAL_SOCKET *n
             string_freez(u);
         }
 
-        struct socket_endpoint *server_endpoint;
+        const struct socket_endpoint *server_endpoint;
         const char *server_address;
         const char *client_address_space;
         const char *server_address_space;
@@ -240,7 +240,9 @@ static void local_socket_to_json_array(struct sockets_stats *st, LOCAL_SOCKET *n
     buffer_json_array_close(wb);
 }
 
-static void populate_aggregated_key(LOCAL_SOCKET *n) {
+static void populate_aggregated_key(const LOCAL_SOCKET *nn) {
+    LOCAL_SOCKET *n = (LOCAL_SOCKET *)nn;
+
     n->network_viewer.count = 1;
 
     n->network_viewer.aggregated_key.pid = n->pid;
@@ -269,7 +271,7 @@ static void populate_aggregated_key(LOCAL_SOCKET *n) {
     n->network_viewer.aggregated_key.remote_address_space = local_sockets_address_space(&n->remote);
 }
 
-static void local_sockets_cb_to_json(LS_STATE *ls, LOCAL_SOCKET *n, void *data) {
+static void local_sockets_cb_to_json(LS_STATE *ls, const LOCAL_SOCKET *n, void *data) {
     struct sockets_stats *st = data;
     populate_aggregated_key(n);
     local_socket_to_json_array(st, n, ls->proc_self_net_ns_inode, false);
@@ -280,12 +282,12 @@ static void local_sockets_cb_to_json(LS_STATE *ls, LOCAL_SOCKET *n, void *data) 
 #define SUM_THEM_ALL(a, b) (a) += (b)
 #define OR_THEM_ALL(a, b) (a) |= (b)
 
-static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, void *data) {
+static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const LOCAL_SOCKET *n, void *data) {
     SIMPLE_HASHTABLE_AGGREGATED_SOCKETS *ht = data;
 
     populate_aggregated_key(n);
     XXH64_hash_t hash = XXH3_64bits(&n->network_viewer.aggregated_key, sizeof(n->network_viewer.aggregated_key));
-    SIMPLE_HASHTABLE_SLOT_AGGREGATED_SOCKETS *sl = simple_hashtable_get_slot_AGGREGATED_SOCKETS(ht, hash, n, true);
+    SIMPLE_HASHTABLE_SLOT_AGGREGATED_SOCKETS *sl = simple_hashtable_get_slot_AGGREGATED_SOCKETS(ht, hash, (LOCAL_SOCKET *)n, true);
     LOCAL_SOCKET *t = SIMPLE_HASHTABLE_SLOT_DATA(sl);
     if(t) {
         t->network_viewer.count++;
@@ -511,7 +513,9 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                 .max_errors = 10,
                 .max_concurrent_namespaces = 5,
             },
+#if defined(LOCAL_SOCKETS_USE_SETNS)
             .spawn_server = spawn_srv,
+#endif
             .stats = { 0 },
             .sockets_hashtable = { 0 },
             .local_ips_hashtable = { 0 },
@@ -963,11 +967,13 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix(true) == -1) exit(1);
 
+#if defined(LOCAL_SOCKETS_USE_SETNS)
     spawn_srv = spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, "setns", local_sockets_spawn_server_callback, argc, (const char **)argv);
     if(spawn_srv == NULL) {
         fprintf(stderr, "Cannot create spawn server.\n");
         exit(1);
     }
+#endif
 
     uc = system_usernames_cache_init();
     sc = system_servicenames_cache_init();

@@ -35,7 +35,9 @@ static const char *protocol_name(LOCAL_SOCKET *n) {
         return "UNKNOWN";
 }
 
-static void print_local_listeners(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, void *data __maybe_unused) {
+static void print_local_listeners(LS_STATE *ls __maybe_unused, const LOCAL_SOCKET *nn, void *data __maybe_unused) {
+    LOCAL_SOCKET *n = (LOCAL_SOCKET *)nn;
+
     char local_address[INET6_ADDRSTRLEN];
     char remote_address[INET6_ADDRSTRLEN];
 
@@ -55,7 +57,9 @@ static void print_local_listeners(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, 
     printf("%s|%s|%u|%s\n", protocol_name(n), local_address, n->local.port, string2str(n->cmdline));
 }
 
-static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, void *data __maybe_unused) {
+static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, const LOCAL_SOCKET *nn, void *data __maybe_unused) {
+    LOCAL_SOCKET *n = (LOCAL_SOCKET *)nn;
+
     char local_address[INET6_ADDRSTRLEN];
     char remote_address[INET6_ADDRSTRLEN];
 
@@ -304,16 +308,21 @@ int main(int argc, char **argv) {
         }
     }
 
+#if defined(LOCAL_SOCKETS_USE_SETNS)
     SPAWN_SERVER *spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, NULL, local_sockets_spawn_server_callback, argc, (const char **)argv);
     if(spawn_server == NULL) {
         fprintf(stderr, "Cannot create spawn server.\n");
         exit(1);
     }
+
     ls.spawn_server = spawn_server;
+#endif
 
     local_sockets_process(&ls);
 
+#if defined(LOCAL_SOCKETS_USE_SETNS)
     spawn_server_destroy(spawn_server);
+#endif
 
     getrusage(RUSAGE_SELF, &ended);
 
@@ -345,6 +354,35 @@ int main(int argc, char **argv) {
 
         duration_snprintf(buf, sizeof(buf), (int64_t)total_ut, "us", true);
         fprintf(stderr, "%20s: %6.2f%% %s\n", "TOTAL", 100.0, buf);
+
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Namespaces    [ found: %zu, absent: %zu, invalid: %zu ]\n"
+#if defined(LOCAL_SOCKETS_USE_SETNS)
+                        "  \\_    forks [ tried: %zu, failed: %zu, unresponsive: %zu ]\n"
+                        "  \\_  sockets [ new: %zu, existing: %zu ]\n"
+#endif
+                , ls.stats.namespaces_found, ls.stats.namespaces_absent, ls.stats.namespaces_invalid
+#if defined(LOCAL_SOCKETS_USE_SETNS)
+                , ls.stats.namespaces_forks_attempted, ls.stats.namespaces_forks_failed, ls.stats.namespaces_forks_unresponsive
+                , ls.stats.namespaces_sockets_new, ls.stats.namespaces_sockets_existing
+#endif
+                );
+
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Sockets       [ found: %zu ]\n",
+                ls.stats.sockets_added);
+
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Main Procfile [ opens: %zu, reads: %zu, resizes: %zu, memory: %zu ]\n"
+                        "  \\_    reads [ total bytes read: %zu, average read size: %zu, max read size: %zu ]\n"
+                        "  \\_      max [ max file size: %zu, max lines: %zu, max words: %zu ]\n",
+                ls.stats.ff.opens, ls.stats.ff.reads, ls.stats.ff.resizes, ls.stats.ff.memory,
+                ls.stats.ff.total_read_bytes, ls.stats.ff.total_read_bytes / (ls.stats.ff.reads ? ls.stats.ff.reads : 1), ls.stats.ff.max_read_size,
+                ls.stats.ff.max_source_bytes, ls.stats.ff.max_lines, ls.stats.ff.max_words);
+
+        fprintf(stderr, "\n");
+        fprintf(stderr, "MNL           [ requests: %zu ]\n",
+                ls.stats.mnl_sends);
     }
 
     return 0;
