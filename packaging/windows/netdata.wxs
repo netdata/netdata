@@ -28,11 +28,7 @@
     </Package>
 
     <Fragment>
-        <Property Id="TOKEN" Value=" " />
-        <Property Id="ROOMS" Value=" " />
-        <Property Id="INSECURE" Value="no" />
-        <Property Id="PROXY" Value=" " />
-        <Property Id="URL" Value="https://app.netdata.cloud" />
+        <Property Id="MsiLogging" Value="voicewarmupx!"/>
 
         <StandardDirectory Id="ProgramFiles64Folder">
             <Directory Id="INSTALLFOLDER" Name="Netdata Agent">
@@ -58,13 +54,19 @@
         <ComponentGroup Id="WevtComponents" Directory="System64Folder">
             <Component>
                 <File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
-                    <Permission User="NT SERVICE\EventLog" Read="yes" />
+                    <Permission User="NT SERVICE\EventLog" GenericRead="yes" Synchronize="yes" />
+                    <Permission User="NT AUTHORITY\SYSTEM" GenericAll="yes" />
+                    <Permission User="BUILTIN\Administrators" GenericAll="yes" />
+                    <Permission User="BUILTIN\Users" GenericRead="yes" GenericExecute="yes" />
+                    <Permission User="[LogonUser]" GenericAll="yes" />
+                    <Permission User="ALL APPLICATION PACKAGES" GenericRead="yes" GenericExecute="yes" />
+                    <Permission User="ALL RESTRICTED APPLICATION PACKAGES" GenericRead="yes" GenericExecute="yes" />
                 </File>
             </Component>
 
             <Component>
                 <File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml">
-              <util:EventManifest ResourceFile="[#WevtDll]" MessageFile="[#WevtDll]" />
+                    <util:EventManifest ResourceFile="[#WevtDll]" MessageFile="[#WevtDll]" />
                 </File>
             </Component>
         </ComponentGroup>
