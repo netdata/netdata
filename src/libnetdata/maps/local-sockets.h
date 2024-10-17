@@ -9,8 +9,8 @@
 #define _countof(x) (sizeof(x) / sizeof(*(x)))
 #endif
 
-// #define LOCAL_SOCKETS_USE_SETNS
-// #define USE_LIBMNL_AFTER_SETNS
+#define LOCAL_SOCKETS_USE_SETNS
+#define USE_LIBMNL_AFTER_SETNS
 
 #if defined(HAVE_LIBMNL)
 #include <linux/rtnetlink.h>
@@ -88,6 +88,7 @@ struct local_sockets_config {
     bool namespaces;
     bool tcp_info;
     bool no_mnl;
+    bool procfile;
     bool report;
 
     size_t max_errors;
@@ -97,9 +98,12 @@ struct local_sockets_config {
     void *data;
 
     const char *host_prefix;
+};
 
-    // internal use
+struct local_sockets_state {
+    uint32_t nl_seq;
     uint64_t net_ns_inode;
+    pid_t net_ns_pid;
 };
 
 struct timing_work {
@@ -108,8 +112,14 @@ struct timing_work {
     const char *name;
 };
 
+struct local_sockets_ns_req {
+    struct local_sockets_config config;
+    struct local_sockets_state ns_state;
+};
+
 typedef struct local_socket_state {
     struct local_sockets_config config;
+    struct local_sockets_state ns_state;
 
     struct {
         size_t mnl_sends;
@@ -145,8 +155,6 @@ typedef struct local_socket_state {
 #endif
 
 #if defined(HAVE_LIBMNL)
-    bool use_mnl;
-    struct mnl_socket *nl;
     uint16_t tmp_protocol;
 #endif
 
@@ -710,32 +718,6 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
 
 #if defined(HAVE_LIBMNL)
 
-static inline void local_sockets_libmnl_init(LS_STATE *ls) {
-    if(ls->config.no_mnl) return;
-
-    ls->nl = mnl_socket_open(NETLINK_INET_DIAG);
-    if (ls->nl == NULL) {
-        local_sockets_log(ls, "cannot open libmnl netlink socket");
-        ls->use_mnl = false;
-    }
-    else if (mnl_socket_bind(ls->nl, 0, MNL_SOCKET_AUTOPID) < 0) {
-        local_sockets_log(ls, "cannot bind libmnl netlink socket");
-        mnl_socket_close(ls->nl);
-        ls->nl = NULL;
-        ls->use_mnl = false;
-    }
-    else
-        ls->use_mnl = true;
-}
-
-static inline void local_sockets_libmnl_cleanup(LS_STATE *ls) {
-    if(ls->nl) {
-        mnl_socket_close(ls->nl);
-        ls->nl = NULL;
-        ls->use_mnl = false;
-    }
-}
-
 static inline int local_sockets_libmnl_cb_data(const struct nlmsghdr *nlh, void *data) {
     LS_STATE *ls = data;
 
@@ -809,16 +791,30 @@ static inline int local_sockets_libmnl_cb_data(const struct nlmsghdr *nlh, void 
 static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t family, uint16_t protocol) {
     ls->tmp_protocol = protocol;
 
-    char buf[MNL_SOCKET_BUFFER_SIZE];
-    struct nlmsghdr *nlh;
-    struct inet_diag_req_v2 req;
-    unsigned int seq, portid = mnl_socket_get_portid(ls->nl);
+    struct mnl_socket *nl = mnl_socket_open(NETLINK_INET_DIAG);
+    if (nl == NULL) {
+        local_sockets_log(ls, "mnl_socket_open() failed");
+        return false;
+    }
 
-    memset(&req, 0, sizeof(req));
-    req.sdiag_family = family;
-    req.sdiag_protocol = protocol;
-    req.idiag_states = -1;
-    req.idiag_ext = 0;
+    if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
+        local_sockets_log(ls, "mnl_socket_bind() failed");
+        mnl_socket_close(nl);
+        return false;
+    }
+
+    char buf[MNL_SOCKET_BUFFER_SIZE];
+    struct nlmsghdr *nlh = mnl_nlmsg_put_header(buf);
+    nlh->nlmsg_type = SOCK_DIAG_BY_FAMILY;
+    nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+    nlh->nlmsg_seq = ls->ns_state.nl_seq ? ls->ns_state.nl_seq++ : time(NULL);
+
+    struct inet_diag_req_v2 req = {
+        .sdiag_family = family,
+        .sdiag_protocol = protocol,
+        .idiag_states = ~0,  // Request all socket states
+        .idiag_ext = 0,
+    };
 
     if(family == AF_INET6)
         req.idiag_ext |= 1 << (INET_DIAG_SKV6ONLY - 1);
@@ -826,55 +822,169 @@ static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t famil
     if(protocol == IPPROTO_TCP && ls->config.tcp_info)
         req.idiag_ext |= 1 << (INET_DIAG_INFO - 1);
 
-    nlh = mnl_nlmsg_put_header(buf);
-    nlh->nlmsg_type = SOCK_DIAG_BY_FAMILY;
-    nlh->nlmsg_flags = NLM_F_ROOT | NLM_F_MATCH | NLM_F_REQUEST;
-    nlh->nlmsg_seq = seq = time(NULL);
     mnl_nlmsg_put_extra_header(nlh, sizeof(req));
     memcpy(mnl_nlmsg_get_payload(nlh), &req, sizeof(req));
 
     ls->stats.mnl_sends++;
-    if (mnl_socket_sendto(ls->nl, nlh, nlh->nlmsg_len) < 0) {
+    if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0) {
         local_sockets_log(ls, "mnl_socket_sendto() failed");
+        mnl_socket_close(nl);
         return false;
     }
 
+    bool rc = true;
+    size_t received = 0;
     ssize_t ret;
-    while ((ret = mnl_socket_recvfrom(ls->nl, buf, sizeof(buf))) > 0) {
-        ret = mnl_cb_run(buf, ret, seq, portid, local_sockets_libmnl_cb_data, ls);
+    while ((ret = mnl_socket_recvfrom(nl, buf, sizeof(buf))) > 0) {
+        ret = mnl_cb_run(buf, ret, 0, 0, local_sockets_libmnl_cb_data, ls);
         if (ret == MNL_CB_ERROR) {
             local_sockets_log(ls, "mnl_cb_run() failed");
+            rc = false;
             break;
         }
-        else if (ret == MNL_CB_STOP)
+        else if (ret <= MNL_CB_STOP)
             break;
+
+        received++;
     }
+    mnl_socket_close(nl);
+
     if (ret == -1) {
         local_sockets_log(ls, "mnl_socket_recvfrom() failed");
-        return false;
+        rc = false;
     }
 
-    return true;
+    return rc;
 }
 #endif // HAVE_LIBMNL
 
+static inline bool local_sockets_process_proc_line(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol, size_t line, char **words, size_t num_words) {
+    // char *sl_txt = get_word(words, num_words, 0);
+    char *local_ip_txt = get_word(words, num_words, 1);
+    char *local_port_txt = get_word(words, num_words, 2);
+    char *remote_ip_txt = get_word(words, num_words, 3);
+    char *remote_port_txt = get_word(words, num_words, 4);
+    char *state_txt = get_word(words, num_words, 5);
+    char *tx_queue_txt = get_word(words, num_words, 6);
+    char *rx_queue_txt = get_word(words, num_words, 7);
+    char *tr_txt = get_word(words, num_words, 8);
+    char *tm_when_txt = get_word(words, num_words, 9);
+    char *retrans_txt = get_word(words, num_words, 10);
+    char *uid_txt = get_word(words, num_words, 11);
+    // char *timeout_txt = get_word(words, num_words, 12);
+    char *inode_txt = get_word(words, num_words, 13);
+
+    if(!local_ip_txt || !local_port_txt || !remote_ip_txt || !remote_port_txt || !state_txt ||
+        !tx_queue_txt || !rx_queue_txt || !tr_txt || !tm_when_txt || !retrans_txt || !uid_txt || !inode_txt) {
+        local_sockets_log(ls, "cannot parse ipv4 line No %zu of filename '%s'", line, filename);
+        return false;
+    }
+
+    LOCAL_SOCKET n = {
+        .direction = SOCKET_DIRECTION_NONE,
+        .ipv6ony = {
+            .checked = false,
+            .ipv46 = false,
+        },
+        .local = {
+            .family = family,
+            .protocol = protocol,
+        },
+        .remote = {
+            .family = family,
+            .protocol = protocol,
+        },
+        .uid = UID_UNSET,
+    };
+
+    n.local.port = str2uint32_hex(local_port_txt, NULL);
+    n.remote.port = str2uint32_hex(remote_port_txt, NULL);
+    n.state = str2uint32_hex(state_txt, NULL);
+    n.wqueue = str2uint32_hex(tx_queue_txt, NULL);
+    n.rqueue = str2uint32_hex(rx_queue_txt, NULL);
+    n.timer = str2uint32_hex(tr_txt, NULL);
+    n.expires = str2uint32_hex(tm_when_txt, NULL);
+    n.retransmits = str2uint32_hex(retrans_txt, NULL);
+    n.uid = str2uint32_t(uid_txt, NULL);
+    n.inode = str2uint64_t(inode_txt, NULL);
+
+    if(family == AF_INET) {
+        n.local.ip.ipv4 = str2uint32_hex(local_ip_txt, NULL);
+        n.remote.ip.ipv4 = str2uint32_hex(remote_ip_txt, NULL);
+    }
+    else if(family == AF_INET6) {
+        ipv6_to_in6_addr(local_ip_txt, &n.local.ip.ipv6);
+        ipv6_to_in6_addr(remote_ip_txt, &n.remote.ip.ipv6);
+    }
+
+    local_sockets_add_socket(ls, &n);
+    return true;
+}
+
+static inline bool local_sockets_read_proc_net_x_getline(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
+    static bool is_space[256] = {
+        [':'] = true,
+        [' '] = true,
+    };
+
+    if(family != AF_INET && family != AF_INET6)
+        return false;
+
+    FILE *fp = fopen(filename, "r");
+    if (fp == NULL)
+        return false;
+
+    char *line = malloc(1024);  // no mallocz() here because getline() may resize
+    if(!line) {
+        fclose(fp);
+        return false;
+    }
+
+    size_t len = 1024;
+    ssize_t read;
+
+    ssize_t min_line_length = (family == AF_INET) ? 105 : 155;
+    size_t counter = 0;
+
+    // Read line by line
+    while ((read = getline(&line, &len, fp)) != -1) {
+        if(counter++ == 0) continue; // skip the first line
+
+        if(read < min_line_length) {
+            local_sockets_log(ls, "too small line No %zu of filename '%s': %s", counter, filename, line);
+            continue;
+        }
+
+        char *words[32];
+        size_t num_words = quoted_strings_splitter(line, words, 32, is_space);
+        local_sockets_process_proc_line(ls, filename, family, protocol, counter, words, num_words);
+    }
+
+    fclose(fp);
+
+    if (line)
+        free(line); // no freez() here because getline() may resize
+
+    return true;
+}
+
 #define INITIALLY_EXPECTED_PROC_NET_LINES 16384
-#define PROC_NET_BYTES_PER_LINE 155
-#define PROC_NET_WORDS_PER_LINE 32
+#define PROC_NET_BYTES_PER_LINE 155 // 105 for IPv4, 155 for IPv6
+#define PROC_NET_WORDS_PER_LINE 22
 #define INITIALLY_EXPECTED_PROC_NET_WORDS (INITIALLY_EXPECTED_PROC_NET_LINES * PROC_NET_WORDS_PER_LINE)
 #define INITIALLY_EXPECTED_PROC_NET_BYTES (INITIALLY_EXPECTED_PROC_NET_LINES * PROC_NET_BYTES_PER_LINE)
 
-static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
+static inline bool local_sockets_read_proc_net_x_procfile(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
     if(family != AF_INET && family != AF_INET6)
         return false;
 
     procfile_set_adaptive_allocation(true, INITIALLY_EXPECTED_PROC_NET_BYTES, INITIALLY_EXPECTED_PROC_NET_LINES, INITIALLY_EXPECTED_PROC_NET_WORDS);
 
-    bool was_ff_open = ls->ff;
+    bool copy_initial_ff_stats = ls->ff == NULL && ls->stats.ff.memory > 0;
     ls->ff = procfile_reopen(ls->ff, filename, ls->ff ? NULL :" :", PROCFILE_FLAG_DEFAULT);
 
     // we just created ff, copy our old stats to it
-    if(ls->ff && !was_ff_open) ls->ff->stats = ls->stats.ff;
+    if(ls->ff && copy_initial_ff_stats) ls->ff->stats = ls->stats.ff;
 
     ls->ff = procfile_readall(ls->ff);
     if(!ls->ff) return false;
@@ -883,72 +993,29 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
     ls->stats.ff = ls->ff->stats;
 
     for(size_t l = 1; l < procfile_lines(ls->ff) ;l++) {
-        size_t words = procfile_linewords(ls->ff, l);
-        if(!words) continue;
-        if(words < 14) {
-            local_sockets_log(ls, "too small line No %zu of filename '%s' (has %zu words)", l, filename, words);
+        size_t w = procfile_linewords(ls->ff, l);
+        if(!w) continue;
+        if(w < 14) {
+            local_sockets_log(ls, "too small line No %zu of filename '%s' (has %zu words)", l, filename, w);
             continue;
         }
 
-        LOCAL_SOCKET n = {
-            .direction = SOCKET_DIRECTION_NONE,
-            .ipv6ony = {
-                .checked = false,
-                .ipv46 = false,
-            },
-            .local = {
-                .family = family,
-                .protocol = protocol,
-            },
-            .remote = {
-                .family = family,
-                .protocol = protocol,
-            },
-            .uid = UID_UNSET,
-        };
-
-        // char *sl_txt = procfile_lineword(ls->ff, l, 0);
-        char *local_ip_txt = procfile_lineword(ls->ff, l, 1);
-        char *local_port_txt = procfile_lineword(ls->ff, l, 2);
-        char *remote_ip_txt = procfile_lineword(ls->ff, l, 3);
-        char *remote_port_txt = procfile_lineword(ls->ff, l, 4);
-        char *state_txt = procfile_lineword(ls->ff, l, 5);
-        char *tx_queue_txt = procfile_lineword(ls->ff, l, 6);
-        char *rx_queue_txt = procfile_lineword(ls->ff, l, 7);
-        char *tr_txt = procfile_lineword(ls->ff, l, 8);
-        char *tm_when_txt = procfile_lineword(ls->ff, l, 9);
-        char *retrans_txt = procfile_lineword(ls->ff, l, 10);
-        char *uid_txt = procfile_lineword(ls->ff, l, 11);
-        // char *timeout_txt = procfile_lineword(ls->ff, l, 12);
-        char *inode_txt = procfile_lineword(ls->ff, l, 13);
-
-        if(!local_ip_txt || !local_port_txt || !remote_ip_txt || !remote_port_txt || !state_txt ||
-            !tx_queue_txt || !rx_queue_txt || !tr_txt || !tm_when_txt || !retrans_txt || !uid_txt || !inode_txt) {
-            local_sockets_log(ls, "cannot parse ipv4 line No %zu of filename '%s'", l, filename);
-            continue;
-        }
-
-        n.local.port = str2uint32_hex(local_port_txt, NULL);
-        n.remote.port = str2uint32_hex(remote_port_txt, NULL);
-        n.state = str2uint32_hex(state_txt, NULL);
-        n.wqueue = str2uint32_hex(tx_queue_txt, NULL);
-        n.rqueue = str2uint32_hex(rx_queue_txt, NULL);
-        n.timer = str2uint32_hex(tr_txt, NULL);
-        n.expires = str2uint32_hex(tm_when_txt, NULL);
-        n.retransmits = str2uint32_hex(retrans_txt, NULL);
-        n.uid = str2uint32_t(uid_txt, NULL);
-        n.inode = str2uint64_t(inode_txt, NULL);
-
-        if(family == AF_INET) {
-            n.local.ip.ipv4 = str2uint32_hex(local_ip_txt, NULL);
-            n.remote.ip.ipv4 = str2uint32_hex(remote_ip_txt, NULL);
-        }
-        else if(family == AF_INET6) {
-            ipv6_to_in6_addr(local_ip_txt, &n.local.ip.ipv6);
-            ipv6_to_in6_addr(remote_ip_txt, &n.remote.ip.ipv6);
-        }
-
-        local_sockets_add_socket(ls, &n);
+        char *words[14] = { 0 };
+        words[0] = procfile_lineword(ls->ff, l, 0);
+        words[1] = procfile_lineword(ls->ff, l, 1);
+        words[2] = procfile_lineword(ls->ff, l, 2);
+        words[3] = procfile_lineword(ls->ff, l, 3);
+        words[4] = procfile_lineword(ls->ff, l, 4);
+        words[5] = procfile_lineword(ls->ff, l, 5);
+        words[6] = procfile_lineword(ls->ff, l, 6);
+        words[7] = procfile_lineword(ls->ff, l, 7);
+        words[8] = procfile_lineword(ls->ff, l, 8);
+        words[9] = procfile_lineword(ls->ff, l, 9);
+        words[10] = procfile_lineword(ls->ff, l, 10);
+        words[11] = procfile_lineword(ls->ff, l, 11);
+        words[12] = procfile_lineword(ls->ff, l, 12);
+        words[13] = procfile_lineword(ls->ff, l, 13);
+        local_sockets_process_proc_line(ls, filename, family, protocol, l, words, _countof(words));
     }
 
     return true;
@@ -1046,10 +1113,7 @@ static inline void local_sockets_init(LS_STATE *ls) {
     memset(&ls->stats, 0, sizeof(ls->stats));
 
 #if defined(HAVE_LIBMNL)
-    ls->use_mnl = false;
-    ls->nl = NULL;
     ls->tmp_protocol = 0;
-    local_sockets_libmnl_init(ls);
 #endif
 
 #if defined(LOCAL_SOCKETS_USE_SETNS)
@@ -1075,10 +1139,6 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
         ls->spawn_server = NULL;
         ls->spawn_server_is_mine = false;
     }
-#endif
-
-#if defined(HAVE_LIBMNL)
-    local_sockets_libmnl_cleanup(ls);
 #endif
 
     // free the sockets hashtable data
@@ -1175,17 +1235,21 @@ static void local_sockets_track_time_by_protocol(LS_STATE *ls, bool mnl, uint16_
 
 static inline void local_sockets_do_family_protocol(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
 #if defined(HAVE_LIBMNL)
-    if(!ls->config.no_mnl && ls->nl && ls->use_mnl) {
+    if(!ls->config.no_mnl) {
         local_sockets_track_time_by_protocol(ls, true, family, protocol);
-        ls->use_mnl = local_sockets_libmnl_get_sockets(ls, family, protocol);
-
-        if(ls->use_mnl)
+        if(local_sockets_libmnl_get_sockets(ls, family, protocol))
             return;
+
+        // else, do proc
     }
 #endif
 
     local_sockets_track_time_by_protocol(ls, false, family, protocol);
-    local_sockets_read_proc_net_x(ls, filename, family, protocol);
+
+    if(ls->config.procfile)
+        local_sockets_read_proc_net_x_procfile(ls, filename, family, protocol);
+    else
+        local_sockets_read_proc_net_x_getline(ls, filename, family, protocol);
 }
 
 static inline void local_sockets_read_all_system_sockets(LS_STATE *ls) {
@@ -1255,7 +1319,10 @@ static inline void local_sockets_send_to_parent(struct local_socket_state *ls, c
 
     if(!local_socket_is_terminator(n)) {
         ls->stats.errors_encountered = 0;
-        local_sockets_log(ls, "child is sending inode %"PRIu64" of namespace %"PRIu64", from namespace %"PRIu64, n->inode, n->net_ns_inode, ls->proc_self_net_ns_inode);
+//        local_sockets_log(
+//            ls,
+//            "child is sending inode %"PRIu64" of namespace %"PRIu64", from namespace %"PRIu64" for pid %d",
+//            n->inode, n->net_ns_inode, ls->proc_self_net_ns_inode, ls->ns_state.net_ns_pid);
     }
 
     if(write(fd, n, sizeof(*n)) != sizeof(*n))
@@ -1273,8 +1340,12 @@ static inline void local_sockets_send_to_parent(struct local_socket_state *ls, c
 static inline int local_sockets_spawn_server_callback(SPAWN_REQUEST *request) {
     static const struct local_socket terminator = LOCAL_SOCKET_TERMINATOR;
 
+    struct local_sockets_ns_req *req = (struct local_sockets_ns_req *)request->data;
+
     LS_STATE ls = { 0 };
-    ls.config = *((struct local_sockets_config *)request->data);
+    ls.config = req->config;
+    ls.ns_state = req->ns_state;
+    ls.ns_state.nl_seq += gettid_uncached() * 10;
 
     // we don't need these inside namespaces
     ls.config.cmdline = false;
@@ -1288,7 +1359,7 @@ static inline int local_sockets_spawn_server_callback(SPAWN_REQUEST *request) {
 
     // initialize local sockets
     local_sockets_init(&ls);
-    ls.proc_self_net_ns_inode = ls.config.net_ns_inode;
+    ls.proc_self_net_ns_inode = ls.ns_state.net_ns_inode;
     ls.config.host_prefix = ""; // we need the /proc of the container
 
     struct local_sockets_child_work cw = {
@@ -1360,9 +1431,14 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         return false;
     }
 
-    struct local_sockets_config config = ls->config;
-    config.net_ns_inode = ps->net_ns_inode;
-    SPAWN_INSTANCE *si = spawn_server_exec(ls->spawn_server, STDERR_FILENO, fd, NULL, &config, sizeof(config), SPAWN_INSTANCE_TYPE_CALLBACK);
+    struct local_sockets_ns_req req = {
+        .config = ls->config,
+        .ns_state = ls->ns_state,
+    };
+    req.ns_state.net_ns_pid = ps->pid;
+    req.ns_state.net_ns_inode = ps->net_ns_inode;
+
+    SPAWN_INSTANCE *si = spawn_server_exec(ls->spawn_server, STDERR_FILENO, fd, NULL, &req, sizeof(req), SPAWN_INSTANCE_TYPE_CALLBACK);
     close(fd); fd = -1;
 
     if(ls->config.report)

@@ -159,13 +159,15 @@ int main(int argc, char **argv) {
                     "\n"
                     " Current options:\n"
                     "\n"
-                    "    %s %s %s %s %s %s %s %s %s\n"
+                    "    %s %s %s %s %s %s %s %s %s %s %s %s\n"
                     "\n"
                     " Option 'debug' enables all sources and all directions and provides\n"
                     " a full dump of current sockets.\n"
                     "\n"
                     " Option 'report' reports timings per step while collecting and processing\n"
                     " system information.\n"
+                    "\n"
+                    " Option 'procfile' uses procfile to read proc files, instead of getline().\n"
                     "\n"
                     " DIRECTION DETECTION\n"
                     " The program detects the direction of the sockets using these rules:\n"
@@ -212,6 +214,9 @@ int main(int argc, char **argv) {
                     , ls.config.inbound ? "inbound" : "no-inbound"
                     , ls.config.outbound ? "outbound" : "no-outbound"
                     , ls.config.namespaces ? "namespaces" : "no-namespaces"
+                    , ls.config.no_mnl ? "no-mnl" : "mnl"
+                    , ls.config.procfile ? "procfile" : "no-procfile"
+                    , ls.config.report ? "report" : "no-report"
                     );
             exit(1);
         }
@@ -237,6 +242,7 @@ int main(int argc, char **argv) {
             ls.config.namespaces = true;
             ls.config.tcp_info = true;
             ls.config.uid = true;
+            ls.config.procfile = false;
             ls.config.max_errors = SIZE_MAX;
             ls.config.cb = print_local_listeners_debug;
 
@@ -297,6 +303,10 @@ int main(int argc, char **argv) {
         else if (strcmp("mnl", s) == 0) {
             ls.config.no_mnl = !positive;
             // fprintf(stderr, "%s mnl\n", positive ? "enabling" : "disabling");
+        }
+        else if (strcmp("procfile", s) == 0) {
+            ls.config.procfile = positive;
+            // fprintf(stderr, "%s procfile\n", positive ? "enabling" : "disabling");
         }
         else if (strcmp("report", s) == 0) {
             ls.config.report = positive;
@@ -381,7 +391,7 @@ int main(int argc, char **argv) {
                 ls.stats.ff.max_source_bytes, ls.stats.ff.max_lines, ls.stats.ff.max_words);
 
         fprintf(stderr, "\n");
-        fprintf(stderr, "MNL           [ requests: %zu ]\n",
+        fprintf(stderr, "MNL(without namespaces) [ requests: %zu ]\n",
                 ls.stats.mnl_sends);
     }
 
