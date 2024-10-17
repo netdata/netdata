@@ -464,10 +464,7 @@ def write_to_file(path, md, meta_yaml, sidebar_label, community, mode='default')
         # proper_edit_name = meta_yaml.replace(
         #     "metadata.yaml", f'integrations/{clean_string(sidebar_label)}.md\"')
 
-        
         md = add_custom_edit_url(md, meta_yaml, sidebar_label, mode='logs')
-
-        
 
         finalpath = f'{path}/integrations/{name}.md'
 
