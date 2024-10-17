@@ -154,108 +154,108 @@ modules:
         list: []
     alerts:
       - name: vernemq_socket_errors
-        metric: vernemq.socket_errors
-        info: number of socket errors in the last minute
+        metric: vernemq.node_socket_errors
+        info: Node ${label:node} socket errors in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_queue_message_drop
-        metric: vernemq.queue_undelivered_messages
-        info: number of dropped messaged due to full queues in the last minute
+        metric: vernemq.node_queue_undelivered_messages
+        info: Node ${label:node} dropped messages due to full queues in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_queue_message_expired
-        metric: vernemq.queue_undelivered_messages
-        info: number of messages which expired before delivery in the last minute
+        metric: vernemq.node_queue_undelivered_messages
+        info: Node ${label:node} expired before delivery messages in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_queue_message_unhandled
-        metric: vernemq.queue_undelivered_messages
-        info: "number of unhandled messages (connections with clean session=true) in the last minute"
+        metric: vernemq.node_queue_undelivered_messages
+        info: Node ${label:node} unhandled messages in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_average_scheduler_utilization
-        metric: vernemq.average_scheduler_utilization
-        info: average scheduler utilization over the last 10 minutes
+        metric: vernemq.node_average_scheduler_utilization
+        info: Node ${label:node} scheduler utilization over the last 10 minutes
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_cluster_dropped
-        metric: vernemq.cluster_dropped
-        info: amount of traffic dropped during communication with the cluster nodes in the last minute
+        metric: vernemq.node_cluster_dropped
+        info: Node ${label:node} traffic dropped during communication with the cluster nodes in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_netsplits
-        metric: vvernemq.netsplits
-        info: "number of detected netsplits (split brain situation) in the last minute"
+        metric: vernemq.node_netsplits
+        info: "Node ${label:node} detected netsplits (split brain) in the last minute"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_connack_sent_reason_unsuccessful
-        metric: vernemq.mqtt_connack_sent_reason
-        info: number of sent unsuccessful v3/v5 CONNACK packets in the last minute
+        metric: vernemq.node_mqtt_connack_sent_by_reason_code
+        info: Node ${label:node} unsuccessful sent v5 CONNACK packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_disconnect_received_reason_not_normal
-        metric: vernemq.mqtt_disconnect_received_reason
-        info: number of received not normal v5 DISCONNECT packets in the last minute
+        metric: vernemq.node_mqtt_disconnect_received_by_reason_code
+        info: Node ${label:node} received not normal v5 DISCONNECT packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_disconnect_sent_reason_not_normal
-        metric: vernemq.mqtt_disconnect_sent_reason
-        info: number of sent not normal v5 DISCONNECT packets in the last minute
+        metric: vernemq.node_mqtt_disconnect_sent_by_reason_code
+        info: Node ${label:node} sent not normal v5 DISCONNECT packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_subscribe_error
-        metric: vernemq.mqtt_subscribe_error
-        info: number of failed v3/v5 SUBSCRIBE operations in the last minute
+        metric: vernemq.node_mqtt_subscribe_error
+        info: Node ${label:node} mqtt v${label:mqtt_version} failed SUBSCRIBE operations in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_subscribe_auth_error
-        metric: vernemq.mqtt_subscribe_auth_error
-        info: number of unauthorized v3/v5 SUBSCRIBE attempts in the last minute
+        metric: vernemq.node_mqtt_subscribe_auth_error
+        info: Node ${label:node} mqtt v${label:mqtt_version} unauthorized SUBSCRIBE attempts in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_unsubscribe_error
-        metric: vernemq.mqtt_unsubscribe_error
-        info: number of failed v3/v5 UNSUBSCRIBE operations in the last minute
+        metric: vernemq.node_mqtt_unsubscribe_error
+        info: Node ${label:node} mqtt v${label:mqtt_version} failed UNSUBSCRIBE operations in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_publish_errors
-        metric: vernemq.mqtt_publish_errors
-        info: number of failed v3/v5 PUBLISH operations in the last minute
+        metric: vernemq.node_mqtt_publish_errors
+        info: Node ${label:node} mqtt v${label:mqtt_version} failed PUBLISH operations in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_publish_auth_errors
-        metric: vernemq.mqtt_publish_auth_errors
-        info: number of unauthorized v3/v5 PUBLISH attempts in the last minute
+        metric: vernemq.node_mqtt_publish_auth_errors
+        info: Node ${label:node} mqtt v${label:mqtt_version} unauthorized PUBLISH attempts in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_puback_received_reason_unsuccessful
-        metric: vernemq.mqtt_puback_received_reason
-        info: number of received unsuccessful v5 PUBACK packets in the last minute
+        metric: vernemq.node_mqtt_puback_received_by_reason_code
+        info: Node ${label:node} mqtt v5 received unsuccessful PUBACK packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_puback_sent_reason_unsuccessful
-        metric: vernemq.mqtt_puback_sent_reason
-        info: number of sent unsuccessful v5 PUBACK packets in the last minute
+        metric: vernemq.node_mqtt_puback_sent_by_reason_code
+        info: Node ${label:node} mqtt v5 unsuccessful sent PUBACK packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_puback_unexpected
-        metric: vernemq.mqtt_puback_invalid_error
-        info: number of received unexpected v3/v5 PUBACK packets in the last minute
+        metric: vernemq.node_mqtt_puback_invalid_error
+        info: Node ${label:node} mqtt v${label:mqtt_version} received unexpected PUBACK messages in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_pubrec_received_reason_unsuccessful
-        metric: vernemq.mqtt_pubrec_received_reason
-        info: number of received unsuccessful v5 PUBREC packets in the last minute
+        metric: vernemq.node_mqtt_pubrec_received_by_reason_code
+        info: Node ${label:node} mqtt v5 received unsuccessful PUBREC packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_pubrec_sent_reason_unsuccessful
-        metric: vernemq.mqtt_pubrec_sent_reason
-        info: number of sent unsuccessful v5 PUBREC packets in the last minute
+        metric: vernemq.node_mqtt_pubrec_sent_by_reason_code
+        info: Node ${label:node} mqtt v5 unsuccessful sent PUBREC packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_pubrec_invalid_error
-        metric: vernemq.mqtt_pubrec_invalid_error
-        info: number of received unexpected v3 PUBREC packets in the last minute
+        metric: vernemq.node_mqtt_pubrec_invalid_error
+        info: Node ${label:node} mqtt v${label:mqtt_version} received invalid PUBREC packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_pubrel_received_reason_unsuccessful
-        metric: vernemq.mqtt_pubrel_received_reason
-        info: number of received unsuccessful v5 PUBREL packets in the last minute
+        metric: vernemq.node_mqtt_pubrel_received_by_reason_code
+        info: Node ${label:node} mqtt v5 received unsuccessful PUBREL packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_pubrel_sent_reason_unsuccessful
-        metric: vernemq.mqtt_pubrel_sent_reason
-        info: number of sent unsuccessful v5 PUBREL packets in the last minute
+        metric: vernemq.node_mqtt_pubrel_sent_by_reason_code
+        info: Node ${label:node} mqtt v5 unsuccessful sent PUBREL packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_pubcomp_received_reason_unsuccessful
-        metric: vernemq.mqtt_pubcomp_received_reason
-        info: number of received unsuccessful v5 PUBCOMP packets in the last minute
+        metric: vernemq.node_mqtt_pubcomp_received_by_reason_code
+        info: Node ${label:node} mqtt v5 received unsuccessful PUBCOMP packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_pubcomp_sent_reason_unsuccessful
-        metric: vernemq.mqtt_pubcomp_sent_reason
-        info: number of sent unsuccessful v5 PUBCOMP packets in the last minute
+        metric: vernemq.node_mqtt_pubcomp_sent_by_reason_code
+        info: Node ${label:node} mqtt v5 unsuccessful sent  PUBCOMP packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
       - name: vernemq_mqtt_pubcomp_unexpected
-        metric: vernemq.mqtt_pubcomp_invalid_error
-        info: number of received unexpected v3/v5 PUBCOMP packets in the last minute
+        metric: vernemq.node_mqtt_pubcomp_invalid_error
+        info: Node ${label:node} mqtt v${label:mqtt_version} received unexpected PUBCOMP packets in the last minute
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
     metrics:
       folding:
@@ -264,68 +264,70 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: These metrics refer to the entire monitored application.
-          labels: []
+        - name: node
+          description: These metrics refer to the VerneMQ node.
+          labels:
+            - name: node
+              description: The value of this label is identical to the value of the "node" label exposed by VerneMQ.
           metrics:
-            - name: vernemq.sockets
+            - name: vernemq.node_socket
               description: Open Sockets
               unit: sockets
               chart_type: line
               dimensions:
                 - name: open
-            - name: vernemq.socket_operations
+            - name: vernemq.node_socket_operations
               description: Socket Open and Close Events
               unit: sockets/s
               chart_type: line
               dimensions:
                 - name: open
                 - name: close
-            - name: vernemq.client_keepalive_expired
+            - name: vernemq.node_client_keepalive_expired
               description: Closed Sockets due to Keepalive Time Expired
               unit: sockets/s
               chart_type: line
               dimensions:
                 - name: closed
-            - name: vernemq.socket_close_timeout
+            - name: vernemq.node_socket_close_timeout
               description: Closed Sockets due to no CONNECT Frame On Time
               unit: sockets/s
               chart_type: line
               dimensions:
                 - name: closed
-            - name: vernemq.socket_errors
+            - name: vernemq.node_socket_errors
               description: Socket Errors
               unit: errors/s
               chart_type: line
               dimensions:
                 - name: errors
-            - name: vernemq.queue_processes
+            - name: vernemq.node_queue_processes
               description: Living Queues in an Online or an Offline State
               unit: queue processes
               chart_type: line
               dimensions:
                 - name: queue_processes
-            - name: vernemq.queue_processes_operations
+            - name: vernemq.node_queue_processes_operations
               description: Queue Processes Setup and Teardown Events
               unit: events/s
               chart_type: line
               dimensions:
                 - name: setup
                 - name: teardown
-            - name: vernemq.queue_process_init_from_storage
+            - name: vernemq.node_queue_process_init_from_storage
               description: Queue Processes Initialized from Offline Storage
               unit: queue processes/s
               chart_type: line
               dimensions:
                 - name: queue_processes
-            - name: vernemq.queue_messages
+            - name: vernemq.node_queue_messages
               description: Received and Sent PUBLISH Messages
               unit: messages/s
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
-            - name: vernemq.queue_undelivered_messages
+            - name: vernemq.node_queue_undelivered_messages
               description: Undelivered PUBLISH Messages
               unit: messages/s
               chart_type: stacked
@@ -333,338 +335,452 @@ modules:
                 - name: dropped
                 - name: expired
                 - name: unhandled
-            - name: vernemq.router_subscriptions
+            - name: vernemq.node_router_subscriptions
               description: Subscriptions in the Routing Table
               unit: subscriptions
               chart_type: line
               dimensions:
                 - name: subscriptions
-            - name: vernemq.router_matched_subscriptions
+            - name: vernemq.node_router_matched_subscriptions
               description: Matched Subscriptions
               unit: subscriptions/s
               chart_type: line
               dimensions:
                 - name: local
                 - name: remote
-            - name: vernemq.router_memory
+            - name: vernemq.node_router_memory
               description: Routing Table Memory Usage
-              unit: KiB
+              unit: bytes
               chart_type: area
               dimensions:
                 - name: used
-            - name: vernemq.average_scheduler_utilization
+            - name: vernemq.node_average_scheduler_utilization
               description: Average Scheduler Utilization
               unit: percentage
               chart_type: area
               dimensions:
                 - name: utilization
-            - name: vernemq.system_utilization_scheduler
-              description: Scheduler Utilization
-              unit: percentage
-              chart_type: stacked
-              dimensions:
-                - name: a dimension per scheduler
-            - name: vernemq.system_processes
+            - name: vernemq.node_system_processes
               description: Erlang Processes
               unit: processes
               chart_type: line
               dimensions:
                 - name: processes
-            - name: vernemq.system_reductions
+            - name: vernemq.node_system_reductions
               description: Reductions
               unit: ops/s
               chart_type: line
               dimensions:
                 - name: reductions
-            - name: vernemq.system_context_switches
+            - name: vernemq.node_system_context_switches
               description: Context Switches
               unit: ops/s
               chart_type: line
               dimensions:
                 - name: context_switches
-            - name: vernemq.system_io
+            - name: vernemq.node_system_io
               description: Received and Sent Traffic through Ports
-              unit: kilobits/s
+              unit: bytes/s
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
-            - name: vernemq.system_run_queue
+            - name: vernemq.node_system_run_queue
               description: Processes that are Ready to Run on All Run-Queues
               unit: processes
               chart_type: line
               dimensions:
                 - name: ready
-            - name: vernemq.system_gc_count
+            - name: vernemq.node_system_gc_count
               description: GC Count
               unit: ops/s
               chart_type: line
               dimensions:
                 - name: gc
-            - name: vernemq.system_gc_words_reclaimed
+            - name: vernemq.node_system_gc_words_reclaimed
               description: GC Words Reclaimed
               unit: ops/s
               chart_type: line
               dimensions:
                 - name: words_reclaimed
-            - name: vernemq.system_allocated_memory
+            - name: vernemq.node_system_allocated_memory
               description: Memory Allocated by the Erlang Processes and by the Emulator
-              unit: KiB
+              unit: bytes
               chart_type: stacked
               dimensions:
                 - name: processes
                 - name: system
-            - name: vernemq.bandwidth
-              description: Bandwidth
-              unit: kilobits/s
+            - name: vernemq.node_traffic
+              description: Traffic
+              unit: bytes/s
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
-            - name: vernemq.retain_messages
+            - name: vernemq.node_retain_messages
               description: Stored Retained Messages
               unit: messages
               chart_type: line
               dimensions:
                 - name: messages
-            - name: vernemq.retain_memory
+            - name: vernemq.node_retain_memory
               description: Stored Retained Messages Memory Usage
-              unit: KiB
+              unit: bytes
               chart_type: area
               dimensions:
                 - name: used
-            - name: vernemq.cluster_bandwidth
+            - name: vernemq.node_cluster_traffic
               description: Communication with Other Cluster Nodes
-              unit: kilobits/s
+              unit: bytes/s
               chart_type: area
               dimensions:
                 - name: received
                 - name: sent
-            - name: vernemq.cluster_dropped
+            - name: vernemq.node_cluster_dropped
               description: Traffic Dropped During Communication with Other Cluster Nodes
-              unit: kilobits/s
+              unit: bytes/s
               chart_type: area
               dimensions:
                 - name: dropped
-            - name: vernemq.netsplit_unresolved
+            - name: vernemq.node_netsplit_unresolved
               description: Unresolved Netsplits
               unit: netsplits
               chart_type: line
               dimensions:
                 - name: unresolved
-            - name: vernemq.netsplits
+            - name: vernemq.node_netsplits
               description: Netsplits
               unit: netsplits/s
               chart_type: stacked
               dimensions:
                 - name: resolved
                 - name: detected
-            - name: vernemq.mqtt_auth
-              description: v5 AUTH
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
-            - name: vernemq.mqtt_auth_received_reason
-              description: v5 AUTH Received by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_auth_sent_reason
-              description: v5 AUTH Sent by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_connect
-              description: v3/v5 CONNECT and CONNACK
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: connect
-                - name: connack
-            - name: vernemq.mqtt_connack_sent_reason
-              description: v3/v5 CONNACK Sent by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_disconnect
-              description: v3/v5 DISCONNECT
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
-            - name: vernemq.mqtt_disconnect_received_reason
-              description: v5 DISCONNECT Received by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_disconnect_sent_reason
-              description: v5 DISCONNECT Sent by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_subscribe
-              description: v3/v5 SUBSCRIBE and SUBACK
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: subscribe
-                - name: suback
-            - name: vernemq.mqtt_subscribe_error
-              description: v3/v5 Failed SUBSCRIBE Operations due to a Netsplit
-              unit: ops/s
-              chart_type: line
-              dimensions:
-                - name: failed
-            - name: vernemq.mqtt_subscribe_auth_error
-              description: v3/v5 Unauthorized SUBSCRIBE Attempts
-              unit: attempts/s
-              chart_type: line
-              dimensions:
-                - name: unauth
-            - name: vernemq.mqtt_unsubscribe
-              description: v3/v5 UNSUBSCRIBE and UNSUBACK
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: unsubscribe
-                - name: unsuback
-            - name: vernemq.mqtt_unsubscribe_error
-              description: v3/v5 Failed UNSUBSCRIBE Operations due to a Netsplit
-              unit: ops/s
-              chart_type: line
-              dimensions:
-                - name: mqtt_unsubscribe_error
-            - name: vernemq.mqtt_publish
-              description: v3/v5 QoS 0,1,2 PUBLISH
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
-            - name: vernemq.mqtt_publish_errors
-              description: v3/v5 Failed PUBLISH Operations due to a Netsplit
-              unit: ops/s
-              chart_type: line
-              dimensions:
-                - name: failed
-            - name: vernemq.mqtt_publish_auth_errors
-              description: v3/v5 Unauthorized PUBLISH Attempts
-              unit: attempts/s
-              chart_type: area
-              dimensions:
-                - name: unauth
-            - name: vernemq.mqtt_puback
-              description: v3/v5 QoS 1 PUBACK
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
-            - name: vernemq.mqtt_puback_received_reason
-              description: v5 PUBACK QoS 1 Received by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_puback_sent_reason
-              description: v5 PUBACK QoS 1 Sent by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_puback_invalid_error
-              description: v3/v5 PUBACK QoS 1 Received Unexpected Messages
-              unit: messages/s
-              chart_type: line
-              dimensions:
-                - name: unexpected
-            - name: vernemq.mqtt_pubrec
-              description: v3/v5 PUBREC QoS 2
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
-            - name: vernemq.mqtt_pubrec_received_reason
-              description: v5 PUBREC QoS 2 Received by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_pubrec_sent_reason
-              description: v5 PUBREC QoS 2 Sent by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_pubrec_invalid_error
-              description: v3 PUBREC QoS 2 Received Unexpected Messages
-              unit: messages/s
-              chart_type: line
-              dimensions:
-                - name: unexpected
-            - name: vernemq.mqtt_pubrel
-              description: v3/v5 PUBREL QoS 2
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
-            - name: vernemq.mqtt_pubrel_received_reason
-              description: v5 PUBREL QoS 2 Received by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_pubrel_sent_reason
-              description: v5 PUBREL QoS 2 Sent by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_pubcom
-              description: v3/v5 PUBCOMP QoS 2
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
-            - name: vernemq.mqtt_pubcomp_received_reason
-              description: v5 PUBCOMP QoS 2 Received by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_pubcomp_sent_reason
-              description: v5 PUBCOMP QoS 2 Sent by Reason
-              unit: packets/s
-              chart_type: stacked
-              dimensions:
-                - name: a dimensions per reason
-            - name: vernemq.mqtt_pubcomp_invalid_error
-              description: v3/v5 PUBCOMP QoS 2 Received Unexpected Messages
-              unit: messages/s
-              chart_type: line
-              dimensions:
-                - name: unexpected
-            - name: vernemq.mqtt_ping
-              description: v3/v5 PING
-              unit: packets/s
-              chart_type: line
-              dimensions:
-                - name: pingreq
-                - name: pingresp
             - name: vernemq.node_uptime
               description: Node Uptime
               unit: seconds
               chart_type: line
               dimensions:
                 - name: time
+        - name: mqtt
+          description: These metrics are specific to the used MQTT protocol version.
+          labels:
+            - name: node
+              description: The value of this label is identical to the value of the "node" label exposed by VerneMQ.
+            - name: mqtt_version
+              description: MQTT version.
+          metrics:
+            - name: vernemq.node_mqtt_auth
+              description: MQTT AUTH Packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vernemq.node_mqtt_auth_received_by_reason_code
+              description: MQTT AUTH Received by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: continue_authentication
+                - name: reauthenticate
+            - name: vernemq.node_mqtt_auth_sent_by_reason_code
+              description: MQTT AUTH Sent by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: continue_authentication
+                - name: reauthenticate
+            - name: vernemq.node_mqtt_connect
+              description: MQTT CONNECT and CONNACK
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: connect
+                - name: connack
+            - name: vernemq.node_mqtt_connack_sent_by_return_code
+              description: MQTT CONNACK Sent by Return Code
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: unsupported_protocol_version
+                - name: client_identifier_not_valid
+                - name: server_unavailable
+                - name: bad_username_or_password
+                - name: not_authorized
+            - name: vernemq.node_mqtt_connack_sent_by_reason_code
+              description: MQTT CONNACK Sent by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: unspecified_error
+                - name: malformed_packet
+                - name: protocol_error
+                - name: impl_specific_error
+                - name: unsupported_protocol_version
+                - name: client_identifier_not_valid
+                - name: bad_username_or_password
+                - name: not_authorized
+                - name: server_unavailable
+                - name: server_busy
+                - name: banned
+                - name: bad_authentication_method
+                - name: topic_name_invalid
+                - name: packet_too_large
+                - name: quota_exceeded
+                - name: payload_format_invalid
+                - name: retain_not_supported
+                - name: qos_not_supported
+                - name: use_another_server
+                - name: server_moved
+                - name: connection_rate_exceeded
+            - name: vernemq.node_mqtt_disconnect
+              description: MQTT DISCONNECT Packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vernemq.node_mqtt_disconnect_received_by_reason_code
+              description: MQTT DISCONNECT Received by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: normal_disconnect
+                - name: disconnect_with_will_msg
+                - name: unspecified_error
+                - name: malformed_packet
+                - name: protocol_error
+                - name: impl_specific_error
+                - name: topic_name_invalid
+                - name: receive_max_exceeded
+                - name: topic_alias_invalid
+                - name: packet_too_large
+                - name: message_rate_too_high
+                - name: quota_exceeded
+                - name: administrative_action
+                - name: payload_format_invalid
+            - name: node_mqtt_disconnect_sent_by_reason_code
+              description: MQTT DISCONNECT Sent by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: normal_disconnect
+                - name: unspecified_error
+                - name: malformed_packet
+                - name: protocol_error
+                - name: impl_specific_error
+                - name: not_authorized
+                - name: server_busy
+                - name: server_shutting_down
+                - name: keep_alive_timeout
+                - name: session_taken_over
+                - name: topic_filter_invalid
+                - name: topic_name_invalid
+                - name: receive_max_exceeded
+                - name: topic_alias_invalid
+                - name: packet_too_large
+                - name: message_rate_too_high
+                - name: quota_exceeded
+                - name: administrative_action
+                - name: payload_format_invalid
+                - name: retain_not_supported
+                - name: qos_not_supported
+                - name: use_another_server
+                - name: server_moved
+                - name: shared_subs_not_supported
+                - name: connection_rate_exceeded
+                - name: max_connect_time
+                - name: subscription_ids_not_supported
+                - name: wildcard_subs_not_supported
+            - name: vernemq.node_mqtt_subscribe
+              description: MQTT SUBSCRIBE and SUBACK Packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: subscribe
+                - name: suback
+            - name: vernemq.node_mqtt_subscribe_error
+              description: MQTT Failed SUBSCRIBE Operations due to a Netsplit
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: subscribe
+            - name: vernemq.node_mqtt_subscribe_auth_error
+              description: MQTT Unauthorized SUBSCRIBE Attempts
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: subscribe_auth
+            - name: vernemq.node_mqtt_unsubscribe
+              description: MQTT UNSUBSCRIBE and UNSUBACK Packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: unsubscribe
+                - name: unsuback
+            - name: vernemq.node_mqtt_unsubscribe_error
+              description: MQTT Failed UNSUBSCRIBE Operations due to a Netsplit
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: unsubscribe
+            - name: vernemq.node_mqtt_publish
+              description: MQTT QoS 0,1,2 PUBLISH
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vernemq.node_mqtt_publish_errors
+              description: MQTT Failed PUBLISH Operations due to a Netsplit
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: publish
+            - name: vernemq.node_mqtt_publish_auth_errors
+              description: MQTT Unauthorized PUBLISH Attempts
+              unit: errors/s
+              chart_type: area
+              dimensions:
+                - name: publish_auth
+            - name: vernemq.node_mqtt_puback
+              description: vMQTT QoS 1 PUBACK Packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vernemq.node_mqtt_puback_received_by_reason_code
+              description: MQTT PUBACK QoS 1 Received by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: no_matching_subscribers
+                - name: unspecified_error
+                - name: impl_specific_error
+                - name: not_authorized
+                - name: topic_name_invalid
+                - name: packet_id_in_use
+                - name: quota_exceeded
+                - name: payload_format_invalid
+            - name: vernemq.node_mqtt_puback_sent_by_reason_code
+              description: MQTT PUBACK QoS 1 Sent by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: no_matching_subscribers
+                - name: unspecified_error
+                - name: impl_specific_error
+                - name: not_authorized
+                - name: topic_name_invalid
+                - name: packet_id_in_use
+                - name: quota_exceeded
+                - name: payload_format_invalid
+            - name: vernemq.node_mqtt_puback_invalid_error
+              description: MQTT PUBACK QoS 1 Received Unexpected Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: unexpected
+            - name: vernemq.node_mqtt_pubrec
+              description: MQTT PUBREC QoS 2 Packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vernemq.node_mqtt_pubrec_received_by_reason_code
+              description: MQTT PUBREC QoS 2 Received by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: no_matching_subscribers
+                - name: unspecified_error
+                - name: impl_specific_error
+                - name: not_authorized
+                - name: topic_name_invalid
+                - name: packet_id_in_use
+                - name: quota_exceeded
+                - name: payload_format_invalid
+            - name: vernemq.node_mqtt_pubrec_sent_by_reason_code
+              description: MQTT PUBREC QoS 2 Sent by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: no_matching_subscribers
+                - name: unspecified_error
+                - name: impl_specific_error
+                - name: not_authorized
+                - name: topic_name_invalid
+                - name: packet_id_in_use
+                - name: quota_exceeded
+                - name: payload_format_invalid
+            - name: vernemq.node_mqtt_pubrec_invalid_error
+              description: MQTT PUBREC QoS 2 Received Unexpected Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: unexpected
+            - name: vernemq.node_mqtt_pubrel
+              description: MQTT PUBREL QoS 2 Packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vernemq.node_mqtt_pubrel_received_by_reason_code
+              description: MQTT PUBREL QoS 2 Received by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: packet_id_not_found
+            - name: vernemq.node_mqtt_pubrel_sent_by_reason_code
+              description: MQTT PUBREL QoS 2 Sent by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: packet_id_not_found
+            - name: vernemq.node_mqtt_pubcomp
+              description: MQTT PUBCOMP QoS 2 Packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: vernemq.node_mqtt_pubcomp_received_by_reason_code
+              description: MQTT PUBCOMP QoS 2 Received by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: packet_id_not_found
+            - name: vernemq.node_mqtt_pubcomp_sent_by_reason_cod
+              description: MQTT PUBCOMP QoS 2 Sent by Reason
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: packet_id_not_found
+            - name: vernemq.node_mqtt_pubcomp_invalid_error
+              description: MQTT PUBCOMP QoS 2 Received Unexpected Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: unexpected
+            - name: vernemq.node_mqtt_ping
+              description: MQTT PING Packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: pingreq
+                - name: pingresp
