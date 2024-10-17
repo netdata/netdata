@@ -1,5 +1,5 @@
 
-<p align="center">
+<p style="text-align: center;">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_light.png" alt="Netdata" width="300"/>
 </a>
@@ -7,10 +7,10 @@
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
 </a>
 </p>
-<h3 align="center">Monitor your servers, containers, and applications,<br/>in high-resolution and in real-time.</h3>
+<h3 style="text-align: center;">Monitor your servers, containers, and applications,<br/>in high-resolution and in real-time.</h3>
 
 <br />
-<p align="center">
+<p style="text-align: center;">
   <a href="https://github.com/netdata/netdata/"><img src="https://img.shields.io/github/stars/netdata/netdata?style=social" alt="GitHub Stars"></a>
   <br />
   <a href="https://app.netdata.cloud/spaces/netdata-demo?utm_campaign=github_readme_demo_badge"><img src="https://img.shields.io/badge/Live%20Demo-green" alt="Live Demo"></a>
@@ -21,7 +21,7 @@
   <a href="https://github.com/netdata/netdata/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/github/discussions/netdata/netdata?logo=github&label=github%20discussions"></a>
 </p>
 
-<p align="center"><b>Visit the <a href="https://www.netdata.cloud">Project's Home Page</a></b></p>
+<p style="text-align: center;"><b>Visit the <a href="https://www.netdata.cloud">Project's Home Page</a></b></p>
 
 <hr class="solid">
 
@@ -106,8 +106,8 @@ Netdata monitors all the following:
 |                                 **VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small> | Yes<small><br/>`cgroups`</small> |    -    |   -   | Yes<small><br/>`Hyper-V`</small> |
 |                       **Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small> |               Yes                |   Yes   |  Yes  |               Yes                |
 | **Packaged Applications**<small><br/>nginx, apache, postgres, redis, mongodb,<br/>and hundreds more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
-| **Cloud Provider Infrastructure**<small><br/>AWS, GCP, Azure, and more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
-|                                              **Custom Applications**<small><br/>OpenMetrics, StatsD and soon OpenTelemetry</small> |               Yes                |   Yes   |  Yes  |               Yes                |
+|                              **Cloud Provider Infrastructure**<small><br/>AWS, GCP, Azure, and more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
+|                       **Custom Applications**<small><br/>OpenMetrics, StatsD and soon OpenTelemetry</small> |               Yes                |   Yes   |  Yes  |               Yes                |
 
 When the Netdata Agent runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies that can be monitored.
 
@@ -119,7 +119,7 @@ The Netdata Agent also provides full **enterprise hardware** coverage, monitorin
 
 ### :star: Netdata is the most energy-efficient monitoring tool :star:
 
-<p align="center">
+<p style="text-align: center;">
 <a href="https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf#gh-dark-mode-only">
   <img src="https://github.com/netdata/netdata/assets/139226121/7118757a-38fb-48d7-b12a-53e709a8e8c0" alt="Energy Efficiency" width="1000"/>
 </a>
@@ -142,7 +142,7 @@ The study did not normalize the results based on the number of metrics collected
 
 ### Netdata vs Prometheus
 
-<p align="center">
+<p style="text-align: center;">
 <a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis#gh-light-mode-only">
   <img src="https://github.com/netdata/netdata/assets/139226121/6c21ae39-8656-45c3-bc85-4b012679d2bb" alt="Netdata" width="1000"/>
 </a>
@@ -156,7 +156,7 @@ On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% les
 ---
 
 &nbsp;<br/>
-<p align="center">
+<p style="text-align: center;">
   <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/white/cncf-white.svg#gh-dark-mode-only" alt="CNCF" width="300">
   <img src="https://raw.githubusercontent.com/cncf/artwork/master/other/cncf/horizontal/black/cncf-black.svg#gh-light-mode-only" alt="CNCF" width="300">
   <br />
@@ -168,7 +168,7 @@ On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% les
 
 <hr class="solid">
 
-<p align="center">
+<p style="text-align: center;">
   <b>Below is an animated image, but you can see Netdata live!</b><br/>
 	<a href="https://frankfurt.netdata.rocks"><b>FRANKFURT</b></a> |
 	<a href="https://newyork.netdata.rocks"><b>NEWYORK</b></a> |
@@ -190,7 +190,7 @@ On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% les
 
 ## Getting Started
 
-<p align="center">
+<p style="text-align: center;">
   <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v3/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=M&value_color=blue&precision=2&divide=1000000&options=unaligned&tier=1&v44" alt="User base"></a>
   <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v3/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=M&divide=1000000&value_color=orange&precision=2&options=unaligned&tier=1&v44" alt="Servers monitored"></a>
   <a href="https://registry.my-netdata.io/#menu_netdata_submenu_registry"><img src="https://registry.my-netdata.io/api/v3/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=M&value_color=yellowgreen&precision=2&divide=1000000&options=unaligned&tier=1&v44" alt="Sessions served"></a>
@@ -755,7 +755,7 @@ to collect metrics, troubleshoot via charts, export to external databases, and m
 
 ## :tada: Community
 
-<p align="center">
+<p style="text-align: center;">
   <a href="https://discord.com/invite/2mEmfW735j"><img alt="Discord" src="https://img.shields.io/discord/847502280503590932?logo=discord&logoColor=white&label=chat%20on%20discord"></a>
   <a href="https://community.netdata.cloud"><img alt="Discourse topics" src="https://img.shields.io/discourse/topics?server=https%3A%2F%2Fcommunity.netdata.cloud%2F&logo=discourse&label=discourse%20forum"></a>
   <a href="https://github.com/netdata/netdata/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/github/discussions/netdata/netdata?logo=github&label=github%20discussions"></a>
@@ -779,7 +779,7 @@ You can also find Netdata on:<br/>
 
 ## :pray: Contribute
 
-<p align="center">
+<p style="text-align: center;">
   <a href="https://github.com/netdata/netdata/graphs/contributors"><img alt="Open Source Contributors" src="https://img.shields.io/github/contributors/netdata/netdata?label=open-source%20contributors"></a>
 </p>
 
