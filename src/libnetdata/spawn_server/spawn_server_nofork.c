@@ -49,48 +49,6 @@ static int connect_to_spawn_server(const char *path, bool log) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// the child created by the spawn server
-
-static void spawn_server_run_child(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
-    // get the fds from the request
-    int stdin_fd = rq->fds[0];
-    int stdout_fd = rq->fds[1];
-    int stderr_fd = rq->fds[2];
-    int custom_fd = rq->fds[3]; (void)custom_fd;
-
-    // change stdio fds to the ones in the request
-    if (dup2(stdin_fd, STDIN_FILENO) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: cannot dup2(%d) stdin of request No %zu: %s",
-            stdin_fd, rq->request_id, rq->cmdline);
-        exit(EXIT_FAILURE);
-    }
-    if (dup2(stdout_fd, STDOUT_FILENO) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: cannot dup2(%d) stdin of request No %zu: %s",
-            stdout_fd, rq->request_id, rq->cmdline);
-        exit(EXIT_FAILURE);
-    }
-    if (dup2(stderr_fd, STDERR_FILENO) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: cannot dup2(%d) stderr of request No %zu: %s",
-            stderr_fd, rq->request_id, rq->cmdline);
-        exit(EXIT_FAILURE);
-    }
-
-    // close the excess fds
-    close(stdin_fd); stdin_fd = rq->fds[0] = STDIN_FILENO;
-    close(stdout_fd); stdout_fd = rq->fds[1] = STDOUT_FILENO;
-    close(stderr_fd); stderr_fd = rq->fds[2] = STDERR_FILENO;
-
-    // overwrite the process environment
-    environ = (char **)rq->envp;
-
-    // run the callback and return its code
-    exit(server->cb(rq));
-}
-
-// --------------------------------------------------------------------------------------------------------------------
 // Encoding and decoding of spawn server request argv type of data
 
 // Function to encode argv or envp
@@ -364,8 +322,42 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
         os_close_all_non_std_open_fds_except(rq->fds, 4, 0);
         nd_log_reopen_log_files_for_spawn_server("spawn-callback");
 
-        spawn_server_run_child(server, rq);
-        exit(63);
+        // get the fds from the request
+        int stdin_fd = rq->fds[0];
+        int stdout_fd = rq->fds[1];
+        int stderr_fd = rq->fds[2];
+        int custom_fd = rq->fds[3]; (void)custom_fd;
+
+        // change stdio fds to the ones in the request
+        if (dup2(stdin_fd, STDIN_FILENO) == -1) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: cannot dup2(%d) stdin of request No %zu: %s",
+                   stdin_fd, rq->request_id, rq->cmdline);
+            exit(EXIT_FAILURE);
+        }
+        if (dup2(stdout_fd, STDOUT_FILENO) == -1) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: cannot dup2(%d) stdin of request No %zu: %s",
+                   stdout_fd, rq->request_id, rq->cmdline);
+            exit(EXIT_FAILURE);
+        }
+        if (dup2(stderr_fd, STDERR_FILENO) == -1) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: cannot dup2(%d) stderr of request No %zu: %s",
+                   stderr_fd, rq->request_id, rq->cmdline);
+            exit(EXIT_FAILURE);
+        }
+
+        // close the excess fds
+        close(stdin_fd); stdin_fd = rq->fds[0] = STDIN_FILENO;
+        close(stdout_fd); stdout_fd = rq->fds[1] = STDOUT_FILENO;
+        close(stderr_fd); stderr_fd = rq->fds[2] = STDERR_FILENO;
+
+        // overwrite the process environment
+        environ = (char **)rq->envp;
+
+        // run the callback and return its code
+        exit(server->cb(rq));
     }
 
     // the parent
