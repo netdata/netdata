@@ -16,13 +16,13 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
 
 struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER *payload, int *code, json_parse_function_payload_t cb, void *cb_data) {
     if(!payload || !buffer_strlen(payload)) {
-        *code = rrd_call_function_error(output, "No payload given", HTTP_RESP_BAD_REQUEST);
+        *code = rrd_call_function_error(output, "No payload given, but a payload is required for this feature.", HTTP_RESP_BAD_REQUEST);
         return NULL;
     }
 
     struct json_tokener *tokener = json_tokener_new();
     if (!tokener) {
-        *code = rrd_call_function_error(output, "Cannot initialize json parser", HTTP_RESP_INTERNAL_SERVER_ERROR);
+        *code = rrd_call_function_error(output, "Failed to initialize json parser.", HTTP_RESP_INTERNAL_SERVER_ERROR);
         return NULL;
     }
 
