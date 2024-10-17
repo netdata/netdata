@@ -9,13 +9,16 @@
         UpgradeCode="0d949b90-a54d-4aae-9616-e15fbc410530"
         Compressed="no">
 
-		<ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+        <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
 
-		<WixVariable Id="WixUILicenseRtf" Value="cloud.rtf" />
+        <WixVariable Id="WixUILicenseRtf" Value="cloud.rtf" />
 
         <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
         <Icon Id="NetdataIcon.ico" SourceFile="NetdataWhite.ico"/>
         <Property Id="ARPPRODUCTICON" Value="NetdataIcon.ico" />
+
+        <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Netdata is installed and running now! Enjoy real-time performance and health monitoring..." />
+        <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"  Value="Launch MSYS2 terminal." />
 
         <Feature Id="Main">
             <ComponentGroupRef Id="NetdataComponents" />
