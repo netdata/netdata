@@ -12,6 +12,6 @@ const char *daemon_pipename(void) {
 #ifdef _WIN32
     return "\\\\?\\pipe\\netdata-cli";
 #else
-    return "/tmp/netdata-ipc";
+    return "/var/run/netdata/netdata-cli";
 #endif
 }
