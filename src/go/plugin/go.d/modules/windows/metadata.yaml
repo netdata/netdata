@@ -1247,8 +1247,7 @@ modules:
               unit: seconds
               chart_type: line
               dimensions:
-                - name: document_locked
-                - name: document_not_found
+                - name: uptime
         - name: mssql instance
           description: TBD
           labels:
