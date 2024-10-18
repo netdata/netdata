@@ -31,6 +31,8 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
         buffer_json_cloud_status(wb, now_s);
 
+        size_t currently_collected_metrics = 0;
+
         buffer_json_member_add_object(wb, "nodes");
         {
             size_t receiving = 0, archived = 0, sending = 0, total = 0;
@@ -47,6 +49,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                     else
                         archived++;
                 }
+                currently_collected_metrics += host->accounting.currently_collected;
             }
             dfe_done(host);
 
@@ -82,7 +85,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             }
 #endif
             time_t first_time_s = storage_engine_global_first_time_s(eng->seb, localhost->db[tier].si);
-            size_t currently_collected_metrics = storage_engine_collected_metrics(eng->seb, localhost->db[tier].si);
+//            size_t currently_collected_metrics = storage_engine_collected_metrics(eng->seb, localhost->db[tier].si);
 
             NETDATA_DOUBLE percent;
             if (used && max)

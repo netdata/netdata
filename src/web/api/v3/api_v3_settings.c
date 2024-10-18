@@ -260,7 +260,7 @@ int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
     if(web_client_flags_check_auth(w) != WEB_CLIENT_FLAG_AUTH_BEARER && strcmp(file, "default") != 0)
         return rrd_call_function_error(
             w->response.data,
-            "Only the 'default' settings file is allowed for unauthenticated users",
+            "Only the 'default' settings file is allowed for anonymous users",
             HTTP_RESP_BAD_REQUEST);
 
     switch(w->mode) {

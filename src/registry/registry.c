@@ -517,16 +517,16 @@ void registry_statistics(void) {
         rrddim_add(stm, "machines_urls",  NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    struct aral_statistics *p_aral_stats = aral_statistics(registry.persons_aral);
+    struct aral_statistics *p_aral_stats = aral_get_statistics(registry.persons_aral);
     rrddim_set(stm, "persons",       (collected_number)p_aral_stats->structures.allocated_bytes + (collected_number)p_aral_stats->malloc.allocated_bytes + (collected_number)p_aral_stats->mmap.allocated_bytes);
 
-    struct aral_statistics *m_aral_stats = aral_statistics(registry.machines_aral);
+    struct aral_statistics *m_aral_stats = aral_get_statistics(registry.machines_aral);
     rrddim_set(stm, "machines",      (collected_number)m_aral_stats->structures.allocated_bytes + (collected_number)m_aral_stats->malloc.allocated_bytes + (collected_number)m_aral_stats->mmap.allocated_bytes);
 
-    struct aral_statistics *pu_aral_stats = aral_statistics(registry.person_urls_aral);
+    struct aral_statistics *pu_aral_stats = aral_get_statistics(registry.person_urls_aral);
     rrddim_set(stm, "persons_urls",  (collected_number)pu_aral_stats->structures.allocated_bytes + (collected_number)pu_aral_stats->malloc.allocated_bytes + (collected_number)pu_aral_stats->mmap.allocated_bytes);
 
-    struct aral_statistics *mu_aral_stats = aral_statistics(registry.machine_urls_aral);
+    struct aral_statistics *mu_aral_stats = aral_get_statistics(registry.machine_urls_aral);
     rrddim_set(stm, "machines_urls", (collected_number)mu_aral_stats->structures.allocated_bytes + (collected_number)mu_aral_stats->malloc.allocated_bytes + (collected_number)mu_aral_stats->mmap.allocated_bytes);
 
     rrdset_done(stm);

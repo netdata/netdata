@@ -28,7 +28,7 @@ static bool bearer_parse_json_payload(json_object *jobj, const char *path, void 
 int function_bearer_get_token(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload, const char *source) {
     if(!request_source_is_cloud(source))
         return rrd_call_function_error(
-            wb, "You cannot access this function from outside Netdata Cloud", HTTP_RESP_BAD_REQUEST);
+            wb, "Bearer tokens can only be provided via NC.", HTTP_RESP_BAD_REQUEST);
 
     int code;
     struct bearer_token_request rq = { 0 };

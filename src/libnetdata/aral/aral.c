@@ -117,7 +117,7 @@ size_t aral_structures(ARAL *ar) {
     return aral_structures_from_stats(ar->stats);
 }
 
-struct aral_statistics *aral_statistics(ARAL *ar) {
+struct aral_statistics *aral_get_statistics(ARAL *ar) {
     return ar->stats;
 }
 
@@ -799,6 +799,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
         aral_delete_leftover_files(ar->config.name, directory_name, file);
     }
 
+    errno_clear();
     internal_error(true,
                    "ARAL: '%s' "
                    "element size %zu (requested %zu bytes), "

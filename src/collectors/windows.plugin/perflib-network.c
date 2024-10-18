@@ -718,7 +718,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
 
                 rrdset_flag_set(d->packets.st, RRDSET_FLAG_DETAIL);
 
-                add_interface_labels(d->traffic.st, windows_shared_buffer, physical);
+                add_interface_labels(d->packets.st, windows_shared_buffer, physical);
 
                 d->packets.rd_received = rrddim_add(d->packets.st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->packets.rd_sent = rrddim_add(d->packets.st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -748,7 +748,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
 
                 rrdset_flag_set(d->speed.st, RRDSET_FLAG_DETAIL);
 
-                add_interface_labels(d->traffic.st, windows_shared_buffer, physical);
+                add_interface_labels(d->speed.st, windows_shared_buffer, physical);
 
                 d->speed.rd = rrddim_add(d->speed.st, "speed",  NULL,  1, BITS_IN_A_KILOBIT, RRD_ALGORITHM_ABSOLUTE);
             }

@@ -432,9 +432,8 @@ int become_daemon(int dont_fork, const char *user)
             perror("cannot fork");
             exit(1);
         }
-        if(i != 0) {
-            exit(0); // the parent
-        }
+        if(i != 0) exit(0); // the parent
+        gettid_uncached();
 
         // become session leader
         if (setsid() < 0) {
@@ -448,9 +447,8 @@ int become_daemon(int dont_fork, const char *user)
             perror("cannot fork");
             exit(1);
         }
-        if(i != 0) {
-            exit(0); // the parent
-        }
+        if(i != 0) exit(0); // the parent
+        gettid_uncached();
     }
 
     // generate our pid file

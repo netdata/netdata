@@ -153,4 +153,6 @@ static inline bool parse_journal_field(const char *data, size_t data_length, con
 
 void systemd_journal_dyncfg_init(struct functions_evloop_globals *wg);
 
+bool is_journal_file(const char *filename, ssize_t len, const char **start_of_extension);
+
 #endif //NETDATA_COLLECTORS_SYSTEMD_INTERNALS_H

@@ -351,7 +351,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
                                                HTTP_RESP_CLIENT_CLOSED_REQUEST);
             else
                 code = rrd_call_function_error(r->result.wb,
-                                               "Timeout while waiting for a response from the collector.",
+                                               "Timeout while waiting for a response from the plugin that serves this features",
                                                HTTP_RESP_GATEWAY_TIMEOUT);
 
             tmp->free_with_signal = true;
@@ -359,7 +359,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
         }
         else {
             code = rrd_call_function_error(
-                r->result.wb, "Internal error while communicating with the collector",
+                r->result.wb, "Internal error while communicating with the plugin that serves this feature.",
                 HTTP_RESP_INTERNAL_SERVER_ERROR);
 
             tmp->free_with_signal = true;
@@ -398,7 +398,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                      rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                     BUFFER *payload, const char *source, bool hidden) {
+                     BUFFER *payload, const char *source, bool allow_restricted) {
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
@@ -412,7 +412,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     if(!host) {
         code = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
-        rrd_call_function_error(result_wb, "no host given for running the function", code);
+        rrd_call_function_error(result_wb, "No host given for routing this request to.", code);
 
         if(result_cb)
             result_cb(result_wb, code, result_cb_data);
@@ -436,9 +436,9 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
 
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
-    if((rdcf->options & RRD_FUNCTION_HIDDEN) && !hidden) {
+    if((rdcf->options & RRD_FUNCTION_RESTRICTED) && !allow_restricted) {
         code = rrd_call_function_error(result_wb,
-                                       "You cannot access a hidden function like this. ",
+                                       "This feature is not available via this API.",
                                        HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
         dictionary_acquired_item_release(host->functions, host_function_acquired);
 
@@ -546,7 +546,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                "FUNCTIONS: duplicate transaction '%s', function: '%s'",
                t.transaction, t.cmd);
 
-        code = rrd_call_function_error(result_wb, "duplicate transaction", HTTP_RESP_BAD_REQUEST);
+        code = rrd_call_function_error(result_wb, "Duplicate transaction.", HTTP_RESP_BAD_REQUEST);
 
         rrd_functions_inflight_cleanup(&t);
         dictionary_acquired_item_release(r->host->functions, t.host_function_acquired);

@@ -437,6 +437,7 @@ void rrdlabels_get_value_to_buffer_or_unset(RRDLABELS *labels, BUFFER *wb, const
     RRDLABEL *lb;
     RRDLABEL_SRC ls;
 
+    bool set = false;
     lfe_start_read(labels, lb, ls)
     {
         if (lb->index.key == this_key) {
@@ -444,10 +445,15 @@ void rrdlabels_get_value_to_buffer_or_unset(RRDLABELS *labels, BUFFER *wb, const
                 buffer_strcat(wb, string2str(lb->index.value));
             else
                 buffer_strcat(wb, unset);
+            set = true;
             break;
         }
     }
     lfe_done(labels);
+
+    if(!set)
+        buffer_strcat(wb, unset);
+
     string_freez(this_key);
 }
 

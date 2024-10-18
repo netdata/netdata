@@ -1,4 +1,14 @@
 ## Setup
+[% if entry.integration_type == 'logs' %]
+
+## Prerequisites
+
+[[ entry.setup.prerequisites.description]]
+
+## Configuration
+
+There is no configuration needed for this integration.
+[% else %]
 
 [% if entry.setup.description %]
 [[ entry.setup.description ]]
@@ -104,5 +114,6 @@ There are no configuration options.
 [% else%]
 There are no configuration examples.
 
+[% endif %]
 [% endif %]
 [% endif %]

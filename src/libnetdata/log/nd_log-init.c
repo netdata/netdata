@@ -265,17 +265,13 @@ void nd_log_reopen_log_files(bool log) {
     if(log)
         netdata_log_info("Reopening all log files.");
 
-    nd_log.std_output.initialized = false;
-    nd_log.std_error.initialized = false;
-    nd_log.journal_direct.initialized = false;
-    nd_log.journal.initialized = false;
     nd_log_initialize();
 
     if(log)
         netdata_log_info("Log files re-opened.");
 }
 
-void nd_log_reopen_log_files_for_spawn_server(void) {
+void nd_log_reopen_log_files_for_spawn_server(const char *name) {
     gettid_uncached();
 
     if(nd_log.syslog.initialized) {
@@ -291,11 +287,33 @@ void nd_log_reopen_log_files_for_spawn_server(void) {
         nd_log_journal_direct_init(NULL);
     }
 
-    nd_log.sources[NDLS_UNSET].method = NDLM_DISABLED;
-    nd_log.sources[NDLS_ACCESS].method = NDLM_DISABLED;
-    nd_log.sources[NDLS_ACLK].method = NDLM_DISABLED;
-    nd_log.sources[NDLS_DEBUG].method = NDLM_DISABLED;
-    nd_log.sources[NDLS_HEALTH].method = NDLM_DISABLED;
-    nd_log_reopen_log_files(false);
+    for(size_t i = 0; i < _NDLS_MAX ;i++) {
+        if(i != NDLS_COLLECTORS && i != NDLS_DAEMON) continue;
+
+        spinlock_init(&nd_log.sources[i].spinlock);
+        nd_log.sources[i].fd = -1;
+        nd_log.sources[i].fp = NULL;
+        nd_log.sources[i].pending_msg = NULL;
+#if defined(OS_WINDOWS)
+        nd_log.sources[i].hEventLog = NULL;
+#endif
+    }
+
+    for(size_t i = 0; i < _NDLS_MAX ;i++) {
+        if(i == NDLS_COLLECTORS || i == NDLS_DAEMON) continue;
+        nd_log.sources[i].method = NDLM_DISABLED;
+    }
+
+    spinlock_init(&nd_log.std_output.spinlock);
+    spinlock_init(&nd_log.std_error.spinlock);
+
+    nd_log.journal.initialized = false;
+    nd_log.journal_direct.initialized = false;
+    nd_log.syslog.initialized = false;
+    nd_log.eventlog.initialized = false;
+    nd_log.std_output.initialized = false;
+    nd_log.std_error.initialized = false;
+
+    nd_log_initialize_for_external_plugins(name);
 }
 

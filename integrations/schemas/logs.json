@@ -1,0 +1,97 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Netdata Logs integrations metadata.",
+    "oneOf": [
+        {
+            "$ref": "#/$defs/entry"
+        },
+        {
+            "type": "array",
+            "minLength": 1,
+            "items": {
+                "$ref": "#/$defs/entry"
+            }
+        }
+    ],
+    "$defs": {
+        "entry": {
+            "type": "object",
+            "description": "Data for a single logs integration.",
+            "properties": {
+                "id": {
+                    "$ref": "./shared.json#/$defs/id"
+                },
+                "meta": {
+                    "$ref": "./shared.json#/$defs/instance"
+                },
+                "keywords": {
+                    "$ref": "./shared.json#/$defs/keywords"
+                },
+                "overview": {
+                    "type": "object",
+                    "properties": {
+                        "description": {
+                            "type": "string",
+                            "description": "General description of what the integration does."
+                        },
+                        "visualization": {
+                            "type": "object",
+                            "properties": {
+                                "description": {
+                                    "type": "string",
+                                    "description": "How the user can access the data provided by the integration"
+                                }
+                            },
+                            "required": [
+                                "description"
+                            ]
+                        },
+                        "key_features": {
+                            "type": "object",
+                            "properties": {
+                                "description": {
+                                    "type": "string",
+                                    "description": "The key features of the integration."
+                                }
+                            },
+                            "required": [
+                                "description"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "description",
+                        "visualization",
+                        "key_features"
+                    ]
+                },
+                "setup": {
+                    "type": "object",
+                    "properties": {
+                        "prerequisites": {
+                            "type": "object",
+                            "properties": {
+                                "description": {
+                                    "type": "string",
+                                    "description": "Prerequisites of getting the integration working. For Log Functions only a Netdata account should be needed."
+                                }
+                            },
+                            "required": [
+                                "description"
+                            ]
+                        },
+                        "required": [
+                            "prerequisites"
+                        ]
+                    }
+                }
+            },
+            "required": [
+                "id",
+                "meta",
+                "keywords",
+                "overview"
+            ]
+        }
+    }
+}

@@ -601,7 +601,7 @@ static inline const char *rrdhost_dyncfg_status_to_string(RRDHOST_DYNCFG_STATUS 
     }
 }
 
-typedef struct rrdhost_status {
+typedef struct {
     RRDHOST *host;
     time_t now;
 

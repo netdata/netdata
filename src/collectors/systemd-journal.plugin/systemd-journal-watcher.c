@@ -245,7 +245,7 @@ void process_event(Watcher *watcher, int inotifyFd, struct inotify_event *event)
                    "JOURNAL WATCHER: Received unhandled event with mask %u for directory '%s'",
                    event->mask, fullPath);
     }
-    else if(len > sizeof(".journal") - 1 && strcmp(&event->name[len - (sizeof(".journal") - 1)], ".journal") == 0) {
+    else if(is_journal_file(event->name, (ssize_t)len, NULL)) {
         // It is a file that ends in .journal
         // add it to our pending list
         dictionary_set(watcher->pending, fullPath, NULL, 0);

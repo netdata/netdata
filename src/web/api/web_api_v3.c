@@ -201,7 +201,7 @@ static struct web_api_command api_commands_v3[] = {
         .hash = 0,
         .acl = HTTP_ACL_NOCHECK,
         .access = HTTP_ACCESS_NONE,
-        .callback = api_v2_claim,
+        .callback = api_v3_claim,
         .allow_subpaths = 0
     },
     {

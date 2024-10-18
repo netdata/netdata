@@ -74,7 +74,7 @@ static HANDLE CreateEventHandle(const char *msg)
 
     if (!h)
     {
-        netdata_service_log(msg);
+        netdata_service_log("%s", msg);
 
         if (!ReportSvcStatus(SERVICE_STOPPED, GetLastError(), 1000, 0))
         {

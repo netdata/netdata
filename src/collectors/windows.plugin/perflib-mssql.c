@@ -870,11 +870,12 @@ int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
     rrddim_set_by_pointer(mli->parent->st_deadLocks,
                           mli->rd_deadLocks,
                           (collected_number)mli->deadLocks.current.Data);
+
+    return 1;
 }
 
 static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_LOCKS]);
     if (!pObjectType) return;
 
@@ -1250,11 +1251,12 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     for (i = 0; transaction_chart[i]; i++) {
         transaction_chart[i](mli, db, *update_every);
     }
+
+    return 1;
 }
 
 static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, p->objectName[NETDATA_MSSQL_DATABASE]);
     if (!pObjectType) return;
 

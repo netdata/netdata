@@ -32,7 +32,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
 size_t aral_element_size(ARAL *ar);
 size_t aral_overhead(ARAL *ar);
 size_t aral_structures(ARAL *ar);
-struct aral_statistics *aral_statistics(ARAL *ar);
+struct aral_statistics *aral_get_statistics(ARAL *ar);
 size_t aral_structures_from_stats(struct aral_statistics *stats);
 size_t aral_overhead_from_stats(struct aral_statistics *stats);
 

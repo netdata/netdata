@@ -80,6 +80,11 @@ func (sc *Scanner) Scan() ([]*Chip, error) {
 				continue
 			}
 
+			// power average_max can be unknown (https://github.com/netdata/netdata/issues/18805)
+			if content == "unknown" && subfeat != "label" {
+				continue
+			}
+
 			if _, ok := rawSns[feat]; !ok {
 				rawSns[feat] = make(map[string]rawValue)
 			}

@@ -1411,7 +1411,7 @@ void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em)
     char *mem = { NETDATA_EBPF_STAT_DIMENSION_MEMORY };
     char *aral = { NETDATA_EBPF_STAT_DIMENSION_ARAL };
 
-    struct aral_statistics *stats = aral_statistics(memory);
+    struct aral_statistics *stats = aral_get_statistics(memory);
 
     ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, em->memory_usage, "");
     write_chart_dimension(mem, (long long)stats->structures.allocated_bytes);
