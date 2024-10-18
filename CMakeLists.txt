@@ -450,7 +450,8 @@ int main() {
 
 check_cxx_source_compiles("
 int main() {
-        __atomic_load_8(nullptr, 0);
+        int test;
+        __atomic_load_n(&test, 0);
         return 0;
 }
 " HAVE_BUILTIN_ATOMICS)

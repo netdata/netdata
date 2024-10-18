@@ -161,7 +161,7 @@ void rrd_functions_host_destroy(RRDHOST *host) {
 
 // ----------------------------------------------------------------------------
 
-static inline bool is_function_hidden(const char *name, const char *tags) {
+static inline bool is_function_restricted(const char *name, const char *tags) {
     return (name && name[0] == '_' && name[1] == '_') || (tags && strstr(tags, RRDFUNCTIONS_TAG_HIDDEN) != NULL);
 }
 
@@ -185,7 +185,7 @@ static inline RRD_FUNCTION_OPTIONS get_function_options(RRDSET *st, const char *
 
     RRD_FUNCTION_OPTIONS options = st ? RRD_FUNCTION_LOCAL : RRD_FUNCTION_GLOBAL;
 
-    return options | (is_function_hidden(name, tags) ? RRD_FUNCTION_HIDDEN : 0);
+    return options | (is_function_restricted(name, tags) ? RRD_FUNCTION_RESTRICTED : 0);
 }
 
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority,
@@ -283,11 +283,11 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
     if(!(*item)) {
         if(found)
             return rrd_call_function_error(wb,
-                                           "The collector that registered this function, is not currently running.",
+                                           "The plugin that registered this feature, is not currently running.",
                                            HTTP_RESP_SERVICE_UNAVAILABLE);
         else
             return rrd_call_function_error(wb,
-                                           "No collector is supplying this function on this host at this time.",
+                                           "This feature is not available on this host at this time.",
                                            HTTP_RESP_NOT_FOUND);
     }
 
