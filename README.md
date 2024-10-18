@@ -97,7 +97,7 @@ Netdata monitors all the following:
 |                                 **Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small> |               Full               |   Yes   |  Yes  |               Yes                |
 |                        **Hardware & Sensors**<small><br/>Fans, Temperatures, Controllers, GPUs, etc</small> |               Full               |  Some   | Some  |              Some                |
 |                                       **O/S Services**<small><br/>Resources, Performance and Status</small> | Yes<small><br/>`systemd`</small> |    -    |   -   |                -                 |
-|                                                                                                    **Logs** | Yes<small><br/>`systemd`-journal |    -    |   -   | Yes<small><br/>Windows Event Log, and<br/>Event Tracing for Windows</small> |
+|                                                                                                    **Logs** | Yes<small><br/>`systemd`-journal |    -    |   -   | Yes<small><br/>`Windows Event Log`, and<br/>`Event Tracing for Windows`</small> |
 |                                      **Processes**<small><br/>Resources, Performance, OOM, and more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
 |                                 **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |               Yes                |    -    |   -   |                -                 |
 |                               **Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small> |               Yes                |    -    |   -   |                -                 |
