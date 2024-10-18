@@ -1623,7 +1623,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                            update_every,
                            disk_labels_cb,
                            d);
-            }
         }
 
         if (do_dc_stats && d->do_ops == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
