@@ -41,6 +41,13 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     RRDSET *st = ctr->st;
     RRDHOST *host = st->rrdhost;
 
+    rd->dimension_id = __atomic_add_fetch(&host->accounting.dimension_count, 1, __ATOMIC_RELAXED);
+    spinlock_lock(&host->accounting.spinlock);
+    Pvoid_t *Pvalue = JudyLIns(&host->accounting.JudyL, rd->dimension_id, PJE0);
+    if (Pvalue)
+        *Pvalue = rd;
+    spinlock_unlock(&host->accounting.spinlock);
+
     rd->flags = RRDDIM_FLAG_NONE;
 
     rd->id = string_strdupz(ctr->id);
@@ -230,6 +237,10 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         else
             freez(rd->db.data);
     }
+
+    spinlock_lock(&host->accounting.spinlock);
+    (void) JudyLDel(&host->accounting.JudyL, rd->dimension_id, PJE0);
+    spinlock_unlock(&host->accounting.spinlock);
 
     string_freez(rd->id);
     string_freez(rd->name);
@@ -556,6 +567,12 @@ collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *
     rd->collector.collected_value = value;
     rrddim_set_updated(rd);
     rd->collector.counter++;
+
+//    spinlock_lock(&st->rrdhost->accounting.spinlock);
+//    Pvoid_t *Pvalue = JudyLIns(&st->rrdhost->accounting.JudySecL, (Word_t) collected_time.tv_sec, PJE0);
+//    if (Pvalue)
+//        *((int64_t *)Pvalue) = *((int64_t *)Pvalue) + 1;
+//    spinlock_unlock(&st->rrdhost->accounting.spinlock);
 
     collected_number v = (value >= 0) ? value : -value;
     if (unlikely(v > rd->collector.collected_value_max))
