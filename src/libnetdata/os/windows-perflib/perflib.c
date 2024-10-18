@@ -529,7 +529,7 @@ PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id) {
     char source[24];
     snprintfz(source, sizeof(source), "%u", id);
 
-    LPBYTE pData = (LPBYTE)getPerformanceData((id > 0) ? source : NULL);
+        LPBYTE pData = (LPBYTE)getPerformanceData((id > 0) ? source : NULL);
     if (!pData) return NULL;
 
     PERF_DATA_BLOCK *pDataBlock = getDataBlock(pData);
