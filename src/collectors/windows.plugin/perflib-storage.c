@@ -30,6 +30,10 @@ struct physical_disk {
     COUNTER_DATA diskReadBytesPerSec;
     COUNTER_DATA diskWriteBytesPerSec;
 
+    ND_DISK_OPS disk_ops;
+    COUNTER_DATA diskReadsPerSec;
+    COUNTER_DATA diskWritesPerSec;
+
     COUNTER_DATA percentIdleTime;
     COUNTER_DATA percentDiskTime;
     COUNTER_DATA percentDiskReadTime;
@@ -42,8 +46,6 @@ struct physical_disk {
     COUNTER_DATA averageDiskSecondsPerRead;
     COUNTER_DATA averageDiskSecondsPerWrite;
     COUNTER_DATA diskTransfersPerSec;
-    COUNTER_DATA diskReadsPerSec;
-    COUNTER_DATA diskWritesPerSec;
     COUNTER_DATA diskBytesPerSec;
     COUNTER_DATA averageDiskBytesPerTransfer;
     COUNTER_DATA averageDiskBytesPerRead;
@@ -214,6 +216,11 @@ static void physical_disk_labels(RRDSET *st, void *data) {
         rrdlabels_add(st->rrdlabels, "mount_point", string2str(d->mount_point), RRDLABEL_SRC_AUTO);
 }
 
+static bool str_is_numeric(const char *s) {
+    while(*s) if(!isdigit((uint8_t)*s++)) return false;
+    return true;
+}
+
 static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     DICTIONARY *dict = physicalDisks;
 
@@ -230,12 +237,7 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
             strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
 
         char *device = windows_shared_buffer;
-        char *mount_point = NULL;
-
-        if((mount_point = strchr(device, ' '))) {
-            *mount_point = '\0';
-            mount_point++;
-        }
+        char mount_point[128]; mount_point[0] = '\0';
 
         struct physical_disk *d;
         bool is_system;
@@ -244,6 +246,18 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
             is_system = true;
         }
         else {
+            char *space;
+            if((space = strchr(windows_shared_buffer, ' '))) {
+                *space++ = '\0';
+                strncpyz(mount_point, space, sizeof(mount_point) - 1);
+            }
+
+            if(str_is_numeric(windows_shared_buffer)) {
+                uint64_t n = str2ull(device, NULL);
+                snprintfz(windows_shared_buffer, sizeof(windows_shared_buffer), "Disk %" PRIu64, n);
+                device = windows_shared_buffer;
+            }
+
             d = dictionary_set(dict, device, NULL, sizeof(*d));
             is_system = false;
         }
@@ -271,6 +285,21 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                     d);
         }
 
+        if (!is_system &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskReadsPerSec) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskWritesPerSec)) {
+
+            common_disk_ops(
+                    &d->disk_ops,
+                    device,
+                    NULL,
+                    d->diskReadBytesPerSec.current.Data,
+                    d->diskWriteBytesPerSec.current.Data,
+                    update_every,
+                    physical_disk_labels,
+                    d);
+        }
+
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime);
@@ -283,8 +312,6 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerWrite);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskTransfersPerSec);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskReadsPerSec);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskWritesPerSec);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskBytesPerSec);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerTransfer);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerRead);
