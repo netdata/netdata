@@ -844,10 +844,10 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
     else
         SQLITE_BIND_FAIL(done, sqlite3_bind_null(res, ++param));
 
+    char repeat[255];
     if (!ap->config.has_custom_repeat_config)
         SQLITE_BIND_FAIL(done, sqlite3_bind_null(res, ++param));
     else {
-        char repeat[255];
         snprintfz(repeat, sizeof(repeat) - 1, "warning %us critical %us", ap->config.warn_repeat_every, ap->config.crit_repeat_every);
         SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, repeat, -1, SQLITE_STATIC));
     }
