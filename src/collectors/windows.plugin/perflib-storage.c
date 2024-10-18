@@ -35,9 +35,11 @@ struct physical_disk {
     COUNTER_DATA diskWritesPerSec;
 
     ND_DISK_UTIL disk_util;
-    COUNTER_DATA percentIdleTime;
-
+    // COUNTER_DATA percentIdleTime;
     COUNTER_DATA percentDiskTime;
+
+    ND_DISK_BUSY disk_busy;
+
     COUNTER_DATA percentDiskReadTime;
     COUNTER_DATA percentDiskWriteTime;
     COUNTER_DATA currentDiskQueueLength;
@@ -67,7 +69,7 @@ void dict_logical_disk_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, voi
 }
 
 void initialize_physical_disk(struct physical_disk *pd) {
-    pd->percentIdleTime.key = "% Idle Time";
+    // pd->percentIdleTime.key = "% Idle Time";
     pd->percentDiskTime.key = "% Disk Time";
     pd->percentDiskReadTime.key = "% Disk Read Time";
     pd->percentDiskWriteTime.key = "% Disk Write Time";
@@ -306,27 +308,37 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                     d);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime)) {
-            if(d->percentIdleTime.previous.Data && d->percentIdleTime.previous.Time) {
-                collected_number idle_percentage =
-                        100 * (d->percentIdleTime.current.Data - d->percentIdleTime.previous.Data)
-                        / (d->percentIdleTime.current.Time - d->percentIdleTime.previous.Time);
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime)) {
+            if(d->percentDiskTime.previous.Data && d->percentDiskTime.previous.Time) {
+                collected_number busy_percentage =
+                        100 * (d->percentDiskTime.current.Data - d->percentDiskTime.previous.Data)
+                        / (d->percentDiskTime.current.Time - d->percentDiskTime.previous.Time);
 
-                if (idle_percentage > 100) idle_percentage = 100;
-                collected_number disk_utilization = 100 - idle_percentage;
+                collected_number busy_ms = busy_percentage * MSEC_PER_SEC;
+
+                if (busy_percentage > 100)
+                    busy_percentage = 100;
 
                 common_disk_util(
                         &d->disk_util,
                         device,
                         NULL,
-                        disk_utilization,
+                        busy_percentage,
+                        update_every,
+                        physical_disk_labels,
+                        d);
+
+                common_disk_busy(
+                        &d->disk_busy,
+                        device,
+                        NULL,
+                        busy_ms,
                         update_every,
                         physical_disk_labels,
                         d);
             }
         }
 
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskWriteTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->currentDiskQueueLength);

@@ -10,7 +10,7 @@ typedef struct {
     RRDDIM *rd_util;
 } ND_DISK_UTIL;
 
-static inline void common_disk_util(ND_DISK_UTIL *d, const char *id, const char *name, uint8_t percent, int update_every, instance_labels_cb_t cb, void *data) {
+static inline void common_disk_util(ND_DISK_UTIL *d, const char *id, const char *name, uint64_t percent, int update_every, instance_labels_cb_t cb, void *data) {
     if(unlikely(!d->st_util)) {
         d->st_util = rrdset_create_localhost(
                 "disk_util"
