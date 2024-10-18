@@ -34,7 +34,9 @@ struct physical_disk {
     COUNTER_DATA diskReadsPerSec;
     COUNTER_DATA diskWritesPerSec;
 
+    ND_DISK_UTIL disk_util;
     COUNTER_DATA percentIdleTime;
+
     COUNTER_DATA percentDiskTime;
     COUNTER_DATA percentDiskReadTime;
     COUNTER_DATA percentDiskWriteTime;
@@ -272,7 +274,10 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskReadBytesPerSec) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskWriteBytesPerSec)) {
             if(is_system)
-                common_system_io(d->diskReadBytesPerSec.current.Data, d->diskWriteBytesPerSec.current.Data, update_every);
+                common_system_io(
+                        d->diskReadBytesPerSec.current.Data,
+                        d->diskWriteBytesPerSec.current.Data,
+                        update_every);
             else
                 common_disk_io(
                     &d->disk_io,
@@ -285,8 +290,9 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                     d);
         }
 
-        if (!is_system &&
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskReadsPerSec) &&
+        if(is_system) continue;
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskReadsPerSec) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskWritesPerSec)) {
 
             common_disk_ops(
@@ -300,7 +306,26 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                     d);
         }
 
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime);
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime)) {
+            if(d->percentIdleTime.previous.Data && d->percentIdleTime.previous.Time) {
+                collected_number idle_percentage =
+                        100 * (d->percentIdleTime.current.Data - d->percentIdleTime.previous.Data)
+                        / (d->percentIdleTime.current.Time - d->percentIdleTime.previous.Time);
+
+                if (idle_percentage > 100) idle_percentage = 100;
+                collected_number disk_utilization = 100 - idle_percentage;
+
+                common_disk_util(
+                        &d->disk_util,
+                        device,
+                        NULL,
+                        disk_utilization,
+                        update_every,
+                        physical_disk_labels,
+                        d);
+            }
+        }
+
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskWriteTime);

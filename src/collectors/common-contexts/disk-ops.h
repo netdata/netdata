@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef NETDATA_DISK_OPS_H
 #define NETDATA_DISK_OPS_H

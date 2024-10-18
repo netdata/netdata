@@ -82,6 +82,7 @@ static struct disk {
 
     ND_DISK_IO disk_io;
     ND_DISK_OPS disk_ops;
+    ND_DISK_UTIL disk_util;
 
     RRDSET *st_ext_io;
     RRDDIM *rd_io_discards;
@@ -1743,35 +1744,18 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             last_busy_ms = rrddim_set_by_pointer(d->st_busy, d->rd_busy_busy, busy_ms);
             rrdset_done(d->st_busy);
 
-            if(unlikely(!d->st_util)) {
-                d->st_util = rrdset_create_localhost(
-                        "disk_util"
-                        , d->chart_id
-                        , d->disk
-                        , family
-                        , "disk.util"
-                        , "Disk Utilization Time"
-                        , "% of time working"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
-                        , NETDATA_CHART_PRIO_DISK_UTIL
-                        , update_every
-                        , RRDSET_TYPE_AREA
-                );
-
-                rrdset_flag_set(d->st_util, RRDSET_FLAG_DETAIL);
-
-                d->rd_util_utilization = rrddim_add(d->st_util, "utilization", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-                add_labels_to_disk(d, d->st_util);
-            }
-
             collected_number disk_utilization = (busy_ms - last_busy_ms) / (10 * update_every);
             if (disk_utilization > 100)
                 disk_utilization = 100;
 
-            rrddim_set_by_pointer(d->st_util, d->rd_util_utilization, disk_utilization);
-            rrdset_done(d->st_util);
+            common_disk_util(&d->disk_util,
+                             d->chart_id,
+                             d->disk,
+                             disk_utilization,
+                             update_every,
+                             disk_labels_cb,
+                             d);
+
         }
 
         if (d->do_mops == CONFIG_BOOLEAN_YES || d->do_mops == CONFIG_BOOLEAN_AUTO) {
