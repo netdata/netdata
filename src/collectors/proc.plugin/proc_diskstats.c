@@ -1292,7 +1292,6 @@ static void diskstats_cleanup_disks() {
             rrdset_obsolete_and_pointer_null(d->st_ext_iotime);
             rrdset_obsolete_and_pointer_null(d->st_mops);
             rrdset_obsolete_and_pointer_null(d->st_ext_mops);
-            rrdset_obsolete_and_pointer_null(d->disk_ops.st_ops);
             rrdset_obsolete_and_pointer_null(d->st_ext_ops);
             rrdset_obsolete_and_pointer_null(d->st_svctm);
             rrdset_obsolete_and_pointer_null(d->st_bcache);
