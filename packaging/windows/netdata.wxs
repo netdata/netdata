@@ -20,6 +20,12 @@
         <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Netdata is installed and running now! Enjoy real-time performance and health monitoring..." />
         <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"  Value="Launch MSYS2 terminal." />
 
+		<Property Id="TOKEN" Value="#" />
+		<Property Id="ROOMS" Value="#" />
+		<Property Id="INSECURE" Value="no" />
+		<Property Id="PROXY" Value="#" />
+		<Property Id="URL" Value="https://app.netdata.cloud" />
+
         <Feature Id="Main">
             <ComponentGroupRef Id="NetdataComponents" />
             <ComponentGroupRef Id="WevtComponents" />
