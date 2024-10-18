@@ -43,11 +43,14 @@ typedef struct _rawdata {
 typedef struct _counterdata {
     DWORD id;
     bool updated;
+    uint8_t failures;           // counts the number of failures to find this key
     const char *key;
     DWORD OverwriteCounterType; // if set, the counter type will be overwritten once read
     RAW_DATA current;
     RAW_DATA previous;
 } COUNTER_DATA;
+
+#define PERFLIB_MAX_FAILURES_TO_FIND_METRIC 10
 
 #define RAW_DATA_EMPTY (RAW_DATA){ 0 }
 

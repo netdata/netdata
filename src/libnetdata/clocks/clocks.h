@@ -77,6 +77,8 @@ typedef struct heartbeat {
 #define MSEC_PER_SEC    1000ULL
 #endif
 
+#define NS100_PER_MS    10000ULL
+
 #define USEC_PER_MS     1000ULL
 
 #ifndef HAVE_CLOCK_GETTIME
