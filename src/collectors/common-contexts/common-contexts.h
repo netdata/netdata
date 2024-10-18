@@ -30,5 +30,6 @@ typedef void (*instance_labels_cb_t)(RRDSET *st, void *data);
 #include "disk-ops.h"
 #include "disk-util.h"
 #include "disk-busy.h"
+#include "disk-iotime.h"
 
 #endif //NETDATA_COMMON_CONTEXTS_H

@@ -84,6 +84,7 @@ static struct disk {
     ND_DISK_OPS disk_ops;
     ND_DISK_UTIL disk_util;
     ND_DISK_BUSY disk_busy;
+    ND_DISK_IOTIME disk_iotime;
 
     RRDSET *st_ext_io;
     RRDDIM *rd_io_discards;
@@ -1808,33 +1809,18 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if (d->do_iotime == CONFIG_BOOLEAN_YES || d->do_iotime == CONFIG_BOOLEAN_AUTO) {
             d->do_iotime = CONFIG_BOOLEAN_YES;
 
-            if(unlikely(!d->st_iotime)) {
-                d->st_iotime = rrdset_create_localhost(
-                        "disk_iotime"
-                        , d->chart_id
-                        , d->disk
-                        , family
-                        , "disk.iotime"
-                        , "Disk Total I/O Time"
-                        , "milliseconds/s"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
-                        , NETDATA_CHART_PRIO_DISK_IOTIME
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                );
+            last_readms  = d->disk_iotime.rd_reads_ms ? d->disk_iotime.rd_reads_ms->collector.last_collected_value : 0;
+            last_writems = d->disk_iotime.rd_writes_ms ? d->disk_iotime.rd_writes_ms->collector.last_collected_value : 0;
 
-                rrdset_flag_set(d->st_iotime, RRDSET_FLAG_DETAIL);
-
-                d->rd_iotime_reads  = rrddim_add(d->st_iotime, "reads",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                d->rd_iotime_writes = rrddim_add(d->st_iotime, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-                add_labels_to_disk(d, d->st_iotime);
-            }
-
-            last_readms  = rrddim_set_by_pointer(d->st_iotime, d->rd_iotime_reads, readms);
-            last_writems = rrddim_set_by_pointer(d->st_iotime, d->rd_iotime_writes, writems);
-            rrdset_done(d->st_iotime);
+            common_disk_iotime(
+                    &d->disk_iotime,
+                    d->chart_id,
+                    d->disk,
+                    readms,
+                    writems,
+                    update_every,
+                    disk_labels_cb,
+                    d);
         }
 
         if(do_dc_stats && d->do_iotime == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {

@@ -35,13 +35,15 @@ struct physical_disk {
     COUNTER_DATA diskWritesPerSec;
 
     ND_DISK_UTIL disk_util;
-    // COUNTER_DATA percentIdleTime;
-    COUNTER_DATA percentDiskTime;
+    COUNTER_DATA percentIdleTime;
 
     ND_DISK_BUSY disk_busy;
+    COUNTER_DATA percentDiskTime;
 
+    ND_DISK_IOTIME disk_iotime;
     COUNTER_DATA percentDiskReadTime;
     COUNTER_DATA percentDiskWriteTime;
+
     COUNTER_DATA currentDiskQueueLength;
     COUNTER_DATA averageDiskQueueLength;
     COUNTER_DATA averageDiskReadQueueLength;
@@ -308,39 +310,51 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                     d);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime)) {
-            if(d->percentDiskTime.previous.Data && d->percentDiskTime.previous.Time) {
-                collected_number busy_percentage =
-                        100 * (d->percentDiskTime.current.Data - d->percentDiskTime.previous.Data)
-                        / (d->percentDiskTime.current.Time - d->percentDiskTime.previous.Time);
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime)) {
+            if (d->percentIdleTime.previous.Data && d->percentIdleTime.previous.Time) {
+                collected_number idle_percentage =
+                        100 * (d->percentIdleTime.current.Data - d->percentIdleTime.previous.Data)
+                        / (d->percentIdleTime.current.Time - d->percentIdleTime.previous.Time);
 
-                collected_number busy_ms = busy_percentage * MSEC_PER_SEC;
-
-                if (busy_percentage > 100)
-                    busy_percentage = 100;
+                if (idle_percentage > 100)
+                    idle_percentage = 100;
 
                 common_disk_util(
                         &d->disk_util,
                         device,
                         NULL,
-                        busy_percentage,
-                        update_every,
-                        physical_disk_labels,
-                        d);
-
-                common_disk_busy(
-                        &d->disk_busy,
-                        device,
-                        NULL,
-                        busy_ms,
+                        100 - idle_percentage,
                         update_every,
                         physical_disk_labels,
                         d);
             }
         }
 
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskWriteTime);
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime)) {
+            common_disk_busy(
+                    &d->disk_busy,
+                    device,
+                    NULL,
+                    d->percentDiskTime.current.Data / NS100_PER_MS,
+                    update_every,
+                    physical_disk_labels,
+                    d);
+        }
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskWriteTime)) {
+
+            common_disk_iotime(
+                    &d->disk_iotime,
+                    device,
+                    NULL,
+                    d->percentDiskReadTime.current.Data / NS100_PER_MS,
+                    d->percentDiskWriteTime.current.Data / NS100_PER_MS,
+                    update_every,
+                    physical_disk_labels,
+                    d);
+        }
+
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->currentDiskQueueLength);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskQueueLength);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskReadQueueLength);
