@@ -84,7 +84,7 @@ static void execute_commands_function(struct sender_state *s, const char *comman
 
         if(code != HTTP_RESP_OK) {
             if (!buffer_strlen(wb))
-                rrd_call_function_error(wb, "Failed to route request to collector", code);
+                rrd_call_function_error(wb, "Failed to route this request to the plugin that offered it.", code);
         }
     }
 }

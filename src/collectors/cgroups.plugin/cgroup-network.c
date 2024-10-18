@@ -3,6 +3,8 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+SPAWN_SERVER *spawn_server = NULL;
+
 char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
 char env_netdata_log_method[FILENAME_MAX + 50] = "";
 char env_netdata_log_format[FILENAME_MAX + 50] = "";
@@ -42,7 +44,7 @@ unsigned int read_iface_iflink(const char *prefix, const char *iface) {
 
     unsigned long long iflink = 0;
     int ret = read_single_number_file(filename, &iflink);
-    if(ret) collector_error("Cannot read '%s'.", filename);
+    if(ret) nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot read '%s'.", filename);
 
     return (unsigned int)iflink;
 }
@@ -55,7 +57,7 @@ unsigned int read_iface_ifindex(const char *prefix, const char *iface) {
 
     unsigned long long ifindex = 0;
     int ret = read_single_number_file(filename, &ifindex);
-    if(ret) collector_error("Cannot read '%s'.", filename);
+    if(ret) nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot read '%s'.", filename);
 
     return (unsigned int)ifindex;
 }
@@ -68,19 +70,15 @@ struct iface *read_proc_net_dev(const char *scope __maybe_unused, const char *pr
 
     snprintfz(filename, FILENAME_MAX, "%s%s", prefix, (*prefix)?"/proc/1/net/dev":"/proc/net/dev");
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    collector_info("parsing '%s'", filename);
-#endif
-
     ff = procfile_open(filename, " \t,:|", PROCFILE_FLAG_DEFAULT);
     if(unlikely(!ff)) {
-        collector_error("Cannot open file '%s'", filename);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open file '%s'", filename);
         return NULL;
     }
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) {
-        collector_error("Cannot read file '%s'", filename);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot read file '%s'", filename);
         return NULL;
     }
 
@@ -97,9 +95,7 @@ struct iface *read_proc_net_dev(const char *scope __maybe_unused, const char *pr
         t->next = root;
         root = t;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-        collector_info("added %s interface '%s', ifindex %u, iflink %u", scope, t->device, t->ifindex, t->iflink);
-#endif
+        nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "added %s interface '%s', ifindex %u, iflink %u", scope, t->device, t->ifindex, t->iflink);
     }
 
     procfile_close(ff);
@@ -143,12 +139,16 @@ static void continue_as_child(void) {
     int status;
     pid_t ret;
 
-    if (child < 0)
-        collector_error("fork() failed");
+    if (child < 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "fork() failed");
+        exit(1);
+    }
 
-    if (child == 0)
+    if (child == 0) {
         // the child returns
+        gettid_uncached();
         return;
+    }
 
     // here is the parent
     for (;;) {
@@ -160,7 +160,6 @@ static void continue_as_child(void) {
         } else {
             break;
         }
-
         tinysleep();
     }
 
@@ -187,6 +186,7 @@ static void continue_as_child(void) {
      *
      */
 
+    nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "sanitizers detected, killing myself to avoid lockup");
     kill(getpid(), SIGKILL);
 #endif
 
@@ -207,7 +207,7 @@ int proc_pid_fd(const char *prefix, const char *ns, pid_t pid) {
     int fd = open(filename, O_RDONLY | O_CLOEXEC);
 
     if(fd == -1)
-        collector_error("Cannot open proc_pid_fd() file '%s'", filename);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open proc_pid_fd() file '%s'", filename);
 
     return fd;
 }
@@ -231,10 +231,8 @@ static struct ns {
         { .nstype = 0,               .fd = -1, .status = -1, .name = NULL,      .path = NULL        }
 };
 
-int switch_namespace(const char *prefix, pid_t pid) {
-
+static int switch_namespace(const char *prefix, pid_t pid) {
 #ifdef HAVE_SETNS
-
     int i;
     for(i = 0; all_ns[i].name ; i++)
         all_ns[i].fd = proc_pid_fd(prefix, all_ns[i].path, pid);
@@ -257,7 +255,9 @@ int switch_namespace(const char *prefix, pid_t pid) {
                 if(setns(all_ns[i].fd, all_ns[i].nstype) == -1) {
                     if(pass == 1) {
                         all_ns[i].status = 0;
-                        collector_error("Cannot switch to %s namespace of pid %d", all_ns[i].name, (int) pid);
+                        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                               "Cannot switch to %s namespace of pid %d",
+                               all_ns[i].name, (int) pid);
                     }
                 }
                 else
@@ -266,21 +266,22 @@ int switch_namespace(const char *prefix, pid_t pid) {
         }
     }
 
+    gettid_uncached();
     setgroups(0, NULL);
 
     if(root_fd != -1) {
         if(fchdir(root_fd) < 0)
-            collector_error("Cannot fchdir() to pid %d root directory", (int)pid);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot fchdir() to pid %d root directory", (int)pid);
 
         if(chroot(".") < 0)
-            collector_error("Cannot chroot() to pid %d root directory", (int)pid);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot chroot() to pid %d root directory", (int)pid);
 
         close(root_fd);
     }
 
     if(cwd_fd != -1) {
         if(fchdir(cwd_fd) < 0)
-            collector_error("Cannot fchdir() to pid %d current working directory", (int)pid);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot fchdir() to pid %d current working directory", (int)pid);
 
         close(cwd_fd);
     }
@@ -304,9 +305,8 @@ int switch_namespace(const char *prefix, pid_t pid) {
 #else
 
     errno = ENOSYS;
-    collector_error("setns() is missing on this system.");
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "setns() is missing on this system.");
     return 1;
-
 #endif
 }
 
@@ -314,13 +314,13 @@ pid_t read_pid_from_cgroup_file(const char *filename) {
     int fd = open(filename, procfile_open_flags);
     if(fd == -1) {
         if (errno != ENOENT)
-            collector_error("Cannot open pid_from_cgroup() file '%s'.", filename);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open pid_from_cgroup() file '%s'.", filename);
         return 0;
     }
 
     FILE *fp = fdopen(fd, "r");
     if(!fp) {
-        collector_error("Cannot upgrade fd to fp for file '%s'.", filename);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot upgrade fd to fp for file '%s'.", filename);
         return 0;
     }
 
@@ -335,9 +335,8 @@ pid_t read_pid_from_cgroup_file(const char *filename) {
 
     fclose(fp);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(pid > 0) collector_info("found pid %d on file '%s'", pid, filename);
-#endif
+    if(pid > 0)
+        nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "found pid %d on file '%s'", pid, filename);
 
     return pid;
 }
@@ -359,7 +358,7 @@ pid_t read_pid_from_cgroup(const char *path) {
 
     DIR *dir = opendir(path);
     if (!dir) {
-        collector_error("cannot read directory '%s'", path);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "cannot read directory '%s'", path);
         return 0;
     }
 
@@ -396,9 +395,8 @@ struct found_device {
 } *detected_devices = NULL;
 
 void add_device(const char *host, const char *guest) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    collector_info("adding device with host '%s', guest '%s'", host, guest);
-#endif
+    errno_clear();
+    nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "adding device with host '%s', guest '%s'", host, guest);
 
     uint32_t hash = simple_hash(host);
 
@@ -450,36 +448,34 @@ void detect_veth_interfaces(pid_t pid) {
     host = read_proc_net_dev("host", netdata_configured_host_prefix);
     if(!host) {
         errno_clear();
-        collector_error("cannot read host interface list.");
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "no host interface list.");
         goto cleanup;
     }
 
     if(!eligible_ifaces(host)) {
         errno_clear();
-        collector_info("there are no double-linked host interfaces available.");
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "no double-linked host interfaces available.");
         goto cleanup;
     }
 
     if(switch_namespace(netdata_configured_host_prefix, pid)) {
         errno_clear();
-        collector_error("cannot switch to the namespace of pid %u", (unsigned int) pid);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "cannot switch to the namespace of pid %u", (unsigned int) pid);
         goto cleanup;
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    collector_info("switched to namespaces of pid %d", pid);
-#endif
+    nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "switched to namespaces of pid %d", pid);
 
     cgroup = read_proc_net_dev("cgroup", NULL);
     if(!cgroup) {
         errno_clear();
-        collector_error("cannot read cgroup interface list.");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "cannot read cgroup interface list.");
         goto cleanup;
     }
 
     if(!eligible_ifaces(cgroup)) {
         errno_clear();
-        collector_error("there are not double-linked cgroup interfaces available.");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "there are not double-linked cgroup interfaces available.");
         goto cleanup;
     }
 
@@ -506,15 +502,71 @@ void detect_veth_interfaces(pid_t pid) {
         if(iface_is_eligible(h)) {
             for (c = cgroup; c; c = c->next) {
                 if(iface_is_eligible(c) && h->ifindex == c->iflink && h->iflink == c->ifindex) {
-                    add_device(h->device, c->device);
+                    printf("%s %s\n", h->device, c->device);
+                    // add_device(h->device, c->device);
                 }
             }
         }
     }
 
+    printf("EXIT DONE\n");
+    fflush(stdout);
+
 cleanup:
     free_host_ifaces(cgroup);
     free_host_ifaces(host);
+}
+
+struct send_to_spawned_process {
+    pid_t pid;
+    char host_prefix[FILENAME_MAX];
+};
+
+
+static int spawn_callback(SPAWN_REQUEST *request) {
+    const struct send_to_spawned_process *d = request->data;
+    detect_veth_interfaces(d->pid);
+    return 0;
+}
+
+#define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
+static void read_from_spawned(SPAWN_INSTANCE *si, const char *name __maybe_unused) {
+    char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
+    char *s;
+    FILE *fp = fdopen(spawn_server_instance_read_fd(si), "r");
+    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
+        trim(s);
+
+        if(*s && *s != '\n') {
+            char *t = s;
+            while(*t && *t != ' ') t++;
+            if(*t == ' ') {
+                *t = '\0';
+                t++;
+            }
+
+            if(strcmp(s, "EXIT") == 0)
+                break;
+
+            if(!*s || !*t) continue;
+            add_device(s, t);
+        }
+    }
+    fclose(fp);
+    spawn_server_instance_read_fd_unset(si);
+    spawn_server_exec_kill(spawn_server, si);
+}
+
+void detect_veth_interfaces_spawn(pid_t pid) {
+    struct send_to_spawned_process d = {
+        .pid = pid,
+    };
+    strncpyz(d.host_prefix, netdata_configured_host_prefix, sizeof(d.host_prefix) - 1);
+    SPAWN_INSTANCE *si = spawn_server_exec(spawn_server, STDERR_FILENO, 0, NULL, &d, sizeof(d), SPAWN_INSTANCE_TYPE_CALLBACK);
+    if(si)
+        read_from_spawned(si, "switch namespace callback");
+    else
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "cgroup-network cannot spawn switch namespace callback");
 }
 
 // ----------------------------------------------------------------------------
@@ -528,41 +580,35 @@ void call_the_helper(pid_t pid, const char *cgroup) {
     else
         snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec " PLUGINS_DIR "/cgroup-network-helper.sh --pid %d", pid);
 
-    collector_info("running: %s", command);
+    nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "running: %s", command);
 
-    POPEN_INSTANCE *pi;
+    SPAWN_INSTANCE *si;
 
-    if(cgroup)
-        pi = spawn_popen_run_variadic(PLUGINS_DIR "/cgroup-network-helper.sh", "--cgroup", cgroup, NULL);
+    if(cgroup) {
+        const char *argv[] = {
+            PLUGINS_DIR "/cgroup-network-helper.sh",
+            "--cgroup",
+            cgroup,
+            NULL,
+        };
+        si = spawn_server_exec(spawn_server, nd_log_collectors_fd(), 0, argv, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
+    }
     else {
         char buffer[100];
         snprintfz(buffer, sizeof(buffer) - 1, "%d", pid);
-        pi = spawn_popen_run_variadic(PLUGINS_DIR "/cgroup-network-helper.sh", "--pid", buffer, NULL);
+        const char *argv[] = {
+            PLUGINS_DIR "/cgroup-network-helper.sh",
+            "--pid",
+            buffer,
+            NULL,
+        };
+        si = spawn_server_exec(spawn_server, nd_log_collectors_fd(), 0, argv, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
     }
 
-    if(pi) {
-        char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
-        char *s;
-        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, spawn_popen_stdout(pi)))) {
-            trim(s);
-
-            if(*s && *s != '\n') {
-                char *t = s;
-                while(*t && *t != ' ') t++;
-                if(*t == ' ') {
-                    *t = '\0';
-                    t++;
-                }
-
-                if(!*s || !*t) continue;
-                add_device(s, t);
-            }
-        }
-
-        spawn_popen_kill(pi);
-    }
+    if(si)
+        read_from_spawned(si, command);
     else
-        collector_error("cannot execute cgroup-network helper script: %s", command);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "cannot execute cgroup-network helper script: %s", command);
 }
 
 int is_valid_path_symbol(char c) {
@@ -593,33 +639,33 @@ int verify_path(const char *path) {
     const char *s = path;
     while((c = *s++)) {
         if(!( isalnum(c) || is_valid_path_symbol(c) )) {
-            collector_error("invalid character in path '%s'", path);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "invalid character in path '%s'", path);
             return -1;
         }
     }
 
     if(strstr(path, "\\") && !strstr(path, "\\x")) {
-        collector_error("invalid escape sequence in path '%s'", path);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "invalid escape sequence in path '%s'", path);
         return 1;
     }
 
     if(strstr(path, "/../")) {
-        collector_error("invalid parent path sequence detected in '%s'", path);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "invalid parent path sequence detected in '%s'", path);
         return 1;
     }
 
     if(path[0] != '/') {
-        collector_error("only absolute path names are supported - invalid path '%s'", path);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "only absolute path names are supported - invalid path '%s'", path);
         return -1;
     }
 
     if (stat(path, &sb) == -1) {
-        collector_error("cannot stat() path '%s'", path);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "cannot stat() path '%s'", path);
         return -1;
     }
 
     if((sb.st_mode & S_IFMT) != S_IFDIR) {
-        collector_error("path '%s' is not a directory", path);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "path '%s' is not a directory", path);
         return -1;
     }
 
@@ -641,10 +687,10 @@ char *fix_path_variable(void) {
         char *s = strsep(&ptr, ":");
         if(s && *s) {
             if(verify_path(s) == -1) {
-                collector_error("the PATH variable includes an invalid path '%s' - removed it.", s);
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "the PATH variable includes an invalid path '%s' - removed it.", s);
             }
             else {
-                collector_info("the PATH variable includes a valid path '%s'.", s);
+                nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "the PATH variable includes a valid path '%s'.", s);
                 if(added) strcat(safe_path, ":");
                 strcat(safe_path, s);
                 added++;
@@ -652,8 +698,8 @@ char *fix_path_variable(void) {
         }
     }
 
-    collector_info("unsafe PATH:      '%s'.", path);
-    collector_info("  safe PATH: '%s'.", safe_path);
+    nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "unsafe PATH:      '%s'.", path);
+    nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "  safe PATH: '%s'.", safe_path);
 
     freez(p);
     return safe_path;
@@ -677,7 +723,7 @@ int main(int argc, const char **argv) {
         collector_error("setresuid(0, 0, 0) failed.");
 
     nd_log_initialize_for_external_plugins("cgroup-network");
-    netdata_main_spawn_server_init(NULL, argc, argv);
+    spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC | SPAWN_SERVER_OPTION_CALLBACK, NULL, spawn_callback, argc, argv);
 
     // since cgroup-network runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
@@ -730,7 +776,7 @@ int main(int argc, const char **argv) {
 
         if(pid <= 0) {
             errno_clear();
-            collector_error("Invalid pid %d given", (int) pid);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Invalid pid %d given", (int) pid);
             return 2;
         }
 
@@ -739,7 +785,7 @@ int main(int argc, const char **argv) {
     else if(!strcmp(argv[arg], "--cgroup")) {
         const char *cgroup = argv[arg+1];
         if(verify_path(cgroup) == -1) {
-            collector_error("cgroup '%s' does not exist or is not valid.", cgroup);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "cgroup '%s' does not exist or is not valid.", cgroup);
             return 1;
         }
 
@@ -748,16 +794,19 @@ int main(int argc, const char **argv) {
 
         if(pid <= 0 && !detected_devices) {
             errno_clear();
-            collector_error("Cannot find a cgroup PID from cgroup '%s'", cgroup);
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot find a cgroup PID from cgroup '%s'", cgroup);
         }
     }
     else
         usage();
 
     if(pid > 0)
-        detect_veth_interfaces(pid);
+        detect_veth_interfaces_spawn(pid);
 
     int found = send_devices();
+
+    spawn_server_destroy(spawn_server);
+
     if(found <= 0) return 1;
     return 0;
 }

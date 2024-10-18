@@ -39,6 +39,7 @@ typedef struct spawn_server SPAWN_SERVER;
 
 SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name, spawn_request_callback_t child_callback, int argc, const char **argv);
 void spawn_server_destroy(SPAWN_SERVER *server);
+pid_t spawn_server_pid(SPAWN_SERVER *server);
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type);
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si);

@@ -60,7 +60,7 @@ static void functions2json(DICTIONARY *functions, BUFFER *wb) {
     struct rrd_host_function *t;
     dfe_start_read(functions, t) {
         if (!rrd_collector_running(t->collector)) continue;
-        if(t->options & (RRD_FUNCTION_DYNCFG|RRD_FUNCTION_HIDDEN)) continue;
+        if(t->options & (RRD_FUNCTION_DYNCFG| RRD_FUNCTION_RESTRICTED)) continue;
 
         buffer_json_member_add_object(wb, t_dfe.name);
         {
@@ -99,7 +99,7 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
     struct rrd_host_function *t;
     dfe_start_read(host->functions, t) {
         if(!rrd_collector_running(t->collector)) continue;
-        if(t->options & (RRD_FUNCTION_DYNCFG|RRD_FUNCTION_HIDDEN)) continue;
+        if(t->options & (RRD_FUNCTION_DYNCFG| RRD_FUNCTION_RESTRICTED)) continue;
 
         buffer_json_member_add_object(wb, t_dfe.name);
         {
@@ -130,7 +130,7 @@ void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst,
     struct rrd_host_function *t;
     dfe_start_read(rrdset_functions_view, t) {
         if(!rrd_collector_running(t->collector)) continue;
-        if(t->options & (RRD_FUNCTION_DYNCFG|RRD_FUNCTION_HIDDEN)) continue;
+        if(t->options & (RRD_FUNCTION_DYNCFG| RRD_FUNCTION_RESTRICTED)) continue;
 
         dictionary_set(dst, t_dfe.name, value, value_size);
     }
@@ -144,7 +144,7 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
     struct rrd_host_function *t;
     dfe_start_read(host->functions, t) {
         if(!rrd_collector_running(t->collector)) continue;
-        if(t->options & (RRD_FUNCTION_DYNCFG|RRD_FUNCTION_HIDDEN)) continue;
+        if(t->options & (RRD_FUNCTION_DYNCFG| RRD_FUNCTION_RESTRICTED)) continue;
 
         if(help)
             *help = t->help;

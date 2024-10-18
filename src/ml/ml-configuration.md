@@ -1,18 +1,18 @@
 # ML Configuration
 
-Netdata's [Machine Learning](/src/ml/README.md) capabilities are enabled by default.
+Netdata's [Machine Learning](/src/ml/README.md) capabilities are enabled by default if the [Database mode](/src/database/README.md) is set to `db = dbengine`
 
 To enable or disable Machine Learning capabilities on a node:
 
 1. [Edit `netdata.conf`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config)
-2. In the `[ml]` section, set `enabled = yes` to enable or `enabled = no` to disable
+2. In the `[ml]` section, set `enabled` to `yes` to enable ML, `no` to disable it, or leave it at the default `auto` to enable ML only when [Database mode](/src/database/README.md) is set to `dbengine`
 3. [Restart Netdata](/docs/netdata-agent/start-stop-restart.md)
 
 Below is a list of all the available configuration params and their default values.
 
 ```bash
 [ml]
-        # enabled = yes
+        # enabled = auto
         # maximum num samples to train = 21600
         # minimum num samples to train = 900
         # train every = 3h
@@ -85,7 +85,7 @@ flowchart BT
 
 ## Descriptions (min/max)
 
-- `enabled`: `yes` to enable, `no` to disable.
+- `enabled`: `yes` to enable, `no` to disable, or `auto` to let Netdata decide when to enable ML.
 - `maximum num samples to train`: (`3600`/`86400`) This is the maximum amount of time you would like to train each model on. For example, the default of `21600` trains on the preceding 6 hours of data, assuming an `update every` of 1 second.
 - `minimum num samples to train`: (`900`/`21600`) This is the minimum amount of data required to be able to train a model. For example, the default of `900` implies that once at least 15 minutes of data is available for training, a model is trained, otherwise it is skipped and checked again at the next training run.
 - `train every`: (`3h`/`6h`) This is how often each model will be retrained. For example, the default of `3h` means that each model is retrained every 3 hours. Note: The training of all models is spread out across the `train every` period for efficiency, so in reality, it means that each model will be trained in a staggered manner within each `train every` period.

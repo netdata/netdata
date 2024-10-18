@@ -6,36 +6,9 @@
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static const char *protocol_name(LOCAL_SOCKET *n) {
-    if(n->local.family == AF_INET) {
-        if(n->local.protocol == IPPROTO_TCP)
-            return "TCP";
-        else if(n->local.protocol == IPPROTO_UDP)
-            return "UDP";
-        else
-            return "UNKNOWN_IPV4";
-    }
-    else if(is_local_socket_ipv46(n)) {
-        if (n->local.protocol == IPPROTO_TCP)
-            return "TCP46";
-        else if(n->local.protocol == IPPROTO_UDP)
-            return "UDP46";
-        else
-            return "UNKNOWN_IPV46";
-    }
-    else if(n->local.family == AF_INET6) {
-        if (n->local.protocol == IPPROTO_TCP)
-            return "TCP6";
-        else if(n->local.protocol == IPPROTO_UDP)
-            return "UDP6";
-        else
-            return "UNKNOWN_IPV6";
-    }
-    else
-        return "UNKNOWN";
-}
+static void print_local_listeners(LS_STATE *ls __maybe_unused, const LOCAL_SOCKET *nn, void *data __maybe_unused) {
+    LOCAL_SOCKET *n = (LOCAL_SOCKET *)nn;
 
-static void print_local_listeners(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, void *data __maybe_unused) {
     char local_address[INET6_ADDRSTRLEN];
     char remote_address[INET6_ADDRSTRLEN];
 
@@ -52,36 +25,7 @@ static void print_local_listeners(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, 
         ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
     }
 
-    printf("%s|%s|%u|%s\n", protocol_name(n), local_address, n->local.port, string2str(n->cmdline));
-}
-
-static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, void *data __maybe_unused) {
-    char local_address[INET6_ADDRSTRLEN];
-    char remote_address[INET6_ADDRSTRLEN];
-
-    if(n->local.family == AF_INET) {
-        ipv4_address_to_txt(n->local.ip.ipv4, local_address);
-        ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
-    }
-    else if(n->local.family == AF_INET6) {
-        ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
-        ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
-    }
-
-    printf("%s, direction=%s%s%s%s%s pid=%d, state=0x%0x, ns=%"PRIu64", local=%s[:%u], remote=%s[:%u], uid=%u, comm=%s\n",
-           protocol_name(n),
-           (n->direction & SOCKET_DIRECTION_LISTEN) ? "LISTEN," : "",
-           (n->direction & SOCKET_DIRECTION_INBOUND) ? "INBOUND," : "",
-           (n->direction & SOCKET_DIRECTION_OUTBOUND) ? "OUTBOUND," : "",
-           (n->direction & (SOCKET_DIRECTION_LOCAL_INBOUND|SOCKET_DIRECTION_LOCAL_OUTBOUND)) ? "LOCAL," : "",
-           (n->direction == 0) ? "NONE," : "",
-           n->pid,
-           (unsigned int)n->state,
-           n->net_ns_inode,
-           local_address, n->local.port,
-           remote_address, n->remote.port,
-           n->uid,
-           n->comm);
+    printf("%s|%s|%u|%s\n", local_sockets_protocol_name(n), local_address, n->local.port, string2str(n->cmdline));
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -155,13 +99,15 @@ int main(int argc, char **argv) {
                     "\n"
                     " Current options:\n"
                     "\n"
-                    "    %s %s %s %s %s %s %s %s %s\n"
+                    "    %s %s %s %s %s %s %s %s %s %s %s %s\n"
                     "\n"
                     " Option 'debug' enables all sources and all directions and provides\n"
                     " a full dump of current sockets.\n"
                     "\n"
                     " Option 'report' reports timings per step while collecting and processing\n"
                     " system information.\n"
+                    "\n"
+                    " Option 'procfile' uses procfile to read proc files, instead of getline().\n"
                     "\n"
                     " DIRECTION DETECTION\n"
                     " The program detects the direction of the sockets using these rules:\n"
@@ -208,6 +154,9 @@ int main(int argc, char **argv) {
                     , ls.config.inbound ? "inbound" : "no-inbound"
                     , ls.config.outbound ? "outbound" : "no-outbound"
                     , ls.config.namespaces ? "namespaces" : "no-namespaces"
+                    , ls.config.no_mnl ? "no-mnl" : "mnl"
+                    , ls.config.procfile ? "procfile" : "no-procfile"
+                    , ls.config.report ? "report" : "no-report"
                     );
             exit(1);
         }
@@ -233,8 +182,9 @@ int main(int argc, char **argv) {
             ls.config.namespaces = true;
             ls.config.tcp_info = true;
             ls.config.uid = true;
+            ls.config.procfile = false;
             ls.config.max_errors = SIZE_MAX;
-            ls.config.cb = print_local_listeners_debug;
+            ls.config.cb = local_listeners_print_socket;
 
             debug = true;
         }
@@ -294,6 +244,10 @@ int main(int argc, char **argv) {
             ls.config.no_mnl = !positive;
             // fprintf(stderr, "%s mnl\n", positive ? "enabling" : "disabling");
         }
+        else if (strcmp("procfile", s) == 0) {
+            ls.config.procfile = positive;
+            // fprintf(stderr, "%s procfile\n", positive ? "enabling" : "disabling");
+        }
         else if (strcmp("report", s) == 0) {
             ls.config.report = positive;
             // fprintf(stderr, "%s report\n", positive ? "enabling" : "disabling");
@@ -304,16 +258,21 @@ int main(int argc, char **argv) {
         }
     }
 
+#if defined(LOCAL_SOCKETS_USE_SETNS)
     SPAWN_SERVER *spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, NULL, local_sockets_spawn_server_callback, argc, (const char **)argv);
     if(spawn_server == NULL) {
         fprintf(stderr, "Cannot create spawn server.\n");
         exit(1);
     }
+
     ls.spawn_server = spawn_server;
+#endif
 
     local_sockets_process(&ls);
 
+#if defined(LOCAL_SOCKETS_USE_SETNS)
     spawn_server_destroy(spawn_server);
+#endif
 
     getrusage(RUSAGE_SELF, &ended);
 
@@ -345,6 +304,35 @@ int main(int argc, char **argv) {
 
         duration_snprintf(buf, sizeof(buf), (int64_t)total_ut, "us", true);
         fprintf(stderr, "%20s: %6.2f%% %s\n", "TOTAL", 100.0, buf);
+
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Namespaces    [ found: %zu, absent: %zu, invalid: %zu ]\n"
+#if defined(LOCAL_SOCKETS_USE_SETNS)
+                        "  \\_    forks [ tried: %zu, failed: %zu, unresponsive: %zu ]\n"
+                        "  \\_  sockets [ new: %zu, existing: %zu ]\n"
+#endif
+                , ls.stats.namespaces_found, ls.stats.namespaces_absent, ls.stats.namespaces_invalid
+#if defined(LOCAL_SOCKETS_USE_SETNS)
+                , ls.stats.namespaces_forks_attempted, ls.stats.namespaces_forks_failed, ls.stats.namespaces_forks_unresponsive
+                , ls.stats.namespaces_sockets_new, ls.stats.namespaces_sockets_existing
+#endif
+                );
+
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Sockets       [ found: %zu ]\n",
+                ls.stats.sockets_added);
+
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Main Procfile [ opens: %zu, reads: %zu, resizes: %zu, memory: %zu ]\n"
+                        "  \\_    reads [ total bytes read: %zu, average read size: %zu, max read size: %zu ]\n"
+                        "  \\_      max [ max file size: %zu, max lines: %zu, max words: %zu ]\n",
+                ls.stats.ff.opens, ls.stats.ff.reads, ls.stats.ff.resizes, ls.stats.ff.memory,
+                ls.stats.ff.total_read_bytes, ls.stats.ff.total_read_bytes / (ls.stats.ff.reads ? ls.stats.ff.reads : 1), ls.stats.ff.max_read_size,
+                ls.stats.ff.max_source_bytes, ls.stats.ff.max_lines, ls.stats.ff.max_words);
+
+        fprintf(stderr, "\n");
+        fprintf(stderr, "MNL(without namespaces) [ requests: %zu ]\n",
+                ls.stats.mnl_sends);
     }
 
     return 0;
