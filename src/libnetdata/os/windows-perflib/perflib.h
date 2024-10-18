@@ -50,6 +50,8 @@ typedef struct _counterdata {
     RAW_DATA previous;
 } COUNTER_DATA;
 
+#define PERFLIB_MAX_FAILURES_TO_FIND_METRIC 10
+
 #define RAW_DATA_EMPTY (RAW_DATA){ 0 }
 
 bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd);

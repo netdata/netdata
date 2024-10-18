@@ -454,16 +454,25 @@ PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PE
 }
 
 bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd) {
-    if(cd->failures > 30) {
-        // we don't want to lookup and compare strings all the time
-        // when a metric is not there, so we try to find it for
-        // XX times, and then we give up.
-        goto failed;
-    }
-
     DWORD id = cd->id;
     const char *key = cd->key;
     internal_fatal(key == NULL, "You have to set a key for this call.");
+
+    if(unlikely(cd->failures >= PERFLIB_MAX_FAILURES_TO_FIND_METRIC)) {
+        // we don't want to lookup and compare strings all the time
+        // when a metric is not there, so we try to find it for
+        // XX times, and then we give up.
+
+        if(cd->failures == PERFLIB_MAX_FAILURES_TO_FIND_METRIC) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "WINDOWS: PERFLIB: Giving up on metric '%s' (tried to find it %u times).",
+                   cd->key, cd->failures);
+
+            cd->failures++; // increment it once, so that we will not log this again
+        }
+
+        goto failed;
+    }
 
     PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
     for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
