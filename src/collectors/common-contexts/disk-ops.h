@@ -13,7 +13,7 @@ typedef struct {
 static inline void common_disk_ops(ND_DISK_OPS *d, const char *id, const char *name, uint64_t ops_read, uint64_t ops_write, int update_every, instance_labels_cb_t cb, void *data) {
     if(unlikely(!d->st_ops)) {
         d->st_ops = rrdset_create_localhost(
-                "disk"
+                "disk_ops"
                 , id
                 , name
                 , "ops"

@@ -1450,18 +1450,17 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         char *disk;
         unsigned long       major = 0, minor = 0;
 
-        collected_number    reads = 0,  mreads = 0,  readsectors = 0,  readms = 0,
-                            writes = 0, mwrites = 0, writesectors = 0, writems = 0,
+        collected_number rd_ios = 0,  mreads = 0,  readsectors = 0,  readms = 0, wr_ios = 0, mwrites = 0, writesectors = 0, writems = 0,
                             queued_ios = 0, busy_ms = 0, backlog_ms = 0,
                             discards = 0, mdiscards = 0, discardsectors = 0, discardms = 0,
                             flushes = 0, flushms = 0;
 
 
-        collected_number    last_reads = 0,  last_readsectors = 0,  last_readms = 0,
-                            last_writes = 0, last_writesectors = 0, last_writems = 0,
-                            last_busy_ms = 0,
-                            last_discards = 0, last_discardsectors = 0, last_discardms = 0,
-                            last_flushes = 0, last_flushms = 0;
+        collected_number last_rd_ios = 0,  last_readsectors = 0,  last_readms = 0,
+                         last_wr_ios = 0, last_writesectors = 0, last_writems = 0,
+                         last_busy_ms = 0,
+                         last_discards = 0, last_discardsectors = 0, last_discardms = 0,
+                         last_flushes = 0, last_flushms = 0;
 
         size_t words = procfile_linewords(ff, l);
         if(unlikely(words < 14)) continue;
@@ -1472,8 +1471,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // # of reads completed # of writes completed
         // This is the total number of reads or writes completed successfully.
-        reads           = str2ull(procfile_lineword(ff, l, 3), NULL);  // rd_ios
-        writes          = str2ull(procfile_lineword(ff, l, 7), NULL);  // wr_ios
+        rd_ios = str2ull(procfile_lineword(ff, l, 3), NULL);  // rd_ios
+        wr_ios = str2ull(procfile_lineword(ff, l, 7), NULL);  // wr_ios
 
         // # of reads merged # of writes merged
         // Reads and writes which are adjacent to each other may be merged for
@@ -1612,14 +1611,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if (d->do_ops == CONFIG_BOOLEAN_YES || d->do_ops == CONFIG_BOOLEAN_AUTO) {
             d->do_ops = CONFIG_BOOLEAN_YES;
 
-            last_reads = reads;
-            last_writes = writes;
+            last_rd_ios = d->disk_ops.rd_ops_reads ? d->disk_ops.rd_ops_reads->collector.last_collected_value : 0;
+            last_wr_ios = d->disk_ops.rd_ops_writes ? d->disk_ops.rd_ops_writes->collector.last_collected_value : 0;
 
             common_disk_ops(&d->disk_ops,
                            d->chart_id,
-                           d->disk,
-                           reads,
-                           writes,
+                           d->disk, rd_ios, wr_ios,
                            update_every,
                            disk_labels_cb,
                            d);
@@ -1933,8 +1930,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     add_labels_to_disk(d, d->st_await);
                 }
 
-                double read_avg = (reads - last_reads) ? (double)(readms - last_readms) / (reads - last_reads) : 0;
-                double write_avg = (writes - last_writes) ? (double)(writems - last_writems) / (writes - last_writes) : 0;
+                double read_avg = (rd_ios - last_rd_ios) ? (double)(readms - last_readms) / (rd_ios - last_rd_ios) : 0;
+                double write_avg = (wr_ios - last_wr_ios) ? (double)(writems - last_writems) / (wr_ios - last_wr_ios) : 0;
 
                 rrddim_set_by_pointer(d->st_await, d->rd_await_reads, (collected_number)(read_avg * 1000));
                 rrddim_set_by_pointer(d->st_await, d->rd_await_writes, (collected_number)(write_avg * 1000));
@@ -2006,8 +2003,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     add_labels_to_disk(d, d->st_avgsz);
                 }
 
-                rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_reads,  (reads  - last_reads)  ? (readsectors  - last_readsectors)  / (reads  - last_reads)  : 0);
-                rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_writes, (writes - last_writes) ? (writesectors - last_writesectors) / (writes - last_writes) : 0);
+                rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_reads,  (rd_ios - last_rd_ios)  ? (readsectors  - last_readsectors)  / (rd_ios - last_rd_ios)  : 0);
+                rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_writes, (wr_ios - last_wr_ios) ? (writesectors - last_writesectors) / (wr_ios - last_wr_ios) : 0);
                 rrdset_done(d->st_avgsz);
             }
 
@@ -2068,8 +2065,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 }
 
                 double svctm_avg =
-                    ((reads - last_reads) + (writes - last_writes)) ?
-                        (double)(busy_ms - last_busy_ms) / ((reads - last_reads) + (writes - last_writes)) :
+                    ((rd_ios - last_rd_ios) + (wr_ios - last_wr_ios)) ?
+                        (double)(busy_ms - last_busy_ms) / ((rd_ios - last_rd_ios) + (wr_ios - last_wr_ios)) :
                         0;
 
                 rrddim_set_by_pointer(d->st_svctm, d->rd_svctm_svctm, (collected_number)(svctm_avg * 1000));
