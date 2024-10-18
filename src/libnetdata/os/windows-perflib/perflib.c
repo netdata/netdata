@@ -454,6 +454,17 @@ PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PE
 }
 
 bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd) {
+    if(cd->failures > 30) {
+        // we don't want to lookup and compare strings all the time
+        // when a metric is not there, so we try to find it for
+        // XX times, and then we give up.
+        goto failed;
+    }
+
+    DWORD id = cd->id;
+    const char *key = cd->key;
+    internal_fatal(key == NULL, "You have to set a key for this call.");
+
     PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
     for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
         pCounterDefinition = getCounterDefinition(pDataBlock, pObjectType, pCounterDefinition);
@@ -464,12 +475,13 @@ bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pO
             break;
         }
 
-        if(cd->id) {
-            if(cd->id != pCounterDefinition->CounterNameTitleIndex)
+        if(id) {
+            if(id != pCounterDefinition->CounterNameTitleIndex)
                 continue;
         }
         else {
-            if(strcmp(RegistryFindNameByID(pCounterDefinition->CounterNameTitleIndex), cd->key) != 0)
+            const char *name = RegistryFindNameByID(pCounterDefinition->CounterNameTitleIndex);
+            if(strcmp(name, key) != 0)
                 continue;
 
             cd->id = pCounterDefinition->CounterNameTitleIndex;
@@ -479,10 +491,16 @@ bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pO
         PERF_COUNTER_BLOCK *pCounterBlock = getInstanceCounterBlock(pDataBlock, pObjectType, pInstance);
 
         cd->previous = cd->current;
-        cd->updated = getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current);
-        return cd->updated;
+        if(likely(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current))) {
+            cd->updated = true;
+            cd->failures = 0;
+            return true;
+        }
     }
 
+    cd->failures++;
+
+failed:
     cd->previous = cd->current;
     cd->current = RAW_DATA_EMPTY;
     cd->updated = false;

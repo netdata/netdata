@@ -190,6 +190,7 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
             continue;
 
         struct logical_disk *d = dictionary_set(dict, windows_shared_buffer, NULL, sizeof(*d));
+        d->last_collected = now_ut;
 
         if(!d->collected_metadata) {
             d->filesystem = getFileSystemType(windows_shared_buffer);
@@ -302,6 +303,7 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
             d = dictionary_set(dict, device, NULL, sizeof(*d));
             is_system = false;
         }
+        d->last_collected = now_ut;
 
         if (!d->collected_metadata) {
             // TODO collect metadata - device_type, serial, id
