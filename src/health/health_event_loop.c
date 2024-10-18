@@ -138,7 +138,7 @@ static void health_initialize_rrdhost(RRDHOST *host) {
     host->health.health_default_recipient = string_dup(health_globals.config.default_recipient);
     host->health.use_summary_for_notifications = health_globals.config.use_summary_for_notifications;
 
-    host->health_log.next_log_id = (uint32_t)now_realtime_sec();
+    host->health_log.next_log_id = get_uint32_id();
     host->health_log.next_alarm_id = 0;
 
     rw_spinlock_init(&host->health_log.spinlock);

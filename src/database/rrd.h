@@ -1637,6 +1637,11 @@ static inline double rrddim_get_last_stored_value(RRDDIM *rd_dim, double *max_va
     return value;
 }
 
+static inline uint32_t get_uint32_id()
+{
+    return now_realtime_sec() & UINT32_MAX;
+}
+
 //
 // RRD DB engine declarations
 

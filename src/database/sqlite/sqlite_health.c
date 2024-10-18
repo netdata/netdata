@@ -727,8 +727,10 @@ void sql_health_alarm_log_load(RRDHOST *host)
     dictionary_destroy(all_rrdcalcs);
     all_rrdcalcs = NULL;
 
-    if(!host->health_max_unique_id) host->health_max_unique_id = (uint32_t)now_realtime_sec();
-    if(!host->health_max_alarm_id)  host->health_max_alarm_id  = (uint32_t)now_realtime_sec();
+    if (!host->health_max_unique_id)
+        host->health_max_unique_id = get_uint32_id();
+    if (!host->health_max_alarm_id)
+        host->health_max_alarm_id = get_uint32_id();
 
     host->health_log.next_log_id = host->health_max_unique_id + 1;
     if (unlikely(!host->health_log.next_alarm_id || host->health_log.next_alarm_id <= host->health_max_alarm_id))
