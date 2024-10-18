@@ -18,6 +18,7 @@ int default_rrd_update_every = UPDATE_EVERY;
 int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 #ifdef ENABLE_DBENGINE
 RRD_MEMORY_MODE default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+bool dbengine_tier0_in_ram = false;
 #else
 RRD_MEMORY_MODE default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
 #endif
