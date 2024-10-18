@@ -82,6 +82,7 @@ static struct disk {
 
     ND_DISK_IO disk_io;
     ND_DISK_OPS disk_ops;
+    ND_DISK_QOPS disk_qops;
     ND_DISK_UTIL disk_util;
     ND_DISK_BUSY disk_busy;
     ND_DISK_IOTIME disk_iotime;
@@ -93,17 +94,8 @@ static struct disk {
     RRDDIM *rd_ops_discards;
     RRDDIM *rd_ops_flushes;
 
-    RRDSET *st_qops;
-    RRDDIM *rd_qops_operations;
-
     RRDSET *st_backlog;
     RRDDIM *rd_backlog_backlog;
-
-    RRDSET *st_busy;
-    RRDDIM *rd_busy_busy;
-
-    RRDSET *st_util;
-    RRDDIM *rd_util_utilization;
 
     RRDSET *st_mops;
     RRDDIM *rd_mops_reads;
@@ -111,10 +103,6 @@ static struct disk {
 
     RRDSET *st_ext_mops;
     RRDDIM *rd_mops_discards;
-
-    RRDSET *st_iotime;
-    RRDDIM *rd_iotime_reads;
-    RRDDIM *rd_iotime_writes;
 
     RRDSET *st_ext_iotime;
     RRDDIM *rd_iotime_discards;
@@ -1049,15 +1037,15 @@ static int diskstats_function_block_devices(BUFFER *wb, const char *function __m
             max_io = MAX(max_io, io_total);
         }
         // Backlog and Busy Time
-        double busy_perc = rrddim_get_last_stored_value(d->rd_util_utilization, &max_busy_perc, 1);
-        double busy_time = rrddim_get_last_stored_value(d->rd_busy_busy, &max_busy_time, 1);
+        double busy_perc = rrddim_get_last_stored_value(d->disk_util.rd_util, &max_busy_perc, 1);
+        double busy_time = rrddim_get_last_stored_value(d->disk_busy.rd_busy, &max_busy_time, 1);
         double backlog_time = rrddim_get_last_stored_value(d->rd_backlog_backlog, &max_backlog_time, 1);
         // IOPS
         double iops_reads = rrddim_get_last_stored_value(d->disk_ops.rd_ops_reads, &max_iops_reads, 1);
         double iops_writes = rrddim_get_last_stored_value(d->disk_ops.rd_ops_writes, &max_iops_writes, 1);
         // IO Time
-        double iops_time_reads = rrddim_get_last_stored_value(d->rd_iotime_reads, &max_iops_time_reads, 1);
-        double iops_time_writes = rrddim_get_last_stored_value(d->rd_iotime_writes, &max_iops_time_writes, 1);
+        double iops_time_reads = rrddim_get_last_stored_value(d->disk_iotime.rd_reads_ms, &max_iops_time_reads, 1);
+        double iops_time_writes = rrddim_get_last_stored_value(d->disk_iotime.rd_writes_ms, &max_iops_time_writes, 1);
         // Avg IO Time
         double iops_avg_time_read = rrddim_get_last_stored_value(d->rd_await_reads, &max_iops_avg_time_read, 1);
         double iops_avg_time_write = rrddim_get_last_stored_value(d->rd_await_writes, &max_iops_avg_time_write, 1);
@@ -1287,23 +1275,26 @@ static void diskstats_cleanup_disks() {
         if (unlikely(global_cleanup_removed_disks && !d->updated)) {
             struct disk *t = d;
 
+            rrdset_obsolete_and_pointer_null(d->disk_io.st_io);
+            rrdset_obsolete_and_pointer_null(d->disk_ops.st_ops);
+            rrdset_obsolete_and_pointer_null(d->disk_qops.st_qops);
+            rrdset_obsolete_and_pointer_null(d->disk_util.st_util);
+            rrdset_obsolete_and_pointer_null(d->disk_busy.st_busy);
+            rrdset_obsolete_and_pointer_null(d->disk_iotime.st_iotime);
+
             rrdset_obsolete_and_pointer_null(d->st_avgsz);
             rrdset_obsolete_and_pointer_null(d->st_ext_avgsz);
             rrdset_obsolete_and_pointer_null(d->st_await);
             rrdset_obsolete_and_pointer_null(d->st_ext_await);
             rrdset_obsolete_and_pointer_null(d->st_backlog);
-            rrdset_obsolete_and_pointer_null(d->st_busy);
             rrdset_obsolete_and_pointer_null(d->disk_io.st_io);
             rrdset_obsolete_and_pointer_null(d->st_ext_io);
-            rrdset_obsolete_and_pointer_null(d->st_iotime);
             rrdset_obsolete_and_pointer_null(d->st_ext_iotime);
             rrdset_obsolete_and_pointer_null(d->st_mops);
             rrdset_obsolete_and_pointer_null(d->st_ext_mops);
             rrdset_obsolete_and_pointer_null(d->disk_ops.st_ops);
             rrdset_obsolete_and_pointer_null(d->st_ext_ops);
-            rrdset_obsolete_and_pointer_null(d->st_qops);
             rrdset_obsolete_and_pointer_null(d->st_svctm);
-            rrdset_obsolete_and_pointer_null(d->st_util);
             rrdset_obsolete_and_pointer_null(d->st_bcache);
             rrdset_obsolete_and_pointer_null(d->st_bcache_bypass);
             rrdset_obsolete_and_pointer_null(d->st_bcache_rates);
@@ -1660,31 +1651,14 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if (d->do_qops == CONFIG_BOOLEAN_YES || d->do_qops == CONFIG_BOOLEAN_AUTO) {
             d->do_qops = CONFIG_BOOLEAN_YES;
 
-            if(unlikely(!d->st_qops)) {
-                d->st_qops = rrdset_create_localhost(
-                        "disk_qops"
-                        , d->chart_id
-                        , d->disk
-                        , family
-                        , "disk.qops"
-                        , "Disk Current I/O Operations"
-                        , "operations"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
-                        , NETDATA_CHART_PRIO_DISK_QOPS
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                );
-
-                rrdset_flag_set(d->st_qops, RRDSET_FLAG_DETAIL);
-
-                d->rd_qops_operations = rrddim_add(d->st_qops, "operations", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-                add_labels_to_disk(d, d->st_qops);
-            }
-
-            rrddim_set_by_pointer(d->st_qops, d->rd_qops_operations, queued_ios);
-            rrdset_done(d->st_qops);
+            common_disk_qops(
+                    &d->disk_qops,
+                    d->chart_id,
+                    d->disk,
+                    queued_ios,
+                    update_every,
+                    disk_labels_cb,
+                    d);
         }
 
         if (d->do_backlog == CONFIG_BOOLEAN_YES || d->do_backlog == CONFIG_BOOLEAN_AUTO) {

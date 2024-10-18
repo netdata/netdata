@@ -44,7 +44,9 @@ struct physical_disk {
     COUNTER_DATA percentDiskReadTime;
     COUNTER_DATA percentDiskWriteTime;
 
+    ND_DISK_QOPS disk_qops;
     COUNTER_DATA currentDiskQueueLength;
+
     COUNTER_DATA averageDiskQueueLength;
     COUNTER_DATA averageDiskReadQueueLength;
     COUNTER_DATA averageDiskWriteQueueLength;
@@ -355,7 +357,17 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                     d);
         }
 
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->currentDiskQueueLength);
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->currentDiskQueueLength)) {
+            common_disk_qops(
+                    &d->disk_qops,
+                    device,
+                    NULL,
+                    d->currentDiskQueueLength.current.Data,
+                    update_every,
+                    physical_disk_labels,
+                    d);
+        }
+
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskQueueLength);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskReadQueueLength);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskWriteQueueLength);
