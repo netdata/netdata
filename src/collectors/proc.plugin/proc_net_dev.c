@@ -12,7 +12,7 @@
 
 #define READ_RETRY_PERIOD 60 // seconds
 
-time_t double_linked_device_collect_delay_secs = 120;
+time_t virtual_device_collect_delay_secs = 40;
 
 enum {
     NETDEV_DUPLEX_UNKNOWN,
@@ -92,7 +92,6 @@ static struct netdev {
     int enabled;
     bool updated;
     bool function_ready;
-    bool double_linked; // iflink != ifindex
 
     time_t discover_time;
     
@@ -809,7 +808,6 @@ static struct netdev *get_netdev(const char *name) {
     d->len = strlen(d->name);
     d->chart_labels = rrdlabels_create();
     d->function_ready = false;
-    d->double_linked = false;
 
     d->chart_type_net_bytes      = strdupz("net");
     d->chart_type_net_compressed = strdupz("net_compressed");
@@ -858,25 +856,10 @@ static struct netdev *get_netdev(const char *name) {
     return d;
 }
 
-static bool is_iface_double_linked(struct netdev *d) {
-    char filename[FILENAME_MAX + 1];
-    unsigned long long iflink = 0;
-    unsigned long long ifindex = 0;
-
-    snprintfz(filename, FILENAME_MAX, "%s/sys/class/net/%s/iflink", netdata_configured_host_prefix, d->name);
-    if (read_single_number_file(filename, &iflink))
-        return false;
-
-    snprintfz(filename, FILENAME_MAX, "%s/sys/class/net/%s/ifindex", netdata_configured_host_prefix, d->name);
-    if (read_single_number_file(filename, &ifindex))
-        return false;
-
-    return iflink != ifindex;
-}
-
 int do_proc_net_dev(int update_every, usec_t dt) {
     (void)dt;
     static SIMPLE_PATTERN *disabled_list = NULL;
+    static SIMPLE_PATTERN *virtual_iface_no_delay = NULL;
     static procfile *ff = NULL;
     static int enable_new_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1,
@@ -921,8 +904,26 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         do_compressed   = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "compressed packets for all interfaces", CONFIG_BOOLEAN_NO);
 
         disabled_list = simple_pattern_create(
-                config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "disable by default interfaces matching",
-                           "lo fireqos* *-ifb fwpr* fwbr* fwln*"), NULL, SIMPLE_PATTERN_EXACT, true);
+            config_get(
+                CONFIG_SECTION_PLUGIN_PROC_NETDEV,
+                "disable by default interfaces matching",
+                "lo fireqos* *-ifb fwpr* fwbr* fwln*"),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
+
+        virtual_iface_no_delay = simple_pattern_create(
+            " bond* "
+            " vlan* "
+            " vmbr* "
+            " wg* "
+            " vpn* "
+            " tun* "
+            " gre* "
+            " docker* ",
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
 
         netdev_renames_init();
     }
@@ -1009,8 +1010,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(d->enabled == CONFIG_BOOLEAN_NO)
                 continue;
 
-            d->double_linked = is_iface_double_linked(d);
-
             d->do_bandwidth = do_bandwidth;
             d->do_packets = do_packets;
             d->do_errors = do_errors;
@@ -1060,8 +1059,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         // This is necessary to prevent the creation of charts for virtual interfaces that will later be 
         // recreated as container interfaces (create container) or
         // rediscovered and recreated only to be deleted almost immediately (stop/remove container)
-        if (d->double_linked && d->virtual && (now - d->discover_time < double_linked_device_collect_delay_secs))
+        if (d->virtual && !simple_pattern_matches(virtual_iface_no_delay, d->name) &&
+            (now - d->discover_time < virtual_device_collect_delay_secs)) {
             continue;
+        }
 
         if(likely(d->do_bandwidth != CONFIG_BOOLEAN_NO || !d->virtual)) {
             d->rbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 1));
@@ -1717,7 +1718,7 @@ void *netdev_main(void *ptr_is_null __maybe_unused)
     worker_register_job_name(0, "netdev");
 
     if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
-        double_linked_device_collect_delay_secs = 300;
+        virtual_device_collect_delay_secs = 300;
 
     rrd_function_add_inline(localhost, NULL, "network-interfaces", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_NETDEV_HELP,
