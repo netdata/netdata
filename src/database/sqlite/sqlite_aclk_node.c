@@ -167,6 +167,12 @@ void aclk_check_node_info_and_collectors(void)
         if (pp_queue_empty && wc->node_info_send_time && wc->node_info_send_time + 30 < now) {
             wc->node_info_send_time = 0;
             build_node_info(host);
+            if (netdata_cloud_enabled) {
+                netdata_mutex_lock(&host->receiver_lock);
+                int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
+                netdata_mutex_unlock(&host->receiver_lock);
+                aclk_host_state_update(host, live, 1);
+            }
             internal_error(true, "ACLK SYNC: Sending node info for %s", rrdhost_hostname(host));
         }
 
