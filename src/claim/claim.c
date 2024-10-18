@@ -197,7 +197,7 @@ CLOUD_STATUS claim_reload_and_wait_online(void) {
         int ms = 0;
         do {
             status = cloud_status();
-            if ((status == CLOUD_STATUS_ONLINE || status == CLOUD_STATUS_INDIRECT) && !UUIDiszero(localhost->host_id))
+            if ((status == CLOUD_STATUS_ONLINE) && !UUIDiszero(localhost->node_id))
                 break;
 
             sleep_usec(50 * USEC_PER_MS);
