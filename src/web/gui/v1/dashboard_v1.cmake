@@ -22,19 +22,19 @@ src/web/gui/v1/robots.txt
 src/web/gui/v1/service-worker.js
 src/web/gui/v1/sitemap.xml
 src/web/gui/v1/tv-react.html
-src/web/gui/v1/tv.html COMPONENT netdata DESTINATION ${WEB_DEST})
+src/web/gui/v1/tv.html COMPONENT dashboard DESTINATION ${WEB_DEST})
     install(FILES src/web/gui/v1/css/bootstrap-3.3.7.css
 src/web/gui/v1/css/bootstrap-slate-flat-3.3.7.css
 src/web/gui/v1/css/bootstrap-slider-10.0.0.min.css
 src/web/gui/v1/css/bootstrap-theme-3.3.7.min.css
 src/web/gui/v1/css/bootstrap-toggle-2.2.2.min.css
 src/web/gui/v1/css/dashboard.css
-src/web/gui/v1/css/dashboard.slate.css COMPONENT netdata DESTINATION ${WEB_DEST}/css)
+src/web/gui/v1/css/dashboard.slate.css COMPONENT dashboard DESTINATION ${WEB_DEST}/css)
     install(FILES src/web/gui/v1/fonts/glyphicons-halflings-regular.eot
 src/web/gui/v1/fonts/glyphicons-halflings-regular.svg
 src/web/gui/v1/fonts/glyphicons-halflings-regular.ttf
 src/web/gui/v1/fonts/glyphicons-halflings-regular.woff
-src/web/gui/v1/fonts/glyphicons-halflings-regular.woff2 COMPONENT netdata DESTINATION ${WEB_DEST}/fonts)
+src/web/gui/v1/fonts/glyphicons-halflings-regular.woff2 COMPONENT dashboard DESTINATION ${WEB_DEST}/fonts)
     install(FILES src/web/gui/v1/images/alert-128-orange.png
 src/web/gui/v1/images/alert-128-red.png
 src/web/gui/v1/images/alert-multi-size-orange.ico
@@ -84,7 +84,7 @@ src/web/gui/v1/images/overview.png
 src/web/gui/v1/images/packaging-beta-tag.svg
 src/web/gui/v1/images/post.png
 src/web/gui/v1/images/pricing.png
-src/web/gui/v1/images/seo-performance-128.png COMPONENT netdata DESTINATION ${WEB_DEST}/images)
+src/web/gui/v1/images/seo-performance-128.png COMPONENT dashboard DESTINATION ${WEB_DEST}/images)
     install(FILES src/web/gui/v1/lib/bootstrap-3.3.7.min.js
 src/web/gui/v1/lib/bootstrap-slider-10.0.0.min.js
 src/web/gui/v1/lib/bootstrap-table-1.11.0.min.js
@@ -104,13 +104,13 @@ src/web/gui/v1/lib/jquery.sparkline-2.1.2.min.js
 src/web/gui/v1/lib/lz-string-1.4.4.min.js
 src/web/gui/v1/lib/pako-1.0.6.min.js
 src/web/gui/v1/lib/perfect-scrollbar-0.6.15.min.js
-src/web/gui/v1/lib/tableExport-1.6.0.min.js COMPONENT netdata DESTINATION ${WEB_DEST}/lib)
+src/web/gui/v1/lib/tableExport-1.6.0.min.js COMPONENT dashboard DESTINATION ${WEB_DEST}/lib)
     install(FILES src/web/gui/v1/static/css/2.c454aab8.chunk.css
 src/web/gui/v1/static/css/2.c454aab8.chunk.css.map
 src/web/gui/v1/static/css/4.a36e3b73.chunk.css
 src/web/gui/v1/static/css/4.a36e3b73.chunk.css.map
 src/web/gui/v1/static/css/main.53ba10f1.chunk.css
-src/web/gui/v1/static/css/main.53ba10f1.chunk.css.map COMPONENT netdata DESTINATION ${WEB_DEST}/static/css)
+src/web/gui/v1/static/css/main.53ba10f1.chunk.css.map COMPONENT dashboard DESTINATION ${WEB_DEST}/static/css)
     install(FILES src/web/gui/v1/static/js/10.a5cd7d0e.chunk.js
 src/web/gui/v1/static/js/10.a5cd7d0e.chunk.js.map
 src/web/gui/v1/static/js/2.62d105c5.chunk.js
@@ -135,7 +135,7 @@ src/web/gui/v1/static/js/main.e248095a.chunk.js
 src/web/gui/v1/static/js/main.e248095a.chunk.js.LICENSE
 src/web/gui/v1/static/js/main.e248095a.chunk.js.map
 src/web/gui/v1/static/js/runtime-main.08abed8f.js
-src/web/gui/v1/static/js/runtime-main.08abed8f.js.map COMPONENT netdata DESTINATION ${WEB_DEST}/static/js)
+src/web/gui/v1/static/js/runtime-main.08abed8f.js.map COMPONENT dashboard DESTINATION ${WEB_DEST}/static/js)
     install(FILES src/web/gui/v1/static/media/ibm-plex-sans-latin-100.245539db.woff2
 src/web/gui/v1/static/media/ibm-plex-sans-latin-100.9a582f3a.woff
 src/web/gui/v1/static/media/ibm-plex-sans-latin-100italic.1ea7c5d2.woff
@@ -164,5 +164,5 @@ src/web/gui/v1/static/media/ibm-plex-sans-latin-700.b8809d61.woff
 src/web/gui/v1/static/media/ibm-plex-sans-latin-700.c9983d3d.woff2
 src/web/gui/v1/static/media/ibm-plex-sans-latin-700italic.02954bee.woff2
 src/web/gui/v1/static/media/ibm-plex-sans-latin-700italic.72e9af40.woff
-src/web/gui/v1/static/media/material-icons.0509ab09.woff2 COMPONENT netdata DESTINATION ${WEB_DEST}/static/media)
-    install(FILES src/web/gui/v1/index.html COMPONENT netdata DESTINATION ${WEB_DEST}/v1)
+src/web/gui/v1/static/media/material-icons.0509ab09.woff2 COMPONENT dashboard DESTINATION ${WEB_DEST}/static/media)
+    install(FILES src/web/gui/v1/index.html COMPONENT dashboard DESTINATION ${WEB_DEST}/v1)
