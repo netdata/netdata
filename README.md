@@ -90,15 +90,15 @@ Netdata scales effortlessly from a single server to thousands, even in complex, 
 
 Netdata monitors all the following:
 
-|                                                                                                   Component |              Linux               | FreeBSD | macOS |             Windows*             |
+|                                                                                                   Component |              Linux               | FreeBSD | macOS |             Windows              |
 |------------------------------------------------------------------------------------------------------------:|:--------------------------------:|:-------:|:-----:|:--------------------------------:|
 |                             **System Resources**<small><br/>CPU, Memory and system shared resources</small> |               Full               |   Yes   |  Yes  |               Yes                |
-|                                **Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small> |               Full               |  Basic  | Basic |              Basic               |
-|                                 **Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small> |               Full               |  Basic  | Basic |              Basic               |
-|                        **Hardware & Sensors**<small><br/>Fans, Temperatures, Controllers, GPUs, etc</small> |               Full               |  Some   | Some  |               Some               |
-|                                       **O/S Services**<small><br/>Resources, Performance and Status</small> | Yes<small><br/>`systemd`</small> |    -    |   -   |              Basic               |
-|                                                                                                    **Logs** | Yes<small><br/>`systemd`-journal |    -    |   -   |                -                 |
+|                                **Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small> |               Full               |   Yes   |  Yes  |               Yes                |
+|                                 **Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small> |               Full               |   Yes   |  Yes  |               Yes                |
+|                        **Hardware & Sensors**<small><br/>Fans, Temperatures, Controllers, GPUs, etc</small> |               Full               |  Some   | Some  |              Some                |
+|                                       **O/S Services**<small><br/>Resources, Performance and Status</small> | Yes<small><br/>`systemd`</small> |    -    |   -   |                -                 |
 |                                      **Processes**<small><br/>Resources, Performance, OOM, and more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
+|                                                                             System and Application **Logs** | Yes<small><br/>`systemd`-journal |    -    |   -   | Yes<small><br/>`Windows Event Log`, and<br/>`Event Tracing for Windows`</small> |
 |                                 **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |               Yes                |    -    |   -   |                -                 |
 |                               **Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small> |               Yes                |    -    |   -   |                -                 |
 |                                 **VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small> | Yes<small><br/>`cgroups`</small> |    -    |   -   | Yes<small><br/>`Hyper-V`</small> |
@@ -107,11 +107,7 @@ Netdata monitors all the following:
 |                              **Cloud Provider Infrastructure**<small><br/>AWS, GCP, Azure, and more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
 |                       **Custom Applications**<small><br/>OpenMetrics, StatsD and soon OpenTelemetry</small> |               Yes                |   Yes   |  Yes  |               Yes                |
 
-When the Netdata Agent runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies that can be monitored.
-
-The Netdata Agent also provides full **enterprise hardware** coverage, monitoring all components that provide hardware error reporting, like PCI AER, RAM EDAC, IPMI, S.M.A.R.T., NVMe, Fans, Power, Voltages, and more.
-
-<small> * The Netdata Agent runs on Linux, FreeBSD and macOS. For Windows, we currently rely on Windows Exporter (so a Netdata running on Linux, FreeBSD or macOS is required, next to the monitored Windows servers). However, a Windows version of the Netdata Agent is at its final state for release.</small>
+When the Netdata Agent runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies and offers full **enterprise hardware** coverage, monitoring all components that provide hardware error reporting, like PCI AER, RAM EDAC, IPMI, S.M.A.R.T., NVMe, Fans, Power, Voltages, and more.
 
 ---
 

@@ -264,7 +264,7 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
 
         rrd_call_function_error(
             rfe->result.wb,
-            "unknown config id given", code);
+            "Unknown config id given.", code);
     }
 
 cleanup:

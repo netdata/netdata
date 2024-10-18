@@ -59,7 +59,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
 
         pf->code = HTTP_RESP_SERVICE_UNAVAILABLE;
         netdata_log_error("FUNCTION '%s': failed to send it to the plugin, error %zd", string2str(pf->function), ret);
-        rrd_call_function_error(pf->result_body_wb, "Failed to communicate with collector", pf->code);
+        rrd_call_function_error(pf->result_body_wb, "Failed to send this request to the plugin that offered it.", pf->code);
     }
     else {
         pf->sent_successfully = true;
@@ -75,7 +75,7 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
     struct inflight_function *pf = new_func;
 
     netdata_log_error("PLUGINSD_PARSER: duplicate UUID on pending function '%s' detected. Ignoring the second one.", string2str(pf->function));
-    pf->code = rrd_call_function_error(pf->result_body_wb, "This request is already in progress", HTTP_RESP_BAD_REQUEST);
+    pf->code = rrd_call_function_error(pf->result_body_wb, "This transaction is already in progress.", HTTP_RESP_BAD_REQUEST);
     pf->result.cb(pf->result_body_wb, pf->code, pf->result.data);
     string_freez(pf->function);
 
@@ -94,7 +94,7 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
                    pf->sent_monotonic_ut - pf->started_monotonic_ut, now_realtime_usec() - pf->sent_monotonic_ut);
 
     if(pf->code == HTTP_RESP_SERVICE_UNAVAILABLE && !buffer_strlen(pf->result_body_wb))
-        rrd_call_function_error(pf->result_body_wb, "The plugin exited while servicing this call.", pf->code);
+        rrd_call_function_error(pf->result_body_wb, "The plugin that was servicing this request, exited before responding.", pf->code);
 
     pf->result.cb(pf->result_body_wb, pf->code, pf->result.data);
 
@@ -127,7 +127,7 @@ void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut)
 
             if(!buffer_strlen(pf->result_body_wb) || pf->code == HTTP_RESP_OK)
                 pf->code = rrd_call_function_error(pf->result_body_wb,
-                                                   "Timeout waiting for collector response.",
+                                                   "Timeout waiting for a response.",
                                                    HTTP_RESP_GATEWAY_TIMEOUT);
 
             dictionary_del(parser->inflight.functions, pf_dfe.name);

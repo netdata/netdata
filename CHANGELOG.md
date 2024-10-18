@@ -6,7 +6,17 @@
 
 **Merged pull requests:**
 
+- aesthetic changes in the code [\#18808](https://github.com/netdata/netdata/pull/18808) ([ktsaou](https://github.com/ktsaou))
+- allow local-listeners to associate container sockets with pids [\#18807](https://github.com/netdata/netdata/pull/18807) ([ktsaou](https://github.com/ktsaou))
+- fix\(go.d/sensors\): ignore 'unknown' values [\#18806](https://github.com/netdata/netdata/pull/18806) ([ilyam8](https://github.com/ilyam8))
+- feat\(apps.plugin\): add vernemq to apps\_groups.conf [\#18802](https://github.com/netdata/netdata/pull/18802) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18801](https://github.com/netdata/netdata/pull/18801) ([netdatabot](https://github.com/netdatabot))
+- bugfix for logs integrations [\#18800](https://github.com/netdata/netdata/pull/18800) ([Ancairon](https://github.com/Ancairon))
+- docs: fix grammar in readme [\#18799](https://github.com/netdata/netdata/pull/18799) ([ilyam8](https://github.com/ilyam8))
+- local-listeners improvements [\#18798](https://github.com/netdata/netdata/pull/18798) ([ktsaou](https://github.com/ktsaou))
+- Remove macOS 12 from CI, and add macOS 15. [\#18797](https://github.com/netdata/netdata/pull/18797) ([Ferroin](https://github.com/Ferroin))
 - Windows fixes \(chart labels and warnings\) [\#18796](https://github.com/netdata/netdata/pull/18796) ([ktsaou](https://github.com/ktsaou))
+- Schedule a node state update after context load [\#18795](https://github.com/netdata/netdata/pull/18795) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18794](https://github.com/netdata/netdata/pull/18794) ([netdatabot](https://github.com/netdatabot))
 - Add ref to dyncfg [\#18793](https://github.com/netdata/netdata/pull/18793) ([Ancairon](https://github.com/Ancairon))
 - systemd-journal; support querying archived files [\#18792](https://github.com/netdata/netdata/pull/18792) ([ktsaou](https://github.com/ktsaou))
@@ -98,6 +108,7 @@
 - Bump go.mongodb.org/mongo-driver from 1.17.0 to 1.17.1 in /src/go [\#18679](https://github.com/netdata/netdata/pull/18679) ([dependabot[bot]](https://github.com/apps/dependabot))
 - go.d downgrade go-ora to v2.8.20 [\#18677](https://github.com/netdata/netdata/pull/18677) ([ilyam8](https://github.com/ilyam8))
 - Docs fixes [\#18676](https://github.com/netdata/netdata/pull/18676) ([Ancairon](https://github.com/Ancairon))
+- cgroup-network now uses its own spawn server [\#18674](https://github.com/netdata/netdata/pull/18674) ([ktsaou](https://github.com/ktsaou))
 - Apps plugin improvements2 [\#18673](https://github.com/netdata/netdata/pull/18673) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18672](https://github.com/netdata/netdata/pull/18672) ([netdatabot](https://github.com/netdatabot))
 - Regenerate integrations.js [\#18671](https://github.com/netdata/netdata/pull/18671) ([netdatabot](https://github.com/netdatabot))
@@ -428,13 +439,6 @@
 - go.d beanstalk [\#18263](https://github.com/netdata/netdata/pull/18263) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18262](https://github.com/netdata/netdata/pull/18262) ([netdatabot](https://github.com/netdatabot))
 - go.d x509check add not\_revoked dimension [\#18261](https://github.com/netdata/netdata/pull/18261) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/beanstalk [\#18259](https://github.com/netdata/netdata/pull/18259) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18258](https://github.com/netdata/netdata/pull/18258) ([netdatabot](https://github.com/netdatabot))
-- docs: improve "Settings on Microsoft Teams" description [\#18257](https://github.com/netdata/netdata/pull/18257) ([ilyam8](https://github.com/ilyam8))
-- docs: add a note that the min dbengine tier size is 256 MB [\#18256](https://github.com/netdata/netdata/pull/18256) ([ilyam8](https://github.com/ilyam8))
-- Update Installer Code \(Services\) [\#18253](https://github.com/netdata/netdata/pull/18253) ([thiagoftsm](https://github.com/thiagoftsm))
-- Don’t install netdata-updater code on Windows. [\#18251](https://github.com/netdata/netdata/pull/18251) ([Ferroin](https://github.com/Ferroin))
-- Add trigger to clean up chart labels and charts [\#18248](https://github.com/netdata/netdata/pull/18248) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
