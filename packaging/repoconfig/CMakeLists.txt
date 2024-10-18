@@ -9,8 +9,8 @@ list(APPEND DEB_DISTROS debian ubuntu)
 
 set(DEB_GPG_KEY_SOURCE "https://repo.netdata.cloud/netdatabot.gpg.key")
 
-set(PACKAGE_VERSION 3)
-set(PACKAGE_RELEASE 5)
+set(PACKAGE_VERSION 4)
+set(PACKAGE_RELEASE 1)
 
 set(CPACK_THREADS 0)
 set(CPACK_STRIP_FILES NO)
@@ -118,9 +118,14 @@ if(${DISTRO} IN_LIST DEB_DISTROS)
   message(STATUS "Generating stable repository configuration for ${DISTRO} ${SUITE}")
   set(VARIANT stable)
   configure_file(netdata.sources.in netdata.sources @ONLY)
+  configure_file(mirrorlist.deb netdata-stable.mirrors @ONLY)
   message(STATUS "Generating edge repository configuration for ${DISTRO} ${SUITE}")
   set(VARIANT edge)
   configure_file(netdata.sources.in netdata-edge.sources @ONLY)
+  configure_file(mirrorlist.deb netdata-edge.mirrors @ONLY)
+  message(STATUS "Generating repoconfig repository mirrorlist for ${DISTOR} ${SUITE}")
+  set(VARIANT repoconfig)
+  configure_file(mirrorlist.deb netdata-repoconfig.mirrors @ONLY)
   message(STATUS "Preparing changelogs")
   set(PKG_NAME netdata-repo)
   file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/netdata-repo)
@@ -132,8 +137,16 @@ if(${DISTRO} IN_LIST DEB_DISTROS)
   install(FILES ${CMAKE_BINARY_DIR}/netdata.sources
           DESTINATION etc/apt/sources.list.d
           COMPONENT netdata-repo)
+  install(FILES ${CMAKE_BINARY_DIR}/netdata-stable.mirrors
+                ${CMAKE_BINARY_DIR}/netdata-repoconfig.mirrors
+          DESTINATION usr/share/netdata/repoconfig
+          COMPONENT netdata-repo)
   install(FILES ${CMAKE_BINARY_DIR}/netdata-edge.sources
           DESTINATION etc/apt/sources.list.d
+          COMPONENT netdata-repo-edge)
+  install(FILES ${CMAKE_BINARY_DIR}/netdata-edge.mirrors
+                ${CMAKE_BINARY_DIR}/netdata-repoconfig.mirrors
+          DESTINATION usr/share/netdata/repoconfig
           COMPONENT netdata-repo-edge)
 
   add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/netdatabot.gpg.key
@@ -216,16 +229,29 @@ elseif(${DISTRO} IN_LIST RPM_DISTROS)
   message(STATUS "Generating stable repository configuration for ${DISTRO} ${DISTRO_VERSION}")
   set(VARIANT stable)
   configure_file(netdata.repo.${REPO_ID} netdata.repo @ONLY)
+  configure_file(mirrorlist.rpm netdata-stable.mirrors @ONLY)
   message(STATUS "Generating edge repository configuration for ${DISTRO} ${DISTRO_VERSION}")
   set(VARIANT edge)
   configure_file(netdata.repo.${REPO_ID} netdata-edge.repo @ONLY)
+  configure_file(mirrorlist.rpm netdata-edge.mirrors @ONLY)
+  message(STATUS "Generating repoconfig repository mirrorlist for ${DISTOR} ${SUITE}")
+  set(VARIANT repoconfig)
+  configure_file(mirrorlist.rpm netdata-repoconfig.mirrors @ONLY)
 
   install(FILES ${CMAKE_BINARY_DIR}/netdata.repo
           COMPONENT netdata-repo
           DESTINATION etc/${REPO_CFG_PATH})
+  install(FILES ${CMAKE_BINARY_DIR}/netdata-stable.mirrors
+                ${CMAKE_BINARY_DIR}/netdata-repoconfig.mirrors
+          COMPONENT netdata-repo
+          DESTINATION usr/share/netdata/repoconfig)
   install(FILES ${CMAKE_BINARY_DIR}/netdata-edge.repo
           COMPONENT netdata-repo-edge
           DESTINATION etc/${REPO_CFG_PATH})
+  install(FILES ${CMAKE_BINARY_DIR}/netdata-edge.mirrors
+                ${CMAKE_BINARY_DIR}/netdata-repoconfig.mirrors
+          COMPONENT netdata-repo-edge
+          DESTINATION usr/share/netdata/repoconfig)
 
   set(CPACK_RPM_COMPONENT_INSTALL ON)
   set(CPACK_RPM_PACAKGE_AUTOREQPROV OFF)
