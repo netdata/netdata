@@ -497,8 +497,8 @@ static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dicti
     else
         dict->value_aral = NULL;
 
-    if(!(dict->options & (DICT_OPTION_INDEX_JUDY|DICT_OPTION_INDEX_HASHTABLE)))
-        dict->options |= DICT_OPTION_INDEX_JUDY;
+//    if(!(dict->options & (DICT_OPTION_INDEX_JUDY|DICT_OPTION_INDEX_HASHTABLE)))
+    dict->options |= DICT_OPTION_INDEX_JUDY;
 
     size_t dict_size = 0;
     dict_size += sizeof(DICTIONARY);
