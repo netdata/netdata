@@ -377,8 +377,8 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
                     &d->disk_ops,
                     device,
                     NULL,
-                    d->diskReadBytesPerSec.current.Data,
-                    d->diskWriteBytesPerSec.current.Data,
+                    d->diskReadsPerSec.current.Data,
+                    d->diskWritesPerSec.current.Data,
                     update_every,
                     physical_disk_labels,
                     d);
