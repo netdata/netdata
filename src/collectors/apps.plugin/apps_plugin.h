@@ -151,6 +151,8 @@ extern int max_fds_cache_seconds;
 
 // --------------------------------------------------------------------------------------------------------------------
 
+#define MAX_SYSTEM_FD_TO_ALLOW_FILES_PROCESSING 100000
+
 extern pid_t INIT_PID;
 
 extern bool debug_enabled;
@@ -161,7 +163,8 @@ extern bool enable_groups_charts;
 extern bool include_exited_childs;
 extern bool enable_function_cmdline;
 extern bool proc_pid_cmdline_is_needed;
-extern bool enable_file_charts;
+extern int enable_file_charts;
+extern bool obsolete_file_charts;
 
 extern size_t
     global_iterations_counter,
@@ -177,10 +180,6 @@ extern size_t
 extern bool enable_guest_charts;
 extern bool show_guest_time;
 #endif
-
-extern uint32_t
-    all_files_len,
-    all_files_size;
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 extern kernel_uint_t
@@ -463,6 +462,7 @@ struct pid_fd {
 
 #define pid_stat_comm(p) (string2str(p->comm))
 #define pid_stat_cmdline(p) (string2str(p->cmdline))
+uint32_t all_file_len_get(void);
 
 struct pid_stat {
     int32_t pid;

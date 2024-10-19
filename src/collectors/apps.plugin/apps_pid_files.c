@@ -38,6 +38,14 @@ struct file_descriptor {
     FD_FILETYPE type;
 } *all_files = NULL;
 
+static uint32_t
+    all_files_len,
+    all_files_size;
+
+uint32_t all_file_len_get(void) {
+    return all_files_len;
+}
+
 // ----------------------------------------------------------------------------
 
 static inline void reallocate_target_fds(struct target *w) {
@@ -110,6 +118,15 @@ static inline void aggregate_fd_on_target(int fd, struct target *w) {
 }
 
 void aggregate_pid_fds_on_targets(struct pid_stat *p) {
+    if(enable_file_charts == CONFIG_BOOLEAN_AUTO && all_files_len > MAX_SYSTEM_FD_TO_ALLOW_FILES_PROCESSING) {
+        nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "apps.plugin: the number of system file descriptors are too many (%u), "
+                                             "disabling file charts. If you want this enabled, set the 'with-files' "
+                                             "parameter to [plugin:apps] section of netdata.conf", all_files_size);
+
+        enable_file_charts = CONFIG_BOOLEAN_NO;
+        obsolete_file_charts = true;
+        return;
+    }
 
     if(unlikely(!p->updated)) {
         // the process is not running
