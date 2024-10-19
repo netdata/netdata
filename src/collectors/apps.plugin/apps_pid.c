@@ -58,7 +58,7 @@ void apps_pids_init(void) {
 }
 
 static inline uint64_t pid_hash(pid_t pid) {
-    return ((uint64_t)pid << 31) + (uint64_t)pid; // we remove 1 bit when shifting to make it different
+    return XXH3_64bits(&pid, sizeof(pid));
 }
 
 inline struct pid_stat *find_pid_entry(pid_t pid) {
