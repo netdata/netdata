@@ -1176,6 +1176,7 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/disk-iotime.h
         src/collectors/common-contexts/disk-ops.h
         src/collectors/common-contexts/disk-qops.h
+        src/collectors/common-contexts/disk-svctm.h
         src/collectors/common-contexts/disk-util.h
         src/collectors/common-contexts/system-io.h
         src/collectors/common-contexts/system-interrupts.h

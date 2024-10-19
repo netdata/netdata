@@ -87,6 +87,7 @@ static struct disk {
     ND_DISK_BUSY disk_busy;
     ND_DISK_IOTIME disk_iotime;
     ND_DISK_AWAIT disk_await;
+    ND_DISK_SVCTM disk_svctm;
 
     RRDSET *st_ext_io;
     RRDDIM *rd_io_discards;
@@ -119,9 +120,6 @@ static struct disk {
 
     RRDSET *st_ext_avgsz;
     RRDDIM *rd_avgsz_discards;
-
-    RRDSET *st_svctm;
-    RRDDIM *rd_svctm_svctm;
 
     RRDSET *st_bcache_size;
     RRDDIM *rd_bcache_dirty_size;
@@ -1279,6 +1277,7 @@ static void diskstats_cleanup_disks() {
             rrdset_obsolete_and_pointer_null(d->disk_busy.st_busy);
             rrdset_obsolete_and_pointer_null(d->disk_iotime.st_iotime);
             rrdset_obsolete_and_pointer_null(d->disk_await.st_await);
+            rrdset_obsolete_and_pointer_null(d->disk_svctm.st_svctm);
 
             rrdset_obsolete_and_pointer_null(d->st_avgsz);
             rrdset_obsolete_and_pointer_null(d->st_ext_avgsz);
@@ -1290,7 +1289,6 @@ static void diskstats_cleanup_disks() {
             rrdset_obsolete_and_pointer_null(d->st_mops);
             rrdset_obsolete_and_pointer_null(d->st_ext_mops);
             rrdset_obsolete_and_pointer_null(d->st_ext_ops);
-            rrdset_obsolete_and_pointer_null(d->st_svctm);
             rrdset_obsolete_and_pointer_null(d->st_bcache);
             rrdset_obsolete_and_pointer_null(d->st_bcache_bypass);
             rrdset_obsolete_and_pointer_null(d->st_bcache_rates);
@@ -1949,36 +1947,20 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
             if ((d->do_util == CONFIG_BOOLEAN_YES || d->do_util == CONFIG_BOOLEAN_AUTO) &&
                 (d->do_ops == CONFIG_BOOLEAN_YES || d->do_ops == CONFIG_BOOLEAN_AUTO)) {
-                if(unlikely(!d->st_svctm)) {
-                    d->st_svctm = rrdset_create_localhost(
-                            "disk_svctm"
-                            , d->chart_id
-                            , d->disk
-                            , family
-                            , "disk.svctm"
-                            , "Average Service Time"
-                            , "milliseconds/operation"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
-                            , NETDATA_CHART_PRIO_DISK_SVCTM
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rrdset_flag_set(d->st_svctm, RRDSET_FLAG_DETAIL);
-
-                    d->rd_svctm_svctm = rrddim_add(d->st_svctm, "svctm", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-
-                    add_labels_to_disk(d, d->st_svctm);
-                }
 
                 double svctm_avg =
-                    ((rd_ios - last_rd_ios) + (wr_ios - last_wr_ios)) ?
-                        (double)(busy_ms - last_busy_ms) / ((rd_ios - last_rd_ios) + (wr_ios - last_wr_ios)) :
+                        ((rd_ios - last_rd_ios) + (wr_ios - last_wr_ios)) ?
+                        (double) (busy_ms - last_busy_ms) / ((rd_ios - last_rd_ios) + (wr_ios - last_wr_ios)) :
                         0;
 
-                rrddim_set_by_pointer(d->st_svctm, d->rd_svctm_svctm, (collected_number)(svctm_avg * 1000));
-                rrdset_done(d->st_svctm);
+                common_disk_svctm(
+                        &d->disk_svctm,
+                        d->chart_id,
+                        d->disk,
+                        svctm_avg,
+                        update_every,
+                        disk_labels_cb,
+                        d);
             }
         }
 
