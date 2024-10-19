@@ -21,7 +21,8 @@ typedef struct groupnames_cache {
 static inline STRING *system_groupnames_cache_lookup_gid(GROUPNAMES_CACHE *gc, gid_t gid) {
     spinlock_lock(&gc->spinlock);
 
-    SIMPLE_HASHTABLE_SLOT_GROUPNAMES_CACHE *sl = simple_hashtable_get_slot_GROUPNAMES_CACHE(&gc->ht, gid, &gid, true);
+    XXH64_hash_t hash = XXH3_64bits(&gid, sizeof(gid));
+    SIMPLE_HASHTABLE_SLOT_GROUPNAMES_CACHE *sl = simple_hashtable_get_slot_GROUPNAMES_CACHE(&gc->ht, hash, &gid, true);
     STRING *g = SIMPLE_HASHTABLE_SLOT_DATA(sl);
     if(!g) {
         char tmp[1024 + 1];

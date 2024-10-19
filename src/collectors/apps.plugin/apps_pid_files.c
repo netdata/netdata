@@ -38,6 +38,14 @@ struct file_descriptor {
     FD_FILETYPE type;
 } *all_files = NULL;
 
+static uint32_t
+    all_files_len,
+    all_files_size;
+
+uint32_t all_file_len_get(void) {
+    return all_files_len;
+}
+
 // ----------------------------------------------------------------------------
 
 static inline void reallocate_target_fds(struct target *w) {
@@ -110,6 +118,15 @@ static inline void aggregate_fd_on_target(int fd, struct target *w) {
 }
 
 void aggregate_pid_fds_on_targets(struct pid_stat *p) {
+    if(enable_file_charts == CONFIG_BOOLEAN_AUTO && all_files_len > MAX_SYSTEM_FD_TO_ALLOW_FILES_PROCESSING) {
+        nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "apps.plugin: the number of system file descriptors are too many (%u), "
+                                             "disabling file charts. If you want this enabled, set the 'with-files' "
+                                             "parameter to [plugin:apps] section of netdata.conf", all_files_size);
+
+        enable_file_charts = CONFIG_BOOLEAN_NO;
+        obsolete_file_charts = true;
+        return;
+    }
 
     if(unlikely(!p->updated)) {
         // the process is not running
@@ -247,8 +264,10 @@ void file_descriptor_not_used(int id) {
 static inline void all_files_grow() {
     void *old = all_files;
 
+    uint32_t new_size = (all_files_size > 0) ? all_files_size * 2 : 2048;
+
     // there is no empty slot
-    all_files = reallocz(all_files, (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP) * sizeof(struct file_descriptor));
+    all_files = reallocz(all_files, new_size * sizeof(struct file_descriptor));
 
     // if the address changed, we have to rebuild the index
     // since all pointers are now invalid
@@ -264,7 +283,7 @@ static inline void all_files_grow() {
 
     // initialize the newly added entries
 
-    for(uint32_t i = all_files_size; i < (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP); i++) {
+    for(uint32_t i = all_files_size; i < new_size; i++) {
         all_files[i].count = 0;
         all_files[i].name = NULL;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -274,7 +293,7 @@ static inline void all_files_grow() {
     }
 
     if(unlikely(!all_files_size)) all_files_len = 1;
-    all_files_size += FILE_DESCRIPTORS_INCREASE_STEP;
+    all_files_size = new_size;
 }
 
 static inline uint32_t file_descriptor_set_on_empty_slot(const char *name, uint32_t hash, FD_FILETYPE type) {

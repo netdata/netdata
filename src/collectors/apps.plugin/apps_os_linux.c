@@ -55,17 +55,16 @@ bool apps_os_read_pid_fds_linux(struct pid_stat *p, void *ptr __maybe_unused) {
         if(unlikely((size_t)fdid >= p->fds_size)) {
             // it is small, extend it
 
-            debug_log("extending fd memory slots for %s from %d to %d"
-                      , pid_stat_comm(p)
-                          , p->fds_size
-                      , fdid + MAX_SPARE_FDS
-            );
+            uint32_t new_size = fds_new_size(p->fds_size, fdid);
 
-            p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(struct pid_fd));
+            debug_log("extending fd memory slots for %s from %u to %u",
+                      pid_stat_comm(p), p->fds_size, new_size);
+
+            p->fds = reallocz(p->fds, new_size * sizeof(struct pid_fd));
 
             // and initialize it
-            init_pid_fds(p, p->fds_size, (fdid + MAX_SPARE_FDS) - p->fds_size);
-            p->fds_size = (size_t)fdid + MAX_SPARE_FDS;
+            init_pid_fds(p, p->fds_size, new_size - p->fds_size);
+            p->fds_size = new_size;
         }
 
         if(unlikely(p->fds[fdid].fd < 0 && de->d_ino != p->fds[fdid].inode)) {
