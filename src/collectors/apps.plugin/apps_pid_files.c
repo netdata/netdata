@@ -2,6 +2,15 @@
 
 #include "apps_plugin.h"
 
+static uint32_t
+        all_files_len = 0,
+        all_files_size = 0;
+
+uint32_t all_files_len_get(void) {
+    (void)all_files_size;
+    return all_files_len;
+}
+
 #if (PROCESSES_HAVE_FDS == 1)
 // ----------------------------------------------------------------------------
 // file descriptor
@@ -37,14 +46,6 @@ struct file_descriptor {
     uint32_t pos;
     FD_FILETYPE type;
 } *all_files = NULL;
-
-static uint32_t
-    all_files_len,
-    all_files_size;
-
-uint32_t all_file_len_get(void) {
-    return all_files_len;
-}
 
 // ----------------------------------------------------------------------------
 

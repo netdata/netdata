@@ -90,7 +90,7 @@ void send_resource_usage_to_netdata(usec_t dt) {
             , inodes_changed_counter
             , links_changed_counter
             , all_pids_count()
-            , all_file_len_get()
+            , all_files_len_get()
             , apps_groups_targets_count
             , targets_assignment_counter
     );
