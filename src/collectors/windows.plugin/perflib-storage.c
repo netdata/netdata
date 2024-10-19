@@ -7,9 +7,15 @@
 #define _COMMON_PLUGIN_MODULE_NAME "PerflibStorage"
 #include "../common-contexts/common-contexts.h"
 
+#include "libnetdata/os/windows-wmi/windows-wmi.h"
+
 struct logical_disk {
     usec_t last_collected;
     bool collected_metadata;
+
+    UINT DriveType;
+    DWORD SerialNumber;
+    bool readonly;
 
     STRING *filesystem;
 
@@ -27,6 +33,11 @@ struct physical_disk {
 
     STRING *device;
     STRING *mount_point;
+    STRING *manufacturer;
+    STRING *model;
+    STRING *media_type;
+    STRING *name;
+    STRING *device_id;
 
     ND_DISK_IO disk_io;
     // COUNTER_DATA diskBytesPerSec;
@@ -113,6 +124,11 @@ static void physical_disk_initialize(struct physical_disk *d) {
 static void physical_disk_cleanup(struct physical_disk *d) {
     string_freez(d->device);
     string_freez(d->mount_point);
+    string_freez(d->manufacturer);
+    string_freez(d->model);
+    string_freez(d->media_type);
+    string_freez(d->name);
+    string_freez(d->device_id);
 
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_io.st_io);
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_ops.st_ops);
@@ -146,7 +162,7 @@ static void initialize(void) {
     dictionary_register_insert_callback(physicalDisks, dict_physical_disk_insert_cb, NULL);
 }
 
-static STRING *getFileSystemType(const char* diskName) {
+static STRING *getFileSystemType(struct logical_disk *d, const char* diskName) {
     if (!diskName || !*diskName) return NULL;
 
     char fileSystemNameBuffer[128] = {0};  // Buffer for file system name
@@ -158,13 +174,15 @@ static STRING *getFileSystemType(const char* diskName) {
 
     // Check if the input is likely a drive letter (e.g., "C:")
     if (isalpha((uint8_t)diskName[0]) && diskName[1] == ':' && diskName[2] == '\0')
-        snprintf(pathBuffer, sizeof(pathBuffer), "%s\\", diskName);  // Format as "C:\\"
+        snprintf(pathBuffer, sizeof(pathBuffer), "%s\\", diskName);  // Format as "C:\"
     else
         // Assume it's a Volume GUID path or a device path
-        snprintf(pathBuffer, sizeof(pathBuffer), "\\\\.\\%s", diskName);  // Format as "\\.\HarddiskVolume1"
+        snprintf(pathBuffer, sizeof(pathBuffer), "\\\\.\\%s\\", diskName);  // Format as "\\.\HarddiskVolume1\"
+
+    d->DriveType = GetDriveTypeA(pathBuffer);
 
     // Attempt to get the volume information
-    success = GetVolumeInformation(
+    success = GetVolumeInformationA(
         pathBuffer,                // Path to the disk
         NULL,                      // We don't need the volume name
         0,                         // Size of volume name buffer is 0
@@ -175,13 +193,33 @@ static STRING *getFileSystemType(const char* diskName) {
         sizeof(fileSystemNameBuffer) // Size of file system name buffer
     );
 
-    if (success && fileSystemNameBuffer[0]) {
-        char *s = fileSystemNameBuffer;
-        while(*s) { *s = tolower((uint8_t)*s); s++; }
-        return string_strdupz(fileSystemNameBuffer);  // Duplicate the file system name
+    if(success) {
+        d->readonly = fileSystemFlags & FILE_READ_ONLY_VOLUME;
+        d->SerialNumber = serialNumber;
+
+        if (fileSystemNameBuffer[0]) {
+            char *s = fileSystemNameBuffer;
+            while (*s) {
+                *s = tolower((uint8_t) *s);
+                s++;
+            }
+            return string_strdupz(fileSystemNameBuffer);  // Duplicate the file system name
+        }
     }
-    else
-        return NULL;
+    return NULL;
+}
+
+static const char *drive_type_to_str(UINT type) {
+    switch(type) {
+        default:
+        case 0: return "unknown";
+        case 1: return "norootdir";
+        case 2: return "removable";
+        case 3: return "fixed";
+        case 4: return "remote";
+        case 5: return "cdrom";
+        case 6: return "ramdisk";
+    }
 }
 
 static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut) {
@@ -205,7 +243,7 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
         d->last_collected = now_ut;
 
         if(!d->collected_metadata) {
-            d->filesystem = getFileSystemType(windows_shared_buffer);
+            d->filesystem = getFileSystemType(d, windows_shared_buffer);
             d->collected_metadata = true;
         }
 
@@ -229,10 +267,15 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
             );
 
             rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-            // rrdlabels_add(d->st->rrdlabels, "mount_root", name, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_disk_space->rrdlabels, "drive_type", drive_type_to_str(d->DriveType), RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_disk_space->rrdlabels, "filesystem", d->filesystem ? string2str(d->filesystem) : "unknown", RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_disk_space->rrdlabels, "rw_mode", d->readonly ? "ro" : "rw", RRDLABEL_SRC_AUTO);
 
-            if(d->filesystem)
-                rrdlabels_add(d->st_disk_space->rrdlabels, "filesystem", string2str(d->filesystem), RRDLABEL_SRC_AUTO);
+            {
+                char buf[UINT64_HEX_MAX_LENGTH];
+                print_uint64_hex(buf, d->SerialNumber);
+                rrdlabels_add(d->st_disk_space->rrdlabels, "serial_number", buf, RRDLABEL_SRC_AUTO);
+            }
 
             d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -268,6 +311,21 @@ static void physical_disk_labels(RRDSET *st, void *data) {
 
     if (d->mount_point)
         rrdlabels_add(st->rrdlabels, "mount_point", string2str(d->mount_point), RRDLABEL_SRC_AUTO);
+
+    if (d->manufacturer)
+        rrdlabels_add(st->rrdlabels, "manufacturer", string2str(d->manufacturer), RRDLABEL_SRC_AUTO);
+
+    if (d->model)
+        rrdlabels_add(st->rrdlabels, "model", string2str(d->model), RRDLABEL_SRC_AUTO);
+
+    if (d->media_type)
+        rrdlabels_add(st->rrdlabels, "media_type", string2str(d->media_type), RRDLABEL_SRC_AUTO);
+
+    if (d->name)
+        rrdlabels_add(st->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+
+    if (d->device_id)
+        rrdlabels_add(st->rrdlabels, "device_id", string2str(d->device_id), RRDLABEL_SRC_AUTO);
 }
 
 static bool str_is_numeric(const char *s) {
@@ -306,6 +364,9 @@ static inline bool perflib_previous_is_set(COUNTER_DATA *d) {
     return d->updated && d->previous.Data && d->previous.Time && d->current.Time > d->previous.Time;
 }
 
+#define MAX_WMI_DRIVES 100
+static DiskDriveInfoWMI infos[MAX_WMI_DRIVES];
+
 static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut) {
     DICTIONARY *dict = physicalDisks;
 
@@ -321,6 +382,7 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
         if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
             strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
 
+        int device_index = -1;
         char *device = windows_shared_buffer;
         char mount_point[128]; mount_point[0] = '\0';
 
@@ -338,8 +400,8 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
             }
 
             if(str_is_numeric(windows_shared_buffer)) {
-                uint64_t n = str2ull(device, NULL);
-                snprintfz(windows_shared_buffer, sizeof(windows_shared_buffer), "Disk %" PRIu64, n);
+                device_index = str2ull(device, NULL);
+                snprintfz(windows_shared_buffer, sizeof(windows_shared_buffer), "Disk %d", device_index);
                 device = windows_shared_buffer;
             }
 
@@ -349,7 +411,22 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
         d->last_collected = now_ut;
 
         if (!d->collected_metadata) {
-            // TODO collect metadata - device_type, serial, id
+            if(!is_system && device_index != -1) {
+                size_t infoCount = GetDiskDriveInfo(infos, _countof(infos));
+                for(size_t k = 0; k < infoCount ; k++) {
+                    if(infos[k].Index != device_index)
+                        continue;
+
+                    d->manufacturer = string_strdupz(infos[k].Manufacturer);
+                    d->model = string_strdupz(infos[k].Model);
+                    d->media_type = string_strdupz(infos[k].MediaType);
+                    d->name = string_strdupz(infos[k].Name);
+                    d->device_id = string_strdupz(infos[k].DeviceID);
+
+                    break;
+                }
+            }
+
             d->device = string_strdupz(device);
             d->mount_point = string_strdupz(mount_point);
             d->collected_metadata = true;
