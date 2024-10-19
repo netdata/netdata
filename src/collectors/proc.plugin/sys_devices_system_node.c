@@ -231,7 +231,7 @@ static void do_numa_meminfo(struct node *m, int update_every) {
                        (hash == hash_MemFree && !strcmp(name, "MemFree"))
                     || (hash == hash_MemUsed && !strcmp(name, "MemUsed"))
                     ))
-                rrddim_set(m->meminfo.st, name, (collected_number)str2kernel_uint_t(value));
+                rrddim_set(m->meminfo.st, name, (collected_number)str2kernel_uint_t(value) * 1024);
         }
 
         rrdset_done(m->meminfo.st);
