@@ -49,12 +49,15 @@ struct physical_disk {
     ND_DISK_QOPS disk_qops;
     COUNTER_DATA currentDiskQueueLength;
 
-    COUNTER_DATA averageDiskQueueLength;
-    COUNTER_DATA averageDiskReadQueueLength;
-    COUNTER_DATA averageDiskWriteQueueLength;
-    COUNTER_DATA averageDiskSecondsPerTransfer;
+    ND_DISK_AWAIT disk_await;
+    // COUNTER_DATA averageDiskSecondsPerTransfer;
     COUNTER_DATA averageDiskSecondsPerRead;
     COUNTER_DATA averageDiskSecondsPerWrite;
+
+    // COUNTER_DATA averageDiskQueueLength;
+    COUNTER_DATA averageDiskReadQueueLength;
+    COUNTER_DATA averageDiskWriteQueueLength;
+
     COUNTER_DATA diskTransfersPerSec;
     COUNTER_DATA diskBytesPerSec;
     COUNTER_DATA averageDiskBytesPerTransfer;
@@ -84,12 +87,15 @@ static void physical_disk_initialize(struct physical_disk *d) {
     d->percentDiskReadTime.key = "% Disk Read Time";
     d->percentDiskWriteTime.key = "% Disk Write Time";
     d->currentDiskQueueLength.key = "Current Disk Queue Length";
-    d->averageDiskQueueLength.key = "Avg. Disk Queue Length";
+
+    // d->averageDiskQueueLength.key = "Avg. Disk Queue Length";
     d->averageDiskReadQueueLength.key = "Avg. Disk Read Queue Length";
     d->averageDiskWriteQueueLength.key = "Avg. Disk Write Queue Length";
-    d->averageDiskSecondsPerTransfer.key = "Avg. Disk sec/Transfer";
+
+    // d->averageDiskSecondsPerTransfer.key = "Avg. Disk sec/Transfer";
     d->averageDiskSecondsPerRead.key = "Avg. Disk sec/Read";
     d->averageDiskSecondsPerWrite.key = "Avg. Disk sec/Write";
+
     d->diskTransfersPerSec.key = "Disk Transfers/sec";
     d->diskReadsPerSec.key = "Disk Reads/sec";
     d->diskWritesPerSec.key = "Disk Writes/sec";
@@ -263,6 +269,24 @@ static bool str_is_numeric(const char *s) {
     return true;
 }
 
+static inline double perflib_average_timer_ms(COUNTER_DATA *d) {
+    ULONGLONG data1 = d->current.Data;
+    ULONGLONG data0 = d->previous.Data;
+    LONGLONG time1 = d->current.Time;
+    LONGLONG time0 = d->previous.Time;
+    LONGLONG freq1 = d->current.Frequency;
+
+    LONGLONG dt = (time1 - time0);
+    if(dt > 0)
+        return ((double)(data1 - data0) / (double)(freq1 / MSEC_PER_SEC)) / dt;
+    else
+        return 0;
+}
+
+static inline bool perflib_previous_is_set(COUNTER_DATA *d) {
+    return d->updated && d->previous.Data && d->previous.Time && d->current.Time > d->previous.Time;
+}
+
 static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut) {
     DICTIONARY *dict = physicalDisks;
 
@@ -348,8 +372,7 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime)) {
-            if (d->percentIdleTime.previous.Data && d->percentIdleTime.previous.Time &&
-                    d->percentIdleTime.current.Time > d->percentIdleTime.previous.Time) {
+            if (perflib_previous_is_set(&d->percentIdleTime)) {
                 collected_number idle_percentage =
                         100 * (d->percentIdleTime.current.Data - d->percentIdleTime.previous.Data)
                         / (d->percentIdleTime.current.Time - d->percentIdleTime.previous.Time);
@@ -404,12 +427,29 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
                     d);
         }
 
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskQueueLength);
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerWrite)) {
+
+            if (perflib_previous_is_set(&d->averageDiskSecondsPerRead) &&
+                    perflib_previous_is_set(&d->averageDiskSecondsPerWrite)) {
+
+                common_disk_await(
+                        &d->disk_await,
+                        device,
+                        NULL,
+                        perflib_average_timer_ms(&d->averageDiskSecondsPerRead),
+                        perflib_average_timer_ms(&d->averageDiskSecondsPerWrite),
+                        update_every,
+                        physical_disk_labels,
+                        d);
+            }
+        }
+
+        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskQueueLength);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskReadQueueLength);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskWriteQueueLength);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerTransfer);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerWrite);
+
+        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerTransfer);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskTransfersPerSec);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskBytesPerSec);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerTransfer);
