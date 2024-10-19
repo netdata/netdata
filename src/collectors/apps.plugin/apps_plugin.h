@@ -462,7 +462,7 @@ struct pid_fd {
 
 #define pid_stat_comm(p) (string2str(p->comm))
 #define pid_stat_cmdline(p) (string2str(p->cmdline))
-uint32_t all_file_len_get(void);
+uint32_t all_files_len_get(void);
 
 struct pid_stat {
     int32_t pid;
