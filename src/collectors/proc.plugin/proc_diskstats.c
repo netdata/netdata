@@ -88,6 +88,7 @@ static struct disk {
     ND_DISK_IOTIME disk_iotime;
     ND_DISK_AWAIT disk_await;
     ND_DISK_SVCTM disk_svctm;
+    ND_DISK_AVGSZ disk_avgsz;
 
     RRDSET *st_ext_io;
     RRDDIM *rd_io_discards;
@@ -113,10 +114,6 @@ static struct disk {
     RRDSET *st_ext_await;
     RRDDIM *rd_await_discards;
     RRDDIM *rd_await_flushes;
-
-    RRDSET *st_avgsz;
-    RRDDIM *rd_avgsz_reads;
-    RRDDIM *rd_avgsz_writes;
 
     RRDSET *st_ext_avgsz;
     RRDDIM *rd_avgsz_discards;
@@ -1045,8 +1042,8 @@ static int diskstats_function_block_devices(BUFFER *wb, const char *function __m
         double iops_avg_time_read = rrddim_get_last_stored_value(d->disk_await.rd_await_reads, &max_iops_avg_time_read, 1);
         double iops_avg_time_write = rrddim_get_last_stored_value(d->disk_await.rd_await_writes, &max_iops_avg_time_write, 1);
         // Avg IO Size
-        double iops_avg_size_read = rrddim_get_last_stored_value(d->rd_avgsz_reads, &max_iops_avg_size_read, 1);
-        double iops_avg_size_write = rrddim_get_last_stored_value(d->rd_avgsz_writes, &max_iops_avg_size_write, 1);
+        double iops_avg_size_read = rrddim_get_last_stored_value(d->disk_avgsz.rd_avgsz_reads, &max_iops_avg_size_read, 1);
+        double iops_avg_size_write = rrddim_get_last_stored_value(d->disk_avgsz.rd_avgsz_writes, &max_iops_avg_size_write, 1);
 
 
         buffer_json_add_array_item_double(wb, io_reads);
@@ -1279,7 +1276,7 @@ static void diskstats_cleanup_disks() {
             rrdset_obsolete_and_pointer_null(d->disk_await.st_await);
             rrdset_obsolete_and_pointer_null(d->disk_svctm.st_svctm);
 
-            rrdset_obsolete_and_pointer_null(d->st_avgsz);
+            rrdset_obsolete_and_pointer_null(d->disk_avgsz.st_avgsz);
             rrdset_obsolete_and_pointer_null(d->st_ext_avgsz);
             rrdset_obsolete_and_pointer_null(d->st_ext_await);
             rrdset_obsolete_and_pointer_null(d->st_backlog);
@@ -1885,33 +1882,19 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
             if ((d->do_io == CONFIG_BOOLEAN_YES || d->do_io == CONFIG_BOOLEAN_AUTO) &&
                 (d->do_ops == CONFIG_BOOLEAN_YES || d->do_ops == CONFIG_BOOLEAN_AUTO)) {
-                if(unlikely(!d->st_avgsz)) {
-                    d->st_avgsz = rrdset_create_localhost(
-                            "disk_avgsz"
-                            , d->chart_id
-                            , d->disk
-                            , family
-                            , "disk.avgsz"
-                            , "Average Completed I/O Operation Bandwidth"
-                            , "KiB/operation"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_DISKSTATS_NAME
-                            , NETDATA_CHART_PRIO_DISK_AVGSZ
-                            , update_every
-                            , RRDSET_TYPE_AREA
-                    );
 
-                    rrdset_flag_set(d->st_avgsz, RRDSET_FLAG_DETAIL);
+                kernel_uint_t avg_read_bytes = SECTOR_SIZE * ((rd_ios - last_rd_ios)  ? (readsectors  - last_readsectors)  / (rd_ios - last_rd_ios) : 0);
+                kernel_uint_t avg_write_bytes = SECTOR_SIZE * ((wr_ios - last_wr_ios) ? (writesectors - last_writesectors) / (wr_ios - last_wr_ios) : 0);
 
-                    d->rd_avgsz_reads  = rrddim_add(d->st_avgsz, "reads",  NULL, SECTOR_SIZE, 1024,      RRD_ALGORITHM_ABSOLUTE);
-                    d->rd_avgsz_writes = rrddim_add(d->st_avgsz, "writes", NULL, SECTOR_SIZE * -1, 1024, RRD_ALGORITHM_ABSOLUTE);
-
-                    add_labels_to_disk(d, d->st_avgsz);
-                }
-
-                rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_reads,  (rd_ios - last_rd_ios)  ? (readsectors  - last_readsectors)  / (rd_ios - last_rd_ios)  : 0);
-                rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_writes, (wr_ios - last_wr_ios) ? (writesectors - last_writesectors) / (wr_ios - last_wr_ios) : 0);
-                rrdset_done(d->st_avgsz);
+                common_disk_avgsz(
+                        &d->disk_avgsz,
+                        d->chart_id,
+                        d->disk,
+                        avg_read_bytes,
+                        avg_write_bytes,
+                        update_every,
+                        disk_labels_cb,
+                        d);
             }
 
             if(do_dc_stats && d->do_io  == CONFIG_BOOLEAN_YES && d->do_ops == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {

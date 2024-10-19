@@ -1171,6 +1171,7 @@ endif()
 set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/common-contexts.h
         src/collectors/common-contexts/disk-await.h
+        src/collectors/common-contexts/disk-avgsz.h
         src/collectors/common-contexts/disk-busy.h
         src/collectors/common-contexts/disk-io.h
         src/collectors/common-contexts/disk-iotime.h

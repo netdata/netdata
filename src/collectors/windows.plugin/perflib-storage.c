@@ -29,10 +29,12 @@ struct physical_disk {
     STRING *mount_point;
 
     ND_DISK_IO disk_io;
+    // COUNTER_DATA diskBytesPerSec;
     COUNTER_DATA diskReadBytesPerSec;
     COUNTER_DATA diskWriteBytesPerSec;
 
     ND_DISK_OPS disk_ops;
+    // COUNTER_DATA diskTransfersPerSec;
     COUNTER_DATA diskReadsPerSec;
     COUNTER_DATA diskWritesPerSec;
 
@@ -48,6 +50,9 @@ struct physical_disk {
 
     ND_DISK_QOPS disk_qops;
     COUNTER_DATA currentDiskQueueLength;
+    // COUNTER_DATA averageDiskQueueLength;
+    // COUNTER_DATA averageDiskReadQueueLength;
+    // COUNTER_DATA averageDiskWriteQueueLength;
 
     ND_DISK_AWAIT disk_await;
     COUNTER_DATA averageDiskSecondsPerRead;
@@ -56,15 +61,11 @@ struct physical_disk {
     ND_DISK_SVCTM disk_svctm;
     COUNTER_DATA averageDiskSecondsPerTransfer;
 
-    // COUNTER_DATA averageDiskQueueLength;
-    COUNTER_DATA averageDiskReadQueueLength;
-    COUNTER_DATA averageDiskWriteQueueLength;
-
-    COUNTER_DATA diskTransfersPerSec;
-    COUNTER_DATA diskBytesPerSec;
-    COUNTER_DATA averageDiskBytesPerTransfer;
+    ND_DISK_AVGSZ disk_avgsz;
+    //COUNTER_DATA averageDiskBytesPerTransfer;
     COUNTER_DATA averageDiskBytesPerRead;
     COUNTER_DATA averageDiskBytesPerWrite;
+
     COUNTER_DATA splitIoPerSec;
 };
 
@@ -89,22 +90,19 @@ static void physical_disk_initialize(struct physical_disk *d) {
     d->percentDiskReadTime.key = "% Disk Read Time";
     d->percentDiskWriteTime.key = "% Disk Write Time";
     d->currentDiskQueueLength.key = "Current Disk Queue Length";
-
     // d->averageDiskQueueLength.key = "Avg. Disk Queue Length";
-    d->averageDiskReadQueueLength.key = "Avg. Disk Read Queue Length";
-    d->averageDiskWriteQueueLength.key = "Avg. Disk Write Queue Length";
-
+    // d->averageDiskReadQueueLength.key = "Avg. Disk Read Queue Length";
+    // d->averageDiskWriteQueueLength.key = "Avg. Disk Write Queue Length";
     d->averageDiskSecondsPerTransfer.key = "Avg. Disk sec/Transfer";
     d->averageDiskSecondsPerRead.key = "Avg. Disk sec/Read";
     d->averageDiskSecondsPerWrite.key = "Avg. Disk sec/Write";
-
-    d->diskTransfersPerSec.key = "Disk Transfers/sec";
+    // d->diskTransfersPerSec.key = "Disk Transfers/sec";
     d->diskReadsPerSec.key = "Disk Reads/sec";
     d->diskWritesPerSec.key = "Disk Writes/sec";
-    d->diskBytesPerSec.key = "Disk Bytes/sec";
+    // d->diskBytesPerSec.key = "Disk Bytes/sec";
     d->diskReadBytesPerSec.key = "Disk Read Bytes/sec";
     d->diskWriteBytesPerSec.key = "Disk Write Bytes/sec";
-    d->averageDiskBytesPerTransfer.key = "Avg. Disk Bytes/Transfer";
+    // d->averageDiskBytesPerTransfer.key = "Avg. Disk Bytes/Transfer";
     d->averageDiskBytesPerRead.key = "Avg. Disk Bytes/Read";
     d->averageDiskBytesPerWrite.key = "Avg. Disk Bytes/Write";
     d->splitIoPerSec.key = "Split IO/Sec";
@@ -285,6 +283,19 @@ static inline double perflib_average_timer_ms(COUNTER_DATA *d) {
         return 0;
 }
 
+static inline uint64_t perflib_average_bulk(COUNTER_DATA *d) {
+    ULONGLONG data1 = d->current.Data;
+    ULONGLONG data0 = d->previous.Data;
+    LONGLONG time1 = d->current.Time;
+    LONGLONG time0 = d->previous.Time;
+
+    LONGLONG dt = (time1 - time0);
+    if(dt > 0)
+        return (data1 - data0) / dt;
+    else
+        return 0;
+}
+
 static inline bool perflib_previous_is_set(COUNTER_DATA *d) {
     return d->updated && d->previous.Data && d->previous.Time && d->current.Time > d->previous.Time;
 }
@@ -448,9 +459,7 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerTransfer)) {
-
             if (perflib_previous_is_set(&d->averageDiskSecondsPerTransfer)) {
-
                 common_disk_svctm(
                         &d->disk_svctm,
                         device,
@@ -462,15 +471,31 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
             }
         }
 
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskQueueLength);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskReadQueueLength);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskWriteQueueLength);
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerRead) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerWrite)) {
 
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskTransfersPerSec);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskBytesPerSec);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerTransfer);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerRead);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerWrite);
+            if (perflib_previous_is_set(&d->averageDiskBytesPerRead) &&
+                perflib_previous_is_set(&d->averageDiskBytesPerWrite)) {
+
+                common_disk_avgsz(
+                        &d->disk_avgsz,
+                        device,
+                        NULL,
+                        perflib_average_bulk(&d->averageDiskBytesPerRead),
+                        perflib_average_bulk(&d->averageDiskBytesPerWrite),
+                        update_every,
+                        physical_disk_labels,
+                        d);
+            }
+        }
+
+        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskQueueLength);
+        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskReadQueueLength);
+        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskWriteQueueLength);
+        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskTransfersPerSec);
+        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskBytesPerSec);
+        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerTransfer);
+
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->splitIoPerSec);
     }
 
