@@ -1872,30 +1872,6 @@ void facets_set_additional_options(FACETS *facets, FACETS_OPTIONS options) {
 
 // ----------------------------------------------------------------------------
 
-static inline void facets_key_set_unsampled_value(FACETS *facets, FACET_KEY *k) {
-    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
-        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
-
-    k->current_value.flags |= FACET_KEY_VALUE_UPDATED | FACET_KEY_VALUE_UNSAMPLED;
-
-    facets->operations.values.registered++;
-    facets->operations.values.unsampled++;
-
-    // no need to copy the UNSET value
-    // empty values are exported as empty
-    k->current_value.raw = NULL;
-    k->current_value.raw_len = 0;
-    k->current_value.b->len = 0;
-    k->current_value.flags &= ~FACET_KEY_VALUE_COPIED;
-
-    if(unlikely(k->values.enabled))
-        FACET_VALUE_ADD_UNSAMPLED_VALUE_TO_INDEX(k);
-    else {
-        k->key_found_in_row++;
-        k->key_values_selected_in_row++;
-    }
-}
-
 static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
     if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
         facets->keys_in_row.array[facets->keys_in_row.used++] = k;
