@@ -6,9 +6,15 @@
 
 **Merged pull requests:**
 
+- claiming should wait for node id and status ONLINE only [\#18816](https://github.com/netdata/netdata/pull/18816) ([ktsaou](https://github.com/ktsaou))
+- Comment out dictionary with hashtable code for now [\#18814](https://github.com/netdata/netdata/pull/18814) ([stelfrag](https://github.com/stelfrag))
+- Fix variable scope to prevent invalid memory access [\#18813](https://github.com/netdata/netdata/pull/18813) ([stelfrag](https://github.com/stelfrag))
+- fix\(proc/proc\_net\_dev\): delay collecting all virtual interfaces [\#18812](https://github.com/netdata/netdata/pull/18812) ([ilyam8](https://github.com/ilyam8))
+- Revert "Fix atomic builtins test that currently fails for llvm+compiler\_rt when gcc is not present" [\#18811](https://github.com/netdata/netdata/pull/18811) ([stelfrag](https://github.com/stelfrag))
 - aesthetic changes in the code [\#18808](https://github.com/netdata/netdata/pull/18808) ([ktsaou](https://github.com/ktsaou))
 - allow local-listeners to associate container sockets with pids [\#18807](https://github.com/netdata/netdata/pull/18807) ([ktsaou](https://github.com/ktsaou))
 - fix\(go.d/sensors\): ignore 'unknown' values [\#18806](https://github.com/netdata/netdata/pull/18806) ([ilyam8](https://github.com/ilyam8))
+- Calculate currently collected metrics [\#18803](https://github.com/netdata/netdata/pull/18803) ([stelfrag](https://github.com/stelfrag))
 - feat\(apps.plugin\): add vernemq to apps\_groups.conf [\#18802](https://github.com/netdata/netdata/pull/18802) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18801](https://github.com/netdata/netdata/pull/18801) ([netdatabot](https://github.com/netdatabot))
 - bugfix for logs integrations [\#18800](https://github.com/netdata/netdata/pull/18800) ([Ancairon](https://github.com/Ancairon))
@@ -434,11 +440,6 @@
 - go.d smartctl: improve checking scsi-sat in scan [\#18269](https://github.com/netdata/netdata/pull/18269) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18268](https://github.com/netdata/netdata/pull/18268) ([netdatabot](https://github.com/netdatabot))
 - apps conf add beanstalkd [\#18267](https://github.com/netdata/netdata/pull/18267) ([ilyam8](https://github.com/ilyam8))
-- Fix CI issues in build workflow. [\#18266](https://github.com/netdata/netdata/pull/18266) ([Ferroin](https://github.com/Ferroin))
-- Add detailed reporting of failed checksums in kickstart script. [\#18265](https://github.com/netdata/netdata/pull/18265) ([Ferroin](https://github.com/Ferroin))
-- go.d beanstalk [\#18263](https://github.com/netdata/netdata/pull/18263) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18262](https://github.com/netdata/netdata/pull/18262) ([netdatabot](https://github.com/netdatabot))
-- go.d x509check add not\_revoked dimension [\#18261](https://github.com/netdata/netdata/pull/18261) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
