@@ -5,6 +5,8 @@
 
 #include "windows-wmi.h"
 
+#if defined(OS_WINDOWS)
+
 typedef struct {
     char DeviceID[256];
     char Model[256];
@@ -22,5 +24,7 @@ typedef struct {
 } DiskDriveInfoWMI;
 
 size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size);
+
+#endif
 
 #endif //NETDATA_WINDOWS_WMI_GETDISKDRIVEINFO_H

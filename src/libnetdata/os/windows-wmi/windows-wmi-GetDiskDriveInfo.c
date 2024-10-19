@@ -2,6 +2,8 @@
 
 #include "windows-wmi-GetDiskDriveInfo.h"
 
+#if defined(OS_WINDOWS)
+
 size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
     if (InitializeWMI() != S_OK) return 0;
 
@@ -138,3 +140,5 @@ size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
 
     return index;
 }
+
+#endif

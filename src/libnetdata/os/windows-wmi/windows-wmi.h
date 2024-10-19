@@ -4,6 +4,9 @@
 #define NETDATA_WINDOWS_WMI_H
 
 #include "../../libnetdata.h"
+
+#if defined(OS_WINDOWS)
+
 #include <windows.h>
 #include <wbemidl.h>
 
@@ -18,5 +21,7 @@ HRESULT InitializeWMI(void);
 void CleanupWMI(void);
 
 #include "windows-wmi-GetDiskDriveInfo.h"
+
+#endif
 
 #endif //NETDATA_WINDOWS_WMI_H

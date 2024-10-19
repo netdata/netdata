@@ -2,6 +2,8 @@
 
 #include "windows-wmi.h"
 
+#if defined(OS_WINDOWS)
+
 __thread ND_WMI nd_wmi = { 0 };
 
 HRESULT InitializeWMI(void) {
@@ -104,3 +106,5 @@ void CleanupWMI(void) {
 
     CoUninitialize();
 }
+
+#endif
