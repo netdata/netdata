@@ -212,11 +212,12 @@ extern netdata_mutex_t apps_and_stdout_mutex;
 #define MAX_CMDLINE 65536
 
 // ----------------------------------------------------------------------------
-// to avoid reallocating too frequently, we can increase the number of spare
-// file descriptors used by processes.
-// IMPORTANT:
-// having a lot of spares, increases the CPU utilization of the plugin.
-#define MAX_SPARE_FDS 1
+// to avoid reallocating too frequently when we add file descriptors,
+// we double the allocation at every increase request.
+
+static inline uint32_t fds_new_size(uint32_t old_size, uint32_t new_fd) {
+    return MAX(old_size * 2, new_fd + 1); // 1 space always
+}
 
 // ----------------------------------------------------------------------------
 // some variables for keeping track of processes count by states
