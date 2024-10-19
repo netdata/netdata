@@ -36,7 +36,7 @@ static inline STRING *system_usernames_cache_lookup_uid(USERNAMES_CACHE *uc, uid
         else
             u = string_strdupz(pw.pw_name);
 
-        simple_hashtable_set_slot_USERNAMES_CACHE(&uc->ht, sl, uid, u);
+        simple_hashtable_set_slot_USERNAMES_CACHE(&uc->ht, sl, hash, u);
     }
 
     u = string_dup(u);
