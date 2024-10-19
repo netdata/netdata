@@ -64,7 +64,7 @@ static inline STRING *system_servicenames_cache_lookup(SERVICENAMES_CACHE *sc, u
                 s = string_strdupz(se->s_name);
         }
 
-        simple_hashtable_set_slot_SERVICENAMES_CACHE(&sc->ht, sl, key, s);
+        simple_hashtable_set_slot_SERVICENAMES_CACHE(&sc->ht, sl, hash, s);
     }
 
     s = string_dup(s);

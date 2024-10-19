@@ -36,7 +36,7 @@ static inline STRING *system_groupnames_cache_lookup_gid(GROUPNAMES_CACHE *gc, g
         else
             g = string_strdupz(grp.gr_name);
 
-        simple_hashtable_set_slot_GROUPNAMES_CACHE(&gc->ht, sl, gid, g);
+        simple_hashtable_set_slot_GROUPNAMES_CACHE(&gc->ht, sl, hash, g);
     }
 
     g = string_dup(g);
