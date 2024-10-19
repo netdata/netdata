@@ -67,6 +67,8 @@ struct physical_disk {
     COUNTER_DATA averageDiskBytesPerWrite;
 
     COUNTER_DATA splitIoPerSec;
+    RRDSET *st_split;
+    RRDDIM *rd_split;
 };
 
 struct physical_disk system_physical_total = {
@@ -118,6 +120,10 @@ static void physical_disk_cleanup(struct physical_disk *d) {
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_busy.st_busy);
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_iotime.st_iotime);
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_qops.st_qops);
+    rrdset_is_obsolete___safe_from_collector_thread(d->disk_await.st_await);
+    rrdset_is_obsolete___safe_from_collector_thread(d->disk_svctm.st_svctm);
+    rrdset_is_obsolete___safe_from_collector_thread(d->disk_avgsz.st_avgsz);
+    rrdset_is_obsolete___safe_from_collector_thread(d->st_split);
 }
 
 void dict_physical_disk_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -489,14 +495,33 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
             }
         }
 
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskQueueLength);
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskReadQueueLength);
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskWriteQueueLength);
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskTransfersPerSec);
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskBytesPerSec);
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerTransfer);
+        if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->splitIoPerSec)) {
+            if (!d->st_split) {
+                d->st_split = rrdset_create_localhost(
+                        "disk_split",
+                        device,
+                        NULL,
+                        "iops",
+                        "disk.split",
+                        "Split I/O Operations",
+                        "operations/s",
+                        _COMMON_PLUGIN_NAME,
+                        _COMMON_PLUGIN_MODULE_NAME,
+                        NETDATA_CHART_PRIO_DISK_SPLIT,
+                        update_every,
+                        RRDSET_TYPE_LINE
+                );
 
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->splitIoPerSec);
+                rrdset_flag_set(d->st_split, RRDSET_FLAG_DETAIL);
+
+                d->rd_split = rrddim_add(d->st_split, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                physical_disk_labels(d->st_split, d);
+            }
+
+            rrddim_set_by_pointer(d->st_split, d->rd_split, d->splitIoPerSec.current.Data);
+            rrdset_done(d->st_split);
+        }
     }
 
     // cleanup
