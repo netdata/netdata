@@ -4,12 +4,23 @@
 
 struct node {
     char *name;
-    char *numastat_filename;
-    procfile *numastat_ff;
-    RRDSET *numastat_st;
+
+    struct {
+        char *filename;
+        procfile *ff;
+        RRDSET *st;
+    } numastat;
+
+    struct {
+        char *filename;
+        procfile *ff;
+        RRDSET *st;
+    } meminfo;
+
     struct node *next;
 };
 static struct node *numa_root = NULL;
+static int numa_node_count = 0;
 
 static int find_all_nodes() {
     int numa_node_count = 0;
@@ -47,8 +58,16 @@ static int find_all_nodes() {
             freez(m);
             continue;
         }
+        m->numastat.filename = strdupz(name);
 
-        m->numastat_filename = strdupz(name);
+        snprintfz(name, FILENAME_MAX, "%s/%s/meminfo", dirname, de->d_name);
+        if(stat(name, &st) == -1) {
+            freez(m->numastat.filename);
+            freez(m->name);
+            freez(m);
+            continue;
+        }
+        m->meminfo.filename = strdupz(name);
 
         m->next = numa_root;
         numa_root = m;
@@ -59,22 +78,12 @@ static int find_all_nodes() {
     return numa_node_count;
 }
 
-int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
-    (void)dt;
-
+static void do_muma_numastat(struct node *m, int update_every) {
     static uint32_t hash_local_node = 0, hash_numa_foreign = 0, hash_interleave_hit = 0, hash_other_node = 0, hash_numa_hit = 0, hash_numa_miss = 0;
-    static int do_numastat = -1, numa_node_count = 0;
-    struct node *m;
+    static bool initialized = false;
 
-    if(unlikely(numa_root == NULL)) {
-        numa_node_count = find_all_nodes();
-        if(unlikely(numa_root == NULL))
-            return 1;
-    }
-
-    if(unlikely(do_numastat == -1)) {
-        do_numastat = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/node", "enable per-node numa metrics", CONFIG_BOOLEAN_AUTO);
-
+    if(unlikely(!initialized)) {
+        initialized = true;
         hash_local_node     = simple_hash("local_node");
         hash_numa_foreign   = simple_hash("numa_foreign");
         hash_interleave_hit = simple_hash("interleave_hit");
@@ -83,82 +92,176 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
         hash_numa_miss      = simple_hash("numa_miss");
     }
 
-    if (do_numastat == CONFIG_BOOLEAN_YES || (do_numastat == CONFIG_BOOLEAN_AUTO && numa_node_count >= 2)) {
-        for(m = numa_root; m; m = m->next) {
-            if(m->numastat_filename) {
+    if (m->numastat.filename) {
+        if(unlikely(!m->numastat.ff)) {
+            m->numastat.ff = procfile_open(m->numastat.filename, " ", PROCFILE_FLAG_DEFAULT);
 
-                if(unlikely(!m->numastat_ff)) {
-                    m->numastat_ff = procfile_open(m->numastat_filename, " ", PROCFILE_FLAG_DEFAULT);
-
-                    if(unlikely(!m->numastat_ff))
-                        continue;
-                }
-
-                m->numastat_ff = procfile_readall(m->numastat_ff);
-                if(unlikely(!m->numastat_ff || procfile_lines(m->numastat_ff) < 1 || procfile_linewords(m->numastat_ff, 0) < 1))
-                    continue;
-
-                if(unlikely(!m->numastat_st)) {
-                    m->numastat_st = rrdset_create_localhost(
-                            "mem"
-                            , m->name
-                            , NULL
-                            , "numa"
-                            , "mem.numa_nodes"
-                            , "NUMA events"
-                            , "events/s"
-                            , PLUGIN_PROC_NAME
-                            , "/sys/devices/system/node"
-                            , NETDATA_CHART_PRIO_MEM_NUMA_NODES
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rrdlabels_add(m->numastat_st->rrdlabels, "numa_node", m->name, RRDLABEL_SRC_AUTO);
-
-                    rrdset_flag_set(m->numastat_st, RRDSET_FLAG_DETAIL);
-
-                    rrddim_add(m->numastat_st, "numa_hit",       "hit",        1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(m->numastat_st, "numa_miss",      "miss",       1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(m->numastat_st, "local_node",     "local",      1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(m->numastat_st, "numa_foreign",   "foreign",    1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(m->numastat_st, "interleave_hit", "interleave", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(m->numastat_st, "other_node",     "other",      1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-                }
-
-                size_t lines = procfile_lines(m->numastat_ff), l;
-                for(l = 0; l < lines; l++) {
-                    size_t words = procfile_linewords(m->numastat_ff, l);
-
-                    if(unlikely(words < 2)) {
-                        if(unlikely(words))
-                            collector_error("Cannot read %s numastat line %zu. Expected 2 params, read %zu.", m->name, l, words);
-                        continue;
-                    }
-
-                    char *name  = procfile_lineword(m->numastat_ff, l, 0);
-                    char *value = procfile_lineword(m->numastat_ff, l, 1);
-
-                    if (unlikely(!name || !*name || !value || !*value))
-                        continue;
-
-                    uint32_t hash = simple_hash(name);
-                    if(likely(
-                               (hash == hash_numa_hit       && !strcmp(name, "numa_hit"))
-                            || (hash == hash_numa_miss      && !strcmp(name, "numa_miss"))
-                            || (hash == hash_local_node     && !strcmp(name, "local_node"))
-                            || (hash == hash_numa_foreign   && !strcmp(name, "numa_foreign"))
-                            || (hash == hash_interleave_hit && !strcmp(name, "interleave_hit"))
-                            || (hash == hash_other_node     && !strcmp(name, "other_node"))
-                    ))
-                        rrddim_set(m->numastat_st, name, (collected_number)str2kernel_uint_t(value));
-                }
-
-                rrdset_done(m->numastat_st);
-            }
+            if(unlikely(!m->numastat.ff))
+                return;
         }
+
+        m->numastat.ff = procfile_readall(m->numastat.ff);
+        if(unlikely(!m->numastat.ff || procfile_lines(m->numastat.ff) < 1 || procfile_linewords(m->numastat.ff, 0) < 1))
+            return;
+
+        if(unlikely(!m->numastat.st)) {
+            m->numastat.st = rrdset_create_localhost(
+                "numa_node_stat"
+                , m->name
+                , NULL
+                , "numa"
+                , "mem.numa_node_stat"
+                , "NUMA Node Memory Allocation Events"
+                , "events/s"
+                , PLUGIN_PROC_NAME
+                , "/sys/devices/system/node"
+                , NETDATA_CHART_PRIO_MEM_NUMA_NODES_NUMASTAT
+                , update_every
+                , RRDSET_TYPE_LINE
+            );
+
+            rrdlabels_add(m->numastat.st->rrdlabels, "numa_node", m->name, RRDLABEL_SRC_AUTO);
+
+            rrdset_flag_set(m->numastat.st, RRDSET_FLAG_DETAIL);
+
+            rrddim_add(m->numastat.st, "numa_hit",       "hit",        1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(m->numastat.st, "numa_miss",      "miss",       1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(m->numastat.st, "local_node",     "local",      1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(m->numastat.st, "numa_foreign",   "foreign",    1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(m->numastat.st, "interleave_hit", "interleave", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(m->numastat.st, "other_node",     "other",      1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        }
+
+        size_t lines = procfile_lines(m->numastat.ff), l;
+        for(l = 0; l < lines; l++) {
+            size_t words = procfile_linewords(m->numastat.ff, l);
+
+            if(unlikely(words < 2)) {
+                if(unlikely(words))
+                    collector_error("Cannot read %s line %zu. Expected 2 params, read %zu.", m->numastat.filename, l, words);
+                continue;
+            }
+
+            char *name  = procfile_lineword(m->numastat.ff, l, 0);
+            char *value = procfile_lineword(m->numastat.ff, l, 1);
+
+            if (unlikely(!name || !*name || !value || !*value))
+                continue;
+
+            uint32_t hash = simple_hash(name);
+            if(likely(
+                       (hash == hash_numa_hit       && !strcmp(name, "numa_hit"))
+                    || (hash == hash_numa_miss      && !strcmp(name, "numa_miss"))
+                    || (hash == hash_local_node     && !strcmp(name, "local_node"))
+                    || (hash == hash_numa_foreign   && !strcmp(name, "numa_foreign"))
+                    || (hash == hash_interleave_hit && !strcmp(name, "interleave_hit"))
+                    || (hash == hash_other_node     && !strcmp(name, "other_node"))
+                        ))
+                rrddim_set(m->numastat.st, name, (collected_number)str2kernel_uint_t(value));
+        }
+
+        rrdset_done(m->numastat.st);
+    }
+}
+
+static void do_numa_meminfo(struct node *m, int update_every) {
+    static uint32_t hash_MemFree = 0, hash_MemUsed = 0;
+    static bool initialized = false;
+    
+    if(unlikely(!initialized)) {
+        initialized = true;
+        hash_MemFree = simple_hash("MemFree");
+        hash_MemUsed = simple_hash("MemUsed");
     }
 
-    return 0;
+    if (m->meminfo.filename) {
+        if(unlikely(!m->meminfo.ff)) {
+            m->meminfo.ff = procfile_open(m->meminfo.filename, " :", PROCFILE_FLAG_DEFAULT);
+            if(unlikely(!m->meminfo.ff))
+                return;
+        }
+
+        m->meminfo.ff = procfile_readall(m->meminfo.ff);
+        if(unlikely(!m->meminfo.ff || procfile_lines(m->meminfo.ff) < 1 || procfile_linewords(m->meminfo.ff, 0) < 1))
+            return;
+
+        if(unlikely(!m->meminfo.st)) {
+            m->meminfo.st = rrdset_create_localhost(
+                "numa_node_mem_usage"
+                , m->name
+                , NULL
+                , "numa"
+                , "mem.numa_node_mem_usage"
+                , "NUMA Node Memory Usage"
+                , "bytes"
+                , PLUGIN_PROC_NAME
+                , "/sys/devices/system/node"
+                , NETDATA_CHART_PRIO_MEM_NUMA_NODES_MEMINFO
+                , update_every
+                , RRDSET_TYPE_STACKED
+            );
+
+            rrdlabels_add(m->meminfo.st->rrdlabels, "numa_node", m->name, RRDLABEL_SRC_AUTO);
+
+            rrdset_flag_set(m->meminfo.st, RRDSET_FLAG_DETAIL);
+
+            rrddim_add(m->meminfo.st, "MemFree", "free", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(m->meminfo.st, "MemUsed", "used", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        size_t lines = procfile_lines(m->meminfo.ff), l;
+        for(l = 0; l < lines; l++) {
+            size_t words = procfile_linewords(m->meminfo.ff, l);
+
+            if(unlikely(words < 4)) {
+                if(unlikely(words))
+                    collector_error("Cannot read %s line %zu. Expected 4 params, read %zu.", m->meminfo.filename, l, words);
+                continue;
+            }
+
+            char *name  = procfile_lineword(m->meminfo.ff, l, 2);
+            char *value = procfile_lineword(m->meminfo.ff, l, 3);
+
+            if (unlikely(!name || !*name || !value || !*value))
+                continue;
+
+            uint32_t hash = simple_hash(name);
+            if(likely(
+                       (hash == hash_MemFree && !strcmp(name, "MemFree"))
+                    || (hash == hash_MemUsed && !strcmp(name, "MemUsed"))
+                    ))
+                rrddim_set(m->meminfo.st, name, (collected_number)str2kernel_uint_t(value) * 1024);
+        }
+
+        rrdset_done(m->meminfo.st);
+    }
+}
+
+int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
+    (void)dt;
+    struct node *m;
+
+    static int do_numastat = -1;
+
+    if(unlikely(do_numastat == -1)) {
+        do_numastat = config_get_boolean_ondemand(
+            "plugin:proc:/sys/devices/system/node", "enable per-node numa metrics", CONFIG_BOOLEAN_AUTO);
+    }
+
+    if(unlikely(numa_root == NULL)) {
+        numa_node_count = find_all_nodes();
+        if(unlikely(numa_root == NULL))
+            return 1;
+    }
+
+    if (do_numastat == CONFIG_BOOLEAN_YES || (do_numastat == CONFIG_BOOLEAN_AUTO && numa_node_count >= 2)) {
+        for (m = numa_root; m; m = m->next) {
+            do_muma_numastat(m, update_every);
+            do_numa_meminfo(m, update_every);
+        }
+        return 0;
+    }
+
+    return 1;
 }
