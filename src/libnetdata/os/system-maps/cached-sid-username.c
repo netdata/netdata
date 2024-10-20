@@ -16,15 +16,10 @@ typedef struct {
     // IMPORTANT:
     // This is malloc'd ! You have to manually set fields to zero.
 
-    const char *account;
-    const char *domain;
-    const char *full;
-    const char *sid_str;
-
-    uint32_t account_len;
-    uint32_t domain_len;
-    uint32_t full_len;
-    uint32_t sid_str_len;
+    STRING *account;
+    STRING *domain;
+    STRING *full;
+    STRING *sid_str;
 
     // this needs to be last, because of its variable size
     SID_KEY key;
@@ -84,28 +79,21 @@ static void lookup_user_in_system(SID_VALUE *sv) {
         const char *account = account2utf8(account_unicode);
         const char *domain = domain2utf8(domain_unicode);
         snprintfz(tmp, sizeof(tmp), "%s\\%s", domain, account);
-        sv->domain = strdupz(domain); sv->domain_len = strlen(sv->domain);
-        sv->account = strdupz(account); sv->account_len = strlen(sv->account);
-        sv->full = strdupz(tmp); sv->full_len = strlen(sv->full);
+        sv->domain = string_strdupz(domain);
+        sv->account = string_strdupz(account);
+        sv->full = string_strdupz(tmp);
     }
     else {
         sv->domain = NULL;
         sv->account = NULL;
         sv->full = NULL;
-        sv->domain_len = 0;
-        sv->account_len = 0;
-        sv->full_len = 0;
     }
 
     wchar_t *sid_string = NULL;
-    if (ConvertSidToStringSidW(sv->key.sid, &sid_string)) {
-        sv->sid_str = strdupz(account2utf8(sid_string));
-        sv->sid_str_len = strlen(sv->sid_str);
-    }
-    else {
+    if (ConvertSidToStringSidW(sv->key.sid, &sid_string))
+        sv->sid_str = string_strdupz(account2utf8(sid_string));
+    else
         sv->sid_str = NULL;
-        sv->sid_str_len = 0;
-    }
 }
 
 static SID_VALUE *lookup_or_convert_user_id_to_name_lookup(PSID sid) {
@@ -145,25 +133,25 @@ bool cached_sid_to_account_domain_sidstr(PSID sid, TXT_UTF8 *dst_account, TXT_UT
 
     if(found) {
         if (found->account) {
-            txt_utf8_resize(dst_account, found->account_len + 1, false);
-            memcpy(dst_account->data, found->account, found->account_len + 1);
-            dst_account->used = found->account_len + 1;
+            txt_utf8_resize(dst_account, string_strlen(found->account) + 1, false);
+            memcpy(dst_account->data, string2str(found->account), string_strlen(found->account) + 1);
+            dst_account->used = string_strlen(found->account) + 1;
         }
         else
             txt_utf8_empty(dst_account);
 
         if (found->domain) {
-            txt_utf8_resize(dst_domain, found->domain_len + 1, false);
-            memcpy(dst_domain->data, found->domain, found->domain_len + 1);
-            dst_domain->used = found->domain_len + 1;
+            txt_utf8_resize(dst_domain, string_strlen(found->domain) + 1, false);
+            memcpy(dst_domain->data, string2str(found->domain), string_strlen(found->domain) + 1);
+            dst_domain->used = string_strlen(found->domain) + 1;
         }
         else
             txt_utf8_empty(dst_domain);
 
         if (found->sid_str) {
-            txt_utf8_resize(dst_sid_str, found->sid_str_len + 1, false);
-            memcpy(dst_sid_str->data, found->sid_str, found->sid_str_len + 1);
-            dst_sid_str->used = found->sid_str_len + 1;
+            txt_utf8_resize(dst_sid_str, string_strlen(found->sid_str) + 1, false);
+            memcpy(dst_sid_str->data, string2str(found->sid_str), string_strlen(found->sid_str) + 1);
+            dst_sid_str->used = string_strlen(found->sid_str) + 1;
         }
         else
             txt_utf8_empty(dst_sid_str);
@@ -186,14 +174,14 @@ bool cached_sid_to_buffer_append(PSID sid, BUFFER *dst, const char *prefix) {
             if (prefix && *prefix)
                 buffer_strcat(dst, prefix);
 
-            buffer_fast_strcat(dst, found->full, found->full_len);
+            buffer_fast_strcat(dst, string2str(found->full), string_strlen(found->full));
             added++;
         }
         if (found->sid_str) {
             if (prefix && *prefix)
                 buffer_strcat(dst, prefix);
 
-            buffer_fast_strcat(dst, found->sid_str, found->sid_str_len);
+            buffer_fast_strcat(dst, string2str(found->sid_str), string_strlen(found->sid_str));
             added++;
         }
     }
