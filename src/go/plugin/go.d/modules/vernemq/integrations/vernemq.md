@@ -54,79 +54,99 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per VerneMQ instance
+### Per node
 
-These metrics refer to the entire monitored application.
+These metrics refer to the VerneMQ node.
 
-This scope has no labels.
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| node | The value of this label is identical to the value of the "node" label exposed by VerneMQ. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| vernemq.sockets | open | sockets |
-| vernemq.socket_operations | open, close | sockets/s |
-| vernemq.client_keepalive_expired | closed | sockets/s |
-| vernemq.socket_close_timeout | closed | sockets/s |
-| vernemq.socket_errors | errors | errors/s |
-| vernemq.queue_processes | queue_processes | queue processes |
-| vernemq.queue_processes_operations | setup, teardown | events/s |
-| vernemq.queue_process_init_from_storage | queue_processes | queue processes/s |
-| vernemq.queue_messages | received, sent | messages/s |
-| vernemq.queue_undelivered_messages | dropped, expired, unhandled | messages/s |
-| vernemq.router_subscriptions | subscriptions | subscriptions |
-| vernemq.router_matched_subscriptions | local, remote | subscriptions/s |
-| vernemq.router_memory | used | KiB |
-| vernemq.average_scheduler_utilization | utilization | percentage |
-| vernemq.system_utilization_scheduler | a dimension per scheduler | percentage |
-| vernemq.system_processes | processes | processes |
-| vernemq.system_reductions | reductions | ops/s |
-| vernemq.system_context_switches | context_switches | ops/s |
-| vernemq.system_io | received, sent | kilobits/s |
-| vernemq.system_run_queue | ready | processes |
-| vernemq.system_gc_count | gc | ops/s |
-| vernemq.system_gc_words_reclaimed | words_reclaimed | ops/s |
-| vernemq.system_allocated_memory | processes, system | KiB |
-| vernemq.bandwidth | received, sent | kilobits/s |
-| vernemq.retain_messages | messages | messages |
-| vernemq.retain_memory | used | KiB |
-| vernemq.cluster_bandwidth | received, sent | kilobits/s |
-| vernemq.cluster_dropped | dropped | kilobits/s |
-| vernemq.netsplit_unresolved | unresolved | netsplits |
-| vernemq.netsplits | resolved, detected | netsplits/s |
-| vernemq.mqtt_auth | received, sent | packets/s |
-| vernemq.mqtt_auth_received_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_auth_sent_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_connect | connect, connack | packets/s |
-| vernemq.mqtt_connack_sent_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_disconnect | received, sent | packets/s |
-| vernemq.mqtt_disconnect_received_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_disconnect_sent_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_subscribe | subscribe, suback | packets/s |
-| vernemq.mqtt_subscribe_error | failed | ops/s |
-| vernemq.mqtt_subscribe_auth_error | unauth | attempts/s |
-| vernemq.mqtt_unsubscribe | unsubscribe, unsuback | packets/s |
-| vernemq.mqtt_unsubscribe_error | mqtt_unsubscribe_error | ops/s |
-| vernemq.mqtt_publish | received, sent | packets/s |
-| vernemq.mqtt_publish_errors | failed | ops/s |
-| vernemq.mqtt_publish_auth_errors | unauth | attempts/s |
-| vernemq.mqtt_puback | received, sent | packets/s |
-| vernemq.mqtt_puback_received_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_puback_sent_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_puback_invalid_error | unexpected | messages/s |
-| vernemq.mqtt_pubrec | received, sent | packets/s |
-| vernemq.mqtt_pubrec_received_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_pubrec_sent_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_pubrec_invalid_error | unexpected | messages/s |
-| vernemq.mqtt_pubrel | received, sent | packets/s |
-| vernemq.mqtt_pubrel_received_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_pubrel_sent_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_pubcom | received, sent | packets/s |
-| vernemq.mqtt_pubcomp_received_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_pubcomp_sent_reason | a dimensions per reason | packets/s |
-| vernemq.mqtt_pubcomp_invalid_error | unexpected | messages/s |
-| vernemq.mqtt_ping | pingreq, pingresp | packets/s |
+| vernemq.node_socket | open | sockets |
+| vernemq.node_socket_operations | open, close | sockets/s |
+| vernemq.node_client_keepalive_expired | closed | sockets/s |
+| vernemq.node_socket_close_timeout | closed | sockets/s |
+| vernemq.node_socket_errors | errors | errors/s |
+| vernemq.node_queue_processes | queue_processes | queue processes |
+| vernemq.node_queue_processes_operations | setup, teardown | events/s |
+| vernemq.node_queue_process_init_from_storage | queue_processes | queue processes/s |
+| vernemq.node_queue_messages | received, sent | messages/s |
+| vernemq.node_queue_undelivered_messages | dropped, expired, unhandled | messages/s |
+| vernemq.node_router_subscriptions | subscriptions | subscriptions |
+| vernemq.node_router_matched_subscriptions | local, remote | subscriptions/s |
+| vernemq.node_router_memory | used | bytes |
+| vernemq.node_average_scheduler_utilization | utilization | percentage |
+| vernemq.node_system_processes | processes | processes |
+| vernemq.node_system_reductions | reductions | ops/s |
+| vernemq.node_system_context_switches | context_switches | ops/s |
+| vernemq.node_system_io | received, sent | bytes/s |
+| vernemq.node_system_run_queue | ready | processes |
+| vernemq.node_system_gc_count | gc | ops/s |
+| vernemq.node_system_gc_words_reclaimed | words_reclaimed | ops/s |
+| vernemq.node_system_allocated_memory | processes, system | bytes |
+| vernemq.node_traffic | received, sent | bytes/s |
+| vernemq.node_retain_messages | messages | messages |
+| vernemq.node_retain_memory | used | bytes |
+| vernemq.node_cluster_traffic | received, sent | bytes/s |
+| vernemq.node_cluster_dropped | dropped | bytes/s |
+| vernemq.node_netsplit_unresolved | unresolved | netsplits |
+| vernemq.node_netsplits | resolved, detected | netsplits/s |
 | vernemq.node_uptime | time | seconds |
+
+### Per mqtt
+
+These metrics are specific to the used MQTT protocol version.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| node | The value of this label is identical to the value of the "node" label exposed by VerneMQ. |
+| mqtt_version | MQTT version. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vernemq.node_mqtt_auth | received, sent | packets/s |
+| vernemq.node_mqtt_auth_received_by_reason_code | success, continue_authentication, reauthenticate | packets/s |
+| vernemq.node_mqtt_auth_sent_by_reason_code | success, continue_authentication, reauthenticate | packets/s |
+| vernemq.node_mqtt_connect | connect, connack | packets/s |
+| vernemq.node_mqtt_connack_sent_by_return_code | success, unsupported_protocol_version, client_identifier_not_valid, server_unavailable, bad_username_or_password, not_authorized | packets/s |
+| vernemq.node_mqtt_connack_sent_by_reason_code | success, unspecified_error, malformed_packet, protocol_error, impl_specific_error, unsupported_protocol_version, client_identifier_not_valid, bad_username_or_password, not_authorized, server_unavailable, server_busy, banned, bad_authentication_method, topic_name_invalid, packet_too_large, quota_exceeded, payload_format_invalid, retain_not_supported, qos_not_supported, use_another_server, server_moved, connection_rate_exceeded | packets/s |
+| vernemq.node_mqtt_disconnect | received, sent | packets/s |
+| vernemq.node_mqtt_disconnect_received_by_reason_code | normal_disconnect, disconnect_with_will_msg, unspecified_error, malformed_packet, protocol_error, impl_specific_error, topic_name_invalid, receive_max_exceeded, topic_alias_invalid, packet_too_large, message_rate_too_high, quota_exceeded, administrative_action, payload_format_invalid | packets/s |
+| node_mqtt_disconnect_sent_by_reason_code | normal_disconnect, unspecified_error, malformed_packet, protocol_error, impl_specific_error, not_authorized, server_busy, server_shutting_down, keep_alive_timeout, session_taken_over, topic_filter_invalid, topic_name_invalid, receive_max_exceeded, topic_alias_invalid, packet_too_large, message_rate_too_high, quota_exceeded, administrative_action, payload_format_invalid, retain_not_supported, qos_not_supported, use_another_server, server_moved, shared_subs_not_supported, connection_rate_exceeded, max_connect_time, subscription_ids_not_supported, wildcard_subs_not_supported | packets/s |
+| vernemq.node_mqtt_subscribe | subscribe, suback | packets/s |
+| vernemq.node_mqtt_subscribe_error | subscribe | errors/s |
+| vernemq.node_mqtt_subscribe_auth_error | subscribe_auth | errors/s |
+| vernemq.node_mqtt_unsubscribe | unsubscribe, unsuback | packets/s |
+| vernemq.node_mqtt_unsubscribe_error | unsubscribe | errors/s |
+| vernemq.node_mqtt_publish | received, sent | packets/s |
+| vernemq.node_mqtt_publish_errors | publish | errors/s |
+| vernemq.node_mqtt_publish_auth_errors | publish_auth | errors/s |
+| vernemq.node_mqtt_puback | received, sent | packets/s |
+| vernemq.node_mqtt_puback_received_by_reason_code | success, no_matching_subscribers, unspecified_error, impl_specific_error, not_authorized, topic_name_invalid, packet_id_in_use, quota_exceeded, payload_format_invalid | packets/s |
+| vernemq.node_mqtt_puback_sent_by_reason_code | success, no_matching_subscribers, unspecified_error, impl_specific_error, not_authorized, topic_name_invalid, packet_id_in_use, quota_exceeded, payload_format_invalid | packets/s |
+| vernemq.node_mqtt_puback_invalid_error | unexpected | messages/s |
+| vernemq.node_mqtt_pubrec | received, sent | packets/s |
+| vernemq.node_mqtt_pubrec_received_by_reason_code | success, no_matching_subscribers, unspecified_error, impl_specific_error, not_authorized, topic_name_invalid, packet_id_in_use, quota_exceeded, payload_format_invalid | packets/s |
+| vernemq.node_mqtt_pubrec_sent_by_reason_code | success, no_matching_subscribers, unspecified_error, impl_specific_error, not_authorized, topic_name_invalid, packet_id_in_use, quota_exceeded, payload_format_invalid | packets/s |
+| vernemq.node_mqtt_pubrec_invalid_error | unexpected | messages/s |
+| vernemq.node_mqtt_pubrel | received, sent | packets/s |
+| vernemq.node_mqtt_pubrel_received_by_reason_code | success, packet_id_not_found | packets/s |
+| vernemq.node_mqtt_pubrel_sent_by_reason_code | success, packet_id_not_found | packets/s |
+| vernemq.node_mqtt_pubcomp | received, sent | packets/s |
+| vernemq.node_mqtt_pubcomp_received_by_reason_code | success, packet_id_not_found | packets/s |
+| vernemq.node_mqtt_pubcomp_sent_by_reason_cod | success, packet_id_not_found | packets/s |
+| vernemq.node_mqtt_pubcomp_invalid_error | unexpected | messages/s |
+| vernemq.node_mqtt_ping | pingreq, pingresp | packets/s |
 
 
 
@@ -137,32 +157,32 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ vernemq_socket_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.socket_errors | number of socket errors in the last minute |
-| [ vernemq_queue_message_drop ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.queue_undelivered_messages | number of dropped messaged due to full queues in the last minute |
-| [ vernemq_queue_message_expired ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.queue_undelivered_messages | number of messages which expired before delivery in the last minute |
-| [ vernemq_queue_message_unhandled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.queue_undelivered_messages | number of unhandled messages (connections with clean session=true) in the last minute |
-| [ vernemq_average_scheduler_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.average_scheduler_utilization | average scheduler utilization over the last 10 minutes |
-| [ vernemq_cluster_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.cluster_dropped | amount of traffic dropped during communication with the cluster nodes in the last minute |
-| [ vernemq_netsplits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vvernemq.netsplits | number of detected netsplits (split brain situation) in the last minute |
-| [ vernemq_mqtt_connack_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_connack_sent_reason | number of sent unsuccessful v3/v5 CONNACK packets in the last minute |
-| [ vernemq_mqtt_disconnect_received_reason_not_normal ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_disconnect_received_reason | number of received not normal v5 DISCONNECT packets in the last minute |
-| [ vernemq_mqtt_disconnect_sent_reason_not_normal ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_disconnect_sent_reason | number of sent not normal v5 DISCONNECT packets in the last minute |
-| [ vernemq_mqtt_subscribe_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_subscribe_error | number of failed v3/v5 SUBSCRIBE operations in the last minute |
-| [ vernemq_mqtt_subscribe_auth_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_subscribe_auth_error | number of unauthorized v3/v5 SUBSCRIBE attempts in the last minute |
-| [ vernemq_mqtt_unsubscribe_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_unsubscribe_error | number of failed v3/v5 UNSUBSCRIBE operations in the last minute |
-| [ vernemq_mqtt_publish_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_publish_errors | number of failed v3/v5 PUBLISH operations in the last minute |
-| [ vernemq_mqtt_publish_auth_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_publish_auth_errors | number of unauthorized v3/v5 PUBLISH attempts in the last minute |
-| [ vernemq_mqtt_puback_received_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_puback_received_reason | number of received unsuccessful v5 PUBACK packets in the last minute |
-| [ vernemq_mqtt_puback_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_puback_sent_reason | number of sent unsuccessful v5 PUBACK packets in the last minute |
-| [ vernemq_mqtt_puback_unexpected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_puback_invalid_error | number of received unexpected v3/v5 PUBACK packets in the last minute |
-| [ vernemq_mqtt_pubrec_received_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_pubrec_received_reason | number of received unsuccessful v5 PUBREC packets in the last minute |
-| [ vernemq_mqtt_pubrec_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_pubrec_sent_reason | number of sent unsuccessful v5 PUBREC packets in the last minute |
-| [ vernemq_mqtt_pubrec_invalid_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_pubrec_invalid_error | number of received unexpected v3 PUBREC packets in the last minute |
-| [ vernemq_mqtt_pubrel_received_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_pubrel_received_reason | number of received unsuccessful v5 PUBREL packets in the last minute |
-| [ vernemq_mqtt_pubrel_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_pubrel_sent_reason | number of sent unsuccessful v5 PUBREL packets in the last minute |
-| [ vernemq_mqtt_pubcomp_received_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_pubcomp_received_reason | number of received unsuccessful v5 PUBCOMP packets in the last minute |
-| [ vernemq_mqtt_pubcomp_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_pubcomp_sent_reason | number of sent unsuccessful v5 PUBCOMP packets in the last minute |
-| [ vernemq_mqtt_pubcomp_unexpected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.mqtt_pubcomp_invalid_error | number of received unexpected v3/v5 PUBCOMP packets in the last minute |
+| [ vernemq_socket_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_socket_errors | Node ${label:node} socket errors in the last minute |
+| [ vernemq_queue_message_drop ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_queue_undelivered_messages | Node ${label:node} dropped messages due to full queues in the last minute |
+| [ vernemq_queue_message_expired ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_queue_undelivered_messages | Node ${label:node} expired before delivery messages in the last minute |
+| [ vernemq_queue_message_unhandled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_queue_undelivered_messages | Node ${label:node} unhandled messages in the last minute |
+| [ vernemq_average_scheduler_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_average_scheduler_utilization | Node ${label:node} scheduler utilization over the last 10 minutes |
+| [ vernemq_cluster_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_cluster_dropped | Node ${label:node} traffic dropped during communication with the cluster nodes in the last minute |
+| [ vernemq_netsplits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_netsplits | Node ${label:node} detected netsplits (split brain) in the last minute |
+| [ vernemq_mqtt_connack_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_connack_sent_by_reason_code | Node ${label:node} unsuccessful sent v5 CONNACK packets in the last minute |
+| [ vernemq_mqtt_disconnect_received_reason_not_normal ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_disconnect_received_by_reason_code | Node ${label:node} received not normal v5 DISCONNECT packets in the last minute |
+| [ vernemq_mqtt_disconnect_sent_reason_not_normal ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_disconnect_sent_by_reason_code | Node ${label:node} sent not normal v5 DISCONNECT packets in the last minute |
+| [ vernemq_mqtt_subscribe_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_subscribe_error | Node ${label:node} mqtt v${label:mqtt_version} failed SUBSCRIBE operations in the last minute |
+| [ vernemq_mqtt_subscribe_auth_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_subscribe_auth_error | Node ${label:node} mqtt v${label:mqtt_version} unauthorized SUBSCRIBE attempts in the last minute |
+| [ vernemq_mqtt_unsubscribe_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_unsubscribe_error | Node ${label:node} mqtt v${label:mqtt_version} failed UNSUBSCRIBE operations in the last minute |
+| [ vernemq_mqtt_publish_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_publish_errors | Node ${label:node} mqtt v${label:mqtt_version} failed PUBLISH operations in the last minute |
+| [ vernemq_mqtt_publish_auth_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_publish_auth_errors | Node ${label:node} mqtt v${label:mqtt_version} unauthorized PUBLISH attempts in the last minute |
+| [ vernemq_mqtt_puback_received_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_puback_received_by_reason_code | Node ${label:node} mqtt v5 received unsuccessful PUBACK packets in the last minute |
+| [ vernemq_mqtt_puback_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_puback_sent_by_reason_code | Node ${label:node} mqtt v5 unsuccessful sent PUBACK packets in the last minute |
+| [ vernemq_mqtt_puback_unexpected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_puback_invalid_error | Node ${label:node} mqtt v${label:mqtt_version} received unexpected PUBACK messages in the last minute |
+| [ vernemq_mqtt_pubrec_received_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubrec_received_by_reason_code | Node ${label:node} mqtt v5 received unsuccessful PUBREC packets in the last minute |
+| [ vernemq_mqtt_pubrec_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubrec_sent_by_reason_code | Node ${label:node} mqtt v5 unsuccessful sent PUBREC packets in the last minute |
+| [ vernemq_mqtt_pubrec_invalid_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubrec_invalid_error | Node ${label:node} mqtt v${label:mqtt_version} received invalid PUBREC packets in the last minute |
+| [ vernemq_mqtt_pubrel_received_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubrel_received_by_reason_code | Node ${label:node} mqtt v5 received unsuccessful PUBREL packets in the last minute |
+| [ vernemq_mqtt_pubrel_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubrel_sent_by_reason_code | Node ${label:node} mqtt v5 unsuccessful sent PUBREL packets in the last minute |
+| [ vernemq_mqtt_pubcomp_received_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubcomp_received_by_reason_code | Node ${label:node} mqtt v5 received unsuccessful PUBCOMP packets in the last minute |
+| [ vernemq_mqtt_pubcomp_sent_reason_unsuccessful ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubcomp_sent_by_reason_code | Node ${label:node} mqtt v5 unsuccessful sent  PUBCOMP packets in the last minute |
+| [ vernemq_mqtt_pubcomp_unexpected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubcomp_invalid_error | Node ${label:node} mqtt v${label:mqtt_version} received unexpected PUBCOMP packets in the last minute |
 
 
 ## Setup
