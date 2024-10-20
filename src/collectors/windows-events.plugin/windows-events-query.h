@@ -83,7 +83,7 @@ typedef struct wevt_log {
         // every string operation overwrites it, multiple times per event log entry
         // it can be used within any function, for its own purposes,
         // but never share between functions
-        TXT_UNICODE unicode;
+        TXT_UTF16 unicode;
 
         // string attributes of the current event log entry
         // valid until another event if fetched
@@ -136,10 +136,11 @@ void wevt_query_done(WEVT_LOG *log);
 
 bool wevt_get_next_event(WEVT_LOG *log, WEVT_EVENT *ev);
 
-bool EvtFormatMessage_utf16(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags);
+bool EvtFormatMessage_utf16(
+    TXT_UTF16 *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags);
 
-bool EvtFormatMessage_Event_utf8(TXT_UNICODE *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
-bool EvtFormatMessage_Xml_utf8(TXT_UNICODE *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
+bool EvtFormatMessage_Event_utf8(TXT_UTF16 *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
+bool EvtFormatMessage_Xml_utf8(TXT_UTF16 *tmp, struct provider_meta_handle *p, EVT_HANDLE hEvent, TXT_UTF8 *dst);
 
 void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator);
 
@@ -152,7 +153,7 @@ static inline void wevt_variant_resize(WEVT_VARIANT *v, size_t required_size) {
         return;
 
     wevt_variant_cleanup(v);
-    v->size = compute_new_size(v->size, required_size);
+    v->size = txt_compute_new_size(v->size, required_size);
     v->data = mallocz(v->size);
 }
 
@@ -202,20 +203,20 @@ static inline uint64_t wevt_field_get_uint64_hex(EVT_VARIANT *ev) {
 
 static inline bool wevt_field_get_string_utf8(EVT_VARIANT *ev, TXT_UTF8 *dst) {
     if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull) {
-        wevt_utf8_empty(dst);
+        txt_utf8_empty(dst);
         return false;
     }
 
     fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeString);
-    return wevt_str_wchar_to_utf8(dst, ev->StringVal, -1);
+    return wchar_to_txt_utf8(dst, ev->StringVal, -1);
 }
 
 bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str);
 static inline bool wevt_field_get_sid(EVT_VARIANT *ev, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str) {
     if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull) {
-        wevt_utf8_empty(dst_account);
-        wevt_utf8_empty(dst_domain);
-        wevt_utf8_empty(dst_sid_str);
+        txt_utf8_empty(dst_account);
+        txt_utf8_empty(dst_domain);
+        txt_utf8_empty(dst_sid_str);
         return false;
     }
 

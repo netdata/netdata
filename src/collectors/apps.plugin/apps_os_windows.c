@@ -525,7 +525,7 @@ static char *ansi_to_utf8(LPCSTR str) {
     static __thread WCHAR unicode[PATH_MAX];
 
     // Step 1: Convert ANSI string (LPSTR) to wide string (UTF-16)
-    size_t count = any_to_utf16(CP_ACP, unicode, _countof(unicode), str, -1);
+    size_t count = any_to_utf16(CP_ACP, unicode, _countof(unicode), str, -1, NULL);
     if (!count) return NULL;
 
     return wchar_to_utf8(unicode);

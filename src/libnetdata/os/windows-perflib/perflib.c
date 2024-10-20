@@ -398,7 +398,7 @@ static inline BOOL getEncodedStringToUTF8(char *dst, size_t dst_len, DWORD CodeP
     }
     else {
         tempBuffer = unicode;
-        charsCopied = any_to_utf16(CodePage, unicode, _countof(unicode), start, (int)length);
+        charsCopied = any_to_utf16(CodePage, unicode, _countof(unicode), start, (int)length, NULL);
         if(!charsCopied) return FALSE;
     }
 

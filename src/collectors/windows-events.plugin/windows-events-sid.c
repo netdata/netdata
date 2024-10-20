@@ -131,28 +131,31 @@ bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst_account, TXT_UTF8 *dst
             memcpy(dst_account->data, found->account, found->account_len + 1);
             dst_account->used = found->account_len + 1;
         }
-        else wevt_utf8_empty(dst_account);
+        else
+            txt_utf8_empty(dst_account);
 
         if (found->domain) {
             txt_utf8_resize(dst_domain, found->domain_len + 1, false);
             memcpy(dst_domain->data, found->domain, found->domain_len + 1);
             dst_domain->used = found->domain_len + 1;
         }
-        else wevt_utf8_empty(dst_domain);
+        else
+            txt_utf8_empty(dst_domain);
 
         if (found->sid_str) {
             txt_utf8_resize(dst_sid_str, found->sid_str_len + 1, false);
             memcpy(dst_sid_str->data, found->sid_str, found->sid_str_len + 1);
             dst_sid_str->used = found->sid_str_len + 1;
         }
-        else wevt_utf8_empty(dst_sid_str);
+        else
+            txt_utf8_empty(dst_sid_str);
 
         return true;
     }
 
-    wevt_utf8_empty(dst_account);
-    wevt_utf8_empty(dst_domain);
-    wevt_utf8_empty(dst_sid_str);
+    txt_utf8_empty(dst_account);
+    txt_utf8_empty(dst_domain);
+    txt_utf8_empty(dst_sid_str);
     return false;
 }
 

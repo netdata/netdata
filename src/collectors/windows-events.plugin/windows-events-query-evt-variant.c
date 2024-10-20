@@ -21,13 +21,14 @@ static inline void append_utf16(BUFFER *b, LPCWSTR utf16Str, const char *separat
         remaining = b->size - b->len;
     }
 
-    size_t used = utf16_to_utf8(&b->buffer[b->len], remaining, utf16Str, -1);
-    if(used >= remaining) {
-        // oops, we need to resize
-        size_t needed = utf16_to_utf8(NULL, 0, utf16Str, -1); // find the size needed
+    bool truncated = false;
+    size_t used = utf16_to_utf8(&b->buffer[b->len], remaining, utf16Str, -1, &truncated);
+    if(truncated) {
+        // we need to resize
+        size_t needed = utf16_to_utf8(NULL, 0, utf16Str, -1, NULL); // find the size needed
         buffer_need_bytes(b, needed);
         remaining = b->size - b->len;
-        used = utf16_to_utf8(&b->buffer[b->len], remaining, utf16Str, -1);
+        used = utf16_to_utf8(&b->buffer[b->len], remaining, utf16Str, -1, NULL);
     }
 
     if(used) {
