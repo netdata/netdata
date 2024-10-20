@@ -851,6 +851,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/nd_log-to-windows-common.h
         src/libnetdata/os/system-maps/cache-host-users-and-groups.c
         src/libnetdata/os/system-maps/cache-host-users-and-groups.h
+        src/libnetdata/common.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

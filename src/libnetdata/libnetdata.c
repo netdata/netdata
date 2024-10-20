@@ -2,6 +2,10 @@
 
 #include "libnetdata.h"
 
+#define MALLOC_ALIGNMENT (sizeof(uintptr_t) * 2)
+#define size_t_atomic_count(op, var, size) __atomic_## op ##_fetch(&(var), size, __ATOMIC_RELAXED)
+#define size_t_atomic_bytes(op, var, size) __atomic_## op ##_fetch(&(var), ((size) % MALLOC_ALIGNMENT)?((size) + MALLOC_ALIGNMENT - ((size) % MALLOC_ALIGNMENT)):(size), __ATOMIC_RELAXED)
+
 #if !defined(MADV_DONTFORK)
 #define MADV_DONTFORK 0
 #endif
