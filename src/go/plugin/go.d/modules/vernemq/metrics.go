@@ -2,37 +2,79 @@
 
 package vernemq
 
-// Source Code Metrics:
-//  - https://github.com/vernemq/vernemq/blob/master/apps/vmq_server/src/vmq_metrics.erl
-//  - https://github.com/vernemq/vernemq/blob/master/apps/vmq_server/src/vmq_metrics.hrl
+func newNodeStats() *nodeStats {
+	return &nodeStats{
+		stats: make(map[string]int64),
+		mqtt4: make(map[string]int64),
+		mqtt5: make(map[string]int64),
+	}
+}
 
-// Source Code FSM:
-//  - https://github.com/vernemq/vernemq/blob/master/apps/vmq_server/src/vmq_mqtt_fsm.erl
-//  - https://github.com/vernemq/vernemq/blob/master/apps/vmq_server/src/vmq_mqtt5_fsm.erl
+type nodeStats struct {
+	stats map[string]int64
+	mqtt4 map[string]int64
+	mqtt5 map[string]int64
+}
 
-// MQTT Packet Types:
-//  - v4: http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/errata01/os/mqtt-v3.1.1-errata01-os-complete.html#_Toc442180834
-//  - v5: https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901019
+// Source code metrics: https://github.com/vernemq/vernemq/blob/master/apps/vmq_server/src/vmq_metrics.erl
+// Not used metrics: https://docs.vernemq.com/monitoring/introduction
 
-// Erlang VM:
-//  - http://erlang.org/documentation/doc-5.7.1/erts-5.7.1/doc/html/erlang.html
+const (
+	// Sockets
+	metricSocketOpen             = "socket_open"
+	metricSocketClose            = "socket_close"
+	metricSocketError            = "socket_error"
+	metricSocketCloseTimeout     = "socket_close_timeout"
+	metricClientKeepaliveExpired = "client_keepalive_expired" // v4, v5
 
-// Not used metrics (https://docs.vernemq.com/monitoring/introduction):
-// - "mqtt_connack_accepted_sent"              // v4, not populated,  "mqtt_connack_sent" used instead
-// - "mqtt_connack_unacceptable_protocol_sent" // v4, not populated,  "mqtt_connack_sent" used instead
-// - "mqtt_connack_identifier_rejected_sent"   // v4, not populated,  "mqtt_connack_sent" used instead
-// - "mqtt_connack_server_unavailable_sent"    // v4, not populated,  "mqtt_connack_sent" used instead
-// - "mqtt_connack_bad_credentials_sent"       // v4, not populated,  "mqtt_connack_sent" used instead
-// - "mqtt_connack_not_authorized_sent"        // v4, not populated,  "mqtt_connack_sent" used instead
-// - "system_exact_reductions"
-// - "system_runtime"
-// - "vm_memory_atom"
-// - "vm_memory_atom_used"
-// - "vm_memory_binary"
-// - "vm_memory_code"
-// - "vm_memory_ets"
-// - "vm_memory_processes_used"
-// - "vm_memory_total"
+	// Queues
+	metricQueueProcesses              = "queue_processes"
+	metricQueueSetup                  = "queue_setup"
+	metricQueueTeardown               = "queue_teardown"
+	metricQueueMessageIn              = "queue_message_in"
+	metricQueueMessageOut             = "queue_message_out"
+	metricQueueMessageDrop            = "queue_message_drop"
+	metricQueueMessageExpired         = "queue_message_expired"
+	metricQueueMessageUnhandled       = "queue_message_unhandled"
+	metricQueueInitializedFromStorage = "queue_initialized_from_storage"
+
+	// Subscriptions
+	metricRouterMatchesLocal  = "router_matches_local"
+	metricRouterMatchesRemote = "router_matches_remote"
+	metricRouterMemory        = "router_memory"
+	metricRouterSubscriptions = "router_subscriptions"
+
+	// Erlang VM
+	metricSystemUtilization        = "system_utilization"
+	metricSystemProcessCount       = "system_process_count"
+	metricSystemReductions         = "system_reductions"
+	metricSystemContextSwitches    = "system_context_switches"
+	metricSystemIOIn               = "system_io_in"
+	metricSystemIOOut              = "system_io_out"
+	metricSystemRunQueue           = "system_run_queue"
+	metricSystemGCCount            = "system_gc_count"
+	metricSystemWordsReclaimedByGC = "system_words_reclaimed_by_gc"
+	metricVMMemoryProcesses        = "vm_memory_processes"
+	metricVMMemorySystem           = "vm_memory_system"
+
+	// Bandwidth
+	metricBytesReceived = "bytes_received"
+	metricBytesSent     = "bytes_sent"
+
+	// Retain
+	metricRetainMemory   = "retain_memory"
+	metricRetainMessages = "retain_messages"
+
+	// Cluster
+	metricClusterBytesDropped  = "cluster_bytes_dropped"
+	metricClusterBytesReceived = "cluster_bytes_received"
+	metricClusterBytesSent     = "cluster_bytes_sent"
+	metricNetSplitDetected     = "netsplit_detected"
+	metricNetSplitResolved     = "netsplit_resolved"
+
+	// Uptime
+	metricSystemWallClock = "system_wallclock"
+)
 
 // -----------------------------------------------MQTT------------------------------------------------------------------
 const (
@@ -92,59 +134,116 @@ const (
 	metricMQTTInvalidMsgSizeError = "mqtt_invalid_msg_size_error" // v4, v5
 )
 
-const (
-	// Sockets
-	metricSocketOpen             = "socket_open"
-	metricSocketClose            = "socket_close"
-	metricSocketError            = "socket_error"
-	metricSocketCloseTimeout     = "socket_close_timeout"
-	metricClientKeepaliveExpired = "client_keepalive_expired" // v4, v5
+var (
+	mqtt5AUTHReceivedReasonCodes = []string{
+		"success",
+		"continue_authentication",
+		"reauthenticate",
+	}
+	mqtt5AUTHSentReasonCodes = mqtt5AUTHReceivedReasonCodes
 
-	// Queues
-	metricQueueProcesses              = "queue_processes"
-	metricQueueSetup                  = "queue_setup"
-	metricQueueTeardown               = "queue_teardown"
-	metricQueueMessageIn              = "queue_message_in"
-	metricQueueMessageOut             = "queue_message_out"
-	metricQueueMessageDrop            = "queue_message_drop"
-	metricQueueMessageExpired         = "queue_message_expired"
-	metricQueueMessageUnhandled       = "queue_message_unhandled"
-	metricQueueInitializedFromStorage = "queue_initialized_from_storage"
+	mqtt4CONNACKSentReturnCodes = []string{
+		"success",
+		"unsupported_protocol_version",
+		"client_identifier_not_valid",
+		"server_unavailable",
+		"bad_username_or_password",
+		"not_authorized",
+	}
+	mqtt5CONNACKSentReasonCodes = []string{
+		"success",
+		"unspecified_error",
+		"malformed_packet",
+		"protocol_error",
+		"impl_specific_error",
+		"unsupported_protocol_version",
+		"client_identifier_not_valid",
+		"bad_username_or_password",
+		"not_authorized",
+		"server_unavailable",
+		"server_busy",
+		"banned",
+		"bad_authentication_method",
+		"topic_name_invalid",
+		"packet_too_large",
+		"quota_exceeded",
+		"payload_format_invalid",
+		"retain_not_supported",
+		"qos_not_supported",
+		"use_another_server",
+		"server_moved",
+		"connection_rate_exceeded",
+	}
 
-	// Subscriptions
-	metricRouterMatchesLocal  = "router_matches_local"
-	metricRouterMatchesRemote = "router_matches_remote"
-	metricRouterMemory        = "router_memory"
-	metricRouterSubscriptions = "router_subscriptions"
+	mqtt5DISCONNECTReceivedReasonCodes = []string{
+		"normal_disconnect",
+		"disconnect_with_will_msg",
+		"unspecified_error",
+		"malformed_packet",
+		"protocol_error",
+		"impl_specific_error",
+		"topic_name_invalid",
+		"receive_max_exceeded",
+		"topic_alias_invalid",
+		"packet_too_large",
+		"message_rate_too_high",
+		"quota_exceeded",
+		"administrative_action",
+		"payload_format_invalid",
+	}
+	mqtt5DISCONNECTSentReasonCodes = []string{
+		"normal_disconnect",
+		"unspecified_error",
+		"malformed_packet",
+		"protocol_error",
+		"impl_specific_error",
+		"not_authorized",
+		"server_busy",
+		"server_shutting_down",
+		"keep_alive_timeout",
+		"session_taken_over",
+		"topic_filter_invalid",
+		"topic_name_invalid",
+		"receive_max_exceeded",
+		"topic_alias_invalid",
+		"packet_too_large",
+		"message_rate_too_high",
+		"quota_exceeded",
+		"administrative_action",
+		"payload_format_invalid",
+		"retain_not_supported",
+		"qos_not_supported",
+		"use_another_server",
+		"server_moved",
+		"shared_subs_not_supported",
+		"connection_rate_exceeded",
+		"max_connect_time",
+		"subscription_ids_not_supported",
+		"wildcard_subs_not_supported",
+	}
 
-	// Erlang VM
-	metricSystemUtilization        = "system_utilization"
-	metricSystemProcessCount       = "system_process_count"
-	metricSystemReductions         = "system_reductions"
-	metricSystemContextSwitches    = "system_context_switches"
-	metricSystemIOIn               = "system_io_in"
-	metricSystemIOOut              = "system_io_out"
-	metricSystemRunQueue           = "system_run_queue"
-	metricSystemGCCount            = "system_gc_count"
-	metricSystemWordsReclaimedByGC = "system_words_reclaimed_by_gc"
-	metricVMMemoryProcesses        = "vm_memory_processes"
-	metricVMMemorySystem           = "vm_memory_system"
+	mqtt5PUBACKReceivedReasonCodes = []string{
+		"success",
+		"no_matching_subscribers",
+		"unspecified_error",
+		"impl_specific_error",
+		"not_authorized",
+		"topic_name_invalid",
+		"packet_id_in_use",
+		"quota_exceeded",
+		"payload_format_invalid",
+	}
+	mqtt5PUBACKSentReasonCodes = mqtt5PUBACKReceivedReasonCodes
 
-	// Bandwidth
-	metricBytesReceived = "bytes_received"
-	metricBytesSent     = "bytes_sent"
+	mqtt5PUBRECReceivedReasonCodes = mqtt5PUBACKReceivedReasonCodes
+	mqtt5PUBRECSentReasonCodes     = mqtt5PUBACKReceivedReasonCodes
 
-	// Retain
-	metricRetainMemory   = "retain_memory"
-	metricRetainMessages = "retain_messages"
+	mqtt5PUBRELReceivedReasonCodes = []string{
+		"success",
+		"packet_id_not_found",
+	}
+	mqtt5PUBRELSentReasonCodes = mqtt5PUBRELReceivedReasonCodes
 
-	// Cluster
-	metricClusterBytesDropped  = "cluster_bytes_dropped"
-	metricClusterBytesReceived = "cluster_bytes_received"
-	metricClusterBytesSent     = "cluster_bytes_sent"
-	metricNetSplitDetected     = "netsplit_detected"
-	metricNetSplitResolved     = "netsplit_resolved"
-
-	// Uptime
-	metricSystemWallClock = "system_wallclock"
+	mqtt5PUBCOMPReceivedReasonCodes = mqtt5PUBRELReceivedReasonCodes
+	mqtt5PUBCOMPSentReasonCodes     = mqtt5PUBRELReceivedReasonCodes
 )

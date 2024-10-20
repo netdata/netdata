@@ -11,7 +11,7 @@ import (
 
 func (v *VerneMQ) validateConfig() error {
 	if v.URL == "" {
-		return errors.New("url is not set")
+		return errors.New("url is required but not set")
 	}
 	return nil
 }

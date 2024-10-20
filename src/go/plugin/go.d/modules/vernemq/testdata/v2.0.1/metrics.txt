@@ -1,0 +1,588 @@
+# HELP vernemq_socket_open The number of times an MQTT socket has been opened.
+# TYPE vernemq_socket_open counter
+vernemq_socket_open{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_socket_close The number of times an MQTT socket has been closed.
+# TYPE vernemq_socket_close counter
+vernemq_socket_close{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_socket_close_timeout The number of times VerneMQ closed an MQTT socket due to no CONNECT frame has been received on time.
+# TYPE vernemq_socket_close_timeout counter
+vernemq_socket_close_timeout{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_socket_error The total number of socket errors that have occurred.
+# TYPE vernemq_socket_error counter
+vernemq_socket_error{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_bytes_received The total number of bytes received.
+# TYPE vernemq_bytes_received counter
+vernemq_bytes_received{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_bytes_sent The total number of bytes sent.
+# TYPE vernemq_bytes_sent counter
+vernemq_bytes_sent{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_mqtt_connect_received The number of CONNECT packets received.
+# TYPE vernemq_mqtt_connect_received counter
+vernemq_mqtt_connect_received{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_connect_received{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_publish_received The number of PUBLISH packets received.
+# TYPE vernemq_mqtt_publish_received counter
+vernemq_mqtt_publish_received{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_publish_received{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_puback_received The number of PUBACK packets received.
+# TYPE vernemq_mqtt_puback_received counter
+vernemq_mqtt_puback_received{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_pubrec_received The number of PUBREC packets received.
+# TYPE vernemq_mqtt_pubrec_received counter
+vernemq_mqtt_pubrec_received{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_pubrel_received The number of PUBREL packets received.
+# TYPE vernemq_mqtt_pubrel_received counter
+vernemq_mqtt_pubrel_received{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_pubcomp_received The number of PUBCOMP packets received.
+# TYPE vernemq_mqtt_pubcomp_received counter
+vernemq_mqtt_pubcomp_received{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_subscribe_received The number of SUBSCRIBE packets received.
+# TYPE vernemq_mqtt_subscribe_received counter
+vernemq_mqtt_subscribe_received{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_subscribe_received{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_unsubscribe_received The number of UNSUBSCRIBE packets received.
+# TYPE vernemq_mqtt_unsubscribe_received counter
+vernemq_mqtt_unsubscribe_received{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_unsubscribe_received{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_pingreq_received The number of PINGREQ packets received.
+# TYPE vernemq_mqtt_pingreq_received counter
+vernemq_mqtt_pingreq_received{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_pingreq_received{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_disconnect_received The number of DISCONNECT packets received.
+# TYPE vernemq_mqtt_disconnect_received counter
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_connack_accepted_sent The number of times a connection has been accepted.
+# TYPE vernemq_mqtt_connack_accepted_sent counter
+vernemq_mqtt_connack_accepted_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_connack_unacceptable_protocol_sent The number of times the broker is not able to support the requested protocol.
+# TYPE vernemq_mqtt_connack_unacceptable_protocol_sent counter
+vernemq_mqtt_connack_unacceptable_protocol_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_connack_identifier_rejected_sent The number of times a client was rejected due to a unacceptable identifier.
+# TYPE vernemq_mqtt_connack_identifier_rejected_sent counter
+vernemq_mqtt_connack_identifier_rejected_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_connack_server_unavailable_sent The number of times a client was rejected due the the broker being unavailable.
+# TYPE vernemq_mqtt_connack_server_unavailable_sent counter
+vernemq_mqtt_connack_server_unavailable_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_connack_bad_credentials_sent The number of times a client sent bad credentials.
+# TYPE vernemq_mqtt_connack_bad_credentials_sent counter
+vernemq_mqtt_connack_bad_credentials_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_connack_not_authorized_sent The number of times a client was rejected due to insufficient authorization.
+# TYPE vernemq_mqtt_connack_not_authorized_sent counter
+vernemq_mqtt_connack_not_authorized_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_publish_sent The number of PUBLISH packets sent.
+# TYPE vernemq_mqtt_publish_sent counter
+vernemq_mqtt_publish_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_publish_sent{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_puback_sent The number of PUBACK packets sent.
+# TYPE vernemq_mqtt_puback_sent counter
+vernemq_mqtt_puback_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_pubrec_sent The number of PUBREC packets sent.
+# TYPE vernemq_mqtt_pubrec_sent counter
+vernemq_mqtt_pubrec_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_pubrel_sent The number of PUBREL packets sent.
+# TYPE vernemq_mqtt_pubrel_sent counter
+vernemq_mqtt_pubrel_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_pubcomp_sent The number of PUBCOMP packets sent.
+# TYPE vernemq_mqtt_pubcomp_sent counter
+vernemq_mqtt_pubcomp_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_suback_sent The number of SUBACK packets sent.
+# TYPE vernemq_mqtt_suback_sent counter
+vernemq_mqtt_suback_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_suback_sent{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_unsuback_sent The number of UNSUBACK packets sent.
+# TYPE vernemq_mqtt_unsuback_sent counter
+vernemq_mqtt_unsuback_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_unsuback_sent{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_pingresp_sent The number of PINGRESP packets sent.
+# TYPE vernemq_mqtt_pingresp_sent counter
+vernemq_mqtt_pingresp_sent{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_pingresp_sent{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_publish_auth_error The number of unauthorized publish attempts.
+# TYPE vernemq_mqtt_publish_auth_error counter
+vernemq_mqtt_publish_auth_error{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_publish_auth_error{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_subscribe_auth_error The number of unauthorized subscription attempts.
+# TYPE vernemq_mqtt_subscribe_auth_error counter
+vernemq_mqtt_subscribe_auth_error{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_subscribe_auth_error{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_invalid_msg_size_error The number of packages exceeding the maximum allowed size.
+# TYPE vernemq_mqtt_invalid_msg_size_error counter
+vernemq_mqtt_invalid_msg_size_error{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_invalid_msg_size_error{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_puback_invalid_error The number of unexpected PUBACK messages received.
+# TYPE vernemq_mqtt_puback_invalid_error counter
+vernemq_mqtt_puback_invalid_error{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_puback_invalid_error{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_pubrec_invalid_error The number of unexpected PUBREC messages received.
+# TYPE vernemq_mqtt_pubrec_invalid_error counter
+vernemq_mqtt_pubrec_invalid_error{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+# HELP vernemq_mqtt_pubcomp_invalid_error The number of unexpected PUBCOMP messages received.
+# TYPE vernemq_mqtt_pubcomp_invalid_error counter
+vernemq_mqtt_pubcomp_invalid_error{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_pubcomp_invalid_error{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_publish_error The number of times a PUBLISH operation failed due to a netsplit.
+# TYPE vernemq_mqtt_publish_error counter
+vernemq_mqtt_publish_error{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_publish_error{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_subscribe_error The number of times a SUBSCRIBE operation failed due to a netsplit.
+# TYPE vernemq_mqtt_subscribe_error counter
+vernemq_mqtt_subscribe_error{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_subscribe_error{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_mqtt_unsubscribe_error The number of times an UNSUBSCRIBE operation failed due to a netsplit.
+# TYPE vernemq_mqtt_unsubscribe_error counter
+vernemq_mqtt_unsubscribe_error{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_mqtt_unsubscribe_error{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_client_keepalive_expired The number of clients which failed to communicate within the keepalive time period.
+# TYPE vernemq_client_keepalive_expired counter
+vernemq_client_keepalive_expired{node="VerneMQ@10.10.10.20",mqtt_version="4"} 0
+vernemq_client_keepalive_expired{node="VerneMQ@10.10.10.20",mqtt_version="5"} 0
+# HELP vernemq_queue_setup The number of times a MQTT queue process has been started.
+# TYPE vernemq_queue_setup counter
+vernemq_queue_setup{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_queue_initialized_from_storage The number of times a MQTT queue process has been initialized from offline storage.
+# TYPE vernemq_queue_initialized_from_storage counter
+vernemq_queue_initialized_from_storage{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_queue_teardown The number of times a MQTT queue process has been terminated.
+# TYPE vernemq_queue_teardown counter
+vernemq_queue_teardown{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_queue_message_drop The number of messages dropped due to full queues.
+# TYPE vernemq_queue_message_drop counter
+vernemq_queue_message_drop{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_queue_message_expired The number of messages which expired before delivery.
+# TYPE vernemq_queue_message_expired counter
+vernemq_queue_message_expired{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_queue_message_unhandled The number of unhandled messages when connecting with clean session=true or QoS0 for offline sessions.
+# TYPE vernemq_queue_message_unhandled counter
+vernemq_queue_message_unhandled{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_queue_message_in The number of PUBLISH packets received by MQTT queue processes.
+# TYPE vernemq_queue_message_in counter
+vernemq_queue_message_in{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_queue_message_out The number of PUBLISH packets sent from MQTT queue processes.
+# TYPE vernemq_queue_message_out counter
+vernemq_queue_message_out{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_client_expired Not in use (deprecated)
+# TYPE vernemq_client_expired counter
+vernemq_client_expired{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_cluster_bytes_received The number of bytes received from other cluster nodes.
+# TYPE vernemq_cluster_bytes_received counter
+vernemq_cluster_bytes_received{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_cluster_bytes_sent The number of bytes send to other cluster nodes.
+# TYPE vernemq_cluster_bytes_sent counter
+vernemq_cluster_bytes_sent{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_cluster_bytes_dropped The number of bytes dropped while sending data to other cluster nodes.
+# TYPE vernemq_cluster_bytes_dropped counter
+vernemq_cluster_bytes_dropped{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_router_matches_local The number of matched local subscriptions.
+# TYPE vernemq_router_matches_local counter
+vernemq_router_matches_local{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_router_matches_remote The number of matched remote subscriptions.
+# TYPE vernemq_router_matches_remote counter
+vernemq_router_matches_remote{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_mqtt_connack_sent The number of CONNACK packets sent.
+# TYPE vernemq_mqtt_connack_sent counter
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="4",return_code="success"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="4",return_code="unsupported_protocol_version"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="4",return_code="client_identifier_not_valid"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="4",return_code="server_unavailable"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="4",return_code="bad_username_or_password"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="4",return_code="not_authorized"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="normal_disconnect"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="disconnect_with_will_msg"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="unspecified_error"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="malformed_packet"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="protocol_error"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="impl_specific_error"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="topic_name_invalid"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="receive_max_exceeded"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="topic_alias_invalid"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="packet_too_large"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="message_rate_too_high"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="quota_exceeded"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="administrative_action"} 0
+vernemq_mqtt_disconnect_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="payload_format_invalid"} 0
+# HELP vernemq_mqtt_disconnect_sent The number of DISCONNECT packets sent.
+# TYPE vernemq_mqtt_disconnect_sent counter
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="normal_disconnect"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="unspecified_error"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="malformed_packet"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="protocol_error"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="impl_specific_error"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="not_authorized"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="server_busy"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="server_shutting_down"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="keep_alive_timeout"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="session_taken_over"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="topic_filter_invalid"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="topic_name_invalid"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="receive_max_exceeded"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="topic_alias_invalid"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="packet_too_large"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="message_rate_too_high"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="quota_exceeded"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="administrative_action"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="payload_format_invalid"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="retain_not_supported"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="qos_not_supported"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="use_another_server"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="server_moved"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="shared_subs_not_supported"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="connection_rate_exceeded"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="max_connect_time"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="subscription_ids_not_supported"} 0
+vernemq_mqtt_disconnect_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="wildcard_subs_not_supported"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="success"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="unspecified_error"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="malformed_packet"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="protocol_error"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="impl_specific_error"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="unsupported_protocol_version"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="client_identifier_not_valid"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="bad_username_or_password"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="not_authorized"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="server_unavailable"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="server_busy"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="banned"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="bad_authentication_method"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="topic_name_invalid"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="packet_too_large"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="quota_exceeded"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="payload_format_invalid"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="retain_not_supported"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="qos_not_supported"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="use_another_server"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="server_moved"} 0
+vernemq_mqtt_connack_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="connection_rate_exceeded"} 0
+vernemq_mqtt_puback_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="success"} 0
+vernemq_mqtt_puback_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="no_matching_subscribers"} 0
+vernemq_mqtt_puback_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="unspecified_error"} 0
+vernemq_mqtt_puback_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="impl_specific_error"} 0
+vernemq_mqtt_puback_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="not_authorized"} 0
+vernemq_mqtt_puback_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="topic_name_invalid"} 0
+vernemq_mqtt_puback_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="packet_id_in_use"} 0
+vernemq_mqtt_puback_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="quota_exceeded"} 0
+vernemq_mqtt_puback_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="payload_format_invalid"} 0
+vernemq_mqtt_puback_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="success"} 0
+vernemq_mqtt_puback_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="no_matching_subscribers"} 0
+vernemq_mqtt_puback_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="unspecified_error"} 0
+vernemq_mqtt_puback_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="impl_specific_error"} 0
+vernemq_mqtt_puback_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="not_authorized"} 0
+vernemq_mqtt_puback_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="topic_name_invalid"} 0
+vernemq_mqtt_puback_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="packet_id_in_use"} 0
+vernemq_mqtt_puback_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="quota_exceeded"} 0
+vernemq_mqtt_puback_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="payload_format_invalid"} 0
+vernemq_mqtt_pubrec_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="success"} 0
+vernemq_mqtt_pubrec_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="no_matching_subscribers"} 0
+vernemq_mqtt_pubrec_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="unspecified_error"} 0
+vernemq_mqtt_pubrec_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="impl_specific_error"} 0
+vernemq_mqtt_pubrec_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="not_authorized"} 0
+vernemq_mqtt_pubrec_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="topic_name_invalid"} 0
+vernemq_mqtt_pubrec_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="packet_id_in_use"} 0
+vernemq_mqtt_pubrec_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="quota_exceeded"} 0
+vernemq_mqtt_pubrec_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="payload_format_invalid"} 0
+vernemq_mqtt_pubrec_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="success"} 0
+vernemq_mqtt_pubrec_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="no_matching_subscribers"} 0
+vernemq_mqtt_pubrec_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="unspecified_error"} 0
+vernemq_mqtt_pubrec_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="impl_specific_error"} 0
+vernemq_mqtt_pubrec_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="not_authorized"} 0
+vernemq_mqtt_pubrec_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="topic_name_invalid"} 0
+vernemq_mqtt_pubrec_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="packet_id_in_use"} 0
+vernemq_mqtt_pubrec_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="quota_exceeded"} 0
+vernemq_mqtt_pubrec_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="payload_format_invalid"} 0
+vernemq_mqtt_pubrel_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="success"} 0
+vernemq_mqtt_pubrel_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="packet_id_not_found"} 0
+vernemq_mqtt_pubrel_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="success"} 0
+vernemq_mqtt_pubrel_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="packet_id_not_found"} 0
+vernemq_mqtt_pubcomp_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="success"} 0
+vernemq_mqtt_pubcomp_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="packet_id_not_found"} 0
+vernemq_mqtt_pubcomp_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="success"} 0
+vernemq_mqtt_pubcomp_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="packet_id_not_found"} 0
+# HELP vernemq_mqtt_auth_sent The number of AUTH packets sent.
+# TYPE vernemq_mqtt_auth_sent counter
+vernemq_mqtt_auth_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="success"} 0
+vernemq_mqtt_auth_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="continue_authentication"} 0
+vernemq_mqtt_auth_sent{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="reauthenticate"} 0
+# HELP vernemq_mqtt_auth_received The number of AUTH packets received.
+# TYPE vernemq_mqtt_auth_received counter
+vernemq_mqtt_auth_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="success"} 0
+vernemq_mqtt_auth_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="continue_authentication"} 0
+vernemq_mqtt_auth_received{node="VerneMQ@10.10.10.20",mqtt_version="5",reason_code="reauthenticate"} 0
+# HELP vernemq_total_active_connections The total number of active MQTT and MQTTWS connections.
+# TYPE vernemq_total_active_connections gauge
+vernemq_total_active_connections{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_active_mqtt_connections The number of active MQTT(S) connections.
+# TYPE vernemq_active_mqtt_connections gauge
+vernemq_active_mqtt_connections{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_active_mqttws_connections The number of active MQTT WS(S) connections.
+# TYPE vernemq_active_mqttws_connections gauge
+vernemq_active_mqttws_connections{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_queue_processes The number of MQTT queue processes.
+# TYPE vernemq_queue_processes gauge
+vernemq_queue_processes{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_retain_memory The number of bytes used for storing retained messages.
+# TYPE vernemq_retain_memory gauge
+vernemq_retain_memory{node="VerneMQ@10.10.10.20"} 15792
+# HELP vernemq_retain_messages The number of currently stored retained messages.
+# TYPE vernemq_retain_messages gauge
+vernemq_retain_messages{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_router_memory The number of bytes used by the routing table.
+# TYPE vernemq_router_memory gauge
+vernemq_router_memory{node="VerneMQ@10.10.10.20"} 20224
+# HELP vernemq_router_subscriptions The number of subscriptions in the routing table.
+# TYPE vernemq_router_subscriptions gauge
+vernemq_router_subscriptions{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_netsplit_resolved The number of resolved netsplits.
+# TYPE vernemq_netsplit_resolved counter
+vernemq_netsplit_resolved{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_netsplit_detected The number of detected netsplits.
+# TYPE vernemq_netsplit_detected counter
+vernemq_netsplit_detected{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_32 Scheduler 32 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_32 gauge
+vernemq_system_utilization_scheduler_32{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_31 Scheduler 31 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_31 gauge
+vernemq_system_utilization_scheduler_31{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_30 Scheduler 30 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_30 gauge
+vernemq_system_utilization_scheduler_30{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_29 Scheduler 29 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_29 gauge
+vernemq_system_utilization_scheduler_29{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_28 Scheduler 28 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_28 gauge
+vernemq_system_utilization_scheduler_28{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_27 Scheduler 27 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_27 gauge
+vernemq_system_utilization_scheduler_27{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_26 Scheduler 26 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_26 gauge
+vernemq_system_utilization_scheduler_26{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_25 Scheduler 25 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_25 gauge
+vernemq_system_utilization_scheduler_25{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_24 Scheduler 24 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_24 gauge
+vernemq_system_utilization_scheduler_24{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_23 Scheduler 23 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_23 gauge
+vernemq_system_utilization_scheduler_23{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_22 Scheduler 22 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_22 gauge
+vernemq_system_utilization_scheduler_22{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_21 Scheduler 21 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_21 gauge
+vernemq_system_utilization_scheduler_21{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_20 Scheduler 20 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_20 gauge
+vernemq_system_utilization_scheduler_20{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_19 Scheduler 19 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_19 gauge
+vernemq_system_utilization_scheduler_19{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_18 Scheduler 18 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_18 gauge
+vernemq_system_utilization_scheduler_18{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_17 Scheduler 17 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_17 gauge
+vernemq_system_utilization_scheduler_17{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_utilization_scheduler_16 Scheduler 16 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_16 gauge
+vernemq_system_utilization_scheduler_16{node="VerneMQ@10.10.10.20"} 2
+# HELP vernemq_system_utilization_scheduler_15 Scheduler 15 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_15 gauge
+vernemq_system_utilization_scheduler_15{node="VerneMQ@10.10.10.20"} 1
+# HELP vernemq_system_utilization_scheduler_14 Scheduler 14 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_14 gauge
+vernemq_system_utilization_scheduler_14{node="VerneMQ@10.10.10.20"} 3
+# HELP vernemq_system_utilization_scheduler_13 Scheduler 13 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_13 gauge
+vernemq_system_utilization_scheduler_13{node="VerneMQ@10.10.10.20"} 4
+# HELP vernemq_system_utilization_scheduler_12 Scheduler 12 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_12 gauge
+vernemq_system_utilization_scheduler_12{node="VerneMQ@10.10.10.20"} 2
+# HELP vernemq_system_utilization_scheduler_11 Scheduler 11 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_11 gauge
+vernemq_system_utilization_scheduler_11{node="VerneMQ@10.10.10.20"} 3
+# HELP vernemq_system_utilization_scheduler_10 Scheduler 10 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_10 gauge
+vernemq_system_utilization_scheduler_10{node="VerneMQ@10.10.10.20"} 3
+# HELP vernemq_system_utilization_scheduler_9 Scheduler 9 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_9 gauge
+vernemq_system_utilization_scheduler_9{node="VerneMQ@10.10.10.20"} 3
+# HELP vernemq_system_utilization_scheduler_8 Scheduler 8 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_8 gauge
+vernemq_system_utilization_scheduler_8{node="VerneMQ@10.10.10.20"} 14
+# HELP vernemq_system_utilization_scheduler_7 Scheduler 7 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_7 gauge
+vernemq_system_utilization_scheduler_7{node="VerneMQ@10.10.10.20"} 5
+# HELP vernemq_system_utilization_scheduler_6 Scheduler 6 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_6 gauge
+vernemq_system_utilization_scheduler_6{node="VerneMQ@10.10.10.20"} 4
+# HELP vernemq_system_utilization_scheduler_5 Scheduler 5 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_5 gauge
+vernemq_system_utilization_scheduler_5{node="VerneMQ@10.10.10.20"} 4
+# HELP vernemq_system_utilization_scheduler_4 Scheduler 4 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_4 gauge
+vernemq_system_utilization_scheduler_4{node="VerneMQ@10.10.10.20"} 5
+# HELP vernemq_system_utilization_scheduler_3 Scheduler 3 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_3 gauge
+vernemq_system_utilization_scheduler_3{node="VerneMQ@10.10.10.20"} 3
+# HELP vernemq_system_utilization_scheduler_2 Scheduler 2 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_2 gauge
+vernemq_system_utilization_scheduler_2{node="VerneMQ@10.10.10.20"} 6
+# HELP vernemq_system_utilization_scheduler_1 Scheduler 1 utilization (percentage)
+# TYPE vernemq_system_utilization_scheduler_1 gauge
+vernemq_system_utilization_scheduler_1{node="VerneMQ@10.10.10.20"} 100
+# HELP vernemq_system_utilization The average system (scheduler) utilization (percentage).
+# TYPE vernemq_system_utilization gauge
+vernemq_system_utilization{node="VerneMQ@10.10.10.20"} 5
+# HELP vernemq_vm_memory_ets The amount of memory allocated for ETS tables.
+# TYPE vernemq_vm_memory_ets gauge
+vernemq_vm_memory_ets{node="VerneMQ@10.10.10.20"} 6665000
+# HELP vernemq_vm_memory_code The amount of memory allocated for code.
+# TYPE vernemq_vm_memory_code gauge
+vernemq_vm_memory_code{node="VerneMQ@10.10.10.20"} 13546686
+# HELP vernemq_vm_memory_binary The amount of memory allocated for binaries.
+# TYPE vernemq_vm_memory_binary gauge
+vernemq_vm_memory_binary{node="VerneMQ@10.10.10.20"} 729792
+# HELP vernemq_vm_memory_atom_used The amount of memory used by atoms.
+# TYPE vernemq_vm_memory_atom_used gauge
+vernemq_vm_memory_atom_used{node="VerneMQ@10.10.10.20"} 634383
+# HELP vernemq_vm_memory_atom The amount of memory allocated for atoms.
+# TYPE vernemq_vm_memory_atom gauge
+vernemq_vm_memory_atom{node="VerneMQ@10.10.10.20"} 639193
+# HELP vernemq_vm_memory_system The amount of memory allocated for the emulator.
+# TYPE vernemq_vm_memory_system gauge
+vernemq_vm_memory_system{node="VerneMQ@10.10.10.20"} 44839192
+# HELP vernemq_vm_memory_processes_used The amount of memory used by processes.
+# TYPE vernemq_vm_memory_processes_used gauge
+vernemq_vm_memory_processes_used{node="VerneMQ@10.10.10.20"} 13751224
+# HELP vernemq_vm_memory_processes The amount of memory allocated for processes.
+# TYPE vernemq_vm_memory_processes gauge
+vernemq_vm_memory_processes{node="VerneMQ@10.10.10.20"} 13754320
+# HELP vernemq_vm_memory_total The total amount of memory allocated.
+# TYPE vernemq_vm_memory_total gauge
+vernemq_vm_memory_total{node="VerneMQ@10.10.10.20"} 58593512
+# HELP vernemq_system_process_count The number of Erlang processes.
+# TYPE vernemq_system_process_count gauge
+vernemq_system_process_count{node="VerneMQ@10.10.10.20"} 465
+# HELP vernemq_system_wallclock The number of milli-seconds passed since the node was started.
+# TYPE vernemq_system_wallclock counter
+vernemq_system_wallclock{node="VerneMQ@10.10.10.20"} 51082602
+# HELP vernemq_system_runtime The sum of the runtime for all threads in the Erlang runtime system.
+# TYPE vernemq_system_runtime counter
+vernemq_system_runtime{node="VerneMQ@10.10.10.20"} 54249
+# HELP vernemq_system_run_queue The total number of processes and ports ready to run on all run-queues.
+# TYPE vernemq_system_run_queue gauge
+vernemq_system_run_queue{node="VerneMQ@10.10.10.20"} 0
+# HELP vernemq_system_reductions The number of reductions performed in the VM since the node was started.
+# TYPE vernemq_system_reductions counter
+vernemq_system_reductions{node="VerneMQ@10.10.10.20"} 340640218
+# HELP vernemq_system_io_out The total number of bytes sent through ports.
+# TYPE vernemq_system_io_out counter
+vernemq_system_io_out{node="VerneMQ@10.10.10.20"} 1702500
+# HELP vernemq_system_io_in The total number of bytes received through ports.
+# TYPE vernemq_system_io_in counter
+vernemq_system_io_in{node="VerneMQ@10.10.10.20"} 30616669
+# HELP vernemq_system_words_reclaimed_by_gc The number of words reclaimed by the garbage collector.
+# TYPE vernemq_system_words_reclaimed_by_gc counter
+vernemq_system_words_reclaimed_by_gc{node="VerneMQ@10.10.10.20"} 661531058
+# HELP vernemq_system_gc_count The number of garbage collections performed.
+# TYPE vernemq_system_gc_count counter
+vernemq_system_gc_count{node="VerneMQ@10.10.10.20"} 355236
+# HELP vernemq_system_exact_reductions The exact number of reductions performed.
+# TYPE vernemq_system_exact_reductions counter
+vernemq_system_exact_reductions{node="VerneMQ@10.10.10.20"} 340307987
+# HELP vernemq_system_context_switches The total number of context switches.
+# TYPE vernemq_system_context_switches counter
+vernemq_system_context_switches{node="VerneMQ@10.10.10.20"} 3902972
+# HELP vernemq_storage_scan_microseconds A histogram of the storage scan latency.
+# TYPE vernemq_storage_scan_microseconds histogram
+vernemq_storage_scan_microseconds_bucket{node="VerneMQ@10.10.10.20",le="+Inf"} 50
+vernemq_storage_scan_microseconds_bucket{node="VerneMQ@10.10.10.20",le="1000000"} 50
+vernemq_storage_scan_microseconds_bucket{node="VerneMQ@10.10.10.20",le="100000"} 50
+vernemq_storage_scan_microseconds_bucket{node="VerneMQ@10.10.10.20",le="10000"} 50
+vernemq_storage_scan_microseconds_bucket{node="VerneMQ@10.10.10.20",le="1000"} 50
+vernemq_storage_scan_microseconds_bucket{node="VerneMQ@10.10.10.20",le="100"} 8
+vernemq_storage_scan_microseconds_bucket{node="VerneMQ@10.10.10.20",le="10"} 0
+vernemq_storage_scan_microseconds_count{node="VerneMQ@10.10.10.20"} 50
+vernemq_storage_scan_microseconds_sum{node="VerneMQ@10.10.10.20"} 6482
+# HELP vernemq_storage_write_microseconds A histogram of the storage write latency.
+# TYPE vernemq_storage_write_microseconds histogram
+vernemq_storage_write_microseconds_bucket{node="VerneMQ@10.10.10.20",le="+Inf"} 68140
+vernemq_storage_write_microseconds_bucket{node="VerneMQ@10.10.10.20",le="1000000"} 68140
+vernemq_storage_write_microseconds_bucket{node="VerneMQ@10.10.10.20",le="100000"} 68140
+vernemq_storage_write_microseconds_bucket{node="VerneMQ@10.10.10.20",le="10000"} 68140
+vernemq_storage_write_microseconds_bucket{node="VerneMQ@10.10.10.20",le="1000"} 68112
+vernemq_storage_write_microseconds_bucket{node="VerneMQ@10.10.10.20",le="100"} 35957
+vernemq_storage_write_microseconds_bucket{node="VerneMQ@10.10.10.20",le="10"} 0
+vernemq_storage_write_microseconds_count{node="VerneMQ@10.10.10.20"} 68140
+vernemq_storage_write_microseconds_sum{node="VerneMQ@10.10.10.20"} 7490218
+# HELP vernemq_storage_read_microseconds A histogram of the storage read latency.
+# TYPE vernemq_storage_read_microseconds histogram
+vernemq_storage_read_microseconds_bucket{node="VerneMQ@10.10.10.20",le="+Inf"} 362
+vernemq_storage_read_microseconds_bucket{node="VerneMQ@10.10.10.20",le="1000000"} 362
+vernemq_storage_read_microseconds_bucket{node="VerneMQ@10.10.10.20",le="100000"} 362
+vernemq_storage_read_microseconds_bucket{node="VerneMQ@10.10.10.20",le="10000"} 362
+vernemq_storage_read_microseconds_bucket{node="VerneMQ@10.10.10.20",le="1000"} 362
+vernemq_storage_read_microseconds_bucket{node="VerneMQ@10.10.10.20",le="100"} 350
+vernemq_storage_read_microseconds_bucket{node="VerneMQ@10.10.10.20",le="10"} 0
+vernemq_storage_read_microseconds_count{node="VerneMQ@10.10.10.20"} 362
+vernemq_storage_read_microseconds_sum{node="VerneMQ@10.10.10.20"} 19097
+# HELP vernemq_metadata_fold_microseconds A histogram of the metadata fold latency.
+# TYPE vernemq_metadata_fold_microseconds histogram
+vernemq_metadata_fold_microseconds_bucket{node="VerneMQ@10.10.10.20",le="+Inf"} 3
+vernemq_metadata_fold_microseconds_bucket{node="VerneMQ@10.10.10.20",le="1000000"} 3
+vernemq_metadata_fold_microseconds_bucket{node="VerneMQ@10.10.10.20",le="100000"} 3
+vernemq_metadata_fold_microseconds_bucket{node="VerneMQ@10.10.10.20",le="10000"} 3
+vernemq_metadata_fold_microseconds_bucket{node="VerneMQ@10.10.10.20",le="1000"} 0
+vernemq_metadata_fold_microseconds_bucket{node="VerneMQ@10.10.10.20",le="100"} 0
+vernemq_metadata_fold_microseconds_bucket{node="VerneMQ@10.10.10.20",le="10"} 0
+vernemq_metadata_fold_microseconds_count{node="VerneMQ@10.10.10.20"} 3
+vernemq_metadata_fold_microseconds_sum{node="VerneMQ@10.10.10.20"} 4332
+# HELP vernemq_metadata_get_microseconds A histogram of the metadata get latency.
+# TYPE vernemq_metadata_get_microseconds histogram
+vernemq_metadata_get_microseconds_bucket{node="VerneMQ@10.10.10.20",le="+Inf"} 342
+vernemq_metadata_get_microseconds_bucket{node="VerneMQ@10.10.10.20",le="1000000"} 342
+vernemq_metadata_get_microseconds_bucket{node="VerneMQ@10.10.10.20",le="100000"} 342
+vernemq_metadata_get_microseconds_bucket{node="VerneMQ@10.10.10.20",le="10000"} 342
+vernemq_metadata_get_microseconds_bucket{node="VerneMQ@10.10.10.20",le="1000"} 341
+vernemq_metadata_get_microseconds_bucket{node="VerneMQ@10.10.10.20",le="100"} 327
+vernemq_metadata_get_microseconds_bucket{node="VerneMQ@10.10.10.20",le="10"} 0
+vernemq_metadata_get_microseconds_count{node="VerneMQ@10.10.10.20"} 342
+vernemq_metadata_get_microseconds_sum{node="VerneMQ@10.10.10.20"} 23294
+# HELP vernemq_swc_dotkeymap_memory The number of words allocated to the SWC group dotkeymap.
+# TYPE vernemq_swc_dotkeymap_memory gauge
+vernemq_swc_dotkeymap_memory{node="VerneMQ@10.10.10.20",group="meta1"} 915
+vernemq_swc_dotkeymap_memory{node="VerneMQ@10.10.10.20",group="meta10"} 915
+vernemq_swc_dotkeymap_memory{node="VerneMQ@10.10.10.20",group="meta2"} 915
+vernemq_swc_dotkeymap_memory{node="VerneMQ@10.10.10.20",group="meta3"} 915
+vernemq_swc_dotkeymap_memory{node="VerneMQ@10.10.10.20",group="meta4"} 915
+vernemq_swc_dotkeymap_memory{node="VerneMQ@10.10.10.20",group="meta5"} 915
+vernemq_swc_dotkeymap_memory{node="VerneMQ@10.10.10.20",group="meta6"} 915
+vernemq_swc_dotkeymap_memory{node="VerneMQ@10.10.10.20",group="meta7"} 915
+vernemq_swc_dotkeymap_memory{node="VerneMQ@10.10.10.20",group="meta8"} 915
+vernemq_swc_dotkeymap_memory{node="VerneMQ@10.10.10.20",group="meta9"} 915
+# HELP vernemq_swc_object_count The number of replicated objects by this SWC group.
+# TYPE vernemq_swc_object_count gauge
+vernemq_swc_object_count{node="VerneMQ@10.10.10.20",group="meta1"} 0
+vernemq_swc_object_count{node="VerneMQ@10.10.10.20",group="meta10"} 0
+vernemq_swc_object_count{node="VerneMQ@10.10.10.20",group="meta2"} 0
+vernemq_swc_object_count{node="VerneMQ@10.10.10.20",group="meta3"} 0
+vernemq_swc_object_count{node="VerneMQ@10.10.10.20",group="meta4"} 0
+vernemq_swc_object_count{node="VerneMQ@10.10.10.20",group="meta5"} 0
+vernemq_swc_object_count{node="VerneMQ@10.10.10.20",group="meta6"} 0
+vernemq_swc_object_count{node="VerneMQ@10.10.10.20",group="meta7"} 0
+vernemq_swc_object_count{node="VerneMQ@10.10.10.20",group="meta8"} 0
+vernemq_swc_object_count{node="VerneMQ@10.10.10.20",group="meta9"} 0
+# HELP vernemq_swc_tombstone_count The number of replicated tombstones by this SWC group.
+# TYPE vernemq_swc_tombstone_count gauge
+vernemq_swc_tombstone_count{node="VerneMQ@10.10.10.20",group="meta1"} 0
+vernemq_swc_tombstone_count{node="VerneMQ@10.10.10.20",group="meta10"} 0
+vernemq_swc_tombstone_count{node="VerneMQ@10.10.10.20",group="meta2"} 0
+vernemq_swc_tombstone_count{node="VerneMQ@10.10.10.20",group="meta3"} 0
+vernemq_swc_tombstone_count{node="VerneMQ@10.10.10.20",group="meta4"} 0
+vernemq_swc_tombstone_count{node="VerneMQ@10.10.10.20",group="meta5"} 0
+vernemq_swc_tombstone_count{node="VerneMQ@10.10.10.20",group="meta6"} 0
+vernemq_swc_tombstone_count{node="VerneMQ@10.10.10.20",group="meta7"} 0
+vernemq_swc_tombstone_count{node="VerneMQ@10.10.10.20",group="meta8"} 0
+vernemq_swc_tombstone_count{node="VerneMQ@10.10.10.20",group="meta9"} 0

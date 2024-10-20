@@ -2,910 +2,1175 @@
 
 package vernemq
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import (
+	"fmt"
+	"strings"
 
-type (
-	Charts = module.Charts
-	Chart  = module.Chart
-	Dims   = module.Dims
-	Dim    = module.Dim
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-var charts = Charts{
-	chartOpenSockets.Copy(),
-	chartSocketEvents.Copy(),
-	chartClientKeepaliveExpired.Copy(),
-	chartSocketErrors.Copy(),
-	chartSocketCloseTimeout.Copy(),
+const (
+	prioNodeSockets = module.Priority + iota
+	prioNodeSocketEvents
+	prioNodeClientKeepaliveExpired
+	prioNodeSocketCloseTimeout
+	prioNodeSocketErrors
 
-	chartQueueProcesses.Copy(),
-	chartQueueProcessesEvents.Copy(),
-	chartQueueProcessesOfflineStorage.Copy(),
-	chartQueueMessages.Copy(),
-	chartQueueUndeliveredMessages.Copy(),
+	prioNodeQueueProcesses
+	prioNodeQueueProcessesEvents
+	prioNodeQueueProcessesOfflineStorage
+	prioNodeQueueMessages
+	prioNodeQueueUndeliveredMessages
 
-	chartRouterSubscriptions.Copy(),
-	chartRouterMatchedSubscriptions.Copy(),
-	chartRouterMemory.Copy(),
+	prioNodeRouterSubscriptions
+	prioNodeRouterMatchedSubscriptions
+	prioNodeRouterMemory
 
-	chartAverageSchedulerUtilization.Copy(),
-	chartSchedulerUtilization.Copy(),
-	chartSystemProcesses.Copy(),
-	chartSystemReductions.Copy(),
-	chartSystemContextSwitches.Copy(),
-	chartSystemIO.Copy(),
-	chartSystemRunQueue.Copy(),
-	chartSystemGCCount.Copy(),
-	chartSystemGCWordsReclaimed.Copy(),
-	chartSystemMemoryAllocated.Copy(),
+	prioNodeAverageSchedulerUtilization
+	prioNodeSystemProcesses
+	prioNodeSystemReductions
+	prioNodeSystemContext
+	prioNodeSystemIO
+	prioNodeSystemRunQueue
+	prioNodeSystemGCCount
+	prioNodeSystemGCWordsReclaimed
+	prioNodeSystemMemoryAllocated
 
-	chartBandwidth.Copy(),
+	prioNodeTraffic
 
-	chartRetainMessages.Copy(),
-	chartRetainMemoryUsage.Copy(),
+	prioNodeRetainMessages
+	prioNodeRetainMemoryUsage
 
-	chartClusterCommunicationBandwidth.Copy(),
-	chartClusterCommunicationDropped.Copy(),
-	chartNetSplitUnresolved.Copy(),
-	chartNetSplits.Copy(),
+	prioNodeClusterCommunicationTraffic
+	prioNodeClusterCommunicationDropped
+	prioNodeNetSplitUnresolved
+	prioNodeNetSplits
 
-	chartMQTTv5AUTH.Copy(),
-	chartMQTTv5AUTHReceivedReason.Copy(),
-	chartMQTTv5AUTHSentReason.Copy(),
+	prioMqttPublishPackets
+	prioMqttPublishErrors
+	prioMqttPublishAuthPackets
 
-	chartMQTTv3v5CONNECT.Copy(),
-	chartMQTTv3v5CONNACKSentReason.Copy(),
+	prioMqttPubAckPackets
+	prioMqttPubAckReceivedReason
+	prioMqttPubAckSentReason
+	prioMqttPubAckUnexpectedMessages
 
-	chartMQTTv3v5DISCONNECT.Copy(),
-	chartMQTTv5DISCONNECTReceivedReason.Copy(),
-	chartMQTTv5DISCONNECTSentReason.Copy(),
+	prioMqttPubRecPackets
+	prioMqttPubRecReceivedReason
+	prioMqttPubRecSentReason
+	prioMqttPubRecUnexpectedMessages
 
-	chartMQTTv3v5SUBSCRIBE.Copy(),
-	chartMQTTv3v5SUBSCRIBEError.Copy(),
-	chartMQTTv3v5SUBSCRIBEAuthError.Copy(),
+	prioMqttPubRelPackets
+	prioMqttPubRelReceivedReason
+	prioMqttPubRelSentReason
 
-	chartMQTTv3v5UNSUBSCRIBE.Copy(),
-	chartMQTTv3v5UNSUBSCRIBEError.Copy(),
+	prioMqttPubCompPackets
+	prioMqttPubCompReceivedReason
+	prioMqttPubCompSentReason
+	prioMqttPubCompUnexpectedMessages
 
-	chartMQTTv3v5PUBLISH.Copy(),
-	chartMQTTv3v5PUBLISHErrors.Copy(),
-	chartMQTTv3v5PUBLISHAuthErrors.Copy(),
-	chartMQTTv3v5PUBACK.Copy(),
-	chartMQTTv5PUBACKReceivedReason.Copy(),
-	chartMQTTv5PUBACKSentReason.Copy(),
-	chartMQTTv3v5PUBACKUnexpected.Copy(),
-	chartMQTTv3v5PUBREC.Copy(),
-	chartMQTTv5PUBRECReceivedReason.Copy(),
-	chartMQTTv5PUBRECSentReason.Copy(),
-	chartMQTTv3PUBRECUnexpected.Copy(),
-	chartMQTTv3v5PUBREL.Copy(),
-	chartMQTTv5PUBRELReceivedReason.Copy(),
-	chartMQTTv5PUBRELSentReason.Copy(),
-	chartMQTTv3v5PUBCOMP.Copy(),
-	chartMQTTv5PUBCOMPReceivedReason.Copy(),
-	chartMQTTv5PUBCOMPSentReason.Copy(),
-	chartMQTTv3v5PUBCOMPUnexpected.Copy(),
+	prioMqttConnectPackets
+	prioMqttConnectSentReason
 
-	chartMQTTv3v5PING.Copy(),
+	prioMqttDisconnectPackets
+	prioMqttDisconnectReceivedReason
+	prioMqttDisconnectSentReason
 
-	chartUptime.Copy(),
+	prioMqttSubscribePackets
+	prioMqttSubscribeErrors
+	prioMqttSubscribeAuthPackets
+
+	prioMqttUnsubscribePackets
+	prioMqttUnsubscribeErrors
+
+	prioMqttAuthPackets
+	prioMqttAuthReceivedReason
+	prioMqttAuthSentReason
+
+	prioMqttPingPackets
+
+	prioNodeUptime
+)
+
+var nodeChartsTmpl = module.Charts{
+	nodeOpenSocketsChartTmpl.Copy(),
+	nodeSocketEventsChartTmpl.Copy(),
+	nodeSocketCloseTimeoutChartTmpl.Copy(),
+	nodeSocketErrorsChartTmpl.Copy(),
+
+	nodeQueueProcessesChartTmpl.Copy(),
+	nodeQueueProcessesEventsChartTmpl.Copy(),
+	nodeQueueProcessesOfflineStorageChartTmpl.Copy(),
+	nodeQueueMessagesChartTmpl.Copy(),
+	nodeQueueUndeliveredMessagesChartTmpl.Copy(),
+
+	nodeRouterSubscriptionsChartTmpl.Copy(),
+	nodeRouterMatchedSubscriptionsChartTmpl.Copy(),
+	nodeRouterMemoryChartTmpl.Copy(),
+
+	nodeAverageSchedulerUtilizationChartTmpl.Copy(),
+	nodeSystemProcessesChartTmpl.Copy(),
+	nodeSystemReductionsChartTmpl.Copy(),
+	nodeSystemContextSwitches.Copy(),
+	nodeSystemIOChartTmpl.Copy(),
+	nodeSystemRunQueueChartTmpl.Copy(),
+	nodeSystemGCCountChartTmpl.Copy(),
+	nodeSystemGCWordsReclaimedChartTmpl.Copy(),
+	nodeSystemMemoryAllocatedChartTmpl.Copy(),
+
+	nodeTrafficChartTmpl.Copy(),
+
+	nodeRetainMessagesChartsTmpl.Copy(),
+	nodeRetainMemoryUsageChartTmpl.Copy(),
+
+	nodeClusterCommunicationTrafficChartTmpl.Copy(),
+	nodeClusterCommunicationDroppedChartTmpl.Copy(),
+	nodeNetSplitUnresolvedChartTmpl.Copy(),
+	nodeNetSplitsChartTmpl.Copy(),
+
+	nodeUptimeChartTmpl.Copy(),
+}
+
+var nodeMqtt5ChartsTmpl = module.Charts{
+	nodeClientKeepaliveExpiredChartTmpl.Copy(),
+
+	nodeMqttPUBLISHPacketsChartTmpl.Copy(),
+	nodeMqttPUBLISHErrorsChartTmpl.Copy(),
+	nodeMqttPUBLISHAuthErrorsChartTmpl.Copy(),
+
+	nodeMqttPUBACKPacketsChartTmpl.Copy(),
+	nodeMqttPUBACKReceivedByReasonChartTmpl.Copy(),
+	nodeMqttPUBACKSentByReasonChartTmpl.Copy(),
+	nodeMqttPUBACKUnexpectedMessagesChartTmpl.Copy(),
+
+	nodeMqttPUBRECPacketsChartTmpl.Copy(),
+	nodeMqttPUBRECReceivedByReasonChartTmpl.Copy(),
+	nodeMqttPUBRECSentByReasonChartTmpl.Copy(),
+
+	nodeMqttPUBRELPacketsChartTmpl.Copy(),
+	nodeMqttPUBRELReceivedByReasonChartTmpl.Copy(),
+	nodeMqttPUBRELSentByReasonChartTmpl.Copy(),
+
+	nodeMqttPUBCOMPPacketsChartTmpl.Copy(),
+	nodeMqttPUBCOMPReceivedByReasonChartTmpl.Copy(),
+	nodeMqttPUBCOMPSentByReasonChartTmpl.Copy(),
+	nodeMqttPUBCOMPUnexpectedMessagesChartTmpl.Copy(),
+
+	nodeMqttCONNECTPacketsChartTmpl.Copy(),
+	nodeMqttCONNACKSentByReasonCodeChartTmpl.Copy(),
+
+	nodeMqtt5DISCONNECTPacketsChartTmpl.Copy(),
+	nodeMqttDISCONNECTReceivedByReasonChartTmpl.Copy(),
+	nodeMqttDISCONNECTSentByReasonChartTmpl.Copy(),
+
+	nodeMqttSUBSCRIBEPacketsChartTmpl.Copy(),
+	modeMqttSUBSCRIBEErrorsChartTmpl.Copy(),
+	nodeMqttSUBSCRIBEAuthErrorsChartTmpl.Copy(),
+
+	nodeMqttUNSUBSCRIBEPacketsChartTmpl.Copy(),
+	nodeMqttUNSUBSCRIBEErrorsChartTmpl.Copy(),
+
+	nodeMqttAUTHPacketsChartTmpl.Copy(),
+	nodeMqttAUTHReceivedByReasonChartTmpl.Copy(),
+	nodeMqttAUTHSentByReasonChartTmpl.Copy(),
+
+	nodeMqttPINGPacketsChartTmpl.Copy(),
+}
+
+var nodeMqtt4ChartsTmpl = module.Charts{
+	nodeClientKeepaliveExpiredChartTmpl.Copy(),
+
+	nodeMqttPUBLISHPacketsChartTmpl.Copy(),
+	nodeMqttPUBLISHErrorsChartTmpl.Copy(),
+	nodeMqttPUBLISHAuthErrorsChartTmpl.Copy(),
+
+	nodeMqttPUBACKPacketsChartTmpl.Copy(),
+	nodeMqttPUBACKUnexpectedMessagesChartTmpl.Copy(),
+
+	nodeMqttPUBRECPacketsChartTmpl.Copy(),
+	nodeMqttPUBRECUnexpectedMessagesChartTmpl.Copy(),
+
+	nodeMqttPUBRELPacketsChartTmpl.Copy(),
+
+	nodeMqttPUBCOMPPacketsChartTmpl.Copy(),
+	nodeMqttPUBCOMPUnexpectedMessagesChartTmpl.Copy(),
+
+	nodeMqttCONNECTPacketsChartTmpl.Copy(),
+	nodeMqttCONNACKSentByReturnCodeChartTmpl.Copy(),
+
+	nodeMqtt4DISCONNECTPacketsChartTmpl.Copy(),
+
+	nodeMqttSUBSCRIBEPacketsChartTmpl.Copy(),
+	modeMqttSUBSCRIBEErrorsChartTmpl.Copy(),
+
+	nodeMqttSUBSCRIBEAuthErrorsChartTmpl.Copy(),
+	nodeMqttUNSUBSCRIBEPacketsChartTmpl.Copy(),
+	nodeMqttUNSUBSCRIBEErrorsChartTmpl.Copy(),
+
+	nodeMqttPINGPacketsChartTmpl.Copy(),
 }
 
 // Sockets
 var (
-	chartOpenSockets = Chart{
-		ID:    "sockets",
-		Title: "Open Sockets",
-		Units: "sockets",
-		Fam:   "sockets",
-		Ctx:   "vernemq.sockets",
-		Dims: Dims{
-			{ID: "open_sockets", Name: "open"},
+	nodeOpenSocketsChartTmpl = module.Chart{
+		ID:       "node_%s_sockets",
+		Title:    "Open Sockets",
+		Units:    "sockets",
+		Fam:      "sockets",
+		Ctx:      "vernemq.node_sockets",
+		Priority: prioNodeSockets,
+		Dims: module.Dims{
+			{ID: dimNode("open_sockets"), Name: "open"},
 		},
 	}
-	chartSocketEvents = Chart{
-		ID:    "socket_events",
-		Title: "Socket Open and Close Events",
-		Units: "events/s",
-		Fam:   "sockets",
-		Ctx:   "vernemq.socket_operations",
-		Dims: Dims{
-			{ID: metricSocketOpen, Name: "open", Algo: module.Incremental},
-			{ID: metricSocketClose, Name: "close", Algo: module.Incremental, Mul: -1},
+	nodeSocketEventsChartTmpl = module.Chart{
+		ID:       "node_%s_socket_events",
+		Title:    "Open and Close Socket Events",
+		Units:    "events/s",
+		Fam:      "sockets",
+		Ctx:      "vernemq.node_socket_operations",
+		Priority: prioNodeSocketEvents,
+		Dims: module.Dims{
+			{ID: dimNode(metricSocketOpen), Name: "open", Algo: module.Incremental},
+			{ID: dimNode(metricSocketClose), Name: "close", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartClientKeepaliveExpired = Chart{
-		ID:    "client_keepalive_expired",
-		Title: "Closed Sockets due to Keepalive Time Expired",
-		Units: "sockets/s",
-		Fam:   "sockets",
-		Ctx:   "vernemq.client_keepalive_expired",
-		Dims: Dims{
-			{ID: metricClientKeepaliveExpired, Name: "closed", Algo: module.Incremental},
+	nodeClientKeepaliveExpiredChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_client_keepalive_expired",
+		Title:    "Closed Sockets due to Keepalive Time Expired",
+		Units:    "sockets/s",
+		Fam:      "sockets",
+		Ctx:      "vernemq.node_client_keepalive_expired",
+		Priority: prioNodeClientKeepaliveExpired,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricClientKeepaliveExpired), Name: "closed", Algo: module.Incremental},
 		},
 	}
-	chartSocketCloseTimeout = Chart{
-		ID:    "socket_close_timeout",
-		Title: "Closed Sockets due to no CONNECT Frame On Time",
-		Units: "sockets/s",
-		Fam:   "sockets",
-		Ctx:   "vernemq.socket_close_timeout",
-		Dims: Dims{
-			{ID: metricSocketCloseTimeout, Name: "closed", Algo: module.Incremental},
+	nodeSocketCloseTimeoutChartTmpl = module.Chart{
+		ID:       "node_%s_socket_close_timeout",
+		Title:    "Closed Sockets due to no CONNECT Frame On Time",
+		Units:    "sockets/s",
+		Fam:      "sockets",
+		Ctx:      "vernemq.node_socket_close_timeout",
+		Priority: prioNodeSocketCloseTimeout,
+		Dims: module.Dims{
+			{ID: dimNode(metricSocketCloseTimeout), Name: "closed", Algo: module.Incremental},
 		},
 	}
-	chartSocketErrors = Chart{
-		ID:    "socket_errors",
-		Title: "Socket Errors",
-		Units: "errors/s",
-		Fam:   "sockets",
-		Ctx:   "vernemq.socket_errors",
-		Dims: Dims{
-			{ID: metricSocketError, Name: "errors", Algo: module.Incremental},
+	nodeSocketErrorsChartTmpl = module.Chart{
+		ID:       "node_%s_socket_errors",
+		Title:    "Socket Errors",
+		Units:    "errors/s",
+		Fam:      "sockets",
+		Ctx:      "vernemq.node_socket_errors",
+		Priority: prioNodeSocketErrors,
+		Dims: module.Dims{
+			{ID: dimNode(metricSocketError), Name: "errors", Algo: module.Incremental},
 		},
 	}
 )
 
 // Queues
 var (
-	chartQueueProcesses = Chart{
-		ID:    "queue_processes",
-		Title: "Living Queues in an Online or an Offline State",
-		Units: "queue processes",
-		Fam:   "queues",
-		Ctx:   "vernemq.queue_processes",
-		Dims: Dims{
-			{ID: metricQueueProcesses, Name: "queue_processes"},
+	nodeQueueProcessesChartTmpl = module.Chart{
+		ID:       "node_%s_queue_processes",
+		Title:    "Living Queues in an Online or an Offline State",
+		Units:    "queue processes",
+		Fam:      "queues",
+		Ctx:      "vernemq.node_queue_processes",
+		Priority: prioNodeQueueProcesses,
+		Dims: module.Dims{
+			{ID: dimNode(metricQueueProcesses), Name: "queue_processes"},
 		},
 	}
-	chartQueueProcessesEvents = Chart{
-		ID:    "queue_processes_events",
-		Title: "Queue Processes Setup and Teardown Events",
-		Units: "events/s",
-		Fam:   "queues",
-		Ctx:   "vernemq.queue_processes_operations",
-		Dims: Dims{
-			{ID: metricQueueSetup, Name: "setup", Algo: module.Incremental},
-			{ID: metricQueueTeardown, Name: "teardown", Algo: module.Incremental, Mul: -1},
+	nodeQueueProcessesEventsChartTmpl = module.Chart{
+		ID:       "node_%s_queue_processes_events",
+		Title:    "Queue Processes Setup and Teardown Events",
+		Units:    "events/s",
+		Fam:      "queues",
+		Ctx:      "vernemq.node_queue_processes_operations",
+		Priority: prioNodeQueueProcessesEvents,
+		Dims: module.Dims{
+			{ID: dimNode(metricQueueSetup), Name: "setup", Algo: module.Incremental},
+			{ID: dimNode(metricQueueTeardown), Name: "teardown", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartQueueProcessesOfflineStorage = Chart{
-		ID:    "queue_process_init_from_storage",
-		Title: "Queue Processes Initialized from Offline Storage",
-		Units: "queue processes/s",
-		Fam:   "queues",
-		Ctx:   "vernemq.queue_process_init_from_storage",
-		Dims: Dims{
-			{ID: metricQueueInitializedFromStorage, Name: "queue processes", Algo: module.Incremental},
+	nodeQueueProcessesOfflineStorageChartTmpl = module.Chart{
+		ID:       "node_%s_queue_process_init_from_storage",
+		Title:    "Queue Processes Initialized from Offline Storage",
+		Units:    "queue processes/s",
+		Fam:      "queues",
+		Ctx:      "vernemq.node_queue_process_init_from_storage",
+		Priority: prioNodeQueueProcessesOfflineStorage,
+		Dims: module.Dims{
+			{ID: dimNode(metricQueueInitializedFromStorage), Name: "queue processes", Algo: module.Incremental},
 		},
 	}
-	chartQueueMessages = Chart{
-		ID:    "queue_messages",
-		Title: "Received and Sent PUBLISH Messages",
-		Units: "messages/s",
-		Fam:   "queues",
-		Ctx:   "vernemq.queue_messages",
-		Type:  module.Area,
-		Dims: Dims{
-			{ID: metricQueueMessageIn, Name: "received", Algo: module.Incremental},
-			{ID: metricQueueMessageOut, Name: "sent", Algo: module.Incremental, Mul: -1},
+	nodeQueueMessagesChartTmpl = module.Chart{
+		ID:       "node_%s_queue_messages",
+		Title:    "Received and Sent PUBLISH Messages",
+		Units:    "messages/s",
+		Fam:      "queues",
+		Ctx:      "vernemq.node_queue_messages",
+		Type:     module.Area,
+		Priority: prioNodeQueueMessages,
+		Dims: module.Dims{
+			{ID: dimNode(metricQueueMessageIn), Name: "received", Algo: module.Incremental},
+			{ID: dimNode(metricQueueMessageOut), Name: "sent", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartQueueUndeliveredMessages = Chart{
-		ID:    "queue_undelivered_messages",
-		Title: "Undelivered PUBLISH Messages",
-		Units: "messages/s",
-		Fam:   "queues",
-		Ctx:   "vernemq.queue_undelivered_messages",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: metricQueueMessageDrop, Name: "dropped", Algo: module.Incremental},
-			{ID: metricQueueMessageExpired, Name: "expired", Algo: module.Incremental},
-			{ID: metricQueueMessageUnhandled, Name: "unhandled", Algo: module.Incremental},
+	nodeQueueUndeliveredMessagesChartTmpl = module.Chart{
+		ID:       "node_%s_queue_undelivered_messages",
+		Title:    "Undelivered PUBLISH Messages",
+		Units:    "messages/s",
+		Fam:      "queues",
+		Ctx:      "vernemq.node_queue_undelivered_messages",
+		Type:     module.Stacked,
+		Priority: prioNodeQueueUndeliveredMessages,
+		Dims: module.Dims{
+			{ID: dimNode(metricQueueMessageDrop), Name: "dropped", Algo: module.Incremental},
+			{ID: dimNode(metricQueueMessageExpired), Name: "expired", Algo: module.Incremental},
+			{ID: dimNode(metricQueueMessageUnhandled), Name: "unhandled", Algo: module.Incremental},
 		},
 	}
 )
 
 // Subscriptions
 var (
-	chartRouterSubscriptions = Chart{
-		ID:    "router_subscriptions",
-		Title: "Subscriptions in the Routing Table",
-		Units: "subscriptions",
-		Fam:   "subscriptions",
-		Ctx:   "vernemq.router_subscriptions",
-		Dims: Dims{
-			{ID: metricRouterSubscriptions, Name: "subscriptions"},
+	nodeRouterSubscriptionsChartTmpl = module.Chart{
+		ID:       "node_%s_router_subscriptions",
+		Title:    "Subscriptions in the Routing Table",
+		Units:    "subscriptions",
+		Fam:      "subscriptions",
+		Ctx:      "vernemq.node_router_subscriptions",
+		Priority: prioNodeRouterSubscriptions,
+		Dims: module.Dims{
+			{ID: dimNode(metricRouterSubscriptions), Name: "subscriptions"},
 		},
 	}
-	chartRouterMatchedSubscriptions = Chart{
-		ID:    "router_matched_subscriptions",
-		Title: "Matched Subscriptions",
-		Units: "subscriptions/s",
-		Fam:   "subscriptions",
-		Ctx:   "vernemq.router_matched_subscriptions",
-		Dims: Dims{
-			{ID: metricRouterMatchesLocal, Name: "local", Algo: module.Incremental},
-			{ID: metricRouterMatchesRemote, Name: "remote", Algo: module.Incremental},
+	nodeRouterMatchedSubscriptionsChartTmpl = module.Chart{
+		ID:       "node_%s_router_matched_subscriptions",
+		Title:    "Matched Subscriptions",
+		Units:    "subscriptions/s",
+		Fam:      "subscriptions",
+		Ctx:      "vernemq.node_router_matched_subscriptions",
+		Priority: prioNodeRouterMatchedSubscriptions,
+		Dims: module.Dims{
+			{ID: dimNode(metricRouterMatchesLocal), Name: "local", Algo: module.Incremental},
+			{ID: dimNode(metricRouterMatchesRemote), Name: "remote", Algo: module.Incremental},
 		},
 	}
-	chartRouterMemory = Chart{
-		ID:    "router_memory",
-		Title: "Routing Table Memory Usage",
-		Units: "KiB",
-		Fam:   "subscriptions",
-		Ctx:   "vernemq.router_memory",
-		Type:  module.Area,
-		Dims: Dims{
-			{ID: metricRouterMemory, Name: "used", Div: 1024},
+	nodeRouterMemoryChartTmpl = module.Chart{
+		ID:       "node_%s_router_memory",
+		Title:    "Routing Table Memory Usage",
+		Units:    "bytes",
+		Fam:      "subscriptions",
+		Ctx:      "vernemq.node_router_memory",
+		Type:     module.Area,
+		Priority: prioNodeRouterMemory,
+		Dims: module.Dims{
+			{ID: dimNode(metricRouterMemory), Name: "used"},
 		},
 	}
 )
 
 // Erlang VM
 var (
-	chartAverageSchedulerUtilization = Chart{
-		ID:    "average_scheduler_utilization",
-		Title: "Average Scheduler Utilization",
-		Units: "percentage",
-		Fam:   "erlang vm",
-		Ctx:   "vernemq.average_scheduler_utilization",
-		Type:  module.Area,
-		Dims: Dims{
-			{ID: metricSystemUtilization, Name: "utilization"},
+	nodeAverageSchedulerUtilizationChartTmpl = module.Chart{
+		ID:       "node_%s_average_scheduler_utilization",
+		Title:    "Average Scheduler Utilization",
+		Units:    "percentage",
+		Fam:      "erlang vm",
+		Ctx:      "vernemq.node_average_scheduler_utilization",
+		Type:     module.Area,
+		Priority: prioNodeAverageSchedulerUtilization,
+		Dims: module.Dims{
+			{ID: dimNode(metricSystemUtilization), Name: "utilization"},
 		},
 	}
-	chartSchedulerUtilization = Chart{
-		ID:    "scheduler_utilization",
-		Title: "Scheduler Utilization",
-		Units: "percentage",
-		Fam:   "erlang vm",
-		Type:  module.Stacked,
-		Ctx:   "vernemq.system_utilization_scheduler",
-	}
-	chartSystemProcesses = Chart{
-		ID:    "system_processes",
-		Title: "Erlang Processes",
-		Units: "processes",
-		Fam:   "erlang vm",
-		Ctx:   "vernemq.system_processes",
-		Dims: Dims{
-			{ID: metricSystemProcessCount, Name: "processes"},
+	nodeSystemProcessesChartTmpl = module.Chart{
+		ID:       "node_%s_system_processes",
+		Title:    "Erlang Processes",
+		Units:    "processes",
+		Fam:      "erlang vm",
+		Ctx:      "vernemq.node_system_processes",
+		Priority: prioNodeSystemProcesses,
+		Dims: module.Dims{
+			{ID: dimNode(metricSystemProcessCount), Name: "processes"},
 		},
 	}
-	chartSystemReductions = Chart{
-		ID:    "system_reductions",
-		Title: "Reductions",
-		Units: "ops/s",
-		Fam:   "erlang vm",
-		Ctx:   "vernemq.system_reductions",
-		Dims: Dims{
-			{ID: metricSystemReductions, Name: "reductions", Algo: module.Incremental},
+	nodeSystemReductionsChartTmpl = module.Chart{
+		ID:       "node_%s_system_reductions",
+		Title:    "Reductions",
+		Units:    "ops/s",
+		Fam:      "erlang vm",
+		Ctx:      "vernemq.node_system_reductions",
+		Priority: prioNodeSystemReductions,
+		Dims: module.Dims{
+			{ID: dimNode(metricSystemReductions), Name: "reductions", Algo: module.Incremental},
 		},
 	}
-	chartSystemContextSwitches = Chart{
-		ID:    "system_context_switches",
-		Title: "Context Switches",
-		Units: "ops/s",
-		Fam:   "erlang vm",
-		Ctx:   "vernemq.system_context_switches",
-		Dims: Dims{
-			{ID: metricSystemContextSwitches, Name: "context switches", Algo: module.Incremental},
+	nodeSystemContextSwitches = module.Chart{
+		ID:       "node_%s_system_context_switches",
+		Title:    "Context Switches",
+		Units:    "ops/s",
+		Fam:      "erlang vm",
+		Ctx:      "vernemq.node_system_context_switches",
+		Priority: prioNodeSystemContext,
+		Dims: module.Dims{
+			{ID: dimNode(metricSystemContextSwitches), Name: "context switches", Algo: module.Incremental},
 		},
 	}
-	chartSystemIO = Chart{
-		ID:    "system_io",
-		Title: "Received and Sent Traffic through Ports",
-		Units: "kilobits/s",
-		Fam:   "erlang vm",
-		Ctx:   "vernemq.system_io",
-		Type:  module.Area,
-		Dims: Dims{
-			{ID: metricSystemIOIn, Name: "received", Algo: module.Incremental, Mul: 8, Div: 1024},
-			{ID: metricSystemIOOut, Name: "sent", Algo: module.Incremental, Mul: 8, Div: -1024},
+	nodeSystemIOChartTmpl = module.Chart{
+		ID:       "node_%s_system_io",
+		Title:    "Received and Sent Traffic through Ports",
+		Units:    "bytes/s",
+		Fam:      "erlang vm",
+		Ctx:      "vernemq.node_system_io",
+		Type:     module.Area,
+		Priority: prioNodeSystemIO,
+		Dims: module.Dims{
+			{ID: dimNode(metricSystemIOIn), Name: "received", Algo: module.Incremental},
+			{ID: dimNode(metricSystemIOOut), Name: "sent", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartSystemRunQueue = Chart{
-		ID:    "system_run_queue",
-		Title: "Processes that are Ready to Run on All Run-Queues",
-		Units: "processes",
-		Fam:   "erlang vm",
-		Ctx:   "vernemq.system_run_queue",
-		Dims: Dims{
-			{ID: metricSystemRunQueue, Name: "ready"},
+	nodeSystemRunQueueChartTmpl = module.Chart{
+		ID:       "node_%s_system_run_queue",
+		Title:    "Processes that are Ready to Run on All Run-Queues",
+		Units:    "processes",
+		Fam:      "erlang vm",
+		Ctx:      "vernemq.node_system_run_queue",
+		Priority: prioNodeSystemRunQueue,
+		Dims: module.Dims{
+			{ID: dimNode(metricSystemRunQueue), Name: "ready"},
 		},
 	}
-	chartSystemGCCount = Chart{
-		ID:    "system_gc_count",
-		Title: "GC Count",
-		Units: "ops/s",
-		Fam:   "erlang vm",
-		Ctx:   "vernemq.system_gc_count",
-		Dims: Dims{
-			{ID: metricSystemGCCount, Name: "gc", Algo: module.Incremental},
+	nodeSystemGCCountChartTmpl = module.Chart{
+		ID:       "node_%s_system_gc_count",
+		Title:    "GC Count",
+		Units:    "ops/s",
+		Fam:      "erlang vm",
+		Ctx:      "vernemq.node_system_gc_count",
+		Priority: prioNodeSystemGCCount,
+		Dims: module.Dims{
+			{ID: dimNode(metricSystemGCCount), Name: "gc", Algo: module.Incremental},
 		},
 	}
-	chartSystemGCWordsReclaimed = Chart{
-		ID:    "system_gc_words_reclaimed",
-		Title: "GC Words Reclaimed",
-		Units: "ops/s",
-		Fam:   "erlang vm",
-		Ctx:   "vernemq.system_gc_words_reclaimed",
-		Dims: Dims{
-			{ID: metricSystemWordsReclaimedByGC, Name: "words reclaimed", Algo: module.Incremental},
+	nodeSystemGCWordsReclaimedChartTmpl = module.Chart{
+		ID:       "node_%s_system_gc_words_reclaimed",
+		Title:    "GC Words Reclaimed",
+		Units:    "ops/s",
+		Fam:      "erlang vm",
+		Ctx:      "vernemq.node_system_gc_words_reclaimed",
+		Priority: prioNodeSystemGCWordsReclaimed,
+		Dims: module.Dims{
+			{ID: dimNode(metricSystemWordsReclaimedByGC), Name: "words reclaimed", Algo: module.Incremental},
 		},
 	}
-	chartSystemMemoryAllocated = Chart{
-		ID:    "system_allocated_memory",
-		Title: "Memory Allocated by the Erlang Processes and by the Emulator",
-		Units: "KiB",
-		Fam:   "erlang vm",
-		Ctx:   "vernemq.system_allocated_memory",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: metricVMMemoryProcesses, Name: "processes", Div: 1024},
-			{ID: metricVMMemorySystem, Name: "system", Div: 1024},
+	nodeSystemMemoryAllocatedChartTmpl = module.Chart{
+		ID:       "node_%s_system_allocated_memory",
+		Title:    "Memory Allocated by the Erlang Processes and by the Emulator",
+		Units:    "bytes",
+		Fam:      "erlang vm",
+		Ctx:      "vernemq.node_system_allocated_memory",
+		Type:     module.Stacked,
+		Priority: prioNodeSystemMemoryAllocated,
+		Dims: module.Dims{
+			{ID: dimNode(metricVMMemoryProcesses), Name: "processes"},
+			{ID: dimNode(metricVMMemorySystem), Name: "system"},
 		},
 	}
 )
 
-// Bandwidth
+// Traffic
 var (
-	chartBandwidth = Chart{
-		ID:    "bandwidth",
-		Title: "Bandwidth",
-		Units: "kilobits/s",
-		Fam:   "bandwidth",
-		Ctx:   "vernemq.bandwidth",
-		Type:  module.Area,
-		Dims: Dims{
-			{ID: metricBytesReceived, Name: "received", Algo: module.Incremental, Mul: 8, Div: 1024},
-			{ID: metricBytesSent, Name: "sent", Algo: module.Incremental, Mul: 8, Div: -1024},
+	nodeTrafficChartTmpl = module.Chart{
+		ID:       "node_%s_traffic",
+		Title:    "Node Traffic",
+		Units:    "bytes/s",
+		Fam:      "traffic",
+		Ctx:      "vernemq.node_traffic",
+		Type:     module.Area,
+		Priority: prioNodeTraffic,
+		Dims: module.Dims{
+			{ID: dimNode(metricBytesReceived), Name: "received", Algo: module.Incremental},
+			{ID: dimNode(metricBytesSent), Name: "sent", Algo: module.Incremental, Mul: -1},
 		},
 	}
 )
 
 // Retain
 var (
-	chartRetainMessages = Chart{
-		ID:    "retain_messages",
-		Title: "Stored Retained Messages",
-		Units: "messages",
-		Fam:   "retain",
-		Ctx:   "vernemq.retain_messages",
-		Dims: Dims{
-			{ID: metricRetainMessages, Name: "messages"},
+	nodeRetainMessagesChartsTmpl = module.Chart{
+		ID:       "node_%s_retain_messages",
+		Title:    "Stored Retained Messages",
+		Units:    "messages",
+		Fam:      "retain",
+		Ctx:      "vernemq.node_retain_messages",
+		Priority: prioNodeRetainMessages,
+		Dims: module.Dims{
+			{ID: dimNode(metricRetainMessages), Name: "messages"},
 		},
 	}
-	chartRetainMemoryUsage = Chart{
-		ID:    "retain_memory",
-		Title: "Stored Retained Messages Memory Usage",
-		Units: "KiB",
-		Fam:   "retain",
-		Ctx:   "vernemq.retain_memory",
-		Type:  module.Area,
-		Dims: Dims{
-			{ID: metricRetainMemory, Name: "used", Div: 1024},
+	nodeRetainMemoryUsageChartTmpl = module.Chart{
+		ID:       "node_%s_retain_memory",
+		Title:    "Stored Retained Messages Memory Usage",
+		Units:    "bytes",
+		Fam:      "retain",
+		Ctx:      "vernemq.node_retain_memory",
+		Type:     module.Area,
+		Priority: prioNodeRetainMemoryUsage,
+		Dims: module.Dims{
+			{ID: dimNode(metricRetainMemory), Name: "used"},
 		},
 	}
 )
 
 // Cluster
 var (
-	chartClusterCommunicationBandwidth = Chart{
-		ID:    "cluster_bandwidth",
-		Title: "Communication with Other Cluster Nodes",
-		Units: "kilobits/s",
-		Fam:   "cluster",
-		Ctx:   "vernemq.cluster_bandwidth",
-		Type:  module.Area,
-		Dims: Dims{
-			{ID: metricClusterBytesReceived, Name: "received", Algo: module.Incremental, Mul: 8, Div: 1024},
-			{ID: metricClusterBytesSent, Name: "sent", Algo: module.Incremental, Mul: 8, Div: -1024},
+	nodeClusterCommunicationTrafficChartTmpl = module.Chart{
+		ID:       "node_%s_cluster_traffic",
+		Title:    "Communication with Other Cluster Nodes",
+		Units:    "bytes/s",
+		Fam:      "cluster",
+		Ctx:      "vernemq.node_cluster_traffic",
+		Type:     module.Area,
+		Priority: prioNodeClusterCommunicationTraffic,
+		Dims: module.Dims{
+			{ID: dimNode(metricClusterBytesReceived), Name: "received", Algo: module.Incremental},
+			{ID: dimNode(metricClusterBytesSent), Name: "sent", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartClusterCommunicationDropped = Chart{
-		ID:    "cluster_dropped",
-		Title: "Traffic Dropped During Communication with Other Cluster Nodes",
-		Units: "kilobits/s",
-		Fam:   "cluster",
-		Type:  module.Area,
-		Ctx:   "vernemq.cluster_dropped",
-		Dims: Dims{
-			{ID: metricClusterBytesDropped, Name: "dropped", Algo: module.Incremental, Mul: 8, Div: 1024},
+	nodeClusterCommunicationDroppedChartTmpl = module.Chart{
+		ID:       "node_%s_cluster_dropped",
+		Title:    "Traffic Dropped During Communication with Other Cluster Nodes",
+		Units:    "bytes/s",
+		Fam:      "cluster",
+		Type:     module.Area,
+		Ctx:      "vernemq.node_cluster_dropped",
+		Priority: prioNodeClusterCommunicationDropped,
+		Dims: module.Dims{
+			{ID: dimNode(metricClusterBytesDropped), Name: "dropped", Algo: module.Incremental},
 		},
 	}
-	chartNetSplitUnresolved = Chart{
-		ID:    "netsplit_unresolved",
-		Title: "Unresolved Netsplits",
-		Units: "netsplits",
-		Fam:   "cluster",
-		Ctx:   "vernemq.netsplit_unresolved",
-		Dims: Dims{
-			{ID: "netsplit_unresolved", Name: "unresolved"},
+	nodeNetSplitUnresolvedChartTmpl = module.Chart{
+		ID:       "node_%s_netsplit_unresolved",
+		Title:    "Unresolved Netsplits",
+		Units:    "netsplits",
+		Fam:      "cluster",
+		Ctx:      "vernemq.node_netsplit_unresolved",
+		Priority: prioNodeNetSplitUnresolved,
+		Dims: module.Dims{
+			{ID: dimNode("netsplit_unresolved"), Name: "unresolved"},
 		},
 	}
-	chartNetSplits = Chart{
-		ID:    "netsplit",
-		Title: "Netsplits",
-		Units: "netsplits/s",
-		Fam:   "cluster",
-		Ctx:   "vernemq.netsplits",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: metricNetSplitResolved, Name: "resolved", Algo: module.Incremental},
-			{ID: metricNetSplitDetected, Name: "detected", Algo: module.Incremental},
-		},
-	}
-)
-
-// AUTH
-var (
-	chartMQTTv5AUTH = Chart{
-		ID:    "mqtt_auth",
-		Title: "v5 AUTH",
-		Units: "packets/s",
-		Fam:   "mqtt auth",
-		Ctx:   "vernemq.mqtt_auth",
-		Dims: Dims{
-			{ID: metricAUTHReceived, Name: "received", Algo: module.Incremental},
-			{ID: metricAUTHSent, Name: "sent", Algo: module.Incremental, Mul: -1},
-		},
-	}
-	chartMQTTv5AUTHReceivedReason = Chart{
-		ID:    "mqtt_auth_received_reason",
-		Title: "v5 AUTH Received by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt auth",
-		Ctx:   "vernemq.mqtt_auth_received_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricAUTHReceived, "success"), Name: "success", Algo: module.Incremental},
-		},
-	}
-	chartMQTTv5AUTHSentReason = Chart{
-		ID:    "mqtt_auth_sent_reason",
-		Title: "v5 AUTH Sent by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt auth",
-		Ctx:   "vernemq.mqtt_auth_sent_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricAUTHSent, "success"), Name: "success", Algo: module.Incremental},
+	nodeNetSplitsChartTmpl = module.Chart{
+		ID:       "node_%s_netsplit",
+		Title:    "Netsplits",
+		Units:    "netsplits/s",
+		Fam:      "cluster",
+		Ctx:      "vernemq.node_netsplits",
+		Type:     module.Stacked,
+		Priority: prioNodeNetSplits,
+		Dims: module.Dims{
+			{ID: dimNode(metricNetSplitResolved), Name: "resolved", Algo: module.Incremental},
+			{ID: dimNode(metricNetSplitDetected), Name: "detected", Algo: module.Incremental},
 		},
 	}
 )
 
-// CONNECT
 var (
-	chartMQTTv3v5CONNECT = Chart{
-		ID:    "mqtt_connect",
-		Title: "v3/v5 CONNECT and CONNACK",
-		Units: "packets/s",
-		Fam:   "mqtt connect",
-		Ctx:   "vernemq.mqtt_connect",
-		Dims: Dims{
-			{ID: metricCONNECTReceived, Name: "CONNECT", Algo: module.Incremental},
-			{ID: metricCONNACKSent, Name: "CONNACK", Algo: module.Incremental, Mul: -1},
-		},
-	}
-	chartMQTTv3v5CONNACKSentReason = Chart{
-		ID:    "mqtt_connack_sent_reason",
-		Title: "v3/v5 CONNACK Sent by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt connect",
-		Ctx:   "vernemq.mqtt_connack_sent_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricCONNACKSent, "success"), Name: "success", Algo: module.Incremental},
-		},
-	}
-)
-
-// DISCONNECT
-var (
-	chartMQTTv3v5DISCONNECT = Chart{
-		ID:    "mqtt_disconnect",
-		Title: "v3/v5 DISCONNECT",
-		Units: "packets/s",
-		Fam:   "mqtt disconnect",
-		Ctx:   "vernemq.mqtt_disconnect",
-		Dims: Dims{
-			{ID: metricDISCONNECTReceived, Name: "received", Algo: module.Incremental},
-			{ID: metricDISCONNECTSent, Name: "sent", Algo: module.Incremental, Mul: -1},
-		},
-	}
-	chartMQTTv5DISCONNECTReceivedReason = Chart{
-		ID:    "mqtt_disconnect_received_reason",
-		Title: "v5 DISCONNECT Received by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt disconnect",
-		Ctx:   "vernemq.mqtt_disconnect_received_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricDISCONNECTReceived, "normal_disconnect"), Name: "normal_disconnect", Algo: module.Incremental},
-		},
-	}
-	chartMQTTv5DISCONNECTSentReason = Chart{
-		ID:    "mqtt_disconnect_sent_reason",
-		Title: "v5 DISCONNECT Sent by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt disconnect",
-		Ctx:   "vernemq.mqtt_disconnect_sent_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricDISCONNECTSent, "normal_disconnect"), Name: "normal_disconnect", Algo: module.Incremental},
-		},
-	}
-)
-
-// SUBSCRIBE
-var (
-	chartMQTTv3v5SUBSCRIBE = Chart{
-		ID:    "mqtt_subscribe",
-		Title: "v3/v5 SUBSCRIBE and SUBACK",
-		Units: "packets/s",
-		Fam:   "mqtt subscribe",
-		Ctx:   "vernemq.mqtt_subscribe",
-		Dims: Dims{
-			{ID: metricSUBSCRIBEReceived, Name: "SUBSCRIBE", Algo: module.Incremental},
-			{ID: metricSUBACKSent, Name: "SUBACK", Algo: module.Incremental, Mul: -1},
-		},
-	}
-	chartMQTTv3v5SUBSCRIBEError = Chart{
-		ID:    "mqtt_subscribe_error",
-		Title: "v3/v5 Failed SUBSCRIBE Operations due to a Netsplit",
-		Units: "ops/s",
-		Fam:   "mqtt subscribe",
-		Ctx:   "vernemq.mqtt_subscribe_error",
-		Dims: Dims{
-			{ID: metricSUBSCRIBEError, Name: "failed", Algo: module.Incremental},
-		},
-	}
-	chartMQTTv3v5SUBSCRIBEAuthError = Chart{
-		ID:    "mqtt_subscribe_auth_error",
-		Title: "v3/v5 Unauthorized SUBSCRIBE Attempts",
-		Units: "attempts/s",
-		Fam:   "mqtt subscribe",
-		Ctx:   "vernemq.mqtt_subscribe_auth_error",
-		Dims: Dims{
-			{ID: metricSUBSCRIBEAuthError, Name: "unauth", Algo: module.Incremental},
-		},
-	}
-)
-
-// UNSUBSCRIBE
-var (
-	chartMQTTv3v5UNSUBSCRIBE = Chart{
-		ID:    "mqtt_unsubscribe",
-		Title: "v3/v5 UNSUBSCRIBE and UNSUBACK",
-		Units: "packets/s",
-		Fam:   "mqtt unsubscribe",
-		Ctx:   "vernemq.mqtt_unsubscribe",
-		Dims: Dims{
-			{ID: metricUNSUBSCRIBEReceived, Name: "UNSUBSCRIBE", Algo: module.Incremental},
-			{ID: metricUNSUBACKSent, Name: "UNSUBACK", Algo: module.Incremental, Mul: -1},
-		},
-	}
-	chartMQTTv3v5UNSUBSCRIBEError = Chart{
-		ID:    "mqtt_unsubscribe_error",
-		Title: "v3/v5 Failed UNSUBSCRIBE Operations due to a Netsplit",
-		Units: "ops/s",
-		Fam:   "mqtt unsubscribe",
-		Ctx:   "vernemq.mqtt_unsubscribe_error",
-		Dims: Dims{
-			{ID: metricUNSUBSCRIBEError, Name: "failed", Algo: module.Incremental},
+	nodeUptimeChartTmpl = module.Chart{
+		ID:       "node_%s_uptime",
+		Title:    "Node Uptime",
+		Units:    "seconds",
+		Fam:      "uptime",
+		Ctx:      "vernemq.node_uptime",
+		Priority: prioNodeUptime,
+		Dims: module.Dims{
+			{ID: dimNode(metricSystemWallClock), Name: "time", Div: 1000},
 		},
 	}
 )
 
 // PUBLISH
 var (
-	chartMQTTv3v5PUBLISH = Chart{
-		ID:    "mqtt_publish",
-		Title: "v3/v5 QoS 0,1,2 PUBLISH",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_publish",
-		Dims: Dims{
-			{ID: metricPUBSLISHReceived, Name: "received", Algo: module.Incremental},
-			{ID: metricPUBSLIHSent, Name: "sent", Algo: module.Incremental, Mul: -1},
+	nodeMqttPUBLISHPacketsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_publish",
+		Title:    "MQTT QoS 0,1,2 PUBLISH",
+		Units:    "packets/s",
+		Fam:      "mqtt publish",
+		Ctx:      "vernemq.node_mqtt_publish",
+		Priority: prioMqttPublishPackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricPUBSLISHReceived), Name: "received", Algo: module.Incremental},
+			{ID: dimMqttVer(metricPUBSLIHSent), Name: "sent", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartMQTTv3v5PUBLISHErrors = Chart{
-		ID:    "mqtt_publish_errors",
-		Title: "v3/v5 Failed PUBLISH Operations due to a Netsplit",
-		Units: "ops/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_publish_errors",
-		Dims: Dims{
-			{ID: metricPUBLISHError, Name: "failed", Algo: module.Incremental},
+	nodeMqttPUBLISHErrorsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_publish_errors",
+		Title:    "MQTT Failed PUBLISH Operations due to a Netsplit",
+		Units:    "errors/s",
+		Fam:      "mqtt publish",
+		Ctx:      "vernemq.node_mqtt_publish_errors",
+		Priority: prioMqttPublishErrors,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricPUBLISHError), Name: "publish", Algo: module.Incremental},
 		},
 	}
-	chartMQTTv3v5PUBLISHAuthErrors = Chart{
-		ID:    "mqtt_publish_auth_errors",
-		Title: "v3/v5 Unauthorized PUBLISH Attempts",
-		Units: "attempts/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_publish_auth_errors",
-		Type:  module.Area,
-		Dims: Dims{
-			{ID: metricPUBLISHAuthError, Name: "unauth", Algo: module.Incremental},
+	nodeMqttPUBLISHAuthErrorsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_publish_auth_errors",
+		Title:    "MQTT Unauthorized PUBLISH Attempts",
+		Units:    "errors/s",
+		Fam:      "mqtt publish",
+		Ctx:      "vernemq.node_mqtt_publish_auth_errors",
+		Type:     module.Area,
+		Priority: prioMqttPublishAuthPackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricPUBLISHAuthError), Name: "publish_auth", Algo: module.Incremental},
 		},
 	}
-	chartMQTTv3v5PUBACK = Chart{
-		ID:    "mqtt_puback",
-		Title: "v3/v5 QoS 1 PUBACK",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_puback",
-		Dims: Dims{
-			{ID: metricPUBACKReceived, Name: "received", Algo: module.Incremental},
-			{ID: metricPUBACKSent, Name: "sent", Algo: module.Incremental, Mul: -1},
+	nodeMqttPUBACKPacketsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_puback",
+		Title:    "MQTT QoS 1 PUBACK Packets",
+		Units:    "packets/s",
+		Fam:      "mqtt publish",
+		Ctx:      "vernemq.node_mqtt_puback",
+		Priority: prioMqttPubAckPackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricPUBACKReceived), Name: "received", Algo: module.Incremental},
+			{ID: dimMqttVer(metricPUBACKSent), Name: "sent", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartMQTTv5PUBACKReceivedReason = Chart{
-		ID:    "mqtt_puback_received_reason",
-		Title: "v5 PUBACK QoS 1 Received by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_puback_received_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricPUBACKReceived, "success"), Name: "success", Algo: module.Incremental},
+	nodeMqttPUBACKReceivedByReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_puback_received_by_reason_code",
+			Title:    "MQTT PUBACK QoS 1 Received by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt publish",
+			Ctx:      "vernemq.node_mqtt_puback_received_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttPubAckReceivedReason,
+		}
+		for _, v := range mqtt5PUBACKReceivedReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricPUBACKReceived, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+	nodeMqttPUBACKSentByReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_puback_sent_by_reason_code",
+			Title:    "MQTT PUBACK QoS 1 Sent by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt publish",
+			Ctx:      "vernemq.node_mqtt_puback_sent_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttPubAckSentReason,
+		}
+		for _, v := range mqtt5PUBACKSentReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricPUBACKSent, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+	nodeMqttPUBACKUnexpectedMessagesChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_puback_unexpected",
+		Title:    "MQTT PUBACK QoS 1 Received Unexpected Messages",
+		Units:    "messages/s",
+		Fam:      "mqtt publish",
+		Ctx:      "vernemq.node_mqtt_puback_invalid_error",
+		Priority: prioMqttPubAckUnexpectedMessages,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricPUBACKInvalid), Name: "unexpected", Algo: module.Incremental},
 		},
 	}
-	chartMQTTv5PUBACKSentReason = Chart{
-		ID:    "mqtt_puback_sent_reason",
-		Title: "v5 PUBACK QoS 1 Sent by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_puback_sent_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricPUBACKSent, "success"), Name: "success", Algo: module.Incremental},
+	nodeMqttPUBRECPacketsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_pubrec",
+		Title:    "MQTT PUBREC QoS 2 Packets",
+		Units:    "packets/s",
+		Fam:      "mqtt publish",
+		Ctx:      "vernemq.node_mqtt_pubrec",
+		Priority: prioMqttPubRecPackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricPUBRECReceived), Name: "received", Algo: module.Incremental},
+			{ID: dimMqttVer(metricPUBRECSent), Name: "sent", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartMQTTv3v5PUBACKUnexpected = Chart{
-		ID:    "mqtt_puback_unexpected",
-		Title: "v3/v5 PUBACK QoS 1 Received Unexpected Messages",
-		Units: "messages/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_puback_invalid_error",
-		Dims: Dims{
-			{ID: metricPUBACKInvalid, Name: "unexpected", Algo: module.Incremental},
+	nodeMqttPUBRECReceivedByReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_pubrec_received_by_reason_code",
+			Title:    "MQTT PUBREC QoS 2 Received by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt publish",
+			Ctx:      "vernemq.node_mqtt_pubrec_received_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttPubRecReceivedReason,
+		}
+		for _, v := range mqtt5PUBRECReceivedReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricPUBRECReceived, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+	nodeMqttPUBRECSentByReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_pubrec_sent_by_reason_code",
+			Title:    "MQTT PUBREC QoS 2 Sent by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt publish",
+			Ctx:      "vernemq.node_mqtt_pubrec_sent_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttPubRecSentReason,
+		}
+		for _, v := range mqtt5PUBRECSentReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricPUBRECSent, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+	nodeMqttPUBRECUnexpectedMessagesChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_pubrec_unexpected",
+		Title:    "MQTT PUBREC QoS 2 Received Unexpected Messages",
+		Units:    "messages/s",
+		Fam:      "mqtt publish",
+		Ctx:      "vernemq.node_mqtt_pubrec_invalid_error",
+		Priority: prioMqttPubRecUnexpectedMessages,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricPUBRECInvalid), Name: "unexpected", Algo: module.Incremental},
 		},
 	}
-	chartMQTTv3v5PUBREC = Chart{
-		ID:    "mqtt_pubrec",
-		Title: "v3/v5 PUBREC QoS 2",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_pubrec",
-		Dims: Dims{
-			{ID: metricPUBRECReceived, Name: "received", Algo: module.Incremental},
-			{ID: metricPUBRECSent, Name: "sent", Algo: module.Incremental, Mul: -1},
+	nodeMqttPUBRELPacketsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_pubrel",
+		Title:    "MQTT PUBREL QoS 2 Packets¬",
+		Units:    "packets/s",
+		Fam:      "mqtt publish",
+		Ctx:      "vernemq.node_mqtt_pubrel",
+		Priority: prioMqttPubRelPackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricPUBRELReceived), Name: "received", Algo: module.Incremental},
+			{ID: dimMqttVer(metricPUBRELSent), Name: "sent", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartMQTTv5PUBRECReceivedReason = Chart{
-		ID:    "mqtt_pubrec_received_reason",
-		Title: "v5 PUBREC QoS 2 Received by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_pubrec_received_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricPUBRECReceived, "success"), Name: "success", Algo: module.Incremental},
+	nodeMqttPUBRELReceivedByReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_pubrel_received_by_reason_code",
+			Title:    "MQTT PUBREL QoS 2 Received by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt publish",
+			Ctx:      "vernemq.node_mqtt_pubrel_received_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttPubRelReceivedReason,
+		}
+		for _, v := range mqtt5PUBRELReceivedReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricPUBRELReceived, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+	nodeMqttPUBRELSentByReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_pubrel_sent_by_reason_code",
+			Title:    "MQTT PUBREL QoS 2 Sent by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt publish",
+			Ctx:      "vernemq.node_mqtt_pubrel_sent_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttPubRelSentReason,
+		}
+		for _, v := range mqtt5PUBRELSentReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricPUBRELSent, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+	nodeMqttPUBCOMPPacketsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_pubcomp",
+		Title:    "MQTT PUBCOMP QoS 2 Packets",
+		Units:    "packets/s",
+		Fam:      "mqtt publish",
+		Ctx:      "vernemq.node_mqtt_pubcomp",
+		Priority: prioMqttPubCompPackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricPUBCOMPReceived), Name: "received", Algo: module.Incremental},
+			{ID: dimMqttVer(metricPUBCOMPSent), Name: "sent", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartMQTTv5PUBRECSentReason = Chart{
-		ID:    "mqtt_pubrec_sent_reason",
-		Title: "v5 PUBREC QoS 2 Sent by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_pubrec_sent_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricPUBRECSent, "success"), Name: "success", Algo: module.Incremental},
+	nodeMqttPUBCOMPReceivedByReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_pubcomp_received_by_reason_code",
+			Title:    "MQTT PUBCOMP QoS 2 Received by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt publish",
+			Ctx:      "vernemq.node_mqtt_pubcomp_received_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttPubCompReceivedReason,
+		}
+		for _, v := range mqtt5PUBCOMPReceivedReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricPUBCOMPReceived, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+	nodeMqttPUBCOMPSentByReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_pubcomp_sent_by_reason_code",
+			Title:    "MQTT PUBCOMP QoS 2 Sent by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt publish",
+			Ctx:      "vernemq.node_mqtt_pubcomp_sent_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttPubCompSentReason,
+		}
+		for _, v := range mqtt5PUBCOMPSentReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricPUBCOMPSent, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+	nodeMqttPUBCOMPUnexpectedMessagesChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_pubcomp_unexpected",
+		Title:    "MQTT PUBCOMP QoS 2 Received Unexpected Messages",
+		Units:    "messages/s",
+		Fam:      "mqtt publish",
+		Ctx:      "vernemq.node_mqtt_pubcomp_invalid_error",
+		Priority: prioMqttPubCompUnexpectedMessages,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricPUNCOMPInvalid), Name: "unexpected", Algo: module.Incremental},
 		},
 	}
-	chartMQTTv3PUBRECUnexpected = Chart{
-		ID:    "mqtt_pubrec_unexpected",
-		Title: "v3 PUBREC QoS 2 Received Unexpected Messages",
-		Units: "messages/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_pubrec_invalid_error",
-		Dims: Dims{
-			{ID: metricPUBRECInvalid, Name: "unexpected", Algo: module.Incremental},
+)
+
+// CONNECT
+var (
+	nodeMqttCONNECTPacketsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_connect",
+		Title:    "MQTT CONNECT and CONNACK",
+		Units:    "packets/s",
+		Fam:      "mqtt connect",
+		Ctx:      "vernemq.node_mqtt_connect",
+		Priority: prioMqttConnectPackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricCONNECTReceived), Name: "connect", Algo: module.Incremental},
+			{ID: dimMqttVer(metricCONNACKSent), Name: "connack", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartMQTTv3v5PUBREL = Chart{
-		ID:    "mqtt_pubrel",
-		Title: "v3/v5 PUBREL QoS 2",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_pubrel",
-		Dims: Dims{
-			{ID: metricPUBRELReceived, Name: "received", Algo: module.Incremental},
-			{ID: metricPUBRELSent, Name: "sent", Algo: module.Incremental, Mul: -1},
+	nodeMqttCONNACKSentByReturnCodeChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_connack_sent_by_return_code",
+			Title:    "MQTT CONNACK Sent by Return Code",
+			Units:    "packets/s",
+			Fam:      "mqtt connect",
+			Ctx:      "vernemq.node_mqtt_connack_sent_by_return_code",
+			Type:     module.Stacked,
+			Priority: prioMqttConnectSentReason,
+		}
+		for _, v := range mqtt4CONNACKSentReturnCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttRCode(metricCONNACKSent, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+	nodeMqttCONNACKSentByReasonCodeChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_connack_sent_by_reason_code",
+			Title:    "MQTT CONNACK Sent by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt connect",
+			Ctx:      "vernemq.node_mqtt_connack_sent_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttConnectSentReason,
+		}
+		for _, v := range mqtt5CONNACKSentReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricCONNACKSent, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+)
+
+// DISCONNECT
+var (
+	nodeMqtt5DISCONNECTPacketsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_disconnect",
+		Title:    "MQTT DISCONNECT Packets",
+		Units:    "packets/s",
+		Fam:      "mqtt disconnect",
+		Ctx:      "vernemq.node_mqtt_disconnect",
+		Priority: prioMqttDisconnectPackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricDISCONNECTReceived), Name: "received", Algo: module.Incremental},
+			{ID: dimMqttVer(metricDISCONNECTSent), Name: "sent", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartMQTTv5PUBRELReceivedReason = Chart{
-		ID:    "mqtt_pubrel_received_reason",
-		Title: "v5 PUBREL QoS 2 Received by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_pubrel_received_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricPUBRELReceived, "success"), Name: "success", Algo: module.Incremental},
+	nodeMqtt4DISCONNECTPacketsChartTmpl = func() module.Chart {
+		chart := nodeMqtt5DISCONNECTPacketsChartTmpl.Copy()
+		_ = chart.RemoveDim(dimMqttVer(metricDISCONNECTSent))
+		return *chart
+	}()
+	nodeMqttDISCONNECTReceivedByReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_disconnect_received_by_reason_code",
+			Title:    "MQTT DISCONNECT Received by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt disconnect",
+			Ctx:      "vernemq.node_mqtt_disconnect_received_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttDisconnectReceivedReason,
+		}
+		for _, v := range mqtt5DISCONNECTReceivedReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricDISCONNECTReceived, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+	nodeMqttDISCONNECTSentByReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_disconnect_sent_by_reason_code",
+			Title:    "MQTT DISCONNECT Sent by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt disconnect",
+			Ctx:      "vernemq.node_mqtt_disconnect_sent_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttDisconnectSentReason,
+		}
+		for _, v := range mqtt5DISCONNECTSentReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricDISCONNECTSent, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+)
+
+// SUBSCRIBE
+var (
+	nodeMqttSUBSCRIBEPacketsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_subscribe",
+		Title:    "MQTT SUBSCRIBE and SUBACK Packets",
+		Units:    "packets/s",
+		Fam:      "mqtt subscribe",
+		Ctx:      "vernemq.node_mqtt_subscribe",
+		Priority: prioMqttSubscribePackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricSUBSCRIBEReceived), Name: "subscribe", Algo: module.Incremental},
+			{ID: dimMqttVer(metricSUBACKSent), Name: "suback", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartMQTTv5PUBRELSentReason = Chart{
-		ID:    "mqtt_pubrel_sent_reason",
-		Title: "v5 PUBREL QoS 2 Sent by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_pubrel_sent_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricPUBRELSent, "success"), Name: "success", Algo: module.Incremental},
+	modeMqttSUBSCRIBEErrorsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_subscribe_error",
+		Title:    "MQTT Failed SUBSCRIBE Operations due to Netsplit",
+		Units:    "errors/s",
+		Fam:      "mqtt subscribe",
+		Ctx:      "vernemq.node_mqtt_subscribe_error",
+		Priority: prioMqttSubscribeErrors,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricSUBSCRIBEError), Name: "subscribe", Algo: module.Incremental},
 		},
 	}
-	chartMQTTv3v5PUBCOMP = Chart{
-		ID:    "mqtt_pubcomp",
-		Title: "v3/v5 PUBCOMP QoS 2",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_pubcom",
-		Dims: Dims{
-			{ID: metricPUBCOMPReceived, Name: "received", Algo: module.Incremental},
-			{ID: metricPUBCOMPSent, Name: "sent", Algo: module.Incremental, Mul: -1},
+	nodeMqttSUBSCRIBEAuthErrorsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_subscribe_auth_error",
+		Title:    "MQTT Unauthorized SUBSCRIBE Attempts",
+		Units:    "errors/s",
+		Fam:      "mqtt subscribe",
+		Ctx:      "vernemq.node_mqtt_subscribe_auth_error",
+		Priority: prioMqttSubscribeAuthPackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricSUBSCRIBEAuthError), Name: "subscribe_auth", Algo: module.Incremental},
 		},
 	}
-	chartMQTTv5PUBCOMPReceivedReason = Chart{
-		ID:    "mqtt_pubcomp_received_reason",
-		Title: "v5 PUBCOMP QoS 2 Received by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_pubcomp_received_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricPUBCOMPReceived, "success"), Name: "success", Algo: module.Incremental},
+)
+
+// UNSUBSCRIBE
+var (
+	nodeMqttUNSUBSCRIBEPacketsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_unsubscribe",
+		Title:    "MQTT UNSUBSCRIBE and UNSUBACK Packets",
+		Units:    "packets/s",
+		Fam:      "mqtt unsubscribe",
+		Ctx:      "vernemq.node_mqtt_unsubscribe",
+		Priority: prioMqttUnsubscribePackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricUNSUBSCRIBEReceived), Name: "unsubscribe", Algo: module.Incremental},
+			{ID: dimMqttVer(metricUNSUBACKSent), Name: "unsuback", Algo: module.Incremental, Mul: -1},
 		},
 	}
-	chartMQTTv5PUBCOMPSentReason = Chart{
-		ID:    "mqtt_pubcomp_sent_reason",
-		Title: "v5 PUBCOMP QoS 2 Sent by Reason",
-		Units: "packets/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_pubcomp_sent_reason",
-		Type:  module.Stacked,
-		Dims: Dims{
-			{ID: join(metricPUBCOMPSent, "success"), Name: "success", Algo: module.Incremental},
+	nodeMqttUNSUBSCRIBEErrorsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_unsubscribe_error",
+		Title:    "MQTT Failed UNSUBSCRIBE Operations due to Netsplit",
+		Units:    "errors/s",
+		Fam:      "mqtt unsubscribe",
+		Ctx:      "vernemq.node_mqtt_unsubscribe_error",
+		Priority: prioMqttUnsubscribeErrors,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricUNSUBSCRIBEError), Name: "unsubscribe", Algo: module.Incremental},
 		},
 	}
-	chartMQTTv3v5PUBCOMPUnexpected = Chart{
-		ID:    "mqtt_pubcomp_unexpected",
-		Title: "v3/v5 PUBCOMP QoS 2 Received Unexpected Messages",
-		Units: "messages/s",
-		Fam:   "mqtt publish",
-		Ctx:   "vernemq.mqtt_pubcomp_invalid_error",
-		Dims: Dims{
-			{ID: metricPUNCOMPInvalid, Name: "unexpected", Algo: module.Incremental},
+)
+
+// AUTH
+var (
+	nodeMqttAUTHPacketsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt%s_auth",
+		Title:    "MQTT AUTH Packets",
+		Units:    "packets/s",
+		Fam:      "mqtt auth",
+		Ctx:      "vernemq.node_mqtt_auth",
+		Priority: prioMqttAuthPackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricAUTHReceived), Name: "received", Algo: module.Incremental},
+			{ID: dimMqttVer(metricAUTHSent), Name: "sent", Algo: module.Incremental, Mul: -1},
 		},
 	}
+	nodeMqttAUTHReceivedByReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_auth_received_by_reason_code",
+			Title:    "MQTT AUTH Received by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt auth",
+			Ctx:      "vernemq.node_mqtt_auth_received_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttAuthReceivedReason,
+		}
+		for _, v := range mqtt5AUTHReceivedReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricAUTHReceived, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
+	nodeMqttAUTHSentByReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			ID:       "node_%s_mqtt%s_auth_sent_by_reason_code",
+			Title:    "MQTT AUTH Sent by Reason",
+			Units:    "packets/s",
+			Fam:      "mqtt auth",
+			Ctx:      "vernemq.node_mqtt_auth_sent_by_reason_code",
+			Type:     module.Stacked,
+			Priority: prioMqttAuthSentReason,
+		}
+		for _, v := range mqtt5AUTHSentReasonCodes {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID: dimMqttReason(metricAUTHSent, v), Name: v, Algo: module.Incremental,
+			})
+		}
+		return chart
+	}()
 )
 
 // PING
 var (
-	chartMQTTv3v5PING = Chart{
-		ID:    "mqtt_ping",
-		Title: "v3/v5 PING",
-		Units: "packets/s",
-		Fam:   "mqtt ping",
-		Ctx:   "vernemq.mqtt_ping",
-		Dims: Dims{
-			{ID: metricPINGREQReceived, Name: "PINGREQ", Algo: module.Incremental},
-			{ID: metricPINGRESPSent, Name: "PINGRESP", Algo: module.Incremental, Mul: -1},
+	nodeMqttPINGPacketsChartTmpl = module.Chart{
+		ID:       "node_%s_mqtt_ver_%s_ping",
+		Title:    "MQTT PING Packets",
+		Units:    "packets/s",
+		Fam:      "mqtt ping",
+		Ctx:      "vernemq.node_mqtt_ping",
+		Priority: prioMqttPingPackets,
+		Dims: module.Dims{
+			{ID: dimMqttVer(metricPINGREQReceived), Name: "pingreq", Algo: module.Incremental},
+			{ID: dimMqttVer(metricPINGRESPSent), Name: "pingresp", Algo: module.Incremental, Mul: -1},
 		},
 	}
 )
 
-var (
-	chartUptime = Chart{
-		ID:    "node_uptime",
-		Title: "Node Uptime",
-		Units: "seconds",
-		Fam:   "uptime",
-		Ctx:   "vernemq.node_uptime",
-		Dims: Dims{
-			{ID: metricSystemWallClock, Name: "time", Div: 1000},
-		},
+func (v *VerneMQ) addNodeCharts(node string, nst *nodeStats) {
+	if err := v.Charts().Add(*newNodeCharts(node)...); err != nil {
+		v.Warningf("error on adding node '%s' charts: %v", node, err)
 	}
-)
-
-func (v *VerneMQ) notifyNewScheduler(name string) {
-	if v.cache[name] {
-		return
+	if len(nst.mqtt4) > 0 {
+		if err := v.Charts().Add(*newNodeMqttCharts(node, "4")...); err != nil {
+			v.Warningf("error on adding node '%s' mqtt v4 charts: %v", node, err)
+		}
 	}
-	v.cache[name] = true
-
-	id := chartSchedulerUtilization.ID
-	num := name[len("system_utilization_scheduler_"):]
-
-	v.addAbsDimToChart(id, name, num)
+	if len(nst.mqtt5) > 0 {
+		if err := v.Charts().Add(*newNodeMqttCharts(node, "5")...); err != nil {
+			v.Warningf("error on adding node '%s' mqtt 5 charts: %v", node, err)
+		}
+	}
 }
 
-func (v *VerneMQ) notifyNewReason(name, reason string) {
-	if reason == "success" || reason == "normal_disconnect" {
-		return
-	}
-	key := join(name, reason)
-	if v.cache[key] {
-		return
-	}
-	v.cache[key] = true
+func (v *VerneMQ) removeNodeCharts(node string) {
+	px := cleanChartID(fmt.Sprintf("node_%s_", node))
 
-	var chart Chart
-	switch name {
-	case metricAUTHReceived:
-		chart = chartMQTTv5AUTHReceivedReason
-	case metricAUTHSent:
-		chart = chartMQTTv5AUTHSentReason
-	case metricCONNACKSent:
-		chart = chartMQTTv3v5CONNACKSentReason
-	case metricDISCONNECTReceived:
-		chart = chartMQTTv5DISCONNECTReceivedReason
-	case metricDISCONNECTSent:
-		chart = chartMQTTv5DISCONNECTSentReason
-	case metricPUBACKReceived:
-		chart = chartMQTTv5PUBACKReceivedReason
-	case metricPUBACKSent:
-		chart = chartMQTTv5PUBACKSentReason
-	case metricPUBRECReceived:
-		chart = chartMQTTv5PUBRECReceivedReason
-	case metricPUBRECSent:
-		chart = chartMQTTv5PUBRECSentReason
-	case metricPUBRELReceived:
-		chart = chartMQTTv5PUBRELReceivedReason
-	case metricPUBRELSent:
-		chart = chartMQTTv5PUBRELSentReason
-	case metricPUBCOMPReceived:
-		chart = chartMQTTv5PUBCOMPReceivedReason
-	case metricPUBCOMPSent:
-		chart = chartMQTTv5PUBCOMPSentReason
+	for _, chart := range *v.Charts() {
+		if strings.HasPrefix(chart.ID, px) {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
+}
+
+func newNodeCharts(node string) *module.Charts {
+	charts := nodeChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = cleanChartID(fmt.Sprintf(chart.ID, node))
+		chart.Labels = []module.Label{
+			{Key: "node", Value: node},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, node)
+		}
+	}
+
+	return charts
+}
+
+func newNodeMqttCharts(node, mqttVer string) *module.Charts {
+	var charts *module.Charts
+
+	switch mqttVer {
+	case "4":
+		charts = nodeMqtt4ChartsTmpl.Copy()
+	case "5":
+		charts = nodeMqtt5ChartsTmpl.Copy()
 	default:
-		v.Warningf("unknown metric name, wont be added to the charts: '%s'", name)
-		return
+		return nil
 	}
 
-	v.addIncDimToChart(chart.ID, key, reason)
+	for _, chart := range *charts {
+		chart.ID = cleanChartID(fmt.Sprintf(chart.ID, node, mqttVer))
+		chart.Labels = []module.Label{
+			{Key: "node", Value: node},
+			{Key: "mqtt_version", Value: mqttVer},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, node, mqttVer)
+		}
+	}
+
+	return charts
 }
 
-func (v *VerneMQ) addAbsDimToChart(chartID, dimID, dimName string) {
-	v.addDimToChart(chartID, dimID, dimName, false)
+func dimNode(name string) string {
+	return join("node_%s", name)
 }
 
-func (v *VerneMQ) addIncDimToChart(chartID, dimID, dimName string) {
-	v.addDimToChart(chartID, dimID, dimName, true)
+func dimMqttVer(name string) string {
+	return join("node_%s_mqtt%s", name)
 }
 
-func (v *VerneMQ) addDimToChart(chartID, dimID, dimName string, inc bool) {
-	chart := v.Charts().Get(chartID)
-	if chart == nil {
-		v.Warningf("add '%s' dim: couldn't find '%s' chart", dimID, chartID)
-		return
-	}
+func dimMqttReason(name, reason string) string {
+	return join("node_%s_mqtt%s", name, "reason_code", reason)
+}
 
-	dim := &Dim{ID: dimID, Name: dimName}
-	if inc {
-		dim.Algo = module.Incremental
-	}
+func dimMqttRCode(name, rcode string) string {
+	return join("node_%s_mqtt%s", name, "return_code", rcode)
+}
 
-	if err := chart.AddDim(dim); err != nil {
-		v.Warningf("add '%s' dim: %v", dimID, err)
-		return
-	}
-	chart.MarkNotCreated()
+func cleanChartID(id string) string {
+	r := strings.NewReplacer(".", "_", "'", "_", " ", "_")
+	return r.Replace(id)
 }
