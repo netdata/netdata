@@ -76,12 +76,7 @@ static struct progress {
 };
 
 SIMPLE_HASHTABLE_HASH query_hash(nd_uuid_t *transaction) {
-    struct uuid_hi_lo_t {
-        uint64_t hi;
-        uint64_t lo;
-    } *parts = (struct uuid_hi_lo_t *)transaction;
-
-    return parts->lo;
+    return XXH3_64bits(transaction, sizeof(*transaction));
 }
 
 static void query_progress_init_unsafe(void) {

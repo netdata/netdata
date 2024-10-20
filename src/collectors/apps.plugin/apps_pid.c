@@ -58,7 +58,7 @@ void apps_pids_init(void) {
 }
 
 static inline uint64_t pid_hash(pid_t pid) {
-    return ((uint64_t)pid << 31) + (uint64_t)pid; // we remove 1 bit when shifting to make it different
+    return XXH3_64bits(&pid, sizeof(pid));
 }
 
 inline struct pid_stat *find_pid_entry(pid_t pid) {
@@ -81,8 +81,8 @@ struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
     p = aral_callocz(pids.all_pids.aral);
 
 #if (PROCESSES_HAVE_FDS == 1)
-    p->fds = mallocz(sizeof(struct pid_fd) * MAX_SPARE_FDS);
-    p->fds_size = MAX_SPARE_FDS;
+    p->fds = mallocz(sizeof(struct pid_fd) * 3); // stdin, stdout, stderr
+    p->fds_size = 3;
     init_pid_fds(p, 0, p->fds_size);
 #endif
 

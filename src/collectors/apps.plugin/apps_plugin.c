@@ -34,11 +34,14 @@ bool enable_groups_charts = true;
 bool include_exited_childs = true;
 bool proc_pid_cmdline_is_needed = true; // true when we need to read /proc/cmdline
 
-#if defined(OS_FREEBSD) || defined(OS_MACOS) || defined(OS_WINDOWS)
-bool enable_file_charts = false;
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
+int enable_file_charts = CONFIG_BOOLEAN_NO;
 #elif defined(OS_LINUX)
-bool enable_file_charts = true;
+int enable_file_charts = CONFIG_BOOLEAN_AUTO;
+#elif defined(OS_WINDOWS)
+int enable_file_charts = CONFIG_BOOLEAN_YES;
 #endif
+bool obsolete_file_charts = false;
 
 // ----------------------------------------------------------------------------
 // internal counters
@@ -468,12 +471,12 @@ static void parse_args(int argc, char **argv)
 
 #if (PROCESSES_HAVE_FDS == 1)
         if(strcmp("with-files", argv[i]) == 0) {
-            enable_file_charts = 1;
+            enable_file_charts = CONFIG_BOOLEAN_YES;
             continue;
         }
 
         if(strcmp("no-files", argv[i]) == 0 || strcmp("without-files", argv[i]) == 0) {
-            enable_file_charts = 0;
+            enable_file_charts = CONFIG_BOOLEAN_NO;
             continue;
         }
 #endif

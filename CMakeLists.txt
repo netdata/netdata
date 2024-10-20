@@ -450,8 +450,7 @@ int main() {
 
 check_cxx_source_compiles("
 int main() {
-        int test;
-        __atomic_load_n(&test, 0);
+        __atomic_load_8(nullptr, 0);
         return 0;
 }
 " HAVE_BUILTIN_ATOMICS)
@@ -763,6 +762,14 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setenv.h
         src/libnetdata/os/strndup.c
         src/libnetdata/os/strndup.h
+        src/libnetdata/os/windows-wmi/windows-wmi.c
+        src/libnetdata/os/windows-wmi/windows-wmi.h
+        src/libnetdata/os/windows-wmi/windows-wmi-GetDiskDriveInfo.c
+        src/libnetdata/os/windows-wmi/windows-wmi-GetDiskDriveInfo.h
+        src/libnetdata/os/windows-perflib/perflib.c
+        src/libnetdata/os/windows-perflib/perflib.h
+        src/libnetdata/os/windows-perflib/perflib-names.c
+        src/libnetdata/os/windows-perflib/perflib-dump.c
         src/libnetdata/spawn_server/spawn_server_nofork.c
         src/libnetdata/spawn_server/spawn_server.h
         src/libnetdata/spawn_server/spawn_popen.c
@@ -777,10 +784,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/close_range.h
         src/libnetdata/os/setproctitle.c
         src/libnetdata/os/setproctitle.h
-        src/libnetdata/os/windows-perflib/perflib.c
-        src/libnetdata/os/windows-perflib/perflib.h
-        src/libnetdata/os/windows-perflib/perflib-names.c
-        src/libnetdata/os/windows-perflib/perflib-dump.c
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
         src/libnetdata/json/json-c-parser-inline.c
@@ -1173,7 +1176,15 @@ endif()
 
 set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/common-contexts.h
+        src/collectors/common-contexts/disk-await.h
+        src/collectors/common-contexts/disk-avgsz.h
+        src/collectors/common-contexts/disk-busy.h
         src/collectors/common-contexts/disk-io.h
+        src/collectors/common-contexts/disk-iotime.h
+        src/collectors/common-contexts/disk-ops.h
+        src/collectors/common-contexts/disk-qops.h
+        src/collectors/common-contexts/disk-svctm.h
+        src/collectors/common-contexts/disk-util.h
         src/collectors/common-contexts/system-io.h
         src/collectors/common-contexts/system-interrupts.h
         src/collectors/common-contexts/system-processes.h
@@ -1769,7 +1780,7 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 target_link_libraries(libnetdata PUBLIC
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
-        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;bcrypt;wevtapi>"
+        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;bcrypt;wevtapi;ole32;oleaut32;wbemuuid>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 

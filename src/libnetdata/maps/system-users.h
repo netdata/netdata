@@ -21,7 +21,8 @@ typedef struct usernames_cache {
 static inline STRING *system_usernames_cache_lookup_uid(USERNAMES_CACHE *uc, uid_t uid) {
     spinlock_lock(&uc->spinlock);
 
-    SIMPLE_HASHTABLE_SLOT_USERNAMES_CACHE *sl = simple_hashtable_get_slot_USERNAMES_CACHE(&uc->ht, uid, &uid, true);
+    XXH64_hash_t hash = XXH3_64bits(&uid, sizeof(uid));
+    SIMPLE_HASHTABLE_SLOT_USERNAMES_CACHE *sl = simple_hashtable_get_slot_USERNAMES_CACHE(&uc->ht, hash, &uid, true);
     STRING *u = SIMPLE_HASHTABLE_SLOT_DATA(sl);
     if(!u) {
         char tmp[1024 + 1];
@@ -35,7 +36,7 @@ static inline STRING *system_usernames_cache_lookup_uid(USERNAMES_CACHE *uc, uid
         else
             u = string_strdupz(pw.pw_name);
 
-        simple_hashtable_set_slot_USERNAMES_CACHE(&uc->ht, sl, uid, u);
+        simple_hashtable_set_slot_USERNAMES_CACHE(&uc->ht, sl, hash, u);
     }
 
     u = string_dup(u);

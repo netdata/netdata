@@ -19,10 +19,6 @@ typedef struct servicenames_cache {
     SIMPLE_HASHTABLE_SERVICENAMES_CACHE ht;
 } SERVICENAMES_CACHE;
 
-static inline uint64_t system_servicenames_key(uint16_t port, uint16_t ipproto) {
-    return ((uint64_t)ipproto << 16) | (uint64_t)port;
-}
-
 static inline const char *system_servicenames_ipproto2str(uint16_t ipproto) {
     return (ipproto == IPPROTO_TCP) ? "tcp" : "udp";
 }
@@ -38,10 +34,18 @@ static inline const char *static_portnames(uint16_t port, uint16_t ipproto) {
 }
 
 static inline STRING *system_servicenames_cache_lookup(SERVICENAMES_CACHE *sc, uint16_t port, uint16_t ipproto) {
-    uint64_t key = system_servicenames_key(port, ipproto);
+    struct {
+        uint16_t ipproto;
+        uint16_t port;
+    } key = {
+        .ipproto = ipproto,
+        .port = port,
+    };
+    XXH64_hash_t hash = XXH3_64bits(&key, sizeof(key));
+
     spinlock_lock(&sc->spinlock);
 
-    SIMPLE_HASHTABLE_SLOT_SERVICENAMES_CACHE *sl = simple_hashtable_get_slot_SERVICENAMES_CACHE(&sc->ht, key, &key, true);
+    SIMPLE_HASHTABLE_SLOT_SERVICENAMES_CACHE *sl = simple_hashtable_get_slot_SERVICENAMES_CACHE(&sc->ht, hash, &key, true);
     STRING *s = SIMPLE_HASHTABLE_SLOT_DATA(sl);
     if (!s) {
         const char *st = static_portnames(port, ipproto);
@@ -60,7 +64,7 @@ static inline STRING *system_servicenames_cache_lookup(SERVICENAMES_CACHE *sc, u
                 s = string_strdupz(se->s_name);
         }
 
-        simple_hashtable_set_slot_SERVICENAMES_CACHE(&sc->ht, sl, key, s);
+        simple_hashtable_set_slot_SERVICENAMES_CACHE(&sc->ht, sl, hash, s);
     }
 
     s = string_dup(s);

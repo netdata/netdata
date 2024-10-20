@@ -631,7 +631,8 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                 continue;
 
             // fprintf(stderr, "%d: PID %d is using socket inode %"PRIu64"\n", gettid_uncached(), pid, inode);
-            SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl = simple_hashtable_get_slot_PID_SOCKET(&ls->pid_sockets_hashtable, inode, &inode, true);
+            XXH64_hash_t inode_hash = XXH3_64bits(&inode, sizeof(inode));
+            SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl = simple_hashtable_get_slot_PID_SOCKET(&ls->pid_sockets_hashtable, inode_hash, &inode, true);
             struct pid_socket *ps = SIMPLE_HASHTABLE_SLOT_DATA(sl);
             if(!ps || (ps->pid == 1 && pid != 1)) {
                 if(uid == UID_UNSET && ls->config.uid) {
@@ -672,7 +673,8 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                 if(!net_ns_inode && ls->config.namespaces) {
                     snprintfz(filename, sizeof(filename), "%s/%s/ns/net", proc_filename, proc_entry->d_name);
                     if(local_sockets_read_proc_inode_link(ls, filename, &net_ns_inode, "net")) {
-                        SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode, (uint64_t *)net_ns_inode, true);
+                        XXH64_hash_t net_ns_inode_hash = XXH3_64bits(&net_ns_inode, sizeof(net_ns_inode));
+                        SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode_hash, (uint64_t *)net_ns_inode, true);
                         simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode, (uint64_t *)net_ns_inode);
                     }
                 }
@@ -690,7 +692,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                     freez(ps->cmdline);
 
                 ps->cmdline = cmdline_trimmed ? strdupz(cmdline_trimmed) : NULL;
-                simple_hashtable_set_slot_PID_SOCKET(&ls->pid_sockets_hashtable, sl, inode, ps);
+                simple_hashtable_set_slot_PID_SOCKET(&ls->pid_sockets_hashtable, sl, inode_hash, ps);
                 // fprintf(stderr, "%d: PID %d indexed for using socket inode %"PRIu64"\n", gettid_uncached(), pid, inode);
             }
         }
@@ -721,7 +723,8 @@ static inline void local_sockets_index_listening_port(LS_STATE *ls, LOCAL_SOCKET
 static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
     if(!tmp->inode) return false;
 
-    SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ls->sockets_hashtable, tmp->inode, &tmp->inode, true);
+    XXH64_hash_t inode_hash = XXH3_64bits(&tmp->inode, sizeof(tmp->inode));
+    SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ls->sockets_hashtable, inode_hash, &tmp->inode, true);
     LOCAL_SOCKET *n = SIMPLE_HASHTABLE_SLOT_DATA(sl);
     if(n) {
         local_sockets_log(ls, "inode %" PRIu64" already exists in hashtable - ignoring duplicate", tmp->inode);
@@ -745,7 +748,7 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
 
     // --- look up a pid for it -----------------------------------------------------------------------------------
 
-    SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl_pid = simple_hashtable_get_slot_PID_SOCKET(&ls->pid_sockets_hashtable, n->inode, &n->inode, false);
+    SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl_pid = simple_hashtable_get_slot_PID_SOCKET(&ls->pid_sockets_hashtable, inode_hash, &n->inode, false);
     struct pid_socket *ps = SIMPLE_HASHTABLE_SLOT_DATA(sl_pid);
     if(ps) {
         n->net_ns_inode = ps->net_ns_inode;
@@ -766,7 +769,7 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
 
     // --- index it -----------------------------------------------------------------------------------------------
 
-    simple_hashtable_set_slot_LOCAL_SOCKET(&ls->sockets_hashtable, sl, n->inode, n);
+    simple_hashtable_set_slot_LOCAL_SOCKET(&ls->sockets_hashtable, sl, inode_hash, n);
 
     if(!local_sockets_is_zero_address(&n->local)) {
         // put all the local IPs into the local_ips hashtable
