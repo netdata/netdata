@@ -576,7 +576,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     char buffer2[10 + 1];
     snprintfz(buffer2, 10, "%d", default_port);
 
-    char *ip = buffer, *port = buffer2, *interface = "", *portconfig;
+    char *ip = buffer, *port = buffer2, *iface = "", *portconfig;
 
     int protocol = IPPROTO_TCP, socktype = SOCK_STREAM;
     const char *protocol_str = "tcp";
@@ -631,7 +631,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     if(*e == '%') {
         *e = '\0';
         e++;
-        interface = e;
+        iface = e;
         while(*e && *e != ':' && *e != '=') e++;
     }
 
@@ -668,13 +668,13 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     }
 
     uint32_t scope_id = 0;
-    if(*interface) {
-        scope_id = if_nametoindex(interface);
+    if(*iface) {
+        scope_id = if_nametoindex(iface);
         if(!scope_id)
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "LISTENER: Cannot find a network interface named '%s'. "
                    "Continuing with limiting the network interface",
-                   interface);
+                   iface);
     }
 
     if(!*ip || *ip == '*' || !strcmp(ip, "any") || !strcmp(ip, "all"))
@@ -1035,7 +1035,7 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
     char default_service[10 + 1];
     snprintfz(default_service, 10, "%d", default_port);
 
-    char *host = buffer, *service = default_service, *interface = "";
+    char *host = buffer, *service = default_service, *iface = "";
     int protocol = IPPROTO_TCP, socktype = SOCK_STREAM;
     uint32_t scope_id = 0;
 
@@ -1074,7 +1074,7 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
     if(*e == '%') {
         *e = '\0';
         e++;
-        interface = e;
+        iface = e;
         while(*e && *e != ':') e++;
     }
 
@@ -1092,12 +1092,12 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         return -1;
     }
 
-    if(*interface) {
-        scope_id = if_nametoindex(interface);
+    if(*iface) {
+        scope_id = if_nametoindex(iface);
         if(!scope_id)
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "Cannot find a network interface named '%s'. Continuing with limiting the network interface",
-                   interface);
+                   iface);
     }
 
     if(!*service)

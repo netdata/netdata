@@ -27,7 +27,10 @@
 #include "system-maps/cached-gid-groupname.h"
 #include "system-maps/cache-host-users-and-groups.h"
 #include "windows-perflib/perflib.h"
-#include "windows-wmi/windows-wmi.h"
+
+// this includes windows.h to the whole of netdata
+// so various conflicts arise
+// #include "windows-wmi/windows-wmi.h"
 
 // =====================================================================================================================
 // common defs for Apple/FreeBSD/Linux
