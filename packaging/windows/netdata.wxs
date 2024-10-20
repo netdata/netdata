@@ -98,5 +98,11 @@
                             Wait="yes" />
         </Component>
     </Fragment>
+
+    <Fragment>
+        <UI Id="Netdata_Mondo">
+            <UIRef Id="WixUI_Mondo" />
+        </UI>
+    </Fragment>
 </Wix>
 
