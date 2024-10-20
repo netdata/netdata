@@ -397,7 +397,7 @@ int read_apps_groups_conf(const char *path, const char *file) {
                 managed_list_add(&tree.interpreters, s);
             }
 
-            // done with managers, proceed to next line
+            // done with managers, proceed to the next line
             continue;
         }
 

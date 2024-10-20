@@ -205,12 +205,12 @@ extern size_t pagesize;
 
 extern netdata_mutex_t apps_and_stdout_mutex;
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // string lengths
 
 #define MAX_CMDLINE 65536
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // to avoid reallocating too frequently when we add file descriptors,
 // we double the allocation at every increase request.
 
@@ -218,7 +218,7 @@ static inline uint32_t fds_new_size(uint32_t old_size, uint32_t new_fd) {
     return MAX(old_size * 2, new_fd + 1); // 1 space always
 }
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // some variables for keeping track of processes count by states
 #if (PROCESSES_HAVE_STATE == 1)
 typedef enum {
@@ -234,7 +234,7 @@ extern proc_state proc_state_count[PROC_STATUS_END];
 extern const char *proc_states[];
 #endif
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // the rates we are going to send to netdata will have this detail a value of:
 //  - 1 will send just integer parts to netdata
 //  - 100 will send 2 decimal points
@@ -257,7 +257,7 @@ struct openfds {
 #define pid_openfds_sum(p) ((p)->openfds.files + (p)->openfds.pipes + (p)->openfds.sockets + (p)->openfds.inotifies + (p)->openfds.eventfds + (p)->openfds.timerfds + (p)->openfds.signalfds + (p)->openfds.eventpolls + (p)->openfds.other)
 #endif
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // target
 //
 // target is the structure that processes are aggregated to be reported
@@ -405,7 +405,7 @@ struct target {
     struct target *next;
 };
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // internal flags
 // handled in code (automatically set)
 
@@ -421,7 +421,7 @@ typedef enum __attribute__((packed)) {
     PID_LOG_LIMITS_DETAIL   = (1 << 6),
 } PID_LOG;
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // pid_stat
 //
 // structure to store data for each process running
@@ -460,8 +460,8 @@ struct pid_fd {
 #endif
 };
 
-#define pid_stat_comm(p) (string2str(p->comm))
-#define pid_stat_cmdline(p) (string2str(p->cmdline))
+#define pid_stat_comm(p) (string2str((p)->comm))
+#define pid_stat_cmdline(p) (string2str((p)->cmdline))
 uint32_t all_files_len_get(void);
 
 struct pid_stat {
@@ -488,7 +488,7 @@ struct pid_stat {
 
     STRING *comm_orig;              // the command, as-collected
     STRING *comm;                   // the command, sanitized
-    STRING *name;                   // the command name if any, sanitized
+    STRING *name;                   // the command name, if any, sanitized
     STRING *cmdline;                // the full command line of the program
 
 #if defined(OS_WINDOWS)
@@ -521,8 +521,8 @@ struct pid_stat {
     uint32_t fds_size;              // the size of the fds array
 #endif
 
-    uint32_t children_count;        // number of processes directly referencing this
-                                    // it is absorbed by apps_groups.conf inheritance
+    uint32_t children_count;        // the number of processes directly referencing this.
+                                    // used internally for apps_groups.conf inheritance.
                                     // don't rely on it for anything else.
 
     uint32_t keeploops;             // increases by 1 every time keep is 1 and updated 0
@@ -566,32 +566,11 @@ struct pid_stat {
 #endif
 };
 
-// ----------------------------------------------------------------------------
-
-#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_GID == 1)
-struct user_or_group_id {
-    avl_t avl;
-
-    union {
-#if (PROCESSES_HAVE_UID == 1)
-        uid_t uid;
-#endif
-#if (PROCESSES_HAVE_GID == 1)
-        gid_t gid;
-#endif
-    } id;
-
-    char *name;
-
-    int updated;
-
-    struct user_or_group_id * next;
-};
-#endif
+// --------------------------------------------------------------------------------------------------------------------
 
 extern int update_every;
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // debugging
 
 static inline void debug_log_int(const char *fmt, ... ) {
@@ -618,14 +597,14 @@ static inline void debug_log_dummy(void) {}
 bool managed_log(struct pid_stat *p, PID_LOG log, bool status);
 void sanitize_apps_plugin_chart_meta(char *buf);
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // macro to calculate the incremental rate of a value
 // each parameter is accessed only ONCE - so it is safe to pass function calls
 // or other macros as parameters
 
 #define incremental_rate(rate_variable, last_kernel_variable, new_kernel_value, collected_usec, last_collected_usec, multiplier) do { \
         kernel_uint_t _new_tmp = new_kernel_value; \
-        (rate_variable) = (_new_tmp - (last_kernel_variable)) * (USEC_PER_SEC * multiplier) / ((collected_usec) - (last_collected_usec)); \
+        (rate_variable) = (_new_tmp - (last_kernel_variable)) * (USEC_PER_SEC * (multiplier)) / ((collected_usec) - (last_collected_usec)); \
         (last_kernel_variable) = _new_tmp; \
     } while(0)
 
