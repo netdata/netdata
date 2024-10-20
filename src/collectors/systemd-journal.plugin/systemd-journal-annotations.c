@@ -3,15 +3,6 @@
 #include "systemd-internals.h"
 
 // ----------------------------------------------------------------------------
-#include "libnetdata/maps/system-groups.h"
-
-static struct {
-    GROUPNAMES_CACHE *gc;
-} systemd_annotations_globals = {
-    .gc = NULL,
-};
-
-// ----------------------------------------------------------------------------
 
 const char *errno_map[] = {
         [1] = "1 (EPERM)",          // "Operation not permitted",
@@ -379,9 +370,9 @@ void netdata_systemd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         gid_t gid = str2i(buffer_tostring(wb));
-        STRING *g = system_groupnames_cache_lookup_gid(systemd_annotations_globals.gc, gid);
-        buffer_contents_replace(wb, string2str(g), string_strlen(g));
-        string_freez(g);
+        CACHED_GROUPNAME cg = cached_groupname_get_by_gid(gid);
+        buffer_contents_replace(wb, string2str(cg.groupname), string_strlen(cg.groupname));
+        cached_groupname_release(cg);
     }
 }
 
@@ -648,7 +639,7 @@ void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused,
 
 void netdata_systemd_journal_annotations_init(void) {
     system_usernames_cache_init();
-    systemd_annotations_globals.gc = system_groupnames_cache_init();
+    system_groupnames_cache_init();
     netdata_systemd_journal_message_ids_init();
 }
 

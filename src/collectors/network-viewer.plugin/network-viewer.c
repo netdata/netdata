@@ -23,8 +23,8 @@ static SPAWN_SERVER *spawn_srv = NULL;
         } aggregated_key;                       \
     } network_viewer;
 
-#include "libnetdata/maps/local-sockets.h"
-#include "libnetdata/maps/system-services.h"
+#include "libnetdata/local-sockets/local-sockets.h"
+#include "libnetdata/os/system-maps/system-services.h"
 
 #define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
 #define NETWORK_CONNECTIONS_VIEWER_HELP "Network connections explorer"

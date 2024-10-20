@@ -23,7 +23,8 @@
 #include "os-freebsd-wrappers.h"
 #include "os-macos-wrappers.h"
 #include "os-windows-wrappers.h"
-#include "users-and-groups/cached-uid-username.h"
+#include "system-maps/cached-uid-username.h"
+#include "system-maps/cached-gid-groupname.h"
 #include "windows-perflib/perflib.h"
 #include "windows-wmi/windows-wmi.h"
 

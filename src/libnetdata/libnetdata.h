@@ -432,47 +432,58 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
 extern const char *netdata_configured_host_prefix;
 
-#include "os/os.h"
-
 #define XXH_INLINE_ALL
 #include "xxhash.h"
 
-#include "uuid/uuid.h"
+// safe includes before O/S specific functions
 #include "template-enum.h"
-#include "http/http_access.h"
-#include "http/content_type.h"
-#include "config/dyncfg.h"
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
-#include "threads/threads.h"
+
+#include "string/string.h"
 #include "buffer/buffer.h"
-#include "ringbuffer/ringbuffer.h"
-#include "c_rhash/c_rhash.h"
-#include "locks/locks.h"
-#include "circular_buffer/circular_buffer.h"
-#include "avl/avl.h"
+
+#include "uuid/uuid.h"
+#include "http/content_type.h"
+#include "http/http_access.h"
+
 #include "inlined.h"
-#include "line_splitter/line_splitter.h"
-#include "clocks/clocks.h"
 #include "parsers/parsers.h"
+
+#include "threads/threads.h"
+#include "locks/locks.h"
+#include "completion/completion.h"
+#include "clocks/clocks.h"
+#include "simple_pattern/simple_pattern.h"
+#include "libnetdata/log/nd_log.h"
+
+#include "socket/security.h"    // must be before windows.h
+
+// this may include windows.h
+#include "os/os.h"
+
+#include "socket/socket.h"
+#include "avl/avl.h"
+
+#include "line_splitter/line_splitter.h"
+#include "c_rhash/c_rhash.h"
+#include "ringbuffer/ringbuffer.h"
+#include "circular_buffer/circular_buffer.h"
+#include "buffered_reader/buffered_reader.h"
 #include "datetime/iso8601.h"
 #include "datetime/rfc3339.h"
 #include "datetime/rfc7231.h"
-#include "completion/completion.h"
-#include "libnetdata/log/nd_log.h"
+#include "sanitizers/sanitizers.h"
+
+#include "config/dyncfg.h"
+#include "config/appconfig.h"
 #include "spawn_server/spawn_server.h"
 #include "spawn_server/spawn_popen.h"
-#include "simple_pattern/simple_pattern.h"
-#include "socket/security.h"
-#include "socket/socket.h"
-#include "config/appconfig.h"
-#include "log/systemd-journal-helpers.h"
-#include "buffered_reader/buffered_reader.h"
 #include "procfile/procfile.h"
-#include "string/string.h"
 #include "dictionary/dictionary.h"
 #include "dictionary/thread-cache.h"
-#include "sanitizers/sanitizers.h"
+
+#include "log/systemd-journal-helpers.h"
 
 #if defined(HAVE_LIBBPF) && !defined(__cplusplus)
 #include "ebpf/ebpf.h"
