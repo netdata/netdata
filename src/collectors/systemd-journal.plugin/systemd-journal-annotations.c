@@ -640,6 +640,8 @@ void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused,
 void netdata_systemd_journal_annotations_init(void) {
     cached_usernames_init();
     cached_groupnames_init();
+    update_cached_host_users();
+    update_cached_host_groups();
     netdata_systemd_journal_message_ids_init();
 }
 

@@ -974,6 +974,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 #endif
 
     cached_usernames_init();
+    update_cached_host_users();
     sc = system_servicenames_cache_init();
 
     // ----------------------------------------------------------------------------------------------------------------
