@@ -33,18 +33,6 @@ char *channel2utf8(const wchar_t *channel) {
     return buffer;
 }
 
-char *account2utf8(const wchar_t *user) {
-    static __thread char buffer[1024];
-    unicode2utf8(buffer, sizeof(buffer), user);
-    return buffer;
-}
-
-char *domain2utf8(const wchar_t *domain) {
-    static __thread char buffer[1024];
-    unicode2utf8(buffer, sizeof(buffer), domain);
-    return buffer;
-}
-
 char *query2utf8(const wchar_t *query) {
     static __thread char buffer[16384];
     unicode2utf8(buffer, sizeof(buffer), query);

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "windows-events-sid.h"
+#include "../../libnetdata.h"
+
+#if defined(OS_WINDOWS)
+#include "cached-sid-username.h"
+#include <windows.h>
 #include <sddl.h>
 
 typedef struct {
@@ -49,11 +53,25 @@ static inline bool sid_cache_compar(SID_KEY *a, SID_KEY *b) {
     return a->len == b->len && memcmp(&a->sid, &b->sid, a->len) == 0;
 }
 
-void sid_cache_init(void) {
+void cached_sid_username_init(void) {
     simple_hashtable_init_SID(&sid_globals.hashtable, 100);
 }
 
-static void lookup_user(SID_VALUE *sv) {
+static char *account2utf8(const wchar_t *user) {
+    static __thread char buffer[256];
+    if(utf16_to_utf8(buffer, sizeof(buffer), user, -1, NULL) == 0)
+        buffer[0] = '\0';
+    return buffer;
+}
+
+static char *domain2utf8(const wchar_t *domain) {
+    static __thread char buffer[256];
+    if(utf16_to_utf8(buffer, sizeof(buffer), domain, -1, NULL) == 0)
+        buffer[0] = '\0';
+    return buffer;
+}
+
+static void lookup_user_in_system(SID_VALUE *sv) {
     static __thread wchar_t account_unicode[256];
     static __thread wchar_t domain_unicode[256];
     static __thread char tmp[512 + 2];
@@ -112,7 +130,7 @@ static SID_VALUE *lookup_or_convert_user_id_to_name_lookup(PSID sid) {
     found = mallocz(tmp_size);
     memcpy(found, buf, tmp_size);
 
-    lookup_user(found);
+    lookup_user_in_system(found);
 
     // add it to the cache
     spinlock_lock(&sid_globals.spinlock);
@@ -122,7 +140,7 @@ static SID_VALUE *lookup_or_convert_user_id_to_name_lookup(PSID sid) {
     return found;
 }
 
-bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str) {
+bool cached_sid_to_account_domain_sidstr(PSID sid, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str) {
     SID_VALUE *found = lookup_or_convert_user_id_to_name_lookup(sid);
 
     if(found) {
@@ -159,7 +177,7 @@ bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst_account, TXT_UTF8 *dst
     return false;
 }
 
-bool buffer_sid_to_sid_str_and_name(PSID sid, BUFFER *dst, const char *prefix) {
+bool cached_sid_to_buffer_append(PSID sid, BUFFER *dst, const char *prefix) {
     SID_VALUE *found = lookup_or_convert_user_id_to_name_lookup(sid);
     size_t added = 0;
 
@@ -182,3 +200,5 @@ bool buffer_sid_to_sid_str_and_name(PSID sid, BUFFER *dst, const char *prefix) {
 
     return added > 0;
 }
+
+#endif

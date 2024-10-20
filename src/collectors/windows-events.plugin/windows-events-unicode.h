@@ -35,9 +35,6 @@ static inline void txt_utf8_set_hex_if_empty(TXT_UTF8 *dst, const char *prefix, 
 void unicode2utf8(char *dst, size_t dst_size, const wchar_t *src);
 void utf82unicode(wchar_t *dst, size_t dst_size, const char *src);
 
-char *account2utf8(const wchar_t *user);
-char *domain2utf8(const wchar_t *domain);
-
 char *channel2utf8(const wchar_t *channel);
 wchar_t *channel2unicode(const char *utf8str);
 

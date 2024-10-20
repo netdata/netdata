@@ -1468,8 +1468,8 @@ set(WINDOWS_EVENTS_PLUGIN_FILES
         src/collectors/windows-events.plugin/windows-events-query.c
         src/collectors/windows-events.plugin/windows-events-sources.c
         src/collectors/windows-events.plugin/windows-events-sources.h
-        src/collectors/windows-events.plugin/windows-events-sid.c
-        src/collectors/windows-events.plugin/windows-events-sid.h
+        src/libnetdata/os/system-maps/cached-sid-username.c
+        src/libnetdata/os/system-maps/cached-sid-username.h
         src/collectors/windows-events.plugin/windows-events-unicode.c
         src/collectors/windows-events.plugin/windows-events-unicode.h
         src/collectors/windows-events.plugin/windows-events-xml.c

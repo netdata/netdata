@@ -211,7 +211,7 @@ static inline bool wevt_field_get_string_utf8(EVT_VARIANT *ev, TXT_UTF8 *dst) {
     return wchar_to_txt_utf8(dst, ev->StringVal, -1);
 }
 
-bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str);
+bool cached_sid_to_account_domain_sidstr(PSID sid, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str);
 static inline bool wevt_field_get_sid(EVT_VARIANT *ev, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str) {
     if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull) {
         txt_utf8_empty(dst_account);
@@ -221,7 +221,7 @@ static inline bool wevt_field_get_sid(EVT_VARIANT *ev, TXT_UTF8 *dst_account, TX
     }
 
     fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeSid);
-    return wevt_convert_user_id_to_name(ev->SidVal, dst_account, dst_domain, dst_sid_str);
+    return cached_sid_to_account_domain_sidstr(ev->SidVal, dst_account, dst_domain, dst_sid_str);
 }
 
 static inline uint64_t wevt_field_get_filetime_to_ns(EVT_VARIANT *ev) {

@@ -3,6 +3,8 @@
 #ifndef NETDATA_STRING_UTF8_H
 #define NETDATA_STRING_UTF8_H 1
 
+#include "../libnetdata.h"
+
 #define IS_UTF8_BYTE(x) ((uint8_t)(x) & (uint8_t)0x80)
 #define IS_UTF8_STARTBYTE(x) (IS_UTF8_BYTE(x) && ((uint8_t)(x) & (uint8_t)0x40))
 
