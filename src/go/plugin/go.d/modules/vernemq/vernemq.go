@@ -5,6 +5,7 @@ package vernemq
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -36,8 +37,8 @@ func New() *VerneMQ {
 				},
 			},
 		},
-		charts: charts.Copy(),
-		cache:  make(map[string]bool),
+		charts:    &module.Charts{},
+		seenNodes: make(map[string]bool),
 	}
 }
 
@@ -46,18 +47,21 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type (
-	VerneMQ struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type VerneMQ struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *Charts
+	charts *module.Charts
 
-		prom prometheus.Prometheus
+	prom prometheus.Prometheus
 
-		cache map[string]bool
-	}
-)
+	namespace struct {
+		found bool
+		name  string
+	} // added in v2.0 (default is 'vernemq')
+
+	seenNodes map[string]bool
+}
 
 func (v *VerneMQ) Configuration() any {
 	return v.Config
@@ -65,14 +69,12 @@ func (v *VerneMQ) Configuration() any {
 
 func (v *VerneMQ) Init() error {
 	if err := v.validateConfig(); err != nil {
-		v.Errorf("error on validating config: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	prom, err := v.initPrometheusClient()
 	if err != nil {
-		v.Error(err)
-		return err
+		return fmt.Errorf("init prometheus client: %v", err)
 	}
 	v.prom = prom
 
@@ -82,16 +84,17 @@ func (v *VerneMQ) Init() error {
 func (v *VerneMQ) Check() error {
 	mx, err := v.collect()
 	if err != nil {
-		v.Error(err)
 		return err
 	}
+
 	if len(mx) == 0 {
 		return errors.New("no metrics collected")
 	}
+
 	return nil
 }
 
-func (v *VerneMQ) Charts() *Charts {
+func (v *VerneMQ) Charts() *module.Charts {
 	return v.charts
 }
 
@@ -104,6 +107,7 @@ func (v *VerneMQ) Collect() map[string]int64 {
 	if len(mx) == 0 {
 		return nil
 	}
+
 	return mx
 }
 
