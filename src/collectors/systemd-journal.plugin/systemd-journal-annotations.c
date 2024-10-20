@@ -3,14 +3,11 @@
 #include "systemd-internals.h"
 
 // ----------------------------------------------------------------------------
-#include "libnetdata/maps/system-users.h"
 #include "libnetdata/maps/system-groups.h"
 
 static struct {
-    USERNAMES_CACHE *uc;
     GROUPNAMES_CACHE *gc;
 } systemd_annotations_globals = {
-    .uc = NULL,
     .gc = NULL,
 };
 
@@ -369,9 +366,9 @@ void netdata_systemd_journal_transform_uid(FACETS *facets __maybe_unused, BUFFER
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         uid_t uid = str2i(buffer_tostring(wb));
-        STRING *u = system_usernames_cache_lookup_uid(systemd_annotations_globals.uc, uid);
-        buffer_contents_replace(wb, string2str(u), string_strlen(u));
-        string_freez(u);
+        CACHED_USERNAME cu = cached_username_get_by_uid(uid);
+        buffer_contents_replace(wb, string2str(cu.username), string_strlen(cu.username));
+        cached_username_release(cu);
     }
 }
 
@@ -650,7 +647,7 @@ void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused,
 // ----------------------------------------------------------------------------
 
 void netdata_systemd_journal_annotations_init(void) {
-    systemd_annotations_globals.uc = system_usernames_cache_init();
+    system_usernames_cache_init();
     systemd_annotations_globals.gc = system_groupnames_cache_init();
     netdata_systemd_journal_message_ids_init();
 }

@@ -768,6 +768,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/windows-perflib/perflib.h
         src/libnetdata/os/windows-perflib/perflib-names.c
         src/libnetdata/os/windows-perflib/perflib-dump.c
+        src/libnetdata/os/users-and-groups/cached-uid-username.c
+        src/libnetdata/os/users-and-groups/cached-uid-username.h
         src/libnetdata/spawn_server/spawn_server_nofork.c
         src/libnetdata/spawn_server/spawn_server.h
         src/libnetdata/spawn_server/spawn_popen.c
@@ -1332,7 +1334,6 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
         src/collectors/systemd-journal.plugin/systemd-journal-watcher.c
         src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
-        src/libnetdata/maps/system-users.h
         src/libnetdata/maps/system-groups.h
         src/libnetdata/maps/system-services.h
         src/collectors/systemd-journal.plugin/systemd-journal-sampling.h
@@ -2376,7 +2377,6 @@ endif()
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
         set(NETWORK_VIEWER_FILES
                 src/libnetdata/maps/local-sockets.h
-                src/libnetdata/maps/system-users.h
                 src/collectors/network-viewer.plugin/network-viewer.c
         )
 

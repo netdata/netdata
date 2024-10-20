@@ -7,8 +7,6 @@
 #define _COMMON_PLUGIN_MODULE_NAME "PerflibStorage"
 #include "../common-contexts/common-contexts.h"
 
-#include "libnetdata/os/windows-wmi/windows-wmi.h"
-
 struct logical_disk {
     usec_t last_collected;
     bool collected_metadata;
