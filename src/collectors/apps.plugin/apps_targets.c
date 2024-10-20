@@ -273,6 +273,33 @@ struct target *get_gid_target(gid_t gid) {
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------
+// SID
+
+#if (PROCESSES_HAVE_SID == 1)
+struct target *sids_root_target = NULL;
+
+struct target *get_sid_target(STRING *sid_name) {
+    struct target *w;
+    for(w = sids_root_target ; w ; w = w->next)
+        if(w->sid_name == sid_name) return w;
+
+    w = callocz(sizeof(struct target), 1);
+    w->type = TARGET_TYPE_SID;
+    w->sid_name = string_dup(sid_name);
+    w->id = string_dup(sid_name);
+    w->name = string_dup(sid_name);
+    w->clean_name = get_clean_name(w->name);
+
+    w->next = sids_root_target;
+    sids_root_target = w;
+
+    debug_log("added uid %s ('%s') target", string2str(w->sid_name), string2str(w->name));
+
+    return w;
+}
+#endif
+
+// --------------------------------------------------------------------------------------------------------------------
 // apps_groups.conf
 
 struct target *apps_groups_root_target = NULL;

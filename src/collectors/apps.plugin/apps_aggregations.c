@@ -169,6 +169,9 @@ void aggregate_processes_to_targets(void) {
 #if (PROCESSES_HAVE_GID == 1)
     zero_all_targets(groups_root_target);
 #endif
+#if (PROCESSES_HAVE_SID == 1)
+    zero_all_targets(sids_root_target);
+#endif
 
     // this has to be done, before the cleanup
     struct target *w = NULL, *o = NULL;
@@ -217,6 +220,19 @@ void aggregate_processes_to_targets(void) {
 
             w = p->gid_target = get_gid_target(p->gid);
         }
+
+        aggregate_pid_on_target(w, p, o);
+#endif
+
+        // --------------------------------------------------------------------
+        // sid target
+
+#if (PROCESSES_HAVE_SID == 1)
+        o = p->sid_target;
+        if(likely(p->sid_target && p->sid_target->sid_name == p->sid_name))
+            w = p->sid_target;
+        else
+            w = p->sid_target = get_sid_target(p->sid_name);
 
         aggregate_pid_on_target(w, p, o);
 #endif

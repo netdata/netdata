@@ -770,8 +770,12 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/windows-perflib/perflib-dump.c
         src/libnetdata/os/system-maps/cached-uid-username.c
         src/libnetdata/os/system-maps/cached-uid-username.h
+        src/libnetdata/os/system-maps/cached-sid-username.c
+        src/libnetdata/os/system-maps/cached-sid-username.h
         src/libnetdata/os/system-maps/cached-gid-groupname.c
         src/libnetdata/os/system-maps/cached-gid-groupname.h
+        src/libnetdata/os/system-maps/cache-host-users-and-groups.c
+        src/libnetdata/os/system-maps/cache-host-users-and-groups.h
         src/libnetdata/spawn_server/spawn_server_nofork.c
         src/libnetdata/spawn_server/spawn_server.h
         src/libnetdata/spawn_server/spawn_popen.c
@@ -849,8 +853,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/spawn_server/log-forwarder.h
         src/libnetdata/log/nd_log-common.h
         src/libnetdata/log/nd_log-to-windows-common.h
-        src/libnetdata/os/system-maps/cache-host-users-and-groups.c
-        src/libnetdata/os/system-maps/cache-host-users-and-groups.h
         src/libnetdata/common.h
 )
 
@@ -1469,8 +1471,6 @@ set(WINDOWS_EVENTS_PLUGIN_FILES
         src/collectors/windows-events.plugin/windows-events-query.c
         src/collectors/windows-events.plugin/windows-events-sources.c
         src/collectors/windows-events.plugin/windows-events-sources.h
-        src/libnetdata/os/system-maps/cached-sid-username.c
-        src/libnetdata/os/system-maps/cached-sid-username.h
         src/collectors/windows-events.plugin/windows-events-unicode.c
         src/collectors/windows-events.plugin/windows-events-unicode.h
         src/collectors/windows-events.plugin/windows-events-xml.c

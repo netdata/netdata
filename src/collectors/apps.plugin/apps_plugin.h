@@ -22,6 +22,7 @@
 #define PROCESSES_HAVE_IO_CALLS              0
 #define PROCESSES_HAVE_UID                   1
 #define PROCESSES_HAVE_GID                   1
+#define PROCESSES_HAVE_SID                   0
 #define PROCESSES_HAVE_MAJFLT                1
 #define PROCESSES_HAVE_CHILDREN_FLTS         1
 #define PROCESSES_HAVE_VMSWAP                0
@@ -65,6 +66,7 @@ struct pid_info {
 #define PROCESSES_HAVE_IO_CALLS              0
 #define PROCESSES_HAVE_UID                   1
 #define PROCESSES_HAVE_GID                   1
+#define PROCESSES_HAVE_SID                   0
 #define PROCESSES_HAVE_MAJFLT                1
 #define PROCESSES_HAVE_CHILDREN_FLTS         0
 #define PROCESSES_HAVE_VMSWAP                0
@@ -96,6 +98,7 @@ struct pid_info {
 #define PROCESSES_HAVE_IO_CALLS              1
 #define PROCESSES_HAVE_UID                   0
 #define PROCESSES_HAVE_GID                   0
+#define PROCESSES_HAVE_SID                   1
 #define PROCESSES_HAVE_MAJFLT                0
 #define PROCESSES_HAVE_CHILDREN_FLTS         0
 #define PROCESSES_HAVE_VMSWAP                1
@@ -125,6 +128,7 @@ struct pid_info {
 #define PROCESSES_HAVE_IO_CALLS              1
 #define PROCESSES_HAVE_UID                   1
 #define PROCESSES_HAVE_GID                   1
+#define PROCESSES_HAVE_SID                   0
 #define PROCESSES_HAVE_MAJFLT                1
 #define PROCESSES_HAVE_CHILDREN_FLTS         1
 #define PROCESSES_HAVE_VMSWAP                1
@@ -147,6 +151,10 @@ extern int max_fds_cache_seconds;
 
 #else
 #error "Unsupported operating system"
+#endif
+
+#if (PROCESSES_HAVE_UID == 1) && (PROCESSES_HAVE_SID == 1)
+#error "Do not enable SID and UID at the same time"
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -279,6 +287,9 @@ typedef enum __attribute__((packed)) {
 #if (PROCESSES_HAVE_GID == 1)
     TARGET_TYPE_GID,
 #endif
+#if (PROCESSES_HAVE_SID == 1)
+    TARGET_TYPE_SID,
+#endif
     TARGET_TYPE_TREE,
 } TARGET_TYPE;
 
@@ -384,6 +395,9 @@ struct target {
 #if (PROCESSES_HAVE_GID == 1)
     gid_t gid;
 #endif
+#if (PROCESSES_HAVE_SID == 1)
+    STRING *sid_name;
+#endif
 
     kernel_uint_t values[PDF_MAX];
 
@@ -485,6 +499,9 @@ struct pid_stat {
 #if (PROCESSES_HAVE_GID == 1)
     struct target *gid_target;      // gid based targets
 #endif
+#if (PROCESSES_HAVE_SID == 1)
+    struct target *sid_target;      // sid based targets
+#endif
 
     STRING *comm_orig;              // the command, as-collected
     STRING *comm;                   // the command, sanitized
@@ -504,6 +521,9 @@ struct pid_stat {
 #endif
 #if (PROCESSES_HAVE_GID == 1)
     gid_t gid;
+#endif
+#if (PROCESSES_HAVE_SID == 1)
+    STRING *sid_name;
 #endif
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
@@ -683,6 +703,11 @@ struct target *get_uid_target(uid_t uid);
 #if (PROCESSES_HAVE_GID == 1)
 extern struct target *groups_root_target;
 struct target *get_gid_target(gid_t gid);
+#endif
+
+#if (PROCESSES_HAVE_SID == 1)
+extern struct target *sids_root_target;
+struct target *get_sid_target(STRING *sid_name);
 #endif
 
 extern struct target *apps_groups_root_target;

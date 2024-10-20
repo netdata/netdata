@@ -189,4 +189,13 @@ bool cached_sid_to_buffer_append(PSID sid, BUFFER *dst, const char *prefix) {
     return added > 0;
 }
 
+STRING *cached_sid_fullname_or_sid_str(PSID sid) {
+    SID_VALUE *found = lookup_or_convert_user_id_to_name_lookup(sid);
+    if(found) {
+        if(found->full) return string_dup(found->full);
+        return string_dup(found->sid_str);
+    }
+    return NULL;
+}
+
 #endif

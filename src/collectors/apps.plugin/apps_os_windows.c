@@ -664,6 +664,45 @@ static WCHAR *executable_path_from_cmdline(WCHAR *cmdline) {
     return NULL;
 }
 
+static BOOL GetProcessUserSID(HANDLE hProcess, PSID *ppSid) {
+    HANDLE hToken;
+    BOOL result = FALSE;
+    DWORD dwSize = 0;
+    PTOKEN_USER pTokenUser = NULL;
+
+    if (!OpenProcessToken(hProcess, TOKEN_QUERY, &hToken))
+        return FALSE;
+
+    GetTokenInformation(hToken, TokenUser, NULL, 0, &dwSize);
+    if (dwSize == 0) {
+        CloseHandle(hToken);
+        return FALSE;
+    }
+
+    pTokenUser = (PTOKEN_USER)LocalAlloc(LPTR, dwSize);
+    if (pTokenUser == NULL) {
+        CloseHandle(hToken);
+        return FALSE;
+    }
+
+    if (GetTokenInformation(hToken, TokenUser, pTokenUser, dwSize, &dwSize)) {
+        DWORD sidSize = GetLengthSid(pTokenUser->User.Sid);
+        *ppSid = (PSID)LocalAlloc(LPTR, sidSize);
+        if (*ppSid) {
+            if (CopySid(sidSize, *ppSid, pTokenUser->User.Sid)) {
+                result = TRUE;
+            } else {
+                LocalFree(*ppSid);
+                *ppSid = NULL;
+            }
+        }
+    }
+
+    LocalFree(pTokenUser);
+    CloseHandle(hToken);
+    return result;
+}
+
 void GetAllProcessesInfo(void) {
     static __thread wchar_t unicode[PATH_MAX];
     static __thread DWORD unicode_size = sizeof(unicode) / sizeof(*unicode);
@@ -721,6 +760,14 @@ void GetAllProcessesInfo(void) {
                 if(!p->name)
                     p->name = GetProcessFriendlyNameFromPathSanitized(unicode);
             }
+        }
+
+        if(!p->sid_name) {
+            PSID pSid = NULL;
+            if (GetProcessUserSID(hProcess, &pSid))
+                p->sid_name = cached_sid_fullname_or_sid_str(pSid);
+            else
+                p->sid_name = string_strdupz("Unknown");
         }
 
         CloseHandle(hProcess);

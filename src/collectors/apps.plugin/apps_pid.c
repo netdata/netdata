@@ -134,6 +134,10 @@ void del_pid_entry(pid_t pid) {
     freez(p->fds);
 #endif
 
+#if (PROCESSES_HAVE_SID == 1)
+    string_freez(p->sid_name);
+#endif
+
     string_freez(p->comm_orig);
     string_freez(p->comm);
     string_freez(p->cmdline);
