@@ -187,6 +187,8 @@ void aggregate_processes_to_targets(void) {
         // user target
 
 #if (PROCESSES_HAVE_UID == 1)
+        update_cached_host_users();
+
         o = p->uid_target;
         if(likely(p->uid_target && p->uid_target->uid == p->uid))
             w = p->uid_target;
@@ -204,6 +206,8 @@ void aggregate_processes_to_targets(void) {
         // user group target
 
 #if (PROCESSES_HAVE_GID == 1)
+        update_cached_host_users();
+
         o = p->gid_target;
         if(likely(p->gid_target && p->gid_target->gid == p->gid))
             w = p->gid_target;

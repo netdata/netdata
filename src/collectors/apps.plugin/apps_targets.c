@@ -228,24 +228,10 @@ struct target *get_uid_target(uid_t uid) {
     w->uid = uid;
     w->id = get_numeric_string(uid);
 
-    struct user_or_group_id user_id_to_find = {
-        .id = {
-            .uid = uid,
-        }
-    };
-    struct user_or_group_id *user_or_group_id = user_id_find(&user_id_to_find);
-
-    if(user_or_group_id && user_or_group_id->name && *user_or_group_id->name)
-        w->name = string_strdupz(user_or_group_id->name);
-    else {
-        struct passwd *pw = getpwuid(uid);
-        if(!pw || !pw->pw_name || !*pw->pw_name)
-            w->name = get_numeric_string(uid);
-        else
-            w->name = string_strdupz(pw->pw_name);
-    }
-
+    CACHED_USERNAME cu = cached_username_get_by_uid(uid);
+    w->name = string_dup(cu.username);
     w->clean_name = get_clean_name(w->name);
+    cached_username_release(cu);
 
     w->next = users_root_target;
     users_root_target = w;
@@ -272,24 +258,10 @@ struct target *get_gid_target(gid_t gid) {
     w->gid = gid;
     w->id = get_numeric_string(gid);
 
-    struct user_or_group_id group_id_to_find = {
-        .id = {
-            .gid = gid,
-        }
-    };
-    struct user_or_group_id *group_id = group_id_find(&group_id_to_find);
-
-    if(group_id && group_id->name)
-        w->name = string_strdupz(group_id->name);
-    else {
-        struct group *gr = getgrgid(gid);
-        if(!gr || !gr->gr_name || !*gr->gr_name)
-            w->name = get_numeric_string(gid);
-        else
-            w->name = string_strdupz(gr->gr_name);
-    }
-
+    CACHED_GROUPNAME cg = cached_groupname_get_by_gid(gid);
+    w->name = string_dup(cg.groupname);
     w->clean_name = get_clean_name(w->name);
+    cached_groupname_release(cg);
 
     w->next = groups_root_target;
     groups_root_target = w;

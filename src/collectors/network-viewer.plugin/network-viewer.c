@@ -973,7 +973,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     }
 #endif
 
-    system_usernames_cache_init();
+    cached_usernames_init();
     sc = system_servicenames_cache_init();
 
     // ----------------------------------------------------------------------------------------------------------------

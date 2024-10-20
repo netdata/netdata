@@ -849,6 +849,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/spawn_server/log-forwarder.h
         src/libnetdata/log/nd_log-common.h
         src/libnetdata/log/nd_log-to-windows-common.h
+        src/libnetdata/os/system-maps/cache-host-users-and-groups.c
+        src/libnetdata/os/system-maps/cache-host-users-and-groups.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -2022,7 +2024,6 @@ if(ENABLE_PLUGIN_APPS)
             src/collectors/apps.plugin/apps_plugin.h
             src/collectors/apps.plugin/apps_functions.c
             src/collectors/apps.plugin/apps_targets.c
-            src/collectors/apps.plugin/apps_users_and_groups.c
             src/collectors/apps.plugin/apps_output.c
             src/collectors/apps.plugin/apps_pid_files.c
             src/collectors/apps.plugin/apps_pid.c

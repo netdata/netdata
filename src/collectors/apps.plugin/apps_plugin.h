@@ -637,7 +637,6 @@ void sanitize_apps_plugin_chart_meta(char *buf);
     incremental_rate(p->values[idx], p->raw[idx], value, p->type##_collected_usec, p->last_##type##_collected_usec, CPU_TO_NANOSECONDCORES)
 
 void apps_managers_and_aggregators_init(void);
-void apps_users_and_groups_init(void);
 void apps_pids_init(void);
 
 #if (PROCESSES_HAVE_CMDLINE == 1)
@@ -700,13 +699,11 @@ void aggregate_processes_to_targets(void);
 #if (PROCESSES_HAVE_UID == 1)
 extern struct target *users_root_target;
 struct target *get_uid_target(uid_t uid);
-struct user_or_group_id *user_id_find(struct user_or_group_id *user_id_to_find);
 #endif
 
 #if (PROCESSES_HAVE_GID == 1)
 extern struct target *groups_root_target;
 struct target *get_gid_target(gid_t gid);
-struct user_or_group_id *group_id_find(struct user_or_group_id *group_id_to_find);
 #endif
 
 extern struct target *apps_groups_root_target;

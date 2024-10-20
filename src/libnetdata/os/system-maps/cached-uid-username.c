@@ -14,6 +14,7 @@
 #include "libnetdata/simple_hashtable.h"
 
 static struct {
+    uint32_t version;
     bool initialized;
     SPINLOCK spinlock;
     SIMPLE_HASHTABLE_USERNAMES_CACHE ht;
@@ -30,7 +31,7 @@ static bool compar_uid_ptr(uid_t *a, uid_t *b) {
     return *a == *b;
 }
 
-void cached_username_populate_by_uid(uid_t uid, const char *username, bool overwrite) {
+void cached_username_populate_by_uid(uid_t uid, const char *username, uint32_t version) {
     internal_fatal(!uc.initialized, "system-users cache needs to be initialized");
     if(!username || !*username) return;
 
@@ -39,7 +40,7 @@ void cached_username_populate_by_uid(uid_t uid, const char *username, bool overw
     XXH64_hash_t hash = XXH3_64bits(&uid, sizeof(uid));
     SIMPLE_HASHTABLE_SLOT_USERNAMES_CACHE *sl = simple_hashtable_get_slot_USERNAMES_CACHE(&uc.ht, hash, &uid, true);
     CACHED_USERNAME *cu = SIMPLE_HASHTABLE_SLOT_DATA(sl);
-    if(!cu || (overwrite && string_strcmp(cu->username, username) != 0)) {
+    if(!cu || (cu->version && version > cu->version)) {
         internal_fatal(cu && cu->uid != uid, "invalid uid matched from cache");
 
         if(cu)
@@ -47,6 +48,7 @@ void cached_username_populate_by_uid(uid_t uid, const char *username, bool overw
         else
             cu = callocz(1, sizeof(*cu));
 
+        cu->version = version;
         cu->uid = uid;
         cu->username = string_strdupz(username);
         simple_hashtable_set_slot_USERNAMES_CACHE(&uc.ht, sl, hash, cu);
@@ -70,8 +72,8 @@ CACHED_USERNAME cached_username_get_by_uid(uid_t uid) {
         struct passwd pw, *result = NULL;
 
         if (getpwuid_r(uid, &pw, tmp, sizeof(tmp), &result) != 0 || !result || !pw.pw_name || !(*pw.pw_name)) {
-            char name[50];
-            snprintfz(name, sizeof(name), "%u", uid);
+            char name[UINT64_MAX_LENGTH];
+            print_uint64(name, uid);
             cu->username = string_strdupz(name);
         }
         else
@@ -84,6 +86,7 @@ CACHED_USERNAME cached_username_get_by_uid(uid_t uid) {
     internal_fatal(cu->uid != uid, "invalid uid matched from cache");
 
     CACHED_USERNAME rc = {
+        .version = cu->version,
         .uid = cu->uid,
         .username = string_dup(cu->username),
     };
@@ -96,7 +99,7 @@ void cached_username_release(CACHED_USERNAME cu) {
     string_freez(cu.username);
 }
 
-void system_usernames_cache_init(void) {
+void cached_usernames_init(void) {
     if(uc.initialized) return;
     uc.initialized = true;
 
@@ -104,7 +107,7 @@ void system_usernames_cache_init(void) {
     simple_hashtable_init_USERNAMES_CACHE(&uc.ht, 100);
 }
 
-void system_usernames_cache_destroy(void) {
+void cached_usernames_destroy(void) {
     if(!uc.initialized) return;
 
     spinlock_lock(&uc.spinlock);
@@ -117,6 +120,26 @@ void system_usernames_cache_destroy(void) {
             string_freez(u->username);
             freez(u);
             // simple_hashtable_del_slot_USERNAMES_CACHE(&uc.ht, sl);
+        }
+    }
+
+    simple_hashtable_destroy_USERNAMES_CACHE(&uc.ht);
+    uc.initialized = false;
+}
+
+void cached_usernames_delete_old_versions(uint32_t version) {
+    if(!uc.initialized) return;
+
+    spinlock_lock(&uc.spinlock);
+
+    for(SIMPLE_HASHTABLE_SLOT_USERNAMES_CACHE *sl = simple_hashtable_first_read_only_USERNAMES_CACHE(&uc.ht);
+         sl;
+         sl = simple_hashtable_next_read_only_USERNAMES_CACHE(&uc.ht, sl)) {
+        CACHED_USERNAME *cu = SIMPLE_HASHTABLE_SLOT_DATA(sl);
+        if(cu && cu->version && cu->version < version) {
+            string_freez(cu->username);
+            freez(cu);
+            simple_hashtable_del_slot_USERNAMES_CACHE(&uc.ht, sl);
         }
     }
 

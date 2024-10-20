@@ -25,6 +25,7 @@
 #include "os-windows-wrappers.h"
 #include "system-maps/cached-uid-username.h"
 #include "system-maps/cached-gid-groupname.h"
+#include "system-maps/cache-host-users-and-groups.h"
 #include "windows-perflib/perflib.h"
 #include "windows-wmi/windows-wmi.h"
 

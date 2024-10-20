@@ -734,7 +734,14 @@ int main(int argc, char **argv) {
 
     netdata_log_info("started on pid %d", getpid());
 
-    apps_users_and_groups_init();
+#if (PROCESSES_HAVE_UID == 1)
+    cached_usernames_init();
+#endif
+
+#if (PROCESSES_HAVE_GID == 1)
+    cached_groupnames_init();
+#endif
+
     apps_pids_init();
     OS_FUNCTION(apps_os_init)();
 
