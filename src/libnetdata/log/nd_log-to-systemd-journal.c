@@ -74,7 +74,7 @@ bool nd_log_journal_direct_init(const char *path) {
     return true;
 }
 
-#define SYSTEMD_JOURNAL_SOCKET_PREFIX "/run/system/journal"
+#define SYSTEMD_JOURNAL_SOCKET_PREFIX "/run/systemd/journal"
 static bool is_journal_socket(int fd) {
     struct sockaddr_un addr;
     socklen_t len = sizeof(addr);
