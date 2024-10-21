@@ -130,6 +130,7 @@ typedef enum __attribute__((packed)) {
 #define STATUS_REPORT_MAGIC 0xBADA55EE
 
 struct status_report {
+    uint8_t pad0[100];
     uint32_t magic;
     STATUS_REPORT status;
     union {
@@ -145,6 +146,7 @@ struct status_report {
             int waitpid_status;
         } exited;
     };
+    uint8_t pad1[100];
 };
 
 static void spawn_server_send_status_ping(int sock) {
@@ -1125,6 +1127,21 @@ void spawn_server_exec_destroy(SPAWN_INSTANCE *instance) {
     freez(instance);
 }
 
+static void log_invalid_magic(SPAWN_INSTANCE *instance, struct status_report *sr) {
+    unsigned char buf[sizeof(*sr) + 1];
+    memcpy(buf, sr, sizeof(*sr));
+    buf[sizeof(buf) - 1] = '\0';
+
+    for(size_t i = 0; i < sizeof(buf) - 1; i++) {
+        if (iscntrl(buf[i]) || !isprint(buf[i]))
+            buf[i] = '_';
+    }
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "SPAWN PARENT: invalid final status report for child %d, request %zu (invalid magic %#x in response, reads like '%s')",
+           instance->child_pid, instance->request_id, sr->magic, buf);
+}
+
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
     int rc = -1;
 
@@ -1139,24 +1156,24 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
             "SPAWN PARENT: failed to read final status report for child %d, request %zu",
             instance->child_pid, instance->request_id);
 
-    else if(sr.magic != STATUS_REPORT_MAGIC) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN PARENT: invalid final status report for child %d, request %zu (invalid magic %#x in response)",
-            instance->child_pid, instance->request_id, sr.magic);
-    }
-    else switch(sr.status) {
-        case STATUS_REPORT_EXITED:
-            rc = sr.exited.waitpid_status;
-            break;
+    else if(sr.magic != STATUS_REPORT_MAGIC)
+        log_invalid_magic(instance, &sr);
+    else {
+        switch (sr.status) {
+            case STATUS_REPORT_EXITED:
+                rc = sr.exited.waitpid_status;
+                break;
 
-        case STATUS_REPORT_STARTED:
-        case STATUS_REPORT_FAILED:
-        default:
-            errno = 0;
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                "SPAWN PARENT: invalid status report to exec spawn request %zu for pid %d (status = %u)",
-                instance->request_id, instance->child_pid, sr.status);
-            break;
+            case STATUS_REPORT_STARTED:
+            case STATUS_REPORT_FAILED:
+            default:
+                errno = 0;
+                nd_log(
+                    NDLS_COLLECTORS, NDLP_ERR,
+                    "SPAWN PARENT: invalid status report to exec spawn request %zu for pid %d (status = %u)",
+                    instance->request_id, instance->child_pid, sr.status);
+                break;
+        }
     }
 
     instance->child_pid = 0;
