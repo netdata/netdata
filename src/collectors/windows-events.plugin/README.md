@@ -31,7 +31,7 @@ For more information check [this discussion](https://github.com/netdata/netdata/
 
 The plugin automatically detects all the available channels and offers a list of "Event Channels".
 
-By default, it aggregates events from all event channels, providing a unified systems view of all events.
+By default, it aggregates events from all event channels, providing a unified view of all events.
 
 > To improve query performance, we recommend selecting the relevant event channels, before doing more
 > analysis on the events.
