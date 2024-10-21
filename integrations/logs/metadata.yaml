@@ -35,7 +35,7 @@
   setup:
     prerequisites:
       description: |
-        - A Netdata Cloud account
+        - Netdata Cloud paid subscription
 - id: "windows-event-logs"
   meta:
     name: "Windows Event Logs"
@@ -72,4 +72,4 @@
   setup:
     prerequisites:
       description: |
-        - A Netdata Cloud account
+        - Netdata Cloud paid subscription
