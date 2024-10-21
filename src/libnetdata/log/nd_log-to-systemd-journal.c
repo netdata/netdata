@@ -74,15 +74,7 @@ bool nd_log_journal_direct_init(const char *path) {
     return true;
 }
 
-#define SYSTEMD_JOURNAL_SOCKET_PREFIX "/run/systemd/journal"
-static bool is_journal_socket(int fd) {
-    struct sockaddr_un addr;
-    socklen_t len = sizeof(addr);
-    if (getsockname(fd, (struct sockaddr*)&addr, &len) == 0)
-        return strncmp(addr.sun_path, SYSTEMD_JOURNAL_SOCKET_PREFIX, sizeof(SYSTEMD_JOURNAL_SOCKET_PREFIX) - 1) == 0;
-
-    return false;
-}
+static bool sockets_before[1024];
 
 bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_t fields_max __maybe_unused) {
 #ifdef HAVE_SYSTEMD
@@ -164,15 +156,22 @@ bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_
         }
     }
 
+    bool detect_systemd_socket = __atomic_load_n(&nd_log.journal.first_msg, __ATOMIC_RELAXED) == false;
+    if(detect_systemd_socket) {
+        for(int i = 3 ; (size_t)i < _countof(sockets_before); i++)
+            sockets_before[i] = fd_is_socket(i);
+    }
+
     int r = sd_journal_sendv(iov, iov_count);
 
     // this is the first successful libsystemd log
     // let's detect its fd number (we need it for the spawn server)
-    if(r == 0 && __atomic_load_n(&nd_log.journal.first_msg, __ATOMIC_RELAXED) == false) {
+    if(r == 0 && detect_systemd_socket) {
         __atomic_store_n(&nd_log.journal.first_msg, true, __ATOMIC_RELAXED);
-        for (int fd = 3; fd < 2048; fd++) {
-            if (is_journal_socket(fd)) {
-                nd_log.journal.fd = fd;
+
+        for(int i = 3 ; (size_t)i < _countof(sockets_before); i++) {
+            if (!sockets_before[i] && fd_is_socket(i)) {
+                nd_log.journal.fd = i;
                 break;
             }
         }
