@@ -11,6 +11,21 @@
 
 static long chart_priority = NETDATA_CHART_PRIO_WINDOWS_HYPERV;
 
+static void get_and_sanitize_instance_value(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    char *buffer,
+    size_t buffer_size)
+{
+    // char wstr[8192];
+    if (!getInstanceName(pDataBlock, pObjectType, pi, buffer, sizeof(buffer_size))) {
+        strncpyz(buffer, "[unknown]", buffer_size - 1);
+        // return;
+    }
+    // rrdlabels_sanitize_value(buffer, wstr, buffer_size);
+}
+
 #define DICT_PERF_OPTION (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE)
 
 #define DEFINE_RD(counter_name) RRDDIM *rd_##counter_name
@@ -175,9 +190,9 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 p->rd_GuestVisiblePhysicalMemory = rrddim_add(p->st_vm_memory_physical_guest_visible, "visible_memory", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
                 p->rd_GuestAvailableMemory = rrddim_add(p->st_vm_memory_physical_guest_visible, "available_memory", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
 
-                rrdlabels_add(p->st_vm_memory_physical->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-                rrdlabels_add(p->st_pressure->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-                rrdlabels_add(p->st_vm_memory_physical_guest_visible->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(p->st_vm_memory_physical->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(p->st_pressure->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(p->st_vm_memory_physical_guest_visible->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
         }
 
@@ -216,6 +231,9 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
             p->collected_metadata = true;
         }
 
+        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;
+
         GET_INSTANCE_COUNTER(RemotePhysicalPages);
         GET_INSTANCE_COUNTER(PhysicalPagesAllocated);
 
@@ -253,8 +271,8 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
             p->rd_PhysicalPagesAllocated = rrddim_add(p->st_vm_vid_physical_pages_allocated, "allocated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             p->rd_RemotePhysicalPages = rrddim_add(p->st_vm_vid_remote_physical_pages, "remote_physical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-            rrdlabels_add(p->st_vm_vid_physical_pages_allocated->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(p->st_vm_vid_remote_physical_pages->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_vm_vid_physical_pages_allocated->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_vm_vid_remote_physical_pages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         SETP_DIM_VALUE(st_vm_vid_remote_physical_pages, RemotePhysicalPages);
@@ -318,7 +336,7 @@ static bool do_hyperv_health_summary(PERF_DATA_BLOCK *pDataBlock, int update_eve
         p->rd_HealthCritical = rrddim_add(p->st_health, "critical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         p->rd_HealthOk = rrddim_add(p->st_health, "ok", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-        rrdlabels_add(p->st_health->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(p->st_health->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
     }
 
     SETP_DIM_VALUE(st_health, HealthCritical);
@@ -479,7 +497,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
             p->rd_DeviceSpacePages4K = rrddim_add(p->st_device_space_pages, "4K", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             p->rd_DeviceSpacePages2M = rrddim_add(p->st_device_space_pages, "2M", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             p->rd_DeviceSpacePages1G = rrddim_add(p->st_device_space_pages, "1G", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_device_space_pages->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_device_space_pages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_gpa_space_pages = rrdset_create_localhost(
                 "root_partition_gpa_space_pages",
@@ -498,7 +516,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
             p->rd_GPASpacePages4K = rrddim_add(p->st_gpa_space_pages, "4K", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             p->rd_GPASpacePages2M = rrddim_add(p->st_gpa_space_pages, "2M", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             p->rd_GPASpacePages1G = rrddim_add(p->st_gpa_space_pages, "1G", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_gpa_space_pages->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_gpa_space_pages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_gpa_space_modifications = rrdset_create_localhost(
                 "root_partition_gpa_space_modifications",
@@ -516,7 +534,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->rd_GPASpaceModifications =
                 rrddim_add(p->st_gpa_space_modifications, "gpa", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_gpa_space_modifications->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_gpa_space_modifications->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_attached_devices = rrdset_create_localhost(
                 "root_partition_attached_devices",
@@ -533,7 +551,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 RRDSET_TYPE_LINE);
 
             p->rd_AttachedDevices = rrddim_add(p->st_attached_devices, "attached", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_attached_devices->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_attached_devices->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_deposited_pages = rrdset_create_localhost(
                 "root_partition_deposited_pages",
@@ -550,7 +568,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 RRDSET_TYPE_LINE);
 
             p->rd_DepositedPages = rrddim_add(p->st_deposited_pages, "gpa", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_deposited_pages->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_deposited_pages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_DeviceDMAErrors = rrdset_create_localhost(
                 "root_partition_device_dma_errors",
@@ -568,7 +586,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->rd_DeviceDMAErrors =
                 rrddim_add(p->st_DeviceDMAErrors, "illegal_dma", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_DeviceDMAErrors->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_DeviceDMAErrors->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_DeviceInterruptErrors = rrdset_create_localhost(
                 "root_partition_device_interrupt_errors",
@@ -586,7 +604,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->rd_DeviceInterruptErrors =
                 rrddim_add(p->st_DeviceInterruptErrors, "illegal_interrupt", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_DeviceInterruptErrors->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_DeviceInterruptErrors->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_DeviceInterruptThrottleEvents = rrdset_create_localhost(
                 "root_partition_device_interrupt_throttle_events",
@@ -605,7 +623,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
             p->rd_DeviceInterruptThrottleEvents =
                 rrddim_add(p->st_DeviceInterruptThrottleEvents, "throttling", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrdlabels_add(
-                p->st_DeviceInterruptThrottleEvents->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                p->st_DeviceInterruptThrottleEvents->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_IOΤLBFlushesSec = rrdset_create_localhost(
                 "root_partition_io_tlb_flush",
@@ -622,7 +640,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 RRDSET_TYPE_LINE);
 
             p->rd_IOΤLBFlushesSec = rrddim_add(p->st_IOΤLBFlushesSec, "gpa", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_IOΤLBFlushesSec->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_IOΤLBFlushesSec->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_AddressSpaces = rrdset_create_localhost(
                 "root_partition_address_space",
@@ -639,7 +657,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 RRDSET_TYPE_LINE);
 
             p->rd_AddressSpaces = rrddim_add(p->st_AddressSpaces, "address_spaces", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_AddressSpaces->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_AddressSpaces->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_VirtualTLBPages = rrdset_create_localhost(
                 "root_partition_virtual_tlb_pages",
@@ -656,7 +674,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 RRDSET_TYPE_LINE);
 
             p->rd_VirtualTLBPages = rrddim_add(p->st_VirtualTLBPages, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_VirtualTLBPages->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_VirtualTLBPages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_VirtualTLBFlushEntiresSec = rrdset_create_localhost(
                 "root_partition_virtual_tlb_flush_entries",
@@ -674,7 +692,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->rd_VirtualTLBFlushEntiresSec =
                 rrddim_add(p->st_VirtualTLBFlushEntiresSec, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_VirtualTLBFlushEntiresSec->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_VirtualTLBFlushEntiresSec->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         // Set the data for each dimension
@@ -798,11 +816,11 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
             p->charts_created =  true;
             if (!p->st_operations) {
                 p->st_operations = rrdset_create_localhost(
-                    "vm_device_operations",
+                    "vm_storage_device_operations",
                     windows_shared_buffer,
                     NULL,
                     HYPERV,
-                    HYPERV".vm_device_operations",
+                    HYPERV".vm_storage_device_operations",
                     "VM storage device IOPS",
                     "operations/sec",
                     _COMMON_PLUGIN_NAME,
@@ -814,16 +832,16 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 p->rd_ReadOperationsSec = rrddim_add(p->st_operations, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 p->rd_WriteOperationsSec = rrddim_add(p->st_operations, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                rrdlabels_add(p->st_operations->rrdlabels, "vm_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(p->st_operations->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
 
             if (!p->st_bytes) {
                 p->st_bytes = rrdset_create_localhost(
-                    "vm_device_bytes",
+                    "vm_storage_device_bytes",
                     windows_shared_buffer,
                     NULL,
                     HYPERV,
-                    HYPERV".vm_device_bytes",
+                    HYPERV".vm_storage_device_bytes",
                     "VM storage device IO",
                     "bytes/sec",
                     _COMMON_PLUGIN_NAME,
@@ -835,16 +853,16 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 p->rd_ReadBytesSec = rrddim_add(p->st_bytes, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 p->rd_WriteBytesSec = rrddim_add(p->st_bytes, "write", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                rrdlabels_add(p->st_bytes->rrdlabels, "vm_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(p->st_bytes->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
 
             if (!p->st_errors) {
                 p->st_errors = rrdset_create_localhost(
-                    "vm_device_errors",
+                    "vm_storage_device_errors",
                     windows_shared_buffer,
                     NULL,
                     HYPERV,
-                    HYPERV".vm_device_errors",
+                    HYPERV".vm_storage_device_errors",
                     "VM storage device errors",
                     "errors/sec",
                     _COMMON_PLUGIN_NAME,
@@ -855,7 +873,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
                 p->rd_ErrorCount = rrddim_add(p->st_errors, "errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                rrdlabels_add(p->st_errors->rrdlabels, "vm_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(p->st_errors->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
         }
 
@@ -1318,11 +1336,11 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
         if (!p->charts_created) {
             p->charts_created = true;
             p->st_packets = rrdset_create_localhost(
-                "vm_interface_packets_dropped",
+                "vm_net_interface_packets_dropped",
                 windows_shared_buffer,
                 NULL,
                 HYPERV,
-                HYPERV".vm_interface_packets_dropped",
+                HYPERV".vm_net_interface_packets_dropped",
                 "VM interface packets dropped",
                 "drops/sec",
                 _COMMON_PLUGIN_NAME,
@@ -1334,7 +1352,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
             p->rd_DroppedPacketsIncomingSec = rrddim_add(p->st_packets, "incoming", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             p->rd_DroppedPacketsOutgoingSec = rrddim_add(p->st_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            rrdlabels_add(p->st_packets->rrdlabels, "vm_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_packets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         SETP_DIM_VALUE(st_packets, DroppedPacketsIncomingSec);
@@ -1428,7 +1446,7 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
             p->rd_RemoteRunTime =
                 rrddim_add(p->st_HypervisorProcessor, "remote", NULL, -1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
 
-            rrdlabels_add(p->st_HypervisorProcessor->rrdlabels, "vm", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_HypervisorProcessor->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         SETP_DIM_VALUE(st_HypervisorProcessor, GuestRunTime);

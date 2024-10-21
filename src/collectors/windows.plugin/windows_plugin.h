@@ -15,21 +15,6 @@ void *win_plugin_main(void *ptr);
 
 extern char windows_shared_buffer[8192];
 
-static inline void get_and_sanitize_instance_value(
-    PERF_DATA_BLOCK *pDataBlock,
-    PERF_OBJECT_TYPE *pObjectType,
-    PERF_INSTANCE_DEFINITION *pi,
-    char *buffer,
-    size_t buffer_size)
-{
-    char wstr[8192];
-    if (!getInstanceName(pDataBlock, pObjectType, pi, wstr, sizeof(wstr))) {
-        strncpyz(buffer, "[unknown]", buffer_size - 1);
-        return;
-    }
-    rrdlabels_sanitize_value(buffer, wstr, buffer_size);
-}
-
 int do_GetSystemUptime(int update_every, usec_t dt);
 int do_GetSystemRAM(int update_every, usec_t dt);
 int do_GetSystemCPU(int update_every, usec_t dt);
