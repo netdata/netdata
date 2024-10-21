@@ -63,7 +63,8 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| uuid | GPU id (e.g. 00000000:00:04.0) |
+| uuid | GPU uuid (e.g. GPU-27b94a00-ed54-5c24-b1fd-1054085de32a) |
+| index | GPU index (nvidia_smi typically orders GPUs by PCI bus ID) |
 | product_name | GPU product name (e.g. NVIDIA A100-SXM4-40GB) |
 
 Metrics:
@@ -95,7 +96,7 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| uuid | GPU id (e.g. 00000000:00:04.0) |
+| uuid | GPU uuid (e.g. GPU-27b94a00-ed54-5c24-b1fd-1054085de32a) |
 | product_name | GPU product name (e.g. NVIDIA A100-SXM4-40GB) |
 | gpu_instance_id | GPU instance id (e.g. 1) |
 
