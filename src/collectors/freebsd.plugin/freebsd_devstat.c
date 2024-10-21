@@ -393,8 +393,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                      RRDSET_TYPE_LINE
                                 );
 
-                                rrdset_flag_set(dm->st_ops, RRDSET_FLAG_DETAIL);
-
                                 dm->rd_ops_in   = rrddim_add(dm->st_ops, "reads",  NULL,  1, 1,
                                                              RRD_ALGORITHM_INCREMENTAL);
                                 dm->rd_ops_out  = rrddim_add(dm->st_ops, "writes", NULL, -1, 1,
@@ -428,8 +426,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                       RRDSET_TYPE_LINE
                                 );
 
-                                rrdset_flag_set(dm->st_qops, RRDSET_FLAG_DETAIL);
-
                                 dm->rd_qops = rrddim_add(dm->st_qops, "operations", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                             }
 
@@ -452,8 +448,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                       update_every,
                                                                       RRDSET_TYPE_AREA
                                 );
-
-                                rrdset_flag_set(dm->st_util, RRDSET_FLAG_DETAIL);
 
                                 dm->rd_util = rrddim_add(dm->st_util, "utilization", NULL, 1, 10,
                                                          RRD_ALGORITHM_INCREMENTAL);
@@ -478,8 +472,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                         update_every,
                                                                         RRDSET_TYPE_LINE
                                 );
-
-                                rrdset_flag_set(dm->st_iotime, RRDSET_FLAG_DETAIL);
 
                                 dm->rd_iotime_in    = rrddim_add(dm->st_iotime, "reads",  NULL,  1, 1,
                                                                 RRD_ALGORITHM_INCREMENTAL);
@@ -517,8 +509,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                            update_every,
                                                                            RRDSET_TYPE_LINE
                                     );
-
-                                    rrdset_flag_set(dm->st_await, RRDSET_FLAG_DETAIL);
 
                                     dm->rd_await_in    = rrddim_add(dm->st_await, "reads",  NULL,  1, 1,
                                                                   RRD_ALGORITHM_ABSOLUTE);
@@ -577,8 +567,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                             RRDSET_TYPE_AREA
                                     );
 
-                                    rrdset_flag_set(dm->st_avagsz, RRDSET_FLAG_DETAIL);
-
                                     dm->rd_avagsz_in    = rrddim_add(dm->st_avagsz, "reads",  NULL,  1, KILO_FACTOR,
                                                                      RRD_ALGORITHM_ABSOLUTE);
                                     dm->rd_avagsz_out   = rrddim_add(dm->st_avagsz, "writes", NULL, -1, KILO_FACTOR,
@@ -626,8 +614,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                            update_every,
                                                                            RRDSET_TYPE_LINE
                                     );
-
-                                    rrdset_flag_set(dm->st_svctm, RRDSET_FLAG_DETAIL);
 
                                     dm->rd_svctm = rrddim_add(dm->st_svctm, "svctm", NULL, 1, 1,
                                                               RRD_ALGORITHM_ABSOLUTE);

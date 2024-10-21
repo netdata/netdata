@@ -588,8 +588,6 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
                         RRDSET_TYPE_LINE
                 );
 
-                rrdset_flag_set(d->st_split, RRDSET_FLAG_DETAIL);
-
                 d->rd_split = rrddim_add(d->st_split, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 physical_disk_labels(d->st_split, d);

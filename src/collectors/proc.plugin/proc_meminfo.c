@@ -347,8 +347,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
 
-            rrdset_flag_set(st_mem_hwcorrupt, RRDSET_FLAG_DETAIL);
-
             rd_corrupted = rrddim_add(st_mem_hwcorrupt, "HardwareCorrupted", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
 
@@ -376,8 +374,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , RRDSET_TYPE_AREA
             );
 
-            rrdset_flag_set(st_mem_committed, RRDSET_FLAG_DETAIL);
-
             rd_committed = rrddim_add(st_mem_committed, "Committed_AS", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
 
@@ -404,7 +400,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st_mem_writeback, RRDSET_FLAG_DETAIL);
 
             rd_dirty         = rrddim_add(st_mem_writeback, "Dirty",         NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_writeback     = rrddim_add(st_mem_writeback, "Writeback",     NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -444,8 +439,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
 
-            rrdset_flag_set(st_mem_kernel, RRDSET_FLAG_DETAIL);
-
             rd_slab        = rrddim_add(st_mem_kernel, "Slab",        NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_kernelstack = rrddim_add(st_mem_kernel, "KernelStack", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_pagetables  = rrddim_add(st_mem_kernel, "PageTables",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -484,8 +477,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
 
-            rrdset_flag_set(st_mem_slab, RRDSET_FLAG_DETAIL);
-
             rd_reclaimable   = rrddim_add(st_mem_slab, "reclaimable",   NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_unreclaimable = rrddim_add(st_mem_slab, "unreclaimable", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
@@ -517,8 +508,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
-
-            rrdset_flag_set(st_mem_hugepages, RRDSET_FLAG_DETAIL);
 
             rd_free = rrddim_add(st_mem_hugepages, "free",     NULL, Hugepagesize, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_used = rrddim_add(st_mem_hugepages, "used",     NULL, Hugepagesize, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -555,8 +544,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
 
-            rrdset_flag_set(st_mem_transparent_hugepages, RRDSET_FLAG_DETAIL);
-
             rd_anonymous = rrddim_add(st_mem_transparent_hugepages, "anonymous",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_shared    = rrddim_add(st_mem_transparent_hugepages, "shmem",      NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
@@ -584,8 +571,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
-
-                rrdset_flag_set(st_mem_thp_details, RRDSET_FLAG_DETAIL);
 
                 rd_shmem_pmd_mapped = rrddim_add(st_mem_thp_details, "shmem_pmd", "ShmemPmdMapped", 1, 1024, RRD_ALGORITHM_ABSOLUTE);
                 rd_file_huge_pages = rrddim_add(st_mem_thp_details, "file", "FileHugePages", 1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -621,8 +606,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-
-            rrdset_flag_set(st_mem_reclaiming, RRDSET_FLAG_DETAIL);
 
             rd_active        = rrddim_add(st_mem_reclaiming, "active",        "Active", 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_inactive      = rrddim_add(st_mem_reclaiming, "inactive",      "Inactive", 1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -666,8 +649,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
-
-            rrdset_flag_set(st_mem_high_low, RRDSET_FLAG_DETAIL);
 
             rd_high_used = rrddim_add(st_mem_high_low, "high_used",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_low_used  = rrddim_add(st_mem_high_low, "low_used",   NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);

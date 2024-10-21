@@ -25,8 +25,6 @@ static inline void common_mem_pgfaults(uint64_t minor, uint64_t major, int updat
             , RRDSET_TYPE_LINE
         );
 
-        rrdset_flag_set(st_pgfaults, RRDSET_FLAG_DETAIL);
-
         rd_minor = rrddim_add(st_pgfaults, "minor", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_major = rrddim_add(st_pgfaults, "major", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
     }

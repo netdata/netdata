@@ -669,8 +669,6 @@ STORAGE_ENGINE* storage_engine_find(const char* name);
 // and may lead to missing information.
 
 typedef enum __attribute__ ((__packed__)) rrdset_flags {
-    RRDSET_FLAG_DETAIL                           = (1 << 1),  // if set, the data set should be considered as a detail of another
-                                                              // (the master data set should be the one that has the same family and is not detail)
     RRDSET_FLAG_DEBUG                            = (1 << 2),  // enables or disables debugging for a chart
     RRDSET_FLAG_OBSOLETE                         = (1 << 3),  // this is marked by the collector/module as obsolete
     RRDSET_FLAG_EXPORTING_SEND                   = (1 << 4),  // if set, this chart should be sent to Prometheus web API and external databases

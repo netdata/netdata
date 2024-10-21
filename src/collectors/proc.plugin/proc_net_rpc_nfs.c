@@ -296,8 +296,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
 
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
             rd_udp = rrddim_add(st, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_tcp = rrddim_add(st, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
@@ -332,7 +330,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_calls        = rrddim_add(st, "calls",        NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_retransmits  = rrddim_add(st, "retransmits",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

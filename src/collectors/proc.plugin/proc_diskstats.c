@@ -1624,8 +1624,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_flag_set(d->st_ext_ops, RRDSET_FLAG_DETAIL);
-
                 d->rd_ops_discards = rrddim_add(d->st_ext_ops, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 if (do_fl_stats)
                     d->rd_ops_flushes = rrddim_add(d->st_ext_ops, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1670,8 +1668,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
-
-                rrdset_flag_set(d->st_backlog, RRDSET_FLAG_DETAIL);
 
                 d->rd_backlog_backlog = rrddim_add(d->st_backlog, "backlog", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -1728,8 +1724,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_flag_set(d->st_mops, RRDSET_FLAG_DETAIL);
-
                 d->rd_mops_reads  = rrddim_add(d->st_mops, "reads",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_mops_writes = rrddim_add(d->st_mops, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -1759,8 +1753,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
-
-                rrdset_flag_set(d->st_ext_mops, RRDSET_FLAG_DETAIL);
 
                 d->rd_mops_discards = rrddim_add(d->st_ext_mops, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
@@ -1804,8 +1796,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
-
-                rrdset_flag_set(d->st_ext_iotime, RRDSET_FLAG_DETAIL);
 
                 d->rd_iotime_discards = rrddim_add(d->st_ext_iotime, "discards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 if (do_fl_stats)
@@ -1857,8 +1847,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-
-                    rrdset_flag_set(d->st_ext_await, RRDSET_FLAG_DETAIL);
 
                     d->rd_await_discards = rrddim_add(d->st_ext_await, "discards", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                     if (do_fl_stats)
@@ -1913,8 +1901,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_AREA
                     );
-
-                    rrdset_flag_set(d->st_ext_avgsz, RRDSET_FLAG_DETAIL);
 
                     d->rd_avgsz_discards = rrddim_add(d->st_ext_avgsz, "discards", NULL, SECTOR_SIZE, 1024, RRD_ALGORITHM_ABSOLUTE);
 
@@ -2182,8 +2168,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , RRDSET_TYPE_LINE
                     );
 
-                    rrdset_flag_set(d->st_bcache, RRDSET_FLAG_DETAIL);
-
                     d->rd_bcache_hits            = rrddim_add(d->st_bcache, "hits",       NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     d->rd_bcache_misses          = rrddim_add(d->st_bcache, "misses",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     d->rd_bcache_miss_collisions = rrddim_add(d->st_bcache, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2215,8 +2199,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-
-                    rrdset_flag_set(d->st_bcache_bypass, RRDSET_FLAG_DETAIL);
 
                     d->rd_bcache_bypass_hits   = rrddim_add(d->st_bcache_bypass, "hits",   NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     d->rd_bcache_bypass_misses = rrddim_add(d->st_bcache_bypass, "misses", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

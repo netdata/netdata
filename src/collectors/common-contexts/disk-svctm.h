@@ -27,8 +27,6 @@ static inline void common_disk_svctm(ND_DISK_SVCTM *d, const char *id, const cha
             , RRDSET_TYPE_LINE
         );
 
-        rrdset_flag_set(d->st_svctm, RRDSET_FLAG_DETAIL);
-
         d->rd_svctm  = rrddim_add(d->st_svctm, "svctm", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
 
         if(cb)

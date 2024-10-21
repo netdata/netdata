@@ -30,8 +30,6 @@ static inline void common_mem_swap(uint64_t free_bytes, uint64_t used_bytes, int
             , RRDSET_TYPE_STACKED
         );
 
-        rrdset_flag_set(st_system_swap, RRDSET_FLAG_DETAIL);
-
         rd_free = rrddim_add(st_system_swap, "free",    NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
         rd_used = rrddim_add(st_system_swap, "used",    NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     }

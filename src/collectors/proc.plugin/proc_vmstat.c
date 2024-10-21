@@ -355,8 +355,6 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
 
-            rrdset_flag_set(st_oom_kill, RRDSET_FLAG_DETAIL);
-
             rd_oom_kill = rrddim_add(st_oom_kill, "kills", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
@@ -396,8 +394,6 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-
-            rrdset_flag_set(st_numa, RRDSET_FLAG_DETAIL);
 
             // These depend on CONFIG_NUMA in the kernel.
             rd_local             = rrddim_add(st_numa, "local",             NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);

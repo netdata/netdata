@@ -27,8 +27,6 @@ static inline void common_disk_util(ND_DISK_UTIL *d, const char *id, const char 
                 , RRDSET_TYPE_AREA
         );
 
-        rrdset_flag_set(d->st_util, RRDSET_FLAG_DETAIL);
-
         d->rd_util  = rrddim_add(d->st_util, "utilization",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         if(cb)

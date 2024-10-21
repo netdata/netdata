@@ -259,7 +259,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     // send the chart
     buffer_sprintf(
             wb
-            , " \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s %s\" \"%s\" \"%s\"\n"
+            , " \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s\" \"%s\" \"%s\"\n"
             , rrdset_id(st)
             , name
             , rrdset_title(st)
@@ -270,7 +270,6 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
             , st->priority
             , st->update_every
             , rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)?"obsolete":""
-            , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
             , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
             , rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)?"hidden":""
             , rrdset_plugin_name(st)

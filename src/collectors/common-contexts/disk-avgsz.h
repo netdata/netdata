@@ -28,8 +28,6 @@ static inline void common_disk_avgsz(ND_DISK_AVGSZ *d, const char *id, const cha
             , RRDSET_TYPE_AREA
         );
 
-        rrdset_flag_set(d->st_avgsz, RRDSET_FLAG_DETAIL);
-
         d->rd_avgsz_reads  = rrddim_add(d->st_avgsz, "reads",  NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
         d->rd_avgsz_writes = rrddim_add(d->st_avgsz, "writes", NULL, -1, 1024, RRD_ALGORITHM_ABSOLUTE);
 
