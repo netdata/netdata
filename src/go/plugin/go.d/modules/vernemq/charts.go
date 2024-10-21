@@ -20,6 +20,7 @@ const (
 	prioNodeQueueProcessesEvents
 	prioNodeQueueProcessesOfflineStorage
 	prioNodeQueueMessages
+	prioNodeQueuedMessages
 	prioNodeQueueUndeliveredMessages
 
 	prioNodeRouterSubscriptions
@@ -102,6 +103,7 @@ var nodeChartsTmpl = module.Charts{
 	nodeQueueProcessesEventsChartTmpl.Copy(),
 	nodeQueueProcessesOfflineStorageChartTmpl.Copy(),
 	nodeQueueMessagesChartTmpl.Copy(),
+	nodeQueuedMessagesChartTmpl.Copy(),
 	nodeQueueUndeliveredMessagesChartTmpl.Copy(),
 
 	nodeRouterSubscriptionsChartTmpl.Copy(),
@@ -317,6 +319,18 @@ var (
 		Dims: module.Dims{
 			{ID: dimNode(metricQueueMessageIn), Name: "received", Algo: module.Incremental},
 			{ID: dimNode(metricQueueMessageOut), Name: "sent", Algo: module.Incremental, Mul: -1},
+		},
+	}
+	nodeQueuedMessagesChartTmpl = module.Chart{
+		ID:       "node_%s_queued_messages",
+		Title:    "Queued PUBLISH Messages",
+		Units:    "messages",
+		Fam:      "queues",
+		Ctx:      "vernemq.node_queued_messages",
+		Type:     module.Line,
+		Priority: prioNodeQueuedMessages,
+		Dims: module.Dims{
+			{ID: dimNode("queued_messages"), Name: "queued"},
 		},
 	}
 	nodeQueueUndeliveredMessagesChartTmpl = module.Chart{

@@ -327,6 +327,12 @@ modules:
               dimensions:
                 - name: received
                 - name: sent
+            - name: vernemq.node_queued_messages
+              description: Queued PUBLISH Messages
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: queued
             - name: vernemq.node_queue_undelivered_messages
               description: Undelivered PUBLISH Messages
               unit: messages/s
