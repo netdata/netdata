@@ -7,323 +7,17 @@
 extern "C" {
 # endif
 
-#include "config.h"
-
-#ifdef HAVE_LIBDATACHANNEL
-#define ENABLE_WEBRTC 1
-#endif
-
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
+#include "common.h"
 
 #define JUDYHS_INDEX_SIZE_ESTIMATE(key_bytes) (((key_bytes) + sizeof(Word_t) - 1) / sizeof(Word_t) * 4)
-
-#if defined(NETDATA_DEV_MODE) && !defined(NETDATA_INTERNAL_CHECKS)
-#define NETDATA_INTERNAL_CHECKS 1
-#endif
-
-#ifndef SIZEOF_VOID_P
-#error SIZEOF_VOID_P is not defined
-#endif
-
-#if SIZEOF_VOID_P == 4
-#define ENV32BIT 1
-#else
-#define ENV64BIT 1
-#endif
 
 // NETDATA_TRACE_ALLOCATIONS does not work under musl libc, so don't enable it
 //#if defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_TRACE_ALLOCATIONS)
 //#define NETDATA_TRACE_ALLOCATIONS 1
 //#endif
 
-#define MALLOC_ALIGNMENT (sizeof(uintptr_t) * 2)
-#define size_t_atomic_count(op, var, size) __atomic_## op ##_fetch(&(var), size, __ATOMIC_RELAXED)
-#define size_t_atomic_bytes(op, var, size) __atomic_## op ##_fetch(&(var), ((size) % MALLOC_ALIGNMENT)?((size) + MALLOC_ALIGNMENT - ((size) % MALLOC_ALIGNMENT)):(size), __ATOMIC_RELAXED)
-
-// ----------------------------------------------------------------------------
-// system include files for all netdata C programs
-
-/* select the memory allocator, based on autoconf findings */
-#if defined(ENABLE_JEMALLOC)
-
-#if defined(HAVE_JEMALLOC_JEMALLOC_H)
-#include <jemalloc/jemalloc.h>
-#else // !defined(HAVE_JEMALLOC_JEMALLOC_H)
-#include <malloc.h>
-#endif // !defined(HAVE_JEMALLOC_JEMALLOC_H)
-
-#elif defined(ENABLE_TCMALLOC)
-
-#include <google/tcmalloc.h>
-
-#else /* !defined(ENABLE_JEMALLOC) && !defined(ENABLE_TCMALLOC) */
-
-#if !(defined(__FreeBSD__) || defined(__APPLE__))
-#include <malloc.h>
-#endif /* __FreeBSD__ || __APPLE__ */
-
-#endif /* !defined(ENABLE_JEMALLOC) && !defined(ENABLE_TCMALLOC) */
-
-// ----------------------------------------------------------------------------
-
-#if defined(__FreeBSD__)
-#include <pthread_np.h>
-#define NETDATA_OS_TYPE "freebsd"
-#elif defined(__APPLE__)
-#define NETDATA_OS_TYPE "macos"
-#elif defined(OS_WINDOWS)
-#define NETDATA_OS_TYPE "windows"
-#else
-#define NETDATA_OS_TYPE "linux"
-#endif /* __FreeBSD__, __APPLE__*/
-
-#include <pthread.h>
-#include <errno.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <ctype.h>
-#include <string.h>
-#include <strings.h>
-#include <libgen.h>
-#include <dirent.h>
-#include <fcntl.h>
-#include <getopt.h>
-#include <limits.h>
-#include <locale.h>
-#include <signal.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <time.h>
-#include <unistd.h>
-#include <uv.h>
-#include <assert.h>
-
-#ifdef HAVE_ARPA_INET_H
-#include <arpa/inet.h>
-#endif
-
-#ifdef HAVE_NETINET_TCP_H
-#include <netinet/tcp.h>
-#endif
-
-#ifdef HAVE_SYS_IOCTL_H
-#include <sys/ioctl.h>
-#endif
-
-#ifdef HAVE_GRP_H
-#include <grp.h>
-#else
-typedef uint32_t gid_t;
-#endif
-
-#ifdef HAVE_PWD_H
-#include <pwd.h>
-#else
-typedef uint32_t uid_t;
-#endif
-
-#ifdef HAVE_NET_IF_H
-#include <net/if.h>
-#endif
-
-#ifdef HAVE_POLL_H
-#include <poll.h>
-#endif
-
-#ifdef HAVE_SYSLOG_H
-#include <syslog.h>
-#else
-/* priorities */
-#define	LOG_EMERG	0	/* system is unusable */
-#define	LOG_ALERT	1	/* action must be taken immediately */
-#define	LOG_CRIT	2	/* critical conditions */
-#define	LOG_ERR		3	/* error conditions */
-#define	LOG_WARNING	4	/* warning conditions */
-#define	LOG_NOTICE	5	/* normal but significant condition */
-#define	LOG_INFO	6	/* informational */
-#define	LOG_DEBUG	7	/* debug-level messages */
-
-/* facility codes */
-#define	LOG_KERN	(0<<3)	/* kernel messages */
-#define	LOG_USER	(1<<3)	/* random user-level messages */
-#define	LOG_MAIL	(2<<3)	/* mail system */
-#define	LOG_DAEMON	(3<<3)	/* system daemons */
-#define	LOG_AUTH	(4<<3)	/* security/authorization messages */
-#define	LOG_SYSLOG	(5<<3)	/* messages generated internally by syslogd */
-#define	LOG_LPR		(6<<3)	/* line printer subsystem */
-#define	LOG_NEWS	(7<<3)	/* network news subsystem */
-#define	LOG_UUCP	(8<<3)	/* UUCP subsystem */
-#define	LOG_CRON	(9<<3)	/* clock daemon */
-#define	LOG_AUTHPRIV	(10<<3)	/* security/authorization messages (private) */
-#define	LOG_FTP		(11<<3)	/* ftp daemon */
-
-/* other codes through 15 reserved for system use */
-#define	LOG_LOCAL0	(16<<3)	/* reserved for local use */
-#define	LOG_LOCAL1	(17<<3)	/* reserved for local use */
-#define	LOG_LOCAL2	(18<<3)	/* reserved for local use */
-#define	LOG_LOCAL3	(19<<3)	/* reserved for local use */
-#define	LOG_LOCAL4	(20<<3)	/* reserved for local use */
-#define	LOG_LOCAL5	(21<<3)	/* reserved for local use */
-#define	LOG_LOCAL6	(22<<3)	/* reserved for local use */
-#define	LOG_LOCAL7	(23<<3)	/* reserved for local use */
-#endif
-
-#ifdef HAVE_SYS_MMAN_H
-#include <sys/mman.h>
-#endif
-
-#ifdef HAVE_SYS_RESOURCE_H
-#include <sys/resource.h>
-#endif
-
-#ifdef HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
-#endif
-
-#ifdef HAVE_SYS_WAIT_H
-#include <sys/wait.h>
-#endif
-
-#ifdef HAVE_SYS_UN_H
-#include <sys/un.h>
-#endif
-
-#ifdef HAVE_SPAWN_H
-#include <spawn.h>
-#endif
-
-#ifdef HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#endif
-
-#ifdef HAVE_RESOLV_H
-#include <resolv.h>
-#endif
-
-#ifdef HAVE_NETDB_H
-#include <netdb.h>
-#endif
-
-#ifdef HAVE_SYS_PRCTL_H
-#include <sys/prctl.h>
-#endif
-
-#ifdef HAVE_SYS_STAT_H
-#include <sys/stat.h>
-#endif
-
-#ifdef HAVE_SYS_VFS_H
-#include <sys/vfs.h>
-#endif
-
-#ifdef HAVE_SYS_STATFS_H
-#include <sys/statfs.h>
-#endif
-
-#ifdef HAVE_LINUX_MAGIC_H
-#include <linux/magic.h>
-#endif
-
-#ifdef HAVE_SYS_MOUNT_H
-#include <sys/mount.h>
-#endif
-
-#ifdef HAVE_SYS_STATVFS_H
-#include <sys/statvfs.h>
-#endif
-
-// #1408
-#ifdef MAJOR_IN_MKDEV
-#include <sys/mkdev.h>
-#endif
-#ifdef MAJOR_IN_SYSMACROS
-#include <sys/sysmacros.h>
-#endif
-
-#include <math.h>
-#include <float.h>
-
-#if defined(HAVE_INTTYPES_H)
-#include <inttypes.h>
-#elif defined(HAVE_STDINT_H)
-#include <stdint.h>
-#endif
-
-#include <zlib.h>
-
-#ifdef HAVE_SYS_CAPABILITY_H
-#include <sys/capability.h>
-#endif
-
-
-#ifndef O_CLOEXEC
-#define O_CLOEXEC (0)
-#endif
-
-// ----------------------------------------------------------------------------
-// netdata common definitions
-
-#define _cleanup_(x) __attribute__((__cleanup__(x)))
-
-#ifdef HAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL
-#define NEVERNULL __attribute__((returns_nonnull))
-#else
-#define NEVERNULL
-#endif
-
-#ifdef HAVE_FUNC_ATTRIBUTE_NOINLINE
-#define NOINLINE __attribute__((noinline))
-#else
-#define NOINLINE
-#endif
-
-#ifdef HAVE_FUNC_ATTRIBUTE_MALLOC
-#define MALLOCLIKE __attribute__((malloc))
-#else
-#define MALLOCLIKE
-#endif
-
-#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF)
-#define PRINTFLIKE(f, a) __attribute__ ((format(gnu_printf, f, a)))
-#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF)
-#define PRINTFLIKE(f, a) __attribute__ ((format(printf, f, a)))
-#else
-#define PRINTFLIKE(f, a)
-#endif
-
-#ifdef HAVE_FUNC_ATTRIBUTE_NORETURN
-#define NORETURN __attribute__ ((noreturn))
-#else
-#define NORETURN
-#endif
-
-#ifdef HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT
-#define WARNUNUSED __attribute__ ((warn_unused_result))
-#else
-#define WARNUNUSED
-#endif
-
 #include "libjudy/judy-malloc.h"
 
-#define ABS(x) (((x) < 0)? (-(x)) : (x))
-#define MIN(a,b) (((a)<(b))?(a):(b))
-#define MAX(a,b) (((a)>(b))?(a):(b))
-#define SWAP(a, b) do { \
-    typeof(a) _tmp = b; \
-    b = a;              \
-    a = _tmp;           \
-} while(0)
-
-#define GUID_LEN 36
-
-#define PIPE_READ 0
-#define PIPE_WRITE 1
-
-#include "linked-lists.h"
 #include "storage-point.h"
 #include "paths/paths.h"
 
@@ -389,30 +83,10 @@ extern volatile sig_atomic_t netdata_exit;
 char *read_by_filename(const char *filename, long *file_size);
 char *find_and_replace(const char *src, const char *find, const char *replace, const char *where);
 
-/* fix for alpine linux */
-#ifndef RUSAGE_THREAD
-#ifdef RUSAGE_CHILDREN
-#define RUSAGE_THREAD RUSAGE_CHILDREN
-#endif
-#endif
-
 #define BITS_IN_A_KILOBIT     1000
 #define KILOBITS_IN_A_MEGABIT 1000
 
-/* misc. */
-
-#define UNUSED(x) (void)(x)
-
-#ifdef __GNUC__
-#define UNUSED_FUNCTION(x) __attribute__((unused)) UNUSED_##x
-#else
-#define UNUSED_FUNCTION(x) UNUSED_##x
-#endif
-
 #define error_report(x, args...) do { errno_clear(); netdata_log_error(x, ##args); } while(0)
-
-// Taken from linux kernel
-#define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
 #include "bitmap64.h"
 
@@ -432,47 +106,55 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
 extern const char *netdata_configured_host_prefix;
 
-#include "os/os.h"
-
-#define XXH_INLINE_ALL
-#include "xxhash.h"
-
-#include "uuid/uuid.h"
+// safe includes before O/S specific functions
 #include "template-enum.h"
-#include "http/http_access.h"
-#include "http/content_type.h"
-#include "config/dyncfg.h"
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
-#include "threads/threads.h"
+
+#include "string/string.h"
 #include "buffer/buffer.h"
-#include "ringbuffer/ringbuffer.h"
-#include "c_rhash/c_rhash.h"
-#include "locks/locks.h"
-#include "circular_buffer/circular_buffer.h"
-#include "avl/avl.h"
+
+#include "uuid/uuid.h"
+#include "http/content_type.h"
+#include "http/http_access.h"
+
 #include "inlined.h"
-#include "line_splitter/line_splitter.h"
-#include "clocks/clocks.h"
 #include "parsers/parsers.h"
+
+#include "threads/threads.h"
+#include "locks/locks.h"
+#include "completion/completion.h"
+#include "clocks/clocks.h"
+#include "simple_pattern/simple_pattern.h"
+#include "libnetdata/log/nd_log.h"
+
+#include "socket/security.h"    // must be before windows.h
+
+// this may include windows.h
+#include "os/os.h"
+
+#include "socket/socket.h"
+#include "avl/avl.h"
+
+#include "line_splitter/line_splitter.h"
+#include "c_rhash/c_rhash.h"
+#include "ringbuffer/ringbuffer.h"
+#include "circular_buffer/circular_buffer.h"
+#include "buffered_reader/buffered_reader.h"
 #include "datetime/iso8601.h"
 #include "datetime/rfc3339.h"
 #include "datetime/rfc7231.h"
-#include "completion/completion.h"
-#include "libnetdata/log/nd_log.h"
+#include "sanitizers/sanitizers.h"
+
+#include "config/dyncfg.h"
+#include "config/appconfig.h"
 #include "spawn_server/spawn_server.h"
 #include "spawn_server/spawn_popen.h"
-#include "simple_pattern/simple_pattern.h"
-#include "socket/security.h"
-#include "socket/socket.h"
-#include "config/appconfig.h"
-#include "log/systemd-journal-helpers.h"
-#include "buffered_reader/buffered_reader.h"
 #include "procfile/procfile.h"
-#include "string/string.h"
 #include "dictionary/dictionary.h"
 #include "dictionary/thread-cache.h"
-#include "sanitizers/sanitizers.h"
+
+#include "log/systemd-journal-helpers.h"
 
 #if defined(HAVE_LIBBPF) && !defined(__cplusplus)
 #include "ebpf/ebpf.h"
@@ -493,11 +175,6 @@ extern const char *netdata_configured_host_prefix;
 #include "facets/facets.h"
 #include "functions_evloop/functions_evloop.h"
 #include "query_progress/progress.h"
-
-// BEWARE: this exists in alarm-notify.sh
-#define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"
-
-#define RRD_STORAGE_TIERS 5
 
 static inline size_t struct_natural_alignment(size_t size) __attribute__((const));
 
@@ -643,6 +320,8 @@ bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_
 
 int netdata_base64_decode(unsigned char *out, const unsigned char *in, int in_len);
 int netdata_base64_encode(unsigned char *encoded, const unsigned char *input, size_t input_size);
+
+// --------------------------------------------------------------------------------------------------------------------
 
 static inline void freez_charp(char **p) {
     freez(*p);

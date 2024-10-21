@@ -6,7 +6,6 @@
 #define _COMMON_PLUGIN_NAME PLUGIN_WINDOWS_NAME
 #define _COMMON_PLUGIN_MODULE_NAME "PerflibStorage"
 #include "../common-contexts/common-contexts.h"
-
 #include "libnetdata/os/windows-wmi/windows-wmi.h"
 
 struct logical_disk {

@@ -23,9 +23,8 @@ static SPAWN_SERVER *spawn_srv = NULL;
         } aggregated_key;                       \
     } network_viewer;
 
-#include "libnetdata/maps/local-sockets.h"
-#include "libnetdata/maps/system-users.h"
-#include "libnetdata/maps/system-services.h"
+#include "libnetdata/local-sockets/local-sockets.h"
+#include "libnetdata/os/system-maps/system-services.h"
 
 #define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
 #define NETWORK_CONNECTIONS_VIEWER_HELP "Network connections explorer"
@@ -36,7 +35,6 @@ static SPAWN_SERVER *spawn_srv = NULL;
 
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
-static USERNAMES_CACHE *uc;
 static SERVICENAMES_CACHE *sc;
 
 ENUM_STR_MAP_DEFINE(SOCKET_DIRECTION) = {
@@ -151,9 +149,9 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
         }
         else {
             // buffer_json_add_array_item_uint64(wb, n->uid);
-            STRING *u = system_usernames_cache_lookup_uid(uc, n->uid);
-            buffer_json_add_array_item_string(wb, string2str(u));
-            string_freez(u);
+            CACHED_USERNAME cu = cached_username_get_by_uid(n->uid);
+            buffer_json_add_array_item_string(wb, string2str(cu.username));
+            cached_username_release(cu);
         }
 
         const struct socket_endpoint *server_endpoint;
@@ -975,7 +973,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     }
 #endif
 
-    uc = system_usernames_cache_init();
+    cached_usernames_init();
+    update_cached_host_users();
     sc = system_servicenames_cache_init();
 
     // ----------------------------------------------------------------------------------------------------------------
