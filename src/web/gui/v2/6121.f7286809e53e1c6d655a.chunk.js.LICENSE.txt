@@ -1,6 +1,0 @@
-/*!
-* chartjs-plugin-annotation v2.2.1
-* https://www.chartjs.org/chartjs-plugin-annotation/index
- * (c) 2023 chartjs-plugin-annotation Contributors
- * Released under the MIT License
- */
