@@ -98,7 +98,9 @@ modules:
           description: These metrics refer to the GPU.
           labels:
             - name: uuid
-              description: GPU id (e.g. 00000000:00:04.0)
+              description: GPU uuid (e.g. GPU-27b94a00-ed54-5c24-b1fd-1054085de32a)
+            - name: index
+              description: GPU index (nvidia_smi typically orders GPUs by PCI bus ID)
             - name: product_name
               description: GPU product name (e.g. NVIDIA A100-SXM4-40GB)
           metrics:
@@ -211,7 +213,7 @@ modules:
           description: These metrics refer to the Multi-Instance GPU (MIG).
           labels:
             - name: uuid
-              description: GPU id (e.g. 00000000:00:04.0)
+              description: GPU uuid (e.g. GPU-27b94a00-ed54-5c24-b1fd-1054085de32a)
             - name: product_name
               description: GPU product name (e.g. NVIDIA A100-SXM4-40GB)
             - name: gpu_instance_id

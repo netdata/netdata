@@ -4,6 +4,7 @@ package nvidia_smi
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -261,7 +262,7 @@ var (
 	}
 )
 
-func (nv *NvidiaSmi) addGPUXMLCharts(gpu gpuInfo) {
+func (nv *NvidiaSmi) addGpuCharts(gpu gpuInfo, index int) {
 	charts := gpuXMLCharts.Copy()
 
 	if !isValidValue(gpu.Utilization.GpuUtil) {
@@ -294,7 +295,7 @@ func (nv *NvidiaSmi) addGPUXMLCharts(gpu gpuInfo) {
 	for _, c := range *charts {
 		c.ID = fmt.Sprintf(c.ID, strings.ToLower(gpu.UUID))
 		c.Labels = []module.Label{
-			// csv output has no 'product_brand'
+			{Key: "index", Value: strconv.Itoa(index)},
 			{Key: "uuid", Value: gpu.UUID},
 			{Key: "product_name", Value: gpu.ProductName},
 		}
