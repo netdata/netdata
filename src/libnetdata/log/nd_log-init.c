@@ -271,6 +271,10 @@ void nd_log_reopen_log_files(bool log) {
         netdata_log_info("Log files re-opened.");
 }
 
+int nd_log_systemd_journal_fd(void) {
+    return nd_log.journal.fd;
+}
+
 void nd_log_reopen_log_files_for_spawn_server(const char *name) {
     gettid_uncached();
 
@@ -307,7 +311,6 @@ void nd_log_reopen_log_files_for_spawn_server(const char *name) {
     spinlock_init(&nd_log.std_output.spinlock);
     spinlock_init(&nd_log.std_error.spinlock);
 
-    nd_log.journal.initialized = false;
     nd_log.journal_direct.initialized = false;
     nd_log.syslog.initialized = false;
     nd_log.eventlog.initialized = false;

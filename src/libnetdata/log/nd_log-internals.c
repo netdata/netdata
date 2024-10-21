@@ -284,6 +284,8 @@ struct nd_log nd_log = {
     .overwrite_process_source = 0,
     .journal = {
         .initialized = false,
+        .first_msg = false,
+        .fd = -1,
     },
     .journal_direct = {
         .initialized = false,

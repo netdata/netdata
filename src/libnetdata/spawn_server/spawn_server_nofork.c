@@ -276,7 +276,13 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
         return false;
     }
 
-    os_close_all_non_std_open_fds_except(rq->fds, 3, CLOSE_RANGE_CLOEXEC);
+    int fds_to_keep[] = {
+        rq->fds[0],
+        rq->fds[1],
+        rq->fds[2],
+        nd_log_systemd_journal_fd(),
+    };
+    os_close_all_non_std_open_fds_except(fds_to_keep, _countof(fds_to_keep), CLOSE_RANGE_CLOEXEC);
 
     errno_clear();
     if (posix_spawn(&rq->pid, rq->argv[0], &file_actions, &attr, (char * const *)rq->argv, (char * const *)rq->envp) != 0) {
@@ -327,7 +333,14 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
         os_setproctitle("spawn-callback", server->argc, server->argv);
 
         // close all open file descriptors of the parent, but keep ours
-        os_close_all_non_std_open_fds_except(rq->fds, 4, 0);
+        int fds_to_keep[] = {
+            rq->fds[0],
+            rq->fds[1],
+            rq->fds[2],
+            rq->fds[3],
+            nd_log_systemd_journal_fd(),
+        };
+        os_close_all_non_std_open_fds_except(fds_to_keep, _countof(fds_to_keep), 0);
         nd_log_reopen_log_files_for_spawn_server("spawn-callback");
 
         // get the fds from the request
@@ -1078,7 +1091,12 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         os_setproctitle(buf, server->argc, server->argv);
 
         replace_stdio_with_dev_null();
-        os_close_all_non_std_open_fds_except((int[]){ server->sock, server->pipe[1] }, 2, 0);
+        int fds_to_keep[] = {
+            server->sock,
+            server->pipe[1],
+            nd_log_systemd_journal_fd(),
+        };
+        os_close_all_non_std_open_fds_except(fds_to_keep, _countof(fds_to_keep), 0);
         nd_log_reopen_log_files_for_spawn_server(buf);
         exit(spawn_server_event_loop(server));
     }

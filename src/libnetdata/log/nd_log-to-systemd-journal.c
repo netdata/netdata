@@ -74,6 +74,16 @@ bool nd_log_journal_direct_init(const char *path) {
     return true;
 }
 
+#define SYSTEMD_JOURNAL_SOCKET_PREFIX "/run/system/journal"
+static bool is_journal_socket(int fd) {
+    struct sockaddr_un addr;
+    socklen_t len = sizeof(addr);
+    if (getsockname(fd, (struct sockaddr*)&addr, &len) == 0)
+        return strncmp(addr.sun_path, SYSTEMD_JOURNAL_SOCKET_PREFIX, sizeof(SYSTEMD_JOURNAL_SOCKET_PREFIX) - 1) == 0;
+
+    return false;
+}
+
 bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_t fields_max __maybe_unused) {
 #ifdef HAVE_SYSTEMD
 
@@ -155,6 +165,18 @@ bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_
     }
 
     int r = sd_journal_sendv(iov, iov_count);
+
+    // this is the first successful libsystemd log
+    // let's detect its fd number (we need it for the spawn server)
+    if(r == 0 && __atomic_load_n(&nd_log.journal.first_msg, __ATOMIC_RELAXED) == false) {
+        __atomic_store_n(&nd_log.journal.first_msg, true, __ATOMIC_RELAXED);
+        for (int fd = 3; fd < 1024; fd++) {
+            if (is_journal_socket(fd)) {
+                nd_log.journal.fd = fd;
+                break;
+            }
+        }
+    }
 
     // Clean up allocated memory
     for (int i = 0; i < iov_count; i++) {
