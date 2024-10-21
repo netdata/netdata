@@ -102,6 +102,9 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
     if(host->rrdctx.contexts) return;
 
     rrdhost_create_rrdcontexts(host);
+    if (host->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        return;
+
     ctx_get_context_list(&host->host_id.uuid, rrdcontext_load_context_callback, host);
     ctx_get_chart_list(&host->host_id.uuid, rrdinstance_load_chart_callback, host);
 
@@ -357,6 +360,9 @@ void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
     rc->hub.title = string2str(rc->title);
     rc->hub.units = string2str(rc->units);
     rc->hub.family = string2str(rc->family);
+
+    if (rc->rrdhost->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        return;
 
     // delete it from SQL
     if(ctx_delete_context(&rc->rrdhost->host_id.uuid, &rc->hub) != 0)
@@ -855,8 +861,13 @@ void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused
     if(rrd_flag_is_deleted(rc))
         rrdcontext_delete_from_sql_unsafe(rc);
 
-    else if (ctx_store_context(&rc->rrdhost->host_id.uuid, &rc->hub) != 0)
-        netdata_log_error("RRDCONTEXT: failed to save context '%s' version %"PRIu64" to SQL.", rc->hub.id, rc->hub.version);
+    else {
+        if (rc->rrdhost->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+            return;
+        if (ctx_store_context(&rc->rrdhost->host_id.uuid, &rc->hub) != 0)
+            netdata_log_error(
+                "RRDCONTEXT: failed to save context '%s' version %" PRIu64 " to SQL.", rc->hub.id, rc->hub.version);
+    }
 }
 
 static bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_unused) {
