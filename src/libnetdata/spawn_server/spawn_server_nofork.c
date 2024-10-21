@@ -130,7 +130,6 @@ typedef enum __attribute__((packed)) {
 #define STATUS_REPORT_MAGIC 0xBADA55EE
 
 struct status_report {
-    uint8_t pad0[512];
     uint32_t magic;
     STATUS_REPORT status;
     union {
@@ -146,7 +145,6 @@ struct status_report {
             int waitpid_status;
         } exited;
     };
-    uint8_t pad1[512];
 };
 
 static void spawn_server_send_status_ping(int sock) {
