@@ -38,7 +38,7 @@ func (nv *NvidiaSmi) collectGPUInfo(mx map[string]int64) error {
 	seenGPU := make(map[string]bool)
 	seenMIG := make(map[string]bool)
 
-	for _, gpu := range info.GPUs {
+	for i, gpu := range info.GPUs {
 		if !isValidValue(gpu.UUID) {
 			continue
 		}
@@ -49,7 +49,7 @@ func (nv *NvidiaSmi) collectGPUInfo(mx map[string]int64) error {
 
 		if !nv.gpus[px] {
 			nv.gpus[px] = true
-			nv.addGPUXMLCharts(gpu)
+			nv.addGpuCharts(gpu, i)
 		}
 
 		addMetric(mx, px+"pcie_bandwidth_usage_rx", gpu.PCI.RxUtil, 1024) // KB => bytes
