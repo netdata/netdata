@@ -278,7 +278,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
-                rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                 rrddim_add(st, "free",    NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_add(st, "used",    NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
@@ -411,7 +410,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "InErrs", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -441,7 +439,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "EstabResets", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "ActiveOpens", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -564,7 +561,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InNoECTPkts", "NoECTP", -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -631,7 +627,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -819,7 +814,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "FragOKs", "ok", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "FragFails", "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -849,7 +843,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "ReasmOKs", "ok", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "ReasmFails", "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -879,7 +872,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "InDiscards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutDiscards", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -963,7 +955,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "ok", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -994,7 +985,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "ok", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1027,7 +1017,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "InDiscards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutDiscards", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

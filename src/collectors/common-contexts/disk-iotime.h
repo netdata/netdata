@@ -28,8 +28,6 @@ static inline void common_disk_iotime(ND_DISK_IOTIME *d, const char *id, const c
                 , RRDSET_TYPE_AREA
         );
 
-        rrdset_flag_set(d->st_iotime, RRDSET_FLAG_DETAIL);
-
         d->rd_reads_ms  = rrddim_add(d->st_iotime, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         d->rd_writes_ms = rrddim_add(d->st_iotime, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 

@@ -271,7 +271,6 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                             update_every,
                             RRDSET_TYPE_AREA
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rd = rrddim_add(st, "used", NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                 }
@@ -798,8 +797,6 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
                     RRDSET_TYPE_LINE
             );
 
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
             rd = rrddim_add(st, "started", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
@@ -870,8 +867,6 @@ int do_vm_swap_info(int update_every, usec_t dt) {
                     update_every,
                     RRDSET_TYPE_STACKED
             );
-
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_free = rrddim_add(st, "free",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
             rd_used = rrddim_add(st, "used",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
@@ -1080,8 +1075,6 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
                     update_every,
                     RRDSET_TYPE_LINE
             );
-
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_memory        = rrddim_add(st, "memory",        NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_io_requiring  = rrddim_add(st, "io_requiring",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1756,8 +1749,6 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                             RRDSET_TYPE_LINE
                     );
 
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
                     rd_in_errs      = rrddim_add(st, "InErrs",       NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_in_csum_errs = rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_retrans_segs = rrddim_add(st, "RetransSegs",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1794,8 +1785,6 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                             update_every,
                             RRDSET_TYPE_LINE
                     );
-
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rd_estab_resets  = rrddim_add(st, "EstabResets",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_active_opens  = rrddim_add(st, "ActiveOpens",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1971,8 +1960,6 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                             RRDSET_TYPE_LINE
                     );
 
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
                     rd_rcvce     = rrddim_add(st, "InCEPkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 #if __FreeBSD_version < 1400074
                     rd_ect0      = rrddim_add(st, "ECT0Pkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2081,8 +2068,6 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
                             update_every,
                             RRDSET_TYPE_LINE
                     );
-
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rd_in_errors       = rrddim_add(st, "InErrors",     NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_no_ports        = rrddim_add(st, "NoPorts",      NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2332,8 +2317,6 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                             RRDSET_TYPE_LINE
                     );
 
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
                     rd_ok      = rrddim_add(st, "FragOKs",     "ok",      1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_fails   = rrddim_add(st, "FragFails",   "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_created = rrddim_add(st, "FragCreates", "created", 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2364,8 +2347,6 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                             update_every,
                             RRDSET_TYPE_LINE
                     );
-
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rd_ok     = rrddim_add(st, "ReasmOKs",   "ok",      1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_failed = rrddim_add(st, "ReasmFails", "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2399,8 +2380,6 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                             update_every,
                             RRDSET_TYPE_LINE
                     );
-
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rd_in_discards       = rrddim_add(st, "InDiscards",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out_discards      = rrddim_add(st, "OutDiscards",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2519,8 +2498,6 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                              RRDSET_TYPE_LINE
                     );
 
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
                     rd_ok     = rrddim_add(st, "ok",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_failed = rrddim_add(st, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_all    = rrddim_add(st, "all",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2553,8 +2530,6 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                             update_every,
                             RRDSET_TYPE_LINE
                     );
-
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rd_ok      = rrddim_add(st, "ok",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_failed  = rrddim_add(st, "failed",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2592,8 +2567,6 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                             update_every,
                             RRDSET_TYPE_LINE
                     );
-
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rd_in_discards       = rrddim_add(st, "InDiscards",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out_discards      = rrddim_add(st, "OutDiscards",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

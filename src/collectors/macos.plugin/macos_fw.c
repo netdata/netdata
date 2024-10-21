@@ -199,7 +199,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , update_every
                                 , RRDSET_TYPE_LINE
                         );
-                        rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                         rrddim_add(st, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                         rrddim_add(st, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -235,7 +234,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , update_every
                                 , RRDSET_TYPE_AREA
                         );
-                        rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                         rrddim_add(st, "utilization", NULL, 1, 10000000, RRD_ALGORITHM_INCREMENTAL);
                     }
@@ -270,7 +268,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , update_every
                                 , RRDSET_TYPE_LINE
                         );
-                        rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                         rrddim_add(st, "reads", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
                         rrddim_add(st, "writes", NULL, -1, 1000000, RRD_ALGORITHM_INCREMENTAL);
@@ -302,7 +299,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     , update_every
                                     , RRDSET_TYPE_LINE
                             );
-                            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                             rrddim_add(st, "reads", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
                             rrddim_add(st, "writes", NULL, -1, 1000000, RRD_ALGORITHM_ABSOLUTE);
@@ -330,7 +326,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     , update_every
                                     , RRDSET_TYPE_AREA
                             );
-                            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                             rrddim_add(st, "reads", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
                             rrddim_add(st, "writes", NULL, -1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -358,7 +353,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     , update_every
                                     , RRDSET_TYPE_LINE
                             );
-                            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                             rrddim_add(st, "svctm", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
                         }
@@ -549,7 +543,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -579,7 +572,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -605,7 +597,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
@@ -629,7 +620,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "frames", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

@@ -214,7 +214,6 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_received = rrddim_add(st, "SctpInSCTPPacks",  "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_sent     = rrddim_add(st, "SctpOutSCTPPacks", "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -248,7 +247,6 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_invalid = rrddim_add(st, "SctpOutOfBlues",     "invalid",  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_csum    = rrddim_add(st, "SctpChecksumErrors", "checksum", 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -282,7 +280,6 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
                     , NETDATA_CHART_PRIO_SCTP + 40
                     , update_every
                     , RRDSET_TYPE_LINE);
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_reassembled = rrddim_add(st, "SctpReasmUsrMsgs", "reassembled",  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_fragmented  = rrddim_add(st, "SctpFragUsrMsgs",  "fragmented",  -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -321,7 +318,6 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_InCtrl     = rrddim_add(st, "SctpInCtrlChunks",     "InCtrl",      1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_InOrder    = rrddim_add(st, "SctpInOrderChunks",    "InOrder",     1, 1, RRD_ALGORITHM_INCREMENTAL);

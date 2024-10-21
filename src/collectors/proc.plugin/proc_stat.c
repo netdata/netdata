@@ -794,7 +794,6 @@ int do_proc_stat(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st_forks, RRDSET_FLAG_DETAIL);
 
             rd_started = rrddim_add(st_forks, "started", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }

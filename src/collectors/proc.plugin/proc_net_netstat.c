@@ -465,7 +465,6 @@ static void do_proc_net_snmp6(int update_every) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_ok     = rrddim_add(st, "FragOKs",     "ok",      1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_failed = rrddim_add(st, "FragFails",   "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -501,7 +500,6 @@ static void do_proc_net_snmp6(int update_every) {
                     , NETDATA_CHART_PRIO_IPV6_FRAGSIN
                     , update_every
                     , RRDSET_TYPE_LINE);
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_ok      = rrddim_add(st, "ReasmOKs",     "ok",       1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_failed  = rrddim_add(st, "ReasmFails",   "failed",  -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -544,7 +542,6 @@ static void do_proc_net_snmp6(int update_every) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_InDiscards      = rrddim_add(st, "InDiscards",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_OutDiscards     = rrddim_add(st, "OutDiscards",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -624,7 +621,6 @@ static void do_proc_net_snmp6(int update_every) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_RcvbufErrors = rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -697,7 +693,6 @@ static void do_proc_net_snmp6(int update_every) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_RcvbufErrors = rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -735,7 +730,6 @@ static void do_proc_net_snmp6(int update_every) {
                     , update_every
                     , RRDSET_TYPE_AREA
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_Ip6InMcastOctets  = rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             rd_Ip6OutMcastOctets = rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
@@ -767,7 +761,6 @@ static void do_proc_net_snmp6(int update_every) {
                     , update_every
                     , RRDSET_TYPE_AREA
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_Ip6InBcastOctets  = rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             rd_Ip6OutBcastOctets = rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
@@ -799,7 +792,6 @@ static void do_proc_net_snmp6(int update_every) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_Ip6InMcastPkts  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_Ip6OutMcastPkts = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1781,8 +1773,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , RRDSET_TYPE_AREA
             );
 
-            rrdset_flag_set(st_ip_mcast, RRDSET_FLAG_DETAIL);
-
             rd_in  = rrddim_add(st_ip_mcast, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             rd_out = rrddim_add(st_ip_mcast, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
@@ -1816,8 +1806,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_AREA
             );
-
-            rrdset_flag_set(st_ip_bcast, RRDSET_FLAG_DETAIL);
 
             rd_in  = rrddim_add(st_ip_bcast, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             rd_out = rrddim_add(st_ip_bcast, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
@@ -1853,8 +1841,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
 
-            rrdset_flag_set(st_ip_mcastpkts, RRDSET_FLAG_DETAIL);
-
             rd_in  = rrddim_add(st_ip_mcastpkts, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_out = rrddim_add(st_ip_mcastpkts, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
@@ -1886,8 +1872,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
 
-            rrdset_flag_set(st_ip_bcastpkts, RRDSET_FLAG_DETAIL);
-
             rd_in  = rrddim_add(st_ip_bcastpkts, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_out = rrddim_add(st_ip_bcastpkts, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
@@ -1918,8 +1902,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-
-            rrdset_flag_set(st_ecnpkts, RRDSET_FLAG_DETAIL);
 
             rd_cep    = rrddim_add(st_ecnpkts, "InCEPkts",    "CEP",     1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_noectp = rrddim_add(st_ecnpkts, "InNoECTPkts", "NoECTP", -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2241,7 +2223,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_FragOKs     = rrddim_add(st, "FragOKs",     "ok",      1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_FragFails   = rrddim_add(st, "FragFails",   "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2277,7 +2258,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_ReasmOKs   = rrddim_add(st, "ReasmOKs",   "ok",      1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_ReasmFails = rrddim_add(st, "ReasmFails", "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2319,7 +2299,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_InDiscards      = rrddim_add(st, "InDiscards",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_OutDiscards     = rrddim_add(st, "OutDiscards",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2596,7 +2575,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_InErrs       = rrddim_add(st, "InErrs",       NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_InCsumErrors = rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2631,7 +2609,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_ActiveOpens   = rrddim_add(st, "ActiveOpens",   "active", 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_PassiveOpens  = rrddim_add(st, "PassiveOpens",  "passive", 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2666,7 +2643,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_EstabResets     = rrddim_add(st, "EstabResets",          NULL,                1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_OutRsts         = rrddim_add(st, "OutRsts",              NULL,                1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2744,7 +2720,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_LINE
             );
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rd_RcvbufErrors = rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

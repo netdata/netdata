@@ -297,8 +297,6 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                  RRDSET_TYPE_LINE
                                                  );
 
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
                     rd_packets_in    = rrddim_add(st, "received",           NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_packets_out   = rrddim_add(st, "sent",               NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_packets_m_in  = rrddim_add(st, "multicast_received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -464,8 +462,6 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                                   RRDSET_TYPE_LINE
                         );
 
-                        rrdset_flag_set(ifm->st_packets, RRDSET_FLAG_DETAIL);
-
                         ifm->rd_packets_in    = rrddim_add(ifm->st_packets, "received",           NULL,  1, 1,
                                                            RRD_ALGORITHM_INCREMENTAL);
                         ifm->rd_packets_out   = rrddim_add(ifm->st_packets, "sent",               NULL, -1, 1,
@@ -499,8 +495,6 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                                  RRDSET_TYPE_LINE
                         );
 
-                        rrdset_flag_set(ifm->st_errors, RRDSET_FLAG_DETAIL);
-
                         ifm->rd_errors_in  = rrddim_add(ifm->st_errors, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                         ifm->rd_errors_out = rrddim_add(ifm->st_errors, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     }
@@ -525,8 +519,6 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                                 update_every,
                                                                 RRDSET_TYPE_LINE
                         );
-
-                        rrdset_flag_set(ifm->st_drops, RRDSET_FLAG_DETAIL);
 
                         ifm->rd_drops_in  = rrddim_add(ifm->st_drops, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
 #if __FreeBSD__ >= 11
@@ -556,8 +548,6 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                                  update_every,
                                                                  RRDSET_TYPE_LINE
                         );
-
-                        rrdset_flag_set(ifm->st_events, RRDSET_FLAG_DETAIL);
 
                         ifm->rd_events_coll = rrddim_add(ifm->st_events, "collisions", NULL, -1, 1,
                                                          RRD_ALGORITHM_INCREMENTAL);

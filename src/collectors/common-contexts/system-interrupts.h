@@ -27,8 +27,6 @@ static inline void common_interrupts(uint64_t interrupts, int update_every, char
                                           , update_every
                                           , RRDSET_TYPE_LINE);
 
-        rrdset_flag_set(st_intr, RRDSET_FLAG_DETAIL);
-
         rd_interrupts = rrddim_add(st_intr, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 

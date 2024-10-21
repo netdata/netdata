@@ -1281,8 +1281,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                                         , RRDSET_TYPE_LINE
                                 );
 
-                                rrdset_flag_set(d->st_speed, RRDSET_FLAG_DETAIL);
-
                                 rrdset_update_rrdlabels(d->st_speed, d->chart_labels);
 
                                 d->rd_speed = rrddim_add(d->st_speed, "speed",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1321,8 +1319,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_flag_set(d->st_duplex, RRDSET_FLAG_DETAIL);
-
                 rrdset_update_rrdlabels(d->st_duplex, d->chart_labels);
 
                 d->rd_duplex_full = rrddim_add(d->st_duplex, "full", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1352,8 +1348,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
-
-                rrdset_flag_set(d->st_operstate, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_operstate, d->chart_labels);
 
@@ -1393,8 +1387,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_flag_set(d->st_carrier, RRDSET_FLAG_DETAIL);
-
                 rrdset_update_rrdlabels(d->st_carrier, d->chart_labels);
 
                 d->rd_carrier_up = rrddim_add(d->st_carrier, "up",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1423,8 +1415,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_flag_set(d->st_mtu, RRDSET_FLAG_DETAIL);
-
                 rrdset_update_rrdlabels(d->st_mtu, d->chart_labels);
 
                 d->rd_mtu = rrddim_add(d->st_mtu, "mtu",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1451,8 +1441,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
-
-                rrdset_flag_set(d->st_packets, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_packets, d->chart_labels);
 
@@ -1493,8 +1481,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_flag_set(d->st_errors, RRDSET_FLAG_DETAIL);
-
                 rrdset_update_rrdlabels(d->st_errors, d->chart_labels);
 
                 d->rd_rerrors = rrddim_add(d->st_errors, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1531,8 +1517,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
-
-                rrdset_flag_set(d->st_drops, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_drops, d->chart_labels);
 
@@ -1571,8 +1555,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_flag_set(d->st_fifo, RRDSET_FLAG_DETAIL);
-
                 rrdset_update_rrdlabels(d->st_fifo, d->chart_labels);
 
                 d->rd_rfifo = rrddim_add(d->st_fifo, "receive",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1610,8 +1592,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rrdset_flag_set(d->st_compressed, RRDSET_FLAG_DETAIL);
-
                 rrdset_update_rrdlabels(d->st_compressed, d->chart_labels);
 
                 d->rd_rcompressed = rrddim_add(d->st_compressed, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1648,8 +1628,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
-
-                rrdset_flag_set(d->st_events, RRDSET_FLAG_DETAIL);
 
                 rrdset_update_rrdlabels(d->st_events, d->chart_labels);
 

@@ -341,11 +341,6 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
             else
                 rrdset_isnot_obsolete___safe_from_collector_thread(st);
 
-            if (strstr(options, "detail"))
-                rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-            else
-                rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
-
             if (strstr(options, "hidden"))
                 rrdset_flag_set(st, RRDSET_FLAG_HIDDEN);
             else
@@ -358,7 +353,6 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
         }
         else {
             rrdset_isnot_obsolete___safe_from_collector_thread(st);
-            rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
             rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
         }
 

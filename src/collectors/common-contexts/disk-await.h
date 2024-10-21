@@ -28,8 +28,6 @@ static inline void common_disk_await(ND_DISK_AWAIT *d, const char *id, const cha
             , RRDSET_TYPE_LINE
         );
 
-        rrdset_flag_set(d->st_await, RRDSET_FLAG_DETAIL);
-
         d->rd_await_reads  = rrddim_add(d->st_await, "reads",  NULL,  1, 1000, RRD_ALGORITHM_ABSOLUTE);
         d->rd_await_writes = rrddim_add(d->st_await, "writes", NULL, -1, 1000, RRD_ALGORITHM_ABSOLUTE);
 

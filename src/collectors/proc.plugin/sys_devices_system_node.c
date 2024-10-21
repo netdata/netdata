@@ -122,8 +122,6 @@ static void do_muma_numastat(struct node *m, int update_every) {
 
             rrdlabels_add(m->numastat.st->rrdlabels, "numa_node", m->name, RRDLABEL_SRC_AUTO);
 
-            rrdset_flag_set(m->numastat.st, RRDSET_FLAG_DETAIL);
-
             rrddim_add(m->numastat.st, "numa_hit",       "hit",        1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(m->numastat.st, "numa_miss",      "miss",       1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(m->numastat.st, "local_node",     "local",      1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -203,8 +201,6 @@ static void do_numa_meminfo(struct node *m, int update_every) {
             );
 
             rrdlabels_add(m->meminfo.st->rrdlabels, "numa_node", m->name, RRDLABEL_SRC_AUTO);
-
-            rrdset_flag_set(m->meminfo.st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(m->meminfo.st, "MemFree", "free", 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrddim_add(m->meminfo.st, "MemUsed", "used", 1, 1, RRD_ALGORITHM_ABSOLUTE);

@@ -168,7 +168,6 @@ int do_ipfw(int update_every, usec_t dt) {
                                                  update_every,
                                                  RRDSET_TYPE_STACKED
                 );
-                rrdset_flag_set(st_mem, RRDSET_FLAG_DETAIL);
 
                 rd_dyn_mem = rrddim_add(st_mem, "dynamic", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_stat_mem = rrddim_add(st_mem, "static", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
