@@ -164,10 +164,11 @@ bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_
 
     int r = sd_journal_sendv(iov, iov_count);
 
-    // this is the first successful libsystemd log
-    // let's detect its fd number (we need it for the spawn server)
     if(r == 0 && detect_systemd_socket) {
         __atomic_store_n(&nd_log.journal.first_msg, true, __ATOMIC_RELAXED);
+
+        // this is the first successful libsystemd log
+        // let's detect its fd number (we need it for the spawn server)
 
         for(int i = 3 ; (size_t)i < _countof(sockets_before); i++) {
             if (!sockets_before[i] && fd_is_socket(i)) {
