@@ -29,7 +29,8 @@ static const char *EvtGetExtendedStatus_utf8(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-bool EvtFormatMessage_utf16(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags) {
+bool EvtFormatMessage_utf16(
+    TXT_UTF16 *dst, EVT_HANDLE hMetadata, EVT_HANDLE hEvent, DWORD dwMessageId, EVT_FORMAT_MESSAGE_FLAGS flags) {
     dst->used = 0;
 
     DWORD size = 0;
@@ -39,7 +40,7 @@ bool EvtFormatMessage_utf16(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE h
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() to get message size failed.");
             goto cleanup;
         }
-        txt_unicode_resize(dst, size, false);
+        txt_utf16_resize(dst, size, false);
     }
 
     // First, try to get the message using the existing buffer
@@ -50,7 +51,7 @@ bool EvtFormatMessage_utf16(TXT_UNICODE *dst, EVT_HANDLE hMetadata, EVT_HANDLE h
         }
 
         // Try again with the resized buffer
-        txt_unicode_resize(dst, size, false);
+        txt_utf16_resize(dst, size, false);
         if (!EvtFormatMessage(hMetadata, hEvent, dwMessageId, 0, NULL, flags, dst->size, dst->data, &size)) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed after resizing buffer.");
             goto cleanup;
@@ -75,23 +76,23 @@ cleanup:
 }
 
 static bool EvtFormatMessage_utf8(
-        TXT_UNICODE *tmp, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent,
+    TXT_UTF16 *tmp, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent,
         TXT_UTF8 *dst, EVT_FORMAT_MESSAGE_FLAGS flags) {
 
     dst->src = TXT_SOURCE_EVENT_LOG;
 
     if(EvtFormatMessage_utf16(tmp, provider_handle(p), hEvent, 0, flags))
-        return wevt_str_unicode_to_utf8(dst, tmp);
+        return txt_utf16_to_utf8(dst, tmp);
 
-    wevt_utf8_empty(dst);
+    txt_utf8_empty(dst);
     return false;
 }
 
-bool EvtFormatMessage_Event_utf8(TXT_UNICODE *tmp, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
+bool EvtFormatMessage_Event_utf8(TXT_UTF16 *tmp, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
     return EvtFormatMessage_utf8(tmp, p, hEvent, dst, EvtFormatMessageEvent);
 }
 
-bool EvtFormatMessage_Xml_utf8(TXT_UNICODE *tmp, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
+bool EvtFormatMessage_Xml_utf8(TXT_UTF16 *tmp, PROVIDER_META_HANDLE *p, EVT_HANDLE hEvent, TXT_UTF8 *dst) {
     return EvtFormatMessage_utf8(tmp, p, hEvent, dst, EvtFormatMessageXml);
 }
 
@@ -130,7 +131,7 @@ static void wevt_get_level(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *
     TXT_UTF8 *dst = &log->ops.level;
     uint64_t value = ev->level;
 
-    wevt_utf8_empty(dst);
+    txt_utf8_empty(dst);
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageLevel;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_LEVEL;
@@ -182,7 +183,7 @@ static void wevt_get_opcode(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE 
     TXT_UTF8 *dst = &log->ops.opcode;
     uint64_t value = ev->opcode;
 
-    wevt_utf8_empty(dst);
+    txt_utf8_empty(dst);
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageOpcode;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_OPCODE;
@@ -224,7 +225,7 @@ static void wevt_get_task(WEVT_LOG *log, WEVT_EVENT *ev, PROVIDER_META_HANDLE *h
     TXT_UTF8 *dst = &log->ops.task;
     uint64_t value = ev->task;
 
-    wevt_utf8_empty(dst);
+    txt_utf8_empty(dst);
 
     EVT_FORMAT_MESSAGE_FLAGS flags = EvtFormatMessageTask;
     WEVT_FIELD_TYPE cache_type = WEVT_FIELD_TYPE_TASK;
@@ -273,7 +274,7 @@ static uint64_t wevt_keyword_handle_reserved(uint64_t value, TXT_UTF8 *dst) {
         SET_BITS(WEVT_KEYWORD_RESPONSE_TIME, WEVT_KEYWORD_NAME_RESPONSE_TIME),
     };
 
-    wevt_utf8_empty(dst);
+    txt_utf8_empty(dst);
 
     for(size_t i = 0; i < sizeof(bits) / sizeof(bits[0]) ;i++) {
         if((value & bits[i].mask) == bits[i].mask) {
@@ -592,7 +593,7 @@ void wevt_closelog6(WEVT_LOG *log) {
 
     wevt_variant_cleanup(&log->ops.raw.system);
     wevt_variant_cleanup(&log->ops.raw.user);
-    txt_unicode_cleanup(&log->ops.unicode);
+    txt_utf16_cleanup(&log->ops.unicode);
     txt_utf8_cleanup(&log->ops.channel);
     txt_utf8_cleanup(&log->ops.provider);
     txt_utf8_cleanup(&log->ops.computer);

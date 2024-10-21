@@ -1,5 +1,5 @@
 #ifndef NETDATA_SECURITY_H
-# define NETDATA_SECURITY_H
+#define NETDATA_SECURITY_H
 
 typedef enum __attribute__((packed)) {
     NETDATA_SSL_STATE_NOT_SSL = 1,  // This connection is not SSL
@@ -11,26 +11,6 @@ typedef enum __attribute__((packed)) {
 #define NETDATA_SSL_WEB_SERVER_CTX 0
 #define NETDATA_SSL_STREAMING_SENDER_CTX 1
 #define NETDATA_SSL_EXPORTING_CTX 2
-
-#define OPENSSL_VERSION_095 0x00905100L
-#define OPENSSL_VERSION_097 0x0907000L
-#define OPENSSL_VERSION_110 0x10100000L
-#define OPENSSL_VERSION_111 0x10101000L
-#define OPENSSL_VERSION_300 0x30000000L
-
-#  include <openssl/ssl.h>
-#  include <openssl/rand.h>
-#  include <openssl/err.h>
-#  include <openssl/evp.h>
-#  include <openssl/pem.h>
-#  if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
-#   include <openssl/conf.h>
-#  endif
-
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
-#include <openssl/core_names.h>
-#include <openssl/decoder.h>
-#endif
 
 typedef struct netdata_ssl {
     SSL *conn;               // SSL connection

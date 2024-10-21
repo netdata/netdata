@@ -27,7 +27,7 @@ static void apps_plugin_function_processes_help(const char *transaction) {
                    "   parent:NAME\n"
                    "      Shows only processes that are aggregated under parent `NAME`\n"
                    "\n"
-#if (PROCESSES_HAVE_UID == 1)
+#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_SID == 1)
                    "   user:NAME\n"
                    "      Shows only processes that are running as user name `NAME`.\n"
                    "\n"
@@ -89,6 +89,12 @@ void function_processes(const char *transaction, char *function,
     size_t num_words = quoted_strings_splitter_whitespace(function, words, PLUGINSD_MAX_WORDS);
 
     struct target *category = NULL, *user = NULL, *group = NULL; (void)category; (void)user; (void)group;
+#if (PROCESSES_HAVE_UID == 1)
+    struct target *users_sid_root = users_root_target;
+#endif
+#if (PROCESSES_HAVE_SID == 1)
+    struct target *users_sid_root = sids_root_target;
+#endif
     const char *process_name = NULL;
     pid_t pid = 0;
     uid_t uid = 0; (void)uid;
@@ -110,9 +116,9 @@ void function_processes(const char *transaction, char *function,
                 return;
             }
         }
-#if (PROCESSES_HAVE_UID == 1)
+#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_SID == 1)
         else if(!user && strncmp(keyword, PROCESS_FILTER_USER, strlen(PROCESS_FILTER_USER)) == 0) {
-            user = find_target_by_name(users_root_target, &keyword[strlen(PROCESS_FILTER_USER)]);
+            user = find_target_by_name(users_sid_root, &keyword[strlen(PROCESS_FILTER_USER)]);
             if(!user) {
                 pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST,
                                                        "No user with that name found.");
@@ -271,6 +277,11 @@ void function_processes(const char *transaction, char *function,
             continue;
 #endif
 
+#if (PROCESSES_HAVE_SID == 1)
+        if(user && p->sid_target != user)
+            continue;
+#endif
+
         if(process_name && ((strcmp(pid_stat_comm(p), process_name) != 0 && !p->parent) || (p->parent && strcmp(pid_stat_comm(p), process_name) != 0 && strcmp(pid_stat_comm(p->parent), process_name) != 0)))
             continue;
 
@@ -322,6 +333,10 @@ void function_processes(const char *transaction, char *function,
 
         // uid
         buffer_json_add_array_item_uint64(wb, p->uid);
+#endif
+#if (PROCESSES_HAVE_SID == 1)
+        // account
+        buffer_json_add_array_item_string(wb, p->sid_target ? string2str(p->sid_target->name) : "-");
 #endif
 
 #if (PROCESSES_HAVE_GID == 1)
@@ -493,12 +508,14 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
-#if (PROCESSES_HAVE_UID == 1)
+#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_SID == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "User", "User Owner", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
+#endif
+#if (PROCESSES_HAVE_UID == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "Uid", "User ID", RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,
                                     RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
@@ -1079,7 +1096,7 @@ void function_processes(const char *transaction, char *function,
         }
         buffer_json_object_close(wb);
 
-#if (PROCESSES_HAVE_UID == 1)
+#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_SID == 1)
         // group by User
         buffer_json_member_add_object(wb, "User");
         {

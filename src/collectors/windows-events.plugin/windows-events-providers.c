@@ -78,7 +78,8 @@ static struct {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
 };
 
-static void provider_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *dst, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id);
+static void provider_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property,
+    TXT_UTF16 *dst, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id);
 
 const char *provider_get_name(PROVIDER_META_HANDLE *p) {
     return (p && p->provider && p->provider->name) ? p->provider->name : "__UNKNOWN PROVIDER__";
@@ -226,7 +227,7 @@ PROVIDER_META_HANDLE *provider_get(ND_UUID uuid, LPCWSTR providerName) {
     if(load_it) {
         WEVT_VARIANT content = { 0 };
         WEVT_VARIANT property = { 0 };
-        TXT_UNICODE unicode = { 0 };
+        TXT_UTF16 unicode = { 0 };
 
         provider_detect_platform(h, &content);
         provider_load_list(h, &content, &property, &unicode, &p->keyword, EvtPublisherMetadataKeywords);
@@ -234,7 +235,7 @@ PROVIDER_META_HANDLE *provider_get(ND_UUID uuid, LPCWSTR providerName) {
         provider_load_list(h, &content, &property, &unicode, &p->opcodes, EvtPublisherMetadataOpcodes);
         provider_load_list(h, &content, &property, &unicode, &p->tasks, EvtPublisherMetadataTasks);
 
-        txt_unicode_cleanup(&unicode);
+        txt_utf16_cleanup(&unicode);
         wevt_variant_cleanup(&content);
         wevt_variant_cleanup(&property);
     }
@@ -365,7 +366,8 @@ static int compare_ascending(const void *a, const void *b) {
 //    return 0;
 //}
 
-static void provider_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property, TXT_UNICODE *dst, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id) {
+static void provider_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property,
+    TXT_UTF16 *dst, struct provider_list *l, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id) {
     if(!h || !h->hMetadata) return;
 
     EVT_PUBLISHER_METADATA_PROPERTY_ID name_id, message_id, value_id;
@@ -477,7 +479,7 @@ static void provider_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, W
             if (messageID != (uint32_t)-1) {
                 if (EvtFormatMessage_utf16(dst, hMetadata, NULL, messageID, EvtFormatMessageId)) {
                     size_t len;
-                    d->name = unicode2utf8_strdupz(dst->data, &len);
+                    d->name = utf16_to_utf8_strdupz(dst->data, &len);
                     d->len = len;
                 }
             }
@@ -487,7 +489,7 @@ static void provider_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, W
         if (!d->name && wevt_get_property_from_array(property, hArray, i, name_id)) {
             fatal_assert(property->data->Type == EvtVarTypeString);
             size_t len;
-            d->name = unicode2utf8_strdupz(property->data->StringVal, &len);
+            d->name = utf16_to_utf8_strdupz(property->data->StringVal, &len);
             d->len = len;
         }
 

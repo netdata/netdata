@@ -768,6 +768,14 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/windows-perflib/perflib.h
         src/libnetdata/os/windows-perflib/perflib-names.c
         src/libnetdata/os/windows-perflib/perflib-dump.c
+        src/libnetdata/os/system-maps/cached-uid-username.c
+        src/libnetdata/os/system-maps/cached-uid-username.h
+        src/libnetdata/os/system-maps/cached-sid-username.c
+        src/libnetdata/os/system-maps/cached-sid-username.h
+        src/libnetdata/os/system-maps/cached-gid-groupname.c
+        src/libnetdata/os/system-maps/cached-gid-groupname.h
+        src/libnetdata/os/system-maps/cache-host-users-and-groups.c
+        src/libnetdata/os/system-maps/cache-host-users-and-groups.h
         src/libnetdata/spawn_server/spawn_server_nofork.c
         src/libnetdata/spawn_server/spawn_server.h
         src/libnetdata/spawn_server/spawn_popen.c
@@ -845,6 +853,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/spawn_server/log-forwarder.h
         src/libnetdata/log/nd_log-common.h
         src/libnetdata/log/nd_log-to-windows-common.h
+        src/libnetdata/common.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1332,9 +1341,7 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
         src/collectors/systemd-journal.plugin/systemd-journal-watcher.c
         src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
-        src/libnetdata/maps/system-users.h
-        src/libnetdata/maps/system-groups.h
-        src/libnetdata/maps/system-services.h
+        src/libnetdata/os/system-maps/system-services.h
         src/collectors/systemd-journal.plugin/systemd-journal-sampling.h
 )
 
@@ -1464,8 +1471,6 @@ set(WINDOWS_EVENTS_PLUGIN_FILES
         src/collectors/windows-events.plugin/windows-events-query.c
         src/collectors/windows-events.plugin/windows-events-sources.c
         src/collectors/windows-events.plugin/windows-events-sources.h
-        src/collectors/windows-events.plugin/windows-events-sid.c
-        src/collectors/windows-events.plugin/windows-events-sid.h
         src/collectors/windows-events.plugin/windows-events-unicode.c
         src/collectors/windows-events.plugin/windows-events-unicode.h
         src/collectors/windows-events.plugin/windows-events-xml.c
@@ -2020,7 +2025,6 @@ if(ENABLE_PLUGIN_APPS)
             src/collectors/apps.plugin/apps_plugin.h
             src/collectors/apps.plugin/apps_functions.c
             src/collectors/apps.plugin/apps_targets.c
-            src/collectors/apps.plugin/apps_users_and_groups.c
             src/collectors/apps.plugin/apps_output.c
             src/collectors/apps.plugin/apps_pid_files.c
             src/collectors/apps.plugin/apps_pid.c
@@ -2356,7 +2360,7 @@ endif()
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         set(LOCAL_LISTENERS_FILES
                 src/collectors/utils/local_listeners.c
-                src/libnetdata/maps/local-sockets.h
+                src/libnetdata/local-sockets/local-sockets.h
         )
 
         add_executable(local-listeners ${LOCAL_LISTENERS_FILES})
@@ -2375,8 +2379,7 @@ endif()
 
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
         set(NETWORK_VIEWER_FILES
-                src/libnetdata/maps/local-sockets.h
-                src/libnetdata/maps/system-users.h
+                src/libnetdata/local-sockets/local-sockets.h
                 src/collectors/network-viewer.plugin/network-viewer.c
         )
 

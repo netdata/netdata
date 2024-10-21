@@ -3,6 +3,8 @@
 #ifndef NETDATA_WEB_BUFFER_H
 #define NETDATA_WEB_BUFFER_H 1
 
+#include "../uuid/uuid.h"
+#include "../http/content_type.h"
 #include "../string/utf8.h"
 #include "../libnetdata.h"
 

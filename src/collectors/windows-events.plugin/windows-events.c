@@ -1299,7 +1299,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     wevt_sources_init();
     provider_cache_init();
-    sid_cache_init();
+    cached_sid_username_init();
     field_cache_init();
 
     if(!EnableWindowsPrivilege(SE_SECURITY_NAME))

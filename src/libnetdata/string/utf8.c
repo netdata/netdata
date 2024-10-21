@@ -13,9 +13,12 @@
  *   3. Always return the number of wide characters written, including the null terminator
  */
 
-size_t any_to_utf16(uint32_t CodePage, wchar_t *dst, size_t dst_size, const char *src, int src_len) {
+size_t any_to_utf16(uint32_t CodePage, wchar_t *dst, size_t dst_size, const char *src, int src_len, bool *truncated) {
     if(!src || src_len == 0) {
         // invalid input
+        if(truncated)
+            *truncated = true;
+
         if(dst && dst_size)
             *dst = L'\0';
         return 0;
@@ -23,6 +26,10 @@ size_t any_to_utf16(uint32_t CodePage, wchar_t *dst, size_t dst_size, const char
 
     if(!dst || !dst_size) {
         // the caller wants to know the buffer to allocate for the conversion
+
+        if(truncated)
+            *truncated = true;
+
         int required = MultiByteToWideChar(CodePage, 0, src, src_len, NULL, 0);
         if(required <= 0) return 0; // error in the conversion
 
@@ -34,6 +41,9 @@ size_t any_to_utf16(uint32_t CodePage, wchar_t *dst, size_t dst_size, const char
     // do the conversion directly to the destination buffer
     int rc = MultiByteToWideChar(CodePage, 0, src, src_len, dst, (int)dst_size);
     if(rc <= 0) {
+        if(truncated)
+            *truncated = true;
+
         // conversion failed, let's see why...
         DWORD status = GetLastError();
         if(status == ERROR_INSUFFICIENT_BUFFER) {
@@ -81,9 +91,17 @@ size_t any_to_utf16(uint32_t CodePage, wchar_t *dst, size_t dst_size, const char
 
     size_t len = rc;
 
+    if(truncated)
+        *truncated = false;
+
     if(len >= dst_size) {
-        // truncate it to fit the null
-        dst[dst_size - 1] = L'\0';
+        if(dst[dst_size - 1] != L'\0') {
+            if (truncated)
+                *truncated = true;
+
+            // Truncate it to fit the null terminator
+            dst[dst_size - 1] = L'\0';
+        }
         return dst_size;
     }
 
@@ -106,16 +124,24 @@ size_t any_to_utf16(uint32_t CodePage, wchar_t *dst, size_t dst_size, const char
  *   3. Always return the number of bytes written, including the null terminator
  */
 
-size_t utf16_to_utf8(char *dst, size_t dst_size, const wchar_t *src, int src_len) {
+size_t utf16_to_utf8(char *dst, size_t dst_size, const wchar_t *src, int src_len, bool *truncated) {
     if (!src || src_len == 0) {
         // invalid input
+        if(truncated)
+            *truncated = true;
+
         if(dst && dst_size)
-            *dst = L'\0';
+            *dst = '\0';
+
         return 0;
     }
 
     if (!dst || dst_size == 0) {
         // The caller wants to know the buffer size required for the conversion
+
+        if(truncated)
+            *truncated = true;
+
         int required = WideCharToMultiByte(CP_UTF8, 0, src, src_len, NULL, 0, NULL, NULL);
         if (required <= 0) return 0; // error in the conversion
 
@@ -126,6 +152,9 @@ size_t utf16_to_utf8(char *dst, size_t dst_size, const wchar_t *src, int src_len
     // Perform the conversion directly into the destination buffer
     int rc = WideCharToMultiByte(CP_UTF8, 0, src, src_len, dst, (int)dst_size, NULL, NULL);
     if (rc <= 0) {
+        if(truncated)
+            *truncated = true;
+
         // Conversion failed, let's see why...
         DWORD status = GetLastError();
         if (status == ERROR_INSUFFICIENT_BUFFER) {
@@ -173,9 +202,17 @@ size_t utf16_to_utf8(char *dst, size_t dst_size, const wchar_t *src, int src_len
 
     size_t len = rc;
 
+    if(truncated)
+        *truncated = false;
+
     if (len >= dst_size) {
-        // Truncate it to fit the null terminator
-        dst[dst_size - 1] = '\0';
+        if(dst[dst_size - 1] != '\0') {
+            if (truncated)
+                *truncated = true;
+
+            // Truncate it to fit the null terminator
+            dst[dst_size - 1] = '\0';
+        }
         return dst_size;
     }
 
@@ -189,4 +226,185 @@ size_t utf16_to_utf8(char *dst, size_t dst_size, const wchar_t *src, int src_len
     // The result is already null-terminated
     return len;
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+
+size_t txt_compute_new_size(size_t old_size, size_t required_size) {
+    size_t size = (required_size % 2048 == 0) ? required_size : required_size + 2048;
+    size = (size / 2048) * 2048;
+
+    if(size < old_size * 2)
+        size = old_size * 2;
+
+    return size;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// TXT_UTF8
+
+void txt_utf8_cleanup(TXT_UTF8 *dst) {
+    freez(dst->data);
+    dst->data = NULL;
+    dst->used = 0;
+}
+
+void txt_utf8_resize(TXT_UTF8 *dst, size_t required_size, bool keep) {
+    if(required_size <= dst->size)
+        return;
+
+    size_t new_size = txt_compute_new_size(dst->size, required_size);
+
+    if(keep && dst->data)
+        dst->data = reallocz(dst->data, new_size);
+    else {
+        txt_utf8_cleanup(dst);
+        dst->data = mallocz(new_size);
+        dst->used = 0;
+    }
+
+    dst->size = new_size;
+}
+
+void txt_utf8_empty(TXT_UTF8 *dst) {
+    txt_utf8_resize(dst, 1, false);
+    dst->data[0] = '\0';
+    dst->used = 1;
+}
+
+void txt_utf8_set(TXT_UTF8 *dst, const char *txt, size_t txt_len) {
+    txt_utf8_resize(dst, dst->used + txt_len + 1, true);
+    memcpy(dst->data, txt, txt_len);
+    dst->used = txt_len + 1;
+    dst->data[dst->used - 1] = '\0';
+}
+
+void txt_utf8_append(TXT_UTF8 *dst, const char *txt, size_t txt_len) {
+    if(dst->used <= 1) {
+        // the destination is empty
+        txt_utf8_set(dst, txt, txt_len);
+    }
+    else {
+        // there is something already in the buffer
+        txt_utf8_resize(dst, dst->used + txt_len, true);
+        memcpy(&dst->data[dst->used - 1], txt, txt_len);
+        dst->used += txt_len; // the null was already counted
+        dst->data[dst->used - 1] = '\0';
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// TXT_UTF16
+
+void txt_utf16_cleanup(TXT_UTF16 *dst) {
+    freez(dst->data);
+}
+
+void txt_utf16_resize(TXT_UTF16 *dst, size_t required_size, bool keep) {
+    if(required_size <= dst->size)
+        return;
+
+    size_t new_size = txt_compute_new_size(dst->size, required_size);
+
+    if (keep && dst->data) {
+        dst->data = reallocz(dst->data, new_size * sizeof(wchar_t));
+    } else {
+        txt_utf16_cleanup(dst);
+        dst->data = mallocz(new_size * sizeof(wchar_t));
+        dst->used = 0;
+    }
+
+    dst->size = new_size;
+}
+
+void txt_utf16_set(TXT_UTF16 *dst, const wchar_t *txt, size_t txt_len) {
+    txt_utf16_resize(dst, dst->used + txt_len + 1, true);
+    memcpy(dst->data, txt, txt_len * sizeof(wchar_t));
+    dst->used = txt_len + 1;
+    dst->data[dst->used - 1] = '\0';
+}
+
+void txt_utf16_append(TXT_UTF16 *dst, const wchar_t *txt, size_t txt_len) {
+    if(dst->used <= 1) {
+        // the destination is empty
+        txt_utf16_set(dst, txt, txt_len);
+    }
+    else {
+        // there is something already in the buffer
+        txt_utf16_resize(dst, dst->used + txt_len, true);
+        memcpy(&dst->data[dst->used - 1], txt, txt_len * sizeof(wchar_t));
+        dst->used += txt_len; // the null was already counted
+        dst->data[dst->used - 1] = '\0';
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+bool wchar_to_txt_utf8(TXT_UTF8 *dst, const wchar_t *src, int src_len) {
+    if(!src || !src_len) {
+        txt_utf8_empty(dst);
+        return false;
+    }
+
+    if(!dst->data && !dst->size) {
+        size_t size = utf16_to_utf8(NULL, 0, src, src_len, NULL);
+        if(!size) {
+            txt_utf8_empty(dst);
+            return false;
+        }
+
+        // we +1 here to avoid entering the next condition below
+        txt_utf8_resize(dst, size, false);
+    }
+
+    bool truncated = false;
+    dst->used = utf16_to_utf8(dst->data, dst->size, src, src_len, &truncated);
+    if(truncated) {
+        // we need to resize
+        size_t needed = utf16_to_utf8(NULL, 0, src, src_len, NULL); // find the size needed
+        if(!needed) {
+            txt_utf8_empty(dst);
+            return false;
+        }
+
+        txt_utf8_resize(dst, needed, false);
+        dst->used = utf16_to_utf8(dst->data, dst->size, src, src_len, NULL);
+    }
+
+    // Make sure it is not zero padded at the end
+    while(dst->used >= 2 && dst->data[dst->used - 2] == 0)
+        dst->used--;
+
+    internal_fatal(strlen(dst->data) + 1 != dst->used,
+                   "Wrong UTF8 string length");
+
+    return true;
+}
+
+bool txt_utf16_to_utf8(TXT_UTF8 *utf8, TXT_UTF16 *utf16) {
+    fatal_assert(utf8 && ((utf8->data && utf8->size) || (!utf8->data && !utf8->size)));
+    fatal_assert(utf16 && ((utf16->data && utf16->size) || (!utf16->data && !utf16->size)));
+
+    // pass the entire utf16 size, including the null terminator
+    // so that the resulting utf8 message will be null terminated too.
+    return wchar_to_txt_utf8(utf8, utf16->data, (int)utf16->used - 1);
+}
+
+char *utf16_to_utf8_strdupz(const wchar_t *src, size_t *dst_len) {
+    size_t size = utf16_to_utf8(NULL, 0, src, -1, NULL);
+    if (size) {
+        char *dst = mallocz(size);
+
+        size = utf16_to_utf8(dst, size, src, -1, NULL);
+        if(dst_len)
+            *dst_len = size - 1;
+
+        return dst;
+    }
+
+    if(dst_len)
+        *dst_len = 0;
+
+    return NULL;
+}
+
 #endif

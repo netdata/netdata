@@ -74,10 +74,10 @@ uint32_t
 // the metrics. This results in utilization that exceeds the total utilization
 // of the system.
 //
-// During normalization, we align the per-process utilization, to the total of
-// the system. We first consume the exited children utilization and it the
-// collected values is above the total, we proportionally scale each reported
-// metric.
+// During normalization, we align the per-process utilization to the global
+// utilization of the system. We first consume the exited children utilization
+// and it the collected values is above the total, we proportionally scale each
+// reported metric.
 
 // the total system time, as reported by /proc/stat
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
@@ -211,9 +211,10 @@ void print_hierarchy(struct pid_stat *root) {
 static void normalize_utilization(struct target *root) {
     struct target *w;
 
-    // childs processing introduces spikes
-    // here we try to eliminate them by disabling childs processing either for specific dimensions
-    // or entirely. Of course, either way, we disable it just a single iteration.
+    // children processing introduces spikes,
+    // here we try to eliminate them by disabling children processing either
+    // for specific dimensions or entirely.
+    // of course, either way, we disable it just for a single iteration.
 
     kernel_uint_t max_time = os_get_system_cpus() * NSEC_PER_SEC;
     kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
@@ -249,7 +250,7 @@ static void normalize_utilization(struct target *root) {
             cgtime_fix_ratio = 1.0; //(NETDATA_DOUBLE)(global_utime + global_stime) / (NETDATA_DOUBLE)(utime + cutime + stime + cstime);
         }
         else if((global_utime + global_stime > utime + stime) && (cutime || cstime)) {
-            // children resources are too high
+            // children resources are too high,
             // lower only the children resources
             utime_fix_ratio  =
             stime_fix_ratio  =
@@ -481,7 +482,7 @@ static void parse_args(int argc, char **argv)
         }
 #endif
 
-#if (PROCESSES_HAVE_UID == 1)
+#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_SID == 1)
         if(strcmp("no-users", argv[i]) == 0 || strcmp("without-users", argv[i]) == 0) {
             enable_users_charts = 0;
             continue;
@@ -544,7 +545,7 @@ static void parse_args(int argc, char **argv)
                     "                        (default is enabled)\n"
                     "\n"
 #endif
-#if (PROCESSES_HAVE_UID == 1)
+#if (PROCESSES_HAVE_UID == 1) || (PROCESSES_HAVE_SID == 1)
                     " without-users          disable reporting per user charts\n"
                     "\n"
 #endif
@@ -734,7 +735,18 @@ int main(int argc, char **argv) {
 
     netdata_log_info("started on pid %d", getpid());
 
-    apps_users_and_groups_init();
+#if (PROCESSES_HAVE_UID == 1)
+    cached_usernames_init();
+#endif
+
+#if (PROCESSES_HAVE_GID == 1)
+    cached_groupnames_init();
+#endif
+
+#if (PROCESSES_HAVE_SID == 1)
+    cached_sid_username_init();
+#endif
+
     apps_pids_init();
     OS_FUNCTION(apps_os_init)();
 
@@ -820,6 +832,13 @@ int main(int argc, char **argv) {
         if (enable_groups_charts) {
             send_charts_updates_to_netdata(groups_root_target, "usergroup", "user_group", "User Group Processes");
             send_collected_data_to_netdata(groups_root_target, "usergroup", dt);
+        }
+#endif
+
+#if (PROCESSES_HAVE_SID == 1)
+        if (enable_users_charts) {
+            send_charts_updates_to_netdata(sids_root_target, "user", "user", "User Processes");
+            send_collected_data_to_netdata(sids_root_target, "user", dt);
         }
 #endif
 

@@ -23,7 +23,15 @@
 #include "os-freebsd-wrappers.h"
 #include "os-macos-wrappers.h"
 #include "os-windows-wrappers.h"
+#include "system-maps/cached-uid-username.h"
+#include "system-maps/cached-gid-groupname.h"
+#include "system-maps/cache-host-users-and-groups.h"
+#include "system-maps/cached-sid-username.h"
 #include "windows-perflib/perflib.h"
+
+// this includes windows.h to the whole of netdata
+// so various conflicts arise
+// #include "windows-wmi/windows-wmi.h"
 
 // =====================================================================================================================
 // common defs for Apple/FreeBSD/Linux

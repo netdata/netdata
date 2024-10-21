@@ -248,4 +248,15 @@ struct aral_statistics *pgc_aral_statistics(void);
 size_t pgc_aral_structures(void);
 size_t pgc_aral_overhead(void);
 
+static inline size_t indexing_partition(Word_t ptr, Word_t modulo) __attribute__((const));
+static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
+#ifdef ENV64BIT
+    uint64_t hash = murmur64(ptr);
+    return hash % modulo;
+#else
+    uint32_t hash = murmur32(ptr);
+    return hash % modulo;
+#endif
+}
+
 #endif // DBENGINE_CACHE_H

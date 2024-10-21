@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "windows-events-sid.h"
+#include "../../libnetdata.h"
+
+#if defined(OS_WINDOWS)
+#include "cached-sid-username.h"
+#include <windows.h>
 #include <sddl.h>
 
 typedef struct {
@@ -12,15 +16,10 @@ typedef struct {
     // IMPORTANT:
     // This is malloc'd ! You have to manually set fields to zero.
 
-    const char *account;
-    const char *domain;
-    const char *full;
-    const char *sid_str;
-
-    uint32_t account_len;
-    uint32_t domain_len;
-    uint32_t full_len;
-    uint32_t sid_str_len;
+    STRING *account;
+    STRING *domain;
+    STRING *full;
+    STRING *sid_str;
 
     // this needs to be last, because of its variable size
     SID_KEY key;
@@ -49,11 +48,25 @@ static inline bool sid_cache_compar(SID_KEY *a, SID_KEY *b) {
     return a->len == b->len && memcmp(&a->sid, &b->sid, a->len) == 0;
 }
 
-void sid_cache_init(void) {
+void cached_sid_username_init(void) {
     simple_hashtable_init_SID(&sid_globals.hashtable, 100);
 }
 
-static void lookup_user(SID_VALUE *sv) {
+static char *account2utf8(const wchar_t *user) {
+    static __thread char buffer[256];
+    if(utf16_to_utf8(buffer, sizeof(buffer), user, -1, NULL) == 0)
+        buffer[0] = '\0';
+    return buffer;
+}
+
+static char *domain2utf8(const wchar_t *domain) {
+    static __thread char buffer[256];
+    if(utf16_to_utf8(buffer, sizeof(buffer), domain, -1, NULL) == 0)
+        buffer[0] = '\0';
+    return buffer;
+}
+
+static void lookup_user_in_system(SID_VALUE *sv) {
     static __thread wchar_t account_unicode[256];
     static __thread wchar_t domain_unicode[256];
     static __thread char tmp[512 + 2];
@@ -66,28 +79,21 @@ static void lookup_user(SID_VALUE *sv) {
         const char *account = account2utf8(account_unicode);
         const char *domain = domain2utf8(domain_unicode);
         snprintfz(tmp, sizeof(tmp), "%s\\%s", domain, account);
-        sv->domain = strdupz(domain); sv->domain_len = strlen(sv->domain);
-        sv->account = strdupz(account); sv->account_len = strlen(sv->account);
-        sv->full = strdupz(tmp); sv->full_len = strlen(sv->full);
+        sv->domain = string_strdupz(domain);
+        sv->account = string_strdupz(account);
+        sv->full = string_strdupz(tmp);
     }
     else {
         sv->domain = NULL;
         sv->account = NULL;
         sv->full = NULL;
-        sv->domain_len = 0;
-        sv->account_len = 0;
-        sv->full_len = 0;
     }
 
     wchar_t *sid_string = NULL;
-    if (ConvertSidToStringSidW(sv->key.sid, &sid_string)) {
-        sv->sid_str = strdupz(account2utf8(sid_string));
-        sv->sid_str_len = strlen(sv->sid_str);
-    }
-    else {
+    if (ConvertSidToStringSidW(sv->key.sid, &sid_string))
+        sv->sid_str = string_strdupz(account2utf8(sid_string));
+    else
         sv->sid_str = NULL;
-        sv->sid_str_len = 0;
-    }
 }
 
 static SID_VALUE *lookup_or_convert_user_id_to_name_lookup(PSID sid) {
@@ -112,7 +118,7 @@ static SID_VALUE *lookup_or_convert_user_id_to_name_lookup(PSID sid) {
     found = mallocz(tmp_size);
     memcpy(found, buf, tmp_size);
 
-    lookup_user(found);
+    lookup_user_in_system(found);
 
     // add it to the cache
     spinlock_lock(&sid_globals.spinlock);
@@ -122,41 +128,44 @@ static SID_VALUE *lookup_or_convert_user_id_to_name_lookup(PSID sid) {
     return found;
 }
 
-bool wevt_convert_user_id_to_name(PSID sid, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str) {
+bool cached_sid_to_account_domain_sidstr(PSID sid, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str) {
     SID_VALUE *found = lookup_or_convert_user_id_to_name_lookup(sid);
 
     if(found) {
         if (found->account) {
-            txt_utf8_resize(dst_account, found->account_len + 1, false);
-            memcpy(dst_account->data, found->account, found->account_len + 1);
-            dst_account->used = found->account_len + 1;
+            txt_utf8_resize(dst_account, string_strlen(found->account) + 1, false);
+            memcpy(dst_account->data, string2str(found->account), string_strlen(found->account) + 1);
+            dst_account->used = string_strlen(found->account) + 1;
         }
-        else wevt_utf8_empty(dst_account);
+        else
+            txt_utf8_empty(dst_account);
 
         if (found->domain) {
-            txt_utf8_resize(dst_domain, found->domain_len + 1, false);
-            memcpy(dst_domain->data, found->domain, found->domain_len + 1);
-            dst_domain->used = found->domain_len + 1;
+            txt_utf8_resize(dst_domain, string_strlen(found->domain) + 1, false);
+            memcpy(dst_domain->data, string2str(found->domain), string_strlen(found->domain) + 1);
+            dst_domain->used = string_strlen(found->domain) + 1;
         }
-        else wevt_utf8_empty(dst_domain);
+        else
+            txt_utf8_empty(dst_domain);
 
         if (found->sid_str) {
-            txt_utf8_resize(dst_sid_str, found->sid_str_len + 1, false);
-            memcpy(dst_sid_str->data, found->sid_str, found->sid_str_len + 1);
-            dst_sid_str->used = found->sid_str_len + 1;
+            txt_utf8_resize(dst_sid_str, string_strlen(found->sid_str) + 1, false);
+            memcpy(dst_sid_str->data, string2str(found->sid_str), string_strlen(found->sid_str) + 1);
+            dst_sid_str->used = string_strlen(found->sid_str) + 1;
         }
-        else wevt_utf8_empty(dst_sid_str);
+        else
+            txt_utf8_empty(dst_sid_str);
 
         return true;
     }
 
-    wevt_utf8_empty(dst_account);
-    wevt_utf8_empty(dst_domain);
-    wevt_utf8_empty(dst_sid_str);
+    txt_utf8_empty(dst_account);
+    txt_utf8_empty(dst_domain);
+    txt_utf8_empty(dst_sid_str);
     return false;
 }
 
-bool buffer_sid_to_sid_str_and_name(PSID sid, BUFFER *dst, const char *prefix) {
+bool cached_sid_to_buffer_append(PSID sid, BUFFER *dst, const char *prefix) {
     SID_VALUE *found = lookup_or_convert_user_id_to_name_lookup(sid);
     size_t added = 0;
 
@@ -165,17 +174,28 @@ bool buffer_sid_to_sid_str_and_name(PSID sid, BUFFER *dst, const char *prefix) {
             if (prefix && *prefix)
                 buffer_strcat(dst, prefix);
 
-            buffer_fast_strcat(dst, found->full, found->full_len);
+            buffer_fast_strcat(dst, string2str(found->full), string_strlen(found->full));
             added++;
         }
         if (found->sid_str) {
             if (prefix && *prefix)
                 buffer_strcat(dst, prefix);
 
-            buffer_fast_strcat(dst, found->sid_str, found->sid_str_len);
+            buffer_fast_strcat(dst, string2str(found->sid_str), string_strlen(found->sid_str));
             added++;
         }
     }
 
     return added > 0;
 }
+
+STRING *cached_sid_fullname_or_sid_str(PSID sid) {
+    SID_VALUE *found = lookup_or_convert_user_id_to_name_lookup(sid);
+    if(found) {
+        if(found->full) return string_dup(found->full);
+        return string_dup(found->sid_str);
+    }
+    return NULL;
+}
+
+#endif
