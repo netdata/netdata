@@ -26,12 +26,22 @@ Once you ensure the above prerequisites you need to:
 
 ### From Netdata Sign-up page
 
-If you're starting your flow from Netdata sign-in page you need to:
+#### Requirements
+
+You have to update your DNS settings by adding a TXT record with the Netdata verification code as its **Value**.
+The **Value** can be found by clicking the **DNS TXT record** button in your space settings under **User Management**, in the** Authentication & Authorization** tab.
+
+Log into your domain provider’s website, and navigate to the DNS records section.
+Create a new TXT record with the following specifications:
+- Value/Answer/Description: `"netdata-verification=[VERIFICATION CODE]"`
+- Name/Host/Alias: Leave this blank or type @ to include a subdomain.
+- Time to live (TTL): "86400" (this can also be inherited from the default configuration).
+
+#### Starting the flow from Netdata sign-in page
 
 1. Click on the link `Sign-in with an Enterprise Single Sign-On (SSO)`
 2. Enter your email address
-3. Go to your mailbox and check the `Sign In to Netdata` email that you have received
-4. Click on the **Sign In** button
+3. Complete the SSO flow
 
 Note: If you're not authenticated on the Enterprise SSO tool you'll be prompted to authenticate there
 first before being allowed to proceed to Netdata Cloud.
