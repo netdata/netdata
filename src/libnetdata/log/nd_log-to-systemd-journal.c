@@ -12,18 +12,36 @@ bool nd_log_journal_systemd_init(void) {
     return nd_log.journal.initialized;
 }
 
-bool nd_log_journal_socket_available(void) {
+static int nd_log_journal_direct_fd_find_and_open(char *filename, size_t size) {
+    int fd;
+
     if(netdata_configured_host_prefix && *netdata_configured_host_prefix) {
-        char filename[FILENAME_MAX + 1];
+        journal_construct_path(filename, size, netdata_configured_host_prefix, "netdata");
+        if (is_path_unix_socket(filename) && (fd = journal_direct_fd(filename)) != -1)
+            return fd;
 
-        snprintfz(filename, sizeof(filename), "%s%s",
-                  netdata_configured_host_prefix, "/run/systemd/journal/socket");
-
-        if(is_path_unix_socket(filename))
-            return true;
+        journal_construct_path(filename, size, netdata_configured_host_prefix, NULL);
+        if (is_path_unix_socket(filename) && (fd = journal_direct_fd(filename)) != -1)
+            return fd;
     }
 
-    return is_path_unix_socket("/run/systemd/journal/socket");
+    journal_construct_path(filename, size, NULL, "netdata");
+    if (is_path_unix_socket(filename) && (fd = journal_direct_fd(filename)) != -1)
+        return fd;
+
+    journal_construct_path(filename, size, NULL, NULL);
+    if (is_path_unix_socket(filename) && (fd = journal_direct_fd(filename)) != -1)
+        return fd;
+
+    return -1;
+}
+
+bool nd_log_journal_socket_available(void) {
+    char filename[FILENAME_MAX];
+    int fd = nd_log_journal_direct_fd_find_and_open(filename, sizeof(filename));
+    if(fd == -1) return false;
+    close(fd);
+    return true;
 }
 
 static void nd_log_journal_direct_set_env(void) {
@@ -38,25 +56,9 @@ bool nd_log_journal_direct_init(const char *path) {
     }
 
     int fd;
-    char filename[FILENAME_MAX + 1];
-    if(!is_path_unix_socket(path)) {
-
-        journal_construct_path(filename, sizeof(filename), netdata_configured_host_prefix, "netdata");
-        if (!is_path_unix_socket(filename) || (fd = journal_direct_fd(filename)) == -1) {
-
-            journal_construct_path(filename, sizeof(filename), netdata_configured_host_prefix, NULL);
-            if (!is_path_unix_socket(filename) || (fd = journal_direct_fd(filename)) == -1) {
-
-                journal_construct_path(filename, sizeof(filename), NULL, "netdata");
-                if (!is_path_unix_socket(filename) || (fd = journal_direct_fd(filename)) == -1) {
-
-                    journal_construct_path(filename, sizeof(filename), NULL, NULL);
-                    if (!is_path_unix_socket(filename) || (fd = journal_direct_fd(filename)) == -1)
-                        return false;
-                }
-            }
-        }
-    }
+    char filename[FILENAME_MAX];
+    if(!is_path_unix_socket(path))
+        fd = nd_log_journal_direct_fd_find_and_open(filename, sizeof(filename));
     else {
         snprintfz(filename, sizeof(filename), "%s", path);
         fd = journal_direct_fd(filename);
