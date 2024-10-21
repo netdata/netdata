@@ -29,10 +29,10 @@ Once you ensure the above prerequisites you need to:
 #### Requirements
 
 You have to update your DNS settings by adding a TXT record with the Netdata verification code as its **Value**.
-The **Value** can be found by clicking on **DNS txt record** button, at your space settings on the **User Management** section, under **Authentication & Authorization** tab.
+The **Value** can be found by clicking the **DNS TXT record** button in your space settings under **User Management**, in the** Authentication & Authorization** tab.
 
 Log into your domain provider’s website, and navigate to the DNS records section.
-Create a new TXT-record with the following specifications:
+Create a new TXT record with the following specifications:
 - Value/Answer/Description: `"netdata-verification=[VERIFICATION CODE]"`
 - Name/Host/Alias: Leave this blank or type @ to include a subdomain.
 - Time to live (TTL): "86400" (this can also be inherited from the default configuration).
