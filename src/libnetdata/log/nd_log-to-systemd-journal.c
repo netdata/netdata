@@ -170,7 +170,7 @@ bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_
     // let's detect its fd number (we need it for the spawn server)
     if(r == 0 && __atomic_load_n(&nd_log.journal.first_msg, __ATOMIC_RELAXED) == false) {
         __atomic_store_n(&nd_log.journal.first_msg, true, __ATOMIC_RELAXED);
-        for (int fd = 3; fd < 1024; fd++) {
+        for (int fd = 3; fd < 2048; fd++) {
             if (is_journal_socket(fd)) {
                 nd_log.journal.fd = fd;
                 break;
