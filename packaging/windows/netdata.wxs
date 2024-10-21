@@ -62,11 +62,11 @@
                 <File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
                     <Permission User="NT SERVICE\EventLog" GenericRead="yes" Synchronize="yes" />
                     <Permission User="NT AUTHORITY\SYSTEM" GenericAll="yes" />
-                    <Permission User="BUILTIN\Administrators" GenericAll="yes" />
-                    <Permission User="BUILTIN\Users" GenericRead="yes" GenericExecute="yes" />
+					<!-- Permission User="BUILTIN\Administrators" GenericAll="yes" / -->
+					<!-- Permission User="BUILTIN\Users" GenericRead="yes" GenericExecute="yes" / -->
                     <Permission User="[LogonUser]" GenericAll="yes" />
-                    <Permission User="ALL APPLICATION PACKAGES" GenericRead="yes" GenericExecute="yes" />
-                    <Permission User="ALL RESTRICTED APPLICATION PACKAGES" GenericRead="yes" GenericExecute="yes" />
+					<!-- Permission User="ALL APPLICATION PACKAGES" GenericRead="yes" GenericExecute="yes" / -->
+					<!-- Permission User="ALL RESTRICTED APPLICATION PACKAGES" GenericRead="yes" GenericExecute="yes" / -->
                 </File>
             </Component>
 
@@ -99,52 +99,52 @@
         </Component>
     </Fragment>
 
-    <Fragment>
+	<!-- Fragment>
         <UI Id="Netdata_Mondo">
-            <DialogRef Id="LicenseGPLdlg" />
-            <DialogRef Id="ErrorDlg" />
-            <DialogRef Id="FatalError" />
-            <DialogRef Id="FilesInUse" />
-            <DialogRef Id="MsiRMFilesInUse" />
-            <DialogRef Id="PrepareDlg" />
-            <DialogRef Id="ProgressDlg" />
-            <DialogRef Id="ResumeDlg" />
-            <DialogRef Id="UserExit" />
+			<DialogRef Id="LicenseGPLdlg" />
+			<DialogRef Id="ErrorDlg" />
+			<DialogRef Id="FatalError" />
+			<DialogRef Id="FilesInUse" />
+			<DialogRef Id="MsiRMFilesInUse" />
+			<DialogRef Id="PrepareDlg" />
+			<DialogRef Id="ProgressDlg" />
+			<DialogRef Id="ResumeDlg" />
+			<DialogRef Id="UserExit" />
 
-            <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+			<Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
 
-            <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed AND NOT PATCH" />
-            <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
+			<Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed AND NOT PATCH" />
+			<Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
 
-            <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
-            <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="LicenseGPLdlg" Order="2" Condition="LicenseAccepted = &quot;1&quot;" />
+			<Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+			<Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="LicenseGPLdlg" Order="2" Condition="LicenseAccepted = &quot;1&quot;" />
 
-            <Publish Dialog="LicenseGPLdlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg"></Publish>
-            <Publish Dialog="LicenseGPLdlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg"  Condition="LicenseAccepted = &quot;1&quot;"></Publish>
+			<Publish Dialog="LicenseGPLdlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg"></Publish>
+			<Publish Dialog="LicenseGPLdlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg"  Condition="LicenseAccepted = &quot;1&quot;"></Publish>
 
-            <Publish Dialog="SetupTypeDlg" Control="Back" Event="NewDialog" Value="LicenseGPLdlg" />
-            <Publish Dialog="SetupTypeDlg" Control="TypicalButton" Event="NewDialog" Value="VerifyReadyDlg" />
-            <Publish Dialog="SetupTypeDlg" Control="CustomButton" Event="NewDialog" Value="CustomizeDlg" />
-            <Publish Dialog="SetupTypeDlg" Control="CompleteButton" Event="NewDialog" Value="VerifyReadyDlg" />
+			<Publish Dialog="SetupTypeDlg" Control="Back" Event="NewDialog" Value="LicenseGPLdlg" />
+			<Publish Dialog="SetupTypeDlg" Control="TypicalButton" Event="NewDialog" Value="VerifyReadyDlg" />
+			<Publish Dialog="SetupTypeDlg" Control="CustomButton" Event="NewDialog" Value="CustomizeDlg" />
+			<Publish Dialog="SetupTypeDlg" Control="CompleteButton" Event="NewDialog" Value="VerifyReadyDlg" />
 
-            <Publish Dialog="CustomizeDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="1" Condition="WixUI_InstallMode = &quot;Change&quot;" />
-            <Publish Dialog="CustomizeDlg" Control="Back" Event="NewDialog" Value="SetupTypeDlg" Order="2" Condition="WixUI_InstallMode = &quot;InstallCustom&quot;" />
-            <Publish Dialog="CustomizeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
+			<Publish Dialog="CustomizeDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="1" Condition="WixUI_InstallMode = &quot;Change&quot;" />
+			<Publish Dialog="CustomizeDlg" Control="Back" Event="NewDialog" Value="SetupTypeDlg" Order="2" Condition="WixUI_InstallMode = &quot;InstallCustom&quot;" />
+			<Publish Dialog="CustomizeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
 
-            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="CustomizeDlg" Order="1" Condition="WixUI_InstallMode = &quot;InstallCustom&quot;" />
-            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="SetupTypeDlg" Order="2" Condition="WixUI_InstallMode = &quot;InstallTypical&quot; OR WixUI_InstallMode = &quot;InstallComplete&quot;" />
-            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="CustomizeDlg" Order="3" Condition="WixUI_InstallMode = &quot;Change&quot;" />
-            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="4" Condition="WixUI_InstallMode = &quot;Repair&quot; OR WixUI_InstallMode = &quot;Remove&quot;" />
-            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="WixUI_InstallMode = &quot;Update&quot;" />
+			<Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="CustomizeDlg" Order="1" Condition="WixUI_InstallMode = &quot;InstallCustom&quot;" />
+			<Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="SetupTypeDlg" Order="2" Condition="WixUI_InstallMode = &quot;InstallTypical&quot; OR WixUI_InstallMode = &quot;InstallComplete&quot;" />
+			<Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="CustomizeDlg" Order="3" Condition="WixUI_InstallMode = &quot;Change&quot;" />
+			<Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="4" Condition="WixUI_InstallMode = &quot;Repair&quot; OR WixUI_InstallMode = &quot;Remove&quot;" />
+			<Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="WixUI_InstallMode = &quot;Update&quot;" />
 
-            <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
+			<Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
 
-            <Publish Dialog="MaintenanceTypeDlg" Control="ChangeButton" Event="NewDialog" Value="CustomizeDlg" />
-            <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
-            <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
-            <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+			<Publish Dialog="MaintenanceTypeDlg" Control="ChangeButton" Event="NewDialog" Value="CustomizeDlg" />
+			<Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
+			<Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
+			<Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
         </UI>
-        <UIRef Id="WixUI_Mondo" />
-    </Fragment>
+		<UIRef Id="WixUI_Mondo" />
+    </Fragment -->
 </Wix>
 
