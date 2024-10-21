@@ -14,6 +14,7 @@ extern "C" {
 #define ND_LOG_DEFAULT_THROTTLE_PERIOD 60
 
 void errno_clear(void);
+int nd_log_systemd_journal_fd(void);
 void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting);
 void nd_log_set_facility(const char *facility);
 void nd_log_set_priority_level(const char *setting);

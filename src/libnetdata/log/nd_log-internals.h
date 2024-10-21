@@ -133,12 +133,14 @@ struct nd_log {
 
     struct {
         bool initialized;
+        bool first_msg;
+        int fd;             // we don't control this, we just detect it to keep it open
     } journal;
 
     struct {
         bool initialized;
         int fd;
-        char filename[FILENAME_MAX + 1];
+        char filename[FILENAME_MAX];
     } journal_direct;
 
     struct {

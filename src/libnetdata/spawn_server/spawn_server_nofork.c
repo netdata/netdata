@@ -274,7 +274,13 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
         return false;
     }
 
-    os_close_all_non_std_open_fds_except(rq->fds, 3, CLOSE_RANGE_CLOEXEC);
+    int fds_to_keep[] = {
+        rq->fds[0],
+        rq->fds[1],
+        rq->fds[2],
+        nd_log_systemd_journal_fd(),
+    };
+    os_close_all_non_std_open_fds_except(fds_to_keep, _countof(fds_to_keep), CLOSE_RANGE_CLOEXEC);
 
     errno_clear();
     if (posix_spawn(&rq->pid, rq->argv[0], &file_actions, &attr, (char * const *)rq->argv, (char * const *)rq->envp) != 0) {
@@ -325,7 +331,14 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
         os_setproctitle("spawn-callback", server->argc, server->argv);
 
         // close all open file descriptors of the parent, but keep ours
-        os_close_all_non_std_open_fds_except(rq->fds, 4, 0);
+        int fds_to_keep[] = {
+            rq->fds[0],
+            rq->fds[1],
+            rq->fds[2],
+            rq->fds[3],
+            nd_log_systemd_journal_fd(),
+        };
+        os_close_all_non_std_open_fds_except(fds_to_keep, _countof(fds_to_keep), 0);
         nd_log_reopen_log_files_for_spawn_server("spawn-callback");
 
         // get the fds from the request
@@ -1076,7 +1089,12 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         os_setproctitle(buf, server->argc, server->argv);
 
         replace_stdio_with_dev_null();
-        os_close_all_non_std_open_fds_except((int[]){ server->sock, server->pipe[1] }, 2, 0);
+        int fds_to_keep[] = {
+            server->sock,
+            server->pipe[1],
+            nd_log_systemd_journal_fd(),
+        };
+        os_close_all_non_std_open_fds_except(fds_to_keep, _countof(fds_to_keep), 0);
         nd_log_reopen_log_files_for_spawn_server(buf);
         exit(spawn_server_event_loop(server));
     }
@@ -1125,6 +1143,21 @@ void spawn_server_exec_destroy(SPAWN_INSTANCE *instance) {
     freez(instance);
 }
 
+static void log_invalid_magic(SPAWN_INSTANCE *instance, struct status_report *sr) {
+    unsigned char buf[sizeof(*sr) + 1];
+    memcpy(buf, sr, sizeof(*sr));
+    buf[sizeof(buf) - 1] = '\0';
+
+    for(size_t i = 0; i < sizeof(buf) - 1; i++) {
+        if (iscntrl(buf[i]) || !isprint(buf[i]))
+            buf[i] = '_';
+    }
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+           "SPAWN PARENT: invalid final status report for child %d, request %zu (invalid magic %#x in response, reads like '%s')",
+           instance->child_pid, instance->request_id, sr->magic, buf);
+}
+
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *instance) {
     int rc = -1;
 
@@ -1139,24 +1172,24 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
             "SPAWN PARENT: failed to read final status report for child %d, request %zu",
             instance->child_pid, instance->request_id);
 
-    else if(sr.magic != STATUS_REPORT_MAGIC) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN PARENT: invalid final status report for child %d, request %zu (invalid magic %#x in response)",
-            instance->child_pid, instance->request_id, sr.magic);
-    }
-    else switch(sr.status) {
-        case STATUS_REPORT_EXITED:
-            rc = sr.exited.waitpid_status;
-            break;
+    else if(sr.magic != STATUS_REPORT_MAGIC)
+        log_invalid_magic(instance, &sr);
+    else {
+        switch (sr.status) {
+            case STATUS_REPORT_EXITED:
+                rc = sr.exited.waitpid_status;
+                break;
 
-        case STATUS_REPORT_STARTED:
-        case STATUS_REPORT_FAILED:
-        default:
-            errno = 0;
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                "SPAWN PARENT: invalid status report to exec spawn request %zu for pid %d (status = %u)",
-                instance->request_id, instance->child_pid, sr.status);
-            break;
+            case STATUS_REPORT_STARTED:
+            case STATUS_REPORT_FAILED:
+            default:
+                errno = 0;
+                nd_log(
+                    NDLS_COLLECTORS, NDLP_ERR,
+                    "SPAWN PARENT: invalid status report to exec spawn request %zu for pid %d (status = %u)",
+                    instance->request_id, instance->child_pid, sr.status);
+                break;
+        }
     }
 
     instance->child_pid = 0;

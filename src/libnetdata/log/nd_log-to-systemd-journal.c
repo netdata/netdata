@@ -12,18 +12,36 @@ bool nd_log_journal_systemd_init(void) {
     return nd_log.journal.initialized;
 }
 
-bool nd_log_journal_socket_available(void) {
+static int nd_log_journal_direct_fd_find_and_open(char *filename, size_t size) {
+    int fd;
+
     if(netdata_configured_host_prefix && *netdata_configured_host_prefix) {
-        char filename[FILENAME_MAX + 1];
+        journal_construct_path(filename, size, netdata_configured_host_prefix, "netdata");
+        if (is_path_unix_socket(filename) && (fd = journal_direct_fd(filename)) != -1)
+            return fd;
 
-        snprintfz(filename, sizeof(filename), "%s%s",
-                  netdata_configured_host_prefix, "/run/systemd/journal/socket");
-
-        if(is_path_unix_socket(filename))
-            return true;
+        journal_construct_path(filename, size, netdata_configured_host_prefix, NULL);
+        if (is_path_unix_socket(filename) && (fd = journal_direct_fd(filename)) != -1)
+            return fd;
     }
 
-    return is_path_unix_socket("/run/systemd/journal/socket");
+    journal_construct_path(filename, size, NULL, "netdata");
+    if (is_path_unix_socket(filename) && (fd = journal_direct_fd(filename)) != -1)
+        return fd;
+
+    journal_construct_path(filename, size, NULL, NULL);
+    if (is_path_unix_socket(filename) && (fd = journal_direct_fd(filename)) != -1)
+        return fd;
+
+    return -1;
+}
+
+bool nd_log_journal_socket_available(void) {
+    char filename[FILENAME_MAX];
+    int fd = nd_log_journal_direct_fd_find_and_open(filename, sizeof(filename));
+    if(fd == -1) return false;
+    close(fd);
+    return true;
 }
 
 static void nd_log_journal_direct_set_env(void) {
@@ -38,25 +56,9 @@ bool nd_log_journal_direct_init(const char *path) {
     }
 
     int fd;
-    char filename[FILENAME_MAX + 1];
-    if(!is_path_unix_socket(path)) {
-
-        journal_construct_path(filename, sizeof(filename), netdata_configured_host_prefix, "netdata");
-        if (!is_path_unix_socket(filename) || (fd = journal_direct_fd(filename)) == -1) {
-
-            journal_construct_path(filename, sizeof(filename), netdata_configured_host_prefix, NULL);
-            if (!is_path_unix_socket(filename) || (fd = journal_direct_fd(filename)) == -1) {
-
-                journal_construct_path(filename, sizeof(filename), NULL, "netdata");
-                if (!is_path_unix_socket(filename) || (fd = journal_direct_fd(filename)) == -1) {
-
-                    journal_construct_path(filename, sizeof(filename), NULL, NULL);
-                    if (!is_path_unix_socket(filename) || (fd = journal_direct_fd(filename)) == -1)
-                        return false;
-                }
-            }
-        }
-    }
+    char filename[FILENAME_MAX];
+    if(!is_path_unix_socket(path))
+        fd = nd_log_journal_direct_fd_find_and_open(filename, sizeof(filename));
     else {
         snprintfz(filename, sizeof(filename), "%s", path);
         fd = journal_direct_fd(filename);
@@ -73,6 +75,8 @@ bool nd_log_journal_direct_init(const char *path) {
 
     return true;
 }
+
+static bool sockets_before[1024];
 
 bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_t fields_max __maybe_unused) {
 #ifdef HAVE_SYSTEMD
@@ -154,7 +158,27 @@ bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_
         }
     }
 
+    bool detect_systemd_socket = __atomic_load_n(&nd_log.journal.first_msg, __ATOMIC_RELAXED) == false;
+    if(detect_systemd_socket) {
+        for(int i = 3 ; (size_t)i < _countof(sockets_before); i++)
+            sockets_before[i] = fd_is_socket(i);
+    }
+
     int r = sd_journal_sendv(iov, iov_count);
+
+    if(r == 0 && detect_systemd_socket) {
+        __atomic_store_n(&nd_log.journal.first_msg, true, __ATOMIC_RELAXED);
+
+        // this is the first successful libsystemd log
+        // let's detect its fd number (we need it for the spawn server)
+
+        for(int i = 3 ; (size_t)i < _countof(sockets_before); i++) {
+            if (!sockets_before[i] && fd_is_socket(i)) {
+                nd_log.journal.fd = i;
+                break;
+            }
+        }
+    }
 
     // Clean up allocated memory
     for (int i = 0; i < iov_count; i++) {

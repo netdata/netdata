@@ -44,7 +44,7 @@ void nd_log_initialize_for_external_plugins(const char *name) {
     program_name = name;
 
     for(size_t i = 0; i < _NDLS_MAX ;i++) {
-        nd_log.sources[i].method = STDERR_FILENO;
+        nd_log.sources[i].method = NDLM_DEFAULT;
         nd_log.sources[i].fd = -1;
         nd_log.sources[i].fp = NULL;
     }
@@ -123,12 +123,10 @@ void nd_log_initialize_for_external_plugins(const char *name) {
             break;
     }
 
-    for(size_t i = 0; i < _NDLS_MAX ;i++) {
-        nd_log.sources[i].method = method;
-        nd_log.sources[i].format = format;
-        nd_log.sources[i].fd = -1;
-        nd_log.sources[i].fp = NULL;
-    }
+    nd_log.sources[NDLS_COLLECTORS].method = method;
+    nd_log.sources[NDLS_COLLECTORS].format = format;
+    nd_log.sources[NDLS_COLLECTORS].fd = -1;
+    nd_log.sources[NDLS_COLLECTORS].fp = NULL;
 
     //    nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "FINAL_LOG_METHOD: %s", nd_log_id2method(method));
 }
@@ -271,6 +269,10 @@ void nd_log_reopen_log_files(bool log) {
         netdata_log_info("Log files re-opened.");
 }
 
+int nd_log_systemd_journal_fd(void) {
+    return nd_log.journal.fd;
+}
+
 void nd_log_reopen_log_files_for_spawn_server(const char *name) {
     gettid_uncached();
 
@@ -284,13 +286,11 @@ void nd_log_reopen_log_files_for_spawn_server(const char *name) {
         close(nd_log.journal_direct.fd);
         nd_log.journal_direct.fd = -1;
         nd_log.journal_direct.initialized = false;
-        nd_log_journal_direct_init(NULL);
     }
 
     for(size_t i = 0; i < _NDLS_MAX ;i++) {
-        if(i != NDLS_COLLECTORS && i != NDLS_DAEMON) continue;
-
         spinlock_init(&nd_log.sources[i].spinlock);
+        nd_log.sources[i].method = NDLM_DEFAULT;
         nd_log.sources[i].fd = -1;
         nd_log.sources[i].fp = NULL;
         nd_log.sources[i].pending_msg = NULL;
@@ -299,16 +299,10 @@ void nd_log_reopen_log_files_for_spawn_server(const char *name) {
 #endif
     }
 
-    for(size_t i = 0; i < _NDLS_MAX ;i++) {
-        if(i == NDLS_COLLECTORS || i == NDLS_DAEMON) continue;
-        nd_log.sources[i].method = NDLM_DISABLED;
-    }
-
+    // initialize spinlocks
     spinlock_init(&nd_log.std_output.spinlock);
     spinlock_init(&nd_log.std_error.spinlock);
 
-    nd_log.journal.initialized = false;
-    nd_log.journal_direct.initialized = false;
     nd_log.syslog.initialized = false;
     nd_log.eventlog.initialized = false;
     nd_log.std_output.initialized = false;
