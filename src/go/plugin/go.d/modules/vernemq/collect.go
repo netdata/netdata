@@ -78,17 +78,6 @@ func (v *VerneMQ) getNodesStats(mfs prometheus.MetricFamilies) map[string]*nodeS
 		}
 
 		for _, m := range mf.Metrics() {
-			node := m.Labels().Get("node")
-			if node == "" {
-				continue
-			}
-
-			if _, ok := nodes[node]; !ok {
-				nodes[node] = newNodeStats()
-			}
-
-			nst := nodes[node]
-
 			var value float64
 
 			switch mf.Type() {
@@ -99,6 +88,17 @@ func (v *VerneMQ) getNodesStats(mfs prometheus.MetricFamilies) map[string]*nodeS
 			default:
 				continue
 			}
+
+			node := m.Labels().Get("node")
+			if node == "" {
+				continue
+			}
+
+			if _, ok := nodes[node]; !ok {
+				nodes[node] = newNodeStats()
+			}
+
+			nst := nodes[node]
 
 			if len(m.Labels()) == 1 {
 				nst.stats[name] += int64(value)
