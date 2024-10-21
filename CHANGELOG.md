@@ -6,12 +6,14 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18826](https://github.com/netdata/netdata/pull/18826) ([netdatabot](https://github.com/netdatabot))
 - More windows metrics [\#18824](https://github.com/netdata/netdata/pull/18824) ([ktsaou](https://github.com/ktsaou))
 - fix compilation on windows [\#18823](https://github.com/netdata/netdata/pull/18823) ([ktsaou](https://github.com/ktsaou))
 - numa basic meminfo [\#18822](https://github.com/netdata/netdata/pull/18822) ([ktsaou](https://github.com/ktsaou))
 - fixes last PR merge [\#18821](https://github.com/netdata/netdata/pull/18821) ([ktsaou](https://github.com/ktsaou))
 - optimizations for servers with vast amounts of sockets [\#18820](https://github.com/netdata/netdata/pull/18820) ([ktsaou](https://github.com/ktsaou))
 - claiming should wait for node id and status ONLINE only [\#18816](https://github.com/netdata/netdata/pull/18816) ([ktsaou](https://github.com/ktsaou))
+- fix\(go.d/vernemq\)!: support prometheus namespace added in v2.0 [\#18815](https://github.com/netdata/netdata/pull/18815) ([ilyam8](https://github.com/ilyam8))
 - Comment out dictionary with hashtable code for now [\#18814](https://github.com/netdata/netdata/pull/18814) ([stelfrag](https://github.com/stelfrag))
 - Fix variable scope to prevent invalid memory access [\#18813](https://github.com/netdata/netdata/pull/18813) ([stelfrag](https://github.com/stelfrag))
 - fix\(proc/proc\_net\_dev\): delay collecting all virtual interfaces [\#18812](https://github.com/netdata/netdata/pull/18812) ([ilyam8](https://github.com/ilyam8))
@@ -438,8 +440,6 @@
 - Remove python squid collector implementation  [\#18279](https://github.com/netdata/netdata/pull/18279) ([Ancairon](https://github.com/Ancairon))
 - add go.d/rethinkdb [\#18278](https://github.com/netdata/netdata/pull/18278) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/rethinkdb [\#18277](https://github.com/netdata/netdata/pull/18277) ([ilyam8](https://github.com/ilyam8))
-- Squid collector port to Go [\#18276](https://github.com/netdata/netdata/pull/18276) ([Ancairon](https://github.com/Ancairon))
-- set GOPROXY when building go.d.plugin [\#18275](https://github.com/netdata/netdata/pull/18275) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
