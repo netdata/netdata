@@ -77,6 +77,7 @@ Metrics:
 | vernemq.node_queue_processes_operations | setup, teardown | events/s |
 | vernemq.node_queue_process_init_from_storage | queue_processes | queue processes/s |
 | vernemq.node_queue_messages | received, sent | messages/s |
+| vernemq.node_queued_messages | queued | messages |
 | vernemq.node_queue_undelivered_messages | dropped, expired, unhandled | messages/s |
 | vernemq.node_router_subscriptions | subscriptions | subscriptions |
 | vernemq.node_router_matched_subscriptions | local, remote | subscriptions/s |
