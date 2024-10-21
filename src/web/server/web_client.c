@@ -740,17 +740,6 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
         return HTTP_VALIDATION_NOT_SUPPORTED;
     } else if (!is_it_valid) {
-        //Invalid request, we have more data after the end of message
-        char *check = strstr((char *)buffer_tostring(w->response.data), "\r\n\r\n");
-        if(check) {
-            check += 4;
-            if (*check) {
-                w->header_parse_tries = 0;
-                w->header_parse_last_size = 0;
-                web_client_disable_wait_receive(w);
-                return HTTP_VALIDATION_EXCESS_REQUEST_DATA;
-            }
-        }
         web_client_enable_wait_receive(w);
         return HTTP_VALIDATION_INCOMPLETE;
     }
@@ -1471,13 +1460,6 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "Malformed URL...\r\n");
-            w->response.code = HTTP_RESP_BAD_REQUEST;
-            break;
-        case HTTP_VALIDATION_EXCESS_REQUEST_DATA:
-            netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Excess data in request '%s'.", w->id, w->response.data->buffer);
-
-            buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "Excess data in request.\r\n");
             w->response.code = HTTP_RESP_BAD_REQUEST;
             break;
         case HTTP_VALIDATION_TOO_MANY_READ_RETRIES:
