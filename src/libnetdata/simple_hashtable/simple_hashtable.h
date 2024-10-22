@@ -507,7 +507,7 @@ static inline SIMPLE_HASHTABLE_SLOT_NAMED *simple_hashtable_next_read_only_named
 #ifndef XXH_INLINE_ALL
 #define XXH_INLINE_ALL
 #endif
-#include "xxhash.h"
+#include "../xxHash/xxhash.h"
 
 #define simple_hashtable_set_named CONCAT(simple_hashtable_set, SIMPLE_HASHTABLE_NAME)
 #define simple_hashtable_get_named CONCAT(simple_hashtable_get, SIMPLE_HASHTABLE_NAME)

@@ -26,7 +26,7 @@ static inline const char *value2key_perfLibRegistryEntry(perfLibRegistryEntry *e
 #define SIMPLE_HASHTABLE_KEY_TYPE const char
 #define SIMPLE_HASHTABLE_VALUE_TYPE perfLibRegistryEntry
 #define SIMPLE_HASHTABLE_NAME _PERFLIB
-#include "libnetdata/simple_hashtable.h"
+#include "libnetdata/simple_hashtable/simple_hashtable.h"
 
 static struct {
     SPINLOCK spinlock;

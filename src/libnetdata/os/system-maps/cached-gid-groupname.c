@@ -11,7 +11,7 @@
 #define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION cached_groupname_to_gid_ptr
 #define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION compar_gid_ptr
 #define SIMPLE_HASHTABLE_NAME _GROUPNAMES_CACHE
-#include "libnetdata/simple_hashtable.h"
+#include "libnetdata/simple_hashtable/simple_hashtable.h"
 
 static struct {
     bool initialized;

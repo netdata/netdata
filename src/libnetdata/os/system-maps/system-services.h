@@ -12,7 +12,7 @@
 
 #define SIMPLE_HASHTABLE_VALUE_TYPE STRING
 #define SIMPLE_HASHTABLE_NAME _SERVICENAMES_CACHE
-#include "libnetdata/simple_hashtable.h"
+#include "libnetdata/simple_hashtable/simple_hashtable.h"
 
 typedef struct servicenames_cache {
     SPINLOCK spinlock;
