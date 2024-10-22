@@ -196,6 +196,7 @@ Requires(pre): /usr/sbin/useradd
 # to support weak dependencies. Explicitly requiring our default plugins
 # makes it impossible to properly test the packages prior to upload,
 # so we just skip depending on them on CentOS 7.
+Requires: %{name}-dashboard
 %if 0%{?_have_ebpf}
 Requires: %{name}-plugin-ebpf = %{version}
 %endif
@@ -551,11 +552,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 # ndsudo a helper to run privileged commands
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/ndsudo
 
-# Enforce 0644 for files and 0755 for directories
-# for the netdata web directory
-%defattr(0644,root,root,0755)
-%{_datadir}/%{name}/web
-
 # Enforce 0660 for files and 0770 for directories
 # for the netdata lib, cache and log dirs
 %defattr(0660,root,netdata,0770)
@@ -564,6 +560,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/cloud.d
+
+# Dashboard belongs to a different sub-package
+%exclude %{_datadir}/%{name}/web
 
 # Free IPMI belongs to a different sub-package
 %if %{_have_freeipmi}
@@ -987,7 +986,27 @@ fi
 # CAP_SYS_ADMIN, CAP_SYS_PTRACE and CAP_DAC_READ_SEARCH needed for data collection.
 %caps(cap_sys_admin,cap_sys_ptrace,cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
 
+%package dashboard
+Summary: The local dashboard for the Netdata Agent
+Group: Applications/System
+Requires: %{name} >= %{version}
+Conflicts: %{name} < %{version}
+
+%description dashboard
+ This allows access to the dashboard on the local node without internet access.
+
+%pre dashboard
+if ! getent group %{name} > /dev/null; then
+  groupadd --system %{name}
+fi
+
+%files dashboard
+%defattr(0644,root,root,0755)
+%{_datadir}/%{name}/web
+
 %changelog
+* Thu Aug 29 2024 Austin Hemmelgarn <austin@netdata.cloud>
+- Split dashboard to it’s own package
 * Fri Jul 19 2024 Austin Hemmelgarn <austin@netdata.cloud>
 - Fix dependency issues with old logs-management plugin
 * Tue Jul 16 2024 Austin Hemmelgarn <austin@netdata.cloud>
