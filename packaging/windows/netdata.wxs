@@ -20,10 +20,10 @@
 		<!-- Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Netdata is installed and running now! Enjoy real-time performance and health monitoring..." />
 		<Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT"  Value="Launch MSYS2 terminal." / -->
 
-		<Property Id="TOKEN" Value="#" />
-		<Property Id="ROOMS" Value="#" />
-		<Property Id="INSECURE" Value="no" />
-		<Property Id="PROXY" Value="#" />
+		<Property Id="TOKEN" Value=" " />
+		<Property Id="ROOMS" Value=" " />
+		<Property Id="INSECURE" Value="0" />
+		<Property Id="PROXY" Value=" " />
 		<Property Id="URL" Value="https://app.netdata.cloud" />
 
 		<Feature Id="Main">
@@ -77,7 +77,10 @@
 			</Component>
 		</ComponentGroup>
 
-		<CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand="NetdataClaim.exe /T [TOKEN] /R '[ROOMS]' /U [URL] /I [INSECURE] /P [PROXY]" Execute="deferred" Return="ignore" Impersonate="no"/>
+		<CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='"[USRBINDIR]NetdataClaim.exe /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I [INSECURE] /P &quot;[PROXY]&quot; /D &quot;[INSTALLFOLDER]&quot;"' Execute="deferred" Return="ignore" Impersonate="no"/>
+		<InstallExecuteSequence>
+			<Custom Action="ClaimAgent" Before="InstallFinalize" />
+		</InstallExecuteSequence>
 
 		<Component Id="NetdataService" Directory="USRBINDIR">
 			<File Id="NetdataExe" Name="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
