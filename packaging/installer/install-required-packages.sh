@@ -843,6 +843,7 @@ declare -A pkg_libcurl_dev=(
   ['gentoo']="net-misc/curl"
   ['ubuntu']="libcurl4-openssl-dev"
   ['macos']="curl"
+  ['freebsd']="curl"
   ['default']="libcurl-devel"
 )
 
