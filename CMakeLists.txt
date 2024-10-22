@@ -339,7 +339,6 @@ check_include_file("sys/mount.h" HAVE_SYS_MOUNT_H)
 check_include_file("sys/statvfs.h" HAVE_SYS_STATVFS_H)
 check_include_file("inttypes.h" HAVE_INTTYPES_H)
 check_include_file("stdint.h" HAVE_STDINT_H)
-check_include_file("sys/capability.h" HAVE_SYS_CAPABILITY_H)
 check_include_file("arpa/inet.h" HAVE_ARPA_INET_H)
 check_include_file("netinet/tcp.h" HAVE_NETINET_TCP_H)
 check_include_file("sys/ioctl.h" HAVE_SYS_IOCTL_H)
@@ -354,6 +353,9 @@ check_include_file("sys/socket.h" HAVE_SYS_SOCKET_H)
 check_include_file("sys/wait.h" HAVE_SYS_WAIT_H)
 check_include_file("sys/un.h" HAVE_SYS_UN_H)
 check_include_file("spawn.h" HAVE_SPAWN_H)
+if(OS_LINUX)
+    check_include_file("sys/capability.h" HAVE_SYS_CAPABILITY_H)
+endif()
 
 #
 # check symbols
