@@ -6,7 +6,19 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#18839](https://github.com/netdata/netdata/pull/18839) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d/vernemq\): add "Queued PUBLISH Messages" chart [\#18838](https://github.com/netdata/netdata/pull/18838) ([ilyam8](https://github.com/ilyam8))
+- Remove RRDSET\_FLAG\_DETAIL. [\#18837](https://github.com/netdata/netdata/pull/18837) ([vkalintiris](https://github.com/vkalintiris))
+- Update enterprise SSO docs [\#18836](https://github.com/netdata/netdata/pull/18836) ([car12o](https://github.com/car12o))
+- chore\(go.d/vernemq\): remove unused file [\#18835](https://github.com/netdata/netdata/pull/18835) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18834](https://github.com/netdata/netdata/pull/18834) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d/nvidia\_smi\): add "index" label to GPU charts [\#18833](https://github.com/netdata/netdata/pull/18833) ([ilyam8](https://github.com/ilyam8))
+- spawn-server-nofork: invalid magic [\#18831](https://github.com/netdata/netdata/pull/18831) ([ktsaou](https://github.com/ktsaou))
+- remove old obsolete check for excess data in request [\#18830](https://github.com/netdata/netdata/pull/18830) ([ktsaou](https://github.com/ktsaou))
+- Add the Windows event logs integration to the meta [\#18829](https://github.com/netdata/netdata/pull/18829) ([Ancairon](https://github.com/Ancairon))
+- build\(deps\): bump github.com/redis/go-redis/v9 from 9.6.2 to 9.7.0 in /src/go [\#18828](https://github.com/netdata/netdata/pull/18828) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations.js [\#18826](https://github.com/netdata/netdata/pull/18826) ([netdatabot](https://github.com/netdatabot))
+- Common O/S Caching Layer for users and groups [\#18825](https://github.com/netdata/netdata/pull/18825) ([ktsaou](https://github.com/ktsaou))
 - More windows metrics [\#18824](https://github.com/netdata/netdata/pull/18824) ([ktsaou](https://github.com/ktsaou))
 - fix compilation on windows [\#18823](https://github.com/netdata/netdata/pull/18823) ([ktsaou](https://github.com/ktsaou))
 - numa basic meminfo [\#18822](https://github.com/netdata/netdata/pull/18822) ([ktsaou](https://github.com/ktsaou))
@@ -431,15 +443,6 @@
 - Regenerate integrations.js [\#18292](https://github.com/netdata/netdata/pull/18292) ([netdatabot](https://github.com/netdatabot))
 - remove python.d/gearman [\#18291](https://github.com/netdata/netdata/pull/18291) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/alarms [\#18290](https://github.com/netdata/netdata/pull/18290) ([ilyam8](https://github.com/ilyam8))
-- go.d rethinkdb fix cluster\_servers\_stats\_request [\#18289](https://github.com/netdata/netdata/pull/18289) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/gosnmp/gosnmp from 1.37.0 to 1.38.0 in /src/go [\#18287](https://github.com/netdata/netdata/pull/18287) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump go.mongodb.org/mongo-driver from 1.16.0 to 1.16.1 in /src/go [\#18286](https://github.com/netdata/netdata/pull/18286) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump golang.org/x/net from 0.27.0 to 0.28.0 in /src/go [\#18284](https://github.com/netdata/netdata/pull/18284) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Regenerate integrations.js [\#18282](https://github.com/netdata/netdata/pull/18282) ([netdatabot](https://github.com/netdatabot))
-- Regenerate integrations.js [\#18280](https://github.com/netdata/netdata/pull/18280) ([netdatabot](https://github.com/netdatabot))
-- Remove python squid collector implementation  [\#18279](https://github.com/netdata/netdata/pull/18279) ([Ancairon](https://github.com/Ancairon))
-- add go.d/rethinkdb [\#18278](https://github.com/netdata/netdata/pull/18278) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/rethinkdb [\#18277](https://github.com/netdata/netdata/pull/18277) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
