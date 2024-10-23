@@ -76,8 +76,8 @@
 				</File>
 			</Component>
 		</ComponentGroup>
-
-		<CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='"[USRBINDIR]NetdataClaim.exe /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I [INSECURE] /P &quot;[PROXY]&quot; /D &quot;[INSTALLFOLDER]&quot;"' Execute="deferred" Return="ignore" Impersonate="no"/>
+s
+		<CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='[USRBINDIR]NetdataClaim.exe /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I [INSECURE] /P &quot;[PROXY]&quot; /F &quot;[INSTALLFOLDER]etc\netdata\claim.conf&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
 		<InstallExecuteSequence>
 			<Custom Action="ClaimAgent" Before="InstallFinalize" />
 		</InstallExecuteSequence>
