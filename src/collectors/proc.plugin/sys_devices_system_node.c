@@ -14,7 +14,8 @@ struct node {
     struct {
         char *filename;
         procfile *ff;
-        RRDSET *st;
+        RRDSET *st_mem_usage;
+        RRDSET *st_mem_activity;
     } meminfo;
 
     struct node *next;
@@ -141,22 +142,22 @@ static void do_muma_numastat(struct node *m, int update_every) {
                 continue;
             }
 
-            char *name  = procfile_lineword(m->numastat.ff, l, 0);
+            char *name = procfile_lineword(m->numastat.ff, l, 0);
             char *value = procfile_lineword(m->numastat.ff, l, 1);
 
             if (unlikely(!name || !*name || !value || !*value))
                 continue;
 
             uint32_t hash = simple_hash(name);
-            if(likely(
-                       (hash == hash_numa_hit       && !strcmp(name, "numa_hit"))
-                    || (hash == hash_numa_miss      && !strcmp(name, "numa_miss"))
-                    || (hash == hash_local_node     && !strcmp(name, "local_node"))
-                    || (hash == hash_numa_foreign   && !strcmp(name, "numa_foreign"))
-                    || (hash == hash_interleave_hit && !strcmp(name, "interleave_hit"))
-                    || (hash == hash_other_node     && !strcmp(name, "other_node"))
-                        ))
+
+            if ((hash == hash_numa_hit && !strcmp(name, "numa_hit")) ||
+                (hash == hash_numa_miss && !strcmp(name, "numa_miss")) ||
+                (hash == hash_local_node && !strcmp(name, "local_node")) ||
+                (hash == hash_numa_foreign && !strcmp(name, "numa_foreign")) ||
+                (hash == hash_interleave_hit && !strcmp(name, "interleave_hit")) ||
+                (hash == hash_other_node && !strcmp(name, "other_node"))) {
                 rrddim_set(m->numastat.st, name, (collected_number)str2kernel_uint_t(value));
+            }
         }
 
         rrdset_done(m->numastat.st);
@@ -164,73 +165,106 @@ static void do_muma_numastat(struct node *m, int update_every) {
 }
 
 static void do_numa_meminfo(struct node *m, int update_every) {
-    static uint32_t hash_MemFree = 0, hash_MemUsed = 0;
+    static uint32_t hash_MemFree = 0, hash_MemUsed = 0, hash_ActiveAnon = 0, hash_InactiveAnon = 0, hash_ActiveFile = 0,
+                    hash_InactiveFile = 0;
     static bool initialized = false;
-    
-    if(unlikely(!initialized)) {
+
+    if (unlikely(!initialized)) {
         initialized = true;
         hash_MemFree = simple_hash("MemFree");
         hash_MemUsed = simple_hash("MemUsed");
+        hash_ActiveAnon = simple_hash("Active(anon)");
+        hash_InactiveAnon = simple_hash("Inactive(anon)");
+        hash_ActiveFile = simple_hash("Active(file)");
+        hash_InactiveFile = simple_hash("Inactive(file)");
     }
 
     if (m->meminfo.filename) {
-        if(unlikely(!m->meminfo.ff)) {
+        if (unlikely(!m->meminfo.ff)) {
             m->meminfo.ff = procfile_open(m->meminfo.filename, " :", PROCFILE_FLAG_DEFAULT);
-            if(unlikely(!m->meminfo.ff))
+            if (unlikely(!m->meminfo.ff))
                 return;
         }
 
         m->meminfo.ff = procfile_readall(m->meminfo.ff);
-        if(unlikely(!m->meminfo.ff || procfile_lines(m->meminfo.ff) < 1 || procfile_linewords(m->meminfo.ff, 0) < 1))
+        if (unlikely(!m->meminfo.ff || procfile_lines(m->meminfo.ff) < 1 || procfile_linewords(m->meminfo.ff, 0) < 1))
             return;
 
-        if(unlikely(!m->meminfo.st)) {
-            m->meminfo.st = rrdset_create_localhost(
-                "numa_node_mem_usage"
-                , m->name
-                , NULL
-                , "numa"
-                , "mem.numa_node_mem_usage"
-                , "NUMA Node Memory Usage"
-                , "bytes"
-                , PLUGIN_PROC_NAME
-                , "/sys/devices/system/node"
-                , NETDATA_CHART_PRIO_MEM_NUMA_NODES_MEMINFO
-                , update_every
-                , RRDSET_TYPE_STACKED
-            );
+        if (unlikely(!m->meminfo.st_mem_usage)) {
+            m->meminfo.st_mem_usage = rrdset_create_localhost(
+                "numa_node_mem_usage",
+                m->name,
+                NULL,
+                "numa",
+                "mem.numa_node_mem_usage",
+                "NUMA Node Memory Usage",
+                "bytes",
+                PLUGIN_PROC_NAME,
+                "/sys/devices/system/node",
+                NETDATA_CHART_PRIO_MEM_NUMA_NODES_MEMINFO,
+                update_every,
+                RRDSET_TYPE_STACKED);
 
-            rrdlabels_add(m->meminfo.st->rrdlabels, "numa_node", m->name, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(m->meminfo.st_mem_usage->rrdlabels, "numa_node", m->name, RRDLABEL_SRC_AUTO);
 
-            rrddim_add(m->meminfo.st, "MemFree", "free", 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(m->meminfo.st, "MemUsed", "used", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(m->meminfo.st_mem_usage, "MemFree", "free", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(m->meminfo.st_mem_usage, "MemUsed", "used", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        if (unlikely(!m->meminfo.st_mem_activity)) {
+            m->meminfo.st_mem_activity = rrdset_create_localhost(
+                "numa_node_mem_activity",
+                m->name,
+                NULL,
+                "numa",
+                "mem.numa_node_mem_activity",
+                "NUMA Node Memory Activity",
+                "bytes",
+                PLUGIN_PROC_NAME,
+                "/sys/devices/system/node",
+                NETDATA_CHART_PRIO_MEM_NUMA_NODES_ACTIVITY,
+                update_every,
+                RRDSET_TYPE_STACKED);
+
+            rrdlabels_add(m->meminfo.st_mem_activity->rrdlabels, "numa_node", m->name, RRDLABEL_SRC_AUTO);
+
+            rrddim_add(m->meminfo.st_mem_activity, "Active(anon)", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(m->meminfo.st_mem_activity, "Inactive(anon)", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(m->meminfo.st_mem_activity, "Active(file)", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(m->meminfo.st_mem_activity, "Inactive(file)", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         size_t lines = procfile_lines(m->meminfo.ff), l;
-        for(l = 0; l < lines; l++) {
+        for (l = 0; l < lines; l++) {
             size_t words = procfile_linewords(m->meminfo.ff, l);
 
-            if(unlikely(words < 4)) {
-                if(unlikely(words))
-                    collector_error("Cannot read %s line %zu. Expected 4 params, read %zu.", m->meminfo.filename, l, words);
+            if (unlikely(words < 4)) {
+                if (words)
+                    collector_error(
+                        "Cannot read %s line %zu. Expected 4 params, read %zu.", m->meminfo.filename, l, words);
                 continue;
             }
 
-            char *name  = procfile_lineword(m->meminfo.ff, l, 2);
+            char *name = procfile_lineword(m->meminfo.ff, l, 2);
             char *value = procfile_lineword(m->meminfo.ff, l, 3);
 
             if (unlikely(!name || !*name || !value || !*value))
                 continue;
 
             uint32_t hash = simple_hash(name);
-            if(likely(
-                       (hash == hash_MemFree && !strcmp(name, "MemFree"))
-                    || (hash == hash_MemUsed && !strcmp(name, "MemUsed"))
-                    ))
-                rrddim_set(m->meminfo.st, name, (collected_number)str2kernel_uint_t(value) * 1024);
-        }
 
-        rrdset_done(m->meminfo.st);
+            if ((hash == hash_MemFree && !strcmp(name, "MemFree")) ||
+                (hash == hash_MemUsed && !strcmp(name, "MemUsed"))) {
+                rrddim_set(m->meminfo.st_mem_usage, name, (collected_number)str2kernel_uint_t(value) * 1024);
+            } else if (
+                (hash == hash_ActiveAnon && !strcmp(name, "Active(anon)")) ||
+                (hash == hash_InactiveAnon && !strcmp(name, "Inactive(anon)")) ||
+                (hash == hash_ActiveFile && !strcmp(name, "Active(file)")) ||
+                (hash == hash_InactiveFile && !strcmp(name, "Inactive(file)"))) {
+                rrddim_set(m->meminfo.st_mem_activity, name, (collected_number)str2kernel_uint_t(value) * 1024);
+            }
+        }
+        rrdset_done(m->meminfo.st_mem_usage);
+        rrdset_done(m->meminfo.st_mem_activity);
     }
 }
 
