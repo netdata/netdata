@@ -94,8 +94,8 @@ Install [Borg backup exporter](https://github.com/k0ral/borg-exporter) by follow
 The configuration file name for this integration is `go.d/prometheus.conf`.
 
 
-You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -138,7 +138,7 @@ The following options can be defined globally: update_every, autodetection_retry
 This option allows you to filter out unwanted time series. Only metrics matching the selector will be collected.
 
 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
-- Pattern syntax: [selector](/src/go/plugin/go.d/pkg/prometheus/selector/README.md).
+- Pattern syntax: [selector](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/pkg/prometheus/selector/README.md).
 - Option syntax:
 
 ```yaml

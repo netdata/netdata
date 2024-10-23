@@ -185,8 +185,8 @@ No action required.
 The configuration file name for this integration is `go.d/vsphere.conf`.
 
 
-You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -224,7 +224,7 @@ The following options can be defined globally: update_every, autodetection_retry
 Metrics of hosts matching the selector will be collected.
 
 - Include pattern syntax: "/Datacenter pattern/Cluster pattern/Host pattern".
-- Match pattern syntax: [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
+- Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns).
 - Syntax:
 
   ```yaml
@@ -240,7 +240,7 @@ Metrics of hosts matching the selector will be collected.
 Metrics of VMs matching the selector will be collected.
 
 - Include pattern syntax: "/Datacenter pattern/Cluster pattern/Host pattern/VM pattern".
-- Match pattern syntax: [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
+- Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns).
 - Syntax:
 
   ```yaml

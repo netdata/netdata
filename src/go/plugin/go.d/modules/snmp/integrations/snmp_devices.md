@@ -134,8 +134,8 @@ No action required.
 The configuration file name for this integration is `go.d/snmp.conf`.
 
 
-You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -164,8 +164,8 @@ The following options can be defined globally: update_every, autodetection_retry
 | options.timeout | SNMP request/response timeout. | 5 | no |
 | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
 | options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
-| network_interface_filter.by_name | Filter interfaces by their names using [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
-| network_interface_filter.by_type | Filter interfaces by their types using [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
+| network_interface_filter.by_name | Filter interfaces by their names using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
+| network_interface_filter.by_type | Filter interfaces by their types using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
 | user.name | SNMPv3 user name. |  | no |
 | user.name | Security level of SNMPv3 messages. |  | no |
 | user.auth_proto | Security level of SNMPv3 messages. |  | no |

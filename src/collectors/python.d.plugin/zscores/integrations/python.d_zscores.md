@@ -20,7 +20,7 @@ Module: zscores
 By using smoothed, rolling [Z-Scores](https://en.wikipedia.org/wiki/Standard_score) for selected metrics or charts you can narrow down your focus and shorten root cause analysis.
 
 
-This collector uses the [Netdata rest api](/src/web/api/README.md) to get the `mean` and `stddev`
+This collector uses the [Netdata rest api](https://github.com/netdata/netdata/blob/master/src/web/api/README.md) to get the `mean` and `stddev`
 for each dimension on specified charts over a time range (defined by `train_secs` and `offset_secs`).
 
 For each dimension it will calculate a Z-Score as `z = (x - mean) / stddev` (clipped at `z_clip`). Scores are then smoothed over
@@ -99,8 +99,8 @@ pip3 install numpy pandas requests netdata-pandas==0.0.38
 The configuration file name for this integration is `python.d/zscores.conf`.
 
 
-You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
