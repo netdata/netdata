@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- fix\(packaging\): check for sys/capability.h only on Linux [\#18849](https://github.com/netdata/netdata/pull/18849) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d/sd/nl\): make timeout and interval configurable [\#18847](https://github.com/netdata/netdata/pull/18847) ([ilyam8](https://github.com/ilyam8))
+- fix\(packaging\): fix installing libcurl\_dev on FreeBSD [\#18845](https://github.com/netdata/netdata/pull/18845) ([ilyam8](https://github.com/ilyam8))
+- Silence up-to-date installation targets. [\#18842](https://github.com/netdata/netdata/pull/18842) ([vkalintiris](https://github.com/vkalintiris))
+- docs\(web/gui\): remove legacy dashboard description [\#18841](https://github.com/netdata/netdata/pull/18841) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18839](https://github.com/netdata/netdata/pull/18839) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/vernemq\): add "Queued PUBLISH Messages" chart [\#18838](https://github.com/netdata/netdata/pull/18838) ([ilyam8](https://github.com/ilyam8))
 - Remove RRDSET\_FLAG\_DETAIL. [\#18837](https://github.com/netdata/netdata/pull/18837) ([vkalintiris](https://github.com/vkalintiris))
@@ -310,6 +315,7 @@
 - fix receiver deadlock [\#18440](https://github.com/netdata/netdata/pull/18440) ([ktsaou](https://github.com/ktsaou))
 - fix charts.d/sensors leftovers [\#18439](https://github.com/netdata/netdata/pull/18439) ([ilyam8](https://github.com/ilyam8))
 - remove deadlock from sender [\#18438](https://github.com/netdata/netdata/pull/18438) ([ktsaou](https://github.com/ktsaou))
+- Un-vendor proprietary dashboard code. [\#18437](https://github.com/netdata/netdata/pull/18437) ([Ferroin](https://github.com/Ferroin))
 - go.d remove duplicates in testing [\#18435](https://github.com/netdata/netdata/pull/18435) ([ilyam8](https://github.com/ilyam8))
 - Improve agent shutdown time [\#18434](https://github.com/netdata/netdata/pull/18434) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18432](https://github.com/netdata/netdata/pull/18432) ([netdatabot](https://github.com/netdatabot))
@@ -435,14 +441,6 @@
 - add go.d/nsd [\#18302](https://github.com/netdata/netdata/pull/18302) ([ilyam8](https://github.com/ilyam8))
 - add nsd-control to ndsudo [\#18301](https://github.com/netdata/netdata/pull/18301) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/nsd [\#18300](https://github.com/netdata/netdata/pull/18300) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18299](https://github.com/netdata/netdata/pull/18299) ([netdatabot](https://github.com/netdatabot))
-- go.d gearman fix meta [\#18298](https://github.com/netdata/netdata/pull/18298) ([ilyam8](https://github.com/ilyam8))
-- Handle GOROOT inside build system instead of outside. [\#18296](https://github.com/netdata/netdata/pull/18296) ([Ferroin](https://github.com/Ferroin))
-- add go.d/gearman [\#18294](https://github.com/netdata/netdata/pull/18294) ([ilyam8](https://github.com/ilyam8))
-- Use system certificate configuration for Yum/DNF repos. [\#18293](https://github.com/netdata/netdata/pull/18293) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#18292](https://github.com/netdata/netdata/pull/18292) ([netdatabot](https://github.com/netdatabot))
-- remove python.d/gearman [\#18291](https://github.com/netdata/netdata/pull/18291) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/alarms [\#18290](https://github.com/netdata/netdata/pull/18290) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
