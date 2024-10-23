@@ -108,8 +108,8 @@ sudo pip install 'sqlalchemy<2.0' psycopg2-binary
 The configuration file name for this integration is `python.d/pandas.conf`.
 
 
-You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -136,8 +136,8 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 | chart_configs | an array of chart configuration dictionaries | [] | yes |
 | chart_configs.name | name of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.title | title of the chart to be displayed in the dashboard. | None | yes |
-| chart_configs.family | [family](/docs/dashboards-and-charts/netdata-charts.md#families) of the chart to be displayed in the dashboard. | None | yes |
-| chart_configs.context | [context](/docs/dashboards-and-charts/netdata-charts.md#contexts) of the chart to be displayed in the dashboard. | None | yes |
+| chart_configs.family | [family](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#families) of the chart to be displayed in the dashboard. | None | yes |
+| chart_configs.context | [context](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#contexts) of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.type | the type of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.units | the units of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.df_steps | a series of pandas operations (one per line) that each returns a dataframe. | None | yes |

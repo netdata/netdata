@@ -120,8 +120,8 @@ No action required.
 The configuration file name for this integration is `go.d/sensors.conf`.
 
 
-You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -138,7 +138,7 @@ The following options can be defined globally: update_every.
 |:----|:-----------|:-------|:--------:|
 | update_every | Data collection frequency. | 10 | no |
 | relabel | A list used to update existing sensor labels or add labels to sensors that don't have them. | [] | no |
-| relabel[].chip | [Pattern](/src/libnetdata/simple_pattern/README.md#simple-patterns) to match the `chip_id` label value. |  | no |
+| relabel[].chip | [Pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns) to match the `chip_id` label value. |  | no |
 | relabel[].sensors | A list of sensors to be relabeled for the specified chip. | [] | no |
 | relabel[].sensors[].name | The exact sensor name (e.g., `'temp1'`, `'in1'`, `'voltage1'`). |  | no |
 | relabel[].sensors[].label | The new label value for the sensor. |  | no |

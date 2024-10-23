@@ -91,8 +91,8 @@ No action required.
 The configuration file name for this integration is `go.d/activemq.conf`.
 
 
-You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
@@ -113,8 +113,8 @@ The following options can be defined globally: update_every, autodetection_retry
 | webadmin | Webadmin root path. | admin | yes |
 | max_queues | Maximum number of concurrently collected queues. | 50 | no |
 | max_topics | Maximum number of concurrently collected topics. | 50 | no |
-| queues_filter | Queues filter. Syntax is [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
-| topics_filter | Topics filter. Syntax is [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
+| queues_filter | Queues filter. Syntax is [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
+| topics_filter | Topics filter. Syntax is [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
 | username | Username for basic HTTP authentication. |  | no |
 | password | Password for basic HTTP authentication. |  | no |
 | proxy_username | Username for proxy basic HTTP authentication. |  | no |
