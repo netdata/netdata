@@ -963,12 +963,17 @@ def render_authentications(categories, authentications, ids):
     return authentications, clean_authentications, ids
 
 
+def convert_local_links(text, prefix):
+    return text.replace("](/", f"]({prefix}/")
+
+
 def render_integrations(categories, integrations):
     template = get_jinja_env().get_template('integrations.js')
     data = template.render(
         categories=json.dumps(categories, indent=4),
         integrations=json.dumps(integrations, indent=4),
     )
+    data = convert_local_links(data, "https://github.com/netdata/netdata/blob/master")
     OUTPUT_PATH.write_text(data)
 
 
