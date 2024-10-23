@@ -94,6 +94,7 @@ void apps_managers_and_aggregators_init(void) {
     managed_list_add(&tree.managers, "systemd");                    // lxc containers and host systems (this also catches "systemd --user")
     managed_list_add(&tree.managers, "containerd-shim-runc-v2");    // docker containers
     managed_list_add(&tree.managers, "docker-init");                // docker containers
+    managed_list_add(&tree.managers, "tini");                       // docker containers (https://github.com/krallin/tini)
     managed_list_add(&tree.managers, "dumb-init");                  // some docker containers use this
     managed_list_add(&tree.managers, "openrc-run.sh");              // openrc
     managed_list_add(&tree.managers, "crond");                      // linux crond
