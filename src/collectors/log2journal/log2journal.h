@@ -109,7 +109,7 @@ static inline void freez(void *ptr) {
 // ----------------------------------------------------------------------------
 
 #define XXH_INLINE_ALL
-#include "libnetdata/xxhash.h"
+#include "libnetdata/xxHash/xxhash.h"
 
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
@@ -122,14 +122,14 @@ static inline void freez(void *ptr) {
 // hashtable for HASHED_KEY
 
 // cleanup hashtable defines
-#include "libnetdata/simple_hashtable_undef.h"
+#include "libnetdata/simple_hashtable/simple_hashtable_undef.h"
 
 struct hashed_key;
 static inline int compare_keys(struct hashed_key *k1, struct hashed_key *k2);
 #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_keys
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct hashed_key
 #define SIMPLE_HASHTABLE_NAME _KEY
-#include "libnetdata/simple_hashtable.h"
+#include "libnetdata/simple_hashtable/simple_hashtable.h"
 
 // ----------------------------------------------------------------------------
 

@@ -88,7 +88,7 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 
 #define error_report(x, args...) do { errno_clear(); netdata_log_error(x, ##args); } while(0)
 
-#include "bitmap64.h"
+#include "bitmap/bitmap64.h"
 
 #define COMPRESSION_MAX_CHUNK 0x4000
 #define COMPRESSION_MAX_OVERHEAD 128

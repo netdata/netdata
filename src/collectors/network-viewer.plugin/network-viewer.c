@@ -31,7 +31,7 @@ static SPAWN_SERVER *spawn_srv = NULL;
 
 #define SIMPLE_HASHTABLE_VALUE_TYPE LOCAL_SOCKET
 #define SIMPLE_HASHTABLE_NAME _AGGREGATED_SOCKETS
-#include "libnetdata/simple_hashtable.h"
+#include "libnetdata/simple_hashtable/simple_hashtable.h"
 
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;

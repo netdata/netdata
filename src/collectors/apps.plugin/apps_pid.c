@@ -13,7 +13,7 @@ static inline void link_pid_to_its_parent(struct pid_stat *p);
 #define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION pid_stat_to_pid_ptr
 #define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION pid_ptr_eq
 #define SIMPLE_HASHTABLE_SAMPLE_IMPLEMENTATION 0
-#include "libnetdata/simple_hashtable.h"
+#include "libnetdata/simple_hashtable/simple_hashtable.h"
 
 static inline int32_t *pid_stat_to_pid_ptr(struct pid_stat *p) {
     return &p->pid;

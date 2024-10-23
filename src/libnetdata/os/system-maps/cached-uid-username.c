@@ -11,7 +11,7 @@
 #define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION cached_username_to_uid_ptr
 #define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION compar_uid_ptr
 #define SIMPLE_HASHTABLE_NAME _USERNAMES_CACHE
-#include "libnetdata/simple_hashtable.h"
+#include "libnetdata/simple_hashtable/simple_hashtable.h"
 
 static struct {
     uint32_t version;

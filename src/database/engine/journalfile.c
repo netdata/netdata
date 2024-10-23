@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "libnetdata/bitmap64.h"
 #include "rrdengine.h"
 
 static void after_extent_write_journalfile_v1_io(uv_fs_t* req)

@@ -8,7 +8,7 @@
 // hashtable for HASHED_KEY
 
 // cleanup hashtable defines
-#include "../simple_hashtable_undef.h"
+#include "../simple_hashtable/simple_hashtable_undef.h"
 
 struct query;
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct query
@@ -16,7 +16,7 @@ struct query;
 #define SIMPLE_HASHTABLE_NAME _QUERY
 #define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION query_transaction
 #define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION query_compare_keys
-#include "../simple_hashtable.h"
+#include "../simple_hashtable/simple_hashtable.h"
 
 // ----------------------------------------------------------------------------
 
