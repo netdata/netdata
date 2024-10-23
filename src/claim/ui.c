@@ -27,7 +27,7 @@ LRESULT CALLBACK WndProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM l
                          L"/P PROXY: The proxy information;",
                          L"/U URL  : The cloud URL;",
                          L"/I      : Use insecure connection;",
-                         L"/D DIR  : Directory to store claim.conf"
+                         L"/F File : file to store cloud info;"
     };
 
     switch (message)
