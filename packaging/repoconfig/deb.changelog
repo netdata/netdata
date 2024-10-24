@@ -1,6 +1,12 @@
+@PKG_NAME@ (4-1) unstable; urgency=medium
+
+  * Add repo2.netdata.cloud as a backup repository server.
+
+ -- Netdata Builder <bot@netdata.cloud>  Mon, 16 Sep 2024 11:39:00 -0400
+
 @PKG_NAME@ (3-5) unstable; urgency=medium
 
-  * Swithc DEB packages to fetch repo metadata by hash.
+  * Switch DEB packages to fetch repo metadata by hash.
 
  -- Austin Hemmelgarn <austin@netdata.cloud>  Thu, 12 Sep 2024 07:27:00 -0400
 
