@@ -4,6 +4,8 @@ package maxscale
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -112,7 +114,8 @@ func (m *MaxScale) collectServers(mx map[string]int64) error {
 
 		if !m.seenServers[r.ID] {
 			m.seenServers[r.ID] = true
-			m.addServerCharts(r.ID, r.Attrs.Params.Address)
+			addr := net.JoinHostPort(r.Attrs.Params.Address, strconv.Itoa(int(r.Attrs.Params.Port)))
+			m.addServerCharts(r.ID, addr)
 		}
 
 		px := fmt.Sprintf("server_%s_", r.ID)

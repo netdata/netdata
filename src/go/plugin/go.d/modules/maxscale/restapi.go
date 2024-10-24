@@ -59,6 +59,7 @@ type serversResponse struct {
 		Attrs struct {
 			Params struct {
 				Address string `json:"address"`
+				Port    int    `json:"port"`
 			} `json:"parameters"`
 			State      string `json:"state"`
 			Statistics struct {
