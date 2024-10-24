@@ -1234,13 +1234,20 @@ static void get_netdata_configured_variables()
 
     // ------------------------------------------------------------------------
     // get default database size
+    dbengine_tier0_in_ram = appconfig_get_boolean(
+        &netdata_config,
+        CONFIG_SECTION_DB,
+        "dbengine tier 0 in ram",
+        CONFIG_BOOLEAN_NO);
 
-    if(default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && default_rrd_memory_mode != RRD_MEMORY_MODE_NONE) {
+    if ((default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && default_rrd_memory_mode != RRD_MEMORY_MODE_NONE) ||
+        dbengine_tier0_in_ram) {
         default_rrd_history_entries = (int)config_get_number(
-            CONFIG_SECTION_DB, "retention",
-            align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
+            CONFIG_SECTION_DB,
+            "retention",
+            align_entries_to_pagesize(dbengine_tier0_in_ram ? RRD_MEMORY_MODE_RAM : default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
 
-        long h = align_entries_to_pagesize(default_rrd_memory_mode, default_rrd_history_entries);
+        long h = align_entries_to_pagesize(dbengine_tier0_in_ram ? RRD_MEMORY_MODE_RAM : default_rrd_memory_mode, default_rrd_history_entries);
         if (h != default_rrd_history_entries) {
             config_set_number(CONFIG_SECTION_DB, "retention", h);
             default_rrd_history_entries = (int)h;
