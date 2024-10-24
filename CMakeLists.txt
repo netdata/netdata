@@ -195,7 +195,7 @@ option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)
-option(ENABLE_H2O "Enable H2O web server (experimental)" True)
+option(ENABLE_H2O "Enable H2O web server (experimental)" False)
 mark_as_advanced(ENABLE_H2O)
 
 # Other optional functionality
