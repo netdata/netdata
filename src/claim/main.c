@@ -15,6 +15,7 @@ LPWSTR token = NULL;
 LPWSTR room = NULL;
 LPWSTR proxy = NULL;
 LPWSTR url = NULL;
+LPWSTR extPath = NULL;
 LPWSTR *argv = NULL;
 
 char *aToken = NULL;
@@ -89,6 +90,13 @@ int nd_claim_parse_args(int argc, LPWSTR *argv)
             if(wcslen(argv[i]) >= 8) {
                 proxy = argv[i];
             }
+        }
+
+        if(wcscasecmp(L"/F", argv[i]) == 0) {
+            if (argc <= i + 1)
+                continue;
+            i++;
+            extPath = argv[i];
         }
 
         if(wcscasecmp(L"/U", argv[i]) == 0) {
@@ -180,6 +188,9 @@ static void netdata_claim_exit_callback(int signal)
 
     if (argv)
         LocalFree(argv);
+
+    if (extPath)
+        LocalFree(extPath);
 }
 
 static inline int netdata_claim_prepare_data(char *out, size_t length)
@@ -202,6 +213,15 @@ static inline int netdata_claim_prepare_data(char *out, size_t length)
 
 static int netdata_claim_get_path(char *path)
 {
+    if (extPath) {
+        size_t length = wcslen(extPath) + 1;
+	if (length >= WINDOWS_MAX_PATH) 
+            return -1;
+
+        netdata_claim_convert_str(path, extPath, length - 1);
+	return 0;
+    }
+
     char *usrPath = { "\\usr\\bin" };
     DWORD length = GetCurrentDirectoryA(WINDOWS_MAX_PATH, path);
     if (!length) {
@@ -220,9 +240,17 @@ static void netdata_claim_write_config(char *path)
 {
     char configPath[WINDOWS_MAX_PATH + 1];
     char data[WINDOWS_MAX_PATH + 1];
-    snprintf(configPath, WINDOWS_MAX_PATH - 1, "%s\\etc\\netdata\\claim.conf", path);
+    char *filename;
+    if (!extPath) {
+        snprintf(configPath, WINDOWS_MAX_PATH - 1, "%s\\etc\\netdata\\claim.conf", path);
+        filename = configPath;
+    } else {
+        filename = path;
+    }
 
-    HANDLE hf = CreateFileA(configPath, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+//    MessageBoxA(NULL, configPath, "PATH", 0);
+
+    HANDLE hf = CreateFileA(filename, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hf == INVALID_HANDLE_VALUE)
         netdata_claim_error_exit(L"CreateFileA");
 

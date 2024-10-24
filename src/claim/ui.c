@@ -26,7 +26,8 @@ LRESULT CALLBACK WndProc(HWND hNetdatawnd, UINT message, WPARAM wParam, LPARAM l
                          L"/R ROOMS: A list of rooms to claim;",
                          L"/P PROXY: The proxy information;",
                          L"/U URL  : The cloud URL;",
-                         L"/I      : Use insecure connection;"
+                         L"/I      : Use insecure connection;",
+                         L"/F File : file to store cloud info;"
     };
 
     switch (message)
