@@ -237,6 +237,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [MariaDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/mysql/integrations/mariadb.md)
 
+- [MaxScale](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/maxscale/integrations/maxscale.md)
+
 - [Memcached (community)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/memcached_community.md)
 
 - [Memcached](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/memcached/integrations/memcached.md)
