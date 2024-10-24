@@ -63,8 +63,9 @@
 				<File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
 					<Permission User="NT SERVICE\EventLog" GenericRead="yes" Synchronize="yes" />
 					<Permission User="NT AUTHORITY\SYSTEM" GenericAll="yes" />
-					<!-- Permission User="BUILTIN\Administrators" GenericAll="yes" / -->
-					<!-- Permission User="BUILTIN\Users" GenericRead="yes" GenericExecute="yes" / -->
+					<Permission User="[WIX_ACCOUNT_ADMINISTRATORS]" GenericAll="yes" />
+					<Permission User="[WIX_ACCOUNT_LOCALSYSTEM]" GenericRead="yes" GenericExecute="yes" />
+					<Permission User="[WIX_ACCOUNT_USERS]" GenericRead="yes" GenericExecute="yes" />
 					<Permission User="[LogonUser]" GenericAll="yes" />
 					<!-- Permission User="ALL APPLICATION PACKAGES" GenericRead="yes" GenericExecute="yes" / -->
 					<!-- Permission User="ALL RESTRICTED APPLICATION PACKAGES" GenericRead="yes" GenericExecute="yes" / -->
@@ -77,14 +78,14 @@
 				</File>
 			</Component>
 		</ComponentGroup>
-s
+
 		<CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='[USRBINDIR]NetdataClaim.exe /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I [INSECURE] /P &quot;[PROXY]&quot; /F &quot;[INSTALLFOLDER]etc\netdata\claim.conf&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
 		<InstallExecuteSequence>
 			<Custom Action="ClaimAgent" Before="InstallFinalize" />
 		</InstallExecuteSequence>
 
 		<Component Id="NetdataService" Directory="USRBINDIR">
-			<File Id="NetdataExe" Name="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
+			<File Id="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
 
 			<ServiceInstall Id="InstallService"
                             Name="Netdata"
