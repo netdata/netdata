@@ -67,8 +67,7 @@
 					<Permission User="[WIX_ACCOUNT_LOCALSYSTEM]" GenericRead="yes" GenericExecute="yes" />
 					<Permission User="[WIX_ACCOUNT_USERS]" GenericRead="yes" GenericExecute="yes" />
 					<Permission User="[LogonUser]" GenericAll="yes" />
-					<!-- Permission User="ALL APPLICATION PACKAGES" GenericRead="yes" GenericExecute="yes" / -->
-					<!-- Permission User="ALL RESTRICTED APPLICATION PACKAGES" GenericRead="yes" GenericExecute="yes" / -->
+					<Permission User="[WIX_ACCOUNT_PERFLOGUSERS]" GenericRead="yes" GenericExecute="yes" />					
 				</File>
 			</Component>
 
