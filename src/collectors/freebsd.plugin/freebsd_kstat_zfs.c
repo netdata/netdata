@@ -177,14 +177,16 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
             "autotrim_bytes",
             NULL,
             "trim",
-            NULL,
-            "Auto TRIMmed bytes",
+            "zfs.trim_bytes",
+            "TRIMmed bytes",
             "bytes/s",
             "freebsd.plugin",
             "zfs",
             2320,
             update_every,
             RRDSET_TYPE_LINE);
+
+        rrdlabels_add(st_auto_bytes->rrdlabels, "trim_mode", "auto", RRDLABEL_SRC_AUTO);
 
         rd_auto_bytes_written = rrddim_add(st_auto_bytes, "written", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_auto_bytes_failed = rrddim_add(st_auto_bytes, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -208,14 +210,16 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
             "autotrim_extents",
             NULL,
             "trim",
-            NULL,
-            "Auto TRIMmed extents",
+            "zfs.trim_extents",
+            "TRIMmed extents",
             "extents/s",
             "freebsd.plugin",
             "zfs",
             2321,
             update_every,
             RRDSET_TYPE_LINE);
+
+        rrdlabels_add(st_auto_extents->rrdlabels, "trim_mode", "auto", RRDLABEL_SRC_AUTO);
 
         rd_auto_extents_written = rrddim_add(st_auto_extents, "written", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_auto_extents_failed = rrddim_add(st_auto_extents, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -239,7 +243,7 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
             "trim_bytes",
             NULL,
             "trim",
-            NULL,
+            "zfs.trim_bytes",
             "TRIMmed bytes",
             "bytes/s",
             "freebsd.plugin",
@@ -247,6 +251,8 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
             2322,
             update_every,
             RRDSET_TYPE_LINE);
+
+        rrdlabels_add(st_bytes->rrdlabels, "trim_mode", "manual_full", RRDLABEL_SRC_AUTO);
 
         rd_bytes_written = rrddim_add(st_bytes, "written", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_bytes_failed = rrddim_add(st_bytes, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -269,7 +275,7 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
             "trim_extents",
             NULL,
             "trim",
-            NULL,
+            "zfs.trim_extents",
             "TRIMmed extents",
             "extents/s",
             "freebsd.plugin",
@@ -277,6 +283,8 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
             2323,
             update_every,
             RRDSET_TYPE_LINE);
+
+        rrdlabels_add(st_extents->rrdlabels, "trim_mode", "manual_full", RRDLABEL_SRC_AUTO);
 
         rd_extents_written = rrddim_add(st_extents, "written", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_extents_failed = rrddim_add(st_extents, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
