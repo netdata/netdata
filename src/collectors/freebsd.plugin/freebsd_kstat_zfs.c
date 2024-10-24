@@ -231,79 +231,172 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     return 0;
 }
 
-// kstat.zfs.misc.zio_trim
+struct trim_mib_group {
+    int bytes_failed[6];
+    int bytes_skipped[6];
+    int bytes_written[6];
+    int extents_failed[6];
+    int extents_skipped[6];
+    int extents_written[6];
+};
 
+struct trim_stats {
+    uint64_t bytes_failed;
+    uint64_t bytes_skipped;
+    uint64_t bytes_written;
+    uint64_t extents_failed;
+    uint64_t extents_skipped;
+    uint64_t extents_written;
+};
+
+#define ZFS_TRIM_BASE "kstat.zfs.zroot.misc.iostats"
 int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
     (void)dt;
-    static int mib_bytes[5] = {0, 0, 0, 0, 0}, mib_success[5] = {0, 0, 0, 0, 0},
-               mib_failed[5] = {0, 0, 0, 0, 0}, mib_unsupported[5] = {0, 0, 0, 0, 0};
-    uint64_t bytes, success, failed, unsupported;
 
-    if (unlikely(GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.bytes", mib_bytes, bytes) ||
-                 GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.success", mib_success, success) ||
-                 GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.failed", mib_failed, failed) ||
-                 GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.unsupported", mib_unsupported, unsupported))) {
-        collector_error("DISABLED: zfs.trim_bytes chart");
-        collector_error("DISABLED: zfs.trim_success chart");
-        collector_error("DISABLED: kstat.zfs.misc.zio_trim module");
+    static struct {
+        struct trim_mib_group atrim;
+        struct trim_mib_group trim;
+    } mibs;
+
+    struct trim_stats astats = {0}, stats = {0};
+
+    if (GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".autotrim_bytes_failed", mibs.atrim.bytes_failed, astats.bytes_failed) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".autotrim_bytes_skipped", mibs.atrim.bytes_skipped, astats.bytes_skipped) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".autotrim_bytes_written", mibs.atrim.bytes_written, astats.bytes_written) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".autotrim_extents_failed", mibs.atrim.extents_failed, astats.extents_failed) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".autotrim_extents_skipped", mibs.atrim.extents_skipped, astats.extents_skipped) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".autotrim_extents_written", mibs.atrim.extents_written, astats.extents_written) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".trim_bytes_failed", mibs.trim.bytes_failed, stats.bytes_failed) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".trim_bytes_skipped", mibs.trim.bytes_skipped, stats.bytes_skipped) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".trim_bytes_written", mibs.trim.bytes_written, stats.bytes_written) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".trim_extents_failed", mibs.trim.extents_failed, stats.extents_failed) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".trim_extents_skipped", mibs.trim.extents_skipped, stats.extents_skipped) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".trim_extents_written", mibs.trim.extents_written, stats.extents_written)) {
+        collector_error("DISABLED: zfs trim charts");
         return 1;
-     } else {
+    }
 
-        static RRDSET *st_bytes = NULL;
-        static RRDDIM *rd_bytes = NULL;
+    static RRDSET *st_auto_bytes = NULL;
+    static RRDDIM *rd_auto_bytes_written = NULL;
+    static RRDDIM *rd_auto_bytes_failed = NULL;
+    static RRDDIM *rd_auto_bytes_skipped = NULL;
 
-        if (unlikely(!st_bytes)) {
-            st_bytes = rrdset_create_localhost(
-                    "zfs",
-                    "trim_bytes",
-                    NULL,
-                    "trim",
-                    NULL,
-                    "Successfully TRIMmed bytes",
-                    "bytes",
-                    "freebsd.plugin",
-                    "zfs",
-                    2320,
-                    update_every,
-                    RRDSET_TYPE_LINE
-            );
+    if (unlikely(!st_auto_bytes)) {
+        st_auto_bytes = rrdset_create_localhost(
+            "zfs",
+            "autotrim_bytes",
+            NULL,
+            "trim",
+            NULL,
+            "Auto TRIMmed bytes",
+            "bytes/s",
+            "freebsd.plugin",
+            "zfs",
+            2320,
+            update_every,
+            RRDSET_TYPE_LINE);
 
-            rd_bytes = rrddim_add(st_bytes, "TRIMmed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
+        rd_auto_bytes_written = rrddim_add(st_auto_bytes, "written", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_auto_bytes_failed = rrddim_add(st_auto_bytes, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_auto_bytes_skipped = rrddim_add(st_auto_bytes, "skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
 
-        rrddim_set_by_pointer(st_bytes, rd_bytes, bytes);
-        rrdset_done(st_bytes);
+    rrddim_set_by_pointer(st_auto_bytes, rd_auto_bytes_written, astats.bytes_written);
+    rrddim_set_by_pointer(st_auto_bytes, rd_auto_bytes_failed, astats.bytes_failed);
+    rrddim_set_by_pointer(st_auto_bytes, rd_auto_bytes_skipped, astats.bytes_skipped);
+    rrdset_done(st_auto_bytes);
 
-        static RRDSET *st_requests = NULL;
-        static RRDDIM *rd_successful = NULL, *rd_failed = NULL, *rd_unsupported = NULL;
 
-        if (unlikely(!st_requests)) {
-            st_requests = rrdset_create_localhost(
-                    "zfs",
-                    "trim_requests",
-                    NULL,
-                    "trim",
-                    NULL,
-                    "TRIM requests",
-                    "requests",
-                    "freebsd.plugin",
-                    "zfs",
-                    2321,
-                    update_every,
-                    RRDSET_TYPE_STACKED
-            );
+    static RRDSET *st_auto_extents = NULL;
+    static RRDDIM *rd_auto_extents_written = NULL;
+    static RRDDIM *rd_auto_extents_failed = NULL;
+    static RRDDIM *rd_auto_extents_skipped = NULL;
 
-            rd_successful  = rrddim_add(st_requests, "successful",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_failed      = rrddim_add(st_requests, "failed",      NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_unsupported = rrddim_add(st_requests, "unsupported", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
+    if (unlikely(!st_auto_extents)) {
+        st_auto_extents = rrdset_create_localhost(
+            "zfs",
+            "autotrim_extents",
+            NULL,
+            "trim",
+            NULL,
+            "Auto TRIMmed extents",
+            "extents/s",
+            "freebsd.plugin",
+            "zfs",
+            2321,
+            update_every,
+            RRDSET_TYPE_LINE);
 
-        rrddim_set_by_pointer(st_requests, rd_successful,  success);
-        rrddim_set_by_pointer(st_requests, rd_failed,      failed);
-        rrddim_set_by_pointer(st_requests, rd_unsupported, unsupported);
-        rrdset_done(st_requests);
+        rd_auto_extents_written = rrddim_add(st_auto_extents, "written", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_auto_extents_failed = rrddim_add(st_auto_extents, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_auto_extents_skipped = rrddim_add(st_auto_extents, "skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
 
-     }
+    rrddim_set_by_pointer(st_auto_extents, rd_auto_extents_written, astats.extents_written);
+    rrddim_set_by_pointer(st_auto_extents, rd_auto_extents_failed, astats.extents_failed);
+    rrddim_set_by_pointer(st_auto_extents, rd_auto_extents_skipped, astats.extents_skipped);
+    rrdset_done(st_auto_extents);
+
+
+    static RRDSET *st_bytes = NULL;
+    static RRDDIM *rd_bytes_written = NULL;
+    static RRDDIM *rd_bytes_failed = NULL;
+    static RRDDIM *rd_bytes_skipped = NULL;
+
+    if (unlikely(!st_bytes)) {
+        st_bytes = rrdset_create_localhost(
+            "zfs",
+            "trim_bytes",
+            NULL,
+            "trim",
+            NULL,
+            "TRIMmed bytes",
+            "bytes/s",
+            "freebsd.plugin",
+            "zfs",
+            2322,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_bytes_written = rrddim_add(st_bytes, "written", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_bytes_failed = rrddim_add(st_bytes, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_bytes_skipped = rrddim_add(st_bytes, "skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_bytes, rd_bytes_written, stats.bytes_written);
+    rrddim_set_by_pointer(st_bytes, rd_bytes_failed, stats.bytes_failed);
+    rrddim_set_by_pointer(st_bytes, rd_bytes_skipped, stats.bytes_skipped);
+    rrdset_done(st_bytes);
+
+    static RRDSET *st_extents = NULL;
+    static RRDDIM *rd_extents_written = NULL;
+    static RRDDIM *rd_extents_failed = NULL;
+    static RRDDIM *rd_extents_skipped = NULL;
+
+    if (unlikely(!st_extents)) {
+        st_extents = rrdset_create_localhost(
+            "zfs",
+            "trim_extents",
+            NULL,
+            "trim",
+            NULL,
+            "TRIMmed extents",
+            "extents/s",
+            "freebsd.plugin",
+            "zfs",
+            2323,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_extents_written = rrddim_add(st_extents, "written", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_extents_failed = rrddim_add(st_extents, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_extents_skipped = rrddim_add(st_extents, "skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_extents, rd_extents_written, stats.extents_written);
+    rrddim_set_by_pointer(st_extents, rd_extents_failed, stats.extents_failed);
+    rrddim_set_by_pointer(st_extents, rd_extents_skipped, stats.extents_skipped);
+    rrdset_done(st_extents);
 
     return 0;
 }
