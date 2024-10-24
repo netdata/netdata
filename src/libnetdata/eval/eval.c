@@ -1255,7 +1255,7 @@ void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable,
             }
 
             if (s) {
-                if (s == s1 && !is_valid_variable_character(s[len])) {
+                if (s == s1 && is_valid_variable_character(s[len])) {
                     // Move past the variable if it's part of a larger word.
                     source_ptr = s + len;
                     continue;
