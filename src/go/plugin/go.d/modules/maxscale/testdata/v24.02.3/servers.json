@@ -1,0 +1,198 @@
+{
+  "data": [
+    {
+      "attributes": {
+        "parameters": {
+          "address": "127.0.0.1",
+          "disk_space_threshold": null,
+          "extra_port": 0,
+          "max_routing_connections": 0,
+          "monitorpw": null,
+          "monitoruser": null,
+          "persistmaxtime": "0ms",
+          "persistpoolmax": 0,
+          "port": 3306,
+          "priority": 0,
+          "private_address": null,
+          "proxy_protocol": false,
+          "rank": "primary",
+          "replication_custom_options": null,
+          "socket": null,
+          "ssl": false,
+          "ssl_ca": null,
+          "ssl_cert": null,
+          "ssl_cert_verify_depth": 9,
+          "ssl_cipher": null,
+          "ssl_key": null,
+          "ssl_verify_peer_certificate": false,
+          "ssl_verify_peer_host": false,
+          "ssl_version": "MAX"
+        },
+        "replication_lag": -1,
+        "source": {
+          "file": "/var/lib/maxscale/maxscale.cnf.d/kek.cnf",
+          "type": "runtime"
+        },
+        "state": "Down",
+        "statistics": {
+          "active_operations": 0,
+          "adaptive_avg_select_time": "0ns",
+          "connection_pool_empty": 0,
+          "connections": 0,
+          "failed_auths": 0,
+          "max_connections": 0,
+          "max_pool_size": 0,
+          "persistent_connections": 0,
+          "response_time_distribution": {
+            "read": {
+              "distribution": [
+                {
+                  "count": 0,
+                  "time": "0.000001",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "0.000010",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "0.000100",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "0.001000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "0.010000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "0.100000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "1.000000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "10.000000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "100.000000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "1000.000000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "10000.000000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "100000.000000",
+                  "total": 0
+                }
+              ],
+              "operation": "read",
+              "range_base": 10
+            },
+            "write": {
+              "distribution": [
+                {
+                  "count": 0,
+                  "time": "0.000001",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "0.000010",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "0.000100",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "0.001000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "0.010000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "0.100000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "1.000000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "10.000000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "100.000000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "1000.000000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "10000.000000",
+                  "total": 0
+                },
+                {
+                  "count": 0,
+                  "time": "100000.000000",
+                  "total": 0
+                }
+              ],
+              "operation": "write",
+              "range_base": 10
+            }
+          },
+          "reused_connections": 0,
+          "routed_packets": 0,
+          "total_connections": 0
+        },
+        "uptime": 0,
+        "version_string": ""
+      },
+      "id": "kek",
+      "links": {
+        "self": "http://localhost:8989/v1/servers/kek/"
+      },
+      "relationships": {},
+      "type": "servers"
+    }
+  ],
+  "links": {
+    "self": "http://localhost:8989/v1/servers/"
+  }
+}
