@@ -324,7 +324,7 @@ int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **
         goto cleanup_json;
     }
 
-    *challenge = mallocz(CHALLENGE_LEN);
+    *challenge = mallocz((CHALLENGE_LEN_BASE64 / 4) * 3 + 1);
     *challenge_bytes = netdata_base64_decode(*challenge, (const unsigned char *) challenge_base64, CHALLENGE_LEN_BASE64);
 
     if (*challenge_bytes != CHALLENGE_LEN) {
