@@ -55,6 +55,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/logind"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/logstash"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/lvm"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/maxscale"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/megacli"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/memcached"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/mongodb"

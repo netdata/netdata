@@ -1,0 +1,51 @@
+{
+  "data": [
+    {
+      "attributes": {
+        "stats": {
+          "accepts": 0,
+          "avg_event_queue_length": 1,
+          "current_descriptors": 3,
+          "errors": 0,
+          "hangups": 0,
+          "listening": true,
+          "load": {
+            "last_hour": 0,
+            "last_minute": 0,
+            "last_second": 0
+          },
+          "max_event_queue_length": 1,
+          "max_exec_time": 0,
+          "max_queue_time": 0,
+          "memory": {
+            "query_classifier": 0,
+            "sessions": 0,
+            "total": 0,
+            "zombies": 0
+          },
+          "query_classifier_cache": {
+            "evictions": 0,
+            "hits": 0,
+            "inserts": 0,
+            "misses": 0,
+            "size": 0
+          },
+          "reads": 68359,
+          "sessions": 0,
+          "state": "Active",
+          "total_descriptors": 3,
+          "writes": 0,
+          "zombies": 0
+        }
+      },
+      "id": "0",
+      "links": {
+        "self": "http://localhost:8989/v1/threads/0/"
+      },
+      "type": "threads"
+    }
+  ],
+  "links": {
+    "self": "http://localhost:8989/v1/maxscale/threads/"
+  }
+}
