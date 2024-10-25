@@ -380,7 +380,7 @@
           "classification": { "$ref": "#/definitions/configClassification" },
           "value": { "$ref": "#/definitions/configValue" },
           "conditions": { "$ref": "#/definitions/configConditions" },
-          "actions": { "$ref": "#/definitions/configAction" }
+          "action": { "$ref": "#/definitions/configAction" }
         },
         "required": []
       },
