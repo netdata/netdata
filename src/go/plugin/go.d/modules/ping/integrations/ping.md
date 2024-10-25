@@ -25,22 +25,27 @@ This module measures round-trip time and packet loss by sending ping messages to
 
 There are two operational modes:
 
-- privileged (send raw ICMP ping, default). Requires
-  CAP_NET_RAW [capability](https://man7.org/linux/man-pages/man7/capabilities.7.html) or root privileges:
-  > **Note**: set automatically during Netdata installation.
+- **Privileged** (send raw ICMP ping, default). Requires the necessary permissions ([CAP_NET_RAW](https://man7.org/linux/man-pages/man7/capabilities.7.html) on Linux, `setuid` bit on other systems).
 
-  ```bash
-  sudo setcap CAP_NET_RAW=eip <INSTALL_PREFIX>/usr/libexec/netdata/plugins.d/go.d.plugin
-  ```
+  These permissions are **automatically** set during Netdata installation. However, if you need to set them manually:
+    - set `CAP_NET_RAW` (Linux only).
+      ```bash
+      sudo setcap CAP_NET_RAW=eip <INSTALL_PREFIX>/usr/libexec/netdata/plugins.d/go.d.plugin
+      ```
+    - set `setuid` bit (Other OS).
+      ```bash
+      sudo chmod 4750 <INSTALL_PREFIX>/usr/libexec/netdata/plugins.d/go.d.plugin
+      ```
 
-- unprivileged (send UDP ping, Linux only).
-  Requires configuring [ping_group_range](https://www.man7.org/linux/man-pages/man7/icmp.7.html):
+- **Unprivileged** (send UDP ping, Linux only). Requires configuring [ping_group_range](https://www.man7.org/linux/man-pages/man7/icmp.7.html):
+
+  This configuration is **not set automatically** and requires manual configuration.
 
   ```bash
   sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
   ```
-  To persist the change add `net.ipv4.ping_group_range=0 2147483647` to `/etc/sysctl.conf` and
-  execute `sudo sysctl -p`.
+
+  To persist the change add `net.ipv4.ping_group_range=0 2147483647` to `/etc/sysctl.conf` and execute `sudo sysctl -p`.
 
 
 
