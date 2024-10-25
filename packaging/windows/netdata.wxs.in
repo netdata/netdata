@@ -5,7 +5,7 @@
 	<!-- xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" -->
 	<Package Name="Netdata Agent Installer"
         Manufacturer="Netdata Inc."
-        Version="2.0.0.0"
+        Version="@CMAKE_PROJECT_VERSION@"
         UpgradeCode="0d949b90-a54d-4aae-9616-e15fbc410530">
 
         <MediaTemplate EmbedCab="yes"/>
