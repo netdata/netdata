@@ -3,7 +3,7 @@
 #include "../libnetdata.h"
 
 size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, const unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length) {
-    if(unlikely(!src || !dst || !dst_size)) return 0;
+    if(unlikely(!dst || !dst_size)) return 0;
 
     // skip leading spaces and invalid characters
     while(src && *src && !IS_UTF8_BYTE(*src) && (isspace(*src) || iscntrl(*src) || !isprint(*src)))
