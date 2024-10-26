@@ -61,11 +61,15 @@
 		<ComponentGroup Id="WevtComponents" Directory="System64Folder">
 			<Component>
 				<File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
+					<Permission User="NT SERVICE\EventLog" GenericRead="yes" Synchronize="yes" />
+					<Permission User="NT AUTHORITY\SYSTEM" GenericAll="yes" />
 					<Permission User="[WIX_ACCOUNT_ADMINISTRATORS]" GenericAll="yes" />
 					<Permission User="[WIX_ACCOUNT_LOCALSYSTEM]" GenericRead="yes" GenericExecute="yes" />
 					<Permission User="[WIX_ACCOUNT_USERS]" GenericRead="yes" GenericExecute="yes" />
 					<Permission User="[LogonUser]" GenericAll="yes" />
-					<Permission User="[WIX_ACCOUNT_PERFLOGUSERS]" GenericRead="yes" GenericExecute="yes" />					
+                                       <Permission User="[WIX_ACCOUNT_PERFLOGUSERS]" GenericRead="yes" GenericExecute="yes" />
+					<Permission User="APPLICATION PACKAGE AUTHORITY\ALL APPLICATION PACKAGES" GenericRead="yes" GenericExecute="yes" />
+					<Permission User="APPLICATION PACKAGE AUTHORITY\ALL RESTRICTED APP PACKAGES" GenericRead="yes" GenericExecute="yes" />
 				</File>
 			</Component>
 
