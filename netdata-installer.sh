@@ -929,11 +929,11 @@ if [ "$(id -u)" -eq 0 ]; then
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-    capabilities=1
+    capabilities=0
     if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
       run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-      if ! run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"; then
-        capabilities=0
+      if run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"; then
+        capabilities=1
       fi
     fi
 
