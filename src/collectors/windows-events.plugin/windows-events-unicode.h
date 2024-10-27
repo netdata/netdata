@@ -4,8 +4,6 @@
 #define NETDATA_WINDOWS_EVENTS_UNICODE_H
 
 #include "libnetdata/libnetdata.h"
-#include <windows.h>
-#include <wchar.h>
 
 #define WINEVENT_NAME_KEYWORDS_SEPARATOR    ", "
 static inline void txt_utf8_add_keywords_separator_if_needed(TXT_UTF8 *dst) {

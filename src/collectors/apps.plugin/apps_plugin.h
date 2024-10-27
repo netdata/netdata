@@ -85,8 +85,6 @@ struct pid_info {
 #define OS_FUNCTION(func) OS_FUNC_CONCAT(func, _macos)
 
 #elif defined(OS_WINDOWS)
-#include <windows.h>
-
 #define OS_INIT_PID                          0 // dynamic, is set during data collection
 #define ALL_PIDS_ARE_READ_INSTANTLY          1
 #define PROCESSES_HAVE_CPU_GUEST_TIME        0

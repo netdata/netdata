@@ -76,8 +76,6 @@ bool nd_log_journal_direct_init(const char *path) {
     return true;
 }
 
-static bool sockets_before[1024];
-
 bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_t fields_max __maybe_unused) {
 #ifdef HAVE_SYSTEMD
 
@@ -158,6 +156,7 @@ bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_
         }
     }
 
+    static bool sockets_before[1024];
     bool detect_systemd_socket = __atomic_load_n(&nd_log.journal.first_msg, __ATOMIC_RELAXED) == false;
     if(detect_systemd_socket) {
         for(int i = 3 ; (size_t)i < _countof(sockets_before); i++)

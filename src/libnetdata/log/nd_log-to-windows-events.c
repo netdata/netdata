@@ -3,12 +3,6 @@
 #include "nd_log-internals.h"
 
 #if defined(OS_WINDOWS) && (defined(HAVE_ETW) || defined(HAVE_WEL))
-#include <windows.h>
-#include <winevt.h>
-#include <evntprov.h>
-#include <wchar.h>
-#include <guiddef.h>
-#include <wctype.h>
 
 // --------------------------------------------------------------------------------------------------------------------
 // construct an event id

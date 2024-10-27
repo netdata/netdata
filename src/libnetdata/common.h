@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+/*
+ * This file should include everything from the operating system needed to compile Netdata,
+ * without any Netdata specific includes.
+ *
+ * It should be the baseline of includes (operating system and common libraries related).
+ */
+
 #ifndef LIBNETDATA_COMMON_H
 #define LIBNETDATA_COMMON_H
 
@@ -386,6 +393,25 @@ typedef uint32_t uid_t;
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
 // --------------------------------------------------------------------------------------------------------------------
+
+#if defined(OS_WINDOWS)
+#include <windows.h>
+#include <wctype.h>
+#include <wchar.h>
+#include <tchar.h>
+#include <guiddef.h>
+#include <bcrypt.h>  // For BCryptGenRandom
+#include <io.h>
+#include <fcntl.h>
+#include <process.h>
+#include <tlhelp32.h>
+#include <sys/cygwin.h>
+#include <winevt.h>
+#include <evntprov.h>
+#include <wbemidl.h>
+#include <sddl.h>
+// #include <winternl.h> // conflicts on STRING,
+#endif
 
 # ifdef __cplusplus
 }

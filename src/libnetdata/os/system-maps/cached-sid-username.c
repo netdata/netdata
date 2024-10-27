@@ -4,8 +4,6 @@
 
 #if defined(OS_WINDOWS)
 #include "cached-sid-username.h"
-#include <windows.h>
-#include <sddl.h>
 
 typedef struct {
     size_t len;

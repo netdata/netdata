@@ -6,10 +6,6 @@
 #include "../../libnetdata.h"
 
 #if defined(OS_WINDOWS)
-
-#include <windows.h>
-#include <wbemidl.h>
-
 typedef struct {
     IWbemLocator *pLoc;
     IWbemServices *pSvc;

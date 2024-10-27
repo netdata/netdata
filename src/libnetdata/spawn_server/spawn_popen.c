@@ -2,10 +2,6 @@
 
 #include "spawn_popen.h"
 
-#if defined(OS_WINDOWS)
-#include <windows.h>
-#endif
-
 struct popen_instance {
     SPAWN_INSTANCE *si;
     FILE *child_stdin_fp;

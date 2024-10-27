@@ -3,8 +3,6 @@
 #include "perflib.h"
 
 #if defined(OS_WINDOWS)
-#include <windows.h>
-
 // --------------------------------------------------------------------------------
 
 // Retrieve a buffer that contains the specified performance data.

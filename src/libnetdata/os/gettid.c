@@ -2,10 +2,6 @@
 
 #include "../libnetdata.h"
 
-#if defined(OS_WINDOWS)
-#include <windows.h>
-#endif
-
 pid_t os_gettid(void) {
 #if defined(HAVE_GETTID)
     return gettid();

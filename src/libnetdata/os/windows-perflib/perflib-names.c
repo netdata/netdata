@@ -3,8 +3,6 @@
 #include "perflib.h"
 
 #if defined(OS_WINDOWS)
-#include <windows.h>
-
 #define REGISTRY_KEY "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Perflib\\009"
 
 typedef struct perflib_registry {

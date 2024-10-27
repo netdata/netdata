@@ -18,16 +18,6 @@
 // #define SPAWN_SERVER_VERSION_POSIX_SPAWN 1
 #endif
 
-#if defined(SPAWN_SERVER_VERSION_WINDOWS)
-#include <windows.h>
-#include <io.h>
-#include <fcntl.h>
-#include <process.h>
-#include <tlhelp32.h>
-#include <tchar.h>
-#include <sys/cygwin.h>
-#endif
-
 struct spawn_server {
     size_t id;
     size_t request_id;

@@ -2,10 +2,6 @@
 
 #include "../libnetdata.h"
 
-#if defined(OS_WINDOWS)
-#include <windows.h>
-#endif
-
 #define CPUS_FOR_COLLECTORS 0
 #define CPUS_FOR_NETDATA 1
 

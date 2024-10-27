@@ -3,8 +3,6 @@
 #include "../libnetdata.h"
 
 #if defined(OS_WINDOWS)
-#include <windows.h>
-
 long netdata_registry_get_dword_from_open_key(unsigned int *out, void *lKey, char *name)
 {
     DWORD length = 260;

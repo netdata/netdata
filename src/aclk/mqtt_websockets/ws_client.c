@@ -5,11 +5,6 @@
 #include "ws_client.h"
 #include "common_internal.h"
 
-#ifdef OS_WINDOWS
-#include <windows.h>
-#include <bcrypt.h>  // For BCryptGenRandom
-#endif
-
 static uint32_t generate_random_32bit(void) {
     uint32_t random_number = 0;
 
