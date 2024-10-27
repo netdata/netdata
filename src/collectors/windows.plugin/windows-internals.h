@@ -3,7 +3,7 @@
 #ifndef NETDATA_WINDOWS_INTERNALS_H
 #define NETDATA_WINDOWS_INTERNALS_H
 
-#include <windows.h>
+#include "libnetdata/common.h"
 
 static inline ULONGLONG FileTimeToULL(FILETIME ft) {
     ULARGE_INTEGER ul;

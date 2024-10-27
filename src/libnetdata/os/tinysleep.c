@@ -3,8 +3,6 @@
 #include "../libnetdata.h"
 
 #ifdef OS_WINDOWS
-#include <windows.h>
-
 void tinysleep(void) {
     // Improve the system timer resolution to 1 ms
     timeBeginPeriod(1);

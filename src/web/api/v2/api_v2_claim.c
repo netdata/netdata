@@ -3,11 +3,6 @@
 #include "api_v2_calls.h"
 #include "claim/claim.h"
 
-#if defined(OS_WINDOWS)
-#include <windows.h>
-#include <sys/cygwin.h>
-#endif
-
 static char *netdata_random_session_id_filename = NULL;
 static nd_uuid_t netdata_random_session_id = { 0 };
 

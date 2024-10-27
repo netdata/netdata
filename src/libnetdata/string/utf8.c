@@ -3,8 +3,6 @@
 #include "../libnetdata.h"
 
 #if defined(OS_WINDOWS)
-#include <windows.h>
-
 /*
  * Convert any CodePage to UTF16
  * Goals:

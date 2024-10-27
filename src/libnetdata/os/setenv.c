@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "config.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#if defined(OS_WINDOWS)
-#include <windows.h>
-#endif
+#include "libnetdata/libnetdata.h"
 
 #ifndef HAVE_SETENV
 int os_setenv(const char *name, const char *value, int overwrite) {

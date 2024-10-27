@@ -8,8 +8,6 @@ void nd_process_signals(void);
 
 }
 
-#include <windows.h>
-
 __attribute__((format(printf, 1, 2)))
 static void netdata_service_log(const char *fmt, ...)
 {

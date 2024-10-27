@@ -3,8 +3,6 @@
 #include "perflib.h"
 
 #if defined(OS_WINDOWS)
-#include <windows.h>
-
 static const char *getCounterType(DWORD CounterType) {
     switch (CounterType) {
         case PERF_COUNTER_COUNTER:

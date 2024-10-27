@@ -5,10 +5,6 @@
 
 #include "../libnetdata.h"
 
-#if defined(OS_WINDOWS)
-#include <windows.h>
-#endif
-
 #ifdef __FreeBSD__
 #include <sys/endian.h>
 #endif

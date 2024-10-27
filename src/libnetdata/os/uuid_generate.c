@@ -6,8 +6,6 @@
 #undef uuid_generate_time
 
 #ifdef OS_WINDOWS
-#include <windows.h>
-
 void os_uuid_generate(void *out) {
     RPC_STATUS status = UuidCreate(out);
     while (status != RPC_S_OK && status != RPC_S_UUID_LOCAL_ONLY) {

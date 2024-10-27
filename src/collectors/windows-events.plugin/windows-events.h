@@ -5,9 +5,6 @@
 
 #include "libnetdata/libnetdata.h"
 #include "collectors/all.h"
-#include <windows.h>
-#include <winevt.h>
-#include <wchar.h>
 
 typedef enum {
     WEVT_NO_CHANNEL_MATCHED,
