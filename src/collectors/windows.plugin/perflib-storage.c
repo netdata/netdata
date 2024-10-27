@@ -311,17 +311,17 @@ static void physical_disk_labels(RRDSET *st, void *data) {
     if (d->mount_point)
         rrdlabels_add(st->rrdlabels, "mount_point", string2str(d->mount_point), RRDLABEL_SRC_AUTO);
 
-    if (d->manufacturer)
-        rrdlabels_add(st->rrdlabels, "manufacturer", string2str(d->manufacturer), RRDLABEL_SRC_AUTO);
+//    if (d->manufacturer)
+//        rrdlabels_add(st->rrdlabels, "manufacturer", string2str(d->manufacturer), RRDLABEL_SRC_AUTO);
 
     if (d->model)
         rrdlabels_add(st->rrdlabels, "model", string2str(d->model), RRDLABEL_SRC_AUTO);
 
-    if (d->media_type)
-        rrdlabels_add(st->rrdlabels, "media_type", string2str(d->media_type), RRDLABEL_SRC_AUTO);
+//    if (d->media_type)
+//        rrdlabels_add(st->rrdlabels, "media_type", string2str(d->media_type), RRDLABEL_SRC_AUTO);
 
-    if (d->name)
-        rrdlabels_add(st->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
+//    if (d->name)
+//        rrdlabels_add(st->rrdlabels, "name", string2str(d->name), RRDLABEL_SRC_AUTO);
 
     if (d->device_id)
         rrdlabels_add(st->rrdlabels, "device_id", string2str(d->device_id), RRDLABEL_SRC_AUTO);
