@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+/*
+ * This file should include everything from the operating system needed to compile Netdata,
+ * without any Netdata specific includes.
+ *
+ * It should be the baseline of includes (operating system and common libraries related).
+ */
+
 #ifndef LIBNETDATA_COMMON_H
 #define LIBNETDATA_COMMON_H
 
@@ -403,6 +410,7 @@ typedef uint32_t uid_t;
 #include <evntprov.h>
 #include <wbemidl.h>
 #include <sddl.h>
+// #include <winternl.h> // conflicts on STRING,
 #endif
 
 # ifdef __cplusplus

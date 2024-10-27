@@ -2,13 +2,10 @@
 
 // this must not include libnetdata.h because STRING is defined in winternl.h
 
-#include "config.h"
-#if defined(OS_WINDOWS)
+#include "libnetdata/common.h"
 
-#include <windows.h>
+#if defined(OS_WINDOWS)
 #include <winternl.h>
-#include <psapi.h>
-#include <stdint.h>
 
 // --------------------------------------------------------------------------------------------------------------------
 // Get the full windows command line
