@@ -333,34 +333,48 @@ static bool str_is_numeric(const char *s) {
 }
 
 static inline double perflib_average_timer_ms(COUNTER_DATA *d) {
+    if(!d->updated) return 0.0;
+
     ULONGLONG data1 = d->current.Data;
     ULONGLONG data0 = d->previous.Data;
     LONGLONG time1 = d->current.Time;
     LONGLONG time0 = d->previous.Time;
     LONGLONG freq1 = d->current.Frequency;
 
-    LONGLONG dt = (time1 - time0);
-    if(dt > 0)
-        return ((double)(data1 - data0) / (double)(freq1 / MSEC_PER_SEC)) / dt;
-    else
-        return 0;
+    if(data1 >= data0 && time1 > time0 && time0 && freq1)
+        return ((double)(data1 - data0) / (double)(freq1 / MSEC_PER_SEC)) / (double)(time1 - time0);
+
+    return 0;
 }
 
 static inline uint64_t perflib_average_bulk(COUNTER_DATA *d) {
+    if(!d->updated) return 0;
+
     ULONGLONG data1 = d->current.Data;
     ULONGLONG data0 = d->previous.Data;
     LONGLONG time1 = d->current.Time;
     LONGLONG time0 = d->previous.Time;
 
-    LONGLONG dt = (time1 - time0);
-    if(dt > 0)
-        return (data1 - data0) / dt;
-    else
-        return 0;
+    if(data1 >= data0 && time1 > time0 && time0)
+        return (data1 - data0) / (time1 - time0);
+
+    return 0;
 }
 
-static inline bool perflib_previous_is_set(COUNTER_DATA *d) {
-    return d->updated && d->previous.Data && d->previous.Time && d->current.Time > d->previous.Time;
+static inline uint64_t perflib_idle_time_percent(COUNTER_DATA *d) {
+    if(!d->updated) return 0.0;
+
+    ULONGLONG data1 = d->current.Data;
+    ULONGLONG data0 = d->previous.Data;
+    LONGLONG time1 = d->current.Time;
+    LONGLONG time0 = d->previous.Time;
+
+    if(data1 >= data0 && time1 > time0 && time0) {
+        uint64_t pcent = 100 * (data1 - data0) / (time1 - time0);
+        return pcent > 100 ? 100 : pcent;
+    }
+
+    return 0;
 }
 
 #define MAX_WMI_DRIVES 100
@@ -467,23 +481,14 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime)) {
-            if (perflib_previous_is_set(&d->percentIdleTime)) {
-                collected_number idle_percentage =
-                        100 * (d->percentIdleTime.current.Data - d->percentIdleTime.previous.Data)
-                        / (d->percentIdleTime.current.Time - d->percentIdleTime.previous.Time);
-
-                if (idle_percentage > 100)
-                    idle_percentage = 100;
-
-                common_disk_util(
-                        &d->disk_util,
-                        device,
-                        NULL,
-                        100 - idle_percentage,
-                        update_every,
-                        physical_disk_labels,
-                        d);
-            }
+            common_disk_util(
+                    &d->disk_util,
+                    device,
+                    NULL,
+                    100 - perflib_idle_time_percent(&d->percentIdleTime),
+                    update_every,
+                    physical_disk_labels,
+                    d);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime)) {
@@ -525,50 +530,40 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerWrite)) {
 
-            if (perflib_previous_is_set(&d->averageDiskSecondsPerRead) &&
-                    perflib_previous_is_set(&d->averageDiskSecondsPerWrite)) {
-
-                common_disk_await(
-                        &d->disk_await,
-                        device,
-                        NULL,
-                        perflib_average_timer_ms(&d->averageDiskSecondsPerRead),
-                        perflib_average_timer_ms(&d->averageDiskSecondsPerWrite),
-                        update_every,
-                        physical_disk_labels,
-                        d);
-            }
+            common_disk_await(
+                    &d->disk_await,
+                    device,
+                    NULL,
+                    perflib_average_timer_ms(&d->averageDiskSecondsPerRead),
+                    perflib_average_timer_ms(&d->averageDiskSecondsPerWrite),
+                    update_every,
+                    physical_disk_labels,
+                    d);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerTransfer)) {
-            if (perflib_previous_is_set(&d->averageDiskSecondsPerTransfer)) {
-                common_disk_svctm(
-                        &d->disk_svctm,
-                        device,
-                        NULL,
-                        perflib_average_timer_ms(&d->averageDiskSecondsPerTransfer),
-                        update_every,
-                        physical_disk_labels,
-                        d);
-            }
+            common_disk_svctm(
+                    &d->disk_svctm,
+                    device,
+                    NULL,
+                    perflib_average_timer_ms(&d->averageDiskSecondsPerTransfer),
+                    update_every,
+                    physical_disk_labels,
+                    d);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerRead) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerWrite)) {
 
-            if (perflib_previous_is_set(&d->averageDiskBytesPerRead) &&
-                perflib_previous_is_set(&d->averageDiskBytesPerWrite)) {
-
-                common_disk_avgsz(
-                        &d->disk_avgsz,
-                        device,
-                        NULL,
-                        perflib_average_bulk(&d->averageDiskBytesPerRead),
-                        perflib_average_bulk(&d->averageDiskBytesPerWrite),
-                        update_every,
-                        physical_disk_labels,
-                        d);
-            }
+            common_disk_avgsz(
+                    &d->disk_avgsz,
+                    device,
+                    NULL,
+                    perflib_average_bulk(&d->averageDiskBytesPerRead),
+                    perflib_average_bulk(&d->averageDiskBytesPerWrite),
+                    update_every,
+                    physical_disk_labels,
+                    d);
         }
 
         if(perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->splitIoPerSec)) {
