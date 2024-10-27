@@ -64,12 +64,12 @@ struct transaction_buffer {
 };
 
 enum mqtt_client_state {
-    RAW = 0,
-    CONNECT_PENDING,
-    CONNECTING,
-    CONNECTED, 
-    ERROR,
-    DISCONNECTED
+    MQTT_STATE_RAW = 0,
+    MQTT_STATE_CONNECT_PENDING,
+    MQTT_STATE_CONNECTING,
+    MQTT_STATE_CONNECTED,
+    MQTT_STATE_ERROR,
+    MQTT_STATE_DISCONNECTED
 };
 
 enum parser_state {
@@ -957,7 +957,7 @@ int mqtt_ng_connect(struct mqtt_ng_client *client,
                     uint8_t clean_start,
                     uint16_t keep_alive)
 {
-    client->client_state = RAW;
+    client->client_state = MQTT_STATE_RAW;
     client->parser.state = MQTT_PARSE_FIXED_HEADER_PACKET_TYPE;
 
     LOCK_HDR_BUFFER(&client->main_buffer);
@@ -992,7 +992,7 @@ int mqtt_ng_connect(struct mqtt_ng_client *client,
     client->stats.rx_messages_rcvd = 0;
     spinlock_unlock(&client->stats_spinlock);
 
-    client->client_state = CONNECT_PENDING;
+    client->client_state = MQTT_STATE_CONNECT_PENDING;
     return 0;
 }
 
@@ -1834,12 +1834,12 @@ static int parse_data(struct mqtt_ng_client *client)
 // return -1 on error
 // return 0 if there is fragment set
 static int mqtt_ng_next_to_send(struct mqtt_ng_client *client) {
-    if (client->client_state == CONNECT_PENDING) {
+    if (client->client_state == MQTT_STATE_CONNECT_PENDING) {
         client->main_buffer.sending_frag = client->connect_msg;
-        client->client_state = CONNECTING;
+        client->client_state = MQTT_STATE_CONNECTING;
         return 0;
     }
-    if (client->client_state != CONNECTED)
+    if (client->client_state != MQTT_STATE_CONNECTED)
         return -1;
 
     struct buffer_fragment *frag = BUFFER_FIRST_FRAG(&client->main_buffer.hdr_buffer);
@@ -1970,9 +1970,9 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
 
             client->connect_msg = NULL;
 
-            if (client->client_state != CONNECTING) {
+            if (client->client_state != MQTT_STATE_CONNECTING) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "Received unexpected CONNACK");
-                client->client_state = ERROR;
+                client->client_state = MQTT_STATE_ERROR;
                 return MQTT_NG_CLIENT_PROTOCOL_ERROR;
             }
 
@@ -1985,10 +1985,10 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                 client->connack_callback(client->user_ctx, client->parser.mqtt_packet.connack.reason_code);
             if (!client->parser.mqtt_packet.connack.reason_code) {
                 nd_log(NDLS_DAEMON, NDLP_INFO, "MQTT Connection Accepted By Server");
-                client->client_state = CONNECTED;
+                client->client_state = MQTT_STATE_CONNECTED;
                 break;
             }
-            client->client_state = ERROR;
+            client->client_state = MQTT_STATE_ERROR;
             return MQTT_NG_CLIENT_SERVER_RETURNED_ERROR;
 
         case MQTT_CPT_PUBACK:
@@ -2016,7 +2016,7 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
             }
 
             if ( pub->qos == 1 && ((rc = mqtt_ng_puback(client, pub->packet_id, 0))) ) {
-                client->client_state = ERROR;
+                client->client_state = MQTT_STATE_ERROR;
                 nd_log(NDLS_DAEMON, NDLP_ERR, "Error generating PUBACK reply for PUBLISH");
                 return rc;
             }
@@ -2050,7 +2050,7 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
 
         case MQTT_CPT_DISCONNECT:
             nd_log(NDLS_DAEMON, NDLP_INFO, "Got MQTT DISCONNECT control packet from server. Reason code: %d", (int)client->parser.mqtt_packet.disconnect.reason_code);
-            client->client_state = DISCONNECTED;
+            client->client_state = MQTT_STATE_DISCONNECTED;
             break;
 
         default:
@@ -2063,10 +2063,10 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
 
 int mqtt_ng_sync(struct mqtt_ng_client *client)
 {
-    if (client->client_state == RAW || client->client_state == DISCONNECTED)
+    if (client->client_state == MQTT_STATE_RAW || client->client_state == MQTT_STATE_DISCONNECTED)
         return 0;
     
-    if (client->client_state == ERROR)
+    if (client->client_state == MQTT_STATE_ERROR)
         return 1;
 
     LOCK_HDR_BUFFER(&client->main_buffer);

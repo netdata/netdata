@@ -387,6 +387,21 @@ typedef uint32_t uid_t;
 
 // --------------------------------------------------------------------------------------------------------------------
 
+#if defined(OS_WINDOWS)
+// #define UNICODE
+// #define _UNICODE
+#include <windows.h>
+#include <winevt.h>
+#include <evntprov.h>
+#include <wctype.h>
+#include <wchar.h>
+#include <tchar.h>
+#include <guiddef.h>
+#include <wbemidl.h>
+#include <sddl.h>
+#include <sys/cygwin.h>
+#endif
+
 # ifdef __cplusplus
 }
 # endif
