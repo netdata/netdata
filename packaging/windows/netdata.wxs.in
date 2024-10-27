@@ -59,19 +59,17 @@
 
 		<!-- Install wevt manifest/dll files -->
 		<ComponentGroup Id="WevtComponents" Directory="System64Folder">
-			<Component>
+			<File Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
+			</File>
+			<!-- Component>
 				<File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
-					<Permission User="NT SERVICE\EventLog" GenericRead="yes" Synchronize="yes" />
-					<Permission User="NT AUTHORITY\SYSTEM" GenericAll="yes" />
 					<Permission User="[WIX_ACCOUNT_ADMINISTRATORS]" GenericAll="yes" />
 					<Permission User="[WIX_ACCOUNT_LOCALSYSTEM]" GenericRead="yes" GenericExecute="yes" />
 					<Permission User="[WIX_ACCOUNT_USERS]" GenericRead="yes" GenericExecute="yes" />
-					<Permission User="[LogonUser]" GenericAll="yes" />
-                                       <Permission User="[WIX_ACCOUNT_PERFLOGUSERS]" GenericRead="yes" GenericExecute="yes" />
-					<Permission User="APPLICATION PACKAGE AUTHORITY\ALL APPLICATION PACKAGES" GenericRead="yes" GenericExecute="yes" />
-					<Permission User="APPLICATION PACKAGE AUTHORITY\ALL RESTRICTED APP PACKAGES" GenericRead="yes" GenericExecute="yes" />
+					<Permission User="[LogonUser]" GenericRead="yes" />
+					<Permission User="[WIX_ACCOUNT_PERFLOGUSERS]" GenericRead="yes" GenericExecute="yes" />					
 				</File>
-			</Component>
+			</Component -->
 
 			<Component>
 				<File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml">
@@ -83,6 +81,11 @@
 		<CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='[USRBINDIR]NetdataClaim.exe /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I [INSECURE] /P &quot;[PROXY]&quot; /F &quot;[INSTALLFOLDER]etc\netdata\claim.conf&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
 		<InstallExecuteSequence>
 			<Custom Action="ClaimAgent" Before="InstallFinalize" />
+		</InstallExecuteSequence>
+
+		<CustomAction Id="WevtNetdataDLL" Directory="System64Folder" ExeCommand='[System64Folder]icacls.exe &quot;[System64Folder]wevt_netdata.dll&quot; /GRANT &quot;NT SERVICE\EventLog&quot;:R' Execute="deferred" Return="ignore" Impersonate="no"/>
+		<InstallExecuteSequence>
+			<Custom Action="WevtNetdataDLL" Before="InstallFinalize" />
 		</InstallExecuteSequence>
 
 		<Component Id="NetdataService" Directory="USRBINDIR">
