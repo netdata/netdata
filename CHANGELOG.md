@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix: correct go.d.plugin permission for source builds [\#18876](https://github.com/netdata/netdata/pull/18876) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/prometheus/common from 0.60.0 to 0.60.1 in /src/go [\#18874](https://github.com/netdata/netdata/pull/18874) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump k8s.io/client-go from 0.31.1 to 0.31.2 in /src/go [\#18873](https://github.com/netdata/netdata/pull/18873) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/vmware/govmomi from 0.45.0 to 0.45.1 in /src/go [\#18872](https://github.com/netdata/netdata/pull/18872) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -445,7 +446,6 @@
 - Regenerate integrations.js [\#18328](https://github.com/netdata/netdata/pull/18328) ([netdatabot](https://github.com/netdatabot))
 - add go.d/uwsgi [\#18326](https://github.com/netdata/netdata/pull/18326) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/uwsgi [\#18325](https://github.com/netdata/netdata/pull/18325) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18324](https://github.com/netdata/netdata/pull/18324) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
