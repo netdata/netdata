@@ -80,7 +80,7 @@ Metrics:
 | k8s_state.node_allocatable_mem_limits_used | limits | bytes |
 | k8s_state.node_allocatable_pods_utilization | allocated | % |
 | k8s_state.node_allocatable_pods_usage | available, allocated | pods |
-| k8s_state.node_condition | a dimension per condition | status |
+| k8s_state.node_condition | Ready, DiskPressure, MemoryPressure, NetworkUnavailable, PIDPressure | status |
 | k8s_state.node_schedulability | schedulable, unschedulable | state |
 | k8s_state.node_pods_readiness | ready | % |
 | k8s_state.node_pods_readiness_state | ready, unready | pods |
@@ -118,6 +118,7 @@ Metrics:
 | k8s_state.pod_mem_limits_used | limits | bytes |
 | k8s_state.pod_condition | pod_ready, pod_scheduled, pod_initialized, containers_ready | state |
 | k8s_state.pod_phase | running, failed, succeeded, pending | state |
+| k8s_state.pod_status_reason | Evicted, NodeAffinity, NodeLost, Shutdown, UnexpectedAdmissionError, Other | status |
 | k8s_state.pod_age | age | seconds |
 | k8s_state.pod_containers | containers, init_containers | containers |
 | k8s_state.pod_containers_state | running, waiting, terminated | containers |
@@ -148,8 +149,8 @@ Metrics:
 | k8s_state.pod_container_readiness_state | ready | state |
 | k8s_state.pod_container_restarts | restarts | restarts |
 | k8s_state.pod_container_state | running, waiting, terminated | state |
-| k8s_state.pod_container_waiting_state_reason | a dimension per reason | state |
-| k8s_state.pod_container_terminated_state_reason | a dimension per reason | state |
+| k8s_state.pod_container_waiting_state_reason | ContainerCreating, CrashLoopBackOff, CreateContainerConfigError, CreateContainerError, ErrImagePull, ImagePullBackOff, InvalidImageName, PodInitializing, Other | state |
+| k8s_state.pod_container_terminated_state_reason | Completed, ContainerCannotRun, DeadlineExceeded, Error, Evicted, OOMKilled, Other | state |
 
 
 
