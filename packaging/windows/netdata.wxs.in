@@ -8,6 +8,8 @@
         Version="@CMAKE_PROJECT_VERSION@"
         UpgradeCode="0d949b90-a54d-4aae-9616-e15fbc410530">
 
+	<UIRef Id="WixUI_ErrorProgressText" />
+
         <MediaTemplate EmbedCab="yes"/>
 
 		<!-- ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" / -->
@@ -59,7 +61,10 @@
 
 		<!-- Install wevt manifest/dll files -->
 		<ComponentGroup Id="WevtComponents" Directory="System64Folder">
-			<File Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
+			<File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
+			</File>
+
+			<File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml">
 			</File>
 			<!-- Component>
 				<File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
@@ -71,11 +76,11 @@
 				</File>
 			</Component -->
 
-			<Component>
+			<!-- Component>
 				<File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml">
-					<util:EventManifest ResourceFile="[#WevtDll]" MessageFile="[#WevtDll]" />
+					<util:EventManifest ResourceFile="[WevtDll]" MessageFile="[WevtDll]" />
 				</File>
-			</Component>
+			</Component -->
 		</ComponentGroup>
 
 		<CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='[USRBINDIR]NetdataClaim.exe /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I [INSECURE] /P &quot;[PROXY]&quot; /F &quot;[INSTALLFOLDER]etc\netdata\claim.conf&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
@@ -86,6 +91,11 @@
 		<CustomAction Id="WevtNetdataDLL" Directory="System64Folder" ExeCommand='[System64Folder]icacls.exe &quot;[System64Folder]wevt_netdata.dll&quot; /GRANT &quot;NT SERVICE\EventLog&quot;:R' Execute="deferred" Return="ignore" Impersonate="no"/>
 		<InstallExecuteSequence>
 			<Custom Action="WevtNetdataDLL" Before="InstallFinalize" />
+		</InstallExecuteSequence>
+
+		<CustomAction Id="WevtUtil" Directory="System64Folder" ExeCommand='[System64Folder]wevtutil.exe im &quot;[System64Folder]wevt_netdata_manifest.xml&quot; &quot;/mf:[System64Folder]wevt_netdata.dll&quot; &quot;/rf:[System64Folder]wevt_netdata.dll&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
+		<InstallExecuteSequence>
+			<Custom Action="WevtUtil" Before="InstallFinalize" />
 		</InstallExecuteSequence>
 
 		<Component Id="NetdataService" Directory="USRBINDIR">
