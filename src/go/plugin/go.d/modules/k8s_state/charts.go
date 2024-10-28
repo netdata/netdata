@@ -681,24 +681,42 @@ var (
 			{ID: "pod_%s_container_%s_state_terminated", Name: "terminated"},
 		},
 	}
-	containersStateWaitingChartTmpl = module.Chart{
-		IDSep:    true,
-		ID:       "pod_%s_container_%s.state_waiting_reason",
-		Title:    "Container waiting state reason",
-		Units:    "state",
-		Fam:      "container waiting reason",
-		Ctx:      "k8s_state.pod_container_waiting_state_reason",
-		Priority: prioPodContainerWaitingStateReason,
-	}
-	containersStateTerminatedChartTmpl = module.Chart{
-		IDSep:    true,
-		ID:       "pod_%s_container_%s.state_terminated_reason",
-		Title:    "Container terminated state reason",
-		Units:    "state",
-		Fam:      "container terminated reason",
-		Ctx:      "k8s_state.pod_container_terminated_state_reason",
-		Priority: prioPodContainerTerminatedStateReason,
-	}
+	containersStateWaitingChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			IDSep:    true,
+			ID:       "pod_%s_container_%s.state_waiting_reason",
+			Title:    "Container waiting state reason",
+			Units:    "state",
+			Fam:      "container waiting reason",
+			Ctx:      "k8s_state.pod_container_waiting_state_reason",
+			Priority: prioPodContainerWaitingStateReason,
+		}
+		for _, v := range containerWaitingStateReasons {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID:   "pod_%s_container_%s_state_waiting_reason_" + v,
+				Name: v,
+			})
+		}
+		return chart
+	}()
+	containersStateTerminatedChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			IDSep:    true,
+			ID:       "pod_%s_container_%s.state_terminated_reason",
+			Title:    "Container terminated state reason",
+			Units:    "state",
+			Fam:      "container terminated reason",
+			Ctx:      "k8s_state.pod_container_terminated_state_reason",
+			Priority: prioPodContainerTerminatedStateReason,
+		}
+		for _, v := range containerTerminatedStateReasons {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID:   "pod_%s_container_%s_state_terminated_reason_" + v,
+				Name: v,
+			})
+		}
+		return chart
+	}()
 )
 
 func (ks *KubeState) newContainerCharts(ps *podState, cs *containerState) *module.Charts {
@@ -726,42 +744,6 @@ func (ks *KubeState) addContainerCharts(ps *podState, cs *containerState) {
 	if err := ks.Charts().Add(*charts...); err != nil {
 		ks.Warning(err)
 	}
-}
-
-func (ks *KubeState) addContainerWaitingStateReasonToChart(ps *podState, cs *containerState, reason string) {
-	id := fmt.Sprintf(containersStateWaitingChartTmpl.ID, replaceDots(ps.id()), cs.name)
-	c := ks.Charts().Get(id)
-	if c == nil {
-		ks.Warningf("chart '%s' does not exist", id)
-		return
-	}
-	dim := &module.Dim{
-		ID:   fmt.Sprintf("pod_%s_container_%s_state_waiting_reason_%s", ps.id(), cs.name, reason),
-		Name: reason,
-	}
-	if err := c.AddDim(dim); err != nil {
-		ks.Warning(err)
-		return
-	}
-	c.MarkNotCreated()
-}
-
-func (ks *KubeState) addContainerTerminatedStateReasonToChart(ps *podState, cs *containerState, reason string) {
-	id := fmt.Sprintf(containersStateTerminatedChartTmpl.ID, replaceDots(ps.id()), cs.name)
-	c := ks.Charts().Get(id)
-	if c == nil {
-		ks.Warningf("chart '%s' does not exist", id)
-		return
-	}
-	dim := &module.Dim{
-		ID:   fmt.Sprintf("pod_%s_container_%s_state_terminated_reason_%s", ps.id(), cs.name, reason),
-		Name: reason,
-	}
-	if err := c.AddDim(dim); err != nil {
-		ks.Warning(err)
-		return
-	}
-	c.MarkNotCreated()
 }
 
 var discoveryStatusChart = module.Chart{

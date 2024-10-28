@@ -36,9 +36,7 @@ func newPodState() *podState {
 
 func newContainerState() *containerState {
 	return &containerState{
-		new:                    true,
-		stateWaitingReasons:    make(map[string]*containerStateReason),
-		stateTerminatedReasons: make(map[string]*containerStateReason),
+		new: true,
 	}
 }
 
@@ -138,28 +136,22 @@ type (
 
 func (ps podState) id() string { return ps.namespace + "_" + ps.name }
 
-type (
-	containerState struct {
-		new bool
+type containerState struct {
+	new bool
 
-		name string
-		uid  string
+	name string
+	uid  string
 
-		podName   string
-		nodeName  string
-		namespace string
+	podName   string
+	nodeName  string
+	namespace string
 
-		ready                  bool
-		restarts               int64
-		stateRunning           bool
-		stateWaiting           bool
-		stateTerminated        bool
-		stateWaitingReasons    map[string]*containerStateReason
-		stateTerminatedReasons map[string]*containerStateReason
-	}
-	containerStateReason struct {
-		new    bool
-		reason string
-		active bool
-	}
-)
+	ready           bool
+	restarts        int64
+	stateRunning    bool
+	stateWaiting    bool
+	stateTerminated bool
+
+	waitingReason    string
+	terminatedReason string
+}
