@@ -19,9 +19,8 @@ func newKubeState() *kubeState {
 
 func newNodeState() *nodeState {
 	return &nodeState{
-		new:        true,
-		labels:     make(map[string]string),
-		conditions: make(map[string]*nodeStateCondition),
+		new:    true,
+		labels: make(map[string]string),
 	}
 }
 
@@ -58,15 +57,9 @@ type (
 		allocatableCPU  int64
 		allocatableMem  int64
 		allocatablePods int64
-		conditions      map[string]*nodeStateCondition
+		conditions      []corev1.NodeCondition
 
 		stats nodeStateStats
-	}
-	nodeStateCondition struct {
-		new bool
-		// https://kubernetes.io/docs/concepts/architecture/nodes/#condition
-		//typ    corev1.NodeConditionType
-		status corev1.ConditionStatus
 	}
 	nodeStateStats struct {
 		reqCPU   int64
@@ -127,7 +120,8 @@ type (
 		condPodInitialized  corev1.ConditionStatus
 		condPodReady        corev1.ConditionStatus
 		// https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
-		phase corev1.PodPhase
+		phase        corev1.PodPhase
+		statusReason string
 
 		initContainers map[string]*containerState
 		containers     map[string]*containerState

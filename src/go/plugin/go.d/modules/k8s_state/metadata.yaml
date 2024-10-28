@@ -141,7 +141,11 @@ modules:
               unit: status
               chart_type: line
               dimensions:
-                - name: a dimension per condition
+                - name: Ready
+                - name: DiskPressure
+                - name: MemoryPressure
+                - name: NetworkUnavailable
+                - name: PIDPressure
             - name: k8s_state.node_schedulability
               description: Schedulability
               unit: state
@@ -271,6 +275,17 @@ modules:
                 - name: failed
                 - name: succeeded
                 - name: pending
+            - name: k8s_state.pod_status_reason
+              description: Status reason
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: Evicted
+                - name: NodeAffinity
+                - name: NodeLost
+                - name: Shutdown
+                - name: UnexpectedAdmissionError
+                - name: Other
             - name: k8s_state.pod_age
               description: Age
               unit: seconds
@@ -347,24 +362,24 @@ modules:
               unit: state
               chart_type: line
               dimensions:
-                - name: PodInitializing
                 - name: ContainerCreating
                 - name: CrashLoopBackOff
                 - name: CreateContainerConfigError
+                - name: CreateContainerError
                 - name: ErrImagePull
                 - name: ImagePullBackOff
-                - name: CreateContainerError
                 - name: InvalidImageName
+                - name: PodInitializing
                 - name: Other
             - name: k8s_state.pod_container_terminated_state_reason
               description: Container terminated state reason
               unit: state
               chart_type: line
               dimensions:
-                - name: OOMKilled
                 - name: Completed
-                - name: Error
                 - name: ContainerCannotRun
                 - name: DeadlineExceeded
+                - name: Error
                 - name: Evicted
+                - name: OOMKilled
                 - name: Other

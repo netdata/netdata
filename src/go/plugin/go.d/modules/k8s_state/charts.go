@@ -43,6 +43,7 @@ const (
 	prioPodMemLimitsUsed
 	prioPodCondition
 	prioPodPhase
+	prioPodStatusReason
 	prioPodAge
 	prioPodContainersCount
 	prioPodContainersState
@@ -106,6 +107,7 @@ var podChartsTmpl = module.Charts{
 	podMemLimitsUsedChartTmpl.Copy(),
 	podConditionChartTmpl.Copy(),
 	podPhaseChartTmpl.Copy(),
+	podStatusReasonChartTmpl.Copy(),
 	podAgeChartTmpl.Copy(),
 	podContainersCountChartTmpl.Copy(),
 	podContainersStateChartTmpl.Copy(),
@@ -247,15 +249,24 @@ var (
 		},
 	}
 	// condition
-	nodeConditionsChartTmpl = module.Chart{
-		IDSep:    true,
-		ID:       "node_%s.condition_status",
-		Title:    "Condition status",
-		Units:    "status",
-		Fam:      "node condition",
-		Ctx:      "k8s_state.node_condition",
-		Priority: prioNodeConditions,
-	}
+	nodeConditionsChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			IDSep:    true,
+			ID:       "node_%s.condition_status",
+			Title:    "Condition status",
+			Units:    "status",
+			Fam:      "node condition",
+			Ctx:      "k8s_state.node_condition",
+			Priority: prioNodeConditions,
+		}
+		for _, v := range nodeConditionStatuses {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID:   "node_%s_cond_" + v,
+				Name: v,
+			})
+		}
+		return chart
+	}()
 	nodeSchedulabilityChartTmpl = module.Chart{
 		IDSep:    true,
 		ID:       "node_%s.schedulability",
@@ -426,24 +437,6 @@ func (ks *KubeState) removeNodeCharts(ns *nodeState) {
 	}
 }
 
-func (ks *KubeState) addNodeConditionToCharts(ns *nodeState, cond string) {
-	id := fmt.Sprintf(nodeConditionsChartTmpl.ID, replaceDots(ns.id()))
-	c := ks.Charts().Get(id)
-	if c == nil {
-		ks.Warningf("chart '%s' does not exist", id)
-		return
-	}
-	dim := &module.Dim{
-		ID:   fmt.Sprintf("node_%s_cond_%s", ns.id(), strings.ToLower(cond)),
-		Name: cond,
-	}
-	if err := c.AddDim(dim); err != nil {
-		ks.Warning(err)
-		return
-	}
-	c.MarkNotCreated()
-}
-
 var (
 	podCPURequestsUsedChartTmpl = module.Chart{
 		IDSep:    true,
@@ -523,6 +516,24 @@ var (
 			{ID: "pod_%s_phase_pending", Name: "pending"},
 		},
 	}
+	podStatusReasonChartTmpl = func() module.Chart {
+		chart := module.Chart{
+			IDSep:    true,
+			ID:       "pod_%s.status_reason",
+			Title:    "Status reason",
+			Units:    "status",
+			Fam:      "pod status",
+			Ctx:      "k8s_state.pod_status_reason",
+			Priority: prioPodStatusReason,
+		}
+		for _, v := range podStatusReasons {
+			chart.Dims = append(chart.Dims, &module.Dim{
+				ID:   "pod_%s_status_reason_" + v,
+				Name: v,
+			})
+		}
+		return chart
+	}()
 	podAgeChartTmpl = module.Chart{
 		IDSep:    true,
 		ID:       "pod_%s.age",

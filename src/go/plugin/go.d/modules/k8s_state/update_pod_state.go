@@ -78,6 +78,7 @@ func (ks *KubeState) updatePodState(r resource) {
 	}
 
 	ps.phase = pod.Status.Phase
+	ps.statusReason = pod.Status.Reason
 
 	for _, cntr := range pod.Status.ContainerStatuses {
 		cs, ok := ps.containers[cntr.Name]
