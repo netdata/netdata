@@ -1556,7 +1556,7 @@ int rrdlabels_unittest_sanitization() {
     const unsigned char invalid2[] = { 'A', 'B', 0xC3, 0x28, 'C', 'D', 0x0 };
     errors += rrdlabels_unittest_sanitize_value((const char *)invalid2, "AB (CD");
 
-    // invalid UTF8 No 2
+    // invalid UTF8 No 3
     const unsigned char invalid3[] = { 'A', 'B', 0xC3, 0x28, 0x0 };
     errors += rrdlabels_unittest_sanitize_value((const char *)invalid3, "AB (");
 
