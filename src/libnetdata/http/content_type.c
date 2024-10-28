@@ -42,16 +42,16 @@ static struct {
 
     // secondary - overlapping with primary
 
-    { .format = "text/plain",                   CT_PROMETHEUS, false, "version=0.0.4" },
-    { .format = "prometheus",                   CT_PROMETHEUS },
-    { .format = "text",                         CT_TEXT_PLAIN },
-    { .format = "txt",                          CT_TEXT_PLAIN },
-    { .format = "json",                         CT_APPLICATION_JSON },
-    { .format = "html",                         CT_TEXT_HTML },
-    { .format = "xml",                          CT_APPLICATION_XML },
+    { .format = "text/plain",                   CT_PROMETHEUS, true, "version=0.0.4" },
+    { .format = "prometheus",                   CT_PROMETHEUS, true },
+    { .format = "text",                         CT_TEXT_PLAIN, true },
+    { .format = "txt",                          CT_TEXT_PLAIN, true },
+    { .format = "json",                         CT_APPLICATION_JSON, true },
+    { .format = "html",                         CT_TEXT_HTML, true },
+    { .format = "xml",                          CT_APPLICATION_XML, true },
 
     // terminator
-    { .format = NULL,                           CT_TEXT_PLAIN },
+    { .format = NULL,                           CT_TEXT_PLAIN, true },
 };
 
 HTTP_CONTENT_TYPE content_type_string2id(const char *format) {

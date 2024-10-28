@@ -145,8 +145,8 @@ static int format_remote_write_label_callback(const char *name, const char *valu
     char k[PROMETHEUS_ELEMENT_MAX + 1];
     char v[PROMETHEUS_ELEMENT_MAX + 1];
 
-    prometheus_name_copy(k, name, PROMETHEUS_ELEMENT_MAX);
-    prometheus_label_copy(v, value, PROMETHEUS_ELEMENT_MAX);
+    prometheus_name_copy(k, name, sizeof(k));
+    prometheus_label_copy(v, value, sizeof(v));
     add_label(d->write_request, k, v);
     return 1;
 }
@@ -169,7 +169,7 @@ int format_host_prometheus_remote_write(struct instance *instance, RRDHOST *host
     prometheus_label_copy(
         hostname,
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-        PROMETHEUS_ELEMENT_MAX);
+        sizeof(hostname));
 
     add_host_info(
         connector_specific_data->write_request,
@@ -198,9 +198,9 @@ int format_chart_prometheus_remote_write(struct instance *instance, RRDSET *st)
     prometheus_label_copy(
         chart,
         (instance->config.options & EXPORTING_OPTION_SEND_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st),
-        PROMETHEUS_ELEMENT_MAX);
-    prometheus_label_copy(family, rrdset_family(st), PROMETHEUS_ELEMENT_MAX);
-    prometheus_name_copy(context, rrdset_context(st), PROMETHEUS_ELEMENT_MAX);
+        sizeof(chart));
+    prometheus_label_copy(family, rrdset_family(st), sizeof(family));
+    prometheus_name_copy(context, rrdset_context(st), sizeof(context));
 
     as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
     homogeneous = 1;
@@ -266,7 +266,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                 prometheus_label_copy(
                     dimension,
                     (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-                    PROMETHEUS_ELEMENT_MAX);
+                    sizeof(dimension));
                 snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->config.prefix, context, suffix);
 
                 add_metric(
@@ -281,9 +281,9 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                 prometheus_name_copy(
                     dimension,
                     (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-                    PROMETHEUS_ELEMENT_MAX);
+                    sizeof(dimension));
                 snprintf(
-                    name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", instance->config.prefix, context, dimension,
+                    name, sizeof(name), "%s_%s_%s%s", instance->config.prefix, context, dimension,
                     suffix);
 
                 add_metric(
@@ -307,7 +307,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                 prometheus_label_copy(
                     dimension,
                     (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-                    PROMETHEUS_ELEMENT_MAX);
+                    sizeof(dimension));
                 snprintf(
                     name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", instance->config.prefix, context, units, suffix);
 
@@ -338,8 +338,8 @@ static int format_variable_prometheus_remote_write_callback(const DICTIONARY_ITE
     char name[PROMETHEUS_LABELS_MAX + 1];
     char *suffix = "";
 
-    prometheus_name_copy(context, rrdvar_name(rv), PROMETHEUS_ELEMENT_MAX);
-    snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->config.prefix, context, suffix);
+    prometheus_name_copy(context, rrdvar_name(rv), sizeof(context));
+    snprintf(name, sizeof(name), "%s_%s%s", instance->config.prefix, context, suffix);
 
     NETDATA_DOUBLE value = rrdvar2number(rv);
     add_variable(connector_specific_data->write_request, name,

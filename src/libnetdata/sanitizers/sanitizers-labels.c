@@ -5,26 +5,26 @@
 /*
  * All labels follow these rules:
  *
- * Character           Symbol               Values     Names
- * UTF-8 characters    UTF-8                yes        -> _
- * Lower case letter   [a-z]                yes        yes
- * Upper case letter   [A-Z]                yes        -> [a-z]
- * Digit               [0-9]                yes        yes
- * Underscore          _                    yes        yes
- * Minus               -                    yes        yes
- * Plus                +                    yes        -> _
- * Colon               :                    yes        -> _
- * Semicolon           ;                    -> :       -> _
- * Equal               =                    -> :       -> _
- * Period              .                    yes        yes
- * Comma               ,                    -> .       -> .
- * Slash               /                    yes        yes
- * Backslash           \                    -> /       -> /
- * At                  @                    yes        -> _
- * Space                                    yes        -> _
- * Opening parenthesis (                    yes        -> _
- * Closing parenthesis )                    yes        -> _
- * anything else                            -> _       -> _
+ * Character           Symbol   Names     Values
+ * UTF-8 characters    UTF-8    -> _      yes
+ * Lower case letter   [a-z]    yes       yes
+ * Upper case letter   [A-Z]    yes       yes
+ * Digit               [0-9]    yes       yes
+ * Underscore          _        yes       yes
+ * Minus               -        yes       yes
+ * Plus                +        -> _      yes
+ * Colon               :        -> _      yes
+ * Semicolon           ;        -> _      -> :
+ * Equal               =        -> _      -> :
+ * Period              .        yes       yes
+ * Comma               ,        -> .      -> .
+ * Slash               /        yes       yes
+ * Backslash           \        -> /      -> /
+ * At                  @        -> _      yes
+ * Space                        -> _      yes
+ * Opening parenthesis (        -> _      yes
+ * Closing parenthesis )        -> _      yes
+ * anything else                -> _      -> space
 *
  * The above rules should allow users to set in tags (indicative):
  *
@@ -52,6 +52,7 @@
  *
  */
 
+static unsigned char prometheus_label_names_char_map[256];
 static unsigned char label_names_char_map[256];
 static unsigned char label_values_char_map[256] = {
         [0] = '\0', [1] = ' ', [2] = ' ', [3] = ' ', [4] = ' ', [5] = ' ', [6] = ' ', [7] = ' ', [8] = ' ',
@@ -127,12 +128,30 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
     label_names_char_map['('] = '_';
     label_names_char_map[')'] = '_';
     label_names_char_map['\\'] = '/';
+
+    // prometheus label names
+    for(i = 0; i < 256 ;i++) prometheus_label_names_char_map[i] = '_';
+    for(int s = 'A' ; s <= 'Z' ; s++) prometheus_label_names_char_map[s] = s;
+    for(int s = 'a' ; s <= 'z' ; s++) prometheus_label_names_char_map[s] = s;
+    for(int s = '0' ; s <= '9' ; s++) prometheus_label_names_char_map[s] = s;
+    prometheus_label_names_char_map[0] = '\0';
+    prometheus_label_names_char_map[':'] = ':';
+    prometheus_label_names_char_map['_'] = '_';
 }
 
 size_t rrdlabels_sanitize_name(char *dst, const char *src, size_t dst_size) {
-    return text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_names_char_map, 0, "", NULL);
+    size_t rc = text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_names_char_map, 0, "", NULL);
+
+    for(size_t i = 0; i < rc ; i++)
+        if(dst[i] == ' ') dst[i] = '_';
+
+    return rc;
 }
 
 size_t rrdlabels_sanitize_value(char *dst, const char *src, size_t dst_size) {
     return text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_values_char_map, 1, "[none]", NULL);
+}
+
+size_t prometheus_rrdlabels_sanitize_name(char *dst, const char *src, size_t dst_size) {
+    return text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, prometheus_label_names_char_map, 0, "", NULL);
 }

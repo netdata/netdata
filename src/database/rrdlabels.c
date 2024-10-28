@@ -1158,6 +1158,9 @@ static int rrdlabels_unittest_add_pairs() {
     // test newlines
     errors += rrdlabels_unittest_add_a_pair("   tag   = \t value \r\n", "tag", "value");
 
+    // test spaces in names
+    errors += rrdlabels_unittest_add_a_pair("   t   a   g   = value", "t_a_g", "value");
+
     // test : in values
     errors += rrdlabels_unittest_add_a_pair("tag=:value", "tag", ":value");
     errors += rrdlabels_unittest_add_a_pair("tag::value", "tag", ":value");
@@ -1547,6 +1550,18 @@ int rrdlabels_unittest_sanitization() {
 
     // mixed multi-byte
     errors += rrdlabels_unittest_sanitize_value("Ű‱𩸽‱Ű", "Ű‱𩸽‱Ű");
+
+    // invalid UTF8 No 1
+    const unsigned char invalid1[] = { 0xC3, 0x28, 'A', 'B', 0x0 };
+    errors += rrdlabels_unittest_sanitize_value((const char *)invalid1, "(AB");
+
+    // invalid UTF8 No 2
+    const unsigned char invalid2[] = { 'A', 'B', 0xC3, 0x28, 'C', 'D', 0x0 };
+    errors += rrdlabels_unittest_sanitize_value((const char *)invalid2, "AB (CD");
+
+    // invalid UTF8 No 3
+    const unsigned char invalid3[] = { 'A', 'B', 0xC3, 0x28, 0x0 };
+    errors += rrdlabels_unittest_sanitize_value((const char *)invalid3, "AB (");
 
     return errors;
 }
