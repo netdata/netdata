@@ -16,7 +16,7 @@
 
 		<!-- WixVariable Id="WixUILicenseRtf" Value="cloud.rtf" / -->
 
-		<MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+		<MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of [ProductName] is already installed." AllowSameVersionUpgrades="yes" />
 		<Icon Id="NetdataIcon.ico" SourceFile="NetdataWhite.ico"/>
 		<Property Id="ARPPRODUCTICON" Value="NetdataIcon.ico" />
 
