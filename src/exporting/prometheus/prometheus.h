@@ -27,8 +27,8 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     EXPORTING_OPTIONS exporting_options, PROMETHEUS_OUTPUT_OPTIONS output_options);
 
 int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN *filter);
-size_t prometheus_name_copy(char *d, const char *s, size_t usable);
-size_t prometheus_label_copy(char *d, const char *s, size_t usable);
+void prometheus_name_copy(char *d, const char *s, size_t size);
+void prometheus_label_copy(char *d, const char *s, size_t size);
 char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldunits);
 
 void format_host_labels_prometheus(struct instance *instance, RRDHOST *host);

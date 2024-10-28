@@ -149,24 +149,11 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
  *
  * @param d a destination string.
  * @param s a source string.
- * @param usable the number of characters to copy.
+ * @param size the number of characters to copy.
  * @return Returns the length of the copied string.
  */
-inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
-{
-    size_t n;
-
-    for (n = 0; *s && n < usable; d++, s++, n++) {
-        register char c = *s;
-
-        if (!isalnum(c))
-            *d = '_';
-        else
-            *d = c;
-    }
-    *d = '\0';
-
-    return n;
+inline void prometheus_name_copy(char *d, const char *s, size_t size) {
+    prometheus_rrdlabels_sanitize_name(d, s, size);
 }
 
 /**
@@ -174,28 +161,13 @@ inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
  *
  * @param d a destination string.
  * @param s a source string.
- * @param usable the number of characters to copy.
+ * @param size the number of characters to copy.
  * @return Returns the length of the copied string.
  */
-inline size_t prometheus_label_copy(char *d, const char *s, size_t usable)
-{
-    size_t n;
-
-    // make sure we can escape one character without overflowing the buffer
-    usable--;
-
-    for (n = 0; *s && n < usable; d++, s++, n++) {
-        register char c = *s;
-
-        if (unlikely(c == '"' || c == '\\' || c == '\n')) {
-            *d++ = '\\';
-            n++;
-        }
-        *d = c;
-    }
-    *d = '\0';
-
-    return n;
+inline void prometheus_label_copy(char *d, const char *s, size_t size) {
+    // our label values are already compatible with prometheus label values
+    // so, just copy them
+    strncpyz(d, s, size - 1);
 }
 
 /**
@@ -299,8 +271,8 @@ static int format_prometheus_label_callback(const char *name, const char *value,
     char k[PROMETHEUS_ELEMENT_MAX + 1];
     char v[PROMETHEUS_ELEMENT_MAX + 1];
 
-    prometheus_name_copy(k, name, PROMETHEUS_ELEMENT_MAX);
-    prometheus_label_copy(v, value, PROMETHEUS_ELEMENT_MAX);
+    prometheus_name_copy(k, name, sizeof(k));
+    prometheus_label_copy(v, value, sizeof(v));
 
     if (*k && *v) {
         if (d->count > 0) buffer_strcat(d->instance->labels_buffer, ",");
@@ -341,8 +313,8 @@ static int format_prometheus_chart_label_callback(const char *name, const char *
     char k[PROMETHEUS_ELEMENT_MAX + 1];
     char v[PROMETHEUS_ELEMENT_MAX + 1];
 
-    prometheus_name_copy(k, name, PROMETHEUS_ELEMENT_MAX);
-    prometheus_label_copy(v, value, PROMETHEUS_ELEMENT_MAX);
+    prometheus_name_copy(k, name, sizeof(k));
+    prometheus_label_copy(v, value, sizeof(v));
 
     if (*k && *v)
         buffer_sprintf(wb, ",%s=\"%s\"", k, v);
@@ -630,9 +602,9 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
 
         prometheus_label_copy(chart,
                               (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ?
-                               rrdset_name(st) : rrdset_id(st), PROMETHEUS_ELEMENT_MAX);
-        prometheus_label_copy(family, rrdset_family(st), PROMETHEUS_ELEMENT_MAX);
-        prometheus_name_copy(context, rrdset_context(st), PROMETHEUS_ELEMENT_MAX);
+                               rrdset_name(st) : rrdset_id(st), sizeof(chart));
+        prometheus_label_copy(family, rrdset_family(st), sizeof(family));
+        prometheus_name_copy(context, rrdset_context(st), sizeof(context));
 
         int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(opts->exporting_options)
                             == EXPORTING_SOURCE_DATA_AS_COLLECTED);
@@ -708,7 +680,7 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                         prometheus_label_copy(
                             dimension,
                             (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-                            PROMETHEUS_ELEMENT_MAX);
+                            sizeof(dimension));
                     }
                     else {
                         // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
@@ -717,7 +689,7 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                         prometheus_name_copy(
                             dimension,
                             (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-                            PROMETHEUS_ELEMENT_MAX);
+                            sizeof(dimension));
                     }
                     generate_as_collected_from_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
                 }
@@ -738,7 +710,7 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                         prometheus_label_copy(
                             dimension,
                             (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-                            PROMETHEUS_ELEMENT_MAX);
+                            sizeof(dimension));
 
                         if (opts->output_options & PROMETHEUS_OUTPUT_HELP_TYPE) {
                             generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
@@ -837,7 +809,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_label_copy(hostname, rrdhost_hostname(host), PROMETHEUS_ELEMENT_MAX);
+    prometheus_label_copy(hostname, rrdhost_hostname(host), sizeof(hostname));
 
     format_host_labels_prometheus(instance, host);
 

@@ -8,4 +8,6 @@
 size_t rrdlabels_sanitize_name(char *dst, const char *src, size_t dst_size);
 size_t rrdlabels_sanitize_value(char *dst, const char *src, size_t dst_size);
 
+size_t prometheus_rrdlabels_sanitize_name(char *dst, const char *src, size_t dst_size);
+
 #endif //NETDATA_SANITIZERS_LABELS_H
