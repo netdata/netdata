@@ -36,12 +36,5 @@ func (ks *KubeState) updateNodeState(r resource) {
 	}
 
 	ns.unSchedulable = node.Spec.Unschedulable
-
-	for _, c := range node.Status.Conditions {
-		if v, ok := ns.conditions[string(c.Type)]; !ok {
-			ns.conditions[string(c.Type)] = &nodeStateCondition{new: true, status: c.Status}
-		} else {
-			v.status = c.Status
-		}
-	}
+	ns.conditions = node.Status.Conditions
 }

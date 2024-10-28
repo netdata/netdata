@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -17,25 +16,44 @@ import (
 const precision = 1000
 
 var (
+	podStatusReasons = []string{
+		"Evicted",
+		"NodeAffinity",
+		"NodeLost",
+		"Shutdown",
+		"UnexpectedAdmissionError",
+		"Other",
+	}
+
 	containerWaitingStateReasons = []string{
-		"PodInitializing",
 		"ContainerCreating",
 		"CrashLoopBackOff",
 		"CreateContainerConfigError",
+		"CreateContainerError",
 		"ErrImagePull",
 		"ImagePullBackOff",
-		"CreateContainerError",
 		"InvalidImageName",
+		"PodInitializing",
 		"Other",
 	}
 	containerTerminatedStateReasons = []string{
-		"OOMKilled",
 		"Completed",
-		"Error",
 		"ContainerCannotRun",
 		"DeadlineExceeded",
+		"Error",
 		"Evicted",
+		"OOMKilled",
 		"Other",
+	}
+)
+
+var (
+	nodeConditionStatuses = []string{
+		"Ready",
+		"DiskPressure",
+		"MemoryPressure",
+		"NetworkUnavailable",
+		"PIDPressure",
 	}
 )
 
@@ -56,6 +74,7 @@ func (ks *KubeState) collect() (map[string]int64, error) {
 
 		ks.kubeClusterID = ks.getKubeClusterID()
 		ks.kubeClusterName = ks.getKubeClusterName()
+
 		if chart := ks.Charts().Get(discoveryStatusChart.ID); chart != nil {
 			chart.Labels = []module.Label{
 				{Key: labelKeyClusterID, Value: ks.kubeClusterID, Source: module.LabelSourceK8s},
@@ -92,7 +111,7 @@ func (ks *KubeState) collectKubeState(mx map[string]int64) {
 func (ks *KubeState) collectPodsState(mx map[string]int64) {
 	now := time.Now()
 	for _, ps := range ks.state.pods {
-		// Skip cronjobs (each of them is a unique container because name contains hash)
+		// Skip cronjobs (each of them is a unique container because the name contains hash)
 		// to avoid overwhelming Netdata with high cardinality metrics.
 		// Related issue https://github.com/netdata/netdata/issues/16412
 		if ps.controllerKind == "Job" {
@@ -104,6 +123,7 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 			ks.removePodCharts(ps)
 			continue
 		}
+
 		if ps.new {
 			ps.new = false
 			ks.addPodCharts(ps)
@@ -130,12 +150,14 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 			ns.stats.podsPhaseRunning += boolToInt(ps.phase == corev1.PodRunning)
 			ns.stats.podsPhaseSucceeded += boolToInt(ps.phase == corev1.PodSucceeded)
 			ns.stats.podsPhaseFailed += boolToInt(ps.phase == corev1.PodFailed)
+
 			for _, cs := range ps.initContainers {
 				ns.stats.initContainers++
 				ns.stats.initContStateRunning += boolToInt(cs.stateRunning)
 				ns.stats.initContStateWaiting += boolToInt(cs.stateWaiting)
 				ns.stats.initContStateTerminated += boolToInt(cs.stateTerminated)
 			}
+
 			for _, cs := range ps.containers {
 				ns.stats.containers++
 				ns.stats.contStateRunning += boolToInt(cs.stateRunning)
@@ -155,6 +177,17 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 		mx[px+"phase_succeeded"] = boolToInt(ps.phase == corev1.PodSucceeded)
 		mx[px+"phase_pending"] = boolToInt(ps.phase == corev1.PodPending)
 		mx[px+"age"] = int64(now.Sub(ps.creationTime).Seconds())
+
+		for _, v := range podStatusReasons {
+			mx[px+"status_reason_"+v] = 0
+		}
+		if v := ps.statusReason; v != "" {
+			if !slices.Contains(podStatusReasons, v) {
+				v = "Other"
+			}
+			mx[px+"status_reason_"+v] = 1
+		}
+
 		mx[px+"cpu_requests_used"] = ps.reqCPU
 		mx[px+"cpu_limits_used"] = ps.limitCPU
 		mx[px+"mem_requests_used"] = ps.reqMem
@@ -166,6 +199,7 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 		mx[px+"init_containers_state_running"] = 0
 		mx[px+"init_containers_state_waiting"] = 0
 		mx[px+"init_containers_state_terminated"] = 0
+
 		for _, cs := range ps.initContainers {
 			mx[px+"init_containers_state_running"] += boolToInt(cs.stateRunning)
 			mx[px+"init_containers_state_waiting"] += boolToInt(cs.stateWaiting)
@@ -174,6 +208,7 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 		mx[px+"containers_state_running"] = 0
 		mx[px+"containers_state_waiting"] = 0
 		mx[px+"containers_state_terminated"] = 0
+
 		for _, cs := range ps.containers {
 			if cs.new {
 				cs.new = false
@@ -194,7 +229,7 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 				mx[ppx+"state_waiting_reason_"+v] = 0
 			}
 			if v := cs.waitingReason; v != "" {
-				if !slices.Contains(containerWaitingStateReasons, cs.waitingReason) {
+				if !slices.Contains(containerWaitingStateReasons, v) {
 					v = "Other"
 				}
 				mx[ppx+"state_waiting_reason_"+v] = 1
@@ -204,7 +239,7 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 				mx[ppx+"state_terminated_reason_"+v] = 0
 			}
 			if v := cs.terminatedReason; v != "" {
-				if !slices.Contains(containerTerminatedStateReasons, cs.terminatedReason) {
+				if !slices.Contains(containerTerminatedStateReasons, v) {
 					v = "Other"
 				}
 				mx[ppx+"state_terminated_reason_"+v] = 1
@@ -228,12 +263,11 @@ func (ks *KubeState) collectNodesState(mx map[string]int64) {
 
 		px := fmt.Sprintf("node_%s_", ns.id())
 
-		for typ, cond := range ns.conditions {
-			if cond.new {
-				cond.new = false
-				ks.addNodeConditionToCharts(ns, typ)
-			}
-			mx[px+"cond_"+strings.ToLower(typ)] = condStatusToInt(cond.status)
+		for _, v := range nodeConditionStatuses {
+			mx[px+"cond_"+v] = 0
+		}
+		for _, v := range ns.conditions {
+			mx[px+"cond_"+string(v.Type)] = condStatusToInt(v.Status)
 		}
 
 		mx[px+"age"] = int64(now.Sub(ns.creationTime).Seconds())
