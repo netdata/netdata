@@ -129,6 +129,10 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
     label_names_char_map[')'] = '_';
     label_names_char_map['\\'] = '/';
 
+    for(i = 0; i < 256 ;i++)
+        if(label_names_char_map[i] == ' ')
+            label_names_char_map[i] = '_';
+
     // prometheus label names
     for(i = 0; i < 256 ;i++) prometheus_label_names_char_map[i] = '_';
     for(int s = 'A' ; s <= 'Z' ; s++) prometheus_label_names_char_map[s] = s;
