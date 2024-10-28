@@ -6,11 +6,14 @@
 
 **Merged pull requests:**
 
+- Windows storage fixes [\#18880](https://github.com/netdata/netdata/pull/18880) ([ktsaou](https://github.com/ktsaou))
+- include windows.h globally in libnetdata [\#18878](https://github.com/netdata/netdata/pull/18878) ([ktsaou](https://github.com/ktsaou))
 - fix: correct go.d.plugin permission for source builds [\#18876](https://github.com/netdata/netdata/pull/18876) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/prometheus/common from 0.60.0 to 0.60.1 in /src/go [\#18874](https://github.com/netdata/netdata/pull/18874) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump k8s.io/client-go from 0.31.1 to 0.31.2 in /src/go [\#18873](https://github.com/netdata/netdata/pull/18873) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/vmware/govmomi from 0.45.0 to 0.45.1 in /src/go [\#18872](https://github.com/netdata/netdata/pull/18872) ([dependabot[bot]](https://github.com/apps/dependabot))
 - fix: correct health schema typo preventing Action alert rendering. [\#18871](https://github.com/netdata/netdata/pull/18871) ([ilyam8](https://github.com/ilyam8))
+- Adjust text\_sanitizer to accept the default value [\#18870](https://github.com/netdata/netdata/pull/18870) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18869](https://github.com/netdata/netdata/pull/18869) ([netdatabot](https://github.com/netdatabot))
 - docs\(go.d/ping\): clarify permissions [\#18868](https://github.com/netdata/netdata/pull/18868) ([ilyam8](https://github.com/ilyam8))
 - Fix corruption in expression value replacement [\#18865](https://github.com/netdata/netdata/pull/18865) ([stelfrag](https://github.com/stelfrag))
@@ -443,9 +446,6 @@
 - Regenerate integrations.js [\#18333](https://github.com/netdata/netdata/pull/18333) ([netdatabot](https://github.com/netdatabot))
 - go.d riakkv [\#18330](https://github.com/netdata/netdata/pull/18330) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/riakkv [\#18329](https://github.com/netdata/netdata/pull/18329) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18328](https://github.com/netdata/netdata/pull/18328) ([netdatabot](https://github.com/netdatabot))
-- add go.d/uwsgi [\#18326](https://github.com/netdata/netdata/pull/18326) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/uwsgi [\#18325](https://github.com/netdata/netdata/pull/18325) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
