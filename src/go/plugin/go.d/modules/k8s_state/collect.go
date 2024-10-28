@@ -5,6 +5,7 @@ package k8s_state
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -14,6 +15,29 @@ import (
 )
 
 const precision = 1000
+
+var (
+	containerWaitingStateReasons = []string{
+		"PodInitializing",
+		"ContainerCreating",
+		"CrashLoopBackOff",
+		"CreateContainerConfigError",
+		"ErrImagePull",
+		"ImagePullBackOff",
+		"CreateContainerError",
+		"InvalidImageName",
+		"Other",
+	}
+	containerTerminatedStateReasons = []string{
+		"OOMKilled",
+		"Completed",
+		"Error",
+		"ContainerCannotRun",
+		"DeadlineExceeded",
+		"Evicted",
+		"Other",
+	}
+)
 
 func (ks *KubeState) collect() (map[string]int64, error) {
 	if ks.discoverer == nil {
@@ -165,19 +189,25 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 			mx[ppx+"state_terminated"] = boolToInt(cs.stateTerminated)
 			mx[ppx+"readiness"] = boolToInt(cs.ready)
 			mx[ppx+"restarts"] = cs.restarts
-			for _, r := range cs.stateWaitingReasons {
-				if r.new {
-					r.new = false
-					ks.addContainerWaitingStateReasonToChart(ps, cs, r.reason)
-				}
-				mx[ppx+"state_waiting_reason_"+r.reason] = boolToInt(r.active)
+
+			for _, v := range containerWaitingStateReasons {
+				mx[ppx+"state_waiting_reason_"+v] = 0
 			}
-			for _, r := range cs.stateTerminatedReasons {
-				if r.new {
-					r.new = false
-					ks.addContainerTerminatedStateReasonToChart(ps, cs, r.reason)
+			if v := cs.waitingReason; v != "" {
+				if !slices.Contains(containerWaitingStateReasons, cs.waitingReason) {
+					v = "Other"
 				}
-				mx[ppx+"state_terminated_reason_"+r.reason] = boolToInt(r.active)
+				mx[ppx+"state_waiting_reason_"+v] = 1
+			}
+
+			for _, v := range containerTerminatedStateReasons {
+				mx[ppx+"state_terminated_reason_"+v] = 0
+			}
+			if v := cs.terminatedReason; v != "" {
+				if !slices.Contains(containerTerminatedStateReasons, cs.terminatedReason) {
+					v = "Other"
+				}
+				mx[ppx+"state_terminated_reason_"+v] = 1
 			}
 		}
 	}

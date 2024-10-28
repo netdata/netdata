@@ -79,15 +79,6 @@ func (ks *KubeState) updatePodState(r resource) {
 
 	ps.phase = pod.Status.Phase
 
-	for _, cs := range ps.containers {
-		for _, r := range cs.stateWaitingReasons {
-			r.active = false
-		}
-		for _, r := range cs.stateTerminatedReasons {
-			r.active = false
-		}
-	}
-
 	for _, cntr := range pod.Status.ContainerStatuses {
 		cs, ok := ps.containers[cntr.Name]
 		if !ok {
@@ -108,23 +99,10 @@ func (ks *KubeState) updatePodState(r resource) {
 		cs.stateTerminated = cntr.State.Terminated != nil
 
 		if cntr.State.Waiting != nil {
-			reason := cntr.State.Waiting.Reason
-			r, ok := cs.stateWaitingReasons[reason]
-			if !ok {
-				r = &containerStateReason{new: true, reason: reason}
-				cs.stateWaitingReasons[reason] = r
-			}
-			r.active = true
+			cs.waitingReason = cntr.State.Waiting.Reason
 		}
-
 		if cntr.State.Terminated != nil {
-			reason := cntr.State.Terminated.Reason
-			r, ok := cs.stateTerminatedReasons[reason]
-			if !ok {
-				r = &containerStateReason{new: true, reason: reason}
-				cs.stateTerminatedReasons[reason] = r
-			}
-			r.active = true
+			cs.terminatedReason = cntr.State.Terminated.Reason
 		}
 	}
 

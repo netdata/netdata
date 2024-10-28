@@ -347,10 +347,24 @@ modules:
               unit: state
               chart_type: line
               dimensions:
-                - name: a dimension per reason
+                - name: PodInitializing
+                - name: ContainerCreating
+                - name: CrashLoopBackOff
+                - name: CreateContainerConfigError
+                - name: ErrImagePull
+                - name: ImagePullBackOff
+                - name: CreateContainerError
+                - name: InvalidImageName
+                - name: Other
             - name: k8s_state.pod_container_terminated_state_reason
               description: Container terminated state reason
               unit: state
               chart_type: line
               dimensions:
-                - name: a dimension per reason
+                - name: OOMKilled
+                - name: Completed
+                - name: Error
+                - name: ContainerCannotRun
+                - name: DeadlineExceeded
+                - name: Evicted
+                - name: Other
