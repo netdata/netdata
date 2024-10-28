@@ -5,26 +5,26 @@
 /*
  * All labels follow these rules:
  *
- * Character           Symbol   Names    Values
- * UTF-8 characters    UTF-8    -> _     yes
- * Lower case letter   [a-z]    yes      yes
- * Upper case letter   [A-Z]    yes      yes
- * Digit               [0-9]    yes      yes
- * Underscore          _        yes      yes
- * Minus               -        yes      yes
- * Plus                +        -> _     yes
- * Colon               :        -> _     yes
- * Semicolon           ;        -> _     -> :
- * Equal               =        -> _     -> :
- * Period              .        yes      yes
- * Comma               ,        -> .     -> .
- * Slash               /        yes      yes
- * Backslash           \        -> /     -> /
- * At                  @        -> _     yes
- * Space                        -> _     yes
- * Opening parenthesis (        -> _     yes
- * Closing parenthesis )        -> _     yes
- * anything else                -> _     -> _
+ * Character           Symbol   Names     Values
+ * UTF-8 characters    UTF-8    -> _      yes
+ * Lower case letter   [a-z]    yes       yes
+ * Upper case letter   [A-Z]    yes       yes
+ * Digit               [0-9]    yes       yes
+ * Underscore          _        yes       yes
+ * Minus               -        yes       yes
+ * Plus                +        -> _      yes
+ * Colon               :        -> _      yes
+ * Semicolon           ;        -> _      -> :
+ * Equal               =        -> _      -> :
+ * Period              .        yes       yes
+ * Comma               ,        -> .      -> .
+ * Slash               /        yes       yes
+ * Backslash           \        -> /      -> /
+ * At                  @        -> _      yes
+ * Space                        -> _      yes
+ * Opening parenthesis (        -> _      yes
+ * Closing parenthesis )        -> _      yes
+ * anything else                -> _      -> space
 *
  * The above rules should allow users to set in tags (indicative):
  *
