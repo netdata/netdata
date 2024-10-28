@@ -129,10 +129,6 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
     label_names_char_map[')'] = '_';
     label_names_char_map['\\'] = '/';
 
-    for(i = 0; i < 256 ;i++)
-        if(label_names_char_map[i] == ' ')
-            label_names_char_map[i] = '_';
-
     // prometheus label names
     for(i = 0; i < 256 ;i++) prometheus_label_names_char_map[i] = '_';
     for(int s = 'A' ; s <= 'Z' ; s++) prometheus_label_names_char_map[s] = s;
@@ -144,7 +140,12 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
 }
 
 size_t rrdlabels_sanitize_name(char *dst, const char *src, size_t dst_size) {
-    return text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_names_char_map, 0, "", NULL);
+    size_t rc = text_sanitize((unsigned char *)dst, (const unsigned char *)src, dst_size, label_names_char_map, 0, "", NULL);
+
+    for(size_t i = 0; i < rc ; i++)
+        if(dst[i] == ' ') dst[i] = '_';
+
+    return rc;
 }
 
 size_t rrdlabels_sanitize_value(char *dst, const char *src, size_t dst_size) {

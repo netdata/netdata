@@ -1158,6 +1158,9 @@ static int rrdlabels_unittest_add_pairs() {
     // test newlines
     errors += rrdlabels_unittest_add_a_pair("   tag   = \t value \r\n", "tag", "value");
 
+    // test spaces in names
+    errors += rrdlabels_unittest_add_a_pair("   t   a   g   = value", "t_a_g", "value");
+
     // test : in values
     errors += rrdlabels_unittest_add_a_pair("tag=:value", "tag", ":value");
     errors += rrdlabels_unittest_add_a_pair("tag::value", "tag", ":value");
