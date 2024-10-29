@@ -2367,7 +2367,7 @@ done:
 
 void cleanup_agent_event_log(void)
 {
-    db_execute(db_meta, "DELETE FROM agent_event_log WHERE date_created < UNIXEPOCH() - 30 * 86400");
+    (void) db_execute(db_meta, "DELETE FROM agent_event_log WHERE date_created < UNIXEPOCH() - 30 * 86400");
 }
 
 #define SQL_GET_AGENT_EVENT_TYPE_MEDIAN                                                                                \

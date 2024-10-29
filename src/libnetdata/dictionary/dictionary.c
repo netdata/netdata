@@ -318,10 +318,11 @@ static void dictionary_queue_for_destruction(DICTIONARY *dict) {
 }
 
 void cleanup_destroyed_dictionaries(void) {
-    if(!dictionaries_waiting_to_be_destroyed)
-        return;
-
     netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+    if (!dictionaries_waiting_to_be_destroyed) {
+        netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+        return;
+    }
 
     DICTIONARY *dict, *last = NULL, *next = NULL;
     for(dict = dictionaries_waiting_to_be_destroyed; dict ; dict = next) {

@@ -953,7 +953,7 @@ int connect_to_this_ip46(
                            hostBfr, servBfr);
 
                     // Convert 'struct timeval' to milliseconds for poll():
-                    int timeout_ms = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
+                    int timeout_ms = timeout ? (timeout->tv_sec * 1000 + timeout->tv_usec / 1000) : 1000;
 
                     switch(wait_on_socket_or_cancel_with_timeout(
                         NULL,
