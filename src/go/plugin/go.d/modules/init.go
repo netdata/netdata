@@ -98,6 +98,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/sensors"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/smartctl"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/snmp"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/spigotmc"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/squid"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/squidlog"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules/storcli"

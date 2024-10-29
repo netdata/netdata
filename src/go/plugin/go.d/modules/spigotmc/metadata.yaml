@@ -1,0 +1,136 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-spigotmc
+      plugin_name: go.d.plugin
+      module_name: spigotmc
+      monitored_instance:
+        name: SpigotMC
+        link: https://www.spigotmc.org/
+        categories:
+          - data-collection.gaming
+        icon_filename: "spigot.jfif"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - minecraft
+        - spigotmc
+        - spigot
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors SpigotMC server server performance, in the form of ticks per second average, memory utilization, and active users.
+        method_description: |
+          It sends the `tps` and `list` commands to the Server, and gathers the metrics from the responses.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects SpigotMC instances running on localhost that are listening on port 25575.
+
+            > **Note that the SpigotMC RCON API requires a password**. 
+            > While Netdata can automatically detect SpigotMC instances and create data collection jobs, these jobs will fail unless you provide the necessary credentials.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/spigotmc.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: The IP address and port where the SpigotMC server listens for RCON connections.
+              default_value: 127.0.0.1:25575
+              required: true
+            - name: timeout
+              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:25575
+                    password: somePassword
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:25575
+                    password: somePassword
+
+                  - name: remote
+                    address: 203.0.113.0:25575
+                    password: somePassword
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire monitored application."
+          labels: []
+          metrics:
+            - name: spigotmc.players
+              description: Active Players
+              unit: "players"
+              chart_type: line
+              dimensions:
+                - name: players
+            - name: spigotmc.avg_tps
+              description: Average Ticks Per Second
+              unit: "ticks"
+              chart_type: line
+              dimensions:
+                - name: 1min
+                - name: 5min
+                - name: 15min
+            - name: spigotmc.memory
+              description: Memory Usage
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: used
+                - name: alloc
