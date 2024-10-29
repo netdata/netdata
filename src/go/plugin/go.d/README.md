@@ -134,6 +134,7 @@ see the appropriate collector readme.
 | [squid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/squid)                           |             Squid             |
 | [squidlog](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/squidlog)                     |             Squid             |
 | [smartctl](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/smartctl)                     |   S.M.A.R.T Storage Devices   |
+| [spigotmc](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/spigotmc)                     |           SpigotMC            |
 | [storcli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/storcli)                       |    Broadcom Hardware RAID     |
 | [supervisord](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/supervisord)               |          Supervisor           |
 | [systemdunits](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/systemdunits)             |      Systemd unit state       |
