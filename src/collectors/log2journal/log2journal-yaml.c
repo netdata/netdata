@@ -429,6 +429,34 @@ static size_t yaml_parse_unmatched(yaml_parser_t *parser, LOG_JOB *jb) {
     return errors;
 }
 
+static bool yaml_parse_scalar_boolean(yaml_parser_t *parser, bool def, const char *where, size_t *errors) {
+    bool rc = def;
+
+    yaml_event_t value_event;
+    if (!yaml_parse(parser, &value_event)) {
+        (*errors)++;
+        return rc;
+    }
+
+    if (value_event.type != YAML_SCALAR_EVENT) {
+        yaml_error(parser, &value_event, "Expected scalar for %s boolean", where);
+        (*errors)++;
+    }
+    else if(strncmp((char*)value_event.data.scalar.value, "yes", 3) == 0 ||
+             strncmp((char*)value_event.data.scalar.value, "true", 4) == 0)
+        rc = true;
+    else if(strncmp((char*)value_event.data.scalar.value, "no", 2) == 0 ||
+             strncmp((char*)value_event.data.scalar.value, "false", 5) == 0)
+        rc = false;
+    else {
+        yaml_error(parser, &value_event, "Expected scalar for %s boolean: invalid value %s", where, value_event.data.scalar.value);
+        rc = def;
+    }
+
+    yaml_event_delete(&value_event);
+    return rc;
+}
+
 static bool handle_rewrite_event(yaml_parser_t *parser, yaml_event_t *event,
                                  char **key, char **search_pattern, char **replace_pattern,
                                  RW_FLAGS *flags, bool *mapping_finished,
@@ -506,42 +534,16 @@ static bool handle_rewrite_event(yaml_parser_t *parser, yaml_event_t *event,
                 yaml_event_delete(&value_event);
             }
             else if (yaml_scalar_matches(event, "stop", strlen("stop"))) {
-                yaml_event_t value_event;
-                if (!yaml_parse(parser, &value_event)) {
-                    (*errors)++;
-                    return false;
-                }
-
-                if (value_event.type != YAML_SCALAR_EVENT) {
-                    yaml_error(parser, &value_event, "Expected scalar for rewrite stop boolean");
-                    (*errors)++;
-                }
-                else if(strncmp((char*)value_event.data.scalar.value, "no", 2) == 0 ||
-                         strncmp((char*)value_event.data.scalar.value, "false", 5) == 0)
-                    *flags |= RW_DONT_STOP;
-                else
+                if(yaml_parse_scalar_boolean(parser, true, "rewrite stop", errors))
                     *flags &= ~RW_DONT_STOP;
-
-                yaml_event_delete(&value_event);
+                else
+                    *flags |= RW_DONT_STOP;
             }
             else if (yaml_scalar_matches(event, "inject", strlen("inject"))) {
-                yaml_event_t value_event;
-                if (!yaml_parse(parser, &value_event)) {
-                    (*errors)++;
-                    return false;
-                }
-
-                if (value_event.type != YAML_SCALAR_EVENT) {
-                    yaml_error(parser, &value_event, "Expected scalar for rewrite inject boolean");
-                    (*errors)++;
-                }
-                else if(strncmp((char*)value_event.data.scalar.value, "yes", 3) == 0 ||
-                         strncmp((char*)value_event.data.scalar.value, "true", 4) == 0)
+                if(yaml_parse_scalar_boolean(parser, false, "rewrite inject", errors))
                     *flags |= RW_INJECT;
                 else
                     *flags &= ~RW_INJECT;
-
-                yaml_event_delete(&value_event);
             }
             else {
                 yaml_error(parser, event, "Unexpected scalar in rewrite mapping");
