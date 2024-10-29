@@ -429,7 +429,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [OpenRCT2](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/openrct2.md)
 
-- [SpigotMC](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/spigotmc/integrations/spigotmc.md)
+- [SpigotMC](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/spigotmc/integrations/spigotmc.md)
 
 - [Steam](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/prometheus/integrations/steam.md)
 

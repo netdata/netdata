@@ -1,0 +1,1 @@
+integrations/spigotmc.md
