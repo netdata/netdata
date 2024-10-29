@@ -7,6 +7,7 @@ void rewrite_cleanup(REWRITE *rw) {
 
     if(rw->flags & RW_MATCH_PCRE2)
         search_pattern_cleanup(&rw->match_pcre2);
+
     else if(rw->flags & RW_MATCH_NON_EMPTY)
         replace_pattern_cleanup(&rw->match_non_empty);
 

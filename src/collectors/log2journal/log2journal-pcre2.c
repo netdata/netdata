@@ -102,8 +102,15 @@ PCRE2_STATE *pcre2_parser_create(LOG_JOB *jb) {
 }
 
 void pcre2_parser_destroy(PCRE2_STATE *pcre2) {
-    if(pcre2)
+    if(pcre2) {
+        if(pcre2->re)
+            pcre2_code_free(pcre2->re);
+
+        if(pcre2->match_data)
+            pcre2_match_data_free(pcre2->match_data);
+
         freez(pcre2);
+    }
 }
 
 const char *pcre2_parser_error(PCRE2_STATE *pcre2) {

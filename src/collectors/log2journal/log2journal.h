@@ -245,7 +245,7 @@ typedef enum __attribute__((__packed__)) {
 
     HK_HASHTABLE_ALLOCATED  = (1 << 0), // this is key object allocated in the hashtable
                                         // objects that do not have this, have a pointer to a key in the hashtable
-                                        // objects that have this, value a value allocated
+                                        // objects that have this, value is allocated
 
     HK_FILTERED             = (1 << 1), // we checked once if this key in filtered
     HK_FILTERED_INCLUDED    = (1 << 2), // the result of the filtering was to include it in the output
@@ -274,15 +274,16 @@ typedef struct hashed_key {
 } HASHED_KEY;
 
 static inline void hashed_key_cleanup(HASHED_KEY *k) {
-    if(k->key) {
-        freez((void *)k->key);
-        k->key = NULL;
-    }
-
     if(k->flags & HK_HASHTABLE_ALLOCATED)
         txt_cleanup(&k->value);
     else
         k->hashtable_ptr = NULL;
+
+    freez((void *)k->key);
+    k->key = NULL;
+    k->len = 0;
+    k->hash = 0;
+    k->flags = HK_NONE;
 }
 
 static inline void hashed_key_set(HASHED_KEY *k, const char *name) {
