@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- improvement\(go.d/k8sstate\): collect pod status reason [\#18887](https://github.com/netdata/netdata/pull/18887) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18886](https://github.com/netdata/netdata/pull/18886) ([netdatabot](https://github.com/netdatabot))
+- fix\(go.d/k8sstate\): use static list of warning/terminated reasons [\#18885](https://github.com/netdata/netdata/pull/18885) ([ilyam8](https://github.com/ilyam8))
+- properly sanitize prometheus names and values [\#18884](https://github.com/netdata/netdata/pull/18884) ([ktsaou](https://github.com/ktsaou))
 - Windows storage fixes [\#18880](https://github.com/netdata/netdata/pull/18880) ([ktsaou](https://github.com/ktsaou))
 - include windows.h globally in libnetdata [\#18878](https://github.com/netdata/netdata/pull/18878) ([ktsaou](https://github.com/ktsaou))
 - fix: correct go.d.plugin permission for source builds [\#18876](https://github.com/netdata/netdata/pull/18876) ([ilyam8](https://github.com/ilyam8))
@@ -441,11 +445,6 @@
 - Bump github.com/vmware/govmomi from 0.39.0 to 0.40.0 in /src/go [\#18338](https://github.com/netdata/netdata/pull/18338) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/miekg/dns from 1.1.61 to 1.1.62 in /src/go [\#18337](https://github.com/netdata/netdata/pull/18337) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump k8s.io/client-go from 0.30.3 to 0.31.0 in /src/go [\#18336](https://github.com/netdata/netdata/pull/18336) ([dependabot[bot]](https://github.com/apps/dependabot))
-- add i2pd to apps\_groups.conf [\#18335](https://github.com/netdata/netdata/pull/18335) ([ilyam8](https://github.com/ilyam8))
-- add dashboard v2 license to readme [\#18334](https://github.com/netdata/netdata/pull/18334) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18333](https://github.com/netdata/netdata/pull/18333) ([netdatabot](https://github.com/netdatabot))
-- go.d riakkv [\#18330](https://github.com/netdata/netdata/pull/18330) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/riakkv [\#18329](https://github.com/netdata/netdata/pull/18329) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
