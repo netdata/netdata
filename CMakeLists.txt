@@ -3095,7 +3095,6 @@ if(ENABLE_PLUGIN_PYTHON)
           src/collectors/python.d.plugin/go_expvar/go_expvar.conf
           src/collectors/python.d.plugin/haproxy/haproxy.conf
           src/collectors/python.d.plugin/pandas/pandas.conf
-          src/collectors/python.d.plugin/spigotmc/spigotmc.conf
           src/collectors/python.d.plugin/traefik/traefik.conf
           src/collectors/python.d.plugin/zscores/zscores.conf
           COMPONENT plugin-pythond
@@ -3106,7 +3105,6 @@ if(ENABLE_PLUGIN_PYTHON)
           src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
           src/collectors/python.d.plugin/haproxy/haproxy.chart.py
           src/collectors/python.d.plugin/pandas/pandas.chart.py
-          src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
           src/collectors/python.d.plugin/traefik/traefik.chart.py
           src/collectors/python.d.plugin/zscores/zscores.chart.py
           COMPONENT plugin-pythond
