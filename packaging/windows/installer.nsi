@@ -402,6 +402,8 @@ ManifestExistsForUninstall:
         ${If} $0 != 0
             DetailPrint "Warning: Failed to uninstall the event manifest."
         ${EndIf}
+        Delete "$SYSDIR\wevt_netdata_manifest.xml"
+        Delete "$SYSDIR\wevt_netdata.dll"
         Goto DoneUninstall
 
 ManifestNotExistsForUninstall:
@@ -410,6 +412,7 @@ ManifestNotExistsForUninstall:
 DoneUninstall:
 
         ; Remove files
+        SetOutPath "$PROGRAMFILES"
         RMDir /r /REBOOTOK "$INSTDIR"
 
         DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Netdata"
