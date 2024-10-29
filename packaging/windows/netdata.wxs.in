@@ -40,7 +40,7 @@
 		<Property Id="MsiLogging" Value="voicewarmupx!"/>
 
 		<StandardDirectory Id="ProgramFiles64Folder">
-			<Directory Id="INSTALLFOLDER" Name="Netdata Agent">
+			<Directory Id="INSTALLFOLDER" Name="Netdata">
 				<Directory Id="USRDIR" Name="usr">
 					<Directory Id="USRBINDIR" Name="bin" />
 				</Directory>
