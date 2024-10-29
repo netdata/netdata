@@ -26,6 +26,8 @@
 
 		<Feature Id="Main">
 			<ComponentGroupRef Id="NetdataComponents" />
+			<ComponentRef Id="NetdataVarCache" />
+			<ComponentRef Id="NetdataVarLib" />
 			<ComponentGroupRef Id="WevtComponents" />
 			<ComponentRef Id="NetdataService" />
 		</Feature>
@@ -38,6 +40,10 @@
 			<Directory Id="INSTALLFOLDER" Name="Netdata">
 				<Directory Id="USRDIR" Name="usr">
 					<Directory Id="USRBINDIR" Name="bin" />
+				</Directory>
+				<Directory Id="VARDIR" Name="var">
+					<Directory Id="VARCACHEDIR" Name="cache" />
+					<Directory Id="VARLIBDIR" Name="lib" />
 				</Directory>
 			</Directory>
 		</StandardDirectory>
@@ -53,6 +59,14 @@
 				<Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
 			</Files>
 		</ComponentGroup>
+
+		<Component Id="NetdataVarCache" Directory="VARCACHEDIR" Guid="a41bc888-60d4-4d99-bb4f-da92614a8f72">
+			<CreateFolder />
+		</Component>
+
+		<Component Id="NetdataVarLib" Directory="VARLIBDIR" Guid="c72d7ea8-c848-46c4-a983-589044f2eec9">
+			<CreateFolder />
+		</Component>
 
 		<!-- Install wevt manifest/dll files -->
 		<ComponentGroup Id="WevtComponents" Directory="System64Folder">
