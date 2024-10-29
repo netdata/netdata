@@ -47,6 +47,12 @@ void log_job_cleanup(LOG_JOB *jb) {
     for(size_t i = 0; i < jb->rewrites.used; i++)
         rewrite_cleanup(&jb->rewrites.array[i]);
 
+    search_pattern_cleanup(&jb->filter.include);
+    search_pattern_cleanup(&jb->filter.exclude);
+
+    hashed_key_cleanup(&jb->filename.key);
+    hashed_key_cleanup(&jb->unmatched.key);
+
     txt_cleanup(&jb->rewrites.tmp);
     txt_cleanup(&jb->filename.current);
 
