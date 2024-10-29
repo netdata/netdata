@@ -13,7 +13,7 @@ function txt_to_rtf() {
     echo '\f0\fs24' >> "$OUTPUT"
 
     sed s/\$/'\\line'/ "$INPUT" | sed s/\\f/'\\page'/ >> "$OUTPUT"
-    echo "}" >> "$OUTPUT"
+    echo '}' >> "$OUTPUT"
 }
 
 if [ ! -f "gpl-3.0.txt" ]; then
