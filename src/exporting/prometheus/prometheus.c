@@ -88,9 +88,8 @@ static netdata_mutex_t prometheus_server_root_mutex = NETDATA_MUTEX_INITIALIZER;
  */
 void prometheus_clean_server_root()
 {
+    netdata_mutex_lock(&prometheus_server_root_mutex);
     if (prometheus_server_root) {
-        netdata_mutex_lock(&prometheus_server_root_mutex);
-
         struct prometheus_server *ps;
         for (ps = prometheus_server_root; ps; ) {
             struct prometheus_server *current = ps;
@@ -101,8 +100,8 @@ void prometheus_clean_server_root()
             freez(current);
         }
         prometheus_server_root = NULL;
-        netdata_mutex_unlock(&prometheus_server_root_mutex);
     }
+    netdata_mutex_unlock(&prometheus_server_root_mutex);
 }
 
 /**
