@@ -200,7 +200,5 @@ src/go/plugin/go.d/vendor
 packaging/utils/netdata-installer-x64.exe
 
 # ignore files used with msi installer
-packaging/windows/*.txt
-packaging/windows/*.rtf
-packaging/utils/netdata.msi
+packaging/utils/*.msi
 
