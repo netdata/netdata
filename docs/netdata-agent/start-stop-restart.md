@@ -1,24 +1,20 @@
 # Start, stop, or restart the Netdata Agent
 
-When you install the Netdata Agent, the [daemon](/src/daemon/README.md) is configured to start at boot and stop and restart/shutdown.
+The Netdata Agent automatically starts at boot after installation.
 
-> You will most often need to _restart_ the Agent to load new or editing configuration files. [Health configuration](/docs/netdata-agent/reload-health-configuration.md) files are the only exception, as they can be reloaded without restarting the entire Agent.
+> In most cases, you need to **restart the Netdata service** to apply changes to configuration files. [Health configuration](/docs/netdata-agent/reload-health-configuration.md) files, which define alerts, are an exception. They can be reloaded **without restarting** by using the `netdatacli` tool.
 >
-> Stopping or restarting the Netdata Agent will cause gaps in stored metrics until the `netdata` process initiates collectors and the database engine.
+> Restarting the Netdata Agent will cause temporary gaps in your collected metrics. This occurs while the netdata process reinitializes its data collectors and database engine.
 
 ## Unix systems
 
 ### Using `systemctl`, `service`, or `init.d`
 
-This is the recommended way to start, stop, or restart the Netdata daemon.
-
-- To **start** Netdata, run `sudo systemctl start netdata`.
-- To **stop** Netdata, run `sudo systemctl stop netdata`.
-- To **restart** Netdata, run `sudo systemctl restart netdata`.
-
-If the above commands fail, or you know that you're using a non-systemd system, try using the `service` command:
-
-- **service**: `sudo service netdata start`, `sudo service netdata stop`, `sudo service netdata restart`
+| Action  | Systemd                        | Non-systemd                  |
+|---------|--------------------------------|------------------------------|
+| start   | `sudo systemctl start netdata` | `sudo service netdata start` |
+| stop    | `sudo systemctl stop netdata`  | `sudo service netdata stop`  |
+| restart | `sudo systemctl stop netdata`  | `sudo service netdata stop`  |
 
 ### Using `netdata`
 
@@ -42,7 +38,7 @@ sudo netdatacli shutdown-agent
 
 > **Note**
 >
-> You will need to run Powershell as administrator.
+> You will need to run PowerShell as administrator.
 
 - To **start** Netdata, run `Start-Service Netdata`.
 - To **stop** Netdata, run `Stop-Service Netdata`.
