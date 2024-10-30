@@ -238,6 +238,11 @@ static int netdata_claim_get_path(char *path)
 
 static void netdata_claim_write_config(char *path)
 {
+#define NETDATA_MIN_CLOUD_LENGTH 135
+#define NETDATA_MIN_ROOM_LENGTH 36
+    if (strlen(aToken) != NETDATA_MIN_CLOUD_LENGTH && strlen(aRoom) < NETDATA_MIN_ROOM_LENGTH)
+        return;
+
     char configPath[WINDOWS_MAX_PATH + 1];
     char data[WINDOWS_MAX_PATH + 1];
     char *filename;
@@ -247,8 +252,6 @@ static void netdata_claim_write_config(char *path)
     } else {
         filename = path;
     }
-
-//    MessageBoxA(NULL, configPath, "PATH", 0);
 
     HANDLE hf = CreateFileA(filename, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hf == INVALID_HANDLE_VALUE)
