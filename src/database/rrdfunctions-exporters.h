@@ -5,13 +5,15 @@
 
 #include "rrd.h"
 
+#define RRDFUNCTIONS_VERSION_SEPARATOR "|"
+
 void rrd_chart_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
 void rrd_global_functions_expose_rrdpush(RRDHOST *host, BUFFER *wb, bool dyncfg);
 
 void chart_functions2json(RRDSET *st, BUFFER *wb);
 void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst, void *value, size_t value_size);
 void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help, STRING **tags,
-                            HTTP_ACCESS *access, int *priority);
+                            HTTP_ACCESS *access, int *priority, uint32_t *version);
 void host_functions2json(RRDHOST *host, BUFFER *wb);
 
 #endif //NETDATA_RRDFUNCTIONS_EXPORTERS_H

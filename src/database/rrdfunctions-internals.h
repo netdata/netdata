@@ -24,6 +24,7 @@ struct rrd_host_function {
     STRING *tags;
     int timeout;                    // the default timeout of the function
     int priority;
+    uint32_t version;
 
     rrd_function_execute_cb_t execute_cb;
     void *execute_cb_data;

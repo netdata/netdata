@@ -849,7 +849,8 @@ void *diskspace_main(void *ptr) {
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
 
     rrd_function_add_inline(localhost, NULL, "mount-points", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_DISKSPACE_HELP,
+                            RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
+                            RRDFUNCTIONS_DISKSPACE_HELP,
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
                             diskspace_function_mount_points);
 

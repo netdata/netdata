@@ -284,7 +284,7 @@ void dyncfg_host_init(RRDHOST *host) {
     // This function needs to be async, although it is internal.
     // The reason is that it can call by itself another function that may or may not be internal (sync).
 
-    rrd_function_add(host, NULL, PLUGINSD_FUNCTION_CONFIG, 120,
-                     1000, "Dynamic configuration", "config", HTTP_ACCESS_ANONYMOUS_DATA,
+    rrd_function_add(host, NULL, PLUGINSD_FUNCTION_CONFIG, 120, 1000, DYNCFG_FUNCTIONS_VERSION,
+                     "Dynamic configuration", "config", HTTP_ACCESS_ANONYMOUS_DATA,
                      false, dyncfg_config_execute_cb, host);
 }

@@ -14,13 +14,14 @@ void rrd_chart_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
         if(t->options & RRD_FUNCTION_DYNCFG) continue;
 
         buffer_sprintf(wb
-                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d\n"
+                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d %"PRIu32"\n"
                        , t_dfe.name
                        , t->timeout
                        , string2str(t->help)
                        , string2str(t->tags)
                        , (HTTP_ACCESS_FORMAT_CAST)t->access
                        , t->priority
+                       , t->version
         );
     }
     dfe_done(t);
@@ -41,13 +42,14 @@ void rrd_global_functions_expose_rrdpush(RRDHOST *host, BUFFER *wb, bool dyncfg)
         }
 
         buffer_sprintf(wb
-                       , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d\n"
+                       , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d %"PRIu32"\n"
                        , tmp_dfe.name
                        , tmp->timeout
                        , string2str(tmp->help)
                        , string2str(tmp->tags)
                        , (HTTP_ACCESS_FORMAT_CAST)tmp->access
                        , tmp->priority
+                       , tmp->version
         );
     }
     dfe_done(tmp);
@@ -66,6 +68,7 @@ static void functions2json(DICTIONARY *functions, BUFFER *wb) {
         {
             buffer_json_member_add_string_or_empty(wb, "help", string2str(t->help));
             buffer_json_member_add_int64(wb, "timeout", (int64_t) t->timeout);
+            buffer_json_member_add_uint64(wb, "version", (uint64_t) t->version);
 
             char options[65];
             snprintfz(
@@ -105,6 +108,7 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
         {
             buffer_json_member_add_string(wb, "help", string2str(t->help));
             buffer_json_member_add_int64(wb, "timeout", t->timeout);
+            buffer_json_member_add_uint64(wb, "version", (uint64_t) t->version);
             buffer_json_member_add_array(wb, "options");
             {
                 if (t->options & RRD_FUNCTION_GLOBAL)
@@ -138,7 +142,7 @@ void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst,
 }
 
 void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size,
-                            STRING **help, STRING **tags, HTTP_ACCESS *access, int *priority) {
+                            STRING **help, STRING **tags, HTTP_ACCESS *access, int *priority, uint32_t *version) {
     if(!host || !host->functions || !dictionary_entries(host->functions) || !dst) return;
 
     struct rrd_host_function *t;
@@ -158,7 +162,14 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
         if(priority)
             *priority = t->priority;
 
-        dictionary_set(dst, t_dfe.name, value, value_size);
+        if(version)
+            *version = t->version;
+
+        char key[UINT64_MAX_LENGTH + sizeof(RRDFUNCTIONS_VERSION_SEPARATOR) + strlen(t_dfe.name)];
+        snprintfz(key, sizeof(key), "%"PRIu32 RRDFUNCTIONS_VERSION_SEPARATOR "%s",
+                  t->version, t_dfe.name);
+
+        dictionary_set(dst, key, value, value_size);
     }
     dfe_done(t);
 }
