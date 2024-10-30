@@ -34,7 +34,7 @@ modules:
           -  `smartctl --json --all {deviceName} --device {deviceType} --nocheck {powerMode}`
         method_description: ""
       supported_platforms:
-        include: []
+        include: [Linux, BSD]
         exclude: []
       multi_instance: false
       additional_permissions:

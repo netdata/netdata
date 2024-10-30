@@ -25,7 +25,7 @@ modules:
           This collector monitors number of sessions and users as reported by the `org.freedesktop.login1` DBus API.
         method_description: ""
       supported_platforms:
-        include: []
+        include: [Linux]
         exclude: []
       multi_instance: true
       additional_permissions:

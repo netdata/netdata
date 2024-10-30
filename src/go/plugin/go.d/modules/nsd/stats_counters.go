@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build linux || freebsd || openbsd || netbsd || dragonfly || darwin
+
 package nsd
 
 // Docs: https://nsd.docs.nlnetlabs.nl/en/latest/manpages/nsd-control.html?highlight=elapsed#statistics-counters

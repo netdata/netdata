@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build linux || freebsd || openbsd || netbsd || dragonfly
+
 package litespeed
 
 import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
