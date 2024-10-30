@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- log2journal: fix config parsing memory leaks [\#18893](https://github.com/netdata/netdata/pull/18893) ([ktsaou](https://github.com/ktsaou))
+- Fix coverity issues [\#18892](https://github.com/netdata/netdata/pull/18892) ([stelfrag](https://github.com/stelfrag))
+- Regenerate integrations.js [\#18891](https://github.com/netdata/netdata/pull/18891) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d.plugin\): add spigotmc collector [\#18890](https://github.com/netdata/netdata/pull/18890) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/spigotmc [\#18889](https://github.com/netdata/netdata/pull/18889) ([ilyam8](https://github.com/ilyam8))
 - improvement\(go.d/k8sstate\): collect pod status reason [\#18887](https://github.com/netdata/netdata/pull/18887) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18886](https://github.com/netdata/netdata/pull/18886) ([netdatabot](https://github.com/netdatabot))
 - fix\(go.d/k8sstate\): use static list of warning/terminated reasons [\#18885](https://github.com/netdata/netdata/pull/18885) ([ilyam8](https://github.com/ilyam8))
@@ -441,10 +446,6 @@
 - add license to readmes menu [\#18345](https://github.com/netdata/netdata/pull/18345) ([ilyam8](https://github.com/ilyam8))
 - add go.d/monit [\#18344](https://github.com/netdata/netdata/pull/18344) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/monit [\#18343](https://github.com/netdata/netdata/pull/18343) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/docker/docker from 27.1.1+incompatible to 27.1.2+incompatible in /src/go [\#18340](https://github.com/netdata/netdata/pull/18340) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/vmware/govmomi from 0.39.0 to 0.40.0 in /src/go [\#18338](https://github.com/netdata/netdata/pull/18338) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/miekg/dns from 1.1.61 to 1.1.62 in /src/go [\#18337](https://github.com/netdata/netdata/pull/18337) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump k8s.io/client-go from 0.30.3 to 0.31.0 in /src/go [\#18336](https://github.com/netdata/netdata/pull/18336) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
