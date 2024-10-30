@@ -47,3 +47,5 @@ sudo netdatacli shutdown-agent
 - To **start** Netdata, run `Start-Service Netdata`.
 - To **stop** Netdata, run `Stop-Service Netdata`.
 - To **restart** Netdata, run `Restart-Service Netdata`.
+
+If you prefer to manage the Agent through the GUI, you can start-stop and restart the `Netdata` service from the "Services" tab of Task Manager.
