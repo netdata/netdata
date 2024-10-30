@@ -2,7 +2,7 @@
 
 The update process can differ based on the install type:
 
-- Install types starting with `binpkg` or ending with `build` or `static` can be updated using our [kickstart script update method](#unix-systems).
+- Install types starting with `binpkg` or ending with `build` or `static` can be updated using our [kickstart script update method](#unix).
 - Installs with an install type of `custom` usually indicate installing a third-party package through the system package manager. To update these installs, you should update the package just like you would any other package on your system.
 - macOS users should check [our update instructions for macOS](#macos).
 - Manually built installs should check [our update instructions for manual builds](#manual-installation-from-git).
@@ -40,11 +40,11 @@ wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /
 >
 > if you installed Netdata using an installation prefix, you will need to add an `--install-prefix` option specifying that prefix to make sure it finds the existing install.
 
-If you see a line starting with `--- Would attempt to update existing installation by running the updater script located at:`, then our [kickstart script update method](#unix-systems) will work for you.
+If you see a line starting with `--- Would attempt to update existing installation by running the updater script located at:`, then our [kickstart script update method](#unix) will work for you.
 
 Otherwise, it should either indicate that the installation type is not supported (which probably means you either have a `custom` install or built Netdata manually) or indicate that it would create a new install (which means that you either used a non-standard install path, or that you don’t actually have Netdata installed).
 
-## Unix systems
+## UNIX
 
 In most cases, you can update Netdata using our one-line kickstart script. This script will automatically
 run the update script that was installed as part of the initial install and preserve the existing install options you specified.
@@ -54,6 +54,14 @@ If you installed Netdata using an installation prefix, you will need to add an `
 ```bash
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
+
+## Windows
+
+To update a Windows Netdata installation, download the executable and proceed to reinstall the Agent. This procedure will update the installation.
+
+> **Note**
+>
+> The Windows Agent is currently under beta and only available for Nightly releases, and the installer can be found in our [nightlies repo](https://github.com/netdata/netdata-nightlies). A stable version will be released soon.
 
 ## macOS
 

@@ -6,7 +6,7 @@ The Netdata Agent automatically starts at boot after installation.
 >
 > Restarting the Netdata Agent will cause temporary gaps in your collected metrics. This occurs while the netdata process reinitializes its data collectors and database engine.
 
-## Unix systems
+## UNIX
 
 ### Using `systemctl`, `service`, or `init.d`
 
@@ -42,7 +42,7 @@ No need to restart the Netdata Agent after modifying health configuration files 
 sudo netdatacli reload-health
 ```
 
-## Windows systems
+## Windows
 
 > **Note**
 >
