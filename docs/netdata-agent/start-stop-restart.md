@@ -1,8 +1,8 @@
-# Start, stop, or restart the Netdata Agent
+# Service Control
 
 The Netdata Agent automatically starts at boot after installation.
 
-> In most cases, you need to **restart the Netdata service** to apply changes to configuration files. [Health configuration](/docs/netdata-agent/reload-health-configuration.md) files, which define alerts, are an exception. They can be reloaded **without restarting** by using the `netdatacli` tool.
+> In most cases, you need to **restart the Netdata service** to apply changes to configuration files. [Health configuration](#reload-health) files, which define alerts, are an exception. They can be reloaded **without restarting** by using the `netdatacli` tool.
 >
 > Restarting the Netdata Agent will cause temporary gaps in your collected metrics. This occurs while the netdata process reinitializes its data collectors and database engine.
 
@@ -32,6 +32,14 @@ The Netdata Agent also comes with a [CLI tool](/src/cli/README.md) capable of pe
 
 ```bash
 sudo netdatacli shutdown-agent
+```
+
+### Reload health
+
+No need to restart the Netdata Agent after modifying health configuration files (alerts). Use `netdatacli` to avoid metric collection gaps.
+
+```bash
+sudo netdatacli reload-health
 ```
 
 ## Windows systems
