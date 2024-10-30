@@ -33,7 +33,7 @@ modules:
           -  `arcconf GETCONFIG 1 PD`
         method_description: ""
       supported_platforms:
-        include: []
+        include: [Linux, BSD]
         exclude: []
       multi_instance: false
       additional_permissions:

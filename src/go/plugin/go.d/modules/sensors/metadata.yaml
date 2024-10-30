@@ -43,7 +43,7 @@ modules:
           - Intrusion
         method_description: ""
       supported_platforms:
-        include: []
+        include: [Linux]
         exclude: []
       multi_instance: false
       additional_permissions:

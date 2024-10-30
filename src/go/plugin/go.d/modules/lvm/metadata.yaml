@@ -28,7 +28,7 @@ modules:
           This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
         method_description: ""
       supported_platforms:
-        include: []
+        include: [Linux, NetBSD]
         exclude: []
       multi_instance: false
       additional_permissions:

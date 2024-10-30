@@ -33,7 +33,7 @@ modules:
           -  `storcli /cALL/eALL/sALL show all J nolog`
         method_description: ""
       supported_platforms:
-        include: []
+        include: [Linux, BSD]
         exclude: []
       multi_instance: false
       additional_permissions:

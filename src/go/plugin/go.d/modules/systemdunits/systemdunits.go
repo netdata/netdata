@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //go:build linux
-// +build linux
 
 package systemdunits
 
