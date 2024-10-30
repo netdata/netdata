@@ -30,7 +30,7 @@ The following table contains all possible installation types:
 | custom             | Anything not covered by the other identifiers, including manual builds, manually running netdata-installer.sh, and third-party packages (community).        |
 | Unknown            | Same as custom.                                                                                                                                             |
 
-If you are using an older version of Netdata, or the above command produces no output, you can run our one-line installation script in dry-run mode to attempt to determine what method to use to update by running the following command:
+If you're using an older Netdata version or the above command doesn't output anything, try our one-line installation script in dry-run mode. Run the following command to determine the appropriate update method:
 
 ```bash
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --dry-run
@@ -47,7 +47,7 @@ Otherwise, it should either indicate that the installation type is not supported
 ## UNIX
 
 In most cases, you can update Netdata using our one-line kickstart script. This script will automatically
-run the update script that was installed as part of the initial install and preserve the existing install options you specified.
+run the update script installed as part of the initial install and preserve the existing install options you specified.
 
 If you installed Netdata using an installation prefix, you will need to add an `--install-prefix` option specifying that prefix to this command to make sure it finds Netdata.
 
@@ -103,12 +103,11 @@ This configuration file can be edited using our [`edit-config` script](/docs/net
 
 The following configuration options are currently supported:
 
-- `NETDATA_UPDATER_JITTER`: Sets an upper limit in seconds on the random delay in the updater script when running as a scheduled task. This random delay helps avoid issues resulting from too many nodes trying to reconnect to the Cloud at the same time. The default value is 3600, which corresponds to one hour. Most users should not ever need to change this.
-- `NETDATA_MAJOR_VERSION_UPDATES`: If set to a value other than 0, then new major versions will be installed  without user confirmation. Must be set to a  non-zero value for automated updates to install new major versions.
-- `NETDATA_NO_SYSTEMD_JOURNAL`: If set to a value other than 0, skip attempting to install the  `netdata-plugin-systemd-journal` package on supported systems on update. This optional package will be installed by default on supported systems by the updater if this option is not set. Only affects systems using native packages.
+- `NETDATA_UPDATER_JITTER`: Sets an upper limit in seconds on the random delay in the updater script when running as a scheduled task. This random delay helps avoid issues resulting from too many nodes trying to reconnect to the Cloud at the same time. The default value is 3600, which corresponds to one hour. Most users shouldn’t ever need to change this.
+- `NETDATA_MAJOR_VERSION_UPDATES`: If set to a value other than 0, then new major versions will be installed without user confirmation. Must be set to a non-zero value for automated updates to install new major versions.
+- `NETDATA_NO_SYSTEMD_JOURNAL`: If set to a value other than 0, skip attempting to install the  `netdata-plugin-systemd-journal` package on supported systems on update. The updater will install this optional package by default on supported systems if this option is not set. It only affects systems using native packages.
 
 ### Updates on hosts without IPv4 connectivity
 
-The update process outlined above suffers from the same issues that installing on hosts without IPv4
-connectivity does, and requires similar workarounds. For more details check [the explanation in our install
-documentation](/packaging/installer/README.md#installs-on-hosts-without-ipv4-connectivity).
+The update process outlined above suffers from the same issues that installing on hosts without IPv4 connectivity does, and requires similar workarounds.
+For more details, check [the explanation in our install documentation](/packaging/installer/README.md#installs-on-hosts-without-ipv4-connectivity).
