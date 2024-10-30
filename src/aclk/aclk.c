@@ -171,7 +171,6 @@ biofailed:
  */
 static int wait_till_agent_claimed(void)
 {
-    //TODO prevent malloc and freez
     ND_UUID uuid = claim_id_get_uuid();
     while (likely(UUIDiszero(uuid))) {
         sleep_usec(USEC_PER_SEC * 1);
@@ -202,7 +201,7 @@ static int wait_till_agent_claim_ready()
         // We trap the impossible NULL here to keep the linter happy without using a fatal() in the code.
         const char *cloud_base_url = cloud_config_url_get();
         if (cloud_base_url == NULL) {
-            netdata_log_error("Do not move the cloud base url out of post_conf_load!!");
+            netdata_log_error("Do not move the \"url\" out of post_conf_load!!");
             return 1;
         }
 
@@ -210,7 +209,7 @@ static int wait_till_agent_claim_ready()
         // TODO make it without malloc/free
         memset(&url, 0, sizeof(url_t));
         if (url_parse(cloud_base_url, &url)) {
-            netdata_log_error("Agent is claimed but the URL in configuration key \"cloud base url\" is invalid, please fix");
+            netdata_log_error("Agent is claimed but the URL in configuration key \"url\" is invalid, please fix");
             url_t_destroy(&url);
             sleep(5);
             continue;
@@ -560,7 +559,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
     while (service_running(SERVICE_ACLK)) {
         aclk_cloud_base_url = cloud_config_url_get();
         if (aclk_cloud_base_url == NULL) {
-            error_report("Do not move the cloud base url out of post_conf_load!!");
+            error_report("Do not move the \"url\" out of post_conf_load!!");
             aclk_status = ACLK_STATUS_NO_CLOUD_URL;
             return -1;
         }
