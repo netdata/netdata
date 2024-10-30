@@ -2075,6 +2075,6 @@ void dbengine_event_loop(void* arg) {
     }
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
-    uv_loop_close(&main->loop);
+    (void) uv_loop_close(&main->loop);
     worker_unregister();
 }
