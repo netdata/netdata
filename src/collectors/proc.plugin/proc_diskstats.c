@@ -1403,7 +1403,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 SIMPLE_PATTERN_EXACT, true);
 
         rrd_function_add_inline(localhost, NULL, "block-devices", 10,
-                                RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_DISKSTATS_HELP,
+                                RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
+                                RRDFUNCTIONS_DISKSTATS_HELP,
                                 "top", HTTP_ACCESS_ANONYMOUS_DATA,
                                 diskstats_function_block_devices);
     }

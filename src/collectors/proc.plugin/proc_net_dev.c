@@ -1701,7 +1701,8 @@ void *netdev_main(void *ptr_is_null __maybe_unused)
         virtual_device_collect_delay_secs = 300;
 
     rrd_function_add_inline(localhost, NULL, "network-interfaces", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_NETDEV_HELP,
+                            RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
+                            RRDFUNCTIONS_NETDEV_HELP,
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
                             netdev_function_net_interfaces);
 

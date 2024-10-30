@@ -1405,12 +1405,14 @@ void *cgroups_main(void *ptr) {
     cgroup_netdev_link_init();
 
     rrd_function_add_inline(localhost, NULL, "containers-vms", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT / 2, RRDFUNCTIONS_CGTOP_HELP,
+                            RRDFUNCTIONS_PRIORITY_DEFAULT / 2, RRDFUNCTIONS_VERSION_DEFAULT,
+                            RRDFUNCTIONS_CGTOP_HELP,
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
                             cgroup_function_cgroup_top);
 
     rrd_function_add_inline(localhost, NULL, "systemd-services", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT / 3, RRDFUNCTIONS_SYSTEMD_SERVICES_HELP,
+                            RRDFUNCTIONS_PRIORITY_DEFAULT / 3, RRDFUNCTIONS_VERSION_DEFAULT,
+                            RRDFUNCTIONS_SYSTEMD_SERVICES_HELP,
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
                             cgroup_function_systemd_top);
 

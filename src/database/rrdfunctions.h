@@ -7,6 +7,7 @@
 #include "libnetdata/libnetdata.h"
 
 #define RRDFUNCTIONS_PRIORITY_DEFAULT 100
+#define RRDFUNCTIONS_VERSION_DEFAULT 0
 #define RRDFUNCTIONS_TAG_HIDDEN "hidden"
 
 #define RRDFUNCTIONS_TIMEOUT_EXTENSION_UT (1 * USEC_PER_SEC)
@@ -67,7 +68,7 @@ void rrd_functions_host_init(RRDHOST *host);
 void rrd_functions_host_destroy(RRDHOST *host);
 
 // add a function, to be run from the collector
-void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, const char *help, const char *tags,
+void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version, const char *help, const char *tags,
                       HTTP_ACCESS access, bool sync, rrd_function_execute_cb_t execute_cb,
                       void *execute_cb_data);
 
