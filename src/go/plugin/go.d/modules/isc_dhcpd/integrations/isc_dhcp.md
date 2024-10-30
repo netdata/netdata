@@ -26,7 +26,10 @@ This collector monitors ISC DHCP lease usage by reading the DHCP client lease da
 
 
 
-This collector is supported on all platforms.
+This collector is only supported on the following platforms:
+
+- Linux
+- BSD
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
