@@ -2,7 +2,7 @@
 
 The Netdata Agent automatically starts at boot after installation.
 
-> In most cases, you need to **restart the Netdata service** to apply changes to configuration files. [Health configuration](#reload-health) files, which define alerts, are an exception. They can be reloaded **without restarting** by using the `netdatacli` tool.
+> In most cases, you need to **restart the Netdata service** to apply changes to configuration files. Health configuration files, which define alerts, are an exception. They can be [reloaded](#reload-health) **without restarting**.
 >
 > Restarting the Netdata Agent will cause temporary gaps in your collected metrics. This occurs while the netdata process reinitializes its data collectors and database engine.
 
