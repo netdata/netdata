@@ -26,7 +26,9 @@ This collector monitors number of sessions and users as reported by the `org.fre
 
 
 
-This collector is supported on all platforms.
+This collector is only supported on the following platforms:
+
+- Linux
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 

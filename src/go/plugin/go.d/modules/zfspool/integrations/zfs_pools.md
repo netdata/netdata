@@ -26,7 +26,10 @@ This collector monitors the health and space usage of ZFS pools using the comman
 
 
 
-This collector is supported on all platforms.
+This collector is only supported on the following platforms:
+
+- Linux
+- BSD
 
 This collector only supports collecting metrics from a single instance of this integration.
 
