@@ -240,7 +240,7 @@ static void netdata_claim_write_config(char *path)
 {
 #define NETDATA_MIN_CLOUD_LENGTH 135
 #define NETDATA_MIN_ROOM_LENGTH 36
-    if (strlen(aToken) != NETDATA_MIN_CLOUD_LENGTH && strlen(aRoom) < NETDATA_MIN_ROOM_LENGTH)
+    if (strlen(aToken) != NETDATA_MIN_CLOUD_LENGTH || strlen(aRoom) < NETDATA_MIN_ROOM_LENGTH)
         return;
 
     char configPath[WINDOWS_MAX_PATH + 1];
