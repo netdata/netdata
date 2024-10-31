@@ -18,13 +18,13 @@ void search_pattern_cleanup(SEARCH_PATTERN *sp) {
         sp->match_data = NULL;
     }
 
-    txt_cleanup(&sp->error);
+    txt_l2j_cleanup(&sp->error);
 }
 
 static void pcre2_error_message(SEARCH_PATTERN *sp, int rc, int pos) {
     char msg[1024];
     pcre2_get_error_in_buffer(msg, sizeof(msg), rc, pos);
-    txt_replace(&sp->error, msg, strlen(msg));
+    txt_l2j_set(&sp->error, msg, strlen(msg));
 }
 
 static inline bool compile_pcre2(SEARCH_PATTERN *sp) {

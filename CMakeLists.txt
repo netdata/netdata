@@ -2557,13 +2557,16 @@ if(PCRE2_FOUND)
                 src/collectors/log2journal/log2journal-replace.c
                 src/collectors/log2journal/log2journal-rename.c
                 src/collectors/log2journal/log2journal-rewrite.c
+                src/collectors/log2journal/log2journal-txt.h
+                src/collectors/log2journal/log2journal-hashed-key.h
         )
 
         add_executable(log2journal ${LOG2JOURNAL_FILES})
         target_include_directories(log2journal BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src ${PCRE2_INCLUDE_DIRS})
         target_compile_options(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
-        target_link_libraries(log2journal PUBLIC "${PCRE2_LDFLAGS}")
 
+        target_link_libraries(log2journal PUBLIC libnetdata)
+        target_link_libraries(log2journal PUBLIC "${PCRE2_LDFLAGS}")
         netdata_add_libyaml_to_target(log2journal)
 
         install(TARGETS log2journal

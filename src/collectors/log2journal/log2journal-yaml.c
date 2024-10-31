@@ -398,7 +398,8 @@ static size_t yaml_parse_unmatched(yaml_parser_t *parser, LOG_JOB *jb) {
                         errors++;
                     } else {
                         if (sub_event.type == YAML_SCALAR_EVENT) {
-                            hashed_key_len_set(&jb->unmatched.key, (char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
+                            hashed_key_set(
+                                &jb->unmatched.key, (char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                         } else {
                             yaml_error(parser, &sub_event, "expected a scalar value for 'key'");
                             errors++;
@@ -663,7 +664,10 @@ static size_t yaml_parse_renames(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &value_event, "Expected scalar for rename new_key");
                                     errors++;
                                 } else {
-                                    hashed_key_len_set(&rn.new_key, (char *)value_event.data.scalar.value, value_event.data.scalar.length);
+                                    hashed_key_set(
+                                        &rn.new_key,
+                                        (char *)value_event.data.scalar.value,
+                                        value_event.data.scalar.length);
                                     yaml_event_delete(&value_event);
                                 }
                             } else if (yaml_scalar_matches(&sub_event, "old_key", strlen("old_key"))) {
@@ -673,7 +677,10 @@ static size_t yaml_parse_renames(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &value_event, "Expected scalar for rename old_key");
                                     errors++;
                                 } else {
-                                    hashed_key_len_set(&rn.old_key, (char *)value_event.data.scalar.value, value_event.data.scalar.length);
+                                    hashed_key_set(
+                                        &rn.old_key,
+                                        (char *)value_event.data.scalar.value,
+                                        value_event.data.scalar.length);
                                     yaml_event_delete(&value_event);
                                 }
                             } else {
@@ -826,13 +833,13 @@ cleanup:
 
 bool yaml_parse_file(const char *config_file_path, LOG_JOB *jb) {
     if(!config_file_path || !*config_file_path) {
-        log2stderr("yaml configuration filename cannot be empty.");
+        l2j_log("yaml configuration filename cannot be empty.");
         return false;
     }
 
     FILE *fp = fopen(config_file_path, "r");
     if (!fp) {
-        log2stderr("Error opening config file: %s", config_file_path);
+        l2j_log("Error opening config file: %s", config_file_path);
         return false;
     }
 
