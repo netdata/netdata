@@ -99,7 +99,7 @@ int do_debugfs_extfrag(int update_every, const char *name) {
             extrafrag->id = extrafrag->node_zone;
             fprintf(
                 stdout,
-                "CHART mem.fragmentation_index_%s '' 'Memory fragmentation index for each order' 'index' 'fragmentation' 'mem.node_zone_fragmentation_index' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
+                "CHART mem.fragmentation_index_%s '' 'Memory fragmentation index for each order' 'index' 'fragmentation' 'mem.numa_node_zone_fragmentation_index' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
                 extrafrag->node_zone,
                 NETDATA_CHART_PRIO_MEM_FRAGMENTATION,
                 update_every,
