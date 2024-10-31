@@ -6,7 +6,7 @@ CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 # shellcheck source=./win-build-dir.sh
 . "${REPO_ROOT}/packaging/windows/win-build-dir.sh"
 
-set -exu -o pipefail
+set -eu -o pipefail
 
 if [ -d "${build}" ]; then
 	rm -rf "${build}"

@@ -82,3 +82,24 @@ if ($LastExitcode -ne 0) {
         exit 1
     }
 }
+
+Write-Host "Installing WiX toolset"
+dotnet tool install wix
+
+if ($LastExitcode -ne 0) {
+    exit 1
+}
+
+Write-Host "Adding WiX extensions"
+
+wix extension -g add WixToolset.Util.wixext
+
+if ($LastExitcode -ne 0) {
+    exit 1
+}
+
+wix extension -g add WixToolset.UI.wixext
+
+if ($LastExitcode -ne 0) {
+    exit 1
+}

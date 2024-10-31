@@ -1,11 +1,7 @@
 #!/bin/bash
 
 if [ -n "${BUILD_DIR}" ]; then
-    if (echo "${BUILD_DIR}" | grep -q -E "^[A-Z]:\\\\"); then
-        build="$(echo "${BUILD_DIR}" | sed -e 's/\\/\//g' -e 's/^\([A-Z]\):\//\/\1\//' -)"
-    else
-        build="${BUILD_DIR}"
-    fi
+    build="$(cygpath -u "${BUILD_DIR}")"
 elif [ -n "${OSTYPE}" ]; then
     if [ -n "${MSYSTEM}" ]; then
         build="${REPO_ROOT}/build-${OSTYPE}-${MSYSTEM}"

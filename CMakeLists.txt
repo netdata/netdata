@@ -2468,7 +2468,7 @@ if(OS_WINDOWS)
         set(NETDATA_RES_FILES "packaging/windows/resources/netdata.rc")
         configure_file(packaging/windows/resources/netdata.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdata.manifest @ONLY)
 
-        configure_file(packaging/windows/netdata.wxs.in ${CMAKE_SOURCE_DIR}/packaging/windows/netdata.wxs @ONLY)
+        configure_file(packaging/windows/netdata.wxs.in netdata.wxs @ONLY)
 endif()
 
 add_executable(netdata

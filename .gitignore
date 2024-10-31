@@ -196,9 +196,5 @@ build/
 src/go/plugin/go.d/bin/
 src/go/plugin/go.d/vendor
 
-# ignore nsis installer
-packaging/utils/netdata-installer-x64.exe
-
 # ignore files used with msi installer
-packaging/utils/*.msi
-
+packaging/windows/*.msi
