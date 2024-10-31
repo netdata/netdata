@@ -33,7 +33,7 @@ if [ ! -f "/gpl-3.0.txt" ]; then
 fi
 
 if [ ! -f "/cloud.txt" ]; then
-    curl -o /cloud.txt "https://staging.netdata.cloud/LICENSE.txt"
+    curl -o /cloud.txt "https://app.netdata.cloud/LICENSE.txt"
 fi
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
