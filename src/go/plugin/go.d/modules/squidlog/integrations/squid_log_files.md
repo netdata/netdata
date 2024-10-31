@@ -113,7 +113,7 @@ sudo ./edit-config go.d/squidlog.conf
 ```
 #### Options
 
-Squid [log format codes](http://www.squid-cache.org/Doc/config/logformat/).
+Squid [log format codes](https://www.squid-cache.org/Doc/config/logformat/).
 
 Squidlog is aware how to parse and interpret the following codes:
 
