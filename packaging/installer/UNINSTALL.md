@@ -9,7 +9,7 @@
 
 Similarly with our documentation on updating Netdata, you need to [determine your installation type](/packaging/installer/UPDATE.md).
 
-**If your installation type indicates a native package, then proceed uninstalling Netdata using your package manager.**
+**If your installation type indicates a native package, then proceed to uninstall Netdata using your package manager.**
 
 The recommended way to uninstall Netdata is to use the same script you used for installation. Just add the `--uninstall` flag:
 
