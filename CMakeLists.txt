@@ -2469,6 +2469,7 @@ if(OS_WINDOWS)
         configure_file(packaging/windows/resources/netdata.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdata.manifest @ONLY)
 
         configure_file(packaging/windows/netdata.wxs.in netdata.wxs @ONLY)
+        configure_file(packaging/windows/NetdataWhite.ico NetdataWhite.ico COPYONLY)
 endif()
 
 add_executable(netdata
