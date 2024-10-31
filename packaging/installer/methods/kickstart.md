@@ -11,6 +11,18 @@ import TabItem from '@theme/TabItem';
 
 This script works on all Linux distributions and macOS environments, by detecting the optimal method of installing Netdata directly to the operating system.
 
+## What does `kickstart.sh` do?
+
+The `kickstart.sh` script does the following after being downloaded and run using `sh`:
+
+- Determines what platform you are running on.
+- Checks for an existing installation, and if found updates that instead of creating a new install.
+- Attempts to install Netdata using our [official native binary packages](/packaging/installer/methods/packages.md).
+- If there are no official native binary packages for your system (or installing that way failed), tries to install using a [static build of Netdata](/packaging/makeself/README.md) if one is available.
+- If no static build is available, installs required dependencies and then attempts to install by building Netdata locally (by downloading the sources and building them directly).
+- Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated with new nightly versions, unless you override that with an [optional parameter](#optional-parameters-to-alter-your-installation).
+- Prints a message whether installation succeeded or failed for QA purposes.
+
 ## Installation
 
 > **Tip**
@@ -36,18 +48,6 @@ To install Netdata, run the following as your normal user:
 >
 > If you plan to also connect the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
 > and `YOUR_ROOM_ID` with the ID of the Room you are willing to connect the node to.
-
-## What does `kickstart.sh` do?
-
-The `kickstart.sh` script does the following after being downloaded and run using `sh`:
-
-- Determines what platform you are running on.
-- Checks for an existing installation, and if found updates that instead of creating a new install.
-- Attempts to install Netdata using our [official native binary packages](/packaging/installer/methods/packages.md).
-- If there are no official native binary packages for your system (or installing that way failed), tries to install using a [static build of Netdata](/packaging/makeself/README.md) if one is available.
-- If no static build is available, installs required dependencies and then attempts to install by building Netdata locally (by downloading the sources and building them directly).
-- Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated with new nightly versions, unless you override that with an [optional parameter](#optional-parameters-to-alter-your-installation).
-- Prints a message whether installation succeeded or failed for QA purposes.
 
 ## Optional parameters to alter your installation
 
