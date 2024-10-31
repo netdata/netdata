@@ -43,7 +43,7 @@ comment on settings it does not currently use.
 
 ## Applying changes
 
-After `netdata.conf` has been modified, Netdata needs to be [restarted](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for
+After `netdata.conf` has been modified, Netdata needs to be [restarted](/docs/netdata-agent/start-stop-restart.md) for
 changes to apply:
 
 ```bash

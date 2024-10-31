@@ -37,8 +37,8 @@ configuring CockroachDB. Netdata only needs to regularly query the database's `_
 display them on the dashboard.
 
 If your CockroachDB instance is accessible through `http://localhost:8080/` or `http://127.0.0.1:8080`, your setup is
-complete. Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, and refresh your browser. You should see CockroachDB
+complete. Restart Netdata with `sudo systemctl restart netdata`, or the appropriate
+method for your system, and refresh your browser. You should see CockroachDB
 metrics in your Netdata dashboard!
 
 <figure>
