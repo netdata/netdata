@@ -60,23 +60,20 @@ static void extfrag_send_chart(char *chart_id, collected_number *values)
 }
 
 int do_debugfs_extfrag(int update_every, const char *name) {
-    static procfile *ff = NULL;
-    static int chart_order = NETDATA_CHART_PRIO_MEM_FRAGMENTATION;
+    static procfile *ff = NULL;;
 
     if (unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename,
-                  FILENAME_MAX,
-                  "%s%s",
-                  netdata_configured_host_prefix,
-                  "/sys/kernel/debug/extfrag/extfrag_index");
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/kernel/debug/extfrag/extfrag_index");
 
         ff = procfile_open(filename, " \t,", PROCFILE_FLAG_DEFAULT);
-        if (unlikely(!ff)) return 1;
+        if (unlikely(!ff))
+            return 1;
     }
 
     ff = procfile_readall(ff);
-    if (unlikely(!ff)) return 1;
+    if (unlikely(!ff))
+        return 1;
 
     size_t l, i, j, lines = procfile_lines(ff);
     for (l = 0; l < lines; l++) {
@@ -102,19 +99,21 @@ int do_debugfs_extfrag(int update_every, const char *name) {
             extrafrag->id = extrafrag->node_zone;
             fprintf(
                 stdout,
-                "CHART mem.fragmentation_index_%s '' 'Memory fragmentation index for each order' 'index' 'fragmentation' 'mem.fragmentation_index_%s' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
+                "CHART mem.fragmentation_index_%s '' 'Memory fragmentation index for each order' 'index' 'fragmentation' 'mem.node_zone_fragmentation_index' 'line' %d %d '' 'debugfs.plugin' '%s'\n",
                 extrafrag->node_zone,
-                zone_lowercase,
-                chart_order++, // FIXME: the same zones must have the same order
+                NETDATA_CHART_PRIO_MEM_FRAGMENTATION,
                 update_every,
                 name);
             for (i = 0; i < NETDATA_ORDER_FRAGMENTATION; i++) {
                 fprintf(stdout, "DIMENSION '%s' '%s' absolute 1 1000 ''\n", orders[i], orders[i]);
             }
-            fprintf(stdout,
-                    "CLABEL 'numa_node' 'node%s' 1\n"
-                    "CLABEL_COMMIT\n",
-                    id);
+            fprintf(
+                stdout,
+                "CLABEL 'numa_node' 'node%s' 1\n"
+                "CLABEL 'zone' '%s' 1\n"
+                "CLABEL_COMMIT\n",
+                id,
+                zone);
         }
         extfrag_send_chart(chart_id, line_orders);
     }
