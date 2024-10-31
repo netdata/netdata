@@ -7,6 +7,10 @@
 > This method assumes you installed Netdata using the `kickstart.sh` or `netdata-installer.sh` script.
 > If you used a different method, it might not work and could complicate the removal process.
 
+Similarly with our documentation on updating Netdata, you need to [determine your installation type](/packaging/installer/UPDATE.md).
+
+**If your installation type indicates a native package, then proceed to uninstall Netdata using your package manager.**
+
 The recommended way to uninstall Netdata is to use the same script you used for installation. Just add the `--uninstall` flag:
 
 ```bash
