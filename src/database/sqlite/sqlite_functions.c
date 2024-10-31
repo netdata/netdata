@@ -252,14 +252,16 @@ int db_execute(sqlite3 *db, const char *cmd)
     int cnt = 0;
 
     while (cnt < SQL_MAX_RETRY) {
-        char *err_msg;
+        char *err_msg = NULL;
         rc = sqlite3_exec_monitored(db, cmd, 0, 0, &err_msg);
         if (likely(rc == SQLITE_OK))
             break;
 
         ++cnt;
-        error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg, cnt);
-        sqlite3_free(err_msg);
+        error_report("Failed to execute '%s', rc = %d (%s) -- attempt %d", cmd, rc, err_msg ? err_msg : "unknown", cnt);
+        if (err_msg) {
+            sqlite3_free(err_msg);
+        }
 
         if (likely(rc == SQLITE_BUSY || rc == SQLITE_LOCKED)) {
             usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
