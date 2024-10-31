@@ -227,7 +227,7 @@ versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.or
 which helps securely encrypt SSL connections.
 
 We recommend you reinstall Netdata with
-a [static build](/packaging/installer/methods/kickstart.md#static-builds),
+a [static build](/packaging/makeself/README.md),
 which uses an up-to-date version of OpenSSL with hostname validation enabled.
 
 If you choose to continue using the outdated version of OpenSSL, your node will still connect to Netdata Cloud, albeit
