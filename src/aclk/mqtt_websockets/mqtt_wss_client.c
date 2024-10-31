@@ -781,6 +781,8 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     // Check user requested TO doesn't interfere with MQTT keep alives
     if (!ping_timeout) {
         int till_next_keep_alive = t_till_next_keepalive_ms(client);
+        if (till_next_keep_alive < 0)
+            till_next_keep_alive = 0;
         if (client->mqtt_connected && (timeout_ms < 0 || timeout_ms >= till_next_keep_alive)) {
             timeout_ms = till_next_keep_alive;
             send_keepalive = 1;
