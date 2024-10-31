@@ -26,7 +26,7 @@ for long-term storage, further analysis, or correlation with data from other sou
 
 #### 
 
-- To use MongoDB as an external storage for long-term archiving, you should first [install](http://mongoc.org/libmongoc/current/installing.html) libmongoc 1.7.0 or higher.
+- To use MongoDB as an external storage for long-term archiving, you should first [install](https://www.mongodb.com/docs/languages/c/c-driver/current/libmongoc/tutorials/obtaining-libraries/installing/#std-label-installing) libmongoc 1.7.0 or higher.
 - Next, re-install Netdata from the source, which detects that the required library is now available.
 
 
