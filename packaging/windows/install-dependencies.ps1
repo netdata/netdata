@@ -84,7 +84,7 @@ if ($LastExitcode -ne 0) {
 }
 
 Write-Host "Installing WiX toolset"
-dotnet tool install wix
+dotnet tool install -g wix
 
 if ($LastExitcode -ne 0) {
     exit 1
