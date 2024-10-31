@@ -31,7 +31,8 @@ static int find_all_nodes() {
 
     DIR *dir = opendir(dirname);
     if(!dir) {
-        collector_error("Cannot read NUMA node directory '%s'", dirname);
+        nd_log(
+            NDLS_COLLECTORS, errno == ENOENT ? NDLP_INFO : NDLP_ERR, "Cannot read NUMA node directory '%s'", dirname);
         return 0;
     }
 
