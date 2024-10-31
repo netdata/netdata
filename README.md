@@ -51,7 +51,7 @@ Netdata is built on three core parts:
 
    _While closed-source, it is free to use with both Netdata Agents and Netdata Cloud, via their public APIs. It is included in the binary packages offered by Netdata, and its latest version is publicly available via CDN._
 
-   <a href="https://github.com/netdata/netdata/blob/master/src/web/gui/v2/LICENSE.md"><img src="https://img.shields.io/badge/Netdata%20UI%20License%20-NCUL1-blue.svg" alt="Netdata UI License: NCUL1"></a>
+   <a href="https://app.netdata.cloud/LICENSE.txt"><img src="https://img.shields.io/badge/Netdata%20UI%20License%20-NCUL1-blue.svg" alt="Netdata UI License: NCUL1"></a>
 
 Netdata scales effortlessly from a single server to thousands, even in complex, multi-cloud or hybrid environments, with the ability to retain data for years.
 
@@ -814,6 +814,6 @@ The Netdata ecosystem consists of three key parts:
 
 - **Netdata Cloud**: A commercial, closed-source component, Netdata Cloud enhances the capabilities of the open-source Netdata Agent by providing horizontal scalability, centralized alert notification dispatch (including a mobile app), user management, role-based access control, and other enterprise-grade features. It is available both as a SaaS solution and for on-premises deployment, with a free-to-use community tier also offered.
 
-- **Netdata UI**: The Netdata UI is closed-source, and handles all visualization and dashboard functionalities related to metrics, logs and other collected data, as well as the central configuration and management of the Netdata ecosystem. It serves both the Netdata Agent and Netdata Cloud. The Netdata UI is distributed in binary form with the Netdata Agent and is publicly accessible via a CDN, licensed under the [Netdata Cloud UI License 1 (NCUL1)](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/LICENSE.md). It integrates third-party open-source components, detailed in the [Netdata UI third-party licenses](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/3D_PARTY_LICENSES.txt).
+- **Netdata UI**: The Netdata UI is closed-source, and handles all visualization and dashboard functionalities related to metrics, logs and other collected data, as well as the central configuration and management of the Netdata ecosystem. It serves both the Netdata Agent and Netdata Cloud. The Netdata UI is distributed in binary form with the Netdata Agent and is publicly accessible via a CDN, licensed under the [Netdata Cloud UI License 1 (NCUL1)](https://app.netdata.cloud/LICENSE.txt). It integrates third-party open-source components, detailed in the [Netdata UI third-party licenses](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/3D_PARTY_LICENSES.txt).
 
 The binary installation packages provided by Netdata include the Netdata Agent and the Netdata UI. Since the Netdata Agent is open-source, it is frequently packaged by third parties (e.g., Linux Distributions) excluding the closed-source components (Netdata UI is not included). While their packages can still be useful in providing the necessary back-ends and the APIs of a fully functional monitoring solution, we recommend using the installation packages we provide to experience the full feature set of Netdata.
