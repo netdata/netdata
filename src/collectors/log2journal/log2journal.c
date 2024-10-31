@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "log2journal.h"
+#include "libnetdata/required_dummies.h"
 
 // ----------------------------------------------------------------------------
 
@@ -73,10 +74,13 @@ static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
                 ht_key->flags |= HK_COLLISION_CHECKED;
 
                 if(strcmp(ht_key->key, k->key) != 0)
-                    log2stderr("Hashtable collision detected on key '%s' (hash %lx) and '%s' (hash %lx). "
-                               "Please file a bug report.", ht_key->key, (unsigned long) ht_key->hash, k->key
-                               , (unsigned long) k->hash
-                              );
+                    l2j_log(
+                        "Hashtable collision detected on key '%s' (hash %lx) and '%s' (hash %lx). "
+                        "Please file a bug report.",
+                        ht_key->key,
+                        (unsigned long)ht_key->hash,
+                        k->key,
+                        (unsigned long)k->hash);
             }
         }
         else {
@@ -97,8 +101,9 @@ static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
 
 static inline HASHED_KEY *get_key_from_hashtable_with_char_ptr(LOG_JOB *jb, const char *key) {
     HASHED_KEY find = {
-            .key = key,
-            .len = strlen(key),
+        .flags = HK_NONE,
+        .key = key,
+        .len = strlen(key),
     };
     find.hash = XXH3_64bits(key, find.len);
 
@@ -109,24 +114,29 @@ static inline HASHED_KEY *get_key_from_hashtable_with_char_ptr(LOG_JOB *jb, cons
 
 static inline void validate_key(LOG_JOB *jb __maybe_unused, HASHED_KEY *k) {
     if(k->len > JOURNAL_MAX_KEY_LEN)
-        log2stderr("WARNING: key '%s' has length %zu, which is more than %zu, the max systemd-journal allows",
-                k->key, (size_t)k->len, (size_t)JOURNAL_MAX_KEY_LEN);
+        l2j_log(
+            "WARNING: key '%s' has length %zu, which is more than %zu, the max systemd-journal allows",
+            k->key,
+            (size_t)k->len,
+            (size_t)JOURNAL_MAX_KEY_LEN);
 
     for(size_t i = 0; i < k->len ;i++) {
         char c = k->key[i];
 
         if((c < 'A' || c > 'Z') && !isdigit(c) && c != '_') {
-            log2stderr("WARNING: key '%s' contains characters that are not allowed by systemd-journal.", k->key);
+            l2j_log("WARNING: key '%s' contains characters that are not allowed by systemd-journal.", k->key);
             break;
         }
     }
 
     if(isdigit(k->key[0]))
-        log2stderr("WARNING: key '%s' starts with a digit and may not be accepted by systemd-journal.", k->key);
+        l2j_log("WARNING: key '%s' starts with a digit and may not be accepted by systemd-journal.", k->key);
 
     if(k->key[0] == '_')
-        log2stderr("WARNING: key '%s' starts with an underscore, which makes it a systemd-journal trusted field. "
-                   "Such fields are accepted by systemd-journal-remote, but not by systemd-journald.", k->key);
+        l2j_log(
+            "WARNING: key '%s' starts with an underscore, which makes it a systemd-journal trusted field. "
+            "Such fields are accepted by systemd-journal-remote, but not by systemd-journald.",
+            k->key);
 }
 
 // ----------------------------------------------------------------------------
@@ -170,16 +180,16 @@ static inline void replace_evaluate(LOG_JOB *jb, HASHED_KEY *k, REPLACE_PATTERN 
     for(REPLACE_NODE *node = rp->nodes; node != NULL; node = node->next) {
         if(node->is_variable) {
             if(hashed_keys_match(&node->name, &jb->line.key))
-                txt_expand_and_append(&ht_key->value, jb->line.trimmed, jb->line.trimmed_len);
+                txt_l2j_append(&ht_key->value, jb->line.trimmed, jb->line.trimmed_len);
 
             else {
                 HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
                 if(ktmp->value.len)
-                    txt_expand_and_append(&ht_key->value, ktmp->value.txt, ktmp->value.len);
+                    txt_l2j_append(&ht_key->value, ktmp->value.txt, ktmp->value.len);
             }
         }
         else
-            txt_expand_and_append(&ht_key->value, node->name.key, node->name.len);
+            txt_l2j_append(&ht_key->value, node->name.key, node->name.len);
     }
 }
 
@@ -202,26 +212,26 @@ static inline void replace_evaluate_from_pcre2(LOG_JOB *jb, HASHED_KEY *k, REPLA
                 PCRE2_SIZE end_offset = ovector[2 * group_number + 1];
                 PCRE2_SIZE length = end_offset - start_offset;
 
-                txt_expand_and_append(&jb->rewrites.tmp, k->value.txt + start_offset, length);
+                txt_l2j_append(&jb->rewrites.tmp, k->value.txt + start_offset, length);
             }
             else {
                 if(hashed_keys_match(&node->name, &jb->line.key))
-                    txt_expand_and_append(&jb->rewrites.tmp, jb->line.trimmed, jb->line.trimmed_len);
+                    txt_l2j_append(&jb->rewrites.tmp, jb->line.trimmed, jb->line.trimmed_len);
 
                 else {
                     HASHED_KEY *ktmp = get_key_from_hashtable_with_char_ptr(jb, node->name.key);
                     if(ktmp->value.len)
-                        txt_expand_and_append(&jb->rewrites.tmp, ktmp->value.txt, ktmp->value.len);
+                        txt_l2j_append(&jb->rewrites.tmp, ktmp->value.txt, ktmp->value.len);
                 }
             }
         }
         else {
-            txt_expand_and_append(&jb->rewrites.tmp, node->name.key, node->name.len);
+            txt_l2j_append(&jb->rewrites.tmp, node->name.key, node->name.len);
         }
     }
 
     // swap the values of the temporary TEXT and the key value
-    TEXT tmp = k->value;
+    TXT_L2J tmp = k->value;
     k->value = jb->rewrites.tmp;
     jb->rewrites.tmp = tmp;
 }
@@ -271,7 +281,7 @@ static inline HASHED_KEY *rename_key(LOG_JOB *jb, HASHED_KEY *k) {
 static inline void send_key_value_constant(LOG_JOB *jb __maybe_unused, HASHED_KEY *key, const char *value, size_t len) {
     HASHED_KEY *ht_key = get_key_from_hashtable(jb, key);
 
-    txt_replace(&ht_key->value, value, len);
+    txt_l2j_set(&ht_key->value, value, len);
     ht_key->flags |= HK_VALUE_FROM_LOG;
 
     //    fprintf(stderr, "SET %s=%.*s\n", ht_key->key, (int)ht_key->value.len, ht_key->value.txt);
@@ -292,7 +302,7 @@ static inline void send_key_value_error(LOG_JOB *jb, HASHED_KEY *key, const char
 inline void log_job_send_extracted_key_value(LOG_JOB *jb, const char *key, const char *value, size_t len) {
     HASHED_KEY *ht_key = get_key_from_hashtable_with_char_ptr(jb, key);
     HASHED_KEY *nk = rename_key(jb, ht_key);
-    txt_replace(&nk->value, value, len);
+    txt_l2j_set(&nk->value, value, len);
     ht_key->flags |= HK_VALUE_FROM_LOG;
 
 //    fprintf(stderr, "SET %s=%.*s\n", ht_key->key, (int)ht_key->value.len, ht_key->value.txt);
@@ -417,7 +427,7 @@ static inline bool jb_switched_filename(LOG_JOB *jb, const char *line, size_t le
         const char *end = strstr(line, " <==");
         while (*start == ' ') start++;
         if (*start != '\n' && *start != '\0' && end) {
-            txt_replace(&jb->filename.current, start, end - start);
+            txt_l2j_set(&jb->filename.current, start, end - start);
             return true;
         }
     }
@@ -486,7 +496,7 @@ int log_job_run(LOG_JOB *jb) {
     else if(strcmp(jb->pattern, "none") != 0) {
         pcre2 = pcre2_parser_create(jb);
         if(pcre2_has_error(pcre2)) {
-            log2stderr("%s", pcre2_parser_error(pcre2));
+            l2j_log("%s", pcre2_parser_error(pcre2));
             pcre2_parser_destroy(pcre2);
             return 1;
         }
@@ -515,11 +525,11 @@ int log_job_run(LOG_JOB *jb) {
 
         if(!line_is_matched) {
             if(json)
-                log2stderr("%s", json_parser_error(json));
+                l2j_log("%s", json_parser_error(json));
             else if(logfmt)
-                log2stderr("%s", logfmt_parser_error(logfmt));
+                l2j_log("%s", logfmt_parser_error(logfmt));
             else if(pcre2)
-                log2stderr("%s", pcre2_parser_error(pcre2));
+                l2j_log("%s", pcre2_parser_error(pcre2));
 
             if(!jb_send_unmatched_line(jb, line))
                 // just logging to stderr, not sending unmatched lines

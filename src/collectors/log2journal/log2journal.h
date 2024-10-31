@@ -3,49 +3,16 @@
 #ifndef NETDATA_LOG2JOURNAL_H
 #define NETDATA_LOG2JOURNAL_H
 
-// only for PACKAGE_VERSION
-#include <config.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <dirent.h>
-#include <string.h>
-#include <stdbool.h>
-#include <string.h>
-#include <ctype.h>
-#include <math.h>
-#include <stdarg.h>
-#include <assert.h>
-
-// ----------------------------------------------------------------------------
-// compatibility
-
-#ifndef HAVE_STRNDUP
-// strndup() is not available on Windows
-static inline char *os_strndup( const char *s1, size_t n)
-{
-    char *copy= (char*)malloc( n+1 );
-    memcpy( copy, s1, n );
-    copy[n] = 0;
-    return copy;
-};
-#define strndup(s, n) os_strndup(s, n)
-#endif
-
-#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF)
-#define PRINTFLIKE(f, a) __attribute__ ((format(gnu_printf, f, a)))
-#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF)
-#define PRINTFLIKE(f, a) __attribute__ ((format(printf, f, a)))
-#else
-#define PRINTFLIKE(f, a)
-#endif
+#include "libnetdata/libnetdata.h"
+#include "log2journal-txt.h"
+#include "log2journal-hashed-key.h"
 
 // ----------------------------------------------------------------------------
 // logging
 
 // enable the compiler to check for printf like errors on our log2stderr() function
-static inline void log2stderr(const char *format, ...) PRINTFLIKE(1, 2);
-static inline void log2stderr(const char *format, ...) {
+static inline void l2j_log(const char *format, ...) PRINTFLIKE(1, 2);
+static inline void l2j_log(const char *format, ...) {
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -54,62 +21,6 @@ static inline void log2stderr(const char *format, ...) {
 }
 
 // ----------------------------------------------------------------------------
-// allocation functions abstraction
-
-static inline void *mallocz(size_t size) {
-    void *ptr = malloc(size);
-    if (!ptr) {
-        log2stderr("Fatal Error: Memory allocation failed. Requested size: %zu bytes.", size);
-        exit(EXIT_FAILURE);
-    }
-    return ptr;
-}
-
-static inline void *callocz(size_t elements, size_t size) {
-    void *ptr = calloc(elements, size);
-    if (!ptr) {
-        log2stderr("Fatal Error: Memory allocation failed. Requested size: %zu bytes.", elements * size);
-        exit(EXIT_FAILURE);
-    }
-    return ptr;
-}
-
-static inline void *reallocz(void *ptr, size_t size) {
-    void *new_ptr = realloc(ptr, size);
-    if (!new_ptr) {
-        log2stderr("Fatal Error: Memory reallocation failed. Requested size: %zu bytes.", size);
-        exit(EXIT_FAILURE);
-    }
-    return new_ptr;
-}
-
-static inline char *strdupz(const char *s) {
-    char *ptr = strdup(s);
-    if (!ptr) {
-        log2stderr("Fatal Error: Memory allocation failed in strdup.");
-        exit(EXIT_FAILURE);
-    }
-    return ptr;
-}
-
-static inline char *strndupz(const char *s, size_t n) {
-    char *ptr = strndup(s, n);
-    if (!ptr) {
-        log2stderr("Fatal Error: Memory allocation failed in strndup. Requested size: %zu bytes.", n);
-        exit(EXIT_FAILURE);
-    }
-    return ptr;
-}
-
-static inline void freez(void *ptr) {
-    if (ptr)
-        free(ptr);
-}
-
-// ----------------------------------------------------------------------------
-
-#define XXH_INLINE_ALL
-#include "libnetdata/xxHash/xxhash.h"
 
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
@@ -121,13 +32,10 @@ static inline void freez(void *ptr) {
 // ----------------------------------------------------------------------------
 // hashtable for HASHED_KEY
 
-// cleanup hashtable defines
-#include "libnetdata/simple_hashtable/simple_hashtable_undef.h"
-
 struct hashed_key;
 static inline int compare_keys(struct hashed_key *k1, struct hashed_key *k2);
 #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_keys
-#define SIMPLE_HASHTABLE_VALUE_TYPE struct hashed_key
+#define SIMPLE_HASHTABLE_VALUE_TYPE HASHED_KEY
 #define SIMPLE_HASHTABLE_NAME _KEY
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 
@@ -173,152 +81,12 @@ static inline size_t copy_to_buffer(char *dst, size_t dst_size, const char *src,
 }
 
 // ----------------------------------------------------------------------------
-// A dynamically sized, reusable text buffer,
-// allowing us to be fast (no allocations during iterations) while having the
-// smallest possible allocations.
-
-typedef struct txt {
-    char *txt;
-    uint32_t size;
-    uint32_t len;
-} TEXT;
-
-static inline void txt_cleanup(TEXT *t) {
-    if(!t)
-        return;
-
-    if(t->txt)
-        freez(t->txt);
-
-    t->txt = NULL;
-    t->size = 0;
-    t->len = 0;
-}
-
-static inline void txt_replace(TEXT *t, const char *s, size_t len) {
-    if(!s || !*s || len == 0) {
-        s = "";
-        len = 0;
-    }
-
-    if(len + 1 <= t->size) {
-        // the existing value allocation, fits our value
-
-        memcpy(t->txt, s, len);
-        t->txt[len] = '\0';
-        t->len = len;
-    }
-    else {
-        // no existing value allocation, or too small for our value
-        // cleanup and increase the buffer
-
-        txt_cleanup(t);
-
-        t->txt = strndupz(s, len);
-        t->size = len + 1;
-        t->len = len;
-    }
-}
-
-static inline void txt_expand_and_append(TEXT *t, const char *s, size_t len) {
-    if(len + 1 > (t->size - t->len)) {
-        size_t new_size = t->len + len + 1;
-        if(new_size < t->size * 2)
-            new_size = t->size * 2;
-
-        t->txt = reallocz(t->txt, new_size);
-        t->size = new_size;
-    }
-
-    char *copy_to = &t->txt[t->len];
-    memcpy(copy_to, s, len);
-    copy_to[len] = '\0';
-    t->len += len;
-}
-
-// ----------------------------------------------------------------------------
-
-typedef enum __attribute__((__packed__)) {
-    HK_NONE                 = 0,
-
-    // permanent flags - they are set once to optimize various decisions and lookups
-
-    HK_HASHTABLE_ALLOCATED  = (1 << 0), // this is key object allocated in the hashtable
-                                        // objects that do not have this, have a pointer to a key in the hashtable
-                                        // objects that have this, value is allocated
-
-    HK_FILTERED             = (1 << 1), // we checked once if this key in filtered
-    HK_FILTERED_INCLUDED    = (1 << 2), // the result of the filtering was to include it in the output
-
-    HK_COLLISION_CHECKED    = (1 << 3), // we checked once for collision check of this key
-
-    HK_RENAMES_CHECKED      = (1 << 4), // we checked once if there are renames on this key
-    HK_HAS_RENAMES          = (1 << 5), // and we found there is a rename rule related to it
-
-    // ephemeral flags - they are unset at the end of each log line
-
-    HK_VALUE_FROM_LOG       = (1 << 14), // the value of this key has been read from the log (or from injection, duplication)
-    HK_VALUE_REWRITTEN      = (1 << 15), // the value of this key has been rewritten due to one of our rewrite rules
-
-} HASHED_KEY_FLAGS;
-
-typedef struct hashed_key {
-    const char *key;
-    uint32_t len;
-    HASHED_KEY_FLAGS flags;
-    XXH64_hash_t hash;
-    union {
-        struct hashed_key *hashtable_ptr; // HK_HASHTABLE_ALLOCATED is not set
-        TEXT value;                       // HK_HASHTABLE_ALLOCATED is set
-    };
-} HASHED_KEY;
-
-static inline void hashed_key_cleanup(HASHED_KEY *k) {
-    if(k->flags & HK_HASHTABLE_ALLOCATED)
-        txt_cleanup(&k->value);
-    else
-        k->hashtable_ptr = NULL;
-
-    freez((void *)k->key);
-    k->key = NULL;
-    k->len = 0;
-    k->hash = 0;
-    k->flags = HK_NONE;
-}
-
-static inline void hashed_key_set(HASHED_KEY *k, const char *name) {
-    hashed_key_cleanup(k);
-
-    k->key = strdupz(name);
-    k->len = strlen(k->key);
-    k->hash = XXH3_64bits(k->key, k->len);
-    k->flags = HK_NONE;
-}
-
-static inline void hashed_key_len_set(HASHED_KEY *k, const char *name, size_t len) {
-    hashed_key_cleanup(k);
-
-    k->key = strndupz(name, len);
-    k->len = len;
-    k->hash = XXH3_64bits(k->key, k->len);
-    k->flags = HK_NONE;
-}
-
-static inline bool hashed_keys_match(HASHED_KEY *k1, HASHED_KEY *k2) {
-    return ((k1 == k2) || (k1->hash == k2->hash && strcmp(k1->key, k2->key) == 0));
-}
-
-static inline int compare_keys(struct hashed_key *k1, struct hashed_key *k2) {
-    return strcmp(k1->key, k2->key);
-}
-
-// ----------------------------------------------------------------------------
 
 typedef struct search_pattern {
     const char *pattern;
     pcre2_code *re;
     pcre2_match_data *match_data;
-    TEXT error;
+    TXT_L2J error;
 } SEARCH_PATTERN;
 
 void search_pattern_cleanup(SEARCH_PATTERN *sp);
@@ -417,7 +185,7 @@ typedef struct log_job {
     struct {
         bool last_line_was_empty;
         HASHED_KEY key;
-        TEXT current;
+        TXT_L2J current;
     } filename;
 
     struct {
@@ -436,7 +204,7 @@ typedef struct log_job {
     struct {
         uint32_t used;
         REWRITE array[MAX_REWRITES];
-        TEXT tmp;
+        TXT_L2J tmp;
     } rewrites;
 
     struct {

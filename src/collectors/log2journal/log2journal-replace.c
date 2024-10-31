@@ -26,7 +26,7 @@ static REPLACE_NODE *replace_pattern_add_node(REPLACE_NODE **head, bool is_varia
     if (!new_node)
         return NULL;
 
-    hashed_key_set(&new_node->name, text);
+    hashed_key_set(&new_node->name, text, -1);
     new_node->is_variable = is_variable;
     new_node->next = NULL;
 
@@ -57,21 +57,21 @@ bool replace_pattern_set(REPLACE_PATTERN *rp, const char *pattern) {
             // Start of a variable
             const char *end = strchr(current, '}');
             if (!end) {
-                log2stderr("Error: Missing closing brace in replacement pattern: %s", rp->pattern);
+                l2j_log("Error: Missing closing brace in replacement pattern: %s", rp->pattern);
                 return false;
             }
 
             size_t name_length = end - current - 2; // Length of the variable name
             char *variable_name = strndupz(current + 2, name_length);
             if (!variable_name) {
-                log2stderr("Error: Memory allocation failed for variable name.");
+                l2j_log("Error: Memory allocation failed for variable name.");
                 return false;
             }
 
             REPLACE_NODE *node = replace_pattern_add_node(&(rp->nodes), true, variable_name);
             if (!node) {
                 freez(variable_name);
-                log2stderr("Error: Failed to add replacement node for variable.");
+                l2j_log("Error: Failed to add replacement node for variable.");
                 return false;
             }
             freez(variable_name);
@@ -88,14 +88,14 @@ bool replace_pattern_set(REPLACE_PATTERN *rp, const char *pattern) {
             size_t text_length = current - start;
             char *text = strndupz(start, text_length);
             if (!text) {
-                log2stderr("Error: Memory allocation failed for literal text.");
+                l2j_log("Error: Memory allocation failed for literal text.");
                 return false;
             }
 
             REPLACE_NODE *node = replace_pattern_add_node(&(rp->nodes), false, text);
             if (!node) {
                 freez(text);
-                log2stderr("Error: Failed to add replacement node for text.");
+                l2j_log("Error: Failed to add replacement node for text.");
                 return false;
             }
             freez(text);

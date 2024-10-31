@@ -10,7 +10,7 @@ static void config_dir_print_available(void) {
     dir = opendir(path);
 
     if (dir == NULL) {
-        log2stderr("       >>> Cannot open directory:\n       %s", path);
+        l2j_log("       >>> Cannot open directory:\n       %s", path);
         return;
     }
 

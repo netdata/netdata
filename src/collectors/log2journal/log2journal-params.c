@@ -7,7 +7,7 @@
 void log_job_init(LOG_JOB *jb) {
     memset(jb, 0, sizeof(*jb));
     simple_hashtable_init_KEY(&jb->hashtable, 32);
-    hashed_key_set(&jb->line.key, "LINE");
+    hashed_key_set(&jb->line.key, "LINE", -1);
 }
 
 static void simple_hashtable_cleanup_allocated_keys(SIMPLE_HASHTABLE_KEY *ht) {
@@ -53,8 +53,8 @@ void log_job_cleanup(LOG_JOB *jb) {
     hashed_key_cleanup(&jb->filename.key);
     hashed_key_cleanup(&jb->unmatched.key);
 
-    txt_cleanup(&jb->rewrites.tmp);
-    txt_cleanup(&jb->filename.current);
+    txt_l2j_cleanup(&jb->rewrites.tmp);
+    txt_l2j_cleanup(&jb->filename.current);
 
     simple_hashtable_cleanup_allocated_keys(&jb->hashtable);
     simple_hashtable_destroy_KEY(&jb->hashtable);
@@ -67,18 +67,18 @@ void log_job_cleanup(LOG_JOB *jb) {
 
 bool log_job_filename_key_set(LOG_JOB *jb, const char *key, size_t key_len) {
     if(!key || !*key) {
-        log2stderr("filename key cannot be empty.");
+        l2j_log("filename key cannot be empty.");
         return false;
     }
 
-    hashed_key_len_set(&jb->filename.key, key, key_len);
+    hashed_key_set(&jb->filename.key, key, key_len);
 
     return true;
 }
 
 bool log_job_key_prefix_set(LOG_JOB *jb, const char *prefix, size_t prefix_len) {
     if(!prefix || !*prefix) {
-        log2stderr("filename key cannot be empty.");
+        l2j_log("filename key cannot be empty.");
         return false;
     }
 
@@ -92,7 +92,7 @@ bool log_job_key_prefix_set(LOG_JOB *jb, const char *prefix, size_t prefix_len) 
 
 bool log_job_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len) {
     if(!pattern || !*pattern) {
-        log2stderr("filename key cannot be empty.");
+        l2j_log("filename key cannot be empty.");
         return false;
     }
 
@@ -106,12 +106,12 @@ bool log_job_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len) {
 
 bool log_job_include_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len) {
     if(jb->filter.include.re) {
-        log2stderr("FILTER INCLUDE: there is already an include filter set");
+        l2j_log("FILTER INCLUDE: there is already an include filter set");
         return false;
     }
 
     if(!search_pattern_set(&jb->filter.include, pattern, pattern_len)) {
-        log2stderr("FILTER INCLUDE: failed: %s", jb->filter.include.error.txt);
+        l2j_log("FILTER INCLUDE: failed: %s", jb->filter.include.error.txt);
         return false;
     }
 
@@ -120,12 +120,12 @@ bool log_job_include_pattern_set(LOG_JOB *jb, const char *pattern, size_t patter
 
 bool log_job_exclude_pattern_set(LOG_JOB *jb, const char *pattern, size_t pattern_len) {
     if(jb->filter.exclude.re) {
-        log2stderr("FILTER INCLUDE: there is already an exclude filter set");
+        l2j_log("FILTER INCLUDE: there is already an exclude filter set");
         return false;
     }
 
     if(!search_pattern_set(&jb->filter.exclude, pattern, pattern_len)) {
-        log2stderr("FILTER EXCLUDE: failed: %s", jb->filter.exclude.error.txt);
+        l2j_log("FILTER EXCLUDE: failed: %s", jb->filter.exclude.error.txt);
         return false;
     }
 
@@ -138,7 +138,7 @@ static bool parse_rename(LOG_JOB *jb, const char *param) {
     // Search for '=' in param
     const char *equal_sign = strchr(param, '=');
     if (!equal_sign || equal_sign == param) {
-        log2stderr("Error: Invalid rename format, '=' not found in %s", param);
+        l2j_log("Error: Invalid rename format, '=' not found in %s", param);
         return false;
     }
 
@@ -216,7 +216,7 @@ RW_FLAGS parse_rewrite_flags(const char *options) {
         }
 
         if(!found)
-            log2stderr("Warning: rewrite options '%s' is not understood.", token);
+            l2j_log("Warning: rewrite options '%s' is not understood.", token);
 
         // Get the next token
         token = strtok(NULL, ",");
@@ -232,33 +232,33 @@ static bool parse_rewrite(LOG_JOB *jb, const char *param) {
     // Search for '=' in param
     const char *equal_sign = strchr(param, '=');
     if (!equal_sign || equal_sign == param) {
-        log2stderr("Error: Invalid rewrite format, '=' not found in %s", param);
+        l2j_log("Error: Invalid rewrite format, '=' not found in %s", param);
         return false;
     }
 
     // Get the next character as the separator
     char separator = *(equal_sign + 1);
     if (!separator || !is_symbol(separator)) {
-        log2stderr("Error: rewrite separator not found after '=', or is not one of /\\|-# in: %s", param);
+        l2j_log("Error: rewrite separator not found after '=', or is not one of /\\|-# in: %s", param);
         return false;
     }
 
     // Find the next occurrence of the separator
     const char *second_separator = strchr(equal_sign + 2, separator);
     if (!second_separator) {
-        log2stderr("Error: rewrite second separator not found in: %s", param);
+        l2j_log("Error: rewrite second separator not found in: %s", param);
         return false;
     }
 
     // Check if the search pattern is empty
     if (equal_sign + 1 == second_separator) {
-        log2stderr("Error: rewrite search pattern is empty in: %s", param);
+        l2j_log("Error: rewrite search pattern is empty in: %s", param);
         return false;
     }
 
     // Check if the replacement pattern is empty
     if (*(second_separator + 1) == '\0') {
-        log2stderr("Error: rewrite replacement pattern is empty in: %s", param);
+        l2j_log("Error: rewrite replacement pattern is empty in: %s", param);
         return false;
     }
 
@@ -287,7 +287,7 @@ static bool parse_rewrite(LOG_JOB *jb, const char *param) {
 static bool parse_inject(LOG_JOB *jb, const char *value, bool unmatched) {
     const char *equal = strchr(value, '=');
     if (!equal) {
-        log2stderr("Error: injection '%s' does not have an equal sign.", value);
+        l2j_log("Error: injection '%s' does not have an equal sign.", value);
         return false;
     }
 
@@ -336,7 +336,10 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
                         log_job_pattern_set(jb, arg, strlen(arg));
                         continue;
                     } else {
-                        log2stderr("Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'", jb->pattern, arg);
+                        l2j_log(
+                            "Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'",
+                            jb->pattern,
+                            arg);
                         return false;
                     }
                 }
@@ -361,7 +364,7 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
             }
 #endif
             else if (strcmp(param, "--unmatched-key") == 0)
-                hashed_key_set(&jb->unmatched.key, value);
+                hashed_key_set(&jb->unmatched.key, value, -1);
             else if (strcmp(param, "--inject") == 0) {
                 if (!parse_inject(jb, value, false))
                     return false;
@@ -392,7 +395,10 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
                     log_job_pattern_set(jb, arg, strlen(arg));
                     continue;
                 } else {
-                    log2stderr("Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'", jb->pattern, arg);
+                    l2j_log(
+                        "Error: Multiple patterns detected. Specify only one pattern. The first is '%s', the second is '%s'",
+                        jb->pattern,
+                        arg);
                     return false;
                 }
             }
@@ -401,7 +407,7 @@ bool log_job_command_line_parse_parameters(LOG_JOB *jb, int argc, char **argv) {
 
     // Check if a pattern is set and exactly one pattern is specified
     if (!jb->pattern) {
-        log2stderr("Warning: pattern not specified. Try the default config with: -c default");
+        l2j_log("Warning: pattern not specified. Try the default config with: -c default");
         log_job_command_line_help(argv[0]);
         return false;
     }

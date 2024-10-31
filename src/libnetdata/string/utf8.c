@@ -270,7 +270,7 @@ void txt_utf8_empty(TXT_UTF8 *dst) {
 }
 
 void txt_utf8_set(TXT_UTF8 *dst, const char *txt, size_t txt_len) {
-    txt_utf8_resize(dst, dst->used + txt_len + 1, true);
+    txt_utf8_resize(dst, txt_len + 1, false);
     memcpy(dst->data, txt, txt_len);
     dst->used = txt_len + 1;
     dst->data[dst->used - 1] = '\0';
