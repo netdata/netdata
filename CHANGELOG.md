@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- versioning for functions [\#18902](https://github.com/netdata/netdata/pull/18902) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#18901](https://github.com/netdata/netdata/pull/18901) ([netdatabot](https://github.com/netdatabot))
+- chore\(go.d.plugin\): add build tags to modules [\#18900](https://github.com/netdata/netdata/pull/18900) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18899](https://github.com/netdata/netdata/pull/18899) ([netdatabot](https://github.com/netdatabot))
+- Updating Netdata docs [\#18898](https://github.com/netdata/netdata/pull/18898) ([Ancairon](https://github.com/Ancairon))
+- remove python.d/zscores [\#18897](https://github.com/netdata/netdata/pull/18897) ([ilyam8](https://github.com/ilyam8))
+- Coverity fixes [\#18896](https://github.com/netdata/netdata/pull/18896) ([stelfrag](https://github.com/stelfrag))
+- docs edit [\#18895](https://github.com/netdata/netdata/pull/18895) ([Ancairon](https://github.com/Ancairon))
+- Start-stop-restart for windows, plus move info to its own file [\#18894](https://github.com/netdata/netdata/pull/18894) ([Ancairon](https://github.com/Ancairon))
 - log2journal: fix config parsing memory leaks [\#18893](https://github.com/netdata/netdata/pull/18893) ([ktsaou](https://github.com/ktsaou))
 - Fix coverity issues [\#18892](https://github.com/netdata/netdata/pull/18892) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18891](https://github.com/netdata/netdata/pull/18891) ([netdatabot](https://github.com/netdatabot))
@@ -85,6 +94,7 @@
 - Do not load/save context data in RAM mode [\#18790](https://github.com/netdata/netdata/pull/18790) ([stelfrag](https://github.com/stelfrag))
 - Fix broken claiming via kickstart on some systems. [\#18789](https://github.com/netdata/netdata/pull/18789) ([Ferroin](https://github.com/Ferroin))
 - Fix atomic builtins test that currently fails for llvm+compiler\_rt when gcc is not present [\#18788](https://github.com/netdata/netdata/pull/18788) ([StormBytePP](https://github.com/StormBytePP))
+- Add basis for MSI installer. [\#18787](https://github.com/netdata/netdata/pull/18787) ([vkalintiris](https://github.com/vkalintiris))
 - fix\(netdata-updater.sh\): ensure `--non-interactive` flag is passed during self-update [\#18786](https://github.com/netdata/netdata/pull/18786) ([ilyam8](https://github.com/ilyam8))
 - Windows Network Interfaces Charts and Alerts [\#18785](https://github.com/netdata/netdata/pull/18785) ([ktsaou](https://github.com/ktsaou))
 - Document ML enabled `auto` [\#18784](https://github.com/netdata/netdata/pull/18784) ([stelfrag](https://github.com/stelfrag))
@@ -438,14 +448,6 @@
 - Regenerate integrations.js [\#18357](https://github.com/netdata/netdata/pull/18357) ([netdatabot](https://github.com/netdatabot))
 - remove python.d lm\_sensors.py [\#18356](https://github.com/netdata/netdata/pull/18356) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/retroshare [\#18355](https://github.com/netdata/netdata/pull/18355) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18353](https://github.com/netdata/netdata/pull/18353) ([netdatabot](https://github.com/netdatabot))
-- go.d httpcheck: add status description to docs [\#18351](https://github.com/netdata/netdata/pull/18351) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18350](https://github.com/netdata/netdata/pull/18350) ([netdatabot](https://github.com/netdatabot))
-- Add missing initial slashes for internal documation links [\#18348](https://github.com/netdata/netdata/pull/18348) ([ralphm](https://github.com/ralphm))
-- fix sending CLEAR notifications with critical severity modifier [\#18347](https://github.com/netdata/netdata/pull/18347) ([ilyam8](https://github.com/ilyam8))
-- add license to readmes menu [\#18345](https://github.com/netdata/netdata/pull/18345) ([ilyam8](https://github.com/ilyam8))
-- add go.d/monit [\#18344](https://github.com/netdata/netdata/pull/18344) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/monit [\#18343](https://github.com/netdata/netdata/pull/18343) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
