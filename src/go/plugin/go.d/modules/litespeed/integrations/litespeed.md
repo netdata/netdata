@@ -25,7 +25,10 @@ Examine Litespeed metrics for insights into web server operations. Analyze reque
 
 The collector uses the statistics under /tmp/lshttpd to gather the metrics.
 
-This collector is supported on all platforms.
+This collector is only supported on the following platforms:
+
+- Linux
+- BSD
 
 This collector only supports collecting metrics from a single instance of this integration.
 

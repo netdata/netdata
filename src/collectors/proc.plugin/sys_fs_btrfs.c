@@ -270,8 +270,8 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
 
     DIR *dir = opendir(path);
     if (!dir) {
-        if(!node->logged_error) {
-            collector_error("BTRFS: Cannot open directory '%s'.", path);
+        if (!node->logged_error) {
+            nd_log(NDLS_COLLECTORS, errno == ENOENT ? NDLP_INFO : NDLP_ERR, "BTRFS: Cannot open directory '%s'.", path);
             node->logged_error = 1;
         }
         return 1;
@@ -374,8 +374,8 @@ static inline int find_btrfs_devices(BTRFS_NODE *node, const char *path) {
 
     DIR *dir = opendir(path);
     if (!dir) {
-        if(!node->logged_error) {
-            collector_error("BTRFS: Cannot open directory '%s'.", path);
+        if (!node->logged_error) {
+            nd_log(NDLS_COLLECTORS, errno == ENOENT ? NDLP_INFO : NDLP_ERR, "BTRFS: Cannot open directory '%s'.", path);
             node->logged_error = 1;
         }
         return 1;
@@ -474,8 +474,8 @@ static inline int find_all_btrfs_pools(const char *path, int update_every) {
 
     DIR *dir = opendir(path);
     if (!dir) {
-        if(!logged_error) {
-            collector_error("BTRFS: Cannot open directory '%s'.", path);
+        if (!logged_error) {
+            nd_log(NDLS_COLLECTORS, errno == ENOENT ? NDLP_INFO : NDLP_ERR, "BTRFS: Cannot open directory '%s'.", path);
             logged_error = 1;
         }
         return 1;

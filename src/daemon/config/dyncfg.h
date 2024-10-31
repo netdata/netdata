@@ -7,6 +7,8 @@
 #include "database/rrd.h"
 #include "database/rrdfunctions.h"
 
+#define DYNCFG_FUNCTIONS_VERSION 0
+
 void dyncfg_add_streaming(BUFFER *wb);
 bool dyncfg_available_for_rrdhost(RRDHOST *host);
 void dyncfg_host_init(RRDHOST *host);

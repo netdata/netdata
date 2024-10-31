@@ -461,13 +461,15 @@ The `source` is an integer field that can have the following values:
 
 The plugin can register functions to Netdata, like this:
 
-> FUNCTION [GLOBAL] "name and parameters of the function" timeout "help string for users" "tags" "access"
+> FUNCTION [GLOBAL] "name and parameters of the function" timeout "help string for users" "tags" "access" priority version
 
 - Tags currently recognized are either `top` or `logs` (or both, space separated).
 - Access is one of `any`, `member`, or `admin`:
   - `any` to offer the function to all users of Netdata, even if they are not authenticated.
   - `member` to offer the function to all authenticated members of Netdata.
-  - `admin` to offer the function only to authenticated administrators. 
+  - `admin` to offer the function only to authenticated administrators.
+- Priority defines the position of the function relative to the other functions (default is 100).
+- Version defines the version of the function (default is 0).
 
 Users can use a function to ask for more information from the collector. Netdata maintains a registry of functions in 2 levels:
 

@@ -26,7 +26,10 @@ This collector monitors the health of LVM logical volumes. It relies on the [`lv
 
 
 
-This collector is supported on all platforms.
+This collector is only supported on the following platforms:
+
+- Linux
+- NetBSD
 
 This collector only supports collecting metrics from a single instance of this integration.
 

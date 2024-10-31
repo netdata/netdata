@@ -285,6 +285,7 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     char *tags          = get_word(words, num_words, i++);
     char *access_str    = get_word(words, num_words, i++);
     char *priority_str  = get_word(words, num_words, i++);
+    char *version_str   = get_word(words, num_words, i++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_FUNCTION);
     if(!host) return PARSER_RC_ERROR;
@@ -293,12 +294,14 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     if(!st) global = true;
 
     if (unlikely(!timeout_str || !name || !help || (!global && !st))) {
-        netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a FUNCTION, without providing the required data (global = '%s', name = '%s', timeout = '%s', help = '%s'). Ignoring it.",
+        netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a FUNCTION, without providing the required data (global = '%s', name = '%s', timeout = '%s', priority = '%s', version = '%s', help = '%s'). Ignoring it.",
                           rrdhost_hostname(host),
                           st?rrdset_id(st):"(unset)",
                           global?"yes":"no",
                           name?name:"(unset)",
-                timeout_str ? timeout_str : "(unset)",
+                          timeout_str ? timeout_str : "(unset)",
+                          priority_str ? priority_str : "(unset)",
+                          version_str ? version_str : "(unset)",
                           help?help:"(unset)"
         );
         return PARSER_RC_ERROR;
@@ -318,7 +321,11 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
             priority = RRDFUNCTIONS_PRIORITY_DEFAULT;
     }
 
-    rrd_function_add(host, st, name, timeout_s, priority, help, tags,
+    uint32_t version = RRDFUNCTIONS_VERSION_DEFAULT;
+    if(version_str && *version_str)
+        version = str2u(version_str);
+
+    rrd_function_add(host, st, name, timeout_s, priority, version, help, tags,
                      http_access_from_hex_mapping_old_roles(access_str), false,
                      pluginsd_function_execute_cb, parser);
 

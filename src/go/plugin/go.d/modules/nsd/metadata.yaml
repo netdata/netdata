@@ -15,7 +15,7 @@ modules:
         - dns
       related_resources:
         integrations:
-          list: []
+          list: [ ]
       info_provided_to_referring_integrations:
         description: ""
       most_popular: false
@@ -32,8 +32,8 @@ modules:
           - `nsd-control stats_noreset`
         method_description: ""
       supported_platforms:
-        include: []
-        exclude: []
+        include: [ Linux, BSD, macOS ]
+        exclude: [ ]
       multi_instance: false
       additional_permissions:
         description: ""
@@ -46,7 +46,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list: [ ]
       configuration:
         file:
           name: go.d/nsd.conf
@@ -78,18 +78,18 @@ modules:
                     update_every: 5  # Collect logical volume statistics every 5 seconds
     troubleshooting:
       problems:
-        list: []
-    alerts: []
+        list: [ ]
+    alerts: [ ]
     metrics:
       folding:
         title: Metrics
         enabled: false
       description: ""
-      availability: []
+      availability: [ ]
       scopes:
         - name: global
           description: These metrics refer to the the entire monitored application.
-          labels: []
+          labels: [ ]
           metrics:
             - name: nsd.queries
               description: Queries

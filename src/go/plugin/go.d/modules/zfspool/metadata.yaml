@@ -28,7 +28,7 @@ modules:
           tool [zpool](https://openzfs.github.io/openzfs-docs/man/master/8/zpool-list.8.html).
         method_description: ""
       supported_platforms:
-        include: []
+        include: [Linux, BSD]
         exclude: []
       multi_instance: false
       additional_permissions:

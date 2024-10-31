@@ -32,7 +32,9 @@ By default, it uses:
 
 
 
-This collector is supported on all platforms.
+This collector is only supported on the following platforms:
+
+- Linux
 
 This collector only supports collecting metrics from a single instance of this integration.
 

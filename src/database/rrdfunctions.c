@@ -94,10 +94,21 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
 
     if(rdcf->timeout != new_rdcf->timeout) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed timeout",
-               dictionary_acquired_item_name(item), rrdhost_hostname(host));
+               "FUNCTIONS: function '%s' of host '%s' changed timeout (from %d to %d)",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host),
+               rdcf->timeout, new_rdcf->timeout);
 
         rdcf->timeout = new_rdcf->timeout;
+        changed = true;
+    }
+
+    if(rdcf->version != new_rdcf->version) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: function '%s' of host '%s' changed version (from %"PRIu32", to %"PRIu32")",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host),
+               rdcf->version, new_rdcf->version);
+
+        rdcf->version = new_rdcf->version;
         changed = true;
     }
 
@@ -188,7 +199,7 @@ static inline RRD_FUNCTION_OPTIONS get_function_options(RRDSET *st, const char *
     return options | (is_function_restricted(name, tags) ? RRD_FUNCTION_RESTRICTED : 0);
 }
 
-void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority,
+void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version,
                       const char *help, const char *tags,
                       HTTP_ACCESS access, bool sync,
                       rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
@@ -212,13 +223,14 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     struct rrd_host_function tmp = {
         .sync = sync,
         .timeout = timeout,
+        .version = version,
+        .priority = priority,
         .options = get_function_options(st, name, tags),
         .access = access,
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
         .help = string_strdupz(help),
         .tags = string_strdupz(tags),
-        .priority = priority,
     };
     const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->functions, key, &tmp, sizeof(tmp));
 

@@ -25,7 +25,7 @@ modules:
         metrics_description: "Examine Litespeed metrics for insights into web server operations. Analyze request rates, response times, and error rates for efficient web service delivery."
         method_description: "The collector uses the statistics under /tmp/lshttpd to gather the metrics."
       supported_platforms:
-        include: []
+        include: [Linux, BSD]
         exclude: []
       multi_instance: false
       additional_permissions:
