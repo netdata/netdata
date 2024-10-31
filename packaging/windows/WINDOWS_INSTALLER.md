@@ -14,9 +14,9 @@ The installer will then guide you through these steps:
 
 1. **Welcome**: This screen provides a summary of the actions the installer will perform.
 2. **License Agreements**:
-    - [Netdata Cloud UI License](/src/web/gui/v2/LICENSE.md): Review and accept the license terms to proceed.
+    - [Netdata Cloud UI License](https://app.netdata.cloud/LICENSE.txt): Review and accept the license terms to proceed.
     - [GPLv3 License](/LICENSE): Read the GNU General Public License v3, which governs the Netdata software.
-3. **Destination**:  Choose the installation directory. By default, Netdata installs in `C:\Program Files\Netdata`.
+3. **Destination**: Choose the installation directory. By default, Netdata installs in `C:\Program Files\Netdata`.
 4. **Installation**: The installer will copy the necessary files to the chosen directory.
 5. **Connect to Netdata Cloud**: To [connect](/src/claim/README.md) your Agent to your Netdata Cloud Space you need to provide the following:
     - **Claim Token**: The Claim Token that securely authenticates and links your Agent to your Space.
