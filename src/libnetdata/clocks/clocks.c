@@ -298,7 +298,7 @@ static usec_t heartbeat_randomness(usec_t step) {
         usec_t now_ut;
         char tag[ND_THREAD_TAG_MAX + 1];
     } key = {
-        .tid = gettid(),
+        .tid = os_gettid(),
         .now_ut = now_realtime_usec(),
     };
     strncpyz(key.tag, nd_thread_tag(), sizeof(key.tag) - 1);
@@ -328,7 +328,7 @@ inline void heartbeat_init(heartbeat_t *hb, usec_t step) {
         heartbeat_alignment_values[hb->statistics_id].dt = 0;
         heartbeat_alignment_values[hb->statistics_id].sequence = 0;
         heartbeat_alignment_values[hb->statistics_id].randomness = hb->randomness;
-        heartbeat_alignment_values[hb->statistics_id].tid = gettid();
+        heartbeat_alignment_values[hb->statistics_id].tid = os_gettid();
     }
 }
 
