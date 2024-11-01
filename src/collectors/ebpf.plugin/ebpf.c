@@ -4034,6 +4034,10 @@ int main(int argc, char **argv)
 
 #ifdef LIBBPF_MAJOR_VERSION
     libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+
+#ifndef NETDATA_INTERNAL_CHECKS
+    libbpf_set_print(netdata_silent_libbpf_vfprintf);
+#endif
 #endif
 
     ebpf_read_local_addresses_unsafe();
