@@ -25,7 +25,7 @@
 		<Property Id="URL" Value="https://app.netdata.cloud" />
 
 		<Property Id="GPLLICENSE" Value="0" />
-		<Property Id="CLOUDLICENSE" Value="0" />
+		<Property Id="CLOUDUILICENSE" Value="0" />
 
 		<Feature Id="Main">
 			<ComponentGroupRef Id="NetdataComponents" />
@@ -44,9 +44,9 @@
                     <Custom Action="CHECKGPL" Before="FileCost" Condition ="GPLLICENSE=&quot;0&quot; AND NOT Installed" />
 		</InstallExecuteSequence>
 
-		<CustomAction Id="CHECKCLOUD" Error="To continue, please accept the terms of the Cloud license (https://app.netdata.cloud/LICENSE.txt) by including the argument CLOUDLICENSE=1."/>
+		<CustomAction Id="CHECKCLOUDUI" Error="To continue, please accept the terms of the Cloud license (https://app.netdata.cloud/LICENSE.txt) by including the argument CLOUDUILICENSE=1."/>
 		<InstallExecuteSequence>
-                    <Custom Action="CHECKCLOUD" Before="FileCost" Condition ="CLOUDLICENSE=&quot;0&quot; AND NOT Installed" />
+                    <Custom Action="CHECKCLOUDUI" Before="FileCost" Condition ="CLOUDUILICENSE=&quot;0&quot; AND NOT Installed" />
 		</InstallExecuteSequence>
 
 		<StandardDirectory Id="ProgramFiles64Folder">
