@@ -1,56 +1,51 @@
 # Sizing Netdata Agents
 
-Netdata automatically adjusts its resource utilization based on its workload.
+Netdata is designed to automatically adjust its resource consumption based on the specific workload.
 
-The resource needs of Netdata's features are as follows:
+This table shows the specific system resources affected by different Netdata features:
 
-|                 Feature | CPU | RAM | Disk I/O | Disk Space | Retention | Bandwidth |
-|------------------------:|:---:|:---:|:--------:|:----------:|:---------:|:---------:|
-|       Collected metrics |  X  |  X  |    X     |     X      |     X     |     -     |
-|        Sample frequency |  X  |  -  |    X     |     X      |     X     |     -     |
-| Database mode and tiers |  -  |  X  |    X     |     X      |     X     |     -     |
-|        Machine learning |  X  |  X  |    -     |     -      |     -     |     -     |
-|               Streaming |  X  |  X  |    -     |     -      |     -     |     X     |
+|                 Feature | CPU | RAM | Disk I/O | Disk Space | Network Traffic |
+|------------------------:|:---:|:---:|:--------:|:----------:|:---------------:|
+|       Collected metrics |  ✓  |  ✓  |    ✓     |     ✓      |        -        |
+|        Sample frequency |  ✓  |  -  |    ✓     |     ✓      |        -        |
+| Database mode and tiers |  -  |  ✓  |    ✓     |     ✓      |        -        |
+|        Machine learning |  ✓  |  ✓  |    -     |     -      |        -        |
+|               Streaming |  ✓  |  ✓  |    -     |     -      |        ✓        |
 
 1. **Collected metrics**
 
-   The number of collected metrics affects almost every aspect of the resources utilization.
-
-   This is the first point to consider restricting when you need to lower the resources used by Netdata.
+    - **Impact**: More metrics mean higher CPU, RAM, disk I/O, and disk space usage.
+    - **Optimization**: To reduce resource consumption, consider lowering the number of collected metrics by disabling unnecessary data collectors.
 
 2. **Sample frequency**
 
-   By default Netdata collects most metrics with 1-second granularity.
-
-   Lowering the data collection frequency from every-second to every-2-seconds, will make Netdata use half the CPU resources. CPU utilization is analogous to the data collection frequency.
+    - **Impact**: Netdata collects most metrics with 1-second granularity. This high frequency impacts CPU usage.
+    - **Optimization**: Lowering the sampling frequency (e.g., 1-second to 2-second intervals) can halve CPU usage. Balance the need for detailed data with resource efficiency.
 
 3. **Database Mode and Tiers**
 
-   By default Netdata stores metrics in 3 database tiers. They are updated in parallel during data collection, and depending on the query duration, Netdata may consult one or more tiers to optimize the resources required to satisfy it.
-
-   The number of database tiers affects the memory requirements of Netdata. Going from 3 tiers to 1 tier, will make Netdata use half the memory.
+    - **Impact**: The number of database tiers directly affects memory consumption. More tiers mean higher memory usage.
+    - **Optimization**: The default number of tiers is 3. Choose the appropriate number of tiers based on data retention requirements.
 
 4. **Machine Learning**
 
-   By default Netdata trains multiple machine learning models for every metric collected, to learn its behavior and detect anomalies.
-
-   Machine Learning is a CPU intensive process and affects the overall CPU utilization of Netdata.
+    - **Impact**: Machine learning model training is CPU-intensive, affecting overall CPU usage.
+    - **Optimization**: Consider disabling machine learning for less critical metrics or adjusting model training frequency.
 
 5. **Streaming Compression**
 
-   When using Netdata in Parent-Child configurations to create Metrics Centralization Points, the compression algorithm used greatly affects CPU utilization and bandwidth consumption.
-
-   Netdata supports multiple streaming compression algorithms, allowing the optimization of either CPU utilization or Network Bandwidth. The default algorithm `zstd` provides the best balance among the two.
+    - **Impact**: Compression algorithm choice affects CPU usage and network traffic.
+    - **Optimization**: Select an algorithm that balances CPU efficiency with network bandwidth requirements (e.g., zstd for a good balance).
 
 ## Minimizing the resources used by Netdata Agents
 
-We suggest to configure Netdata Parents for centralizing metric samples, and disabling most of the features on Netdata Children.
+To optimize resource utilization, consider using a **Netdata Parent-Child** setup.
 
-This will provide minimal resource utilization at the edge, while all the features of Netdata are available through the Netdata Parents.
+This approach involves centralizing the collection and processing of metrics on Netdata Parent nodes while running lightweight Netdata Child Agents on edge devices.
 
 ## Maximizing the scale of Netdata Parents
 
-Netdata Parents automatically size their resource utilization based on the workload they receive. The only possible option for improving query performance is to dedicate more RAM to them.
+Netdata Parents dynamically adjust their resource usage based on the volume of metrics received. However, for optimal query performance, you may need to dedicate more RAM.
 
 Check [RAM Requirements](/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md) for more information.
 
