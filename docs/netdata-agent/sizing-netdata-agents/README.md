@@ -49,40 +49,32 @@ Netdata Parents dynamically adjust their resource usage based on the volume of m
 
 Check [RAM Requirements](/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md) for more information.
 
-## Innovations Netdata has for optimal performance and scalability
+## Netdata's Innovations for optimal performance and scalability
 
-The following are some of the innovations the open-source Netdata Agent has that contribute to its excellent performance and scalability.
+1. **Minimal Disk I/O**
 
-1. **Minimal disk I/O**
+   Netdata directly writes metric data to disk, bypassing system caches and reducing I/O overhead. Additionally, its optimized data structures minimize disk space and memory usage through efficient compression and timestamping.
 
-   When Netdata saves data on-disk, it stores them at their final place, eliminating the need to reorganize this data.
+2. **Compact Storage Engine**
 
-   Netdata is organizing its data structures in such a way that samples are committed on disk as evenly as possible across time, without affecting its memory requirements.
+   Netdata uses a custom 32-bit floating-point format tailored for efficient storage of time-series data, along with an anomaly bit. This, combined with a fixed-step database design, enables efficient storage and retrieval of data.
 
-   Furthermore, Netdata Agents use direct I/O for saving and loading metric samples. This prevents Netdata from polluting system caches with metric data. Netdata maintains its own caches for this data.
+   | Tier                              | Approximate Sample Size (bytes) |
+   |-----------------------------------|---------------------------------|
+   | High-resolution tier (per-second) | 0.6                             |
+   | Mid-resolution tier (per-minute)  | 6                               |
+   | Low-resolution tier (per-hour)    | 18                              |
 
-2. **4 bytes per sample uncompressed**
+   Timestamp optimization further reduces storage overhead by storing timestamps at regular intervals.
 
-   To achieve optimal memory and disk footprint, Netdata uses a custom 32-bit floating point number. This floating point number is used to store the collected samples, together with their anomaly bit.
+3. **Intelligent Query Engine**
 
-   The database of Netdata is fixed-step, so it has predefined slots for every sample, allowing Netdata to store timestamps once every several hundreds of samples, minimizing both its memory requirements and the disk footprint.
+   Netdata prioritizes interactive queries over background tasks like machine learning and replication, ensuring optimal user experience, especially under heavy load.
 
-   The final disk footprint of Netdata varies due to compression efficiency. It is usually about 0.6 bytes per sample for the high-resolution tier (per-second), 6 bytes per sample for the mid-resolution tier (per-minute) and 18 bytes per sample for the low-resolution tier (per-hour).
+4. **Efficient Label Storage**
 
-3. **Query priorities**
+   Netdata uses pointers to reference shared label key-value pairs, minimizing memory usage, especially in highly dynamic environments.
 
-   Alerting, Machine Learning, Streaming and Replication rely on metric queries.
+5. **Scalable Streaming Protocol**
 
-   When multiple queries are running in parallel, Netdata assigns priorities to all of them, favoring interactive queries over background tasks.
-
-   This means that queries do not compete equally for resources. Machine learning or replication may slow down when interactive queries are running and the system starves for resources.
-
-4. **A pointer per label**
-
-   Apart from metric samples, metric labels and their cardinality is the biggest memory consumer, especially in highly ephemeral environments, like kubernetes.
-
-   Netdata uses a single pointer for any label key-value pair that is reused. Keys and values are also deduplicated, providing the best possible memory footprint for metric labels.
-
-5. **Streaming Protocol**
-
-   The streaming protocol of Netdata allows minimizing the resources consumed on production systems by delegating features to other Netdata Agents (Parents), without compromising monitoring fidelity or responsiveness, enabling the creation of a highly distributed observability platform.
+   Netdata's streaming protocol enables the creation of distributed monitoring setups, where Netdata Agents (Children) offload data processing to Netdata Parents, optimizing resource utilization.
