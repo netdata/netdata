@@ -25,5 +25,5 @@ function check_and_get_file() {
 }
 
 check_and_get_file "gpl-3.0.rtf" "https://www.gnu.org/licenses/gpl-3.0.txt"
-check_and_get_file "cloud.rtf" "https://app.netdata.cloud/LICENSE.txt"
+check_and_get_file "ncul1.rtf" "https://app.netdata.cloud/LICENSE.txt"
 
