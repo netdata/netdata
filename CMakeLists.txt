@@ -2465,6 +2465,9 @@ if(OS_WINDOWS)
         set(NETDATACLI_RES_FILES "packaging/windows/resources/netdatacli.rc")
         configure_file(packaging/windows/resources/netdatacli.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdatacli.manifest @ONLY)
 
+        set(NETDATACLIUI_RES_FILES "packaging/windows/resources/netdatacliui.rc")
+        configure_file(packaging/windows/resources/netdatacliui.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdatacliui.manifest @ONLY)
+
         set(NETDATA_RES_FILES "packaging/windows/resources/netdata.rc")
         configure_file(packaging/windows/resources/netdata.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdata.manifest @ONLY)
 
@@ -2596,6 +2599,17 @@ install(TARGETS netdatacli
         COMPONENT netdata
         DESTINATION "${BINDIR}")
 
+if(OS_WINDOWS)
+        set(NETDATACLI_UI_FILES
+                src/cli/ui.c
+                src/cli/ui.h
+                )
+
+        add_executable(NetdataCliUI ${NETDATACLI_UI_FILES}  ${NETDATACLIUI_RES_FILES})
+        target_link_libraries(NetdataCliUI shell32;gdi32;msftedit)
+        target_link_options(NetdataCliUI PUBLIC -mwindows)
+endif()
+
 #
 # Build go.d.plugin
 #
@@ -2681,6 +2695,11 @@ if(NOT OS_WINDOWS)
 else()
         install(PROGRAMS
                 ${CMAKE_BINARY_DIR}/NetdataClaim.exe
+                COMPONENT netdata
+                DESTINATION "${BINDIR}")
+
+        install(PROGRAMS
+                ${CMAKE_BINARY_DIR}/NetdataCliUI.exe
                 COMPONENT netdata
                 DESTINATION "${BINDIR}")
 endif()
