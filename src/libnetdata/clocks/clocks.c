@@ -302,7 +302,8 @@ static usec_t heartbeat_randomness(usec_t step) {
     };
     XXH64_hash_t hash = XXH3_64bits(&key, sizeof(key));
 
-    usec_t alignment_ut = (step / 4) + (hash % (step / 3));
+    usec_t max_randomness = MIN(step / 4, 300 * USEC_PER_MS);
+    usec_t alignment_ut = (100 * USEC_PER_MS) + (hash % max_randomness);
     alignment_ut /= clock_realtime_resolution;
     alignment_ut *= clock_realtime_resolution;
 
@@ -310,6 +311,8 @@ static usec_t heartbeat_randomness(usec_t step) {
 }
 
 inline void heartbeat_init(heartbeat_t *hb, usec_t step) {
+    if(!step) step = USEC_PER_SEC;
+
     netdata_mutex_lock(&heartbeat_alignment_mutex);
     hb->statistics_id = heartbeat_alignment_id;
     heartbeat_alignment_id++;
