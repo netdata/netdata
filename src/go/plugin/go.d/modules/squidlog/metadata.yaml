@@ -46,7 +46,7 @@ modules:
           name: go.d/squidlog.conf
         options:
           description: |
-            Squid [log format codes](http://www.squid-cache.org/Doc/config/logformat/).
+            Squid [log format codes](https://www.squid-cache.org/Doc/config/logformat/).
 
             Squidlog is aware how to parse and interpret the following codes:
 
