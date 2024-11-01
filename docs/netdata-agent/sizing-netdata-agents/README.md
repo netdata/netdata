@@ -51,7 +51,7 @@ Check [RAM Requirements](/docs/netdata-agent/sizing-netdata-agents/ram-requireme
 
 ## Innovations Netdata has for optimal performance and scalability
 
-The following are some of the innovations the open-source Netdata Agent has, that contribute to its excellent performance, and scalability.
+The following are some of the innovations the open-source Netdata Agent has that contribute to its excellent performance and scalability.
 
 1. **Minimal disk I/O**
 
@@ -85,4 +85,4 @@ The following are some of the innovations the open-source Netdata Agent has, tha
 
 5. **Streaming Protocol**
 
-   The streaming protocol of Netdata allows minimizing the resources consumed on production systems by delegating features of to other Netdata Agents (Parents), without compromising monitoring fidelity or responsiveness, enabling the creation of a highly distributed observability platform.
+   The streaming protocol of Netdata allows minimizing the resources consumed on production systems by delegating features to other Netdata Agents (Parents), without compromising monitoring fidelity or responsiveness, enabling the creation of a highly distributed observability platform.
