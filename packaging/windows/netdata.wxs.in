@@ -39,12 +39,12 @@
 	<Fragment>
 		<Property Id="MsiLogging" Value="voicewarmupx!"/>
 
-		<CustomAction Id="CHECKGPL" Error="You must accept the GPL 3.0 license (https://www.gnu.org/licenses/gpl-3.0.txt)."/>
+		<CustomAction Id="CHECKGPL" Error="To continue, please accept the terms of the GPL 3.0 (https://www.gnu.org/licenses/gpl-3.0.txt) license by including the argument GPLLICENSE=1."/>
 		<InstallExecuteSequence>
                     <Custom Action="CHECKGPL" Before="FileCost" Condition ="GPLLICENSE=&quot;0&quot; AND NOT Installed" />
 		</InstallExecuteSequence>
 
-		<CustomAction Id="CHECKCLOUD" Error="You must accept the Cloud license (https://app.netdata.cloud/LICENSE.txt)."/>
+		<CustomAction Id="CHECKCLOUD" Error="To continue, please accept the terms of the Cloud license (https://app.netdata.cloud/LICENSE.txt) by including the argument CLOUDLICENSE=1."/>
 		<InstallExecuteSequence>
                     <Custom Action="CHECKCLOUD" Before="FileCost" Condition ="CLOUDLICENSE=&quot;0&quot; AND NOT Installed" />
 		</InstallExecuteSequence>
