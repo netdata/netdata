@@ -79,9 +79,8 @@ void *win_plugin_main(void *ptr) {
         worker_register_job_name(i, win_modules[i].dim);
     }
 
-    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, localhost->rrd_update_every * USEC_PER_SEC);
 
 #define LGS_MODULE_ID 0
 
@@ -93,7 +92,7 @@ void *win_plugin_main(void *ptr) {
 
     while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
-        usec_t hb_dt = heartbeat_next(&hb, step);
+        usec_t hb_dt = heartbeat_next(&hb);
 
         if(unlikely(!service_running(SERVICE_COLLECTORS)))
             break;

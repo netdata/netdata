@@ -1369,14 +1369,13 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     // ------------------------------------------------------------------------
 
-    const usec_t step_ut = 100 * USEC_PER_MS;
     usec_t send_newline_ut = 0;
     usec_t since_last_scan_ut = WINDOWS_EVENTS_SCAN_EVERY_USEC * 2; // something big to trigger scanning at start
     usec_t since_last_providers_release_ut = 0;
     const bool tty = isatty(fileno(stdout)) == 1;
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, USEC_PER_SEC);
     while(!plugin_should_exit) {
 
         if(since_last_scan_ut > WINDOWS_EVENTS_SCAN_EVERY_USEC) {
@@ -1389,7 +1388,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
             since_last_providers_release_ut = 0;
         }
 
-        usec_t dt_ut = heartbeat_next(&hb, step_ut);
+        usec_t dt_ut = heartbeat_next(&hb);
         since_last_providers_release_ut += dt_ut;
         since_last_scan_ut += dt_ut;
         send_newline_ut += dt_ut;
