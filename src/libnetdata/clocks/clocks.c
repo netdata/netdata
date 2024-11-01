@@ -246,13 +246,15 @@ void sleep_to_absolute_time(usec_t usec) {
 }
 #endif
 
-#define HEARTBEAT_ALIGNMENT_STATISTICS_SIZE 10
+#define HEARTBEAT_ALIGNMENT_STATISTICS_SIZE 50
 netdata_mutex_t heartbeat_alignment_mutex = NETDATA_MUTEX_INITIALIZER;
 static size_t heartbeat_alignment_id = 0;
 
 struct heartbeat_thread_statistics {
+    pid_t tid;
     size_t sequence;
     usec_t dt;
+    usec_t randomness;
 };
 static struct heartbeat_thread_statistics heartbeat_alignment_values[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE] = { 0 };
 
@@ -290,19 +292,38 @@ void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr,
     memcpy(old, current, sizeof(struct heartbeat_thread_statistics) * HEARTBEAT_ALIGNMENT_STATISTICS_SIZE);
 }
 
-inline void heartbeat_init(heartbeat_t *hb) {
-    hb->realtime = 0ULL;
-    hb->randomness = (usec_t)250 * USEC_PER_MS + ((usec_t)(now_realtime_usec() * clock_realtime_resolution) % (250 * USEC_PER_MS));
-    hb->randomness -= (hb->randomness % clock_realtime_resolution);
+static usec_t heartbeat_randomness(usec_t step) {
+    struct {
+        pid_t tid;
+        usec_t now_ut;
+    } key = {
+        .tid = gettid(),
+        .now_ut = now_realtime_usec(),
+    };
+    XXH64_hash_t hash = XXH3_64bits(&key, sizeof(key));
 
+    usec_t alignment_ut = (step / 4) + (hash % (step / 3));
+    alignment_ut /= clock_realtime_resolution;
+    alignment_ut *= clock_realtime_resolution;
+
+    return alignment_ut;
+}
+
+inline void heartbeat_init(heartbeat_t *hb, usec_t step) {
     netdata_mutex_lock(&heartbeat_alignment_mutex);
     hb->statistics_id = heartbeat_alignment_id;
     heartbeat_alignment_id++;
     netdata_mutex_unlock(&heartbeat_alignment_mutex);
 
+    hb->step = step;
+    hb->realtime = 0ULL;
+    hb->randomness = heartbeat_randomness(step);
+
     if(hb->statistics_id < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE) {
         heartbeat_alignment_values[hb->statistics_id].dt = 0;
         heartbeat_alignment_values[hb->statistics_id].sequence = 0;
+        heartbeat_alignment_values[hb->statistics_id].randomness = hb->randomness;
+        heartbeat_alignment_values[hb->statistics_id].tid = gettid();
     }
 }
 
@@ -310,17 +331,8 @@ inline void heartbeat_init(heartbeat_t *hb) {
 // it waits using the monotonic clock
 // it returns the dt using the realtime clock
 
-usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
-    if(unlikely(hb->randomness > tick / 2)) {
-        // TODO: The heartbeat tick should be specified at the heartbeat_init() function
-        usec_t tmp = (now_realtime_usec() * clock_realtime_resolution) % (tick / 2);
-
-        nd_log_limit_static_global_var(erl, 10, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
-                     "heartbeat randomness of %"PRIu64" is too big for a tick of %"PRIu64" - setting it to %"PRIu64"",
-                     hb->randomness, tick, tmp);
-        hb->randomness = tmp;
-    }
+usec_t heartbeat_next(heartbeat_t *hb) {
+    usec_t tick = hb->step;
 
     usec_t dt;
     usec_t now = now_realtime_usec();

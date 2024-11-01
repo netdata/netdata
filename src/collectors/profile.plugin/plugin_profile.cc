@@ -117,7 +117,7 @@ public:
         worker_register_job_custom_metric(WORKER_JOB_METRIC_POINTS_BACKFILLED, "points backfilled", "points", WORKER_METRIC_ABSOLUTE);
 
         heartbeat_t HB;
-        heartbeat_init(&HB);
+        heartbeat_init(&HB, UpdateEvery * USEC_PER_SEC);
 
         worker_is_busy(WORKER_JOB_CREATE_CHARTS);
         create();
@@ -157,7 +157,7 @@ public:
 
             if (CollectionTV.tv_sec >= NowTV.tv_sec) {
                 worker_is_idle();
-                heartbeat_next(&HB, UpdateEvery * USEC_PER_SEC);
+                heartbeat_next(&HB);
             }
         }
     }

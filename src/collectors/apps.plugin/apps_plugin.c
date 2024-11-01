@@ -763,10 +763,9 @@ int main(int argc, char **argv) {
     netdata_mutex_lock(&apps_and_stdout_mutex);
     APPS_PLUGIN_GLOBAL_FUNCTIONS();
 
-    usec_t step = update_every * USEC_PER_SEC;
     global_iterations_counter = 1;
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, update_every * USEC_PER_SEC);
     for(; !apps_plugin_exit ; global_iterations_counter++) {
         netdata_mutex_unlock(&apps_and_stdout_mutex);
 
@@ -778,7 +777,7 @@ int main(int argc, char **argv) {
             dt = update_every * USEC_PER_SEC;
         }
         else
-            dt = heartbeat_next(&hb, step);
+            dt = heartbeat_next(&hb);
 
         netdata_mutex_lock(&apps_and_stdout_mutex);
 

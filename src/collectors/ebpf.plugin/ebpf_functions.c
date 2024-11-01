@@ -712,9 +712,9 @@ void *ebpf_function_thread(void *ptr)
     pthread_mutex_unlock(&lock);
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, USEC_PER_SEC);
     while(!ebpf_plugin_stop()) {
-        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        heartbeat_next(&hb);
 
         if (ebpf_plugin_stop()) {
             break;

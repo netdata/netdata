@@ -771,13 +771,13 @@ static void disk_collector(ebpf_module_t *em)
 
     int update_every = em->update_every;
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, USEC_PER_SEC);
     int counter = update_every - 1;
     int maps_per_core = em->maps_per_core;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
-        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        heartbeat_next(&hb);
 
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;

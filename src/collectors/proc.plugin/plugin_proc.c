@@ -226,9 +226,8 @@ void *proc_main(void *ptr)
         worker_register_job_name(i, proc_modules[i].dim);
     }
 
-    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, localhost->rrd_update_every * USEC_PER_SEC);
 
     inside_lxc_container = is_lxcfs_proc_mounted();
     is_mem_swap_enabled = is_swap_enabled();
@@ -245,7 +244,7 @@ void *proc_main(void *ptr)
 
     while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
-        usec_t hb_dt = heartbeat_next(&hb, step);
+        usec_t hb_dt = heartbeat_next(&hb);
 
         if(unlikely(!service_running(SERVICE_COLLECTORS)))
             break;

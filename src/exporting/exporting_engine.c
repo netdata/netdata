@@ -195,12 +195,11 @@ void *exporting_main(void *ptr)
     RRDDIM *rd_main_system = NULL;
     create_main_rusage_chart(&st_main_rusage, &rd_main_user, &rd_main_system);
 
-    usec_t step_ut = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, localhost->rrd_update_every * USEC_PER_SEC);
 
     while (service_running(SERVICE_EXPORTERS)) {
-        heartbeat_next(&hb, step_ut);
+        heartbeat_next(&hb);
         engine->now = now_realtime_sec();
 
         if (mark_scheduled_instances(engine))

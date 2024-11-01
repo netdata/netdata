@@ -569,14 +569,13 @@ void *analytics_main(void *ptr)
     CLEANUP_FUNCTION_REGISTER(analytics_main_cleanup) cleanup_ptr = ptr;
     unsigned int sec = 0;
     heartbeat_t hb;
-    heartbeat_init(&hb);
-    usec_t step_ut = USEC_PER_SEC;
+    heartbeat_init(&hb, USEC_PER_SEC);
 
     netdata_log_debug(D_ANALYTICS, "Analytics thread starts");
 
-    //first delay after agent start
+    // first delay after agent start
     while (service_running(SERVICE_ANALYTICS) && likely(sec <= ANALYTICS_INIT_SLEEP_SEC)) {
-        heartbeat_next(&hb, step_ut);
+        heartbeat_next(&hb);
         sec++;
     }
 
@@ -592,8 +591,8 @@ void *analytics_main(void *ptr)
 
     sec = 0;
     while (1) {
-        heartbeat_next(&hb, step_ut * 2);
-        sec += 2;
+        heartbeat_next(&hb);
+        sec++;
 
         if (unlikely(!service_running(SERVICE_ANALYTICS)))
             break;

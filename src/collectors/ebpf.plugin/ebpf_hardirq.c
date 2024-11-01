@@ -571,15 +571,15 @@ static void hardirq_collector(ebpf_module_t *em)
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
-    heartbeat_t hb;
-    heartbeat_init(&hb);
     int update_every = em->update_every;
     int counter = update_every - 1;
     //This will be cancelled by its parent
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
+    heartbeat_t hb;
+    heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
-        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        heartbeat_next(&hb);
 
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;

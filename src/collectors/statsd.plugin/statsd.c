@@ -2818,12 +2818,11 @@ void *statsd_main(void *ptr) {
     // ----------------------------------------------------------------------------------------------------------------
     // statsd thread to turn metrics into charts
 
-    usec_t step = statsd.update_every * USEC_PER_SEC;
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, statsd.update_every * USEC_PER_SEC);
     while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
-        heartbeat_next(&hb, step);
+        heartbeat_next(&hb);
 
         worker_is_busy(WORKER_STATSD_FLUSH_GAUGES);
         statsd_flush_index_metrics(&statsd.gauges,     statsd_flush_gauge);

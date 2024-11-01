@@ -1811,9 +1811,6 @@ void ebpf_socket_resume_apps_data()
  */
 void *ebpf_read_socket_thread(void *ptr)
 {
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     ebpf_update_array_vectors(em);
@@ -1826,9 +1823,10 @@ void *ebpf_read_socket_thread(void *ptr)
 
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
-    usec_t period = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
-        (void)heartbeat_next(&hb, period);
+        heartbeat_next(&hb);
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
@@ -2608,9 +2606,6 @@ static void ebpf_socket_send_cgroup_data(int update_every)
  */
 static void socket_collector(ebpf_module_t *em)
 {
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
     int cgroups = em->cgroup_charts;
     if (cgroups)
         ebpf_socket_update_cgroup_algorithm();
@@ -2623,8 +2618,10 @@ static void socket_collector(ebpf_module_t *em)
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
     memset(stats, 0, sizeof(em->hash_table_stats));
+    heartbeat_t hb;
+    heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
-        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        heartbeat_next(&hb);
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
