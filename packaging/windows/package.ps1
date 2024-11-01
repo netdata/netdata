@@ -14,3 +14,26 @@ $env:CHERE_INVOKING = 'yes'
 if ($LastExitcode -ne 0) {
     exit 1
 }
+
+if ($null -eq $env:BUILD_DIR) {
+    $builddir = & $msysbash -l "$PSScriptRoot\get-win-build-path.sh"
+
+    if ($LastExitcode -ne 0) {
+        exit 1
+    }
+} else {
+    $builddir = $env:BUILD_DIR
+}
+
+Push-Location "$builddir"
+
+$wixarch = "x64"
+
+wix build -arch $wixarch -ext WixToolset.Util.wixext -ext WixToolset.UI.wixext -out "$PSScriptRoot\netdata-$wixarch.msi" netdata.wxs
+
+if ($LastExitcode -ne 0) {
+    Pop-Location
+    exit 1
+}
+
+Pop-Location
