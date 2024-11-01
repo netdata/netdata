@@ -253,7 +253,7 @@ static void netdata_claim_write_config(char *path)
         filename = path;
     }
 
-    HANDLE hf = CreateFileA(filename, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE hf = CreateFileA(filename, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hf == INVALID_HANDLE_VALUE)
         netdata_claim_error_exit(L"CreateFileA");
 
