@@ -492,4 +492,13 @@ void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em);
 int ebpf_can_plugin_load_code(int kver, char *plugin_name);
 int ebpf_adjust_memory_limit();
 
+#ifdef LIBBPF_MAJOR_VERSION
+static inline int netdata_silent_libbpf_vfprintf(enum libbpf_print_level level __maybe_unused,
+                                                 const char *format __maybe_unused,
+                                                 va_list args __maybe_unused)
+{
+     return 0;
+}
+#endif
+
 #endif /* NETDATA_EBPF_H */
