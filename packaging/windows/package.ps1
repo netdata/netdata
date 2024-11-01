@@ -25,10 +25,15 @@ if ($null -eq $env:BUILD_DIR) {
     $builddir = $env:BUILD_DIR
 }
 
+Push-Location "$builddir"
+
 $wixarch = "x64"
 
-wix build -arch $wixarch -ext WixToolset.Util.wixext -ext WixToolset.UI.wixext -out "$PSScriptRoot\netdata-$wixarch.msi" "$builddir\netdata.wxs"
+wix build -arch $wixarch -ext WixToolset.Util.wixext -ext WixToolset.UI.wixext -out "$PSScriptRoot\netdata-$wixarch.msi" netdata.wxs
 
 if ($LastExitcode -ne 0) {
+    Pop-Location
     exit 1
 }
+
+Pop-Location
