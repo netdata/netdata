@@ -75,9 +75,14 @@
           ]
         },
         {
-          "title": "Checks",
+          "title": "TCP",
           "fields": [
-            "ports",
+            "ports"
+          ]
+        },
+        {
+          "title": "UDP",
+          "fields": [
             "udp_ports"
           ]
         }
