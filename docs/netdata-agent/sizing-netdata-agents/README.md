@@ -49,7 +49,7 @@ Netdata Parents dynamically adjust their resource usage based on the volume of m
 
 Check [RAM Requirements](/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md) for more information.
 
-## Netdata's Innovations for optimal performance and scalability
+## Netdata's performance and scalability optimization techniques
 
 1. **Minimal Disk I/O**
 
