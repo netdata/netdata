@@ -24,6 +24,9 @@
 		<Property Id="PROXY" Value=" " />
 		<Property Id="URL" Value="https://app.netdata.cloud" />
 
+		<Property Id="GPLLICENSE" Value="0" />
+		<Property Id="CLOUDLICENSE" Value="0" />
+
 		<Feature Id="Main">
 			<ComponentGroupRef Id="NetdataComponents" />
 			<ComponentRef Id="NetdataVarCache" />
@@ -35,6 +38,16 @@
 
 	<Fragment>
 		<Property Id="MsiLogging" Value="voicewarmupx!"/>
+
+		<CustomAction Id="CHECKGPL" Error="You must accept the GPL 3.0 license (https://www.gnu.org/licenses/gpl-3.0.txt)."/>
+		<InstallExecuteSequence>
+                    <Custom Action="CHECKGPL" Before="FileCost" Condition ="GPLLICENSE=&quot;0&quot; AND NOT Installed" />
+		</InstallExecuteSequence>
+
+		<CustomAction Id="CHECKCLOUD" Error="You must accept the Cloud license (https://app.netdata.cloud/LICENSE.txt)."/>
+		<InstallExecuteSequence>
+                    <Custom Action="CHECKCLOUD" Before="FileCost" Condition ="CLOUDLICENSE=&quot;0&quot; AND NOT Installed" />
+		</InstallExecuteSequence>
 
 		<StandardDirectory Id="ProgramFiles64Folder">
 			<Directory Id="INSTALLFOLDER" Name="Netdata">
