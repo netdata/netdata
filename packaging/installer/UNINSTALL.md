@@ -35,7 +35,7 @@ In most cases, these commands will guide you through the uninstallation process 
 
 If you installed Netdata with a custom prefix (different directory location), you may need to specify the original prefix during uninstallation with the `--old-install-prefix` option.
 
-## Uninstalling manually
+### Uninstalling manually
 
 Most official installations of Netdata include an uninstaller script that can be manually invoked instead of using the kickstart script (internally, the kickstart script also uses this uninstaller script, it just handles the process outlined below for you).
 

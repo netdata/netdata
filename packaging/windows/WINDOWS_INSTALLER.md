@@ -62,7 +62,3 @@ Replace `<YOUR_TOKEN>` and `<YOUR_ROOM>` with your actual Netdata Cloud Space cl
 > **Note**
 >
 > The Windows version of Netdata is intended for users on paid plans.
-
-## Uninstalling
-
-To uninstall Netdata, run the `uninstall.exe` file in your Netdata installation directory, typically `<YOUR_INSTALL_LOCATION>\Netdata`.
