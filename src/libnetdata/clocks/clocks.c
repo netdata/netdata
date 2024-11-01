@@ -296,10 +296,12 @@ static usec_t heartbeat_randomness(usec_t step) {
     struct {
         pid_t tid;
         usec_t now_ut;
+        char tag[ND_THREAD_TAG_MAX + 1];
     } key = {
         .tid = gettid(),
         .now_ut = now_realtime_usec(),
     };
+    strncpyz(key.tag, nd_thread_tag(), sizeof(key.tag) - 1);
     XXH64_hash_t hash = XXH3_64bits(&key, sizeof(key));
 
     usec_t max_randomness = MIN(step / 4, 300 * USEC_PER_MS);
