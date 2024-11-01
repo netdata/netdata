@@ -6,6 +6,17 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/fsnotify/fsnotify from 1.7.0 to 1.8.0 in /src/go [\#18920](https://github.com/netdata/netdata/pull/18920) ([dependabot[bot]](https://github.com/apps/dependabot))
+- log2journal now uses libnetdata [\#18919](https://github.com/netdata/netdata/pull/18919) ([ktsaou](https://github.com/ktsaou))
+- docs: fix ui license link [\#18918](https://github.com/netdata/netdata/pull/18918) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18917](https://github.com/netdata/netdata/pull/18917) ([netdatabot](https://github.com/netdatabot))
+- docs: fix broken links in metadata [\#18915](https://github.com/netdata/netdata/pull/18915) ([ilyam8](https://github.com/ilyam8))
+- Fix potential wait forever in mqtt loop [\#18913](https://github.com/netdata/netdata/pull/18913) ([stelfrag](https://github.com/stelfrag))
+- fix\(debugfs/extfrag\): add zone label [\#18910](https://github.com/netdata/netdata/pull/18910) ([ilyam8](https://github.com/ilyam8))
+- proc.plugin: log as info if a dir not exists [\#18909](https://github.com/netdata/netdata/pull/18909) ([ilyam8](https://github.com/ilyam8))
+- uninstall docs edits [\#18908](https://github.com/netdata/netdata/pull/18908) ([Ancairon](https://github.com/Ancairon))
+- Update uninstallation docs and remove reinstallation page [\#18907](https://github.com/netdata/netdata/pull/18907) ([Ancairon](https://github.com/Ancairon))
+- Fix a potential invalid double free memory [\#18905](https://github.com/netdata/netdata/pull/18905) ([stelfrag](https://github.com/stelfrag))
 - versioning for functions [\#18902](https://github.com/netdata/netdata/pull/18902) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18901](https://github.com/netdata/netdata/pull/18901) ([netdatabot](https://github.com/netdatabot))
 - chore\(go.d.plugin\): add build tags to modules [\#18900](https://github.com/netdata/netdata/pull/18900) ([ilyam8](https://github.com/ilyam8))
@@ -440,14 +451,6 @@
 - remove python.d/example [\#18369](https://github.com/netdata/netdata/pull/18369) ([ilyam8](https://github.com/ilyam8))
 - go.d squidlog: improve parser init and parsing [\#18368](https://github.com/netdata/netdata/pull/18368) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/axiomhq/hyperloglog from 0.0.0-20240507144631-af9851f82b27 to 0.1.0 in /src/go [\#18367](https://github.com/netdata/netdata/pull/18367) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/vmware/govmomi from 0.40.0 to 0.42.0 in /src/go [\#18366](https://github.com/netdata/netdata/pull/18366) ([dependabot[bot]](https://github.com/apps/dependabot))
-- eBPF \(reduce CPU and memory usage\) [\#18365](https://github.com/netdata/netdata/pull/18365) ([thiagoftsm](https://github.com/thiagoftsm))
-- Regenerate integrations.js [\#18363](https://github.com/netdata/netdata/pull/18363) ([netdatabot](https://github.com/netdatabot))
-- add go.d/tor [\#18361](https://github.com/netdata/netdata/pull/18361) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/tor [\#18358](https://github.com/netdata/netdata/pull/18358) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18357](https://github.com/netdata/netdata/pull/18357) ([netdatabot](https://github.com/netdatabot))
-- remove python.d lm\_sensors.py [\#18356](https://github.com/netdata/netdata/pull/18356) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/retroshare [\#18355](https://github.com/netdata/netdata/pull/18355) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
