@@ -321,27 +321,16 @@ static usec_t heartbeat_randomness(usec_t step __maybe_unused, size_t statistics
     };
     strncpyz(key.tag, nd_thread_tag(), sizeof(key.tag) - 1);
     XXH64_hash_t hash = XXH3_64bits(&key, sizeof(key));
-    usec_t process_offset_ut = hash % (100 * USEC_PER_MS);
-
-    // Golden ratio conjugate
-    const double phi = 0.61803398875;
-
-    // Calculate the fractional part of statistics_id * phi
-    double fractional = fmod((double)statistics_id * phi, 1.0);
-
-    // Map the fractional part to the desired offset range (100ms to 400ms)
-    usec_t offset_ut = (100ULL + (usec_t)(fractional * 300ULL)) * USEC_PER_MS;
-
-    // add up to 100ms based on the hash
-    offset_ut += process_offset_ut;
+    usec_t offset_ut = (100 * USEC_PER_MS) + (hash % (400 * USEC_PER_MS));
 
     // Calculate the scheduler tick interval in microseconds
     usec_t scheduler_step_ut = USEC_PER_SEC / (usec_t)system_hz;
+    if(scheduler_step_ut > 10 * USEC_PER_MS)
+        scheduler_step_ut = 10 * USEC_PER_MS;
 
-    // if the offset is less than 0.5ms far from the scheduler tick
-    // move it 0.25ms away
-    if(offset_ut % scheduler_step_ut < 500)
-        offset_ut += 500;
+    // if the offset is close to the scheduler tick, move it away from it
+    if(offset_ut % scheduler_step_ut < scheduler_step_ut / 4)
+        offset_ut += scheduler_step_ut / 4;
 
     return offset_ut;
 }

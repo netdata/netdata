@@ -6,7 +6,7 @@
 // system functions
 // to retrieve settings of the system
 
-unsigned int system_hz;
+unsigned int system_hz = 100;
 void os_get_system_HZ(void) {
     long ticks;
 
