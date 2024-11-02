@@ -79,6 +79,8 @@ static usec_t get_clock_resolution(clockid_t clock) {
 // perform any initializations required for clocks
 
 static __attribute__((constructor)) void clocks_init(void) {
+    os_get_system_HZ();
+
     // monotonic raw has to be tested before boottime
     test_clock_monotonic_raw();
 
@@ -311,12 +313,21 @@ static usec_t heartbeat_randomness(usec_t step __maybe_unused, size_t statistics
     // Calculate the fractional part of statistics_id * phi
     double fractional = fmod((double)statistics_id * phi, 1.0);
 
-    // Map the fractional part to the desired offset range (150 to 500ms)
-    usec_t offset_ms = 150ULL + (usec_t)(fractional * 350ULL);
+    // Map the fractional part to the desired offset range (150ms to 500ms)
+    usec_t offset_ut = (150ULL + (usec_t)(fractional * 350ULL)) * USEC_PER_MS;
 
-    // Convert milliseconds to microseconds
-    // we add 500 usec so that we will never align with kernel's HZ value
-    return offset_ms * USEC_PER_MS + 500;
+    // Always use 0.5 ms to avoid running at system HZ
+    offset_ut += 500;
+
+    // Calculate the scheduler tick interval in microseconds
+    usec_t scheduler_step_ut = USEC_PER_SEC / (usec_t)system_hz;
+
+    // if the offset is less than 0.5ms far from the scheduler tick
+    // move it 0.25ms away
+    if(offset_ut % scheduler_step_ut < 500)
+        offset_ut += 250;
+
+    return offset_ut;
 }
 
 inline void heartbeat_init(heartbeat_t *hb, usec_t step) {

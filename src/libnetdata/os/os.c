@@ -12,6 +12,7 @@ void os_get_system_HZ(void) {
 
     if ((ticks = sysconf(_SC_CLK_TCK)) == -1) {
         netdata_log_error("Cannot get system clock ticks");
+        ticks = 100;
     }
 
     system_hz = (unsigned int) ticks;

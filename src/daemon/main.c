@@ -1357,7 +1357,6 @@ static void get_netdata_configured_variables()
     // --------------------------------------------------------------------
     // get various system parameters
 
-    os_get_system_HZ();
     os_get_system_cpus_uncached();
     os_get_system_pid_max();
 
