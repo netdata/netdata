@@ -307,17 +307,33 @@ void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr,
 }
 
 static usec_t heartbeat_randomness(usec_t step __maybe_unused, size_t statistics_id) {
+    struct {
+        pid_t pid;
+        pid_t tid;
+        usec_t now_ut;
+        size_t statistics_id;
+        char tag[ND_THREAD_TAG_MAX + 1];
+    } key = {
+        .pid = getpid(),
+        .tid = os_gettid(),
+        .now_ut = now_realtime_usec(),
+        .statistics_id = statistics_id,
+    };
+    strncpyz(key.tag, nd_thread_tag(), sizeof(key.tag) - 1);
+    XXH64_hash_t hash = XXH3_64bits(&key, sizeof(key));
+    usec_t process_offset_ut = hash % (100 * USEC_PER_MS);
+
     // Golden ratio conjugate
     const double phi = 0.61803398875;
 
     // Calculate the fractional part of statistics_id * phi
     double fractional = fmod((double)statistics_id * phi, 1.0);
 
-    // Map the fractional part to the desired offset range (150ms to 500ms)
-    usec_t offset_ut = (150ULL + (usec_t)(fractional * 350ULL)) * USEC_PER_MS;
+    // Map the fractional part to the desired offset range (100ms to 400ms)
+    usec_t offset_ut = (100ULL + (usec_t)(fractional * 300ULL)) * USEC_PER_MS;
 
-    // Always use 0.5 ms to avoid running at system HZ
-    offset_ut += 500;
+    // add up to 100ms based on the hash
+    offset_ut += process_offset_ut;
 
     // Calculate the scheduler tick interval in microseconds
     usec_t scheduler_step_ut = USEC_PER_SEC / (usec_t)system_hz;
@@ -325,7 +341,7 @@ static usec_t heartbeat_randomness(usec_t step __maybe_unused, size_t statistics
     // if the offset is less than 0.5ms far from the scheduler tick
     // move it 0.25ms away
     if(offset_ut % scheduler_step_ut < 500)
-        offset_ut += 250;
+        offset_ut += 500;
 
     return offset_ut;
 }
