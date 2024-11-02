@@ -653,7 +653,7 @@ jobs:
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
-          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/netdata-*.exe,final-artifacts/integrations.js'
+          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/netdata-*.msi,final-artifacts/integrations.js'
           owner: netdata
           repo: netdata-nightlies
           body: Netdata nightly build for ${{ steps.version.outputs.date }}.
@@ -771,7 +771,7 @@ jobs:
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
-          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/netdata-*.exe,final-artifacts/integrations.js'
+          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/netdata-*.msi,final-artifacts/integrations.js'
           draft: true
           tag: ${{ needs.normalize-tag.outputs.tag }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
