@@ -862,6 +862,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/nd_log-to-windows-common.h
         src/libnetdata/common.h
         src/libnetdata/xxHash/xxhash.h
+        src/libnetdata/os/jitter.c
+        src/libnetdata/os/jitter.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

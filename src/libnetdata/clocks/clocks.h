@@ -4,6 +4,7 @@
 #define NETDATA_CLOCKS_H 1
 
 #include "../libnetdata.h"
+#include "libnetdata/os/jitter.h"
 
 #ifndef HAVE_CLOCK_GETTIME
 struct timespec {
@@ -30,6 +31,8 @@ typedef struct heartbeat {
     usec_t realtime;
     usec_t randomness;
     size_t statistics_id;
+    XXH64_hash_t hash;
+    OS_JITTER jitter;
 } heartbeat_t;
 
 /* Linux value is as good as any other */

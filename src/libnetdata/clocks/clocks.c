@@ -260,6 +260,10 @@ void sleep_to_absolute_time(usec_t usec) {
 }
 #endif
 
+#define HEARTBEAT_MIN_OFFSET_UT     (100 * USEC_PER_MS)
+#define HEARTBEAT_RANDOM_OFFSET_UT  (300 * USEC_PER_MS)
+#define HEARTBEAT_RANDOM_JITTER_UT  (100 * USEC_PER_MS)
+
 #define HEARTBEAT_ALIGNMENT_STATISTICS_SIZE 20
 static SPINLOCK heartbeat_alignment_spinlock = NETDATA_SPINLOCK_INITIALIZER;
 static size_t heartbeat_alignment_id = 0;
@@ -306,22 +310,27 @@ void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr,
     memcpy(old, current, sizeof(struct heartbeat_thread_statistics) * HEARTBEAT_ALIGNMENT_STATISTICS_SIZE);
 }
 
-static usec_t heartbeat_randomness(usec_t step __maybe_unused, size_t statistics_id) {
+static XXH64_hash_t heartbeat_hash(usec_t step, size_t statistics_id) {
     struct {
+        usec_t step;
         pid_t pid;
         pid_t tid;
         usec_t now_ut;
         size_t statistics_id;
         char tag[ND_THREAD_TAG_MAX + 1];
     } key = {
+        .step = step,
         .pid = getpid(),
         .tid = os_gettid(),
         .now_ut = now_realtime_usec(),
         .statistics_id = statistics_id,
     };
     strncpyz(key.tag, nd_thread_tag(), sizeof(key.tag) - 1);
-    XXH64_hash_t hash = XXH3_64bits(&key, sizeof(key));
-    usec_t offset_ut = (100 * USEC_PER_MS) + (hash % (400 * USEC_PER_MS));
+    return XXH3_64bits(&key, sizeof(key));
+}
+
+static usec_t heartbeat_randomness(XXH64_hash_t hash) {
+    usec_t offset_ut = HEARTBEAT_MIN_OFFSET_UT + (hash % HEARTBEAT_RANDOM_OFFSET_UT);
 
     // Calculate the scheduler tick interval in microseconds
     usec_t scheduler_step_ut = USEC_PER_SEC / (usec_t)system_hz;
@@ -345,7 +354,11 @@ inline void heartbeat_init(heartbeat_t *hb, usec_t step) {
 
     hb->step = step;
     hb->realtime = 0ULL;
-    hb->randomness = heartbeat_randomness(hb->step, hb->statistics_id);
+    hb->hash = heartbeat_hash(hb->step, hb->statistics_id);
+    hb->randomness = heartbeat_randomness(hb->hash);
+
+    // Initialize the random number generator for each thread
+    os_jitter_init(&hb->jitter, hb->hash);
 
     if(hb->statistics_id < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE) {
         heartbeat_alignment_values[hb->statistics_id].dt = 0;
@@ -369,6 +382,10 @@ usec_t heartbeat_next(heartbeat_t *hb) {
     // align the next time we want to the clock resolution
     if(next % clock_realtime_resolution)
         next = next - (next % clock_realtime_resolution) + clock_realtime_resolution;
+
+    // Apply random jitter of up to 50ms
+    usec_t jitter = os_jitter_ut(&hb->jitter, HEARTBEAT_RANDOM_JITTER_UT);
+    next += jitter;
 
     // sleep_usec() has a loop to guarantee we will sleep for at least the requested time.
     // According to the specs, when we sleep for a relative time, clock adjustments should
