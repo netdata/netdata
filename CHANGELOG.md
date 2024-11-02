@@ -6,12 +6,18 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/nvidia\_smi\): remove use\_csv\_format \(deprecated\) from config [\#18924](https://github.com/netdata/netdata/pull/18924) ([ilyam8](https://github.com/ilyam8))
+- Docs: small fixes and pass on sizing Agents [\#18923](https://github.com/netdata/netdata/pull/18923) ([Ancairon](https://github.com/Ancairon))
+- go.d/portcheck: separate tabs for tcp/upd ports [\#18922](https://github.com/netdata/netdata/pull/18922) ([ilyam8](https://github.com/ilyam8))
+- Update Libbpf [\#18921](https://github.com/netdata/netdata/pull/18921) ([thiagoftsm](https://github.com/thiagoftsm))
 - build\(deps\): bump github.com/fsnotify/fsnotify from 1.7.0 to 1.8.0 in /src/go [\#18920](https://github.com/netdata/netdata/pull/18920) ([dependabot[bot]](https://github.com/apps/dependabot))
 - log2journal now uses libnetdata [\#18919](https://github.com/netdata/netdata/pull/18919) ([ktsaou](https://github.com/ktsaou))
 - docs: fix ui license link [\#18918](https://github.com/netdata/netdata/pull/18918) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18917](https://github.com/netdata/netdata/pull/18917) ([netdatabot](https://github.com/netdatabot))
 - docs: fix broken links in metadata [\#18915](https://github.com/netdata/netdata/pull/18915) ([ilyam8](https://github.com/ilyam8))
+- Update CI to generate MSI installer for Windows using WiX. [\#18914](https://github.com/netdata/netdata/pull/18914) ([Ferroin](https://github.com/Ferroin))
 - Fix potential wait forever in mqtt loop [\#18913](https://github.com/netdata/netdata/pull/18913) ([stelfrag](https://github.com/stelfrag))
+- add `dagster` to apps\_groups.conf [\#18912](https://github.com/netdata/netdata/pull/18912) ([andrewm4894](https://github.com/andrewm4894))
 - fix\(debugfs/extfrag\): add zone label [\#18910](https://github.com/netdata/netdata/pull/18910) ([ilyam8](https://github.com/ilyam8))
 - proc.plugin: log as info if a dir not exists [\#18909](https://github.com/netdata/netdata/pull/18909) ([ilyam8](https://github.com/ilyam8))
 - uninstall docs edits [\#18908](https://github.com/netdata/netdata/pull/18908) ([Ancairon](https://github.com/Ancairon))
@@ -445,12 +451,6 @@
 - Regenerate integrations.js [\#18377](https://github.com/netdata/netdata/pull/18377) ([netdatabot](https://github.com/netdatabot))
 - go.d dnsmasq: query metrics individually to handle v2.90+ SERVFAIL [\#18376](https://github.com/netdata/netdata/pull/18376) ([ilyam8](https://github.com/ilyam8))
 - Switch to DEB822 format for APT repository configuration. [\#18374](https://github.com/netdata/netdata/pull/18374) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#18373](https://github.com/netdata/netdata/pull/18373) ([netdatabot](https://github.com/netdatabot))
-- Origin-sign all DEB packages regardless of upload target. [\#18372](https://github.com/netdata/netdata/pull/18372) ([Ferroin](https://github.com/Ferroin))
-- remove python.d/changefinder [\#18370](https://github.com/netdata/netdata/pull/18370) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/example [\#18369](https://github.com/netdata/netdata/pull/18369) ([ilyam8](https://github.com/ilyam8))
-- go.d squidlog: improve parser init and parsing [\#18368](https://github.com/netdata/netdata/pull/18368) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/axiomhq/hyperloglog from 0.0.0-20240507144631-af9851f82b27 to 0.1.0 in /src/go [\#18367](https://github.com/netdata/netdata/pull/18367) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
