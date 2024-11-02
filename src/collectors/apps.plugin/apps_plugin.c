@@ -665,7 +665,6 @@ netdata_mutex_t apps_and_stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool apps_plugin_exit = false;
 
 int main(int argc, char **argv) {
-    clocks_init();
     nd_log_initialize_for_external_plugins("apps.plugin");
 
     pagesize = (size_t)sysconf(_SC_PAGESIZE);

@@ -920,8 +920,6 @@ static void xenstat_send_domain_metrics() {
 }
 
 int main(int argc, char **argv) {
-    clocks_init();
-
     // ------------------------------------------------------------------------
     // initialization of netdata plugin
 

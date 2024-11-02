@@ -1647,7 +1647,6 @@ static void plugin_exit(int code) {
 }
 
 int main (int argc, char **argv) {
-    clocks_init();
     nd_log_initialize_for_external_plugins("freeipmi.plugin");
     netdata_threads_init_for_external_plugins(0); // set the default threads stack size here
 

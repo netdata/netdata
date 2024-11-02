@@ -1510,7 +1510,6 @@ int unittest_prepare_rrd(const char **user) {
 }
 
 int netdata_main(int argc, char **argv) {
-    clocks_init();
     string_init();
     analytics_init();
 

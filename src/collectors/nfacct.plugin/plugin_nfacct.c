@@ -747,7 +747,6 @@ void nfacct_signals()
 }
 
 int main(int argc, char **argv) {
-    clocks_init();
     nd_log_initialize_for_external_plugins("nfacct.plugin");
 
     // ------------------------------------------------------------------------

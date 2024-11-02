@@ -18,7 +18,6 @@ static bool journal_data_directories_exist() {
 }
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
-    clocks_init();
     nd_thread_tag_set("sd-jrnl.plugin");
     nd_log_initialize_for_external_plugins("systemd-journal.plugin");
 

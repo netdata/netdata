@@ -958,7 +958,6 @@ close_and_send:
 // main
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
-    clocks_init();
     nd_thread_tag_set("NETWORK-VIEWER");
     nd_log_initialize_for_external_plugins("network-viewer.plugin");
 

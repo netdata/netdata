@@ -152,8 +152,6 @@ void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr,
 void sleep_usec_with_now(usec_t usec, usec_t started_ut);
 #define sleep_usec(usec) sleep_usec_with_now(usec, 0)
 
-void clocks_init(void);
-
 // lower level functions - avoid using directly
 time_t now_sec(clockid_t clk_id);
 usec_t now_usec(clockid_t clk_id);

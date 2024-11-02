@@ -226,7 +226,6 @@ void reset_metrics() {
 }
 
 int main(int argc, char **argv) {
-    clocks_init();
     nd_log_initialize_for_external_plugins("cups.plugin");
 
     parse_command_line(argc, argv);

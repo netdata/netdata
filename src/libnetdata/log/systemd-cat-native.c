@@ -737,7 +737,6 @@ cleanup:
 }
 
 int main(int argc, char *argv[]) {
-    clocks_init();
     nd_log_initialize_for_external_plugins(argv[0]);
 
     int timeout_ms = 0; // wait forever

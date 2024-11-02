@@ -4005,7 +4005,6 @@ static void ebpf_manage_pid(pid_t pid)
  */
 int main(int argc, char **argv)
 {
-    clocks_init();
     nd_log_initialize_for_external_plugins(NETDATA_EBPF_PLUGIN_NAME);
 
     ebpf_set_global_variables();

@@ -1287,7 +1287,6 @@ void parse_command_line(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-    clocks_init();
     nd_log_initialize_for_external_plugins("perf.plugin");
 
     parse_command_line(argc, argv);
