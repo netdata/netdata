@@ -2060,9 +2060,6 @@ void ebpf_vfs_resume_apps_data() {
  */
 void *ebpf_read_vfs_thread(void *ptr)
 {
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     int maps_per_core = em->maps_per_core;
@@ -2075,11 +2072,12 @@ void *ebpf_read_vfs_thread(void *ptr)
 
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
-    usec_t period = update_every * USEC_PER_SEC;
     uint32_t max_period = EBPF_CLEANUP_FACTOR;
     pids_fd[EBPF_PIDS_VFS_IDX] = vfs_maps[NETDATA_VFS_PID].map_fd;
+    heartbeat_t hb;
+    heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
-        (void)heartbeat_next(&hb, period);
+        heartbeat_next(&hb);
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
@@ -2112,8 +2110,6 @@ void *ebpf_read_vfs_thread(void *ptr)
 static void vfs_collector(ebpf_module_t *em)
 {
     int cgroups = em->cgroup_charts;
-    heartbeat_t hb;
-    heartbeat_init(&hb);
     int update_every = em->update_every;
     int counter = update_every - 1;
     int maps_per_core = em->maps_per_core;
@@ -2121,8 +2117,10 @@ static void vfs_collector(ebpf_module_t *em)
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
     memset(stats, 0, sizeof(em->hash_table_stats));
+    heartbeat_t hb;
+    heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
-        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        heartbeat_next(&hb);
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 

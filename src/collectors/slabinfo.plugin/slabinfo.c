@@ -345,7 +345,6 @@ void usage(void) {
 }
 
 int main(int argc, char **argv) {
-    clocks_init();
     nd_log_initialize_for_external_plugins("slabinfo.plugin");
 
     program_name = argv[0];

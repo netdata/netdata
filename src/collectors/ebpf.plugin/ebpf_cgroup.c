@@ -373,13 +373,12 @@ void ebpf_create_charts_on_systemd(ebpf_systemd_args_t *chart)
  */
 void *ebpf_cgroup_integration(void *ptr __maybe_unused)
 {
-    usec_t step = USEC_PER_SEC;
     int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, USEC_PER_SEC);
     //Plugin will be killed when it receives a signal
     while (!ebpf_plugin_stop()) {
-        (void)heartbeat_next(&hb, step);
+        heartbeat_next(&hb);
 
         // We are using a small heartbeat time to wake up thread,
         // but we should not update so frequently the shared memory data

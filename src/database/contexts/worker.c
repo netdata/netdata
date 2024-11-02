@@ -1099,12 +1099,11 @@ void *rrdcontext_main(void *ptr) {
     worker_register_job_custom_metric(WORKER_JOB_PP_QUEUE_SIZE, "post processing queue size", "contexts", WORKER_METRIC_ABSOLUTE);
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
-    usec_t step = RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC;
+    heartbeat_init(&hb, RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC);
 
     while (service_running(SERVICE_CONTEXT)) {
         worker_is_idle();
-        heartbeat_next(&hb, step);
+        heartbeat_next(&hb);
 
         if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 

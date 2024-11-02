@@ -747,7 +747,6 @@ void nfacct_signals()
 }
 
 int main(int argc, char **argv) {
-    clocks_init();
     nd_log_initialize_for_external_plugins("nfacct.plugin");
 
     // ------------------------------------------------------------------------
@@ -832,12 +831,11 @@ int main(int argc, char **argv) {
     time_t started_t = now_monotonic_sec();
 
     size_t iteration;
-    usec_t step = netdata_update_every * USEC_PER_SEC;
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, netdata_update_every * USEC_PER_SEC);
     for(iteration = 0; 1; iteration++) {
-        usec_t dt = heartbeat_next(&hb, step);
+        usec_t dt = heartbeat_next(&hb);
 
         if(unlikely(netdata_exit)) break;
 

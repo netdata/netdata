@@ -26,6 +26,7 @@ typedef int64_t  smsec_t;
 typedef int64_t stime_t;
 
 typedef struct heartbeat {
+    usec_t step;
     usec_t realtime;
     usec_t randomness;
     size_t statistics_id;
@@ -139,19 +140,17 @@ msec_t timeval_msec(struct timeval *tv);
 usec_t dt_usec(struct timeval *now, struct timeval *old);
 susec_t dt_usec_signed(struct timeval *now, struct timeval *old);
 
-void heartbeat_init(heartbeat_t *hb);
+void heartbeat_init(heartbeat_t *hb, usec_t step);
 
 /* Sleeps until next multiple of tick using monotonic clock.
  * Returns elapsed time in microseconds since previous heartbeat
  */
-usec_t heartbeat_next(heartbeat_t *hb, usec_t tick);
+usec_t heartbeat_next(heartbeat_t *hb);
 
 void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr, size_t *count_ptr);
 
 void sleep_usec_with_now(usec_t usec, usec_t started_ut);
 #define sleep_usec(usec) sleep_usec_with_now(usec, 0)
-
-void clocks_init(void);
 
 // lower level functions - avoid using directly
 time_t now_sec(clockid_t clk_id);

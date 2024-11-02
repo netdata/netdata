@@ -67,10 +67,10 @@ void *timex_main(void *ptr)
     usec_t step = update_every * USEC_PER_SEC;
     usec_t real_step = USEC_PER_SEC;
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, USEC_PER_SEC);
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
-        heartbeat_next(&hb, USEC_PER_SEC);
+        heartbeat_next(&hb);
 
         if (real_step < step) {
             real_step += USEC_PER_SEC;

@@ -155,7 +155,6 @@ static void connect_cb(uv_connect_t* req, int status)
 
 int main(int argc, char **argv)
 {
-    clocks_init();
     nd_log_initialize_for_external_plugins("netdatacli");
 
     int ret, i;

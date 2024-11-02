@@ -2366,7 +2366,7 @@ void *unittest_stress_test_collector(void *ptr) {
     time_t start_time_t = pgc_uts.first_time_t + 1;
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, pgc_uts.time_per_collection_ut);
 
     while(!__atomic_load_n(&pgc_uts.stop, __ATOMIC_RELAXED)) {
         // netdata_log_info("COLLECTOR %zu: collecting metrics %zu to %zu, from %ld to %lu", id, metric_start, metric_end, start_time_t, start_time_t + pgc_uts.points_per_page);
@@ -2393,7 +2393,7 @@ void *unittest_stress_test_collector(void *ptr) {
 
         time_t end_time_t = start_time_t + (time_t)pgc_uts.points_per_page;
         while(++start_time_t <= end_time_t && !__atomic_load_n(&pgc_uts.stop, __ATOMIC_RELAXED)) {
-            heartbeat_next(&hb, pgc_uts.time_per_collection_ut);
+            heartbeat_next(&hb);
 
             for (size_t i = metric_start; i < metric_end; i++) {
                 if(pgc_uts.metrics[i])
@@ -2480,9 +2480,9 @@ void *unittest_stress_test_queries(void *ptr) {
 
 void *unittest_stress_test_service(void *ptr) {
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, USEC_PER_SEC);
     while(!__atomic_load_n(&pgc_uts.stop, __ATOMIC_RELAXED)) {
-        heartbeat_next(&hb, 1 * USEC_PER_SEC);
+        heartbeat_next(&hb);
 
         pgc_flush_pages(pgc_uts.cache, 1000);
         pgc_evict_pages(pgc_uts.cache, 0, 0);
@@ -2545,7 +2545,7 @@ void unittest_stress_test(void) {
     }
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, USEC_PER_SEC);
 
     struct {
         size_t entries;
@@ -2578,7 +2578,7 @@ void unittest_stress_test(void) {
     } stats = {}, old_stats = {};
 
     for(int i = 0; i < 86400 ;i++) {
-        heartbeat_next(&hb, 1 * USEC_PER_SEC);
+        heartbeat_next(&hb);
 
         old_stats = stats;
         stats.entries       = __atomic_load_n(&pgc_uts.cache->stats.entries, __ATOMIC_RELAXED);

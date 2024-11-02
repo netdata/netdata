@@ -717,8 +717,6 @@ void usage(void) {
 int main(int argc, const char **argv) {
     pid_t pid = 0;
 
-    clocks_init();
-
     if (setresuid(0, 0, 0) == -1)
         collector_error("setresuid(0, 0, 0) failed.");
 

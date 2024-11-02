@@ -1417,14 +1417,13 @@ void *cgroups_main(void *ptr) {
                             cgroup_function_systemd_top);
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
-    usec_t step = cgroup_update_every * USEC_PER_SEC;
+    heartbeat_init(&hb, cgroup_update_every * USEC_PER_SEC);
     usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_dt = 0;
 
     while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
-        usec_t hb_dt = heartbeat_next(&hb, step);
+        usec_t hb_dt = heartbeat_next(&hb);
 
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;

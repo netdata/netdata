@@ -1218,11 +1218,11 @@ ml_detect_main(void *arg)
     worker_register_job_name(WORKER_JOB_DETECTION_STATS, "training stats");
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, USEC_PER_SEC);
 
     while (!Cfg.detection_stop && service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
-        heartbeat_next(&hb, USEC_PER_SEC);
+        heartbeat_next(&hb);
 
         RRDHOST *rh;
         rrd_rdlock();

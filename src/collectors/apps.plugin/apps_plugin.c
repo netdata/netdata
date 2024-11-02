@@ -665,7 +665,6 @@ netdata_mutex_t apps_and_stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool apps_plugin_exit = false;
 
 int main(int argc, char **argv) {
-    clocks_init();
     nd_log_initialize_for_external_plugins("apps.plugin");
 
     pagesize = (size_t)sysconf(_SC_PAGESIZE);
@@ -709,7 +708,6 @@ int main(int argc, char **argv) {
 #endif /* NETDATA_INTERNAL_CHECKS */
 
     procfile_set_adaptive_allocation(true, 0, 0, 0);
-    os_get_system_HZ();
     os_get_system_cpus_uncached();
     apps_managers_and_aggregators_init(); // before parsing args!
     parse_args(argc, argv);
@@ -763,10 +761,9 @@ int main(int argc, char **argv) {
     netdata_mutex_lock(&apps_and_stdout_mutex);
     APPS_PLUGIN_GLOBAL_FUNCTIONS();
 
-    usec_t step = update_every * USEC_PER_SEC;
     global_iterations_counter = 1;
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, update_every * USEC_PER_SEC);
     for(; !apps_plugin_exit ; global_iterations_counter++) {
         netdata_mutex_unlock(&apps_and_stdout_mutex);
 
@@ -778,7 +775,7 @@ int main(int argc, char **argv) {
             dt = update_every * USEC_PER_SEC;
         }
         else
-            dt = heartbeat_next(&hb, step);
+            dt = heartbeat_next(&hb);
 
         netdata_mutex_lock(&apps_and_stdout_mutex);
 

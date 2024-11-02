@@ -226,7 +226,6 @@ void reset_metrics() {
 }
 
 int main(int argc, char **argv) {
-    clocks_init();
     nd_log_initialize_for_external_plugins("cups.plugin");
 
     parse_command_line(argc, argv);
@@ -243,12 +242,11 @@ int main(int argc, char **argv) {
 
     time_t started_t = now_monotonic_sec();
     size_t iteration = 0;
-    usec_t step = netdata_update_every * USEC_PER_SEC;
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, netdata_update_every * USEC_PER_SEC);
     for (iteration = 0; 1; iteration++) {
-        heartbeat_next(&hb, step);
+        heartbeat_next(&hb);
 
         if (unlikely(netdata_exit))
             break;

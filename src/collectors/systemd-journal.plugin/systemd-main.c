@@ -18,7 +18,6 @@ static bool journal_data_directories_exist() {
 }
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
-    clocks_init();
     nd_thread_tag_set("sd-jrnl.plugin");
     nd_log_initialize_for_external_plugins("systemd-journal.plugin");
 
@@ -114,13 +113,12 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     // ------------------------------------------------------------------------
 
-    const usec_t step_ut = 100 * USEC_PER_MS;
     usec_t send_newline_ut = 0;
     usec_t since_last_scan_ut = SYSTEMD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC * 2; // something big to trigger scanning at start
     const bool tty = isatty(fileno(stdout)) == 1;
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, USEC_PER_SEC);
     while(!plugin_should_exit) {
 
         if(since_last_scan_ut > SYSTEMD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC) {
@@ -128,7 +126,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
             since_last_scan_ut = 0;
         }
 
-        usec_t dt_ut = heartbeat_next(&hb, step_ut);
+        usec_t dt_ut = heartbeat_next(&hb);
         since_last_scan_ut += dt_ut;
         send_newline_ut += dt_ut;
 

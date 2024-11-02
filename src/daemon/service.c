@@ -297,7 +297,7 @@ void *service_main(void *ptr)
     CLEANUP_FUNCTION_REGISTER(service_main_cleanup) cleanup_ptr = ptr;
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, USEC_PER_SEC);
     usec_t step = USEC_PER_SEC * SERVICE_HEARTBEAT;
     usec_t real_step = USEC_PER_SEC;
 
@@ -305,7 +305,7 @@ void *service_main(void *ptr)
 
     while (service_running(SERVICE_MAINTENANCE)) {
         worker_is_idle();
-        heartbeat_next(&hb, USEC_PER_SEC);
+        heartbeat_next(&hb);
         if (real_step < step) {
             real_step += USEC_PER_SEC;
             continue;

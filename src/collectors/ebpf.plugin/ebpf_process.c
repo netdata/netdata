@@ -1120,8 +1120,6 @@ void ebpf_process_update_cgroup_algorithm()
  */
 static void process_collector(ebpf_module_t *em)
 {
-    heartbeat_t hb;
-    heartbeat_init(&hb);
     int publish_global = em->global_charts;
     int cgroups = em->cgroup_charts;
     pthread_mutex_lock(&ebpf_exit_cleanup);
@@ -1137,9 +1135,11 @@ static void process_collector(ebpf_module_t *em)
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
     memset(stats, 0, sizeof(em->hash_table_stats));
+    heartbeat_t hb;
+    heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
-        usec_t dt = heartbeat_next(&hb, USEC_PER_SEC);
-        (void)dt;
+        heartbeat_next(&hb);
+
         if (ebpf_plugin_stop())
             break;
 

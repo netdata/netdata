@@ -159,7 +159,6 @@ static void debugfs_parse_args(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-    clocks_init();
     nd_log_initialize_for_external_plugins("debugfs.plugin");
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
@@ -214,12 +213,11 @@ int main(int argc, char **argv)
     debugfs_parse_args(argc, argv);
 
     size_t iteration;
-    usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, update_every * USEC_PER_SEC);
 
     for (iteration = 0; iteration < 86400; iteration++) {
-        heartbeat_next(&hb, step);
+        heartbeat_next(&hb);
         int enabled = 0;
 
         for (int i = 0; debugfs_modules[i].name; i++) {

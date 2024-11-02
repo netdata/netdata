@@ -1240,9 +1240,9 @@ void *netdata_ipmi_collection_thread(void *ptr) {
     usec_t step = t->freq_s * USEC_PER_SEC;
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, step);
     while(++iteration) {
-        heartbeat_next(&hb, step);
+        heartbeat_next(&hb);
 
         if(t->debug)
             fprintf(stderr, "%s: calling netdata_ipmi_collect_data() for %s\n",
@@ -1647,7 +1647,6 @@ static void plugin_exit(int code) {
 }
 
 int main (int argc, char **argv) {
-    clocks_init();
     nd_log_initialize_for_external_plugins("freeipmi.plugin");
     netdata_threads_init_for_external_plugins(0); // set the default threads stack size here
 
@@ -2000,15 +1999,13 @@ int main (int argc, char **argv) {
     time_t started_t = now_monotonic_sec();
 
     size_t iteration = 0;
-    usec_t step = 100 * USEC_PER_MS;
     bool global_chart_created = false;
     bool tty = isatty(fileno(stdout)) == 1;
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
-
+    heartbeat_init(&hb, update_every * USEC_PER_SEC);
     for(iteration = 0; 1 ; iteration++) {
-        usec_t dt = heartbeat_next(&hb, step);
+        usec_t dt = heartbeat_next(&hb);
 
         if (!tty) {
             netdata_mutex_lock(&stdout_mutex);
@@ -2027,7 +2024,6 @@ int main (int argc, char **argv) {
 
         switch(state.sensors.status) {
             case ICS_RUNNING:
-                step = update_every * USEC_PER_SEC;
                 if(state.sensors.last_iteration_ut < now_monotonic_usec() - IPMI_RESTART_IF_SENSORS_DONT_ITERATE_EVERY_SECONDS * USEC_PER_SEC) {
                     collector_error("%s(): sensors have not be collected for %zu seconds. Exiting to restart.",
                                     __FUNCTION__, (size_t)((now_monotonic_usec() - state.sensors.last_iteration_ut) / USEC_PER_SEC));

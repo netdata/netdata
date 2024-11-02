@@ -958,7 +958,6 @@ close_and_send:
 // main
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
-    clocks_init();
     nd_thread_tag_set("NETWORK-VIEWER");
     nd_log_initialize_for_external_plugins("network-viewer.plugin");
 
@@ -1016,15 +1015,14 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    usec_t step_ut = 100 * USEC_PER_MS;
     usec_t send_newline_ut = 0;
     bool tty = isatty(fileno(stdout)) == 1;
 
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, USEC_PER_SEC);
     while(!plugin_should_exit) {
 
-        usec_t dt_ut = heartbeat_next(&hb, step_ut);
+        usec_t dt_ut = heartbeat_next(&hb);
         send_newline_ut += dt_ut;
 
         if(!tty && send_newline_ut > USEC_PER_SEC) {

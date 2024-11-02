@@ -459,14 +459,14 @@ static void oomkill_collector(ebpf_module_t *em)
     memset(keys, 0, sizeof(keys));
 
     // loop and read until ebpf plugin is closed.
-    heartbeat_t hb;
-    heartbeat_init(&hb);
     int counter = update_every - 1;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
+    heartbeat_t hb;
+    heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
-        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        (void)heartbeat_next(&hb);
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 

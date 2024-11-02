@@ -4005,7 +4005,6 @@ static void ebpf_manage_pid(pid_t pid)
  */
 int main(int argc, char **argv)
 {
-    clocks_init();
     nd_log_initialize_for_external_plugins(NETDATA_EBPF_PLUGIN_NAME);
 
     ebpf_set_global_variables();
@@ -4076,15 +4075,14 @@ int main(int argc, char **argv)
         }
     }
 
-    usec_t step = USEC_PER_SEC;
     heartbeat_t hb;
-    heartbeat_init(&hb);
+    heartbeat_init(&hb, USEC_PER_SEC);
     int update_apps_every = (int) EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
     int update_apps_list = update_apps_every - 1;
     int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     //Plugin will be killed when it receives a signal
     for ( ; !ebpf_plugin_stop(); global_iterations_counter++) {
-        (void)heartbeat_next(&hb, step);
+        (void)heartbeat_next(&hb);
 
         if (global_iterations_counter % EBPF_DEFAULT_UPDATE_EVERY == 0) {
             pthread_mutex_lock(&lock);
