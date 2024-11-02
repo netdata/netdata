@@ -617,7 +617,11 @@ void *rrdpush_sender_thread(void *ptr) {
             }
         };
 
-        int poll_rc = poll(fds, 2, 50); // timeout in milliseconds
+        // let it queue for 10ms if we are less than 50% full
+        if(outstanding < available)
+            microsleep(10 * USEC_PER_MS);
+
+        int poll_rc = poll(fds, 2, 100); // timeout in milliseconds
 
         netdata_log_debug(D_STREAM, "STREAM: poll() finished collector=%d socket=%d (current chunk %zu bytes)...",
               fds[Collector].revents, fds[Socket].revents, outstanding);

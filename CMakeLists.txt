@@ -759,8 +759,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/os-windows-wrappers.h
         src/libnetdata/os/get_system_cpus.c
         src/libnetdata/os/get_system_cpus.h
-        src/libnetdata/os/tinysleep.c
-        src/libnetdata/os/tinysleep.h
+        src/libnetdata/os/sleep.c
+        src/libnetdata/os/sleep.h
         src/libnetdata/os/uuid_generate.c
         src/libnetdata/os/uuid_generate.h
         src/libnetdata/os/setenv.c
