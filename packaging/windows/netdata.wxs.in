@@ -44,7 +44,7 @@
                     <Custom Action="CHECKGPL" Before="FileCost" Condition ="GPLLICENSE=&quot;0&quot; AND NOT Installed" />
 		</InstallExecuteSequence>
 
-		<CustomAction Id="CHECKCLOUDUI" Error="To continue, please accept the terms of the Cloud license (https://app.netdata.cloud/LICENSE.txt) by including the argument CLOUDUILICENSE=1."/>
+		<CustomAction Id="CHECKCLOUDUI" Error="To continue, please accept the terms of the Cloud UI license (https://app.netdata.cloud/LICENSE.txt) by including the argument CLOUDUILICENSE=1."/>
 		<InstallExecuteSequence>
                     <Custom Action="CHECKCLOUDUI" Before="FileCost" Condition ="CLOUDUILICENSE=&quot;0&quot; AND NOT Installed" />
 		</InstallExecuteSequence>
