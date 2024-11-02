@@ -304,26 +304,19 @@ void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr,
     memcpy(old, current, sizeof(struct heartbeat_thread_statistics) * HEARTBEAT_ALIGNMENT_STATISTICS_SIZE);
 }
 
-static usec_t heartbeat_randomness(usec_t step, size_t statistics_id) {
-    struct {
-        pid_t tid;
-        usec_t now_ut;
-        size_t statistics_id;
-        char tag[ND_THREAD_TAG_MAX + 1];
-    } key = {
-        .tid = os_gettid(),
-        .now_ut = now_realtime_usec(),
-        .statistics_id = statistics_id,
-    };
-    strncpyz(key.tag, nd_thread_tag(), sizeof(key.tag) - 1);
-    XXH64_hash_t hash = XXH3_64bits(&key, sizeof(key));
+static usec_t heartbeat_randomness(usec_t step __maybe_unused, size_t statistics_id) {
+    // Golden ratio conjugate
+    const double phi = 0.61803398875;
 
-    usec_t max_randomness = MIN(step / 4, 300 * USEC_PER_MS);
-    usec_t alignment_ut = (100 * USEC_PER_MS) + (hash % max_randomness);
-    alignment_ut /= clock_realtime_resolution;
-    alignment_ut *= clock_realtime_resolution;
+    // Calculate the fractional part of statistics_id * phi
+    double fractional = fmod((double)statistics_id * phi, 1.0);
 
-    return alignment_ut;
+    // Map the fractional part to the desired offset range (150 to 500ms)
+    usec_t offset_ms = 150ULL + (usec_t)(fractional * 350ULL);
+
+    // Convert milliseconds to microseconds
+    // we add 500 usec so that we will never align with kernel's HZ value
+    return offset_ms * USEC_PER_MS + 500;
 }
 
 inline void heartbeat_init(heartbeat_t *hb, usec_t step) {
