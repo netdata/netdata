@@ -395,19 +395,17 @@ size_t rrdpush_decompress(struct decompressor_state *state, const char *compress
 // ----------------------------------------------------------------------------
 // unit test
 
-#define my_random() os_random(UINT32_MAX)
-
 void unittest_generate_random_name(char *dst, size_t size) {
     if(size < 7)
         size = 7;
 
-    size_t len = 5 + my_random() % (size - 6);
+    size_t len = 5 + os_random32() % (size - 6);
 
     for(size_t i = 0; i < len ; i++) {
-        if(my_random() % 2 == 0)
-            dst[i] = 'A' + my_random() % 26;
+        if(os_random8() % 2 == 0)
+            dst[i] = 'A' + os_random8() % 26;
         else
-            dst[i] = 'a' + my_random() % 26;
+            dst[i] = 'a' + os_random8() % 26;
     }
 
     dst[len] = '\0';
@@ -421,9 +419,9 @@ void unittest_generate_message(BUFFER *wb, time_t now_s, size_t counter) {
     time_t point_end_time_s = now_s;
     time_t wall_clock_time_s = now_s;
     size_t chart_slot = counter + 1;
-    size_t dimensions = 2 + my_random() % 5;
+    size_t dimensions = 2 + os_random8() % 5;
     char chart[RRD_ID_LENGTH_MAX + 1] = "name";
-    unittest_generate_random_name(chart, 5 + my_random() % 30);
+    unittest_generate_random_name(chart, 5 + os_random8() % 30);
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2, sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1);
 
@@ -449,10 +447,10 @@ void unittest_generate_message(BUFFER *wb, time_t now_s, size_t counter) {
     for(size_t d = 0; d < dimensions ;d++) {
         size_t dim_slot = d + 1;
         char dim_id[RRD_ID_LENGTH_MAX + 1] = "dimension";
-        unittest_generate_random_name(dim_id, 10 + my_random() % 20);
-        int64_t last_collected_value = (my_random() % 2 == 0) ? (int64_t)(counter + d) : (int64_t)my_random();
-        NETDATA_DOUBLE value = (my_random() % 2 == 0) ? (NETDATA_DOUBLE)my_random() / ((NETDATA_DOUBLE)my_random() + 1) : (NETDATA_DOUBLE)last_collected_value;
-        SN_FLAGS flags = (my_random() % 1000 == 0) ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
+        unittest_generate_random_name(dim_id, 10 + os_random8() % 20);
+        int64_t last_collected_value = (os_random8() % 2 == 0) ? (int64_t)(counter + d) : (int64_t)os_random32();
+        NETDATA_DOUBLE value = (os_random8() % 2 == 0) ? (NETDATA_DOUBLE)os_random64() / ((NETDATA_DOUBLE)os_random64() + 1) : (NETDATA_DOUBLE)last_collected_value;
+        SN_FLAGS flags = (os_random16() % 1000 == 0) ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
 
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2, sizeof(PLUGINSD_KEYWORD_SET_V2) - 1);
 

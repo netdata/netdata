@@ -78,3 +78,80 @@ uint64_t os_random(uint64_t max) {
 
     return value % max;
 }
+
+// Generate an 8-bit random number
+uint8_t os_random8(void) {
+    uint8_t value;
+
+#if defined(HAVE_ARC4RANDOM_BUF)
+    arc4random_buf(&value, sizeof(value));
+#elif defined(HAVE_GETRANDOM)
+    getrandom(&value, sizeof(value), 0);
+#elif defined(HAVE_RAND_S)
+    unsigned int temp;
+    rand_s(&temp);
+    value = (uint8_t)temp;
+#else
+    value = (uint8_t)random();
+#endif
+
+    return value;
+}
+
+// Generate a 16-bit random number
+uint16_t os_random16(void) {
+    uint16_t value;
+
+#if defined(HAVE_ARC4RANDOM_BUF)
+    arc4random_buf(&value, sizeof(value));
+#elif defined(HAVE_GETRANDOM)
+    getrandom(&value, sizeof(value), 0);
+#elif defined(HAVE_RAND_S)
+    unsigned int temp;
+    rand_s(&temp);
+    value = (uint16_t)temp;
+#else
+    value = (uint16_t)random();
+#endif
+
+    return value;
+}
+
+// Generate a 32-bit random number
+uint32_t os_random32(void) {
+    uint32_t value;
+
+#if defined(HAVE_ARC4RANDOM_BUF)
+    arc4random_buf(&value, sizeof(value));
+#elif defined(HAVE_GETRANDOM)
+    getrandom(&value, sizeof(value), 0);
+#elif defined(HAVE_RAND_S)
+    unsigned int temp;
+    rand_s(&temp);
+    value = temp;
+#else
+    value = random();
+#endif
+
+    return value;
+}
+
+// Generate a 64-bit random number
+uint64_t os_random64(void) {
+    uint64_t value;
+
+#if defined(HAVE_ARC4RANDOM_BUF)
+    arc4random_buf(&value, sizeof(value));
+#elif defined(HAVE_GETRANDOM)
+    getrandom(&value, sizeof(value), 0);
+#elif defined(HAVE_RAND_S)
+    unsigned int temp_lo, temp_hi;
+    rand_s(&temp_lo);
+    rand_s(&temp_hi);
+    value = ((uint64_t)temp_hi << 32) | (uint64_t)temp_lo;
+#else
+    value = ((uint64_t)random() << 33) | ((uint64_t)random() << 2) | (random() & 0x3);
+#endif
+
+    return value;
+}
