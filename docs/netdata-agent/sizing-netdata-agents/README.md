@@ -1,4 +1,4 @@
-# Sizing Netdata Agents
+# Resource utilization
 
 Netdata is designed to automatically adjust its resource consumption based on the specific workload.
 
@@ -22,30 +22,35 @@ This table shows the specific system resources affected by different Netdata fea
     - **Impact**: Netdata collects most metrics with 1-second granularity. This high frequency impacts CPU usage.
     - **Optimization**: Lowering the sampling frequency (e.g., 1-second to 2-second intervals) can halve CPU usage. Balance the need for detailed data with resource efficiency.
 
-3. **Database Mode and Tiers**
+3. **Database Mode**
+
+    - **Impact**: The default database mode, `dbengine`, compresses data and writes it to disk.
+    - **Optimization**: In a Parent-Child setup, switch the Child's database mode to `ram`. This eliminates disk I/O for the Child.
+
+4. **Database Tiers**
 
     - **Impact**: The number of database tiers directly affects memory consumption. More tiers mean higher memory usage.
     - **Optimization**: The default number of tiers is 3. Choose the appropriate number of tiers based on data retention requirements.
 
-4. **Machine Learning**
+5. **Machine Learning**
 
     - **Impact**: Machine learning model training is CPU-intensive, affecting overall CPU usage.
     - **Optimization**: Consider disabling machine learning for less critical metrics or adjusting model training frequency.
 
-5. **Streaming Compression**
+6. **Streaming Compression**
 
     - **Impact**: Compression algorithm choice affects CPU usage and network traffic.
     - **Optimization**: Select an algorithm that balances CPU efficiency with network bandwidth requirements (e.g., zstd for a good balance).
 
 ## Minimizing the resources used by Netdata Agents
 
-To optimize resource utilization, consider using a **Netdata Parent-Child** setup.
+To optimize resource utilization, consider using a **Parent-Child** setup.
 
-This approach involves centralizing the collection and processing of metrics on Netdata Parent nodes while running lightweight Netdata Child Agents on edge devices.
+This approach involves centralizing the collection and processing of metrics on Parent nodes while running lightweight Children Agents on edge devices.
 
-## Maximizing the scale of Netdata Parents
+## Maximizing the scale of Parent Agents
 
-Netdata Parents dynamically adjust their resource usage based on the volume of metrics received. However, for optimal query performance, you may need to dedicate more RAM.
+Parents dynamically adjust their resource usage based on the volume of metrics received. However, for optimal query performance, you may need to dedicate more RAM.
 
 Check [RAM Requirements](/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md) for more information.
 
@@ -77,4 +82,4 @@ Check [RAM Requirements](/docs/netdata-agent/sizing-netdata-agents/ram-requireme
 
 5. **Scalable Streaming Protocol**
 
-   Netdata's streaming protocol enables the creation of distributed monitoring setups, where Netdata Agents (Children) offload data processing to Netdata Parents, optimizing resource utilization.
+   Netdata's streaming protocol enables the creation of distributed monitoring setups, where Children offload data processing to Parents, optimizing resource utilization.
