@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package weblog
 
 import (
@@ -113,6 +111,12 @@ func (w *WebLog) collectVhost() {
 		w.addDimToVhostChart(w.line.vhost)
 	}
 	c.Inc()
+	if w.line.hasReqSize() {
+		w.mx.ReqVhostBytesReceived.Add(float64(w.line.reqSize))
+	}
+	if w.line.hasRespSize() {
+		w.mx.ReqVhostBytesSent.Add(float64(w.line.respSize))
+	}
 }
 
 func (w *WebLog) collectPort() {

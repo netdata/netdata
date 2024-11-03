@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package weblog
 
 import (
@@ -270,6 +268,10 @@ var (
 		Ctx:      "web_log.vhost_requests",
 		Type:     module.Stacked,
 		Priority: prioReqVhost,
+		Dims: Dims{
+			{ID: "req_vhost_bytes_received", Name: "bytes_received", Algo: module.Incremental},
+			{ID: "req_vhost_bytes_sent", Name: "bytes_sent", Algo: module.Incremental},
+		},
 	}
 	reqByPort = Chart{
 		ID:       "requests_by_port",
