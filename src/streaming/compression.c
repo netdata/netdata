@@ -395,9 +395,7 @@ size_t rrdpush_decompress(struct decompressor_state *state, const char *compress
 // ----------------------------------------------------------------------------
 // unit test
 
-static inline long int my_random (void) {
-    return random();
-}
+#define my_random() os_random(UINT32_MAX)
 
 void unittest_generate_random_name(char *dst, size_t size) {
     if(size < 7)
