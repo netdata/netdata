@@ -357,9 +357,6 @@ inline void heartbeat_init(heartbeat_t *hb, usec_t step) {
     hb->hash = heartbeat_hash(hb->step, hb->statistics_id);
     hb->randomness = heartbeat_randomness(hb->hash);
 
-    // Initialize the random number generator for each thread
-    os_jitter_init(&hb->jitter, hb->hash);
-
     if(hb->statistics_id < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE) {
         heartbeat_alignment_values[hb->statistics_id].dt = 0;
         heartbeat_alignment_values[hb->statistics_id].sequence = 0;
@@ -382,10 +379,6 @@ usec_t heartbeat_next(heartbeat_t *hb) {
     // align the next time we want to the clock resolution
     if(next % clock_realtime_resolution)
         next = next - (next % clock_realtime_resolution) + clock_realtime_resolution;
-
-    // Apply random jitter of up to 50ms
-    usec_t jitter = os_jitter_ut(&hb->jitter, HEARTBEAT_RANDOM_JITTER_UT);
-    next += jitter;
 
     // sleep_usec() has a loop to guarantee we will sleep for at least the requested time.
     // According to the specs, when we sleep for a relative time, clock adjustments should

@@ -7,7 +7,7 @@
 #include <sys/syscall.h>
 #endif
 
-#include "jitter.h"
+#include "random.h"
 #include "timestamps.h"
 #include "setproctitle.h"
 #include "close_range.h"
