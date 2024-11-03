@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- add randomness per thread to heartbeat [\#18929](https://github.com/netdata/netdata/pull/18929) ([ktsaou](https://github.com/ktsaou))
 - chore\(go.d/nvidia\_smi\): remove use\_csv\_format \(deprecated\) from config [\#18924](https://github.com/netdata/netdata/pull/18924) ([ilyam8](https://github.com/ilyam8))
 - Docs: small fixes and pass on sizing Agents [\#18923](https://github.com/netdata/netdata/pull/18923) ([Ancairon](https://github.com/Ancairon))
 - go.d/portcheck: separate tabs for tcp/upd ports [\#18922](https://github.com/netdata/netdata/pull/18922) ([ilyam8](https://github.com/ilyam8))
@@ -450,7 +451,6 @@
 - ci gen integrations: add cloud-authentication dir [\#18378](https://github.com/netdata/netdata/pull/18378) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18377](https://github.com/netdata/netdata/pull/18377) ([netdatabot](https://github.com/netdatabot))
 - go.d dnsmasq: query metrics individually to handle v2.90+ SERVFAIL [\#18376](https://github.com/netdata/netdata/pull/18376) ([ilyam8](https://github.com/ilyam8))
-- Switch to DEB822 format for APT repository configuration. [\#18374](https://github.com/netdata/netdata/pull/18374) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
