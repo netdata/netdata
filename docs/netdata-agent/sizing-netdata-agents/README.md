@@ -24,8 +24,8 @@ This table shows the specific system resources affected by different Netdata fea
 
 3. **Database Mode**
 
-    - **Impact**: The default database mode is `dbengine`, which compresses and commits data to disk.
-    - **Optimization**: On a Parent-Child setup, switch the Child's database mode to `ram` or `alloc`. This disables saving to disk for the Child, thus not using any disk I/O.
+    - **Impact**: The default database mode, `dbengine`, compresses data and writes it to disk.
+    - **Optimization**: In a Parent-Child setup, switch the Child's database mode to `ram`. This eliminates disk I/O for the Child.
 
 4. **Database Tiers**
 

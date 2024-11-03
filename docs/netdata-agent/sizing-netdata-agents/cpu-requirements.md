@@ -1,41 +1,43 @@
 # CPU
 
-Netdata utilizes CPU based on what features are enabled, read more at our [resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md) page.
+Netdata's CPU usage depends on the features you enable. For details, see [resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md).
 
 ## Children
 
-On Children Agents, where Netdata is running with default settings, CPU utilization should usually be about 1% to 5% of a single CPU core.
+With default settings on Children, CPU utilization typically falls within the range of 1% to 5% of a single core. This includes the combined resource usage of:
 
-This includes 3 database tiers, Machine Learning, per-second data collection, Alerts, and [Streaming to a Parent Agent](/docs/observability-centralization-points/metrics-centralization-points/README.md).
+- Three database tiers for data storage.
+- Machine learning for anomaly detection.
+- Per-second data collection.
+- Alerts.
+- Streaming to a [Parent Agent](/docs/observability-centralization-points/metrics-centralization-points/README.md).
 
 ## Parents
 
-On Metrics Centralization Points -we call them Parent Agents- running on modern server hardware, we estimate CPU utilization per million of samples collected per second:
+For Netdata Parents (Metrics Centralization Points), we estimate the following CPU utilization:
 
-|       Feature        |                     Depends On                      |                       Expected Utilization                       |                               Key Reasons                                |
+|       Feature        |                     Depends On                      |           Expected Utilization (CPU cores per million)           |                               Key Reasons                                |
 |:--------------------:|:---------------------------------------------------:|:----------------------------------------------------------------:|:------------------------------------------------------------------------:|
-|    Metrics Ingest    |        Number of samples received per second        |          2 CPU cores per million of samples per second           |         Decompress and decode received messages, update database         |
-| Metrics re-streaming |         Number of samples resent per second         |          2 CPU cores per million of samples per second           |       Encode and compress messages towards another Parent        |
-|   Machine Learning   | Number of unique time-series concurrently collected | 2 CPU cores per million of unique metrics concurrently collected | Train machine learning models, query existing models to detect anomalies |
+|    Metrics Ingest    |        Number of samples received per second        |                                2                                 |         Decompress and decode received messages, update database         |
+| Metrics re-streaming |         Number of samples resent per second         |                                2                                 |           Encode and compress messages towards another Parent            |
+|   Machine Learning   | Number of unique time-series concurrently collected |                                2                                 | Train machine learning models, query existing models to detect anomalies |
 
-We recommend keeping the total CPU utilization below 60% when a Parent is steadily ingesting metrics, training machine learning models and running health checks. This will leave enough available CPU resources for queries.
+To ensure optimal performance, keep total CPU utilization below 60% when the Parent is actively processing metrics, training models, and running health checks.
 
 ## Increased CPU consumption on Parent startup
 
-When a Parent starts, Children connect to it. There are several operations that temporarily affect CPU utilization, network bandwidth and disk I/O.
+When a Netdata Parent starts up, it undergoes a series of initialization tasks that can temporarily increase CPU, network, and disk I/O usage:
 
-The general flow looks like this:
+1. **Backfilling Higher Tiers**: The Parent calculates aggregated metrics for missing data points, ensuring consistency across different time resolutions.
+2. **Metadata Synchronization**: The Parent and Children exchange metadata information about collected metrics.
+3. **Data Replication**: Missing data is transferred from Children to the Parent.
+4. **Normal Streaming**: Regular streaming of new metrics begins.
+5. **Machine Learning Initialization**: Machine learning models are loaded and prepared for anomaly detection.
+6. **Health Check Initialization**: The health engine starts monitoring metrics and triggering alerts.
 
-1. **Back-filling of higher tiers**: This means calculating the aggregates of the last hour of `tier2` and of the last minute of `tier1`, ensuring that higher tiers reflect all the information `tier0` has. If Netdata was stopped abnormally (e.g. due to a system failure or crash), higher tiers may have to be back-filled for longer durations.
-2. **Metadata synchronization**: The metadata of all metrics that each Child maintains are negotiated between the Child and the Parent and are synchronized.
-3. **Replication**: If the Parent is missing samples the Child has, they are transferred to the Parent before transferring new samples.
-4. Only then the normal **streaming of new metric samples** starts.
-5. At the same time, **Machine Learning** initializes, loads saved trained models and prepares Anomaly Detection.
-6. After a few moments the **Health engine starts checking metrics** for triggering Alerts.
+Additional considerations:
 
-The above process is per metric.
+- **Compression Optimization**: The compression algorithm learns data patterns to optimize compression ratios.
+- **Database Optimization**: The database engine adjusts page sizes for efficient disk I/O.
 
-At the same time:
-
-- The compression algorithm learns the patterns of the data exchanged and optimizes its dictionaries for optimal compression and CPU utilization
-- The database engine adjusts the page size of each metric, so that samples are committed to disk as evenly as possible across time.
+These initial tasks can temporarily increase resource usage, but the impact typically diminishes as the Parent stabilizes and enters a steady-state operation.
