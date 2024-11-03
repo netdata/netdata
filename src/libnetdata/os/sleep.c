@@ -21,7 +21,7 @@ void microsleep(usec_t ut) {
 #else
 void microsleep(usec_t ut) {
     time_t secs = (time_t)(ut / USEC_PER_SEC);
-    nsec_t nsec = (ut % USEC_PER_SEC) * NSEC_PER_USEC;
+    nsec_t nsec = (ut % USEC_PER_SEC) * NSEC_PER_USEC + ((ut == 0) ? 1 : 0);
 
     struct timespec remaining = {
         .tv_sec = secs,
