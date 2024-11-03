@@ -1,65 +1,43 @@
-# CPU Requirements
+# CPU
 
-Netdata's CPU consumption is affected by the following factors:
+Netdata's CPU usage depends on the features you enable. For details, see [resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md).
 
-1. The number of metrics collected
-2. The frequency metrics are collected
-3. Machine Learning
-4. Streaming compression (streaming of metrics to Netdata Parents)
-5. Database Mode
+## Children
 
-## On Production Systems, Netdata Children
+With default settings on Children, CPU utilization typically falls within the range of 1% to 5% of a single core. This includes the combined resource usage of:
 
-On production systems, where Netdata is running with default settings, monitoring the system it is installed at and its containers and applications, CPU utilization should usually be about 1% to 5% of a single CPU core.
+- Three database tiers for data storage.
+- Machine learning for anomaly detection.
+- Per-second data collection.
+- Alerts.
+- Streaming to a [Parent Agent](/docs/observability-centralization-points/metrics-centralization-points/README.md).
 
-This includes 3 database tiers, machine learning, per-second data collection, alerts, and streaming to a Netdata Parent.
+## Parents
 
-## On Metrics Centralization Points, Netdata Parents
+For Netdata Parents (Metrics Centralization Points), we estimate the following CPU utilization:
 
-On Metrics Centralization Points, Netdata Parents running on modern server hardware, we **estimate CPU utilization per million of samples collected per second**:
+|       Feature        |                     Depends On                      |           Expected Utilization (CPU cores per million)           |                               Key Reasons                                |
+|:--------------------:|:---------------------------------------------------:|:----------------------------------------------------------------:|:------------------------------------------------------------------------:|
+|    Metrics Ingest    |        Number of samples received per second        |                                2                                 |         Decompress and decode received messages, update database         |
+| Metrics re-streaming |         Number of samples resent per second         |                                2                                 |           Encode and compress messages towards another Parent            |
+|   Machine Learning   | Number of unique time-series concurrently collected |                                2                                 | Train machine learning models, query existing models to detect anomalies |
 
-|      Feature      |                     Depends On                      |                       Expected Utilization                       |                                Key Reasons                                |
-|:-----------------:|:---------------------------------------------------:|:----------------------------------------------------------------:|:-------------------------------------------------------------------------:|
-| Metrics Ingestion |        Number of samples received per second        |          2 CPU cores per million of samples per second           |         Decompress and decode received messages, update database.         |
-| Metrics re-streaming|         Number of samples resent per second         |          2 CPU cores per million of samples per second           |           Encode and compress messages towards Netdata Parent.            |
-| Machine Learning  | Number of unique time-series concurrently collected | 2 CPU cores per million of unique metrics concurrently collected | Train machine learning models, query existing models to detect anomalies. |
+To ensure optimal performance, keep total CPU utilization below 60% when the Parent is actively processing metrics, training models, and running health checks.
 
-We recommend keeping the total CPU utilization below 60% when a Netdata Parent is steadily ingesting metrics, training machine learning models and running health checks. This will leave enough CPU resources available for queries.
+## Increased CPU consumption on Parent startup
 
-## I want to minimize CPU utilization. What should I do?
+When a Netdata Parent starts up, it undergoes a series of initialization tasks that can temporarily increase CPU, network, and disk I/O usage:
 
-You can control Netdata's CPU utilization with these parameters:
+1. **Backfilling Higher Tiers**: The Parent calculates aggregated metrics for missing data points, ensuring consistency across different time resolutions.
+2. **Metadata Synchronization**: The Parent and Children exchange metadata information about collected metrics.
+3. **Data Replication**: Missing data is transferred from Children to the Parent.
+4. **Normal Streaming**: Regular streaming of new metrics begins.
+5. **Machine Learning Initialization**: Machine learning models are loaded and prepared for anomaly detection.
+6. **Health Check Initialization**: The health engine starts monitoring metrics and triggering alerts.
 
-1. **Data collection frequency**: Going from per-second metrics to every-2-seconds metrics will half the CPU utilization of Netdata.
-2. **Number of metrics collected**: Netdata by default collects every metric available on the systems it runs. Review the metrics collected and disable data collection plugins and modules not needed.
-3. **Machine Learning**: Disable machine learning to save CPU cycles.
-4. **Number of database tiers**: Netdata updates database tiers in parallel, during data collection. This affects both CPU utilization and memory requirements.
-5. **Database Mode**: The default database mode is `dbengine`, which compresses and commits data to disk. If you have a Netdata Parent where metrics are aggregated and saved to disk and there is a reliable connection between the Netdata you want to optimize and its Parent, switch to database mode `ram` or `alloc`. This disables saving to disk, so your Netdata will also not use any disk I/O.  
+Additional considerations:
 
-## I see increased CPU consumption when a busy Netdata Parent starts, why?
+- **Compression Optimization**: The compression algorithm learns data patterns to optimize compression ratios.
+- **Database Optimization**: The database engine adjusts page sizes for efficient disk I/O.
 
-When a Netdata Parent starts and Netdata children get connected to it, there are several operations that temporarily affect CPU utilization, network bandwidth and disk I/O.
-
-The general flow looks like this:
-
-1. **Back-filling of higher tiers**: Usually this means calculating the aggregates of the last hour of `tier2` and of the last minute of `tier1`, ensuring that higher tiers reflect all the information `tier0` has. If Netdata was stopped abnormally (e.g. due to a system failure or crash), higher tiers may have to be back-filled for longer durations.
-2. **Metadata synchronization**: The metadata of all metrics each Netdata Child maintains are negotiated between the Child and the Parent and are synchronized.
-3. **Replication**: If the Parent is missing samples the Child has, these samples are transferred to the Parent before transferring new samples.
-4. Once all these finish, the normal **streaming of new metric samples** starts.
-5. At the same time, **machine learning** initializes, loads saved trained models and prepares anomaly detection.
-6. After a few moments the **health engine starts checking metrics** for triggering alerts.
-
-The above process is per metric. So, while one metric back-fills, another replicates and a third one streams.
-
-At the same time:
-
-- the compression algorithm learns the patterns of the data exchanged and optimizes its dictionaries for optimal compression and CPU utilization,
-- the database engine adjusts the page size of each metric, so that samples are committed to disk as evenly as possible across time.
-
-So, when looking for the "steady CPU consumption during ingestion" of a busy Netdata Parent, we recommend to let it stabilize for a few hours before checking.
-
-Keep in mind that Netdata has been designed so that even if during the initialization phase and the connection of hundreds of Netdata Children the system lacks CPU resources, the Netdata Parent will complete all the operations and eventually enter a steady CPU consumption during ingestion, without affecting the quality of the metrics stored. So, it is ok if during initialization of a busy Netdata Parent, CPU consumption spikes to 100%.
-
-Important: the above initialization process is not such intense when new nodes get connected to a Netdata Parent for the first time (e.g. ephemeral nodes), since several of the steps involved are not required.
-
-Especially for the cases where children disconnect and reconnect to the Parent due to network related issues (i.e. both the Netdata Child and the Netdata Parent have not been restarted and less than 1 hour has passed since the last disconnection), the re-negotiation phase is minimal and metrics are instantly entering the normal streaming phase.
+These initial tasks can temporarily increase resource usage, but the impact typically diminishes as the Parent stabilizes and enters a steady-state operation.
