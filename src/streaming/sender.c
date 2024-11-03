@@ -506,7 +506,6 @@ void *rrdpush_sender_thread(void *ptr) {
     bool was_connected = false;
     size_t iterations = 0;
     time_t now_s = now_monotonic_sec();
-
     while(!rrdhost_sender_should_exit(s)) {
         iterations++;
 
