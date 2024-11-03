@@ -388,6 +388,10 @@ check_function_exists(sched_get_priority_max HAVE_SCHED_GET_PRIORITY_MAX)
 check_function_exists(close_range HAVE_CLOSE_RANGE)
 check_function_exists(backtrace HAVE_BACKTRACE)
 
+check_function_exists(arc4random_uniform HAVE_ARC4RANDOM_UNIFORM)
+check_function_exists(rand_s HAVE_RAND_S)
+check_function_exists(getrandom HAVE_GETRANDOM)
+
 #
 # check source compilation
 #

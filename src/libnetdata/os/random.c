@@ -2,6 +2,10 @@
 
 #include "libnetdata/libnetdata.h"
 
+#if defined(HAVE_GETRANDOM)
+#include <sys/random.h>
+#endif
+
 // return a random number 0 to max - 1
 uint64_t os_random(uint64_t max) {
     if (max <= 1) return 0;
@@ -14,7 +18,7 @@ uint64_t os_random(uint64_t max) {
         } u32;
     } value;
 
-#if defined(RANDOM_USE_ARC4RANDOM)
+#if defined(HAVE_ARC4RANDOM_UNIFORM)
     if (max <= UINT32_MAX) {
         value.u64 = arc4random_uniform((uint32_t)max);
     } else {
@@ -22,7 +26,7 @@ uint64_t os_random(uint64_t max) {
         value.u32.hi = arc4random_uniform(UINT32_MAX);
     }
 
-#elif defined(RANDOM_USE_RAND_S)
+#elif defined(HAVE_RAND_S)
     if (max <= UINT32_MAX) {
         unsigned int temp;
         rand_s(&temp);
@@ -34,6 +38,28 @@ uint64_t os_random(uint64_t max) {
         value.u32.lo = temp_lo;
         value.u32.hi = temp_hi;
     }
+
+#elif defined(HAVE_GETRANDOM)
+    if (max <= UINT8_MAX) {
+        uint8_t v;
+        getrandom(&v, sizeof(v), 0);
+        value.u64 = v;
+    } else if(max <= UINT16_MAX) {
+        uint16_t v;
+        getrandom(&v, sizeof(v), 0);
+        value.u64 = v;
+    } else if (max <= UINT32_MAX) {
+        uint32_t v;
+        getrandom(&v, sizeof(v), 0);
+        value.u64 = v;
+    } else {
+        uint64_t v;
+        getrandom(&v, sizeof(v), 0);
+        value.u64 = v;
+    }
+
+#else
+#error "Can't use any random number generator"
 #endif
 
     return value.u64 % max;
