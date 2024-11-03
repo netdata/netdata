@@ -388,8 +388,7 @@ check_function_exists(sched_get_priority_max HAVE_SCHED_GET_PRIORITY_MAX)
 check_function_exists(close_range HAVE_CLOSE_RANGE)
 check_function_exists(backtrace HAVE_BACKTRACE)
 
-check_function_exists(arc4random_uniform HAVE_ARC4RANDOM_UNIFORM)
-check_function_exists(rand_s HAVE_RAND_S)
+check_function_exists(arc4random_buf HAVE_ARC4RANDOM_BUF)
 check_function_exists(getrandom HAVE_GETRANDOM)
 
 #
@@ -542,6 +541,17 @@ int my_function() {
         return 1;
 }
 " HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT)
+
+# Windows MSVCRT random number generator
+# used only when compiling natively (not MSYS/CYGWIN)
+check_c_source_compiles("
+    #define _CRT_RAND_S
+    #include <stdlib.h>
+    int main() {
+        unsigned int x;
+        return rand_s(&x);
+    }
+" HAVE_RAND_S)
 
 if(OS_FREEBSD OR OS_MACOS)
         set(HAVE_BUILTIN_ATOMICS True)

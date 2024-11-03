@@ -69,7 +69,7 @@
 #cmakedefine HAVE_DLSYM
 #cmakedefine HAVE_LIBCURL
 
-#cmakedefine HAVE_ARC4RANDOM_UNIFORM
+#cmakedefine HAVE_ARC4RANDOM_BUF
 #cmakedefine HAVE_RAND_S
 #cmakedefine HAVE_GETRANDOM
 
