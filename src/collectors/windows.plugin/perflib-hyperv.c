@@ -1646,11 +1646,11 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
                 RRDSET_TYPE_STACKED);
 
             p->rd_GuestRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "guest", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rrddim_add(p->st_HypervisorProcessor, "guest", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
             p->rd_HypervisorRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "hypervisor", NULL, -1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rrddim_add(p->st_HypervisorProcessor, "hypervisor", NULL, -1, 1000000, RRD_ALGORITHM_INCREMENTAL);
             p->rd_RemoteRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "remote", NULL, -1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rrddim_add(p->st_HypervisorProcessor, "remote", NULL, -1, 1000000, RRD_ALGORITHM_INCREMENTAL);
 
             rrdlabels_add(p->st_HypervisorProcessor->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
