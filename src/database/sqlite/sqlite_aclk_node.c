@@ -154,6 +154,9 @@ void aclk_check_node_info_and_collectors(void)
             continue;
         }
 
+        if (!wc->node_info_send_time && !wc->node_collectors_send)
+            continue;
+
         if (unlikely(host_is_replicating(host))) {
             internal_error(true, "ACLK SYNC: Host %s is still replicating", rrdhost_hostname(host));
             replicating++;
