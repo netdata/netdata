@@ -1035,11 +1035,11 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
             p->charts_created =  true;
 
             p->st_bytes = rrdset_create_localhost(
-                "vswitch_bytes",
+                "vswitch_traffic",
                 windows_shared_buffer,
                 NULL,
                 HYPERV,
-                HYPERV ".vswitch_bytes",
+                HYPERV ".vswitch_traffic",
                 "Virtual switch traffic",
                 "kilobits/s",
                 _COMMON_PLUGIN_NAME,
