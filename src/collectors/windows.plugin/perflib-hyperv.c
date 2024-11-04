@@ -19,7 +19,7 @@ static void get_and_sanitize_instance_value(
     size_t buffer_size)
 {
     // char wstr[8192];
-    if (!getInstanceName(pDataBlock, pObjectType, pi, buffer, sizeof(buffer_size))) {
+    if (!getInstanceName(pDataBlock, pObjectType, pi, buffer, buffer_size)) {
         strncpyz(buffer, "[unknown]", buffer_size - 1);
         // return;
     }
@@ -185,10 +185,10 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                p->rd_CurrentPressure = rrddim_add(p->st_pressure, "pressure", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                p->rd_PhysicalMemory = rrddim_add(p->st_vm_memory_physical, "assigned_memory", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
-                p->rd_GuestVisiblePhysicalMemory = rrddim_add(p->st_vm_memory_physical_guest_visible, "visible_memory", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
-                p->rd_GuestAvailableMemory = rrddim_add(p->st_vm_memory_physical_guest_visible, "available_memory", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_CurrentPressure = rrddim_add(p->st_pressure, "pressure", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_PhysicalMemory = rrddim_add(p->st_vm_memory_physical, "assigned", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_GuestVisiblePhysicalMemory = rrddim_add(p->st_vm_memory_physical_guest_visible, "visible", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_GuestAvailableMemory = rrddim_add(p->st_vm_memory_physical_guest_visible, "available", NULL, 1024 * 1024, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(p->st_vm_memory_physical->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
                 rrdlabels_add(p->st_pressure->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
@@ -335,8 +335,6 @@ static bool do_hyperv_health_summary(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
         p->rd_HealthCritical = rrddim_add(p->st_health, "critical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         p->rd_HealthOk = rrddim_add(p->st_health, "ok", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-        rrdlabels_add(p->st_health->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
     }
 
     SETP_DIM_VALUE(st_health, HealthCritical);
