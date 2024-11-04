@@ -1485,9 +1485,9 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_DirectedPacketsSentSec =
-                rrddim_add(p->st_DirectedPackets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             p->rd_DirectedPacketsReceivedSec =
+                rrddim_add(p->st_DirectedPackets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_DirectedPacketsSentSec =
                 rrddim_add(p->st_DirectedPackets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_DirectedPackets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
@@ -1506,9 +1506,9 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_BroadcastPacketsSentSec =
-                rrddim_add(p->st_BroadcastPackets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             p->rd_BroadcastPacketsReceivedSec =
+                rrddim_add(p->st_BroadcastPackets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_BroadcastPacketsSentSec =
                 rrddim_add(p->st_BroadcastPackets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_BroadcastPackets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
@@ -1527,9 +1527,9 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_MulticastPacketsSentSec =
-                rrddim_add(p->st_MulticastPackets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             p->rd_MulticastPacketsReceivedSec =
+                rrddim_add(p->st_MulticastPackets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_MulticastPacketsSentSec =
                 rrddim_add(p->st_MulticastPackets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_MulticastPackets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
