@@ -495,7 +495,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
             p->rd_DeviceSpacePages4K = rrddim_add(p->st_device_space_pages, "4K", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             p->rd_DeviceSpacePages2M = rrddim_add(p->st_device_space_pages, "2M", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             p->rd_DeviceSpacePages1G = rrddim_add(p->st_device_space_pages, "1G", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_device_space_pages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_gpa_space_pages = rrdset_create_localhost(
                 "root_partition_gpa_space_pages",
@@ -514,7 +513,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
             p->rd_GPASpacePages4K = rrddim_add(p->st_gpa_space_pages, "4K", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             p->rd_GPASpacePages2M = rrddim_add(p->st_gpa_space_pages, "2M", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             p->rd_GPASpacePages1G = rrddim_add(p->st_gpa_space_pages, "1G", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_gpa_space_pages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_gpa_space_modifications = rrdset_create_localhost(
                 "root_partition_gpa_space_modifications",
@@ -532,7 +530,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->rd_GPASpaceModifications =
                 rrddim_add(p->st_gpa_space_modifications, "gpa", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_gpa_space_modifications->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_attached_devices = rrdset_create_localhost(
                 "root_partition_attached_devices",
@@ -549,7 +546,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 RRDSET_TYPE_LINE);
 
             p->rd_AttachedDevices = rrddim_add(p->st_attached_devices, "attached", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_attached_devices->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_deposited_pages = rrdset_create_localhost(
                 "root_partition_deposited_pages",
@@ -566,7 +562,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 RRDSET_TYPE_LINE);
 
             p->rd_DepositedPages = rrddim_add(p->st_deposited_pages, "gpa", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_deposited_pages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_DeviceDMAErrors = rrdset_create_localhost(
                 "root_partition_device_dma_errors",
@@ -584,7 +579,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->rd_DeviceDMAErrors =
                 rrddim_add(p->st_DeviceDMAErrors, "illegal_dma", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_DeviceDMAErrors->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_DeviceInterruptErrors = rrdset_create_localhost(
                 "root_partition_device_interrupt_errors",
@@ -602,7 +596,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->rd_DeviceInterruptErrors =
                 rrddim_add(p->st_DeviceInterruptErrors, "illegal_interrupt", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_DeviceInterruptErrors->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_DeviceInterruptThrottleEvents = rrdset_create_localhost(
                 "root_partition_device_interrupt_throttle_events",
@@ -620,8 +613,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->rd_DeviceInterruptThrottleEvents =
                 rrddim_add(p->st_DeviceInterruptThrottleEvents, "throttling", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(
-                p->st_DeviceInterruptThrottleEvents->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_IOΤLBFlushesSec = rrdset_create_localhost(
                 "root_partition_io_tlb_flush",
@@ -638,7 +629,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 RRDSET_TYPE_LINE);
 
             p->rd_IOΤLBFlushesSec = rrddim_add(p->st_IOΤLBFlushesSec, "gpa", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_IOΤLBFlushesSec->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_AddressSpaces = rrdset_create_localhost(
                 "root_partition_address_space",
@@ -655,7 +645,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 RRDSET_TYPE_LINE);
 
             p->rd_AddressSpaces = rrddim_add(p->st_AddressSpaces, "address_spaces", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_AddressSpaces->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_VirtualTLBPages = rrdset_create_localhost(
                 "root_partition_virtual_tlb_pages",
@@ -672,7 +661,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 RRDSET_TYPE_LINE);
 
             p->rd_VirtualTLBPages = rrddim_add(p->st_VirtualTLBPages, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrdlabels_add(p->st_VirtualTLBPages->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_VirtualTLBFlushEntiresSec = rrdset_create_localhost(
                 "root_partition_virtual_tlb_flush_entries",
@@ -690,7 +678,6 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->rd_VirtualTLBFlushEntiresSec =
                 rrddim_add(p->st_VirtualTLBFlushEntiresSec, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrdlabels_add(p->st_VirtualTLBFlushEntiresSec->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         // Set the data for each dimension
