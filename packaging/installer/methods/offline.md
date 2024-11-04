@@ -43,7 +43,6 @@ Once you have prepared the offline install source, you need to copy the offline 
 target system. This can be done in any manner you like, as long as filenames are not changed.
 
 After copying the files, simply run the `install.sh` script located in the
-offline install source directory. It accepts all the [same options as the kickstart
-script](/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) for further
+offline install source directory. It accepts all the [same options as the kickstart script](/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) for further
 customization of the installation, though it will default to not enabling automatic updates (as they are not
 supported on offline installs).
