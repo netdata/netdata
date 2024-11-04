@@ -57,7 +57,7 @@ wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /
 
 ## Windows
 
-To update a Windows Netdata installation, download the executable and proceed to reinstall the Agent. This will update the installation.
+To update a Windows Netdata installation, download the installer and proceed to reinstall the Agent.
 
 > **Note**
 >
