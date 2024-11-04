@@ -91,7 +91,7 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config python.d.conf
 ```
 
-Change the value of the `go_expvar` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
+Change the value of the `go_expvar` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/start-stop-restart.md) for your system.
 
 
 #### Sample `expvar` usage in a Go application

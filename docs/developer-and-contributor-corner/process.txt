@@ -180,7 +180,7 @@ sql: mariad* postmaster* oracle_* ora_* sqlservr
 ```
 
 Restart Netdata with `sudo systemctl restart netdata`, or
-the [appropriate method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, to start collecting utilization metrics
+the appropriate method for your system, to start collecting utilization metrics
 from your application. Time to [visualize your process metrics](#visualize-process-metrics).
 
 ### Custom applications
@@ -207,7 +207,7 @@ custom-app: custom-app
 ```
 
 Restart Netdata with `sudo systemctl restart netdata`, or
-the [appropriate method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, to start collecting utilization metrics
+the appropriate method for your system, to start collecting utilization metrics
 from your application.
 
 ## Visualize process metrics

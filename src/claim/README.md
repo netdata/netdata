@@ -56,7 +56,7 @@ Netdata Agents can be connected to Netdata Cloud by creating the file `/etc/netd
    insecure = Either yes or no (optional)
 ```
 
-- `proxy` can get anything libcurl accepts as proxy, or the keywords `none` and `env`. `none` or just empty disables proxy configuration, while `env` instructs libcurl to use the environment for determining proxy configuration (usually the environment variable `https_proxy`).
+- `proxy` can get anything libcurl accepts as a proxy, or the `none` and `env` keywords. `none` (or just an empty value) disables proxy configuration, while `env` tells libcurl to use the environment to determine the proxy configuration (usually the `https_proxy` environment variable).
 - `insecure` is a boolean (either `yes`, or `no`) and when set to `yes` it instructs libcurl to disable host verification.
 
 example:
@@ -73,8 +73,7 @@ example:
 If the agent is already running, you can either run `netdatacli reload-claiming-state` or restart the agent.
 Otherwise, the agent will be claimed when it starts.
 
-If claiming fails for whatever reason, daemon.log will log the reason (search for `CLAIM`),
-and also `http://ip:19999/api/v2/info` would also state the reason at the `cloud` section of the response.
+If the claiming process fails, the reason will be logged in daemon.log (search for "CLAIM") and the `cloud` section of `http://ip:19999/api/v2/info`.
 
 #### Automatically, via environment variables
 
@@ -88,8 +87,7 @@ Netdata will use the following environment variables:
 
 The `NETDATA_CLAIM_TOKEN` alone is enough for triggering the claiming process.
 
-If claiming fails for whatever reason, daemon.log will log the reason (search for `CLAIM`),
-and also `http://ip:19999/api/v2/info` would also state the reason at the `cloud` section of the response.
+If the claiming process fails, the reason will be logged in daemon.log (search for "CLAIM") and the `cloud` section of `http://ip:19999/api/v2/info`.
 
 ## Reconnect
 
@@ -111,7 +109,7 @@ still be able to see this node in your Rooms in an **unreachable** state.
 
 ### Docker based installations
 
-To remove a node from you Space in Netdata Cloud, and connect it to another Space, follow these steps:
+To remove a node from your Space in Netdata Cloud and connect it to another Space, follow these steps:
 
 1. Enter the running container you wish to remove from your Space
 
@@ -154,19 +152,22 @@ To remove a node from you Space in Netdata Cloud, and connect it to another Spac
     ```
 
 4. Finally, go to your new Space, copy the installation command with the new claim token and run it.  
-   If you are using a `docker-compose.yml` file, you will have to overwrite it with the new claiming token.  
+   If you’re using a `docker-compose.yml` file, you will have to overwrite it with the new claiming token.  
    The node should now appear online in that Space.
 
 ## Regenerate Claiming Token
 
-If in case of some security reason, or other, you need to revoke your previous claiming token and generate a new one you
-can achieve that from the Netdata Cloud UI.
+There may be situations where you need to revoke your previous Netdata Cloud claiming token and generate a new one for security reasons. Here's how to do it:
 
-On any screen where you see the connect the node to Netdata Cloud command you'll see above it, next to
-the [updates channel](/docs/netdata-agent/versions-and-platforms.md), a
-button to **Regenerate token**. This action will invalidate your previous token and generate a fresh new one.
+**Requirements**:
 
-Only the administrators of a Space in Netdata Cloud can trigger this action.
+- Only administrators of Space in Netdata Cloud can regenerate tokens.
+
+**Steps**:
+
+1. Navigate to any screen within the Netdata Cloud UI where you see the "Connect the node to Netdata Cloud" command.
+2. Look above this command, near the [Updates channel](/docs/netdata-agent/versions-and-platforms.md). You should see a button that says "Regenerate token."
+3. Click the "Regenerate token" button. This action will invalidate your previous token and generate a new one.
 
 ## Troubleshoot
 
@@ -202,33 +203,32 @@ installed Netdata using an unsupported package.
 
 > **Note**
 >
-> If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
+> If you’re using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 > please remove that package and reinstall using
 >
 our [recommended kickstart script](/packaging/installer/methods/kickstart.md).
 
 ### kickstart: Failed to write new machine GUID
 
-If you run the kickstart script but don't have privileges required for the actions done on the connecting to Netdata
-Cloud process you will get the following error:
+You might encounter this error if you run the Netdata kickstart script without sufficient permissions:
 
 ```bash
 Failed to write new machine GUID. Please make sure you have rights to write to /var/lib/netdata/registry/netdata.public.unique.id.
 ```
 
-For a successful execution you will need to run the script with root privileges or run it with the user that is running
-the Agent.
+To resolve this issue, you have two options:
 
-### Connecting on older distributions (Ubuntu 14.04, Debian 8, CentOS 6)
+1. Run the script with root privileges.
+2. Run the script with the user that runs the Netdata Agent.
+
+### Connecting to Cloud on older distributions (Ubuntu 14.04, Debian 8, CentOS 6)
 
 If you're running an older Linux distribution or one that has reached EOL, such as Ubuntu 14.04 LTS, Debian 8, or CentOS
 6, your Agent may not be able to securely connect to Netdata Cloud due to an outdated version of OpenSSL. These old
 versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.org/index.php/Hostname_validation),
 which helps securely encrypt SSL connections.
 
-We recommend you reinstall Netdata with
-a [static build](/packaging/installer/methods/kickstart.md#static-builds),
-which uses an up-to-date version of OpenSSL with hostname validation enabled.
+We recommend you reinstall Netdata with a [static build](/packaging/installer/methods/kickstart.md#install-type), which uses an up-to-date version of OpenSSL with hostname validation enabled.
 
 If you choose to continue using the outdated version of OpenSSL, your node will still connect to Netdata Cloud, albeit
 with hostname verification disabled. Without verification, your Netdata Cloud connection could be vulnerable to

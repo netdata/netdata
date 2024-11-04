@@ -53,7 +53,7 @@ LLVM_CONFIG=llvm-config-9 pip3 install --user llvmlite numpy==1.20.1 netdata-pan
 
 ## Enable the anomalies collector
 
-Now you're ready to enable the collector and [restart Netdata](/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
+Now you're ready to enable the collector and restart Netdata.
 
 ```bash
 sudo ./edit-config python.d.conf
