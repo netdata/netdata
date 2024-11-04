@@ -1268,7 +1268,7 @@ struct hypervisor_network_adapter {
     bool collected_metadata;
     bool charts_created;
 
-    RRDSET *st_packets;
+    RRDSET *st_dropped_packets;
     DEFINE_RD(DroppedPacketsOutgoingSec);
     DEFINE_RD(DroppedPacketsIncomingSec);
 
@@ -1394,7 +1394,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
         if (!p->charts_created) {
             p->charts_created = true;
-            p->st_packets = rrdset_create_localhost(
+            p->st_dropped_packets = rrdset_create_localhost(
                 "vm_net_interface_packets_dropped",
                 windows_shared_buffer,
                 NULL,
@@ -1408,10 +1408,10 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_DroppedPacketsIncomingSec = rrddim_add(p->st_packets, "incoming", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_DroppedPacketsOutgoingSec = rrddim_add(p->st_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_DroppedPacketsIncomingSec = rrddim_add(p->st_dropped_packets, "incoming", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_DroppedPacketsOutgoingSec = rrddim_add(p->st_dropped_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            rrdlabels_add(p->st_packets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(p->st_dropped_packets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_send_receive_packets = rrdset_create_localhost(
                 "vm_net_interface_packets",
@@ -1537,8 +1537,8 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
         }
 
-        SETP_DIM_VALUE(st_packets, DroppedPacketsIncomingSec);
-        SETP_DIM_VALUE(st_packets, DroppedPacketsOutgoingSec);
+        SETP_DIM_VALUE(st_dropped_packets, DroppedPacketsIncomingSec);
+        SETP_DIM_VALUE(st_dropped_packets, DroppedPacketsOutgoingSec);
 
         SETP_DIM_VALUE(st_send_receive_packets, PacketsReceivedSec);
         SETP_DIM_VALUE(st_send_receive_packets, PacketsSentSec);
@@ -1564,7 +1564,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
         rrdset_done(p->st_MulticastPackets);
         rrdset_done(p->st_send_receive_bytes);
         rrdset_done(p->st_send_receive_packets);
-        rrdset_done(p->st_packets);
+        rrdset_done(p->st_dropped_packets);
     }
     return true;
 }
