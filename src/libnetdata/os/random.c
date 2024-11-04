@@ -4,7 +4,7 @@
 
 #if !defined(HAVE_ARC4RANDOM_BUF) && !defined(HAVE_RAND_S)
 static SPINLOCK random_lock = NETDATA_SPINLOCK_INITIALIZER;
-static __attribute__((constructor)) void seed_random() {
+static __attribute__((constructor)) void random_seed() {
     // Use current time and process ID to create a high-entropy seed
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -15,9 +15,37 @@ static __attribute__((constructor)) void seed_random() {
     srandom(seed);
 }
 
+static void random_get_bytes(void *buf, size_t bytes) {
+    spinlock_lock(&random_lock);
+    while (bytes > 0) {
+        if (bytes >= sizeof(uint32_t)) {
+            // Generate 4 bytes at a time
+            uint32_t temp = random();
+            memcpy(buf, &temp, sizeof(uint32_t));
+            buf = (uint8_t *)buf + sizeof(uint32_t);
+            bytes -= sizeof(uint32_t);
+        } else if (bytes >= sizeof(uint16_t)) {
+            // Generate 2 bytes at a time
+            uint16_t temp = random();
+            memcpy(buf, &temp, sizeof(uint16_t));
+            buf = (uint8_t *)buf + sizeof(uint16_t);
+            bytes -= sizeof(uint16_t);
+        } else {
+            // Generate remaining bytes
+            uint32_t temp = random();
+            for (size_t i = 0; i < bytes; i++) {
+                ((uint8_t *)buf)[i] = temp & 0xFF;
+                temp >>= 8;
+            }
+            bytes = 0;
+        }
+    }
+    spinlock_unlock(&random_lock);
+}
+
 #if defined(HAVE_GETRANDOM)
 #include <sys/random.h>
-void getrandom_helper(void *buf, size_t buflen) {
+void inline getrandom_get_bytes(void *buf, size_t buflen) {
     ssize_t result;
     while (buflen > 0) {
         result = getrandom(buf, buflen, 0);
@@ -30,32 +58,8 @@ void getrandom_helper(void *buf, size_t buflen) {
                 tinysleep();
                 continue;
             } else {
-                // Fallback to using random() with a spinlock
-                spinlock_lock(&random_lock);
-                while (buflen > 0) {
-                    if (buflen >= sizeof(uint32_t)) {
-                        // Generate 4 bytes at a time
-                        uint32_t temp = random();
-                        memcpy(buf, &temp, sizeof(uint32_t));
-                        buf = (uint8_t *)buf + sizeof(uint32_t);
-                        buflen -= sizeof(uint32_t);
-                    } else if (buflen >= sizeof(uint16_t)) {
-                        // Generate 2 bytes at a time
-                        uint16_t temp = random();
-                        memcpy(buf, &temp, sizeof(uint16_t));
-                        buf = (uint8_t *)buf + sizeof(uint16_t);
-                        buflen -= sizeof(uint16_t);
-                    } else {
-                        // Generate remaining bytes
-                        uint32_t temp = random();
-                        for (size_t i = 0; i < buflen; i++) {
-                            ((uint8_t *)buf)[i] = temp & 0xFF;
-                            temp >>= 8;
-                        }
-                        buflen = 0;
-                    }
-                }
-                spinlock_unlock(&random_lock);
+                // fallback to RAND_bytes
+                random_get_bytes(buf, buflen);
                 return;
             }
         }
@@ -66,149 +70,91 @@ void getrandom_helper(void *buf, size_t buflen) {
 #endif // HAVE_GETRANDOM
 #endif // !HAVE_ARC4RANDOM_BUF && !HAVE_RAND_S
 
-// return a random number 0 to max - 1
-uint64_t os_random(uint64_t max) {
-    if (max <= 1) return 0;
-
-    uint64_t value;
-
-#if defined(HAVE_ARC4RANDOM_BUF)
-    if (max <= UINT8_MAX) {
-        uint8_t v;
-        arc4random_buf(&v, sizeof(v));
-        value = v;
-    } else if(max <= UINT16_MAX) {
-        uint16_t v;
-        arc4random_buf(&v, sizeof(v));
-        value = v;
-    } else if (max <= UINT32_MAX) {
-        uint32_t v;
-        arc4random_buf(&v, sizeof(v));
-        value = v;
-    } else
-        arc4random_buf(&value, sizeof(value));
-
-#elif defined(HAVE_RAND_S)
-    if (max <= UINT_MAX) {
-        unsigned int temp;
-        rand_s(&temp);
-        value = temp;
-    } else {
-        unsigned int temp_lo, temp_hi;
-        rand_s(&temp_lo);
-        rand_s(&temp_hi);
-        value = ((uint64_t)temp_hi << 32) + (uint64_t)temp_lo;
+#if defined(HAVE_RAND_S)
+static inline void rand_s_get_bytes(void *buf, size_t bytes) {
+    while (bytes > 0) {
+        if (bytes >= sizeof(unsigned int)) {
+            unsigned int temp;
+            rand_s(&temp);
+            memcpy(buf, &temp, sizeof(unsigned int));
+            buf = (uint8_t *)buf + sizeof(unsigned int);
+            bytes -= sizeof(unsigned int);
+        } else if (bytes >= sizeof(uint16_t)) {
+            // Generate 2 bytes at a time
+            unsigned int t;
+            rand_s(&t);
+            uint16_t temp = t;
+            memcpy(buf, &temp, sizeof(uint16_t));
+            buf = (uint8_t *)buf + sizeof(uint16_t);
+            bytes -= sizeof(uint16_t);
+        } else {
+            // Generate remaining bytes
+            unsigned int temp;
+            rand_s(&temp);
+            for (size_t i = 0; i < sizeof(temp) && i < bytes; i++) {
+                ((uint8_t *)buf)[0] = temp & 0xFF;
+                temp >>= 8;
+                buf = (uint8_t *)buf + 1;
+                bytes--;
+            }
+        }
     }
-
-#elif defined(HAVE_GETRANDOM)
-    if (max <= UINT8_MAX) {
-        uint8_t v;
-        getrandom_helper(&v, sizeof(v));
-        value = v;
-    } else if(max <= UINT16_MAX) {
-        uint16_t v;
-        getrandom_helper(&v, sizeof(v));
-        value = v;
-    } else if (max <= UINT32_MAX) {
-        uint32_t v;
-        getrandom_helper(&v, sizeof(v));
-        value = v;
-    } else
-        getrandom_helper(&value, sizeof(value));
-
-#else
-    spinlock_lock(&random_lock);
-    if(max <= INT32_MAX)
-        value = random();
-    else
-        value = ((uint64_t) random() << 33) | ((uint64_t) random() << 2) | (random() & 0x3);
-    spinlock_unlock(&random_lock);
+}
 #endif
 
-    return value % max;
+inline void os_random_bytes(void *buf, size_t bytes) {
+    if(RAND_bytes((unsigned char *)buf, bytes) == 1)
+        return;
+
+#if defined(HAVE_ARC4RANDOM_BUF)
+    arc4random_buf(buf, bytes);
+#elif defined(HAVE_GETRANDOM)
+    getrandom_get_bytes(buf, bytes);
+#elif defined(HAVE_RAND_S)
+    rand_s_get_bytes(buf, bytes);
+#else
+    random_get_bytes(buf, bytes);
+#endif
 }
 
 // Generate an 8-bit random number
 uint8_t os_random8(void) {
     uint8_t value;
-
-#if defined(HAVE_ARC4RANDOM_BUF)
-    arc4random_buf(&value, sizeof(value));
-#elif defined(HAVE_GETRANDOM)
-    getrandom_helper(&value, sizeof(value));
-#elif defined(HAVE_RAND_S)
-    unsigned int temp;
-    rand_s(&temp);
-    value = (uint8_t)temp;
-#else
-    spinlock_lock(&random_lock);
-    value = (uint8_t)random();
-    spinlock_unlock(&random_lock);
-#endif
-
+    os_random_bytes(&value, sizeof(value));
     return value;
 }
 
 // Generate a 16-bit random number
 uint16_t os_random16(void) {
     uint16_t value;
-
-#if defined(HAVE_ARC4RANDOM_BUF)
-    arc4random_buf(&value, sizeof(value));
-#elif defined(HAVE_GETRANDOM)
-    getrandom_helper(&value, sizeof(value));
-#elif defined(HAVE_RAND_S)
-    unsigned int temp;
-    rand_s(&temp);
-    value = (uint16_t)temp;
-#else
-    spinlock_lock(&random_lock);
-    value = (uint16_t)random();
-    spinlock_unlock(&random_lock);
-#endif
-
+    os_random_bytes(&value, sizeof(value));
     return value;
 }
 
 // Generate a 32-bit random number
 uint32_t os_random32(void) {
     uint32_t value;
-
-#if defined(HAVE_ARC4RANDOM_BUF)
-    arc4random_buf(&value, sizeof(value));
-#elif defined(HAVE_GETRANDOM)
-    getrandom_helper(&value, sizeof(value));
-#elif defined(HAVE_RAND_S)
-    unsigned int temp;
-    rand_s(&temp);
-    value = temp;
-#else
-    spinlock_lock(&random_lock);
-    value = random();
-    spinlock_unlock(&random_lock);
-#endif
-
+    os_random_bytes(&value, sizeof(value));
     return value;
 }
 
 // Generate a 64-bit random number
 uint64_t os_random64(void) {
     uint64_t value;
-
-#if defined(HAVE_ARC4RANDOM_BUF)
-    arc4random_buf(&value, sizeof(value));
-#elif defined(HAVE_GETRANDOM)
-    getrandom_helper(&value, sizeof(value));
-#elif defined(HAVE_RAND_S)
-    unsigned int temp_lo, temp_hi;
-    rand_s(&temp_lo);
-    rand_s(&temp_hi);
-    value = ((uint64_t)temp_hi << 32) | (uint64_t)temp_lo;
-#else
-    spinlock_lock(&random_lock);
-    value = ((uint64_t)random() << 33) | ((uint64_t)random() << 2) | (random() & 0x3);
-    spinlock_unlock(&random_lock);
-#endif
-
+    os_random_bytes(&value, sizeof(value));
     return value;
+}
+
+// return a random number 0 to max - 1
+uint64_t os_random(uint64_t max) {
+    if (max <= 1) return 0;
+
+    if(max <= UINT8_MAX)
+        return os_random8() % max;
+    else if(max <= UINT16_MAX)
+        return os_random16() % max;
+    else if(max <= UINT32_MAX)
+        return os_random32() % max;
+    else
+        return os_random64() % max;
 }

@@ -5,6 +5,9 @@
 
 #include "libnetdata/common.h"
 
+// fill a buffer with random bytes
+void os_random_bytes(void *buf, size_t bytes);
+
 // return a random number 0 to max - 1
 uint64_t os_random(uint64_t max);
 
