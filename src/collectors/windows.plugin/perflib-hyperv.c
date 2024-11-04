@@ -1264,7 +1264,6 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
     return true;
 }
 
-
 struct hypervisor_network_adapter {
     bool collected_metadata;
     bool charts_created;
@@ -1281,6 +1280,22 @@ struct hypervisor_network_adapter {
     DEFINE_RD(BytesSentSec);
     DEFINE_RD(BytesReceivedSec);
 
+    RRDSET *st_IPsecoffloadBytes;
+    DEFINE_RD(IPsecoffloadBytesReceivedSec);
+    DEFINE_RD(IPsecoffloadBytesSentSec);
+
+    RRDSET *st_DirectedPackets;
+    DEFINE_RD(DirectedPacketsSentSec);
+    DEFINE_RD(DirectedPacketsReceivedSec);
+
+    RRDSET *st_BroadcastPackets;
+    DEFINE_RD(BroadcastPacketsSentSec);
+    DEFINE_RD(BroadcastPacketsReceivedSec);
+
+    RRDSET *st_MulticastPackets;
+    DEFINE_RD(MulticastPacketsSentSec);
+    DEFINE_RD(MulticastPacketsReceivedSec);
+
     COUNTER_DATA DroppedPacketsOutgoingSec;
     COUNTER_DATA DroppedPacketsIncomingSec;
 
@@ -1289,6 +1304,18 @@ struct hypervisor_network_adapter {
 
     COUNTER_DATA BytesSentSec;
     COUNTER_DATA BytesReceivedSec;
+
+    COUNTER_DATA IPsecoffloadBytesReceivedSec;
+    COUNTER_DATA IPsecoffloadBytesSentSec;
+
+    COUNTER_DATA DirectedPacketsSentSec;
+    COUNTER_DATA DirectedPacketsReceivedSec;
+
+    COUNTER_DATA BroadcastPacketsSentSec;
+    COUNTER_DATA BroadcastPacketsReceivedSec;
+
+    COUNTER_DATA MulticastPacketsSentSec;
+    COUNTER_DATA MulticastPacketsReceivedSec;
 };
 
 // Initialize the keys for the root partition metrics
@@ -1302,6 +1329,15 @@ void initialize_hyperv_network_adapter_keys(struct hypervisor_network_adapter *p
 
     p->BytesSentSec.key = "Bytes Sent/sec";
     p->BytesReceivedSec.key = "Bytes Received/sec";
+
+    p->IPsecoffloadBytesReceivedSec.key = "IPsec offload Bytes Receive/sec";
+    p->IPsecoffloadBytesSentSec.key =     "IPsec offload Bytes Sent/sec";
+    p->DirectedPacketsSentSec.key =       "Directed Packets Sent/sec";
+    p->DirectedPacketsReceivedSec.key =   "Directed Packets Received/sec";
+    p->BroadcastPacketsSentSec.key =      "Broadcast Packets Sent/sec";
+    p->BroadcastPacketsReceivedSec.key =  "Broadcast Packets Received/sec";
+    p->MulticastPacketsSentSec.key =      "Multicast Packets Sent/sec";
+    p->MulticastPacketsReceivedSec.key =  "Multicast Packets Received/sec";
 }
 
 void dict_hyperv_network_adapter_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -1343,6 +1379,18 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
         GET_INSTANCE_COUNTER(BytesReceivedSec);
         GET_INSTANCE_COUNTER(BytesSentSec);
+
+        GET_INSTANCE_COUNTER(IPsecoffloadBytesReceivedSec);
+        GET_INSTANCE_COUNTER(IPsecoffloadBytesSentSec);
+
+        GET_INSTANCE_COUNTER(DirectedPacketsSentSec);
+        GET_INSTANCE_COUNTER(DirectedPacketsReceivedSec);
+
+        GET_INSTANCE_COUNTER(BroadcastPacketsSentSec);
+        GET_INSTANCE_COUNTER(BroadcastPacketsReceivedSec);
+
+        GET_INSTANCE_COUNTER(MulticastPacketsSentSec);
+        GET_INSTANCE_COUNTER(MulticastPacketsReceivedSec);
 
         if (!p->charts_created) {
             p->charts_created = true;
@@ -1400,8 +1448,93 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
             p->rd_BytesReceivedSec = rrddim_add(p->st_send_receive_bytes, "received", NULL, 8, 1000, RRD_ALGORITHM_INCREMENTAL);
             p->rd_BytesSentSec = rrddim_add(p->st_send_receive_bytes, "sent", NULL, -8, 1000, RRD_ALGORITHM_INCREMENTAL);
-
             rrdlabels_add(p->st_send_receive_bytes->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+            p->st_IPsecoffloadBytes = rrdset_create_localhost(
+                "vm_net_interface_ipsec_traffic",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_net_interface_ipsec_traffic",
+                "VM interface traffic",
+                "kilobits/s",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_AREA);
+
+            p->rd_IPsecoffloadBytesReceivedSec =
+                rrddim_add(p->st_IPsecoffloadBytes, "received", NULL, 8, 1000, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_IPsecoffloadBytesSentSec =
+                rrddim_add(p->st_IPsecoffloadBytes, "sent", NULL, -8, 1000, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(
+                p->st_IPsecoffloadBytes->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+            p->st_DirectedPackets = rrdset_create_localhost(
+                "vm_net_interface_directed_packets",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_net_interface_directed_packets",
+                "VM interface traffic",
+                "packets/s",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_DirectedPacketsSentSec =
+                rrddim_add(p->st_DirectedPackets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_DirectedPacketsReceivedSec =
+                rrddim_add(p->st_DirectedPackets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(
+                p->st_DirectedPackets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+            p->st_BroadcastPackets = rrdset_create_localhost(
+                "vm_net_interface_broadcast_packets",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_net_interface_broadcast_packets",
+                "VM interface broadcast",
+                "packets/s",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_BroadcastPacketsSentSec =
+                rrddim_add(p->st_BroadcastPackets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_BroadcastPacketsReceivedSec =
+                rrddim_add(p->st_BroadcastPackets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(
+                p->st_BroadcastPackets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+            p->st_MulticastPackets = rrdset_create_localhost(
+                "vm_net_interface_multicast_packets",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_net_interface_multicast_packets",
+                "VM interface multicast",
+                "packets/s",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_MulticastPacketsSentSec =
+                rrddim_add(p->st_MulticastPackets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_MulticastPacketsReceivedSec =
+                rrddim_add(p->st_MulticastPackets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(
+                p->st_MulticastPackets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+
         }
 
         SETP_DIM_VALUE(st_packets, DroppedPacketsIncomingSec);
@@ -1413,6 +1546,22 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
         SETP_DIM_VALUE(st_send_receive_bytes, BytesReceivedSec);
         SETP_DIM_VALUE(st_send_receive_bytes, BytesSentSec);
 
+        SETP_DIM_VALUE(st_IPsecoffloadBytes, IPsecoffloadBytesReceivedSec);
+        SETP_DIM_VALUE(st_IPsecoffloadBytes, IPsecoffloadBytesSentSec);
+
+        SETP_DIM_VALUE(st_DirectedPackets, DirectedPacketsSentSec);
+        SETP_DIM_VALUE(st_DirectedPackets, DirectedPacketsReceivedSec);
+
+        SETP_DIM_VALUE(st_BroadcastPackets, BroadcastPacketsSentSec);
+        SETP_DIM_VALUE(st_BroadcastPackets, BroadcastPacketsReceivedSec);
+
+        SETP_DIM_VALUE(st_MulticastPackets,MulticastPacketsSentSec);
+        SETP_DIM_VALUE(st_MulticastPackets,MulticastPacketsReceivedSec);
+
+        rrdset_done(p->st_IPsecoffloadBytes);
+        rrdset_done(p->st_DirectedPackets);
+        rrdset_done(p->st_BroadcastPackets);
+        rrdset_done(p->st_MulticastPackets);
         rrdset_done(p->st_send_receive_bytes);
         rrdset_done(p->st_send_receive_packets);
         rrdset_done(p->st_packets);
