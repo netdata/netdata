@@ -111,7 +111,7 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config netdata.conf
 ```
 
-Change the value of the `perf` setting to `yes` in the `[plugins]` section. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
+Change the value of the `perf` setting to `yes` in the `[plugins]` section. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/start-stop-restart.md) for your system.
 
 
 
