@@ -820,7 +820,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     HYPERV,
                     HYPERV".vm_storage_device_operations",
                     "VM storage device IOPS",
-                    "operations/sec",
+                    "operations/s",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
                     chart_priority++,
@@ -841,7 +841,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     HYPERV,
                     HYPERV".vm_storage_device_bytes",
                     "VM storage device IO",
-                    "bytes/sec",
+                    "bytes/s",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
                     chart_priority++,
@@ -862,7 +862,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     HYPERV,
                     HYPERV".vm_storage_device_errors",
                     "VM storage device errors",
-                    "errors/sec",
+                    "errors/s",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
                     chart_priority++,
@@ -1054,15 +1054,15 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 HYPERV,
                 HYPERV ".vswitch_bytes",
                 "Virtual switch traffic",
-                "bytes/sec",
+                "kilobits/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
                 chart_priority++,
                 update_every,
-                RRDSET_TYPE_LINE);
+                RRDSET_TYPE_AREA);
 
-            p->rd_BytesReceivedSec = rrddim_add(p->st_bytes, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            p->rd_BytesSentSec = rrddim_add(p->st_bytes, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_BytesReceivedSec = rrddim_add(p->st_bytes, "received", NULL, 8, 1000, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_BytesSentSec = rrddim_add(p->st_bytes, "sent", NULL, -8, 1000, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_bytes->rrdlabels, "vswitch", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
             p->st_packets = rrdset_create_localhost(
@@ -1072,7 +1072,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 HYPERV,
                 HYPERV ".vswitch_packets",
                 "Virtual switch packets",
-                "packets/sec",
+                "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
                 chart_priority++,
@@ -1090,7 +1090,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 HYPERV,
                 HYPERV ".vswitch_directed_packets",
                 "Virtual switch directed packets",
-                "packets/sec",
+                "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
                 chart_priority++,
@@ -1110,7 +1110,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 HYPERV,
                 HYPERV ".vswitch_broadcast_packets",
                 "Virtual switch broadcast packets",
-                "packets/sec",
+                "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
                 chart_priority++,
@@ -1130,7 +1130,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 HYPERV,
                 HYPERV ".vswitch_multicast_packets",
                 "Virtual switch multicast packets",
-                "packets/sec",
+                "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
                 chart_priority++,
@@ -1150,7 +1150,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 HYPERV,
                 HYPERV ".vswitch_dropped_packets",
                 "Virtual switch dropped packets",
-                "drops/sec",
+                "drops/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
                 chart_priority++,
@@ -1170,7 +1170,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 HYPERV,
                 HYPERV ".vswitch_extensions_dropped_packets",
                 "Virtual switch extensions dropped packets",
-                "drops/sec",
+                "drops/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
                 chart_priority++,
@@ -1190,7 +1190,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 HYPERV,
                 HYPERV ".vswitch_packets_flooded",
                 "Virtual switch flooded packets",
-                "packets/sec",
+                "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
                 chart_priority++,
@@ -1207,7 +1207,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 HYPERV,
                 HYPERV ".vswitch_learned_mac_addresses",
                 "Virtual switch learned MAC addresses",
-                "mac addresses/sec",
+                "mac addresses/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
                 chart_priority++,
@@ -1224,7 +1224,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 HYPERV,
                 HYPERV ".vswitch_purged_mac_addresses",
                 "Virtual switch purged MAC addresses",
-                "mac addresses/sec",
+                "mac addresses/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
                 chart_priority++,
@@ -1286,8 +1286,22 @@ struct hypervisor_network_adapter {
     DEFINE_RD(DroppedPacketsOutgoingSec);
     DEFINE_RD(DroppedPacketsIncomingSec);
 
+    RRDSET *st_send_receive_packets;
+    DEFINE_RD(PacketsSentSec);
+    DEFINE_RD(PacketsReceivedSec);
+
+    RRDSET *st_send_receive_bytes;
+    DEFINE_RD(BytesSentSec);
+    DEFINE_RD(BytesReceivedSec);
+
     COUNTER_DATA DroppedPacketsOutgoingSec;
     COUNTER_DATA DroppedPacketsIncomingSec;
+
+    COUNTER_DATA PacketsSentSec;
+    COUNTER_DATA PacketsReceivedSec;
+
+    COUNTER_DATA BytesSentSec;
+    COUNTER_DATA BytesReceivedSec;
 };
 
 // Initialize the keys for the root partition metrics
@@ -1295,6 +1309,12 @@ void initialize_hyperv_network_adapter_keys(struct hypervisor_network_adapter *p
 {
     p->DroppedPacketsOutgoingSec.key = "Dropped Packets Outgoing/sec";
     p->DroppedPacketsIncomingSec.key = "Dropped Packets Incoming/sec";
+
+    p->PacketsSentSec.key = "Packets Sent/sec";
+    p->PacketsReceivedSec.key = "Packets Received/sec";
+
+    p->BytesSentSec.key = "Bytes Sent/sec";
+    p->BytesReceivedSec.key = "Bytes Received/sec";
 }
 
 void dict_hyperv_network_adapter_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -1331,6 +1351,12 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
         GET_INSTANCE_COUNTER(DroppedPacketsIncomingSec);
         GET_INSTANCE_COUNTER(DroppedPacketsOutgoingSec);
 
+        GET_INSTANCE_COUNTER(PacketsReceivedSec);
+        GET_INSTANCE_COUNTER(PacketsSentSec);
+
+        GET_INSTANCE_COUNTER(BytesReceivedSec);
+        GET_INSTANCE_COUNTER(BytesSentSec);
+
         if (!p->charts_created) {
             p->charts_created = true;
             p->st_packets = rrdset_create_localhost(
@@ -1340,7 +1366,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 HYPERV,
                 HYPERV".vm_net_interface_packets_dropped",
                 "VM interface packets dropped",
-                "drops/sec",
+                "drops/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
                 chart_priority++,
@@ -1351,11 +1377,57 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
             p->rd_DroppedPacketsOutgoingSec = rrddim_add(p->st_packets, "outgoing", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrdlabels_add(p->st_packets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+            p->st_send_receive_packets = rrdset_create_localhost(
+                "vm_net_interface_packets",
+                windows_shared_buffer,
+                NULL,
+                HYPERV,
+                HYPERV ".vm_net_interface_packets",
+                "VM interface packets",
+                "packets/s",
+                _COMMON_PLUGIN_NAME,
+                _COMMON_PLUGIN_MODULE_NAME,
+                chart_priority++,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+            p->rd_PacketsReceivedSec = rrddim_add(p->st_send_receive_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_PacketsSentSec = rrddim_add(p->st_send_receive_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_send_receive_packets->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+            p->st_send_receive_bytes = rrdset_create_localhost(
+              "vm_net_interface_traffic",
+              windows_shared_buffer,
+              NULL,
+              HYPERV,
+              HYPERV ".vm_net_interface_traffic",
+              "VM interface traffic",
+              "kilobits/s",
+              _COMMON_PLUGIN_NAME,
+              _COMMON_PLUGIN_MODULE_NAME,
+              chart_priority++,
+              update_every,
+              RRDSET_TYPE_AREA);
+
+            p->rd_BytesReceivedSec = rrddim_add(p->st_send_receive_bytes, "received", NULL, 8, 1000, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_BytesSentSec = rrddim_add(p->st_send_receive_bytes, "sent", NULL, -8, 1000, RRD_ALGORITHM_INCREMENTAL);
+
+            rrdlabels_add(p->st_send_receive_bytes->rrdlabels, "vm_net_interface", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
         SETP_DIM_VALUE(st_packets, DroppedPacketsIncomingSec);
         SETP_DIM_VALUE(st_packets, DroppedPacketsOutgoingSec);
 
+        SETP_DIM_VALUE(st_send_receive_packets, PacketsReceivedSec);
+        SETP_DIM_VALUE(st_send_receive_packets, PacketsSentSec);
+
+        SETP_DIM_VALUE(st_send_receive_bytes, BytesReceivedSec);
+        SETP_DIM_VALUE(st_send_receive_bytes, BytesSentSec);
+
+        rrdset_done(p->st_send_receive_bytes);
+        rrdset_done(p->st_send_receive_packets);
         rrdset_done(p->st_packets);
     }
     return true;
