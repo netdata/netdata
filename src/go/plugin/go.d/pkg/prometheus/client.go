@@ -47,11 +47,7 @@ const (
 
 // New creates a Prometheus instance.
 func New(client *http.Client, request web.RequestConfig) Prometheus {
-	return &prometheus{
-		client:  client,
-		request: request,
-		buf:     bytes.NewBuffer(make([]byte, 0, 16000)),
-	}
+	return NewWithSelector(client, request, nil)
 }
 
 // NewWithSelector creates a Prometheus instance with the selector.
