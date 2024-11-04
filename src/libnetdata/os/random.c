@@ -145,16 +145,51 @@ uint64_t os_random64(void) {
     return value;
 }
 
-// return a random number 0 to max - 1
+#define MAX_RETRIES 10  // Limit retries to avoid an infinite loop
 uint64_t os_random(uint64_t max) {
     if (max <= 1) return 0;
 
-    if(max <= UINT8_MAX)
-        return os_random8() % max;
-    else if(max <= UINT16_MAX)
-        return os_random16() % max;
-    else if(max <= UINT32_MAX)
-        return os_random32() % max;
+    uint64_t value;
+    uint64_t upper_limit;
+    int retries = 0;
+
+    /*
+     * Rejection Sampling
+     * To reduce bias, we can use rejection sampling without creating an infinite loop.
+     * This technique works by discarding values that would introduce bias, but limiting
+     * the number of retries to avoid infinite loops.
+    */
+
+    // Calculate an upper limit so that the range evenly divides into max.
+    // Any values greater than this limit would introduce bias, so we discard them.
+
+    if (max <= UINT8_MAX)
+        upper_limit = UINT8_MAX - (UINT8_MAX % max);
+    else if (max <= UINT16_MAX)
+        upper_limit = UINT16_MAX - (UINT16_MAX % max);
+    else if (max <= UINT32_MAX)
+        upper_limit = UINT32_MAX - (UINT32_MAX % max);
     else
-        return os_random64() % max;
+        upper_limit = UINT64_MAX - (UINT64_MAX % max);
+
+    do {
+        // Generate a random number with the appropriate number of bits
+        if (max <= UINT8_MAX)
+            value = os_random8();
+        else if (max <= UINT16_MAX)
+            value = os_random16();
+        else if (max <= UINT32_MAX)
+            value = os_random32();
+        else
+            value = os_random64();
+
+        // Retry if the generated value is biased (i.e., exceeds upper_limit)
+        if (value < upper_limit)
+            return value % max;  // Value is unbiased, return directly
+
+        retries++;
+    } while (retries < MAX_RETRIES);
+
+    // Fallback to modulo after MAX_RETRIES, accepting minor bias
+    return value % max;
 }
