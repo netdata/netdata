@@ -400,7 +400,6 @@ typedef uint32_t uid_t;
 #include <wchar.h>
 #include <tchar.h>
 #include <guiddef.h>
-#include <bcrypt.h>  // For BCryptGenRandom
 #include <io.h>
 #include <fcntl.h>
 #include <process.h>
