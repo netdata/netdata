@@ -509,6 +509,7 @@ static void aclk_synchronization(void *arg)
             }
         } while (opcode != ACLK_DATABASE_NOOP);
     }
+    config->initialized = false;
 
     if (!uv_timer_stop(&config->timer_req))
         uv_close((uv_handle_t *)&config->timer_req, NULL);
