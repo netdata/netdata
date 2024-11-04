@@ -103,18 +103,18 @@ uint64_t os_random(uint64_t max) {
 #elif defined(HAVE_GETRANDOM)
     if (max <= UINT8_MAX) {
         uint8_t v;
-        getrandom_helper(&v, sizeof(v), 0);
+        getrandom_helper(&v, sizeof(v));
         value = v;
     } else if(max <= UINT16_MAX) {
         uint16_t v;
-        getrandom_helper(&v, sizeof(v), 0);
+        getrandom_helper(&v, sizeof(v));
         value = v;
     } else if (max <= UINT32_MAX) {
         uint32_t v;
-        getrandom_helper(&v, sizeof(v), 0);
+        getrandom_helper(&v, sizeof(v));
         value = v;
     } else
-        getrandom_helper(&value, sizeof(value), 0);
+        getrandom_helper(&value, sizeof(value));
 
 #else
     spinlock_lock(&random_lock);
@@ -135,7 +135,7 @@ uint8_t os_random8(void) {
 #if defined(HAVE_ARC4RANDOM_BUF)
     arc4random_buf(&value, sizeof(value));
 #elif defined(HAVE_GETRANDOM)
-    getrandom_helper(&value, sizeof(value), 0);
+    getrandom_helper(&value, sizeof(value));
 #elif defined(HAVE_RAND_S)
     unsigned int temp;
     rand_s(&temp);
@@ -156,7 +156,7 @@ uint16_t os_random16(void) {
 #if defined(HAVE_ARC4RANDOM_BUF)
     arc4random_buf(&value, sizeof(value));
 #elif defined(HAVE_GETRANDOM)
-    getrandom_helper(&value, sizeof(value), 0);
+    getrandom_helper(&value, sizeof(value));
 #elif defined(HAVE_RAND_S)
     unsigned int temp;
     rand_s(&temp);
@@ -177,7 +177,7 @@ uint32_t os_random32(void) {
 #if defined(HAVE_ARC4RANDOM_BUF)
     arc4random_buf(&value, sizeof(value));
 #elif defined(HAVE_GETRANDOM)
-    getrandom_helper(&value, sizeof(value), 0);
+    getrandom_helper(&value, sizeof(value));
 #elif defined(HAVE_RAND_S)
     unsigned int temp;
     rand_s(&temp);
@@ -198,7 +198,7 @@ uint64_t os_random64(void) {
 #if defined(HAVE_ARC4RANDOM_BUF)
     arc4random_buf(&value, sizeof(value));
 #elif defined(HAVE_GETRANDOM)
-    getrandom_helper(&value, sizeof(value), 0);
+    getrandom_helper(&value, sizeof(value));
 #elif defined(HAVE_RAND_S)
     unsigned int temp_lo, temp_hi;
     rand_s(&temp_lo);
