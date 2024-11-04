@@ -6,6 +6,12 @@ Netdata offers a convenient Windows installer for easy setup. This executable pr
 >
 > This feature is currently under beta and only available for Nightly releases, and the installer can be found in our [nightlies repo](https://github.com/netdata/netdata-nightlies). A stable version will be released soon.
 
+## Graphical User Interface (GUI)
+
+Double-clicking the installer initiates the installation process. Since Netdata adds a service to your system, you'll need to provide administrator privileges.
+
+Netdata will be installed on your system and you will be able to access the dashboard from `localhost:19999` in order to Connect the node to Netdata Cloud.
+
 ## Silent Mode (Command line)
 
 This section provides instructions for installing Netdata in silent mode running `msiexec.exe`, which is ideal for automated deployments.
@@ -37,12 +43,8 @@ Connect your Agent to your Netdata Cloud Space with token `<YOUR_TOKEN>` and roo
 msiexec /qn /i netdata-x64.msi /TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOM>" GPLLICENSE=1 CLOUDUILICENSE=1
 ```
 
-Replace `<YOUR_TOKEN>` and `<YOUR_ROOM>` with your actual Netdata Cloud Space claim token and room ID, respectively.
+Replace `<YOUR_TOKEN>` and `<YOUR_ROOM>` with your Netdata Cloud Space claim token and room ID, respectively.
 
 > **Note**
 >
 > The Windows version of Netdata is intended for users on paid plans.
-
-## Uninstalling
-
-To uninstall Netdata, access Windows Control Panel.
