@@ -340,7 +340,7 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
-      - netdataconfig:/etc/netdata
+      - ./netdataconfig:/etc/netdata
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata
       - /:/host/root:ro,rslave
