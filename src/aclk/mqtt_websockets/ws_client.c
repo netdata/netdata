@@ -5,16 +5,6 @@
 #include "ws_client.h"
 #include "common_internal.h"
 
-static uint32_t generate_random_32bit(void) {
-    uint32_t random_number = 0;
-
-    if (RAND_bytes((unsigned char *)&random_number, sizeof(random_number)) != 1) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to generate a random uint32 mask");
-    }
-
-    return random_number;
-}
-
 const char *websocket_upgrage_hdr = "GET /mqtt HTTP/1.1\x0D\x0A"
                               "Host: %s\x0D\x0A"
                               "Upgrade: websocket\x0D\x0A"
@@ -128,11 +118,11 @@ int ws_client_start_handshake(ws_client *client)
         return 1;
     }
 
-    // Generate a random 16-byte nonce
-    if (!RAND_bytes(nonce, WEBSOCKET_NONCE_SIZE)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to generate nonce");
-        return 1;
-    }
+    uint64_t temp;
+    temp = os_random64();
+    memcpy(nonce, &temp, 8);
+    temp = os_random64();
+    memcpy(nonce + 8, &temp, 8);
 
     // Initialize the digest context
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
@@ -414,7 +404,7 @@ int ws_client_send(const ws_client *client, enum websocket_opcode frame_type, co
         *ptr++ |= size;
 
     char *mask = ptr;
-    uint32_t mask32 = generate_random_32bit();
+    uint32_t mask32 = os_random32();
     if (!mask32) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Unable to get mask to XOR websocket payload");
         return -2;
