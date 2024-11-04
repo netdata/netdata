@@ -15,8 +15,8 @@ This script works on all Linux distributions and macOS environments, by detectin
 
 The `kickstart.sh` script does the following after being downloaded and run using `sh`:
 
-- Determines what platform you are running on.
-- Checks for an existing installation, and if found updates that instead of creating a new install.
+- Determines what platform you’re running on.
+- Checks for an existing installation, and if found updates that instead of creating a new installation.
 - Attempts to install Netdata using our [official native binary packages](/packaging/installer/methods/packages.md).
 - If there are no official native binary packages for your system (or installing that way failed), tries to install using a [static build of Netdata](/packaging/makeself/README.md) if one is available.
 - If no static build is available, installs required dependencies and then attempts to install by building Netdata locally (by downloading the sources and building them directly).
@@ -47,7 +47,7 @@ To install Netdata, run the following as your normal user:
 > **Note**
 >
 > If you plan to also connect the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-> and `YOUR_ROOM_ID` with the ID of the Room you are willing to connect the node to.
+> and `YOUR_ROOM_ID` with the ID of the Room you’re willing to connect the node to.
 
 ## Optional parameters to alter your installation
 
@@ -56,9 +56,9 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 ### destination directory
 
 - `--install-prefix`
-  Specify an installation prefix for local builds (by default, we use a sane prefix based on the type of system).
+  Specify a custom installation directory for local builds. If not provided, a default directory will be used based on your system.
 - `--old-install-prefix`
-  Specify the custom local build's installation prefix that should be removed.
+  Specify the previous custom installation directory to be removed during the update process.
 
 ### interactivity
 
@@ -87,7 +87,7 @@ By default, the script installs the nightly channel of Netdata, providing you wi
 
 ### install type
 
-By default the script will prefer native builds when they are available, and then static builds. It will fallback to build from source when all others are not available.
+By default, the script will prefer native builds when they’re available, and then static builds. It will fallback to build from source when all others aren’t available.
 
 - `--native-only`
    Only install if native binary packages are available. It fails otherwise.
@@ -100,7 +100,7 @@ By default the script will prefer native builds when they are available, and the
 
 ### automatic updates
 
-By default the script installs a cron job to automatically update Netdata to the latest version of the release channel used.
+By default, the script installs a cron job to automatically update Netdata to the latest version of the release channel used.
 
 - `--auto-update`
   Enable automatic updates (this is the default).
@@ -109,10 +109,10 @@ By default the script installs a cron job to automatically update Netdata to the
 
 ### Netdata Cloud related options
 
-By default, the kickstart script will provide a Netdata agent installation that can potentially communicate with Netdata Cloud, if of course the Netdata agent is further configured to do so.
+By default, the kickstart script will provide a Netdata agent installation that can potentially communicate with Netdata Cloud if the Netdata agent is further configured to do so.
 
 - `--claim-token`
-  Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node after the install. This will enable, connect and claim the Netdata agent, to Netdata Cloud.
+  Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node after the installation. This will connect and claim the Netdata Agent to Netdata Cloud.
 - `--claim-url`
   Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`. Use this option to change the Netdata Cloud URL to point to your Netdata Cloud installation.
 - `--claim-rooms`
@@ -120,7 +120,7 @@ By default, the kickstart script will provide a Netdata agent installation that 
 - `--claim-proxy`
   Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [connecting through a proxy](/src/claim/README.md#automatically-via-a-provisioning-system-or-the-command-line) for details.
 - `--claim-only`
-  If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
+  If there is an existing installation, only try to claim it without attempting to update it. If there is no existing installation, install and claim Netdata normally.
 
 ### anonymous telemetry
 
@@ -132,11 +132,11 @@ By default, the agent is sending anonymous telemetry data to help us take identi
 ### reinstalling
 
 - `--reinstall`
-  If there is an existing install, reinstall it instead of trying to update it. If there is not an existing install, install netdata normally.
+  If there is an existing installation, reinstall it instead of trying to update it. If there is not an existing installation, install netdata normally.
 - `--reinstall-even-if-unsafe`
-  If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things (for example, if we cannot detect what type of installation it is). If there is not an existing install, install Netdata normally.
+  If there is an existing installation, reinstall it instead of trying to update it, even if doing so is known to potentially break things (for example, if we can’t detect what type of installation it is). If there is not an existing install, install Netdata normally.
 - `--reinstall-clean`
-  If there is an existing install, uninstall it before trying to install Netdata. Fails if there is no existing install.
+  If there is an existing installation, uninstall it before trying to install Netdata. Fails if there is no existing installation.
 
 ### uninstall
 
@@ -146,7 +146,7 @@ By default, the agent is sending anonymous telemetry data to help us take identi
 ### other options
 
 - `--dry-run`
-  Show what the installer would do, but don’t actually do any of it.
+  Simulates the installation process without making any changes to your system. This allows you to review the steps and potential impacts before proceeding with the actual installation.
 - `--dont-start-it`
   Don’t auto-start the daemon after installing. This parameter is not guaranteed to work.
 - `--distro-override`
@@ -162,13 +162,13 @@ The following options are mutually exclusive and specify special operations othe
 ### environment variables
 
 Additionally, the following environment variables may be used to further customize how the script runs (most users
-should not need to use special values for any of these):
+shouldn’t need to use special values for any of these):
 
 - `TMPDIR`: Used to specify where to put temporary files. On most systems, the default we select automatically
   should be fine. The user running the script needs to both be able to write files to the temporary directory,
   and run files from that location.
-- `ROOTCMD`: Used to specify a command to use to run another command with root privileges if needed. By default
-  we try to use sudo, doas, or pkexec (in that order of preference), but if you need special options for one of
+- `ROOTCMD`: Used to specify a command to use to run another command with root privileges if needed. By default,
+  we try to use sudo, doas, or pkexec (in that order of preference). However, if you need special options for one of
   those to work, or have a different tool to do the same thing on your system, you can specify it here.
 - `DISABLE_TELEMETRY`: If set to a value other than 0, behave as if `--disable-telemetry` was specified.
 
