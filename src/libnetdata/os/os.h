@@ -7,6 +7,7 @@
 #include <sys/syscall.h>
 #endif
 
+#include "random.h"
 #include "timestamps.h"
 #include "setproctitle.h"
 #include "close_range.h"
@@ -17,7 +18,7 @@
 #include "gettid.h"
 #include "get_pid_max.h"
 #include "get_system_cpus.h"
-#include "tinysleep.h"
+#include "sleep.h"
 #include "uuid_generate.h"
 #include "setenv.h"
 #include "os-freebsd-wrappers.h"

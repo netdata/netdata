@@ -388,6 +388,9 @@ check_function_exists(sched_get_priority_max HAVE_SCHED_GET_PRIORITY_MAX)
 check_function_exists(close_range HAVE_CLOSE_RANGE)
 check_function_exists(backtrace HAVE_BACKTRACE)
 
+check_function_exists(arc4random_buf HAVE_ARC4RANDOM_BUF)
+check_function_exists(getrandom HAVE_GETRANDOM)
+
 #
 # check source compilation
 #
@@ -538,6 +541,17 @@ int my_function() {
         return 1;
 }
 " HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT)
+
+# Windows MSVCRT random number generator
+# used only when compiling natively (not MSYS/CYGWIN)
+check_c_source_compiles("
+    #define _CRT_RAND_S
+    #include <stdlib.h>
+    int main() {
+        unsigned int x;
+        return rand_s(&x);
+    }
+" HAVE_RAND_S)
 
 if(OS_FREEBSD OR OS_MACOS)
         set(HAVE_BUILTIN_ATOMICS True)
@@ -759,8 +773,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/os-windows-wrappers.h
         src/libnetdata/os/get_system_cpus.c
         src/libnetdata/os/get_system_cpus.h
-        src/libnetdata/os/tinysleep.c
-        src/libnetdata/os/tinysleep.h
+        src/libnetdata/os/sleep.c
+        src/libnetdata/os/sleep.h
         src/libnetdata/os/uuid_generate.c
         src/libnetdata/os/uuid_generate.h
         src/libnetdata/os/setenv.c
@@ -862,6 +876,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/nd_log-to-windows-common.h
         src/libnetdata/common.h
         src/libnetdata/xxHash/xxhash.h
+        src/libnetdata/os/random.c
+        src/libnetdata/os/random.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

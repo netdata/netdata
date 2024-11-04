@@ -342,15 +342,13 @@ unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min, un
 
     attempt++;
 
-    if (attempt == 0) {
-        srandom(time(NULL));
+    if (attempt == 0)
         return 0;
-    }
 
     unsigned long int delay = pow(base, attempt - 1);
     delay *= MSEC_PER_SEC;
 
-    delay += (random() % (MAX(1000, delay/2)));
+    delay += (os_random32() % (MAX(1000, delay/2)));
 
     if (delay <= min * MSEC_PER_SEC)
         return min;
