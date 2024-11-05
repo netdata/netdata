@@ -14,10 +14,10 @@
             <Icon Id="NetdataIcon.ico" SourceFile="NetdataWhite.ico"/>
             <Property Id="ARPPRODUCTICON" Value="NetdataIcon.ico" />
 
-            <Property Id="TOKEN" Value=" " />
-            <Property Id="ROOMS" Value=" " />
-            <Property Id="INSECURE" Value="0" />
-            <Property Id="PROXY" Value=" " />
+            <Property Id="TOKEN" Secure="yes" />
+            <Property Id="ROOMS" Secure="yes" />
+            <Property Id="INSECURE" Secure="yes" />
+            <Property Id="PROXY" Secure="yes" />
             <Property Id="URL" Value="https://app.netdata.cloud" />
 
             <Property Id="GPLLICENSE" Value="0" />
@@ -229,7 +229,7 @@
                 <Control Id="URLLabel" Type="Text" X="20" Y="105" Width="30" Height="15" Text="URL:" />
                 <Control Id="URL" Type="Edit" X="60" Y="105" Width="250" Height="18" Property="URL" />
 
-                <Control Id="DesktopShortcutCheckBox" Type="CheckBox" X="20" Y="120" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" />
+                <Control Id="InsecureCheckbox" Type="CheckBox" X="20" Y="120" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" />
             
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
