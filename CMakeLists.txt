@@ -1399,7 +1399,7 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/sender-internals.h
         src/streaming/sender-execute.c
         src/streaming/sender-commit.c
-        src/streaming/sender-destinations.c
+        src/streaming/stream-parents.c
         src/streaming/stream-handshake.c
         src/streaming/protocol/command-function.c
         src/streaming/protocol/command-host-labels.c
@@ -1410,7 +1410,7 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-conf.h
         src/streaming/stream-handshake.h
         src/streaming/sender.h
-        src/streaming/sender-destinations.h
+        src/streaming/stream-parents.h
         src/streaming/rrdhost-status.c
         src/streaming/rrdhost-status.h
         src/streaming/receiver.h

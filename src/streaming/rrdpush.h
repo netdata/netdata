@@ -3,11 +3,6 @@
 #ifndef NETDATA_RRDPUSH_H
 #define NETDATA_RRDPUSH_H 1
 
-#include "stream-handshake.h"
-#include "stream-capabilities.h"
-#include "stream-conf.h"
-#include "stream-compression/compression.h"
-
 #include "sender.h"
 #include "receiver.h"
 

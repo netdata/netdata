@@ -116,13 +116,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
             buffer_json_add_array_item_uint64(wb, s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
 
             buffer_json_add_array_item_array(wb); // OutAttemptHandshake
-            time_t last_attempt = 0;
-            for(struct rrdpush_destinations *d = host->destinations; d ; d = d->next) {
-                if(d->since > last_attempt)
-                    last_attempt = d->since;
-
-                buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(d->reason));
-            }
+            time_t last_attempt = rrdpush_destinations_handshare_error_to_json(wb, host);
             buffer_json_array_close(wb); // // OutAttemptHandshake
 
             if(!last_attempt) {

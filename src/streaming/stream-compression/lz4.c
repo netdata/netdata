@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "libnetdata/libnetdata.h"
 #include "lz4.h"
 
 #ifdef ENABLE_LZ4
-#include "lz4.h"
+#include <lz4.h>
 
 // ----------------------------------------------------------------------------
 // compress

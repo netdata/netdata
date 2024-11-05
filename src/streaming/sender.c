@@ -250,10 +250,7 @@ static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
         host->sender->exit.shutdown = false;
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         host->sender->last_state_since_t = now_realtime_sec();
-        if(host->destination) {
-            host->destination->since = host->sender->last_state_since_t;
-            host->destination->reason = host->sender->exit.reason;
-        }
+        rrdpush_destination_set_disconnect_reason(host->destination, host->sender->exit.reason, host->sender->last_state_since_t);
     }
 
     rrdpush_reset_destinations_postpone_time(host);

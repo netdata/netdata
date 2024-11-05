@@ -302,29 +302,7 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
             buffer_json_object_close(wb); // traffic
 
             buffer_json_member_add_array(wb, "candidates");
-            struct rrdpush_destinations *d;
-            for (d = s->host->destinations; d; d = d->next) {
-                buffer_json_add_array_item_object(wb);
-                buffer_json_member_add_uint64(wb, "attempts", d->attempts);
-                {
-
-                    if (d->ssl) {
-                        snprintfz(buf, sizeof(buf) - 1, "%s:SSL", string2str(d->destination));
-                        buffer_json_member_add_string(wb, "destination", buf);
-                    }
-                    else
-                        buffer_json_member_add_string(wb, "destination", string2str(d->destination));
-
-                    buffer_json_member_add_time_t(wb, "since", d->since);
-                    buffer_json_member_add_time_t(wb, "age", s->now - d->since);
-                    buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
-                    if(d->postpone_reconnection_until > s->now) {
-                        buffer_json_member_add_time_t(wb, "next_check", d->postpone_reconnection_until);
-                        buffer_json_member_add_time_t(wb, "next_in", d->postpone_reconnection_until - s->now);
-                    }
-                }
-                buffer_json_object_close(wb); // each candidate
-            }
+            rrdpush_sender_destinations_to_json(wb, s);
             buffer_json_array_close(wb); // candidates
         }
         buffer_json_object_close(wb); // destination

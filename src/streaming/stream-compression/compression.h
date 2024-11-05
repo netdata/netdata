@@ -172,7 +172,8 @@ static inline size_t rrdpush_decompressor_get(struct decompressor_state *state, 
 
 // ----------------------------------------------------------------------------
 
-#include "../rrdpush.h"
+struct sender_state;
+struct receiver_state;
 
 bool rrdpush_compression_initialize(struct sender_state *s);
 bool rrdpush_decompression_initialize(struct receiver_state *rpt);

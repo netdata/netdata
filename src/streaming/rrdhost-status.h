@@ -81,7 +81,7 @@ typedef enum __attribute__((packed)) {
 
 const char *rrdhost_dyncfg_status_to_string(RRDHOST_DYNCFG_STATUS status);
 
-typedef struct {
+typedef struct rrdhost_status {
     RRDHOST *host;
     time_t now;
 

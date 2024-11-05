@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "compression.h"
+#include "../sender.h"
 
 #include "gzip.h"
 

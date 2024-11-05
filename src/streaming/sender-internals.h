@@ -6,6 +6,7 @@
 #include "rrdpush.h"
 #include "h2o-common.h"
 #include "aclk/https_client.h"
+#include "stream-parents.h"
 
 #define WORKER_SENDER_JOB_CONNECT                                0
 #define WORKER_SENDER_JOB_PIPE_READ                              1

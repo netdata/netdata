@@ -1231,8 +1231,8 @@ struct rrdhost {
         RRDHOST_STREAM_PATH path;
     } rrdpush;
 
-    struct rrdpush_destinations *destinations;      // a linked list of possible destinations
-    struct rrdpush_destinations *destination;       // the current destination from the above list
+    STREAM_PARENT *destinations;      // a linked list of possible destinations
+    STREAM_PARENT *destination;       // the current destination from the above list
 
     int32_t rrdpush_last_receiver_exit_reason;
     time_t rrdpush_seconds_to_replicate;            // max time we want to replicate from the child

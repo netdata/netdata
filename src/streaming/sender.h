@@ -4,6 +4,7 @@
 #define NETDATA_SENDER_H
 
 #include "libnetdata/libnetdata.h"
+#include "stream-parents.h"
 
 #define CONNECTED_TO_SIZE 100
 
@@ -38,7 +39,7 @@ typedef struct {
 #include "stream-conf.h"
 #include "stream-compression/compression.h"
 
-#include "sender-destinations.h"
+#include "stream-parents.h"
 
 typedef void (*rrdpush_defer_action_t)(struct sender_state *s, void *data);
 typedef void (*rrdpush_defer_cleanup_t)(struct sender_state *s, void *data);

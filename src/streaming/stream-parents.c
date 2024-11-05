@@ -2,10 +2,80 @@
 
 #include "sender-internals.h"
 
+struct stream_parent {
+    STRING *destination;
+    bool ssl;
+    uint32_t attempts;
+    time_t since;
+    time_t postpone_reconnection_until;
+    STREAM_HANDSHAKE reason;
+
+    STREAM_PARENT *prev;
+    STREAM_PARENT *next;
+};
+
+void rrdpush_destination_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t since) {
+    if(!d) return;
+    d->since = since;
+    d->reason = reason;
+}
+
+void rrdpush_destination_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t postpone_reconnection_until) {
+    if(!d) return;
+    d->reason = reason;
+    d->postpone_reconnection_until = postpone_reconnection_until;
+}
+
+time_t rrdpush_destination_get_reconnection_t(STREAM_PARENT *d) {
+    return d ? d->postpone_reconnection_until : 0;
+}
+
+bool rrdpush_destination_is_ssl(STREAM_PARENT *d) {
+    return d ? d->ssl : false;
+}
+
+time_t rrdpush_destinations_handshare_error_to_json(BUFFER *wb, RRDHOST *host) {
+    time_t last_attempt = 0;
+    for(STREAM_PARENT *d = host->destinations; d ; d = d->next) {
+        if(d->since > last_attempt)
+            last_attempt = d->since;
+
+        buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(d->reason));
+    }
+    return last_attempt;
+}
+
+void rrdpush_sender_destinations_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
+    char buf[1024];
+
+    STREAM_PARENT *d;
+    for (d = s->host->destinations; d; d = d->next) {
+        buffer_json_add_array_item_object(wb);
+        buffer_json_member_add_uint64(wb, "attempts", d->attempts);
+        {
+            if (d->ssl) {
+                snprintfz(buf, sizeof(buf) - 1, "%s:SSL", string2str(d->destination));
+                buffer_json_member_add_string(wb, "destination", buf);
+            }
+            else
+                buffer_json_member_add_string(wb, "destination", string2str(d->destination));
+
+            buffer_json_member_add_time_t(wb, "since", d->since);
+            buffer_json_member_add_time_t(wb, "age", s->now - d->since);
+            buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
+            if(d->postpone_reconnection_until > s->now) {
+                buffer_json_member_add_time_t(wb, "next_check", d->postpone_reconnection_until);
+                buffer_json_member_add_time_t(wb, "next_in", d->postpone_reconnection_until - s->now);
+            }
+        }
+        buffer_json_object_close(wb); // each candidate
+    }
+}
+
 void rrdpush_reset_destinations_postpone_time(RRDHOST *host) {
     uint32_t wait = (host->sender) ? host->sender->reconnect_delay : 5;
     time_t now = now_realtime_sec();
-    for (struct rrdpush_destinations *d = host->destinations; d; d = d->next)
+    for (STREAM_PARENT *d = host->destinations; d; d = d->next)
         d->postpone_reconnection_until = now + wait;
 }
 
@@ -18,7 +88,7 @@ void rrdpush_sender_ssl_init(RRDHOST *host) {
         return;
     }
 
-    for(struct rrdpush_destinations *d = host->destinations; d ; d = d->next) {
+    for(STREAM_PARENT *d = host->destinations; d ; d = d->next) {
         if (d->ssl) {
             // we need to initialize SSL
 
@@ -40,11 +110,11 @@ int connect_to_one_of_destinations(
     size_t *reconnects_counter,
     char *connected_to,
     size_t connected_to_size,
-    struct rrdpush_destinations **destination)
+    STREAM_PARENT **destination)
 {
     int sock = -1;
 
-    for (struct rrdpush_destinations *d = host->destinations; d; d = d->next) {
+    for (STREAM_PARENT *d = host->destinations; d; d = d->next) {
         time_t now = now_realtime_sec();
 
         if(nd_thread_signaled_to_cancel())
@@ -85,14 +155,14 @@ int connect_to_one_of_destinations(
 
 struct destinations_init_tmp {
     RRDHOST *host;
-    struct rrdpush_destinations *list;
+    STREAM_PARENT *list;
     int count;
 };
 
 static bool destinations_init_add_one(char *entry, void *data) {
     struct destinations_init_tmp *t = data;
 
-    struct rrdpush_destinations *d = callocz(1, sizeof(struct rrdpush_destinations));
+    STREAM_PARENT *d = callocz(1, sizeof(STREAM_PARENT));
     char *colon_ssl = strstr(entry, ":SSL");
     if(colon_ssl) {
         *colon_ssl = '\0';
@@ -103,7 +173,7 @@ static bool destinations_init_add_one(char *entry, void *data) {
 
     d->destination = string_strdupz(entry);
 
-    __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(struct rrdpush_destinations), __ATOMIC_RELAXED);
+    __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(STREAM_PARENT), __ATOMIC_RELAXED);
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(t->list, d, prev, next);
 
@@ -131,11 +201,11 @@ void rrdpush_destinations_init(RRDHOST *host) {
 
 void rrdpush_destinations_free(RRDHOST *host) {
     while (host->destinations) {
-        struct rrdpush_destinations *tmp = host->destinations;
+        STREAM_PARENT *tmp = host->destinations;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->destinations, tmp, prev, next);
         string_freez(tmp->destination);
         freez(tmp);
-        __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(struct rrdpush_destinations), __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(STREAM_PARENT), __ATOMIC_RELAXED);
     }
 
     host->destinations = NULL;
