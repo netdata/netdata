@@ -14,8 +14,8 @@
             <Icon Id="NetdataIcon.ico" SourceFile="NetdataWhite.ico"/>
             <Property Id="ARPPRODUCTICON" Value="NetdataIcon.ico" />
 
-            <Property Id="TOKEN" Value=" " />
-            <Property Id="ROOMS" Value=" " />
+            <Property Id="TOKEN" Value="Add your token here" />
+            <Property Id="ROOMS" Value="Add your room(s) here" />
             <Property Id="INSECURE" Value="0" />
             <Property Id="PROXY" Value=" " />
             <Property Id="URL" Value="https://app.netdata.cloud" />
@@ -138,9 +138,12 @@
             <Publish Dialog="ViewLicenseDlg1" Control="Next" Event="NewDialog" Value="ViewLicenseDlg2" />
 
             <Publish Dialog="ViewLicenseDlg2" Control="Back" Event="NewDialog" Value="ViewLicenseDlg1" />
-            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
+            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="NDConfigDialog" />
 
-            <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
+            <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
+            <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
+
+            <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="NDConfigDialog" />
             <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="20" />
             <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="10" />
             <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="10" />
@@ -161,46 +164,79 @@
     </Fragment>
 
     <Fragment>
-    <UI>
-      <Dialog Id="ViewLicenseDlg1" Width="370" Height="270" Title="!(loc.LicenseAgreementDlg_Title)">
-        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
-        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
-        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
-        <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="!(loc.LicenseAgreementDlgDescription)" />
-        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="The Cloud UI License covers the Netdata User Interface." />
-        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
-        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="I &amp;Accept">
-            <Publish Event="SpawnWaitDialog" Value="WaitForCostingDlg" Condition="!(wix.WixUICostingPopupOptOut) OR CostingComplete = 1" />
-        </Control>
-        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
-            <Publish Event="SpawnDialog" Value="CancelDlg" />
-        </Control>
-        <Control Id="LicenseText" Type="ScrollableText" X="20" Y="60" Width="330" Height="158" Sunken="yes" TabSkip="no">
-            <Text SourceFile="ncul1.rtf" />
-        </Control>
-      </Dialog>
-    </UI>
-  </Fragment>
+        <UI>
+            <Dialog Id="ViewLicenseDlg1" Width="370" Height="270" Title="!(loc.LicenseAgreementDlg_Title)">
+                <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
+                <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+                <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+                <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="!(loc.LicenseAgreementDlgDescription)" />
+                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="The Cloud UI License covers the Netdata User Interface." />
+                <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+                <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="I &amp;Accept">
+                    <Publish Event="SpawnWaitDialog" Value="WaitForCostingDlg" Condition="!(wix.WixUICostingPopupOptOut) OR CostingComplete = 1" />
+                </Control>
+                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+                    <Publish Event="SpawnDialog" Value="CancelDlg" />
+                </Control>
+                <Control Id="LicenseText" Type="ScrollableText" X="20" Y="60" Width="330" Height="158" Sunken="yes" TabSkip="no">
+                    <Text SourceFile="ncul1.rtf" />
+                </Control>
+            </Dialog>
+        </UI>
+    </Fragment>
 
     <Fragment>
-    <UI>
-      <Dialog Id="ViewLicenseDlg2" Width="370" Height="270" Title="!(loc.LicenseAgreementDlg_Title)">
-        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
-        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
-        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
-        <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="!(loc.LicenseAgreementDlgDescription)" />
-        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="The GPL-3.0 License covers the agent source code." />
-        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
-        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="I &amp;Accept">
-            <Publish Event="SpawnWaitDialog" Value="WaitForCostingDlg" Condition="!(wix.WixUICostingPopupOptOut) OR CostingComplete = 1" />
-        </Control>
-        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
-            <Publish Event="SpawnDialog" Value="CancelDlg" />
-        </Control>
-        <Control Id="LicenseText" Type="ScrollableText" X="20" Y="60" Width="330" Height="158" Sunken="yes" TabSkip="no">
-            <Text SourceFile="gpl-3.0.rtf" />
-        </Control>
-      </Dialog>
-    </UI>
-  </Fragment>
+        <UI>
+            <Dialog Id="ViewLicenseDlg2" Width="370" Height="270" Title="!(loc.LicenseAgreementDlg_Title)">
+                <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
+                <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+                <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+                <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="!(loc.LicenseAgreementDlgDescription)" />
+                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="The GPL-3.0 License covers the agent source code." />
+
+                <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+                <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="I &amp;Accept">
+                    <Publish Event="SpawnWaitDialog" Value="WaitForCostingDlg" Condition="!(wix.WixUICostingPopupOptOut) OR CostingComplete = 1" />
+                </Control>
+                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+                    <Publish Event="SpawnDialog" Value="CancelDlg" />
+                </Control>
+                <Control Id="LicenseText" Type="ScrollableText" X="20" Y="60" Width="330" Height="158" Sunken="yes" TabSkip="no">
+                    <Text SourceFile="gpl-3.0.rtf" />
+                </Control>
+            </Dialog>
+        </UI>
+    </Fragment>
+
+    <Fragment>
+        <UI>
+            <Dialog Id="NDConfigDialog" Width="370" Height="270" Title="Netdata Claim">
+                <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
+                <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+                <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+                <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="!(loc.LicenseAgreementDlgDescription)" />
+                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Claim agent" />
+
+                <Control Id="TokenLabel" Type="Text" X="20" Y="60" Width="30" Height="15" Text="Token:" />
+                <Control Id="Token" Type="Edit" X="60" Y="60" Width="250" Height="18" Property="TOKEN" />
+            
+                <Control Id="RoomsLabel" Type="Text" X="20" Y="75" Width="30" Height="15" Text="Rooms:" />
+                <Control Id="Rooms" Type="Edit" X="60" Y="75" Width="250" Height="18" Property="ROOMS" />
+            
+                <Control Id="ProxyLabel" Type="Text" X="20" Y="90" Width="30" Height="15" Text="Proxy:" />
+                <Control Id="Proxy" Type="Edit" X="60" Y="90" Width="250" Height="18" Property="PROXY" />
+            
+                <Control Id="URLLabel" Type="Text" X="20" Y="105" Width="30" Height="15" Text="URL:" />
+                <Control Id="URL" Type="Edit" X="60" Y="105" Width="250" Height="18" Property="URL" />
+
+                <Control Id="DesktopShortcutCheckBox" Type="CheckBox" X="20" Y="120" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" />
+            
+                <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+                <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
+                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+                    <Publish Event="SpawnDialog" Value="CancelDlg" />
+                </Control>
+            </Dialog>
+        </UI>
+    </Fragment>
 </Wix>
