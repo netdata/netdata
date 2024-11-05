@@ -2504,6 +2504,7 @@ if(OS_WINDOWS)
         configure_file(packaging/windows/NetdataWhite.ico NetdataWhite.ico COPYONLY)
         configure_file(packaging/windows/gpl-3.0.rtf gpl-3.0.rtf COPYONLY)
         configure_file(packaging/windows/ncul1.rtf ncul1.rtf COPYONLY)
+        configure_file(packaging/windows/Top.bmp Top.bmp COPYONLY)
 endif()
 
 add_executable(netdata

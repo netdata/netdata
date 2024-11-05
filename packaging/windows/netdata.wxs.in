@@ -33,6 +33,7 @@
                 <ComponentRef Id="NetdataService" />
             </Feature>
 
+            <WixVariable Id="WixUIBannerBmp" Value="Top.bmp" />
             <ui:WixUI Id="FeatureTree_ViewLicense" />
     </Package>
 
