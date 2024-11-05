@@ -1,128 +1,206 @@
-<?xml version="1.0" encoding="utf-8"?>
+<Wix
+    xmlns="http://wixtoolset.org/schemas/v4/wxs"
+    xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util"
+    xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
 
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
-	<!-- xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" -->
-	<Package Name="Netdata Agent"
-        Manufacturer="Netdata Inc."
-        Version="@CMAKE_PROJECT_VERSION@"
-        UpgradeCode="0d949b90-a54d-4aae-9616-e15fbc410530">
+    <Package Name="Netdata Agent"
+             Manufacturer="Netdata Inc."
+             Version="@CMAKE_PROJECT_VERSION@"
+             UpgradeCode="0d949b90-a54d-4aae-9616-e15fbc410530">
 
-	<UIRef Id="WixUI_ErrorProgressText" />
+            <Media Id="1" Cabinet="netdata" EmbedCab="yes" />
 
-        <MediaTemplate EmbedCab="yes"/>
+            <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of [ProductName] is already installed." AllowSameVersionUpgrades="yes" />
+            <Icon Id="NetdataIcon.ico" SourceFile="NetdataWhite.ico"/>
+            <Property Id="ARPPRODUCTICON" Value="NetdataIcon.ico" />
 
-		<WixVariable Id="WixUILicenseRtf" Value="gpl-3.0.rtf" />
+            <Property Id="TOKEN" Value=" " />
+            <Property Id="ROOMS" Value=" " />
+            <Property Id="INSECURE" Value="0" />
+            <Property Id="PROXY" Value=" " />
+            <Property Id="URL" Value="https://app.netdata.cloud" />
 
-		<MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of [ProductName] is already installed." AllowSameVersionUpgrades="yes" />
-		<Icon Id="NetdataIcon.ico" SourceFile="NetdataWhite.ico"/>
-		<Property Id="ARPPRODUCTICON" Value="NetdataIcon.ico" />
+            <Property Id="GPLLICENSE" Value="0" />
+            <Property Id="CLOUDUILICENSE" Value="0" />
 
-		<Property Id="TOKEN" Value=" " />
-		<Property Id="ROOMS" Value=" " />
-		<Property Id="INSECURE" Value="0" />
-		<Property Id="PROXY" Value=" " />
-		<Property Id="URL" Value="https://app.netdata.cloud" />
+            <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
-		<Property Id="GPLLICENSE" Value="0" />
-		<Property Id="CLOUDUILICENSE" Value="0" />
+            <Feature Id="Main">
+                <ComponentGroupRef Id="NetdataComponents" />
+                <ComponentRef Id="NetdataVarCache" />
+                <ComponentRef Id="NetdataVarLib" />
+                <ComponentGroupRef Id="WevtComponents" />
+                <ComponentRef Id="NetdataService" />
+            </Feature>
 
-		<Feature Id="Main">
-			<ComponentGroupRef Id="NetdataComponents" />
-			<ComponentRef Id="NetdataVarCache" />
-			<ComponentRef Id="NetdataVarLib" />
-			<ComponentGroupRef Id="WevtComponents" />
-			<ComponentRef Id="NetdataService" />
-		</Feature>
-	</Package>
+            <ui:WixUI Id="FeatureTree_ViewLicense" />
+    </Package>
 
-	<Fragment>
-		<Property Id="MsiLogging" Value="voicewarmupx!"/>
+    <Fragment>
+            <StandardDirectory Id="ProgramFiles64Folder">
+                <Directory Id="INSTALLFOLDER" Name="Netdata">
+                    <Directory Id="USRDIR" Name="usr">
+                        <Directory Id="USRBINDIR" Name="bin" />
+                    </Directory>
+                    <Directory Id="VARDIR" Name="var">
+                        <Directory Id="VARCACHEDIR" Name="cache" />
+                        <Directory Id="VARLIBDIR" Name="lib" />
+                    </Directory>
+                </Directory>
+            </StandardDirectory>
 
-		<CustomAction Id="CHECKGPL" Error="To continue, please accept the terms of the GPL 3.0 (https://www.gnu.org/licenses/gpl-3.0.txt) license by including the argument GPLLICENSE=1."/>
-		<InstallExecuteSequence>
-                    <Custom Action="CHECKGPL" Before="FileCost" Condition ="GPLLICENSE=&quot;0&quot; AND NOT Installed" />
-		</InstallExecuteSequence>
+            <StandardDirectory Id="System64Folder">
+            </StandardDirectory>
 
-		<CustomAction Id="CHECKCLOUDUI" Error="To continue, please accept the terms of the Cloud UI license (https://app.netdata.cloud/LICENSE.txt) by including the argument CLOUDUILICENSE=1."/>
-		<InstallExecuteSequence>
-                    <Custom Action="CHECKCLOUDUI" Before="FileCost" Condition ="CLOUDUILICENSE=&quot;0&quot; AND NOT Installed" />
-		</InstallExecuteSequence>
+            <!-- All the files except for the ones we need to handle specially -->
+            <ComponentGroup Id="NetdataComponents" Directory="INSTALLFOLDER">
+                <Files Include="C:\msys64\opt\netdata\**">
+                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata.exe" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
+                </Files>
+            </ComponentGroup>
 
-		<StandardDirectory Id="ProgramFiles64Folder">
-			<Directory Id="INSTALLFOLDER" Name="Netdata">
-				<Directory Id="USRDIR" Name="usr">
-					<Directory Id="USRBINDIR" Name="bin" />
-				</Directory>
-				<Directory Id="VARDIR" Name="var">
-					<Directory Id="VARCACHEDIR" Name="cache" />
-					<Directory Id="VARLIBDIR" Name="lib" />
-				</Directory>
-			</Directory>
-		</StandardDirectory>
+            <Component Id="NetdataVarCache" Directory="VARCACHEDIR" Guid="a41bc888-60d4-4d99-bb4f-da92614a8f72">
+                <CreateFolder />
+            </Component>
 
-		<StandardDirectory Id="System64Folder">
-		</StandardDirectory>
+            <Component Id="NetdataVarLib" Directory="VARLIBDIR" Guid="c72d7ea8-c848-46c4-a983-589044f2eec9">
+                <CreateFolder />
+            </Component>
 
-		<!-- All the files except for the ones we need to handle specially -->
-		<ComponentGroup Id="NetdataComponents" Directory="INSTALLFOLDER">
-			<Files Include="C:\msys64\opt\netdata\**">
-				<Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata.exe" />
-				<Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" />
-				<Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
-			</Files>
-		</ComponentGroup>
+            <CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='[USRBINDIR]NetdataClaim.exe /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I [INSECURE] /P &quot;[PROXY]&quot; /F &quot;[INSTALLFOLDER]etc\netdata\claim.conf&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
+            <InstallExecuteSequence>
+                <Custom Action="ClaimAgent" Before="InstallFinalize" />
+            </InstallExecuteSequence>
 
-		<Component Id="NetdataVarCache" Directory="VARCACHEDIR" Guid="a41bc888-60d4-4d99-bb4f-da92614a8f72">
-			<CreateFolder />
-		</Component>
+            <!-- Install wevt manifest/dll files -->
+            <ComponentGroup Id="WevtComponents" Directory="System64Folder">
+                <File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
+                </File>
 
-		<Component Id="NetdataVarLib" Directory="VARLIBDIR" Guid="c72d7ea8-c848-46c4-a983-589044f2eec9">
-			<CreateFolder />
-		</Component>
+                <File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml">
+                </File>
+            </ComponentGroup>
 
-		<!-- Install wevt manifest/dll files -->
-		<ComponentGroup Id="WevtComponents" Directory="System64Folder">
-			<File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
-			</File>
+            <Component Id="NetdataService" Directory="USRBINDIR">
+                <File Id="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
 
-			<File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml">
-			</File>
-		</ComponentGroup>
+                <ServiceInstall Id="InstallService"
+                                Name="Netdata"
+                                DisplayName="Netdata Agent"
+                                Description="Distributed, real-time, performance and health monitoring for systems and applications."
+                                Type="ownProcess"
+                                Start="auto"
+                                ErrorControl="normal" />
 
-		<CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='[USRBINDIR]NetdataClaim.exe /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I [INSECURE] /P &quot;[PROXY]&quot; /F &quot;[INSTALLFOLDER]etc\netdata\claim.conf&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
-		<InstallExecuteSequence>
-			<Custom Action="ClaimAgent" Before="InstallFinalize" />
-		</InstallExecuteSequence>
+                <ServiceControl Id="ControlService"
+                                Start="install"
+                                Stop="both"
+                                Remove="uninstall"
+                                Name="Netdata"
+                                Wait="yes" />
+            </Component>
+    </Fragment>
 
-		<CustomAction Id="WevtNetdataDLL" Directory="System64Folder" ExeCommand='[System64Folder]icacls.exe &quot;[System64Folder]wevt_netdata.dll&quot; /GRANT &quot;NT SERVICE\EventLog&quot;:R' Execute="deferred" Return="ignore" Impersonate="no"/>
-		<InstallExecuteSequence>
-			<Custom Action="WevtNetdataDLL" Before="InstallFinalize" />
-		</InstallExecuteSequence>
+    <Fragment>
+            <UI Id="FeatureTree_ViewLicense_X64">
+                <Publish Dialog="ViewLicenseDlg1" Control="Print" Event="DoAction" Value="WixUIPrintEula_X64" />
+                <Publish Dialog="ViewLicenseDlg2" Control="Print" Event="DoAction" Value="WixUIPrintEula_X64" />
+            </UI>
 
-		<CustomAction Id="WevtUtil" Directory="System64Folder" ExeCommand='[System64Folder]wevtutil.exe im &quot;[System64Folder]wevt_netdata_manifest.xml&quot; &quot;/mf:[System64Folder]wevt_netdata.dll&quot; &quot;/rf:[System64Folder]wevt_netdata.dll&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
-		<InstallExecuteSequence>
-			<Custom Action="WevtUtil" Before="InstallFinalize" />
-		</InstallExecuteSequence>
+            <UIRef Id="FeatureTree_ViewLicense" />
+    </Fragment>
 
-		<Component Id="NetdataService" Directory="USRBINDIR">
-			<File Id="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
+    <Fragment>
+        <UI Id="file FeatureTree_ViewLicense">
+            <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+            <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+            <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
 
-			<ServiceInstall Id="InstallService"
-                            Name="Netdata"
-                            DisplayName="Netdata Agent"
-                            Description="Netdata is distributed, real-time, performance and health monitoring for systems and applications."
-                            Type="ownProcess"
-                            Start="auto"
-                            ErrorControl="normal" />
+            <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
 
-			<ServiceControl Id="ControlService"
-                            Start="install"
-                            Stop="both"
-                            Remove="uninstall"
-                            Name="Netdata"
-                            Wait="yes" />
-		</Component>
-	</Fragment>
+            <DialogRef Id="ErrorDlg" />
+            <DialogRef Id="FatalError" />
+            <DialogRef Id="FilesInUse" />
+            <DialogRef Id="MsiRMFilesInUse" />
+            <DialogRef Id="PrepareDlg" />
+            <DialogRef Id="ProgressDlg" />
+            <DialogRef Id="ResumeDlg" />
+            <DialogRef Id="UserExit" />
+
+            <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+
+            <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ViewLicenseDlg1" Condition="NOT Installed" />
+            <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
+
+            <Publish Dialog="ViewLicenseDlg1" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+            <Publish Dialog="ViewLicenseDlg1" Control="Next" Event="NewDialog" Value="ViewLicenseDlg2" />
+
+            <Publish Dialog="ViewLicenseDlg2" Control="Back" Event="NewDialog" Value="ViewLicenseDlg1" />
+            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
+
+            <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
+            <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="20" />
+            <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="10" />
+            <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="10" />
+            <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="20" />
+
+
+            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" Order="1" Condition="NOT Installed OR WixUI_InstallMode = &quot;Change&quot;" />
+            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
+            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="3" Condition="Installed AND PATCH" />
+            <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
+            <Publish Dialog="MaintenanceTypeDlg" Control="ChangeButton" Event="NewDialog" Value="InstallDirDlg" />
+            <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
+            <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
+            <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+        </UI>
+
+        <UIRef Id="WixUI_Common" />
+    </Fragment>
+
+    <Fragment>
+    <UI>
+      <Dialog Id="ViewLicenseDlg1" Width="370" Height="270" Title="!(loc.LicenseAgreementDlg_Title)">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="!(loc.LicenseAgreementDlgDescription)" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="The Cloud UI License covers the Netdata User Interface." />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="I &amp;Accept">
+            <Publish Event="SpawnWaitDialog" Value="WaitForCostingDlg" Condition="!(wix.WixUICostingPopupOptOut) OR CostingComplete = 1" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+            <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+        <Control Id="LicenseText" Type="ScrollableText" X="20" Y="60" Width="330" Height="158" Sunken="yes" TabSkip="no">
+            <Text SourceFile="ncul1.rtf" />
+        </Control>
+      </Dialog>
+    </UI>
+  </Fragment>
+
+    <Fragment>
+    <UI>
+      <Dialog Id="ViewLicenseDlg2" Width="370" Height="270" Title="!(loc.LicenseAgreementDlg_Title)">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="!(loc.LicenseAgreementDlgDescription)" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="The GPL-3.0 License covers the agent source code." />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="I &amp;Accept">
+            <Publish Event="SpawnWaitDialog" Value="WaitForCostingDlg" Condition="!(wix.WixUICostingPopupOptOut) OR CostingComplete = 1" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+            <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+        <Control Id="LicenseText" Type="ScrollableText" X="20" Y="60" Width="330" Height="158" Sunken="yes" TabSkip="no">
+            <Text SourceFile="gpl-3.0.rtf" />
+        </Control>
+      </Dialog>
+    </UI>
+  </Fragment>
 </Wix>
-
