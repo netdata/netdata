@@ -71,7 +71,7 @@
 
             <CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='[USRBINDIR]NetdataClaim.exe /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I [INSECURE] /P &quot;[PROXY]&quot; /F &quot;[INSTALLFOLDER]etc\netdata\claim.conf&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
             <InstallExecuteSequence>
-                <Custom Action="ClaimAgent" Before="InstallFinalize" />
+                <Custom Action="ClaimAgent" After="InstallFiles" />
             </InstallExecuteSequence>
 
             <!-- Install wevt manifest/dll files -->
