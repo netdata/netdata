@@ -6,7 +6,13 @@
 
 **Merged pull requests:**
 
+- Random numbers improvements [\#18939](https://github.com/netdata/netdata/pull/18939) ([ktsaou](https://github.com/ktsaou))
+- fix\(go.d/prometheus\): correct unsupported protocol scheme "file" error [\#18938](https://github.com/netdata/netdata/pull/18938) ([ilyam8](https://github.com/ilyam8))
+- Improve ACLK sync CPU usage [\#18935](https://github.com/netdata/netdata/pull/18935) ([stelfrag](https://github.com/stelfrag))
+- Regenerate integrations.js [\#18932](https://github.com/netdata/netdata/pull/18932) ([netdatabot](https://github.com/netdatabot))
+- better randomness for heartbeat [\#18930](https://github.com/netdata/netdata/pull/18930) ([ktsaou](https://github.com/ktsaou))
 - add randomness per thread to heartbeat [\#18929](https://github.com/netdata/netdata/pull/18929) ([ktsaou](https://github.com/ktsaou))
+- Improve the documentation on removing stale nodes [\#18927](https://github.com/netdata/netdata/pull/18927) ([ralphm](https://github.com/ralphm))
 - Docs: Changes to title and CPU requirements [\#18925](https://github.com/netdata/netdata/pull/18925) ([Ancairon](https://github.com/Ancairon))
 - chore\(go.d/nvidia\_smi\): remove use\_csv\_format \(deprecated\) from config [\#18924](https://github.com/netdata/netdata/pull/18924) ([ilyam8](https://github.com/ilyam8))
 - Docs: small fixes and pass on sizing Agents [\#18923](https://github.com/netdata/netdata/pull/18923) ([Ancairon](https://github.com/Ancairon))
@@ -20,6 +26,7 @@
 - Update CI to generate MSI installer for Windows using WiX. [\#18914](https://github.com/netdata/netdata/pull/18914) ([Ferroin](https://github.com/Ferroin))
 - Fix potential wait forever in mqtt loop [\#18913](https://github.com/netdata/netdata/pull/18913) ([stelfrag](https://github.com/stelfrag))
 - add `dagster` to apps\_groups.conf [\#18912](https://github.com/netdata/netdata/pull/18912) ([andrewm4894](https://github.com/andrewm4894))
+- Installation section simplification [\#18911](https://github.com/netdata/netdata/pull/18911) ([Ancairon](https://github.com/Ancairon))
 - fix\(debugfs/extfrag\): add zone label [\#18910](https://github.com/netdata/netdata/pull/18910) ([ilyam8](https://github.com/ilyam8))
 - proc.plugin: log as info if a dir not exists [\#18909](https://github.com/netdata/netdata/pull/18909) ([ilyam8](https://github.com/ilyam8))
 - uninstall docs edits [\#18908](https://github.com/netdata/netdata/pull/18908) ([Ancairon](https://github.com/Ancairon))
@@ -180,6 +187,7 @@
 - Detect when swap is disabled when agent is running [\#18702](https://github.com/netdata/netdata/pull/18702) ([stelfrag](https://github.com/stelfrag))
 - Bump golang.org/x/net from 0.29.0 to 0.30.0 in /src/go [\#18701](https://github.com/netdata/netdata/pull/18701) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Load chart labels on demand [\#18699](https://github.com/netdata/netdata/pull/18699) ([stelfrag](https://github.com/stelfrag))
+- Add hyper-v metrics [\#18697](https://github.com/netdata/netdata/pull/18697) ([stelfrag](https://github.com/stelfrag))
 - fix system-info disk space in LXC [\#18696](https://github.com/netdata/netdata/pull/18696) ([ilyam8](https://github.com/ilyam8))
 - fix ram usage calculation in LXC [\#18695](https://github.com/netdata/netdata/pull/18695) ([ilyam8](https://github.com/ilyam8))
 - cgroups.plugin: call `setresuid` before spawn server init [\#18694](https://github.com/netdata/netdata/pull/18694) ([ilyam8](https://github.com/ilyam8))
@@ -443,15 +451,6 @@
 - remove proc zfspools [\#18389](https://github.com/netdata/netdata/pull/18389) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18387](https://github.com/netdata/netdata/pull/18387) ([netdatabot](https://github.com/netdatabot))
 - Modify CLI command remove-stale-node to accept hostname [\#18386](https://github.com/netdata/netdata/pull/18386) ([stelfrag](https://github.com/stelfrag))
-- Update windows installer [\#18385](https://github.com/netdata/netdata/pull/18385) ([thiagoftsm](https://github.com/thiagoftsm))
-- go.d zfspool: collect vdev health state [\#18383](https://github.com/netdata/netdata/pull/18383) ([ilyam8](https://github.com/ilyam8))
-- Remove debug message [\#18382](https://github.com/netdata/netdata/pull/18382) ([stelfrag](https://github.com/stelfrag))
-- Remove host immediately on stale node removal [\#18381](https://github.com/netdata/netdata/pull/18381) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#18380](https://github.com/netdata/netdata/pull/18380) ([netdatabot](https://github.com/netdatabot))
-- go.d docs: add a note that debug mode not supported for Dyncfg jobs [\#18379](https://github.com/netdata/netdata/pull/18379) ([ilyam8](https://github.com/ilyam8))
-- ci gen integrations: add cloud-authentication dir [\#18378](https://github.com/netdata/netdata/pull/18378) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18377](https://github.com/netdata/netdata/pull/18377) ([netdatabot](https://github.com/netdatabot))
-- go.d dnsmasq: query metrics individually to handle v2.90+ SERVFAIL [\#18376](https://github.com/netdata/netdata/pull/18376) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 
