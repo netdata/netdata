@@ -75,7 +75,7 @@ protection laws, including the GDPR and CCPA.
 
 ### Data Transfers
 
-While Netdata Agent itself does not engage in any cross-border data transfers, certain infrastructure data
+While Netdata Agent itself does not engage in any cross-border data transfers, certain infrastructure metadata
 is transferred to Netdata Cloud for the purpose of providing its services. All observability data collected and
 processed by Netdata Agents, however, stays strictly within the user's infrastructure, eliminating any concerns about
 cross-border data transfer issues.
