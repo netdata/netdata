@@ -14,8 +14,8 @@
             <Icon Id="NetdataIcon.ico" SourceFile="NetdataWhite.ico"/>
             <Property Id="ARPPRODUCTICON" Value="NetdataIcon.ico" />
 
-            <Property Id="TOKEN" Value="Add your token here" />
-            <Property Id="ROOMS" Value="Add your room(s) here" />
+            <Property Id="TOKEN" Value=" " />
+            <Property Id="ROOMS" Value=" " />
             <Property Id="INSECURE" Value="0" />
             <Property Id="PROXY" Value=" " />
             <Property Id="URL" Value="https://app.netdata.cloud" />
@@ -192,7 +192,7 @@
                 <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
                 <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
                 <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="!(loc.LicenseAgreementDlgDescription)" />
-                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="The GPL-3.0 License covers the agent source code." />
+                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="The GPL-3.0 License covers the Agent source code." />
 
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="I &amp;Accept">
@@ -215,7 +215,7 @@
                 <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
                 <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
                 <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="!(loc.LicenseAgreementDlgDescription)" />
-                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Claim agent" />
+                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Connect to the Cloud" />
 
                 <Control Id="TokenLabel" Type="Text" X="20" Y="60" Width="30" Height="15" Text="Token:" />
                 <Control Id="Token" Type="Edit" X="60" Y="60" Width="250" Height="18" Property="TOKEN" />
