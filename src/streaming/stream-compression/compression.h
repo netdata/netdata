@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrdpush.h"
-
 #ifndef NETDATA_RRDPUSH_COMPRESSION_H
 #define NETDATA_RRDPUSH_COMPRESSION_H 1
+
+#include "libnetdata/libnetdata.h"
 
 // signature MUST end with a newline
 
@@ -171,5 +171,13 @@ static inline size_t rrdpush_decompressor_get(struct decompressor_state *state, 
 }
 
 // ----------------------------------------------------------------------------
+
+#include "../rrdpush.h"
+
+bool rrdpush_compression_initialize(struct sender_state *s);
+bool rrdpush_decompression_initialize(struct receiver_state *rpt);
+void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *order);
+void rrdpush_select_receiver_compression_algorithm(struct receiver_state *rpt);
+void rrdpush_compression_deactivate(struct sender_state *s);
 
 #endif // NETDATA_RRDPUSH_COMPRESSION_H 1

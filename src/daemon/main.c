@@ -1503,7 +1503,7 @@ int unittest_prepare_rrd(const char **user) {
         fprintf(stderr, "rrd_init failed for unittest\n");
         return 1;
     }
-    default_rrdpush_enabled = 0;
+    stream_conf_send_enabled = 0;
 
     return 0;
 }

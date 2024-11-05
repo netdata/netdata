@@ -2,18 +2,18 @@
 
 #include "compression.h"
 
-#include "compression_gzip.h"
+#include "gzip.h"
 
 #ifdef ENABLE_LZ4
-#include "compression_lz4.h"
+#include "lz4.h"
 #endif
 
 #ifdef ENABLE_ZSTD
-#include "compression_zstd.h"
+#include "zstd.h"
 #endif
 
 #ifdef ENABLE_BROTLI
-#include "compression_brotli.h"
+#include "brotli.h"
 #endif
 
 int rrdpush_compression_levels[COMPRESSION_ALGORITHM_MAX] = {

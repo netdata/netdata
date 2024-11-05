@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "compression_brotli.h"
+#include "brotli.h"
 
 #ifdef ENABLE_BROTLI
 #include <brotli/encode.h>

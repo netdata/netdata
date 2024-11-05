@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "stream_path.h"
+#include "stream-path.h"
 #include "rrdpush.h"
 #include "plugins.d/pluginsd_internals.h"
 

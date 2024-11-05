@@ -4,7 +4,7 @@
 #include "streaming.h"
 #include "connlist.h"
 #include "h2o_utils.h"
-#include "streaming/common.h"
+#include "streaming/h2o-common.h"
 
 static int pending_write_reqs = 0;
 

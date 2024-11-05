@@ -76,6 +76,7 @@ struct analytics_data {
     bool exporting_enabled;
 };
 
+struct rrdhost_system_info;
 void set_late_analytics_variables(struct rrdhost_system_info *system_info);
 void analytics_free_data(void);
 void analytics_log_shell(void);

@@ -98,14 +98,53 @@ struct ml_metrics_statistics {
     size_t silenced;
 };
 
+
+// use this for configuration flags, not for state control
+// flags are set/unset in a manner that is not thread safe
+// and may lead to missing information.
+typedef enum __attribute__ ((__packed__)) rrdset_flags {
+    RRDSET_FLAG_DEBUG                            = (1 << 2),  // enables or disables debugging for a chart
+    RRDSET_FLAG_OBSOLETE                         = (1 << 3),  // this is marked by the collector/module as obsolete
+    RRDSET_FLAG_EXPORTING_SEND                   = (1 << 4),  // if set, this chart should be sent to Prometheus web API and external databases
+    RRDSET_FLAG_EXPORTING_IGNORE                 = (1 << 5),  // if set, this chart should not be sent to Prometheus web API and external databases
+
+    RRDSET_FLAG_UPSTREAM_SEND                    = (1 << 6),  // if set, this chart should be sent upstream (streaming)
+    RRDSET_FLAG_UPSTREAM_IGNORE                  = (1 << 7),  // if set, this chart should not be sent upstream (streaming)
+
+    RRDSET_FLAG_STORE_FIRST                      = (1 << 8),  // if set, do not eliminate the first collection during interpolation
+    RRDSET_FLAG_HETEROGENEOUS                    = (1 << 9),  // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
+    RRDSET_FLAG_HOMOGENEOUS_CHECK                = (1 << 10), // if set, the chart should be checked to determine if the dimensions are homogeneous
+    RRDSET_FLAG_HIDDEN                           = (1 << 11), // if set, do not show this chart on the dashboard, but use it for exporting
+    RRDSET_FLAG_SYNC_CLOCK                       = (1 << 12), // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
+    RRDSET_FLAG_OBSOLETE_DIMENSIONS              = (1 << 13), // this is marked by the collector/module when a chart has obsolete dimensions
+
+    RRDSET_FLAG_METADATA_UPDATE                  = (1 << 14), // Mark that metadata needs to be stored
+    RRDSET_FLAG_ANOMALY_DETECTION                = (1 << 15), // flag to identify anomaly detection charts.
+    RRDSET_FLAG_INDEXED_ID                       = (1 << 16), // the rrdset is indexed by its id
+    RRDSET_FLAG_INDEXED_NAME                     = (1 << 17), // the rrdset is indexed by its name
+
+    RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION    = (1 << 18),
+
+    RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS   = (1 << 19), // the sending side has replication in progress
+    RRDSET_FLAG_SENDER_REPLICATION_FINISHED      = (1 << 20), // the sending side has completed replication
+    RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS = (1 << 21), // the receiving side has replication in progress
+    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED    = (1 << 22), // the receiving side has completed replication
+
+    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 23), // a custom variable has been updated and needs to be exposed to parent
+
+    RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 24), // when set, data collection is not available for this chart
+
+    RRDSET_FLAG_HAS_RRDCALC_LINKED               = (1 << 25), // this chart has at least one rrdcal linked
+} RRDSET_FLAGS;
+
 #include "daemon/common.h"
 #include "web/api/queries/query.h"
 #include "web/api/queries/rrdr.h"
 #include "health/rrdvar.h"
 #include "health/rrdcalc.h"
 #include "rrdlabels.h"
-#include "streaming/stream_capabilities.h"
-#include "streaming/stream_path.h"
+#include "streaming/stream-capabilities.h"
+#include "streaming/stream-path.h"
 #include "streaming/rrdpush.h"
 //#include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
@@ -663,45 +702,6 @@ STORAGE_ENGINE* storage_engine_find(const char* name);
 
 // ----------------------------------------------------------------------------
 // RRDSET - this is a chart
-
-// use this for configuration flags, not for state control
-// flags are set/unset in a manner that is not thread safe
-// and may lead to missing information.
-
-typedef enum __attribute__ ((__packed__)) rrdset_flags {
-    RRDSET_FLAG_DEBUG                            = (1 << 2),  // enables or disables debugging for a chart
-    RRDSET_FLAG_OBSOLETE                         = (1 << 3),  // this is marked by the collector/module as obsolete
-    RRDSET_FLAG_EXPORTING_SEND                   = (1 << 4),  // if set, this chart should be sent to Prometheus web API and external databases
-    RRDSET_FLAG_EXPORTING_IGNORE                 = (1 << 5),  // if set, this chart should not be sent to Prometheus web API and external databases
-
-    RRDSET_FLAG_UPSTREAM_SEND                    = (1 << 6),  // if set, this chart should be sent upstream (streaming)
-    RRDSET_FLAG_UPSTREAM_IGNORE                  = (1 << 7),  // if set, this chart should not be sent upstream (streaming)
-
-    RRDSET_FLAG_STORE_FIRST                      = (1 << 8),  // if set, do not eliminate the first collection during interpolation
-    RRDSET_FLAG_HETEROGENEOUS                    = (1 << 9),  // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
-    RRDSET_FLAG_HOMOGENEOUS_CHECK                = (1 << 10), // if set, the chart should be checked to determine if the dimensions are homogeneous
-    RRDSET_FLAG_HIDDEN                           = (1 << 11), // if set, do not show this chart on the dashboard, but use it for exporting
-    RRDSET_FLAG_SYNC_CLOCK                       = (1 << 12), // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
-    RRDSET_FLAG_OBSOLETE_DIMENSIONS              = (1 << 13), // this is marked by the collector/module when a chart has obsolete dimensions
-
-    RRDSET_FLAG_METADATA_UPDATE                  = (1 << 14), // Mark that metadata needs to be stored
-    RRDSET_FLAG_ANOMALY_DETECTION                = (1 << 15), // flag to identify anomaly detection charts.
-    RRDSET_FLAG_INDEXED_ID                       = (1 << 16), // the rrdset is indexed by its id
-    RRDSET_FLAG_INDEXED_NAME                     = (1 << 17), // the rrdset is indexed by its name
-
-    RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION    = (1 << 18),
-
-    RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS   = (1 << 19), // the sending side has replication in progress
-    RRDSET_FLAG_SENDER_REPLICATION_FINISHED      = (1 << 20), // the sending side has completed replication
-    RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS = (1 << 21), // the receiving side has replication in progress
-    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED    = (1 << 22), // the receiving side has completed replication
-
-    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 23), // a custom variable has been updated and needs to be exposed to parent
-
-    RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 24), // when set, data collection is not available for this chart
-
-    RRDSET_FLAG_HAS_RRDCALC_LINKED               = (1 << 25), // this chart has at least one rrdcal linked
-} RRDSET_FLAGS;
 
 #define rrdset_flag_get(st) __atomic_load_n(&((st)->flags), __ATOMIC_ACQUIRE)
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_ACQUIRE) & (flag))

@@ -44,7 +44,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                     sending++;
 
                 if(host != localhost) {
-                    if (rrdhost_state_cloud_emulation(host))
+                    if (rrdhost_is_online(host))
                         receiving++;
                     else
                         archived++;

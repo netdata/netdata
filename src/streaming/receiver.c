@@ -3,7 +3,10 @@
 #include "rrdpush.h"
 #include "web/server/h2o/http_server.h"
 
-extern struct config stream_config;
+// When a child disconnects this is the maximum we will wait
+// before we update the cloud that the child is offline
+#define MAX_CHILD_DISC_DELAY (30000)
+#define MAX_CHILD_DISC_TOLERANCE (125 / 100)
 
 void receiver_state_free(struct receiver_state *rpt) {
     netdata_ssl_close(&rpt->ssl);
@@ -553,7 +556,7 @@ static void rrdpush_send_error_on_taken_over_connection(struct receiver_state *r
             5);
 }
 
-void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status, ND_LOG_FIELD_PRIORITY priority) {
+static void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status, ND_LOG_FIELD_PRIORITY priority) {
     // this function may be called BEFORE we spawn the receiver thread
     // so, we need to add the fields again (it does not harm)
     ND_LOG_STACK lgs[] = {
@@ -589,14 +592,14 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.alarms_delay = 60;
     rpt->config.alarms_history = HEALTH_LOG_RETENTION_DEFAULT;
 
-    rpt->config.rrdpush_enabled = (int)default_rrdpush_enabled;
-    rpt->config.rrdpush_destination = default_rrdpush_destination;
-    rpt->config.rrdpush_api_key = default_rrdpush_api_key;
-    rpt->config.rrdpush_send_charts_matching = default_rrdpush_send_charts_matching;
+    rpt->config.rrdpush_enabled = (int)stream_conf_send_enabled;
+    rpt->config.rrdpush_destination = stream_conf_send_destination;
+    rpt->config.rrdpush_api_key = stream_conf_send_api_key;
+    rpt->config.rrdpush_send_charts_matching = stream_conf_send_charts_matching;
 
-    rpt->config.rrdpush_enable_replication = default_rrdpush_enable_replication;
-    rpt->config.rrdpush_seconds_to_replicate = default_rrdpush_seconds_to_replicate;
-    rpt->config.rrdpush_replication_step = default_rrdpush_replication_step;
+    rpt->config.rrdpush_enable_replication = stream_conf_replication_enabled;
+    rpt->config.rrdpush_seconds_to_replicate = stream_conf_replication_period;
+    rpt->config.rrdpush_replication_step = stream_conf_replication_step;
 
     rpt->config.update_every = (int)appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "update every", rpt->config.update_every);
     if(rpt->config.update_every < 0) rpt->config.update_every = 1;
@@ -648,7 +651,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->key, "replication step", rpt->config.rrdpush_replication_step);
     rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->machine_guid, "replication step", rpt->config.rrdpush_replication_step);
 
-    rpt->config.rrdpush_compression = default_rrdpush_compression_enabled;
+    rpt->config.rrdpush_compression = stream_conf_compression_enabled;
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable compression", rpt->config.rrdpush_compression);
     rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable compression", rpt->config.rrdpush_compression);
 
@@ -921,4 +924,458 @@ void *rrdpush_receiver_thread(void *ptr) {
     rrdhost_set_is_parent_label();
     receiver_state_free(rpt);
     return NULL;
+}
+
+int rrdpush_receiver_permission_denied(struct web_client *w) {
+    // we always respond with the same message and error code
+    // to prevent an attacker from gaining info about the error
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, START_STREAMING_ERROR_NOT_PERMITTED);
+    return HTTP_RESP_UNAUTHORIZED;
+}
+
+int rrdpush_receiver_too_busy_now(struct web_client *w) {
+    // we always respond with the same message and error code
+    // to prevent an attacker from gaining info about the error
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, START_STREAMING_ERROR_BUSY_TRY_LATER);
+    return HTTP_RESP_SERVICE_UNAVAILABLE;
+}
+
+static void rrdpush_receiver_takeover_web_connection(struct web_client *w, struct receiver_state *rpt) {
+    rpt->fd                = w->ifd;
+
+    rpt->ssl.conn          = w->ssl.conn;
+    rpt->ssl.state         = w->ssl.state;
+
+    w->ssl = NETDATA_SSL_UNSET_CONNECTION;
+
+    WEB_CLIENT_IS_DEAD(w);
+
+    if(web_server_mode == WEB_SERVER_MODE_STATIC_THREADED) {
+        web_client_flag_set(w, WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET);
+    }
+    else {
+        if(w->ifd == w->ofd)
+            w->ifd = w->ofd = -1;
+        else
+            w->ifd = -1;
+    }
+
+    buffer_flush(w->response.data);
+}
+
+int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string, void *h2o_ctx __maybe_unused) {
+
+    if(!service_running(ABILITY_STREAMING_CONNECTIONS))
+        return rrdpush_receiver_too_busy_now(w);
+
+    struct receiver_state *rpt = callocz(1, sizeof(*rpt));
+    rpt->connected_since_s = now_realtime_sec();
+    rpt->last_msg_t = now_monotonic_sec();
+    rpt->hops = 1;
+
+    rpt->capabilities = STREAM_CAP_INVALID;
+
+#ifdef ENABLE_H2O
+    rpt->h2o_ctx = h2o_ctx;
+#endif
+
+    __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
+    __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
+
+    rpt->system_info = callocz(1, sizeof(struct rrdhost_system_info));
+    rpt->system_info->hops = rpt->hops;
+
+    rpt->fd                = -1;
+    rpt->client_ip         = strdupz(w->client_ip);
+    rpt->client_port       = strdupz(w->client_port);
+
+    rpt->ssl = NETDATA_SSL_UNSET_CONNECTION;
+
+    rpt->config.update_every = default_rrd_update_every;
+
+    // parse the parameters and fill rpt and rpt->system_info
+
+    while(decoded_query_string) {
+        char *value = strsep_skip_consecutive_separators(&decoded_query_string, "&");
+        if(!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        if(!strcmp(name, "key") && !rpt->key)
+            rpt->key = strdupz(value);
+
+        else if(!strcmp(name, "hostname") && !rpt->hostname)
+            rpt->hostname = strdupz(value);
+
+        else if(!strcmp(name, "registry_hostname") && !rpt->registry_hostname)
+            rpt->registry_hostname = strdupz(value);
+
+        else if(!strcmp(name, "machine_guid") && !rpt->machine_guid)
+            rpt->machine_guid = strdupz(value);
+
+        else if(!strcmp(name, "update_every"))
+            rpt->config.update_every = (int)strtoul(value, NULL, 0);
+
+        else if(!strcmp(name, "os") && !rpt->os)
+            rpt->os = strdupz(value);
+
+        else if(!strcmp(name, "timezone") && !rpt->timezone)
+            rpt->timezone = strdupz(value);
+
+        else if(!strcmp(name, "abbrev_timezone") && !rpt->abbrev_timezone)
+            rpt->abbrev_timezone = strdupz(value);
+
+        else if(!strcmp(name, "utc_offset"))
+            rpt->utc_offset = (int32_t)strtol(value, NULL, 0);
+
+        else if(!strcmp(name, "hops"))
+            rpt->hops = rpt->system_info->hops = (uint16_t) strtoul(value, NULL, 0);
+
+        else if(!strcmp(name, "ml_capable"))
+            rpt->system_info->ml_capable = strtoul(value, NULL, 0);
+
+        else if(!strcmp(name, "ml_enabled"))
+            rpt->system_info->ml_enabled = strtoul(value, NULL, 0);
+
+        else if(!strcmp(name, "mc_version"))
+            rpt->system_info->mc_version = strtoul(value, NULL, 0);
+
+        else if(!strcmp(name, "ver") && (rpt->capabilities & STREAM_CAP_INVALID))
+            rpt->capabilities = convert_stream_version_to_capabilities(strtoul(value, NULL, 0), NULL, false);
+
+        else {
+            // An old Netdata child does not have a compatible streaming protocol, map to something sane.
+            if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))
+                name = "NETDATA_HOST_OS_NAME";
+
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_ID"))
+                name = "NETDATA_HOST_OS_ID";
+
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_ID_LIKE"))
+                name = "NETDATA_HOST_OS_ID_LIKE";
+
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_VERSION"))
+                name = "NETDATA_HOST_OS_VERSION";
+
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_VERSION_ID"))
+                name = "NETDATA_HOST_OS_VERSION_ID";
+
+            else if (!strcmp(name, "NETDATA_SYSTEM_OS_DETECTION"))
+                name = "NETDATA_HOST_OS_DETECTION";
+
+            else if(!strcmp(name, "NETDATA_PROTOCOL_VERSION") && (rpt->capabilities & STREAM_CAP_INVALID))
+                rpt->capabilities = convert_stream_version_to_capabilities(1, NULL, false);
+
+            if (unlikely(rrdhost_set_system_info_variable(rpt->system_info, name, value))) {
+                nd_log_daemon(NDLP_NOTICE, "STREAM '%s' [receive from [%s]:%s]: "
+                                           "request has parameter '%s' = '%s', which is not used."
+                              , (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-"
+                              , rpt->client_ip, rpt->client_port
+                              , name, value);
+            }
+        }
+    }
+
+    if (rpt->capabilities & STREAM_CAP_INVALID)
+        // no version is supplied, assume version 0;
+        rpt->capabilities = convert_stream_version_to_capabilities(0, NULL, false);
+
+    // find the program name and version
+    if(w->user_agent && w->user_agent[0]) {
+        char *t = strchr(w->user_agent, '/');
+        if(t && *t) {
+            *t = '\0';
+            t++;
+        }
+
+        rpt->program_name = strdupz(w->user_agent);
+        if(t && *t) rpt->program_version = strdupz(t);
+    }
+
+    // check if we should accept this connection
+
+    if(!rpt->key || !*rpt->key) {
+        rrdpush_receive_log_status(
+            rpt, "request without an API key, rejecting connection",
+            RRDPUSH_STATUS_NO_API_KEY, NDLP_WARNING);
+
+        receiver_state_free(rpt);
+        return rrdpush_receiver_permission_denied(w);
+    }
+
+    if(!rpt->hostname || !*rpt->hostname) {
+        rrdpush_receive_log_status(
+            rpt, "request without a hostname, rejecting connection",
+            RRDPUSH_STATUS_NO_HOSTNAME, NDLP_WARNING);
+
+        receiver_state_free(rpt);
+        return rrdpush_receiver_permission_denied(w);
+    }
+
+    if(!rpt->registry_hostname)
+        rpt->registry_hostname = strdupz(rpt->hostname);
+
+    if(!rpt->machine_guid || !*rpt->machine_guid) {
+        rrdpush_receive_log_status(
+            rpt, "request without a machine GUID, rejecting connection",
+            RRDPUSH_STATUS_NO_MACHINE_GUID, NDLP_WARNING);
+
+        receiver_state_free(rpt);
+        return rrdpush_receiver_permission_denied(w);
+    }
+
+    {
+        char buf[GUID_LEN + 1];
+
+        if (regenerate_guid(rpt->key, buf) == -1) {
+            rrdpush_receive_log_status(
+                rpt, "API key is not a valid UUID (use the command uuidgen to generate one)",
+                RRDPUSH_STATUS_INVALID_API_KEY, NDLP_WARNING);
+
+            receiver_state_free(rpt);
+            return rrdpush_receiver_permission_denied(w);
+        }
+
+        if (regenerate_guid(rpt->machine_guid, buf) == -1) {
+            rrdpush_receive_log_status(
+                rpt, "machine GUID is not a valid UUID",
+                RRDPUSH_STATUS_INVALID_MACHINE_GUID, NDLP_WARNING);
+
+            receiver_state_free(rpt);
+            return rrdpush_receiver_permission_denied(w);
+        }
+    }
+
+    const char *api_key_type = appconfig_get(&stream_config, rpt->key, "type", "api");
+    if(!api_key_type || !*api_key_type) api_key_type = "unknown";
+    if(strcmp(api_key_type, "api") != 0) {
+        rrdpush_receive_log_status(
+            rpt, "API key is a machine GUID",
+            RRDPUSH_STATUS_INVALID_API_KEY, NDLP_WARNING);
+
+        receiver_state_free(rpt);
+        return rrdpush_receiver_permission_denied(w);
+    }
+
+    if(!appconfig_get_boolean(&stream_config, rpt->key, "enabled", 0)) {
+        rrdpush_receive_log_status(
+            rpt, "API key is not enabled",
+            RRDPUSH_STATUS_API_KEY_DISABLED, NDLP_WARNING);
+
+        receiver_state_free(rpt);
+        return rrdpush_receiver_permission_denied(w);
+    }
+
+    {
+        SIMPLE_PATTERN *key_allow_from = simple_pattern_create(
+            appconfig_get(&stream_config, rpt->key, "allow from", "*"),
+            NULL, SIMPLE_PATTERN_EXACT, true);
+
+        if(key_allow_from) {
+            if(!simple_pattern_matches(key_allow_from, w->client_ip)) {
+                simple_pattern_free(key_allow_from);
+
+                rrdpush_receive_log_status(
+                    rpt, "API key is not allowed from this IP",
+                    RRDPUSH_STATUS_NOT_ALLOWED_IP, NDLP_WARNING);
+
+                receiver_state_free(rpt);
+                return rrdpush_receiver_permission_denied(w);
+            }
+
+            simple_pattern_free(key_allow_from);
+        }
+    }
+
+    {
+        const char *machine_guid_type = appconfig_get(&stream_config, rpt->machine_guid, "type", "machine");
+        if (!machine_guid_type || !*machine_guid_type) machine_guid_type = "unknown";
+
+        if (strcmp(machine_guid_type, "machine") != 0) {
+            rrdpush_receive_log_status(
+                rpt, "machine GUID is an API key",
+                RRDPUSH_STATUS_INVALID_MACHINE_GUID, NDLP_WARNING);
+
+            receiver_state_free(rpt);
+            return rrdpush_receiver_permission_denied(w);
+        }
+    }
+
+    if(!appconfig_get_boolean(&stream_config, rpt->machine_guid, "enabled", 1)) {
+        rrdpush_receive_log_status(
+            rpt, "machine GUID is not enabled",
+            RRDPUSH_STATUS_MACHINE_GUID_DISABLED, NDLP_WARNING);
+
+        receiver_state_free(rpt);
+        return rrdpush_receiver_permission_denied(w);
+    }
+
+    {
+        SIMPLE_PATTERN *machine_allow_from = simple_pattern_create(
+            appconfig_get(&stream_config, rpt->machine_guid, "allow from", "*"),
+            NULL, SIMPLE_PATTERN_EXACT, true);
+
+        if(machine_allow_from) {
+            if(!simple_pattern_matches(machine_allow_from, w->client_ip)) {
+                simple_pattern_free(machine_allow_from);
+
+                rrdpush_receive_log_status(
+                    rpt, "machine GUID is not allowed from this IP",
+                    RRDPUSH_STATUS_NOT_ALLOWED_IP, NDLP_WARNING);
+
+                receiver_state_free(rpt);
+                return rrdpush_receiver_permission_denied(w);
+            }
+
+            simple_pattern_free(machine_allow_from);
+        }
+    }
+
+    if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
+
+        rrdpush_receiver_takeover_web_connection(w, rpt);
+
+        rrdpush_receive_log_status(
+            rpt, "machine GUID is my own",
+            RRDPUSH_STATUS_LOCALHOST, NDLP_DEBUG);
+
+        char initial_response[HTTP_HEADER_SIZE + 1];
+        snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
+
+        if(send_timeout(
+                &rpt->ssl,
+                rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+
+            nd_log_daemon(NDLP_ERR, "STREAM '%s' [receive from [%s]:%s]: "
+                                    "failed to reply."
+                          , rpt->hostname
+                          , rpt->client_ip, rpt->client_port
+            );
+        }
+
+        receiver_state_free(rpt);
+        return HTTP_RESP_OK;
+    }
+
+    if(unlikely(web_client_streaming_rate_t > 0)) {
+        static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+        static time_t last_stream_accepted_t = 0;
+
+        time_t now = now_realtime_sec();
+        spinlock_lock(&spinlock);
+
+        if(unlikely(last_stream_accepted_t == 0))
+            last_stream_accepted_t = now;
+
+        if(now - last_stream_accepted_t < web_client_streaming_rate_t) {
+            spinlock_unlock(&spinlock);
+
+            char msg[100 + 1];
+            snprintfz(msg, sizeof(msg) - 1,
+                      "rate limit, will accept new connection in %ld secs",
+                      (long)(web_client_streaming_rate_t - (now - last_stream_accepted_t)));
+
+            rrdpush_receive_log_status(
+                rpt, msg,
+                RRDPUSH_STATUS_RATE_LIMIT, NDLP_NOTICE);
+
+            receiver_state_free(rpt);
+            return rrdpush_receiver_too_busy_now(w);
+        }
+
+        last_stream_accepted_t = now;
+        spinlock_unlock(&spinlock);
+    }
+
+    /*
+     * Quick path for rejecting multiple connections. The lock taken is fine-grained - it only protects the receiver
+     * pointer within the host (if a host exists). This protects against multiple concurrent web requests hitting
+     * separate threads within the web-server and landing here. The lock guards the thread-shutdown sequence that
+     * detaches the receiver from the host. If the host is being created (first time-access) then we also use the
+     * lock to prevent race-hazard (two threads try to create the host concurrently, one wins and the other does a
+     * lookup to the now-attached structure).
+     */
+
+    {
+        time_t age = 0;
+        bool receiver_stale = false;
+        bool receiver_working = false;
+
+        rrd_rdlock();
+        RRDHOST *host = rrdhost_find_by_guid(rpt->machine_guid);
+        if (unlikely(host && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) /* Ignore archived hosts. */
+            host = NULL;
+
+        if (host) {
+            spinlock_lock(&host->receiver_lock);
+            if (host->receiver) {
+                age = now_monotonic_sec() - host->receiver->last_msg_t;
+
+                if (age < 30)
+                    receiver_working = true;
+                else
+                    receiver_stale = true;
+            }
+            spinlock_unlock(&host->receiver_lock);
+        }
+        rrd_rdunlock();
+
+        if (receiver_stale && stop_streaming_receiver(host, STREAM_HANDSHAKE_DISCONNECT_STALE_RECEIVER)) {
+            // we stopped the receiver
+            // we can proceed with this connection
+            receiver_stale = false;
+
+            nd_log_daemon(NDLP_NOTICE, "STREAM '%s' [receive from [%s]:%s]: "
+                                       "stopped previous stale receiver to accept this one."
+                          , rpt->hostname
+                          , rpt->client_ip, rpt->client_port
+            );
+        }
+
+        if (receiver_working || receiver_stale) {
+            // another receiver is already connected
+            // try again later
+
+            char msg[200 + 1];
+            snprintfz(msg, sizeof(msg) - 1,
+                      "multiple connections for same host, "
+                      "old connection was last used %ld secs ago%s",
+                      age, receiver_stale ? " (signaled old receiver to stop)" : " (new connection not accepted)");
+
+            rrdpush_receive_log_status(
+                rpt, msg,
+                RRDPUSH_STATUS_ALREADY_CONNECTED, NDLP_DEBUG);
+
+            // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
+            buffer_flush(w->response.data);
+            buffer_strcat(w->response.data, START_STREAMING_ERROR_ALREADY_STREAMING);
+            receiver_state_free(rpt);
+            return HTTP_RESP_CONFLICT;
+        }
+    }
+
+    rrdpush_receiver_takeover_web_connection(w, rpt);
+
+    char tag[NETDATA_THREAD_TAG_MAX + 1];
+    snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_RECEIVER "[%s]", rpt->hostname);
+    tag[NETDATA_THREAD_TAG_MAX] = '\0';
+
+    rpt->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt);
+    if(!rpt->thread) {
+        rrdpush_receive_log_status(
+            rpt, "can't create receiver thread",
+            RRDPUSH_STATUS_INTERNAL_SERVER_ERROR, NDLP_ERR);
+
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Can't handle this request");
+        receiver_state_free(rpt);
+        return HTTP_RESP_INTERNAL_SERVER_ERROR;
+    }
+
+    // prevent the caller from closing the streaming socket
+    return HTTP_RESP_OK;
 }

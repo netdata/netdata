@@ -522,7 +522,7 @@ void analytics_gather_mutable_meta_data(void)
     analytics_alarms_notifications();
 
     analytics_set_data(
-        &analytics_data.netdata_config_is_parent, (rrdhost_hosts_available() > 1 || configured_as_parent()) ? "true" : "false");
+        &analytics_data.netdata_config_is_parent, (rrdhost_hosts_available() > 1 || stream_conf_configured_as_parent()) ? "true" : "false");
 
     analytics_set_data(&analytics_data.netdata_host_agent_claimed, is_agent_claimed() ? "true" : "false");
 
@@ -619,7 +619,7 @@ cleanup:
  */
 void set_late_analytics_variables(struct rrdhost_system_info *system_info)
 {
-    analytics_set_data(&analytics_data.netdata_config_stream_enabled, default_rrdpush_enabled ? "true" : "false");
+    analytics_set_data(&analytics_data.netdata_config_stream_enabled, stream_conf_send_enabled ? "true" : "false");
     analytics_set_data_str(&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
     analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "true");
 

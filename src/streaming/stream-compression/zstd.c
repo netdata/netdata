@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "compression_zstd.h"
+#include "zstd.h"
 
 #ifdef ENABLE_ZSTD
 #include <zstd.h>

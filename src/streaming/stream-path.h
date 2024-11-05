@@ -3,7 +3,7 @@
 #ifndef NETDATA_STREAM_PATH_H
 #define NETDATA_STREAM_PATH_H
 
-#include "stream_capabilities.h"
+#include "stream-capabilities.h"
 
 #define STREAM_PATH_JSON_MEMBER "streaming_path"
 

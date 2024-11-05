@@ -973,7 +973,7 @@ set(LIBH2O_FILES
 set(DAEMON_FILES
         src/daemon/buildinfo.c
         src/daemon/buildinfo.h
-        src/daemon/common.c
+        src/daemon/h2o-common.c
         src/daemon/common.h
         src/daemon/daemon.c
         src/daemon/daemon.h
@@ -1017,7 +1017,7 @@ set(H2O_FILES
         src/web/server/h2o/http_server.h
         src/web/server/h2o/h2o_utils.c
         src/web/server/h2o/h2o_utils.h
-        src/web/server/h2o/streaming.c
+        src/web/server/h2o/rrdpush.c
         src/web/server/h2o/streaming.h
         src/web/server/h2o/connlist.c
         src/web/server/h2o/connlist.h
@@ -1371,35 +1371,49 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
 )
 
 set(STREAMING_PLUGIN_FILES
-        src/streaming/rrdpush.c
         src/streaming/rrdpush.h
-        src/streaming/compression.c
-        src/streaming/compression.h
-        src/streaming/compression_brotli.c
-        src/streaming/compression_brotli.h
-        src/streaming/compression_gzip.c
-        src/streaming/compression_gzip.h
-        src/streaming/compression_lz4.c
-        src/streaming/compression_lz4.h
-        src/streaming/compression_zstd.c
-        src/streaming/compression_zstd.h
+        src/streaming/stream-compression/compression.c
+        src/streaming/stream-compression/compression.h
+        src/streaming/stream-compression/brotli.c
+        src/streaming/stream-compression/brotli.h
+        src/streaming/stream-compression/gzip.c
+        src/streaming/stream-compression/gzip.h
+        src/streaming/stream-compression/lz4.c
+        src/streaming/stream-compression/lz4.h
+        src/streaming/stream-compression/zstd.c
+        src/streaming/stream-compression/zstd.h
         src/streaming/receiver.c
         src/streaming/sender.c
         src/streaming/replication.c
         src/streaming/replication.h
-        src/streaming/common.h
+        src/streaming/h2o-common.h
         src/streaming/protocol/command-nodeid.c
         src/streaming/protocol/commands.c
         src/streaming/protocol/commands.h
         src/streaming/protocol/command-claimed_id.c
-        src/streaming/stream_path.c
-        src/streaming/stream_path.h
-        src/streaming/stream_capabilities.c
-        src/streaming/stream_capabilities.h
-        src/streaming/sender_connect.c
-        src/streaming/sender_internals.h
-        src/streaming/sender_execute.c
-        src/streaming/sender_commit.c
+        src/streaming/stream-path.c
+        src/streaming/stream-path.h
+        src/streaming/stream-capabilities.c
+        src/streaming/stream-capabilities.h
+        src/streaming/sender-connect.c
+        src/streaming/sender-internals.h
+        src/streaming/sender-execute.c
+        src/streaming/sender-commit.c
+        src/streaming/sender-destinations.c
+        src/streaming/stream-handshake.c
+        src/streaming/protocol/command-function.c
+        src/streaming/protocol/command-host-labels.c
+        src/streaming/protocol/command-chart-definition.c
+        src/streaming/protocol/command-begin-set-end.c
+        src/streaming/protocol/command-host-variables.c
+        src/streaming/stream-conf.c
+        src/streaming/stream-conf.h
+        src/streaming/stream-handshake.h
+        src/streaming/sender.h
+        src/streaming/sender-destinations.h
+        src/streaming/rrdhost-status.c
+        src/streaming/rrdhost-status.h
+        src/streaming/receiver.h
 )
 
 set(WEB_PLUGIN_FILES

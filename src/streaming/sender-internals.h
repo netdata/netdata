@@ -4,7 +4,7 @@
 #define NETDATA_SENDER_INTERNALS_H
 
 #include "rrdpush.h"
-#include "common.h"
+#include "h2o-common.h"
 #include "aclk/https_client.h"
 
 #define WORKER_SENDER_JOB_CONNECT                                0
@@ -36,10 +36,6 @@
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 25
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 25
 #endif
-
-extern struct config stream_config;
-extern const char *netdata_ssl_ca_path;
-extern const char *netdata_ssl_ca_file;
 
 bool attempt_to_connect(struct sender_state *state);
 void rrdpush_sender_on_connect(RRDHOST *host);

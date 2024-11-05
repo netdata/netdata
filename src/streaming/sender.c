@@ -1,54 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "sender_internals.h"
-
-static inline void rrdpush_sender_add_host_variable_to_buffer(BUFFER *wb, const RRDVAR_ACQUIRED *rva) {
-    buffer_sprintf(
-            wb
-            , "VARIABLE HOST %s = " NETDATA_DOUBLE_FORMAT "\n"
-            , rrdvar_name(rva)
-            , rrdvar2number(rva)
-    );
-
-    netdata_log_debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " NETDATA_DOUBLE_FORMAT, rrdvar_name(rva), rrdvar2number(rva));
-}
-
-void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva) {
-    if(rrdhost_can_send_definitions_to_parent(host)) {
-        BUFFER *wb = sender_start(host->sender);
-        rrdpush_sender_add_host_variable_to_buffer(wb, rva);
-        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-        sender_thread_buffer_free();
-    }
-}
-
-struct custom_host_variables_callback {
-    BUFFER *wb;
-};
-
-static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdvar_ptr __maybe_unused, void *struct_ptr) {
-    const RRDVAR_ACQUIRED *rv = (const RRDVAR_ACQUIRED *)item;
-    struct custom_host_variables_callback *tmp = struct_ptr;
-    BUFFER *wb = tmp->wb;
-
-    rrdpush_sender_add_host_variable_to_buffer(wb, rv);
-    return 1;
-}
-
-static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
-    if(rrdhost_can_send_definitions_to_parent(host)) {
-        BUFFER *wb = sender_start(host->sender);
-        struct custom_host_variables_callback tmp = {
-            .wb = wb
-        };
-        int ret = rrdvar_walkthrough_read(host->rrdvars, rrdpush_sender_thread_custom_host_variables_callback, &tmp);
-        (void)ret;
-        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-        sender_thread_buffer_free();
-
-        netdata_log_debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
-    }
-}
+#include "sender-internals.h"
 
 // resets all the chart, so that their definitions
 // will be resent to the central netdata
@@ -72,7 +24,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
     rrdhost_sender_replicating_charts_zero(host);
 }
 
-static void rrdpush_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force) {
+void rrdpush_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force) {
     static __thread time_t last_reset_time_s = 0;
 
     if(!force && now_s - last_reset_time_s < 300)
@@ -307,7 +259,7 @@ static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
     rrdpush_reset_destinations_postpone_time(host);
 }
 
-static bool rrdhost_sender_should_exit(struct sender_state *s) {
+bool rrdhost_sender_should_exit(struct sender_state *s) {
     if(unlikely(nd_thread_signaled_to_cancel())) {
         if(!s->exit.reason)
             s->exit.reason = STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN;
@@ -339,30 +291,6 @@ static bool rrdhost_sender_should_exit(struct sender_state *s) {
     }
 
     return false;
-}
-
-void rrdpush_initialize_ssl_ctx(RRDHOST *host __maybe_unused) {
-    static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
-    spinlock_lock(&sp);
-
-    if(netdata_ssl_streaming_sender_ctx || !host) {
-        spinlock_unlock(&sp);
-        return;
-    }
-
-    for(struct rrdpush_destinations *d = host->destinations; d ; d = d->next) {
-        if (d->ssl) {
-            // we need to initialize SSL
-
-            netdata_ssl_initialize_ctx(NETDATA_SSL_STREAMING_SENDER_CTX);
-            ssl_security_location_for_context(netdata_ssl_streaming_sender_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
-
-            // stop the loop
-            break;
-        }
-    }
-
-    spinlock_unlock(&sp);
 }
 
 static bool stream_sender_log_capabilities(BUFFER *wb, void *ptr) {
@@ -461,7 +389,7 @@ void *rrdpush_sender_thread(void *ptr) {
         return NULL;
     }
 
-    rrdpush_initialize_ssl_ctx(s->host);
+    rrdpush_sender_ssl_init(s->host);
 
     netdata_log_info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), gettid_cached());
 
@@ -477,10 +405,10 @@ void *rrdpush_sender_thread(void *ptr) {
     s->reconnect_delay = (unsigned int)appconfig_get_duration_seconds(
         &stream_config, CONFIG_SECTION_STREAM, "reconnect delay", 5);
 
-    remote_clock_resync_iterations = (unsigned int)appconfig_get_number(
+    stream_conf_initial_clock_resync_iterations = (unsigned int)appconfig_get_number(
         &stream_config, CONFIG_SECTION_STREAM,
         "initial clock resync iterations",
-        remote_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
+        stream_conf_initial_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
 
     s->parent_using_h2o = appconfig_get_boolean(
         &stream_config, CONFIG_SECTION_STREAM, "parent using h2o", false);
@@ -511,43 +439,11 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->rrdpush_sender_socket == -1)) {
-            if(was_connected) {
+            if(was_connected)
                 rrdpush_sender_on_disconnect(s->host);
-                was_connected = false;
-            }
 
-            worker_is_busy(WORKER_SENDER_JOB_CONNECT);
-
-            now_s = now_monotonic_sec();
-            rrdpush_sender_cbuffer_recreate_timed(s, now_s, false, true);
-            rrdpush_sender_execute_commands_cleanup(s);
-
-            rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-            s->flags &= ~SENDER_FLAG_OVERFLOW;
-            s->read_len = 0;
-            s->buffer->read = 0;
-            s->buffer->write = 0;
-
-            if(!attempt_to_connect(s))
-                continue;
-
-            if(rrdhost_sender_should_exit(s))
-                break;
-
-            now_s = s->last_traffic_seen_t = now_monotonic_sec();
-            stream_path_send_to_parent(s->host);
-            rrdpush_sender_send_claimed_id(s->host);
-            rrdpush_send_host_labels(s->host);
-            rrdpush_send_global_functions(s->host);
-            s->replication.oldest_request_after_t = 0;
-            was_connected = true;
-
-            rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "STREAM %s [send to %s]: enabling metrics streaming...",
-                   rrdhost_hostname(s->host), s->connected_to);
-
+            was_connected = rrdpush_sender_connect(s);
+            now_s = s->last_traffic_seen_t;
             continue;
         }
 
@@ -754,4 +650,22 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_unregister();
 
     return NULL;
+}
+
+void rrdpush_sender_thread_spawn(RRDHOST *host) {
+    sender_lock(host->sender);
+
+    if(!rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
+        char tag[NETDATA_THREAD_TAG_MAX + 1];
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "[%s]", rrdhost_hostname(host));
+
+        host->rrdpush_sender_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
+                                                       rrdpush_sender_thread, (void *)host->sender);
+        if(!host->rrdpush_sender_thread)
+            nd_log_daemon(NDLP_ERR, "STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
+        else
+            rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
+    }
+
+    sender_unlock(host->sender);
 }
