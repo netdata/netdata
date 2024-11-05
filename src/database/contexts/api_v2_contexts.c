@@ -422,7 +422,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
             // stale        - connected but not having live data
             // reachable    - connected with live data
             // pruned       - not connected for some time and has been removed
-            buffer_json_member_add_string(wb, "state", rrdhost_state_cloud_emulation(host) ? "reachable" : "stale");
+            buffer_json_member_add_string(wb, "state", rrdhost_is_online(host) ? "reachable" : "stale");
 
             rrdhost_health_to_json_v2(wb, "health", &s);
             agent_capabilities_to_json(wb, host, "capabilities");

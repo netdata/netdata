@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "compression_gzip.h"
+#include "gzip.h"
 #include <zlib.h>
 
 void rrdpush_compressor_init_gzip(struct compressor_state *state) {

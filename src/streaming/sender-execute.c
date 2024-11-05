@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "sender_internals.h"
+#include "sender-internals.h"
 
 struct inflight_stream_function {
     struct sender_state *sender;

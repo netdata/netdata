@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "sender_internals.h"
+#include "sender-internals.h"
 
 void rrdpush_sender_thread_close_socket(struct sender_state *s) {
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
@@ -387,7 +387,7 @@ err_cleanup:
     return 1;
 }
 
-static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout, struct sender_state *s) {
+static bool sender_send_connection_request(RRDHOST *host, int default_port, int timeout, struct sender_state *s) {
 
     struct timeval tv = {
         .tv_sec = timeout,
@@ -638,7 +638,7 @@ bool attempt_to_connect(struct sender_state *state) {
     state->sent_bytes_on_this_connection = 0;
     memset(state->sent_bytes_on_this_connection_per_type, 0, sizeof(state->sent_bytes_on_this_connection_per_type));
 
-    if(rrdpush_sender_thread_connect_to_parent(state->host, state->default_port, state->timeout, state)) {
+    if(sender_send_connection_request(state->host, state->default_port, state->timeout, state)) {
         // reset the buffer, to properly send charts and metrics
         rrdpush_sender_on_connect(state->host);
 
@@ -673,4 +673,69 @@ bool attempt_to_connect(struct sender_state *state) {
     }
 
     return false;
+}
+
+bool rrdpush_sender_connect(struct sender_state *s) {
+    worker_is_busy(WORKER_SENDER_JOB_CONNECT);
+
+    time_t now_s = now_monotonic_sec();
+    rrdpush_sender_cbuffer_recreate_timed(s, now_s, false, true);
+    rrdpush_sender_execute_commands_cleanup(s);
+
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+    s->flags &= ~SENDER_FLAG_OVERFLOW;
+    s->read_len = 0;
+    s->buffer->read = 0;
+    s->buffer->write = 0;
+
+    if(!attempt_to_connect(s))
+        return false;
+
+    if(rrdhost_sender_should_exit(s))
+        return false;
+
+    s->last_traffic_seen_t = now_monotonic_sec();
+    stream_path_send_to_parent(s->host);
+    rrdpush_sender_send_claimed_id(s->host);
+    rrdpush_send_host_labels(s->host);
+    rrdpush_send_global_functions(s->host);
+    s->replication.oldest_request_after_t = 0;
+
+    rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "STREAM %s [send to %s]: enabling metrics streaming...",
+           rrdhost_hostname(s->host), s->connected_to);
+
+    return true;
+}
+
+// Either the receiver lost the connection or the host is being destroyed.
+// The sender mutex guards thread creation, any spurious data is wiped on reconnection.
+void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wait) {
+    if (!host->sender)
+        return;
+
+    sender_lock(host->sender);
+
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
+
+        host->sender->exit.shutdown = true;
+        host->sender->exit.reason = reason;
+
+        // signal it to cancel
+        nd_thread_signal_cancel(host->rrdpush_sender_thread);
+    }
+
+    sender_unlock(host->sender);
+
+    if(wait) {
+        sender_lock(host->sender);
+        while(host->sender->tid) {
+            sender_unlock(host->sender);
+            sleep_usec(10 * USEC_PER_MS);
+            sender_lock(host->sender);
+        }
+        sender_unlock(host->sender);
+    }
 }

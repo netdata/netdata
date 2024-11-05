@@ -5,6 +5,8 @@
 
 #include "daemon/common.h"
 
+struct parser;
+
 struct replication_query_statistics {
     SPINLOCK spinlock;
     size_t queries_started;
