@@ -34,6 +34,7 @@
             </Feature>
 
             <WixVariable Id="WixUIBannerBmp" Value="Top.bmp" />
+            <UIRef Id="WixUI_ErrorProgressText" />
             <ui:WixUI Id="FeatureTree_ViewLicense" />
     </Package>
 
