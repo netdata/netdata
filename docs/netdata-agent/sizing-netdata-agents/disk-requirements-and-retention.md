@@ -12,7 +12,7 @@ Netdata offers two database modes to suit your needs for performance and data pe
 ## `dbengine`
 
 Netdata's `dbengine` mode efficiently stores data on disk using compression. The actual disk space used depends on how well the data compresses.
-This mode utilizes a tiered storage approach: data is saved in multiple tiers on disk. Each tier retains data at a different resolution (detail level). Higher tiers store a down-sampled (less detailed) version of the data found in lower tiers.
+This mode uses a tiered storage approach: data is saved in multiple tiers on disk. Each tier retains data at a different resolution (detail level). Higher tiers store a down-sampled (less detailed) version of the data found in lower tiers.
 
 ```mermaid
 gantt
@@ -25,7 +25,7 @@ gantt
     tier2, 365d      :a3, 2023-11-02, 59d
 ```
 
-`dbengine` supports up to 5 tiers. By default, 3 tiers are used:
+`dbengine` supports up to five tiers. By default, three tiers are used:
 
 |  Tier   |                                          Resolution                                          | Uncompressed Sample Size | Usually On Disk |
 |:-------:|:--------------------------------------------------------------------------------------------:|:------------------------:|:---------------:|
@@ -40,11 +40,11 @@ gantt
 
 ## `ram`
 
-`ram` mode can help when Netdata should not introduce any disk I/O at all. In both of these modes, metric samples exist only in memory, and only while they are collected.
+`ram` mode can help when Netdata shouldn’t introduce any disk I/O at all. In both of these modes, metric samples exist only in memory, and only while they’re collected.
 
-When Netdata is configured to stream its metrics to a Metrics Observability Centralization Point (a Netdata Parent), metric samples are forwarded in real-time to that Netdata Parent. The ring buffers available in these modes is used to cache the collected samples for some time, in case there are network issues, or the Netdata Parent is restarted for maintenance.
+When Netdata is configured to stream its metrics to a Metrics Observability Centralization Point (a Netdata Parent), metric samples are forwarded in real-time to that Netdata Parent. The ring buffers available in these modes are used to cache the collected samples for some time, in case there are network issues, or the Netdata Parent is restarted for maintenance.
 
-The memory required per sample in these modes, is 4 bytes: `ram` mode uses `mmap()` behind the scene, and can be incremented in steps of 1024 samples (4KiB). Mode `ram` allows the use of the Linux kernel memory dedupper (Kernel-Same-Page or KSM) to deduplicate Netdata ring buffers and save memory.
+The memory required per sample in these modes, is four bytes: `ram` mode uses `mmap()` behind the scene, and can be incremented in steps of 1024 samples (4KiB). Mode `ram` allows the use of the Linux kernel memory dedupper (Kernel-Same-Page or KSM) to deduplicate Netdata ring buffers and save memory.
 
 **Configuring ram mode and retention**:
 

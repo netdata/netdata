@@ -1,6 +1,6 @@
 # Netdata Agent Versions & Platforms
 
-Netdata is evolving rapidly and new features are added at a constant pace. Therefore we have a frequent release cadence to deliver all these features to use as soon as possible.
+Netdata is evolving rapidly and new features are added at a constant pace. Therefore, we have a frequent release cadence to deliver all these features to use as soon as possible.
 
 Netdata Agents are available in 2 versions:
 
@@ -58,9 +58,9 @@ The following builds from source should usually work, although we don't regularl
 
 ## Static Builds and Unsupported Linux Versions
 
-The static builds of Netdata can be used on any Linux platform of the supported architectures. The only requirement these static builds have is a working Linux kernel, any version. Everything else required for Netdata to run, is inside the package itself.
+The static builds of Netdata can be used on any Linux platform of the supported architectures. The only requirement these static builds have is a working Linux kernel, any version. Everything else required for Netdata to run is inside the package itself.
 
-Static builds usually miss certain features that require operating-system support and cannot be provided in a generic way. These features include:
+Static builds usually miss certain features that require operating-system support and can’t be provided generically. These features include:
 
 - IPMI hardware sensors support
 - systemd-journal features

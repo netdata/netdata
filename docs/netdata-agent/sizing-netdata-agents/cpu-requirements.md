@@ -16,11 +16,11 @@ With default settings on Children, CPU utilization typically falls within the ra
 
 For Netdata Parents (Metrics Centralization Points), we estimate the following CPU utilization:
 
-|       Feature        |                     Depends On                      |           Expected Utilization (CPU cores per million)           |                               Key Reasons                                |
-|:--------------------:|:---------------------------------------------------:|:----------------------------------------------------------------:|:------------------------------------------------------------------------:|
-|    Metrics Ingest    |        Number of samples received per second        |                                2                                 |         Decompress and decode received messages, update database         |
-| Metrics re-streaming |         Number of samples resent per second         |                                2                                 |           Encode and compress messages towards another Parent            |
-|   Machine Learning   | Number of unique time-series concurrently collected |                                2                                 | Train machine learning models, query existing models to detect anomalies |
+|       Feature        |                     Depends On                      | Expected Utilization (CPU cores per million) |                               Key Reasons                                |
+|:--------------------:|:---------------------------------------------------:|:--------------------------------------------:|:------------------------------------------------------------------------:|
+|    Metrics Ingest    |        Number of samples received per second        |                      2                       |         Decompress and decode received messages, update database         |
+| Metrics re-streaming |         Number of samples resent per second         |                      2                       |           Encode and compress messages towards another Parent            |
+|   Machine Learning   | Number of unique time-series concurrently collected |                      2                       | Train machine learning models, query existing models to detect anomalies |
 
 To ensure optimal performance, keep total CPU utilization below 60% when the Parent is actively processing metrics, training models, and running health checks.
 
