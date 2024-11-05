@@ -1,9 +1,8 @@
 # Security and Privacy Design
 
 This document serves as the relevant Annex to the [Terms of Service](https://www.netdata.cloud/service-terms/),
-the [Privacy Policy](https://www.netdata.cloud/privacy/) and
-the Data Processing Addendum, when applicable. It provides more information regarding Netdata’s technical and
-organizational security and privacy measures.
+the [Privacy Policy](https://www.netdata.cloud/privacy/) and the Data Processing Addendum, when applicable.
+It provides more information regarding Netdata’s technical and organizational security and privacy measures.
 
 We have given special attention to all aspects of Netdata, ensuring that everything throughout its operation is as
 secure as possible. Netdata has been designed with security in mind.
@@ -16,6 +15,13 @@ Netdata, an open-source software widely installed across the globe, prioritizes 
 commitment to safeguarding user data. The entire structure and internal architecture of the software is built to ensure
 maximum security. We aim to provide a secure environment from the ground up, rather than as an afterthought.
 
+Netdata Cloud ensures a secure, user-centric environment for monitoring and troubleshooting, treating
+observability data and observability metadata distinctly to maintain user control over system insights and
+personal information. **Observability data**, which includes metric values (time series) and log events, remains
+fully under user control, stored locally on the user's premises. **Observability metadata**, including hostnames,
+metric names, alert names, and alert transitions, is minimally required by Netdata Cloud and securely managed
+for routing and platform usage purposes.
+
 ### Compliance with Open Source Security Foundation Best Practices
 
 Netdata is committed to adhering to the best practices laid out by the Open Source Security Foundation (OSSF).
@@ -23,7 +29,7 @@ Currently, the Netdata Agent follows the OSSF best practices at the passing leve
 the [OSSF guidelines](https://bestpractices.coreinfrastructure.org/en/projects/2231)
 
 Netdata Cloud boasts of comprehensive end-to-end automated testing, encompassing the UI, back-end, and agents, where
-involved. In addition, the Netdata Agent uses an array of third-party services for static code analysis, static code
+involved. In addition, the Netdata Agent uses an array of third-party services for static code analysis,
 security analysis, and CI/CD integrations to ensure code quality on a per pull request basis. Tools like Github's
 CodeQL, Github's Dependabot, our own unit tests, various types of linters,
 and [Coverity](https://scan.coverity.com/projects/netdata-netdata?tab=overview) are utilized to this end.
@@ -75,14 +81,14 @@ protection laws, including the GDPR and CCPA.
 
 ### Data Transfers
 
-While Netdata Agent itself does not engage in any cross-border data transfers, certain infrastructure metadata
-is transferred to Netdata Cloud for the purpose of providing its services. All observability data collected and
-processed by Netdata Agents, however, stays strictly within the user's infrastructure, eliminating any concerns about
-cross-border data transfer issues.
+While Netdata Agent itself does not engage in any cross-border data transfers, certain **observability metadata** (e.g.
+hostnames, metric names, alert names, and alert transitions) is transferred to Netdata Cloud solely to provide routing
+and alert notifications. **Observability data**, consisting of metric values (time series) and log events, stays
+strictly within the user's infrastructure, mitigating cross-border data transfer concerns.
 
-When users utilize Netdata Cloud, the parts of the observability data which are viewed via Netdata Cloud, are streamed
-from the Netdata Agents to the users’ web browsers via Netdata Cloud, without being stored on Netdata Cloud's servers.
-This is optional and users have the ability to use observability dashboards bypassing Netdata Cloud.
+For users leveraging Netdata Cloud, **observability data** is securely tunneled through Netdata Cloud for real-time
+viewing, similar to a VPN, without being stored on Netdata Cloud servers. This approach ensures that Netdata Cloud
+maintains only necessary metadata, while full control of observability data remains with the user.
 
 Netdata Cloud only stores Netdata Cloud users identification data (such as observability users' email addresses) and
 infrastructure metadata (such as infrastructure hostnames) necessary for Netdata Cloud's operation. All these metadata
@@ -108,9 +114,11 @@ and reach out with any questions or concerns they may have about data protection
 
 ## Anonymous Statistics
 
-The anonymous statistics collected by the Netdata Agent are related to the installations and not to individual users.
-This data includes community size, types of plugins used, possible crashes, operating systems installed, and the use of
-the registry feature. No IP addresses are collected, but each Netdata installation has a unique ID.
+The anonymous statistics collected by the Netdata Agent pertain to installations rather than individual users,
+capturing general information such as community size, plugin types, crashes, operating systems, and feature usage.
+Importantly, **observability data** — metric values and log events — remain local to the user's infrastructure and
+are not collected in this process. **Observability metadata**, including unique IDs for installations, is anonymized
+and stored solely to support product development and community understanding.
 
 Netdata also collects anonymous telemetry events, which provide information on the usage of various features, errors,
 and performance metrics. This data is used to understand how the software is being used and to identify areas for
@@ -134,41 +142,45 @@ improvement, while respecting user privacy and maintaining transparency.
 Internal Security Measures at Netdata are designed with an emphasis on data privacy and protection. The measures
 include:
 
-1. **Infrastructure as Code (IaC)** :
+1. **Observability data and metadata distinction**
+   Netdata Cloud securely handles observability metadata in isolated environments, while observability data remains
+   exclusively within user premises, stored locally and managed by the user. This distinction ensures that only
+   minimal metadata is required for routing and system identification.
+3. **Infrastructure as Code (IaC)** :
    Netdata Cloud follows the IaC model, which means it is a microservices environment that is completely isolated. All
    changes are managed through Terraform, an open-source IaC software tool that provides a consistent CLI workflow for
    managing cloud services.
-2. **TLS Termination and IAM Service** :
+4. **TLS Termination and IAM Service** :
    At the edge of Netdata Cloud, there is a TLS termination, which provides the decryption point for incoming TLS
    connections. Additionally, an Identity Access Management (IAM) service validates JWT tokens included in request
    cookies or denies access to them.
-3. **Session Identification** :
+5. **Session Identification** :
    Once inside the microservices environment, all requests are associated with session IDs that identify the user making
    the request. This approach provides additional layers of security and traceability.
-4. **Data Storage** :
+6. **Data Storage** :
    Data is stored in various NoSQL and SQL databases and message brokers. The entire environment is fully isolated,
    providing a secure space for data management.
-5. **Authentication** :
+7. **Authentication** :
    Netdata Cloud does not store credentials. It offers three types of authentication: GitHub Single Sign-On (SSO),
    Google SSO, and email validation.
-6. **DDoS Protection** :
+8. **DDoS Protection** :
    Netdata Cloud has multiple protection mechanisms against Distributed Denial of Service (DDoS) attacks, including
    rate-limiting and automated blacklisting.
-7. **Security-Focused Development Process** :
+9. **Security-Focused Development Process** :
    To ensure a secure environment, Netdata employs a security-focused development process. This includes the use of
    static code analyzers to identify potential security vulnerabilities in the codebase.
-8. **High Security Standards** :
+10. **High Security Standards** :
    Netdata Cloud maintains high security standards and can provide additional customization on a per contract basis.
-9. **Employee Security Practices** :
+11. **Employee Security Practices** :
    Netdata ensures its employees follow security best practices, including role-based access, periodic access review,
    and multi-factor authentication. This helps to minimize the risk of unauthorized access to sensitive data.
-10. **Experienced Developers** :
+12. **Experienced Developers** :
     Netdata hires senior developers with vast experience in security-related matters. It enforces two code reviews for
     every Pull Request (PR), ensuring that any potential issues are identified and addressed promptly.
-11. **DevOps Methodologies** :
+13. **DevOps Methodologies** :
     Netdata's DevOps methodologies use the highest standards in access control in all places, utilizing the best
     practices available.
-12. **Risk-Based Security Program** :
+14. **Risk-Based Security Program** :
     Netdata has a risk-based security program that continually assesses and mitigates risks associated with data
     security. This program helps maintain a secure environment for user data.
 
@@ -247,7 +259,12 @@ Netdata is committed to continuous improvement in security and privacy. While we
 
 ## Conclusion
 
-In conclusion, Netdata Cloud's commitment to data security and user privacy is paramount. From the careful design of the
+Netdata Cloud is designed to secure observability insights for users, maintaining a clear separation between
+observability data and observability metadata. All observability data — metric values and log events — are stored locally,
+entirely under user control, while only essential metadata (hostnames, metric names, alert details) is managed by Netdata
+Cloud for system routing and alerting.
+
+Netdata Cloud's commitment to data security and user privacy is paramount. From the careful design of the
 infrastructure and stringent internal security measures to compliance with international regulations and standards like
 GDPR and CCPA, Netdata Cloud ensures a secure environment for users to monitor and troubleshoot their systems.
 
