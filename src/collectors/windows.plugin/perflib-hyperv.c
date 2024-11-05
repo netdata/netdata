@@ -1584,6 +1584,9 @@ struct hypervisor_processor {
     COUNTER_DATA GuestRunTime;
     COUNTER_DATA HypervisorRunTime;
     COUNTER_DATA RemoteRunTime;
+    collected_number GuestRunTime_total;
+    collected_number HypervisorRunTime_total;
+    collected_number RemoteRunTime_total;
 };
 
 
@@ -1592,6 +1595,9 @@ void initialize_hyperv_processor_keys(struct hypervisor_processor *p)
     p->GuestRunTime.key = "% Guest Run Time";
     p->HypervisorRunTime.key = "% Hypervisor Run Time";
     p->RemoteRunTime.key = "% Remote Run Time";
+    p->GuestRunTime_total = 0;
+    p->HypervisorRunTime_total = 0;
+    p->RemoteRunTime_total = 0;
 }
 
 void dict_hyperv_processor_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -1618,6 +1624,10 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
 
         if(strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
+
+        char *vm = strchr(windows_shared_buffer, ':');
+        if (vm)
+            *vm = '\0';
 
         struct hypervisor_processor *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
 
@@ -1655,12 +1665,25 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
             rrdlabels_add(p->st_HypervisorProcessor->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }
 
-        SETP_DIM_VALUE(st_HypervisorProcessor, GuestRunTime);
-        SETP_DIM_VALUE(st_HypervisorProcessor, HypervisorRunTime);
-        SETP_DIM_VALUE(st_HypervisorProcessor, RemoteRunTime);
-
-        rrdset_done(p->st_HypervisorProcessor);
+        p->GuestRunTime_total += (collected_number)p->GuestRunTime.current.Data;
+        p->HypervisorRunTime_total += (collected_number)p->HypervisorRunTime.current.Data;
+        p->RemoteRunTime_total += (collected_number)p->RemoteRunTime.current.Data;
     }
+
+    {
+        struct hypervisor_processor *p;
+        dfe_start_read(item->instance, p) {
+            rrddim_set_by_pointer(p->st_HypervisorProcessor, p->rd_HypervisorRunTime, (collected_number) p->HypervisorRunTime_total);
+            rrddim_set_by_pointer(p->st_HypervisorProcessor, p->rd_GuestRunTime, (collected_number) p->GuestRunTime_total);
+            rrddim_set_by_pointer(p->st_HypervisorProcessor, p->rd_RemoteRunTime, (collected_number) p->RemoteRunTime_total);
+            rrdset_done(p->st_HypervisorProcessor);
+            p->GuestRunTime_total = 0;
+            p->HypervisorRunTime_total = 0;
+            p->RemoteRunTime_total = 0;
+        }
+        dfe_done(p);
+    }
+
     return true;
 }
 
