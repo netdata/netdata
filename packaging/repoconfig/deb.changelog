@@ -1,6 +1,12 @@
+@PKG_NAME@ (4-1) unstable; urgency=medium
+
+  * Update repositories to new subdomain
+
+ -- Austin Hemmelgarn <austin@netdata.cloud>  Thu, 31 Oct 2024 11:00:00 -0400
+
 @PKG_NAME@ (3-5) unstable; urgency=medium
 
-  * Swithc DEB packages to fetch repo metadata by hash.
+  * Switch DEB packages to fetch repo metadata by hash.
 
  -- Austin Hemmelgarn <austin@netdata.cloud>  Thu, 12 Sep 2024 07:27:00 -0400
 

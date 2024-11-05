@@ -1,3 +1,5 @@
+* Thu Oct 31 2024 Austin Hemmelgarn <austin@netdata.cloud> 4-1
+- Switch repos to new subdomain.
 * Thu Sep 17 2024 Austin Hemmelgarn <austin@netdata.cloud> 3-5
 - Fix changelog formatting.
 * Mon Aug 19 2024 Austin Hemmelgarn <austin@netdata.cloud> 3-4
