@@ -24,8 +24,8 @@ static void stream_path_clear(STREAM_PATH *p) {
     p->first_time_t = 0;
     p->capabilities = 0;
     p->flags = STREAM_PATH_FLAG_NONE;
-    p->start_time = 0;
-    p->shutdown_time = 0;
+    p->start_time_ms = 0;
+    p->shutdown_time_ms = 0;
 }
 
 static void rrdhost_stream_path_clear_unsafe(RRDHOST *host, bool destroy) {
@@ -56,8 +56,8 @@ static void stream_path_to_json_object(BUFFER *wb, STREAM_PATH *p) {
     buffer_json_member_add_int64(wb, "hops", p->hops);
     buffer_json_member_add_uint64(wb, "since", p->since);
     buffer_json_member_add_uint64(wb, "first_time_t", p->first_time_t);
-    buffer_json_member_add_uint64(wb, "start_time", p->start_time);
-    buffer_json_member_add_uint64(wb, "shutdown_time", p->shutdown_time);
+    buffer_json_member_add_uint64(wb, "start_time", p->start_time_ms);
+    buffer_json_member_add_uint64(wb, "shutdown_time", p->shutdown_time_ms);
     stream_capabilities_to_json_array(wb, p->capabilities, "capabilities");
     STREAM_PATH_FLAGS_2json(wb, "flags", p->flags);
     buffer_json_object_close(wb);
@@ -72,8 +72,8 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
     p.host_id = localhost->host_id;
     p.node_id = localhost->node_id;
     p.claim_id = claim_id_get_uuid();
-    p.start_time = get_agent_event_time_median(EVENT_AGENT_START_TIME) / USEC_PER_MS;
-    p.shutdown_time = get_agent_event_time_median(EVENT_AGENT_SHUTDOWN_TIME) / USEC_PER_MS;
+    p.start_time_ms = get_agent_event_time_median(EVENT_AGENT_START_TIME) / USEC_PER_MS;
+    p.shutdown_time_ms = get_agent_event_time_median(EVENT_AGENT_SHUTDOWN_TIME) / USEC_PER_MS;
 
     p.flags = STREAM_PATH_FLAG_NONE;
     if(!UUIDiszero(p.claim_id))
@@ -237,8 +237,8 @@ static bool parse_single_path(json_object *jobj, const char *path, STREAM_PATH *
     JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "hops", p->hops, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "since", p->since, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_t", p->first_time_t, error, true);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "start_time", p->start_time, error, true);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "shutdown_time", p->shutdown_time, error, true);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "start_time", p->start_time_ms, error, true);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "shutdown_time", p->shutdown_time_ms, error, true);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "flags", STREAM_PATH_FLAGS_2id_one, p->flags, error, true);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "capabilities", stream_capabilities_parse_one, p->capabilities, error, true);
 
