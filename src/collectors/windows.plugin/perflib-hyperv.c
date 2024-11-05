@@ -151,7 +151,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                     "bytes",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
-                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PHYSICAL + i,
+                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PHYSICAL,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -165,7 +165,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                     "bytes",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
-                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PHYSICAL_GUEST_VISIBLE + i,
+                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PHYSICAL_GUEST_VISIBLE,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -179,7 +179,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                     "percentage",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
-                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PRESSURE_CURRENT + i,
+                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PRESSURE_CURRENT,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -248,7 +248,7 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
                 "pages",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_VID_PHYSICAL_PAGES_ALLOCATED + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_VID_PHYSICAL_PAGES_ALLOCATED,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -262,7 +262,7 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
                 "pages",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_VID_REMOTE_PHYSICAL_PAGES + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_VID_REMOTE_PHYSICAL_PAGES,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -486,7 +486,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "pages",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_SPACE_PAGES + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_SPACE_PAGES,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -504,7 +504,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "pages",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_GPA_SPACE_PAGES + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_GPA_SPACE_PAGES,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -522,7 +522,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "modifications/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_GPA_SPACE_MODIFICATIONS + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_GPA_SPACE_MODIFICATIONS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -539,7 +539,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "devices",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_ATTACHED_DEVICES + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_ATTACHED_DEVICES,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -555,7 +555,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "pages",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEPOSITED_PAGES + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEPOSITED_PAGES,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -571,7 +571,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "requests",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_DMA_ERRORS + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_DMA_ERRORS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -588,7 +588,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "requests",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_INTERRUPT_ERRORS + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_INTERRUPT_ERRORS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -605,7 +605,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "events",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_INTERRUPT_THROTTLE_EVENTS + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_INTERRUPT_THROTTLE_EVENTS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -622,7 +622,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "flushes/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_IO_TLB_FLUSH + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_IO_TLB_FLUSH,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -638,7 +638,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "address spaces",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_ADDRESS_SPACE + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_ADDRESS_SPACE,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -654,7 +654,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "pages",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_VIRTUAL_TLB_PAGES + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_VIRTUAL_TLB_PAGES,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -670,7 +670,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "flushes/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_VIRTUAL_TLB_FLUSH_ENTRIES + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_VIRTUAL_TLB_FLUSH_ENTRIES,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -808,7 +808,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     "operations/s",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
-                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_OPERATIONS + i,
+                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_OPERATIONS,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -829,7 +829,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     "bytes/s",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
-                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_BYTES + i,
+                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_BYTES,
                     update_every,
                     RRDSET_TYPE_AREA);
 
@@ -850,7 +850,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     "errors/s",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
-                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_ERRORS + i,
+                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_ERRORS,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -1042,7 +1042,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "kilobits/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_TRAFFIC + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_TRAFFIC,
                 update_every,
                 RRDSET_TYPE_AREA);
 
@@ -1060,7 +1060,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PACKETS + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PACKETS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1078,7 +1078,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_DIRECTED_PACKETS + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_DIRECTED_PACKETS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1098,7 +1098,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_BROADCAST_PACKETS + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_BROADCAST_PACKETS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1118,7 +1118,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_MULTICAST_PACKETS + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_MULTICAST_PACKETS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1178,7 +1178,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PACKETS_FLOODED + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PACKETS_FLOODED,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1195,7 +1195,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "mac addresses/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_LEARNED_MAC_ADDRESSES + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_LEARNED_MAC_ADDRESSES,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1212,7 +1212,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "mac addresses/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PURGED_MAC_ADDRESSES + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PURGED_MAC_ADDRESSES,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1402,7 +1402,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "drops/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_PACKETS_DROPPED + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_PACKETS_DROPPED,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1421,7 +1421,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_PACKETS + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_PACKETS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1440,7 +1440,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
               "kilobits/s",
               _COMMON_PLUGIN_NAME,
               _COMMON_PLUGIN_MODULE_NAME,
-              NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_TRAFFIC + i,
+              NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_TRAFFIC,
               update_every,
               RRDSET_TYPE_AREA);
 
@@ -1458,7 +1458,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "kilobits/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_IPSEC_TRAFFIC + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_IPSEC_TRAFFIC,
                 update_every,
                 RRDSET_TYPE_AREA);
 
@@ -1479,7 +1479,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_DIRECTED_PACKETS + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_DIRECTED_PACKETS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1500,7 +1500,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_PACKETS + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_PACKETS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1521,7 +1521,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_MULTICAST_PACKETS + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_MULTICAST_PACKETS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1657,7 +1657,7 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
                 "percentage",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE + i,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE,
                 update_every,
                 RRDSET_TYPE_STACKED);
 
@@ -1675,7 +1675,7 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
                "percentage",
                _COMMON_PLUGIN_NAME,
                _COMMON_PLUGIN_MODULE_NAME,
-               NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE_BY_RUN_CONTEXT + i,
+               NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE_BY_RUN_CONTEXT,
                update_every,
                RRDSET_TYPE_STACKED);
 
