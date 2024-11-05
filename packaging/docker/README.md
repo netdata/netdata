@@ -355,6 +355,7 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  netdataconfig:
   netdatalib:
   netdatacache:
 ```
