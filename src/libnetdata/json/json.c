@@ -1,8 +1,9 @@
-#include "jsmn.h"
-#include "../libnetdata.h"
-#include "json.h"
 #include "libnetdata/libnetdata.h"
-#include "health/health.h"
+#include "json.h"
+
+#ifndef ENABLE_JSONC
+#include "jsmn.h"
+#endif
 
 #define JSON_TOKENS 1024
 
@@ -450,7 +451,7 @@ size_t json_walk(json_object *t, void *callback_data, int (*callback_function)(s
         type = json_object_get_type(val);
         if (type == json_type_array) {
             e.type = JSON_ARRAY;
-            json_jsonc_parse_array(val,NULL,health_silencers_json_read_callback);
+            json_jsonc_parse_array(val,NULL,callback_function);
         } else if (type == json_type_object) {
             e.type = JSON_OBJECT;
         } else if (type == json_type_string) {

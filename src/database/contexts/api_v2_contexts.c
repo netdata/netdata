@@ -302,7 +302,7 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
             buffer_json_object_close(wb); // traffic
 
             buffer_json_member_add_array(wb, "candidates");
-            rrdpush_sender_destinations_to_json(wb, s);
+            rrdhost_stream_parents_to_json(wb, s);
             buffer_json_array_close(wb); // candidates
         }
         buffer_json_object_close(wb); // destination

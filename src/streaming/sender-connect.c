@@ -196,7 +196,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     }
 
     if(version >= STREAM_HANDSHAKE_OK_V1) {
-        rrdpush_destination_set_reconnect_delay(host->destination, version, now_realtime_sec() + s->reconnect_delay);
+        stream_parent_set_reconnect_delay(host->current_parent, version, now_realtime_sec() + s->reconnect_delay);
         s->capabilities = convert_stream_version_to_capabilities(version, host, true);
         return true;
     }
@@ -209,7 +209,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
 
     worker_is_busy(worker_job_id);
     rrdpush_sender_thread_close_socket(s);
-    rrdpush_destination_set_reconnect_delay(host->destination, version, now_realtime_sec() + delay);
+    stream_parent_set_reconnect_delay(host->current_parent, version, now_realtime_sec() + delay);
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
@@ -218,7 +218,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     ND_LOG_STACK_PUSH(lgs);
 
     char buf[RFC3339_MAX_LENGTH];
-    rfc3339_datetime_ut(buf, sizeof(buf), rrdpush_destination_get_reconnection_t(host->destination) * USEC_PER_SEC, 0, false);
+    rfc3339_datetime_ut(buf, sizeof(buf), stream_parent_get_reconnection_t(host->current_parent) * USEC_PER_SEC, 0, false);
 
     nd_log(NDLS_DAEMON, priority,
            "STREAM %s [send to %s]: %s - will retry in %d secs, at %s",
@@ -236,7 +236,7 @@ unsigned char alpn_proto_list[] = {
 
 static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
     RRDHOST *host = s->host;
-    bool ssl_required = host ? rrdpush_destination_is_ssl(host->destination) : false;
+    bool ssl_required = host ? stream_parent_is_ssl(host->current_parent) : false;
 
     netdata_ssl_close(&host->sender->ssl);
 
@@ -255,7 +255,8 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
 
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
             rrdpush_sender_thread_close_socket(s);
-            rrdpush_destination_set_reconnect_delay(host->destination, STREAM_HANDSHAKE_ERROR_SSL_ERROR, now_realtime_sec() + 5 * 60);
+            stream_parent_set_reconnect_delay(
+                host->current_parent, STREAM_HANDSHAKE_ERROR_SSL_ERROR, now_realtime_sec() + 5 * 60);
             return false;
         }
 
@@ -272,7 +273,8 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
             netdata_log_error("SSL: closing the stream connection, because the server SSL certificate is not valid.");
             rrdpush_sender_thread_close_socket(s);
-            rrdpush_destination_set_reconnect_delay(host->destination, STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE, now_realtime_sec() + 5 * 60);
+            stream_parent_set_reconnect_delay(
+                host->current_parent, STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE, now_realtime_sec() + 5 * 60);
             return false;
         }
 
@@ -393,15 +395,14 @@ static bool sender_send_connection_request(RRDHOST *host, int default_port, int 
     // make sure the socket is closed
     rrdpush_sender_thread_close_socket(s);
 
-    s->rrdpush_sender_socket = connect_to_one_of_destinations(
-        host
-        , default_port
-        , &tv
-        , &s->reconnects_counter
-        , s->connected_to
-        , sizeof(s->connected_to)-1
-        , &host->destination
-    );
+    s->rrdpush_sender_socket = stream_parent_connect_to_one(
+        host,
+        default_port,
+        &tv,
+        &s->reconnects_counter,
+        s->connected_to,
+        sizeof(s->connected_to) - 1,
+        &host->current_parent);
 
     if(unlikely(s->rrdpush_sender_socket == -1)) {
         // netdata_log_error("STREAM %s [send to %s]: could not connect to parent node at this time.", rrdhost_hostname(host), host->rrdpush_send_destination);
@@ -529,7 +530,8 @@ static bool sender_send_connection_request(RRDHOST *host, int default_port, int 
 
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION);
         rrdpush_sender_thread_close_socket(s);
-        rrdpush_destination_set_reconnect_delay(host->destination, STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE, now_realtime_sec() + 1 * 60);
+        stream_parent_set_reconnect_delay(
+            host->current_parent, STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE, now_realtime_sec() + 1 * 60);
         return false;
     }
 
@@ -556,7 +558,8 @@ static bool sender_send_connection_request(RRDHOST *host, int default_port, int 
                "STREAM %s [send to %s]: failed to send HTTP header to remote netdata.",
                rrdhost_hostname(host), s->connected_to);
 
-        rrdpush_destination_set_reconnect_delay(host->destination, STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT, now_realtime_sec() + 1 * 60);
+        stream_parent_set_reconnect_delay(
+            host->current_parent, STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT, now_realtime_sec() + 1 * 60);
         return false;
     }
 
@@ -582,7 +585,8 @@ static bool sender_send_connection_request(RRDHOST *host, int default_port, int 
                "STREAM %s [send to %s]: remote netdata does not respond.",
                rrdhost_hostname(host), s->connected_to);
 
-        rrdpush_destination_set_reconnect_delay(host->destination, STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, now_realtime_sec() + 30);
+        stream_parent_set_reconnect_delay(
+            host->current_parent, STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, now_realtime_sec() + 30);
         return false;
     }
 

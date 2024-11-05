@@ -446,7 +446,7 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
         aclk_queue_node_info(rpt->host, true);
 
-        rrdpush_reset_destinations_postpone_time(host);
+        rrdhost_stream_parent_reset_postpone_time(host);
 
         set_this = true;
     }
@@ -480,7 +480,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
                 if (rpt->config.health_enabled)
                     rrdcalc_child_disconnected(host);
 
-                rrdpush_reset_destinations_postpone_time(host);
+                rrdhost_stream_parent_reset_postpone_time(host);
             }
             spinlock_lock(&host->receiver_lock);
 
@@ -839,7 +839,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
         rrdhost_option_set(rpt->host, RRDHOST_OPTION_EPHEMERAL_HOST);
 
     // let it reconnect to parent immediately
-    rrdpush_reset_destinations_postpone_time(rpt->host);
+    rrdhost_stream_parent_reset_postpone_time(rpt->host);
 
     // receive data
     size_t count = streaming_parser(rpt, &cd, rpt->fd, (rpt->ssl.conn) ? &rpt->ssl : NULL);

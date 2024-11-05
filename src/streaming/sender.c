@@ -237,7 +237,7 @@ static bool rrdhost_set_sender(RRDHOST *host) {
     }
     sender_unlock(host->sender);
 
-    rrdpush_reset_destinations_postpone_time(host);
+    rrdhost_stream_parent_reset_postpone_time(host);
 
     return ret;
 }
@@ -250,10 +250,11 @@ static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
         host->sender->exit.shutdown = false;
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         host->sender->last_state_since_t = now_realtime_sec();
-        rrdpush_destination_set_disconnect_reason(host->destination, host->sender->exit.reason, host->sender->last_state_since_t);
+        stream_parent_set_disconnect_reason(
+            host->current_parent, host->sender->exit.reason, host->sender->last_state_since_t);
     }
 
-    rrdpush_reset_destinations_postpone_time(host);
+    rrdhost_stream_parent_reset_postpone_time(host);
 }
 
 bool rrdhost_sender_should_exit(struct sender_state *s) {
@@ -386,7 +387,7 @@ void *rrdpush_sender_thread(void *ptr) {
         return NULL;
     }
 
-    rrdpush_sender_ssl_init(s->host);
+    rrdhost_stream_parent_ssl_init(s->host);
 
     netdata_log_info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), gettid_cached());
 

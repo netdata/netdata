@@ -116,7 +116,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
             buffer_json_add_array_item_uint64(wb, s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
 
             buffer_json_add_array_item_array(wb); // OutAttemptHandshake
-            time_t last_attempt = rrdpush_destinations_handshare_error_to_json(wb, host);
+            time_t last_attempt = stream_parent_handshake_error_to_json(wb, host);
             buffer_json_array_close(wb); // // OutAttemptHandshake
 
             if(!last_attempt) {

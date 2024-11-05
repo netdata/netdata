@@ -4,9 +4,6 @@
 #define NETDATA_RRDHOST_STATUS_H
 
 #include "libnetdata/libnetdata.h"
-#include "stream-handshake.h"
-#include "stream-capabilities.h"
-#include "database/rrd.h"
 
 typedef enum __attribute__((packed)) {
     RRDHOST_DB_STATUS_INITIALIZING = 0,
@@ -80,6 +77,10 @@ typedef enum __attribute__((packed)) {
 } RRDHOST_DYNCFG_STATUS;
 
 const char *rrdhost_dyncfg_status_to_string(RRDHOST_DYNCFG_STATUS status);
+
+#include "stream-handshake.h"
+#include "stream-capabilities.h"
+#include "database/rrd.h"
 
 typedef struct rrdhost_status {
     RRDHOST *host;

@@ -14,29 +14,29 @@ struct stream_parent {
     STREAM_PARENT *next;
 };
 
-void rrdpush_destination_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t since) {
+void stream_parent_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t since) {
     if(!d) return;
     d->since = since;
     d->reason = reason;
 }
 
-void rrdpush_destination_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t postpone_reconnection_until) {
+void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t postpone_reconnection_until) {
     if(!d) return;
     d->reason = reason;
     d->postpone_reconnection_until = postpone_reconnection_until;
 }
 
-time_t rrdpush_destination_get_reconnection_t(STREAM_PARENT *d) {
+time_t stream_parent_get_reconnection_t(STREAM_PARENT *d) {
     return d ? d->postpone_reconnection_until : 0;
 }
 
-bool rrdpush_destination_is_ssl(STREAM_PARENT *d) {
+bool stream_parent_is_ssl(STREAM_PARENT *d) {
     return d ? d->ssl : false;
 }
 
-time_t rrdpush_destinations_handshare_error_to_json(BUFFER *wb, RRDHOST *host) {
+time_t stream_parent_handshake_error_to_json(BUFFER *wb, RRDHOST *host) {
     time_t last_attempt = 0;
-    for(STREAM_PARENT *d = host->destinations; d ; d = d->next) {
+    for(STREAM_PARENT *d = host->parents; d ; d = d->next) {
         if(d->since > last_attempt)
             last_attempt = d->since;
 
@@ -45,11 +45,11 @@ time_t rrdpush_destinations_handshare_error_to_json(BUFFER *wb, RRDHOST *host) {
     return last_attempt;
 }
 
-void rrdpush_sender_destinations_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
+void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
     char buf[1024];
 
     STREAM_PARENT *d;
-    for (d = s->host->destinations; d; d = d->next) {
+    for (d = s->host->parents; d; d = d->next) {
         buffer_json_add_array_item_object(wb);
         buffer_json_member_add_uint64(wb, "attempts", d->attempts);
         {
@@ -72,14 +72,14 @@ void rrdpush_sender_destinations_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
     }
 }
 
-void rrdpush_reset_destinations_postpone_time(RRDHOST *host) {
+void rrdhost_stream_parent_reset_postpone_time(RRDHOST *host) {
     uint32_t wait = (host->sender) ? host->sender->reconnect_delay : 5;
     time_t now = now_realtime_sec();
-    for (STREAM_PARENT *d = host->destinations; d; d = d->next)
+    for (STREAM_PARENT *d = host->parents; d; d = d->next)
         d->postpone_reconnection_until = now + wait;
 }
 
-void rrdpush_sender_ssl_init(RRDHOST *host) {
+void rrdhost_stream_parent_ssl_init(RRDHOST *host) {
     static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
     spinlock_lock(&sp);
 
@@ -88,7 +88,7 @@ void rrdpush_sender_ssl_init(RRDHOST *host) {
         return;
     }
 
-    for(STREAM_PARENT *d = host->destinations; d ; d = d->next) {
+    for(STREAM_PARENT *d = host->parents; d ; d = d->next) {
         if (d->ssl) {
             // we need to initialize SSL
 
@@ -103,7 +103,7 @@ void rrdpush_sender_ssl_init(RRDHOST *host) {
     spinlock_unlock(&sp);
 }
 
-int connect_to_one_of_destinations(
+int stream_parent_connect_to_one(
     RRDHOST *host,
     int default_port,
     struct timeval *timeout,
@@ -114,7 +114,7 @@ int connect_to_one_of_destinations(
 {
     int sock = -1;
 
-    for (STREAM_PARENT *d = host->destinations; d; d = d->next) {
+    for (STREAM_PARENT *d = host->parents; d; d = d->next) {
         time_t now = now_realtime_sec();
 
         if(nd_thread_signaled_to_cancel())
@@ -143,8 +143,8 @@ int connect_to_one_of_destinations(
             // move the current item to the end of the list
             // without this, this destination will break the loop again and again
             // not advancing the destinations to find one that may work
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->destinations, d, prev, next);
-            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(host->destinations, d, prev, next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->parents, d, prev, next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(host->parents, d, prev, next);
 
             break;
         }
@@ -153,14 +153,14 @@ int connect_to_one_of_destinations(
     return sock;
 }
 
-struct destinations_init_tmp {
+struct stream_parent_init_tmp {
     RRDHOST *host;
     STREAM_PARENT *list;
     int count;
 };
 
-static bool destinations_init_add_one(char *entry, void *data) {
-    struct destinations_init_tmp *t = data;
+static bool stream_parent_add_one(char *entry, void *data) {
+    struct stream_parent_init_tmp *t = data;
 
     STREAM_PARENT *d = callocz(1, sizeof(STREAM_PARENT));
     char *colon_ssl = strstr(entry, ":SSL");
@@ -183,31 +183,28 @@ static bool destinations_init_add_one(char *entry, void *data) {
     return false; // we return false, so that we will get all defined destinations
 }
 
-void rrdpush_destinations_init(RRDHOST *host) {
+void rrdhost_stream_parents_init(RRDHOST *host) {
     if(!host->rrdpush.send.destination) return;
 
-    rrdpush_destinations_free(host);
+    rrdhost_stream_parents_free(host);
 
-    struct destinations_init_tmp t = {
+    struct stream_parent_init_tmp t = {
         .host = host,
         .list = NULL,
         .count = 0,
     };
-
-    foreach_entry_in_connection_string(host->rrdpush.send.destination, destinations_init_add_one, &t);
-
-    host->destinations = t.list;
+    foreach_entry_in_connection_string(host->rrdpush.send.destination, stream_parent_add_one, &t);
+    host->parents = t.list;
 }
 
-void rrdpush_destinations_free(RRDHOST *host) {
-    while (host->destinations) {
-        STREAM_PARENT *tmp = host->destinations;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->destinations, tmp, prev, next);
+void rrdhost_stream_parents_free(RRDHOST *host) {
+    while (host->parents) {
+        STREAM_PARENT *tmp = host->parents;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->parents, tmp, prev, next);
         string_freez(tmp->destination);
         freez(tmp);
         __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(STREAM_PARENT), __ATOMIC_RELAXED);
     }
 
-    host->destinations = NULL;
+    host->parents = NULL;
 }
-

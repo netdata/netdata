@@ -5,20 +5,21 @@
 
 #include "libnetdata/libnetdata.h"
 #include "stream-handshake.h"
+#include "rrdhost-status.h"
 
 struct rrdhost;
 struct rrdhost_status;
 struct stream_parent;
 typedef struct stream_parent STREAM_PARENT;
 
-void rrdpush_sender_ssl_init(struct rrdhost *host);
+void rrdhost_stream_parent_ssl_init(struct rrdhost *host);
 
-void rrdpush_reset_destinations_postpone_time(struct rrdhost *host);
+void rrdhost_stream_parent_reset_postpone_time(struct rrdhost *host);
 
-void rrdpush_destinations_init(struct rrdhost *host);
-void rrdpush_destinations_free(struct rrdhost *host);
+void rrdhost_stream_parents_init(struct rrdhost *host);
+void rrdhost_stream_parents_free(struct rrdhost *host);
 
-int connect_to_one_of_destinations(
+int stream_parent_connect_to_one(
     struct rrdhost *host,
     int default_port,
     struct timeval *timeout,
@@ -27,12 +28,12 @@ int connect_to_one_of_destinations(
     size_t connected_to_size,
     STREAM_PARENT **destination);
 
-void rrdpush_sender_destinations_to_json(BUFFER *wb, struct rrdhost_status *s);
-void rrdpush_destination_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t since);
-void rrdpush_destination_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t postpone_reconnection_until);
-time_t rrdpush_destination_get_reconnection_t(STREAM_PARENT *d);
-bool rrdpush_destination_is_ssl(STREAM_PARENT *d);
+void rrdhost_stream_parents_to_json(BUFFER *wb, struct rrdhost_status *s);
+void stream_parent_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t since);
+void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t postpone_reconnection_until);
+time_t stream_parent_get_reconnection_t(STREAM_PARENT *d);
+bool stream_parent_is_ssl(STREAM_PARENT *d);
 
-time_t rrdpush_destinations_handshare_error_to_json(BUFFER *wb, struct rrdhost *host);
+time_t stream_parent_handshake_error_to_json(BUFFER *wb, struct rrdhost *host);
 
 #endif //NETDATA_STREAM_PARENTS_H

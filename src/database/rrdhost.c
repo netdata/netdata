@@ -247,7 +247,7 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
         host->sender->ssl = NETDATA_SSL_UNSET_CONNECTION;
 
         host->rrdpush.send.destination = strdupz(rrdpush_destination);
-        rrdpush_destinations_init(host);
+        rrdhost_stream_parents_init(host);
 
         host->rrdpush.send.api_key = strdupz(rrdpush_api_key);
         host->rrdpush.send.charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL,
@@ -1287,7 +1287,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     freez(host->cache_dir);
     freez(host->rrdpush.send.api_key);
     freez(host->rrdpush.send.destination);
-    rrdpush_destinations_free(host);
+    rrdhost_stream_parents_free(host);
     string_freez(host->health.health_default_exec);
     string_freez(host->health.health_default_recipient);
     string_freez(host->registry_hostname);
