@@ -9,8 +9,6 @@
 
 #define HYPERV  "hyperv"
 
-static long chart_priority = NETDATA_CHART_PRIO_WINDOWS_HYPERV;
-
 static void get_and_sanitize_instance_value(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -153,7 +151,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                     "bytes",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
-                    chart_priority++,
+                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PHYSICAL + i,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -167,7 +165,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                     "bytes",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
-                    chart_priority++,
+                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PHYSICAL_GUEST_VISIBLE + i,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -181,7 +179,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                     "percentage",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
-                    chart_priority++,
+                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_MEMORY_PRESSURE_CURRENT + i,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -250,7 +248,7 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
                 "pages",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_VID_PHYSICAL_PAGES_ALLOCATED + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -264,7 +262,7 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
                 "pages",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_VID_REMOTE_PHYSICAL_PAGES + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -329,7 +327,7 @@ static bool do_hyperv_health_summary(PERF_DATA_BLOCK *pDataBlock, int update_eve
             "vms",
             _COMMON_PLUGIN_NAME,
             _COMMON_PLUGIN_MODULE_NAME,
-            chart_priority++,
+            NETDATA_CHART_PRIO_WINDOWS_HYPERV_VMS_HEALTH,
             update_every,
             RRDSET_TYPE_STACKED);
 
@@ -488,7 +486,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "pages",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_SPACE_PAGES + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -506,7 +504,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "pages",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_GPA_SPACE_PAGES + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -524,7 +522,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "modifications/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_GPA_SPACE_MODIFICATIONS + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -541,7 +539,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "devices",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_ATTACHED_DEVICES + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -557,7 +555,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "pages",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEPOSITED_PAGES + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -573,7 +571,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "requests",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_DMA_ERRORS + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -590,7 +588,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "requests",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_INTERRUPT_ERRORS + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -607,7 +605,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "events",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_DEVICE_INTERRUPT_THROTTLE_EVENTS + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -624,7 +622,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "flushes/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_IO_TLB_FLUSH + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -640,7 +638,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "address spaces",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_ADDRESS_SPACE + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -656,7 +654,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "pages",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_VIRTUAL_TLB_PAGES + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -672,7 +670,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 "flushes/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_ROOT_PARTITION_VIRTUAL_TLB_FLUSH_ENTRIES + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -810,7 +808,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     "operations/s",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
-                    chart_priority++,
+                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_OPERATIONS + i,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -831,7 +829,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     "bytes/s",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
-                    chart_priority++,
+                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_BYTES + i,
                     update_every,
                     RRDSET_TYPE_AREA);
 
@@ -852,7 +850,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     "errors/s",
                     _COMMON_PLUGIN_NAME,
                     _COMMON_PLUGIN_MODULE_NAME,
-                    chart_priority++,
+                    NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_STORAGE_DEVICE_ERRORS + i,
                     update_every,
                     RRDSET_TYPE_LINE);
 
@@ -1044,7 +1042,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "kilobits/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_TRAFFIC + i,
                 update_every,
                 RRDSET_TYPE_AREA);
 
@@ -1062,7 +1060,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PACKETS + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1080,7 +1078,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_DIRECTED_PACKETS + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1100,7 +1098,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_BROADCAST_PACKETS + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1120,7 +1118,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_MULTICAST_PACKETS + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1140,7 +1138,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "drops/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_DROPPED_PACKETS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1160,7 +1158,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "drops/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_EXTENSIONS_DROPPED_PACKETS,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1180,7 +1178,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PACKETS_FLOODED + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1197,7 +1195,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "mac addresses/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_LEARNED_MAC_ADDRESSES + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1214,7 +1212,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
                 "mac addresses/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VSWITCH_PURGED_MAC_ADDRESSES + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1404,7 +1402,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "drops/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_PACKETS_DROPPED + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1423,7 +1421,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_PACKETS + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1442,7 +1440,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
               "kilobits/s",
               _COMMON_PLUGIN_NAME,
               _COMMON_PLUGIN_MODULE_NAME,
-              chart_priority++,
+              NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_TRAFFIC + i,
               update_every,
               RRDSET_TYPE_AREA);
 
@@ -1460,7 +1458,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "kilobits/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_IPSEC_TRAFFIC + i,
                 update_every,
                 RRDSET_TYPE_AREA);
 
@@ -1481,7 +1479,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_DIRECTED_PACKETS + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1502,7 +1500,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_PACKETS + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1523,7 +1521,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_MULTICAST_PACKETS + i,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -1581,12 +1579,17 @@ struct hypervisor_processor {
     DEFINE_RD(HypervisorRunTime);
     DEFINE_RD(RemoteRunTime);
 
+    RRDSET *st_HypervisorProcessorTotal;
+    DEFINE_RD(TotalRunTime);
+
     COUNTER_DATA GuestRunTime;
     COUNTER_DATA HypervisorRunTime;
     COUNTER_DATA RemoteRunTime;
+    COUNTER_DATA TotalRunTime;
     collected_number GuestRunTime_total;
     collected_number HypervisorRunTime_total;
     collected_number RemoteRunTime_total;
+    collected_number TotalRunTime_total;
 };
 
 
@@ -1595,9 +1598,11 @@ void initialize_hyperv_processor_keys(struct hypervisor_processor *p)
     p->GuestRunTime.key = "% Guest Run Time";
     p->HypervisorRunTime.key = "% Hypervisor Run Time";
     p->RemoteRunTime.key = "% Remote Run Time";
+    p->TotalRunTime.key = "% Total Run Time";
     p->GuestRunTime_total = 0;
     p->HypervisorRunTime_total = 0;
     p->RemoteRunTime_total = 0;
+    p->TotalRunTime_total = 0;
 }
 
 void dict_hyperv_processor_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -1622,8 +1627,8 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
 
         get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
-        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
-            continue;
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;;
 
         char *vm = strchr(windows_shared_buffer, ':');
         if (vm)
@@ -1638,22 +1643,41 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
         GET_INSTANCE_COUNTER(GuestRunTime);
         GET_INSTANCE_COUNTER(HypervisorRunTime);
         GET_INSTANCE_COUNTER(RemoteRunTime);
+        GET_INSTANCE_COUNTER(TotalRunTime);
 
         if (!p->charts_created) {
             p->charts_created = true;
-            p->st_HypervisorProcessor = rrdset_create_localhost(
+            p->st_HypervisorProcessorTotal = rrdset_create_localhost(
                 "vm_cpu_usage",
                 windows_shared_buffer,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_cpu_usage",
-                "VM CPU usage (100% = 1 core)",
+                "VM CPU usage",
                 "percentage",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                chart_priority++,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE + i,
                 update_every,
                 RRDSET_TYPE_STACKED);
+
+            p->rd_TotalRunTime =
+                rrddim_add(p->st_HypervisorProcessorTotal, "usage", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+            rrdlabels_add(p->st_HypervisorProcessorTotal->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+
+            p->st_HypervisorProcessor = rrdset_create_localhost(
+               "vm_cpu_usage_by_run_context",
+               windows_shared_buffer,
+               NULL,
+               HYPERV,
+               HYPERV ".vm_cpu_usage_by_run_context",
+               "VM CPU usage by run context",
+               "percentage",
+               _COMMON_PLUGIN_NAME,
+               _COMMON_PLUGIN_MODULE_NAME,
+               NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE_BY_RUN_CONTEXT + i,
+               update_every,
+               RRDSET_TYPE_STACKED);
 
             p->rd_GuestRunTime =
                 rrddim_add(p->st_HypervisorProcessor, "guest", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
@@ -1668,6 +1692,7 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
         p->GuestRunTime_total += (collected_number)p->GuestRunTime.current.Data;
         p->HypervisorRunTime_total += (collected_number)p->HypervisorRunTime.current.Data;
         p->RemoteRunTime_total += (collected_number)p->RemoteRunTime.current.Data;
+        p->TotalRunTime_total += (collected_number)p->TotalRunTime.current.Data;
     }
 
     {
@@ -1677,9 +1702,14 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
             rrddim_set_by_pointer(p->st_HypervisorProcessor, p->rd_GuestRunTime, (collected_number) p->GuestRunTime_total);
             rrddim_set_by_pointer(p->st_HypervisorProcessor, p->rd_RemoteRunTime, (collected_number) p->RemoteRunTime_total);
             rrdset_done(p->st_HypervisorProcessor);
+
+            rrddim_set_by_pointer(p->st_HypervisorProcessorTotal, p->rd_TotalRunTime, (collected_number) p->TotalRunTime_total);
+            rrdset_done(p->st_HypervisorProcessorTotal);
+
             p->GuestRunTime_total = 0;
             p->HypervisorRunTime_total = 0;
             p->RemoteRunTime_total = 0;
+            p->TotalRunTime_total = 0;
         }
         dfe_done(p);
     }
