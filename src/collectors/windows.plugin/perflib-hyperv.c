@@ -1628,7 +1628,7 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
         get_and_sanitize_instance_value(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
-            continue;;
+            continue;
 
         char *vm = strchr(windows_shared_buffer, ':');
         if (vm)
