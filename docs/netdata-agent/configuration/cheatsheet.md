@@ -1,6 +1,6 @@
 # Useful management and configuration actions
 
-Below you will find some of the most common actions that one can take while using Netdata. You can use this page as a quick reference for installing Netdata, connecting a node to the Cloud, properly editing the configuration, accessing Netdata's API, and more!
+Below are some of the most common actions one can take while using Netdata. You can use this page as a quick reference for installing Netdata, connecting a node to the Cloud, properly editing the configuration, accessing Netdata's API, and more!
 
 ## Install Netdata
 
@@ -45,8 +45,8 @@ sudo ./edit-config go.d.conf # edit a plugin's config
 
 ```yaml
 modules:
- activemq: no # disabled
- cockroachdb: yes # enabled
+  activemq: no # disabled
+  cockroachdb: yes # enabled
 ```
 
 ### Edit a collector's config

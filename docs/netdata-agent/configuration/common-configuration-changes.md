@@ -139,6 +139,6 @@ The following restrictions apply to host label names:
 - Names cannot start with `_`, but it can be present in other parts of the name.
 - Names only accept alphabet letters, numbers, dots, and dashes.
 
-The policy for values is more flexible, but you can not use exclamation marks (`!`), whitespaces (` `), single quotes
+The policy for values is more flexible, but you cannot use exclamation marks (`!`), whitespaces (` `), single quotes
 (`'`), double quotes (`"`), or asterisks (`*`), because they are used to compare label values in health alerts and
 templates.

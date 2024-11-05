@@ -1,6 +1,6 @@
 # Netdata Agent
 
-The Netdata Agent is the main building block in a Netdata ecosystem. It is installed on all monitored systems to monitor system components, containers and applications.
+The Netdata Agent is the main building block in the Netdata ecosystem. It is installed on all monitored systems to monitor system components, containers and applications.
 
 The Netdata Agent is an **observability pipeline in a box** that can either operate standalone, or blend into a bigger pipeline made by more Netdata Agents (Children and Parents).
 
@@ -53,7 +53,7 @@ stateDiagram-v2
 
 1. **Discover**: auto-detect metric sources on localhost, auto-discover metric sources on Kubernetes.
 2. **Collect**: query data sources to collect metric samples, using the optimal protocol for each data source. 800+ integrations supported, including dozens of native application protocols, OpenMetrics and StatsD.
-3. **Detect Anomalies**: use the trained machine learning models for each metric, to detect in real-time if each sample collected is an outlier (an anomaly), or not.
+3. **Detect Anomalies**: use the trained machine learning models for each metric to detect in real-time if each sample collected is an outlier (an anomaly), or not.
 4. **Store**: keep collected samples and their anomaly status, in the time-series database (database mode `dbengine`) or a ring buffer (database modes `ram` and `alloc`).
 5. **Learn**: train multiple machine learning models for each metric collected, learning behaviors and patterns for detecting anomalies.
 6. **Check**: a health engine, triggering alerts and sending notifications. Netdata comes with hundreds of alert configurations that are automatically attached to metrics when they get collected, detecting errors, common configuration errors and performance issues.
@@ -69,7 +69,7 @@ stateDiagram-v2
 
 2. **Automation**: Netdata is designed to automate most of the process of setting up and running an observability solution. It is designed to instantly provide comprehensive dashboards and fully automated alerts, with zero configuration.
 
-3. **High Fidelity Monitoring**: Netdata was born from our need to kill the console for observability. So, it provides metrics and logs in the same granularity and fidelity console tools do, but also comes with tools that go beyond metrics and logs, to provide a holistic view of the monitored infrastructure (e.g. check [Top Monitoring](/docs/top-monitoring-netdata-functions.md)).  
+3. **High Fidelity Monitoring**: Netdata was born from our need to kill the console for observability. So, it provides metrics and logs in the same granularity and fidelity console tools do, but also comes with tools that go beyond metrics and logs, to provide a holistic view of the monitored infrastructure (e.g., check [Top Monitoring](/docs/top-monitoring-netdata-functions.md)).
 
 4. **Minimal impact on monitored systems and applications**: Netdata has been designed to have a minimal impact on the monitored systems and their applications. There are [independent studies](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf) reporting that Netdata excels in CPU usage, RAM utilization, Execution Time and the impact Netdata has on monitored applications and containers.
 
@@ -77,8 +77,8 @@ stateDiagram-v2
 
 ## Dashboard Versions
 
-The Netdata agents (Standalone, Children and Parents) **share the dashboard** of Netdata Cloud. However, when the user is logged-in and the Netdata agent is connected to Netdata Cloud, the following are enabled (which are otherwise disabled):
+The Netdata agents (Standalone, Children and Parents) **share the dashboard** of Netdata Cloud. However, when the user is logged in and the Netdata agent is connected to Netdata Cloud, the following are enabled (which are otherwise disabled):
 
 1. **Access to Sensitive Data**: Some data, like systemd-journal logs and several [Top Monitoring](/docs/top-monitoring-netdata-functions.md) features expose sensitive data, like IPs, ports, process command lines and more. To access all these when the dashboard is served directly from a Netdata agent, Netdata Cloud is required to verify that the user accessing the dashboard has the required permissions.
 
-2. **Dynamic Configuration**: Netdata agents are configured via configuration files, manually or through some provisioning system. The latest Netdata includes a feature to allow users change some of the configuration (collectors, alerts) via the dashboard. This feature is only available to users of paid Netdata Cloud plan.
+2. **Dynamic Configuration**: Netdata agents are configured via configuration files, manually or through some provisioning system. The latest Netdata includes a feature to allow users to change some configurations (collectors, alerts) via the dashboard. This feature is only available to users of paid Netdata Cloud plan.
