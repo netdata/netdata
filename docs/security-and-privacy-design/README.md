@@ -75,16 +75,20 @@ protection laws, including the GDPR and CCPA.
 
 ### Data Transfers
 
-While Netdata Agent itself does not engage in any cross-border data transfers, certain personal and infrastructure data
-is transferred to Netdata Cloud for the purpose of providing its services. The metric data collected and processed by
-Netdata Agents, however, stays strictly within the user's infrastructure, eliminating any concerns about cross-border
-data transfer issues.
+While Netdata Agent itself does not engage in any cross-border data transfers, certain infrastructure data
+is transferred to Netdata Cloud for the purpose of providing its services. All observability data collected and
+processed by Netdata Agents, however, stays strictly within the user's infrastructure, eliminating any concerns about
+cross-border data transfer issues.
 
-When users utilize Netdata Cloud, the metric data is streamed directly from the Netdata Agent to the users’ web browsers
-via Netdata Cloud, without being stored on Netdata Cloud's servers. However, user identification data (such as email
-addresses) and infrastructure metadata necessary for Netdata Cloud's operation are stored in data centers in the United
-States, using compliant infrastructure providers such as Google Cloud and Amazon Web Services. These transfers and
-storage are carried out in full compliance with applicable data protection laws, including GDPR and CCPA.
+When users utilize Netdata Cloud, the parts of the observability data which are viewed via Netdata Cloud, are streamed
+from the Netdata Agents to the users’ web browsers via Netdata Cloud, without being stored on Netdata Cloud's servers.
+This is optional and users have the ability to use observability dashboards bypassing Netdata Cloud.
+
+Netdata Cloud only stores Netdata Cloud users identification data (such as observability users' email addresses) and
+infrastructure metadata (such as infrastructure hostnames) necessary for Netdata Cloud's operation. All these metadata
+are stored in data centers in the United States, using compliant infrastructure providers such as Google Cloud and
+Amazon Web Services. These transfers and storage are carried out in full compliance with applicable data protection
+laws, including GDPR and CCPA.
 
 ### Privacy Rights
 
