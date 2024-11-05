@@ -86,6 +86,7 @@ typedef enum __attribute__ ((__packed__)) rrd_memory_mode {
 #define RRD_MEMORY_MODE_DBENGINE_NAME "dbengine"
 
 extern RRD_MEMORY_MODE default_rrd_memory_mode;
+extern bool dbengine_tier0_in_ram;
 
 const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
 RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);

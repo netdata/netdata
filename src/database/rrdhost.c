@@ -1049,9 +1049,10 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
     else {
         rrdpush_init();
 
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || rrdpush_receiver_needs_dbengine()) {
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "DBENGINE: Initializing ...");
+        bool init_dbengine = (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || dbengine_tier0_in_ram);
+
+        if (init_dbengine || rrdpush_receiver_needs_dbengine()) {
+            nd_log(NDLS_DAEMON, NDLP_DEBUG, "DBENGINE: Initializing ...");
 
             dbengine_init(hostname);
         }
@@ -1059,6 +1060,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
             storage_tiers = 1;
 
         if (!dbengine_enabled) {
+            dbengine_tier0_in_ram = false;
             if (storage_tiers > 1) {
                 nd_log(NDLS_DAEMON, NDLP_WARNING,
                        "dbengine is not enabled, but %zu tiers have been requested. Resetting tiers to 1",
@@ -1092,7 +1094,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
             , NETDATA_VERSION
             , default_rrd_update_every
             , default_rrd_history_entries
-            , default_rrd_memory_mode
+            , dbengine_tier0_in_ram ? RRD_MEMORY_MODE_RAM : default_rrd_memory_mode
             , health_plugin_enabled()
             , default_rrdpush_enabled
             , default_rrdpush_destination
