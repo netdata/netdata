@@ -648,13 +648,14 @@ typedef enum __attribute__ ((__packed__)) {
     CONTEXTS_V2_NODES               = (1 << 2),
     CONTEXTS_V2_NODES_INFO          = (1 << 3),
     CONTEXTS_V2_NODE_INSTANCES      = (1 << 4),
-    CONTEXTS_V2_CONTEXTS            = (1 << 5),
-    CONTEXTS_V2_AGENTS              = (1 << 6),
-    CONTEXTS_V2_AGENTS_INFO         = (1 << 7),
-    CONTEXTS_V2_VERSIONS            = (1 << 8),
-    CONTEXTS_V2_FUNCTIONS           = (1 << 9),
-    CONTEXTS_V2_ALERTS              = (1 << 10),
-    CONTEXTS_V2_ALERT_TRANSITIONS   = (1 << 11),
+    CONTEXTS_V2_NODES_STREAM_PATH   = (1 << 5),
+    CONTEXTS_V2_CONTEXTS            = (1 << 6),
+    CONTEXTS_V2_AGENTS              = (1 << 7),
+    CONTEXTS_V2_AGENTS_INFO         = (1 << 8),
+    CONTEXTS_V2_VERSIONS            = (1 << 9),
+    CONTEXTS_V2_FUNCTIONS           = (1 << 10),
+    CONTEXTS_V2_ALERTS              = (1 << 11),
+    CONTEXTS_V2_ALERT_TRANSITIONS   = (1 << 12),
 } CONTEXTS_V2_MODE;
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode);

@@ -131,6 +131,14 @@ static struct web_api_command api_commands_v3[] = {
         .allow_subpaths = 0
     },
     {
+        .api = "stream_path",
+        .hash = 0,
+        .acl = HTTP_ACL_NODES,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = api_v3_stream_path,
+        .allow_subpaths = 0
+    },
+    {
         .api = "versions",
         .hash = 0,
         .acl = HTTP_ACL_NOCHECK,
