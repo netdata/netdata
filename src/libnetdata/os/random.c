@@ -15,7 +15,7 @@ static __attribute__((constructor)) void random_seed() {
     srandom(seed);
 }
 
-static void random_get_bytes(void *buf, size_t bytes) {
+static inline void random_bytes(void *buf, size_t bytes) {
     spinlock_lock(&random_lock);
     while (bytes > 0) {
         if (bytes >= sizeof(uint32_t)) {
@@ -45,10 +45,10 @@ static void random_get_bytes(void *buf, size_t bytes) {
 
 #if defined(HAVE_GETRANDOM)
 #include <sys/random.h>
-void inline getrandom_get_bytes(void *buf, size_t buflen) {
+static inline void getrandom_bytes(void *buf, size_t bytes) {
     ssize_t result;
-    while (buflen > 0) {
-        result = getrandom(buf, buflen, 0);
+    while (bytes > 0) {
+        result = getrandom(buf, bytes, 0);
         if (result == -1) {
             if (errno == EINTR) {
                 // Interrupted, retry
@@ -59,19 +59,19 @@ void inline getrandom_get_bytes(void *buf, size_t buflen) {
                 continue;
             } else {
                 // fallback to RAND_bytes
-                random_get_bytes(buf, buflen);
+                random_bytes(buf, bytes);
                 return;
             }
         }
         buf = (uint8_t *)buf + result;
-        buflen -= result;
+        bytes -= result;
     }
 }
 #endif // HAVE_GETRANDOM
 #endif // !HAVE_ARC4RANDOM_BUF && !HAVE_RAND_S
 
 #if defined(HAVE_RAND_S)
-static inline void rand_s_get_bytes(void *buf, size_t bytes) {
+static inline void rand_s_bytes(void *buf, size_t bytes) {
     while (bytes > 0) {
         if (bytes >= sizeof(unsigned int)) {
             unsigned int temp;
@@ -103,17 +103,20 @@ static inline void rand_s_get_bytes(void *buf, size_t bytes) {
 #endif
 
 inline void os_random_bytes(void *buf, size_t bytes) {
+#if defined(HAVE_ARC4RANDOM_BUF)
+    arc4random_buf(buf, bytes);
+#else
+
     if(RAND_bytes((unsigned char *)buf, bytes) == 1)
         return;
 
-#if defined(HAVE_ARC4RANDOM_BUF)
-    arc4random_buf(buf, bytes);
-#elif defined(HAVE_GETRANDOM)
-    getrandom_get_bytes(buf, bytes);
+#if defined(HAVE_GETRANDOM)
+    getrandom_bytes(buf, bytes);
 #elif defined(HAVE_RAND_S)
-    rand_s_get_bytes(buf, bytes);
+    rand_s_bytes(buf, bytes);
 #else
-    random_get_bytes(buf, bytes);
+    random_bytes(buf, bytes);
+#endif
 #endif
 }
 
@@ -145,51 +148,53 @@ uint64_t os_random64(void) {
     return value;
 }
 
-#define MAX_RETRIES 10  // Limit retries to avoid an infinite loop
+/*
+ * Rejection Sampling
+ * To reduce bias, we can use rejection sampling without creating an infinite loop.
+ * This technique works by discarding values that would introduce bias, but limiting
+ * the number of retries to avoid infinite loops.
+*/
+
+// Calculate an upper limit so that the range evenly divides into max.
+// Any values greater than this limit would introduce bias, so we discard them.
+#define MAX_RETRIES 10
+#define os_random_rejection_sampling_X(type, type_max, func, max)           \
+    ({                                                                      \
+        size_t retries = 0;                                                 \
+        type value, upper_limit = type_max - (type_max % (max));            \
+        while ((value = func()) >= upper_limit && retries++ < MAX_RETRIES); \
+        value % (max);                                                      \
+    })
+
 uint64_t os_random(uint64_t max) {
     if (max <= 1) return 0;
 
-    uint64_t value;
-    uint64_t upper_limit;
-    int retries = 0;
+#if defined(HAVE_ARC4RANDOM_UNIFORM)
+    if(max <= UINT32_MAX)
+        // this is not biased
+        return arc4random_uniform(max);
+#endif
 
-    /*
-     * Rejection Sampling
-     * To reduce bias, we can use rejection sampling without creating an infinite loop.
-     * This technique works by discarding values that would introduce bias, but limiting
-     * the number of retries to avoid infinite loops.
-    */
+    if ((max & (max - 1)) == 0) {
+        // max is a power of 2
+        // use bitmasking to directly generate an unbiased random number
 
-    // Calculate an upper limit so that the range evenly divides into max.
-    // Any values greater than this limit would introduce bias, so we discard them.
+        if (max <= UINT8_MAX)
+            return os_random8() & (max - 1);
+        else if (max <= UINT16_MAX)
+            return os_random16() & (max - 1);
+        else if (max <= UINT32_MAX)
+            return os_random32() & (max - 1);
+        else
+            return os_random64() & (max - 1);
+    }
 
     if (max <= UINT8_MAX)
-        upper_limit = UINT8_MAX - (UINT8_MAX % max);
+        return os_random_rejection_sampling_X(uint8_t, UINT8_MAX, os_random8, max);
     else if (max <= UINT16_MAX)
-        upper_limit = UINT16_MAX - (UINT16_MAX % max);
+        return os_random_rejection_sampling_X(uint16_t, UINT16_MAX, os_random16, max);
     else if (max <= UINT32_MAX)
-        upper_limit = UINT32_MAX - (UINT32_MAX % max);
+        return os_random_rejection_sampling_X(uint32_t, UINT32_MAX, os_random32, max);
     else
-        upper_limit = UINT64_MAX - (UINT64_MAX % max);
-
-    do {
-        // Generate a random number with the appropriate number of bits
-        if (max <= UINT8_MAX)
-            value = os_random8();
-        else if (max <= UINT16_MAX)
-            value = os_random16();
-        else if (max <= UINT32_MAX)
-            value = os_random32();
-        else
-            value = os_random64();
-
-        // Retry if the generated value is biased (i.e., exceeds upper_limit)
-        if (value < upper_limit)
-            return value % max;  // Value is unbiased, return directly
-
-        retries++;
-    } while (retries < MAX_RETRIES);
-
-    // Fallback to modulo after MAX_RETRIES, accepting minor bias
-    return value % max;
+        return os_random_rejection_sampling_X(uint64_t, UINT64_MAX, os_random64, max);
 }
