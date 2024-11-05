@@ -1658,7 +1658,7 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
             p->rd_GuestRunTime =
                 rrddim_add(p->st_HypervisorProcessor, "guest", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
             p->rd_HypervisorRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "hypervisor", NULL, -1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_HypervisorProcessor, "hypervisor", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
             p->rd_RemoteRunTime =
                 rrddim_add(p->st_HypervisorProcessor, "remote", NULL, -1, 1000000, RRD_ALGORITHM_INCREMENTAL);
 
