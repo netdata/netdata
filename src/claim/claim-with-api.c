@@ -152,7 +152,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     CURL *curl;
     CURLcode res;
     char target_url[2048];
-    char public_key[2048] = "";  // Adjust size as needed
+    char public_key[2048] = "";
     FILE *fp;
     struct curl_slist *headers = NULL;
 
@@ -266,6 +266,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     if (res != CURLE_OK) {
         claim_agent_failure_reason_set("Request failed with error: %s", curl_easy_strerror(res));
         curl_easy_cleanup(curl);
+        curl_slist_free_all(headers);
         *can_retry = true;
         return false;
     }
@@ -348,6 +349,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     }
 
     curl_easy_cleanup(curl);
+    curl_slist_free_all(headers);
     return ret;
 }
 
