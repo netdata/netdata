@@ -42,7 +42,7 @@ _main() {
     fi
   done
 
-  echo "🎉 All Done!"
+  echo "All Done!"
 }
 
 if [ -n "$0" ] && [ x"$0" != x"-bash" ]; then
