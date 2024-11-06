@@ -1,6 +1,6 @@
 # Enable or Disable Collectors and Plugins
 
-By default, most Collectors adn Plugins are enabled, but you might want to disable something specific for optimization purposes.
+By default, most Collectors and Plugins are enabled, but you might want to disable something specific for optimization purposes.
 
 Using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config), open `netdata.conf` and scroll down to the `[plugins]` section.
 

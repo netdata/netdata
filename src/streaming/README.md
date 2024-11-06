@@ -517,7 +517,7 @@ You can monitor the replication process in two ways:
 ### Replication history
 
 Replication history in [dbengine](/src/database/README.md) mode is limited
-by [Tier 0 retention](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md#effect-of-storage-tiers-and-disk-space-on-retention):
+by [Tier 0 retention](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md):
 
 - Child instances replicate only Tier 0 data.
 - Parent instance calculates higher-level tiers using Tier 0 as the basis.

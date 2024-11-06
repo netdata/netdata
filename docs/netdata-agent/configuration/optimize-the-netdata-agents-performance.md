@@ -16,7 +16,7 @@ The following table summarizes the effect of each optimization on the CPU, RAM a
 |-----------------------------------------------------------------------------------------------------------------------------------|--------------------|--------------------|--------------------|
 | [Use Centralization Points](#use-centralization-points)                                                                           | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | [Disable Plugins or Collectors](#disable-plugins-or-collectors)                                                 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| [Reduce data collection frequency](#reduce-collection-frequency)                                                                  | :heavy_check_mark: |                    | :heavy_check_mark: |
+| [Reduce data collection frequency](#reduce-data-collection-frequency)                                                                  | :heavy_check_mark: |                    | :heavy_check_mark: |
 | [Lower memory usage for metric retention](#lower-memory-usage-for-metric-retention) |                    | :heavy_check_mark: | :heavy_check_mark: |
 | [Change Database mode](#change-database-mode)                                                                |                    | :heavy_check_mark: | :heavy_check_mark: |
 | [Disable ML on Children](#disable-machine-learning-on-children)                                                                   | :heavy_check_mark: |                    |                    |
@@ -48,7 +48,7 @@ If you don't need to store metrics at high resolution for a long period of time,
 
 ## Change Database mode
 
-You can use a different [Database mode](/src/database/README.md#which-database-mode-to-use) when running Netdata on IoT devices, and for Children in [Centralization Point setups](/docs/observability-centralization-points/README.md).
+You can use a different [Database mode](/src/database/README.md#select-database-mode) when running Netdata on IoT devices, and for Children in [Centralization Point setups](/docs/observability-centralization-points/README.md).
 
 ## Disable Machine Learning on Children
 
