@@ -894,7 +894,7 @@ static void dbengine_init(const char *hostname) {
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 
-    new_dbengine_defaults =
+    rrdeng_cfg.new_dbengine_defaults =
         (!legacy_multihost_db_space &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 update every iterations") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 update every iterations") &&
@@ -964,7 +964,7 @@ static void dbengine_init(const char *hostname) {
 
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention time", tier);
         storage_tiers_retention_days[tier] = config_get_duration_days(
-            CONFIG_SECTION_DB, dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_days[tier] : 0);
+            CONFIG_SECTION_DB, dbengineconfig, rrdeng_cfg.new_dbengine_defaults ? storage_tiers_retention_days[tier] : 0);
 
         tiers_init[tier].disk_space_mb = (int) disk_space_mb;
         tiers_init[tier].tier = tier;

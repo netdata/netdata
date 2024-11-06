@@ -19,11 +19,11 @@ typedef struct rrdengine_config {
     int journal_check;
     int disk_quota_mb;
     int multidb_disk_quota_mb;
+    bool new_dbengine_defaults;
 } rrdengine_config_t;
 
 extern rrdengine_config_t rrdeng_cfg;
 
-extern bool new_dbengine_defaults;
 extern bool legacy_multihost_db_space;
 extern RRD_BACKFILL default_backfill;
 
