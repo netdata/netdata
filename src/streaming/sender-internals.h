@@ -38,7 +38,6 @@
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 25
 #endif
 
-bool attempt_to_connect(struct sender_state *state);
 void rrdpush_sender_on_connect(RRDHOST *host);
 void rrdpush_sender_after_connect(RRDHOST *host);
 void rrdpush_sender_thread_close_socket(struct sender_state *s);

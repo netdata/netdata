@@ -1104,7 +1104,7 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         service = default_service;
 
 
-    return connect_to_this_ip46(protocol, socktype, host, scope_id, service, timeout,NULL);
+    return connect_to_this_ip46(protocol, socktype, host, scope_id, service, timeout, NULL);
 }
 
 void foreach_entry_in_connection_string(const char *destination, bool (*callback)(char *entry, void *data), void *data) {

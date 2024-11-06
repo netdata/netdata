@@ -236,15 +236,15 @@ unsigned char alpn_proto_list[] = {
 
 static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
     RRDHOST *host = s->host;
-    bool ssl_required = host ? stream_parent_is_ssl(host->stream.snd.parents.current) : false;
+    bool ssl_required = stream_parent_is_ssl(host->stream.snd.parents.current);
 
-    netdata_ssl_close(&host->sender->ssl);
+    netdata_ssl_close(&s->ssl);
 
     if(!ssl_required)
         return true;
 
-    if (netdata_ssl_open_ext(&host->sender->ssl, netdata_ssl_streaming_sender_ctx, s->rrdpush_sender_socket, alpn_proto_list, sizeof(alpn_proto_list))) {
-        if(!netdata_ssl_connect(&host->sender->ssl)) {
+    if (netdata_ssl_open_ext(&s->ssl, netdata_ssl_streaming_sender_ctx, s->rrdpush_sender_socket, alpn_proto_list, sizeof(alpn_proto_list))) {
+        if(!netdata_ssl_connect(&s->ssl)) {
             // couldn't connect
 
             ND_LOG_STACK lgs[] = {
@@ -261,7 +261,7 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
         }
 
         if (netdata_ssl_validate_certificate_sender &&
-            security_test_certificate(host->sender->ssl.conn)) {
+            security_test_certificate(s->ssl.conn)) {
             // certificate is not valid
 
             ND_LOG_STACK lgs[] = {
@@ -291,7 +291,7 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
     return false;
 }
 
-static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
+static int rrdpush_http_upgrade_prelude(RRDHOST *host __maybe_unused, struct sender_state *s) {
 
     char http[HTTP_HEADER_SIZE + 1];
     snprintfz(http, HTTP_HEADER_SIZE,
@@ -301,7 +301,7 @@ static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
               HTTP_HDR_END);
 
     ssize_t bytes = send_timeout(
-        &host->sender->ssl,
+        &s->ssl,
         s->rrdpush_sender_socket,
         http,
         strlen(http),
@@ -309,7 +309,7 @@ static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
         1000);
 
     bytes = recv_timeout(
-        &host->sender->ssl,
+        &s->ssl,
         s->rrdpush_sender_socket,
         http,
         HTTP_HEADER_SIZE,
@@ -420,7 +420,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
     stream_encoded_t se;
     rrdpush_encode_variable(&se, host);
 
-    host->sender->hops = host->system_info->hops + 1;
+    s->hops = host->system_info->hops + 1;
 
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
@@ -479,7 +479,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
                             , rrdhost_timezone(host)
                             , rrdhost_abbrev_timezone(host)
                             , host->utc_offset
-                        , host->sender->hops
+                        , s->hops
                         , host->system_info->ml_capable
                         , host->system_info->ml_enabled
                         , host->system_info->mc_version
@@ -537,7 +537,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
 
     ssize_t len = (ssize_t)strlen(http);
     ssize_t bytes = send_timeout(
-        &host->sender->ssl,
+        &s->ssl,
         s->rrdpush_sender_socket,
         http,
         len,
@@ -564,7 +564,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
     }
 
     bytes = recv_timeout(
-        &host->sender->ssl,
+        &s->ssl,
         s->rrdpush_sender_socket,
         http,
         HTTP_HEADER_SIZE,
@@ -622,7 +622,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
     return true;
 }
 
-bool attempt_to_connect(struct sender_state *state) {
+static bool attempt_to_connect(struct sender_state *state) {
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
         ND_LOG_FIELD_END(),
