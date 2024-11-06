@@ -59,7 +59,6 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
         initialize_single_ctx(multidb_ctx[i]);
 }
 
-int db_engine_journal_check = 0;
 bool new_dbengine_defaults = false;
 bool legacy_multihost_db_space = false;
 int default_rrdeng_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
@@ -73,6 +72,7 @@ rrdengine_config_t rrdeng_cfg = {
     .page_cache_mb = 32,
 #endif
     .extent_cache_mb = 0,
+    .journal_check = 0,
 };
 
 // ----------------------------------------------------------------------------
