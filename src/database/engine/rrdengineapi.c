@@ -59,7 +59,6 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
         initialize_single_ctx(multidb_ctx[i]);
 }
 
-bool legacy_multihost_db_space = false;
 RRD_BACKFILL default_backfill = RRD_BACKFILL_NEW;
 
 rrdengine_config_t rrdeng_cfg = {
@@ -73,6 +72,7 @@ rrdengine_config_t rrdeng_cfg = {
     .disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB,
     .multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB,
     .new_dbengine_defaults = false,
+    .legacy_multihost_db_space = false,
 };
 
 // ----------------------------------------------------------------------------

@@ -895,7 +895,7 @@ static void dbengine_init(const char *hostname) {
     }
 
     rrdeng_cfg.new_dbengine_defaults =
-        (!legacy_multihost_db_space &&
+        (!rrdeng_cfg.legacy_multihost_db_space &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 update every iterations") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 update every iterations") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 update every iterations") &&
