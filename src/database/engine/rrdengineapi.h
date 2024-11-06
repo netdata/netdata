@@ -21,11 +21,10 @@ typedef struct rrdengine_config {
     int multidb_disk_quota_mb;
     bool new_dbengine_defaults;
     bool legacy_multihost_db_space;
+    RRD_BACKFILL backfill;
 } rrdengine_config_t;
 
 extern rrdengine_config_t rrdeng_cfg;
-
-extern RRD_BACKFILL default_backfill;
 
 extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 extern size_t page_type_size[];

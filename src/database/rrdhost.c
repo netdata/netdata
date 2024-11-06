@@ -905,7 +905,7 @@ static void dbengine_init(const char *hostname) {
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 retention size") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 retention size"));
 
-    default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
+    rrdeng_cfg.backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
     char dbengineconfig[200 + 1];
 
     size_t grouping_iterations = default_rrd_update_every;
