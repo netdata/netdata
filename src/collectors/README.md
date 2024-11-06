@@ -37,26 +37,66 @@ specifics of what a given collector does.
 - **Collectors** are the processes/programs that actually gather metrics from various sources.
 
 - **Plugins** help manage all the independent data collection processes in a variety of programming languages, based on
-    their purpose  and performance requirements. There are three types of plugins:
+  their purpose and performance requirements. There are three types of plugins:
 
-  - **Internal** plugins organize collectors that gather metrics from `/proc`, `/sys` and other Linux kernel sources.
-        They are written in `C`, and run as threads within the Netdata daemon.
+    - **Internal** plugins organize collectors that gather metrics from `/proc`, `/sys` and other Linux kernel sources.
+      They are written in `C`, and run as threads within the Netdata daemon.
 
-  - **External** plugins organize collectors that gather metrics from external processes, such as a MySQL database or
-        Nginx web server. They can be written in any language, and the `netdata` daemon spawns them as long-running
-        independent processes. They communicate with the daemon via pipes. All external plugins are managed by
-        [plugins.d](/src/plugins.d/README.md), which provides additional management options.
+    - **External** plugins organize collectors that gather metrics from external processes, such as a MySQL database or
+      Nginx web server. They can be written in any language, and the `netdata` daemon spawns them as long-running
+      independent processes. They communicate with the daemon via pipes. All external plugins are managed by
+      [plugins.d](/src/plugins.d/README.md), which provides additional management options.
 
 - **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
-    The Go orchestrator is in active development.
+  The Go orchestrator is in active development.
 
-  - [go.d.plugin](/src/go/plugin/go.d/README.md): An orchestrator for data
-        collection modules written in `go`.
+    - [go.d.plugin](/src/go/plugin/go.d/README.md): An orchestrator for data
+      collection modules written in `go`.
 
-  - [python.d.plugin](/src/collectors/python.d.plugin/README.md):
-        An orchestrator for data collection modules written in `python` v2/v3.
+    - [python.d.plugin](/src/collectors/python.d.plugin/README.md):
+      An orchestrator for data collection modules written in `python` v2/v3.
 
-  - [charts.d.plugin](/src/collectors/charts.d.plugin/README.md):
-        An orchestrator for data collection modules written in`bash` v4+.
+    - [charts.d.plugin](/src/collectors/charts.d.plugin/README.md):
+      An orchestrator for data collection modules written in`bash` v4+.
 
 - **Modules** are the individual programs controlled by an orchestrator to collect data from a specific application, or type of endpoint.
+
+## Netdata Plugin Privileges
+
+Netdata uses various plugins and helper binaries that require elevated privileges to collect system metrics.
+This section outlines the required privileges and how they are configured in different environments.
+
+### Privileges
+
+| Plugin/Binary          | Privileges (Linux)                              | Privileges (Non-Linux or Containerized Environment) |   
+|------------------------|-------------------------------------------------|-----------------------------------------------------|
+| apps.plugin            | CAP_DAC_READ_SEARCH, CAP_SYS_PTRACE             | setuid root                                         |
+| debugfs.plugin         | CAP_DAC_READ_SEARCH                             | setuid root                                         |
+| systemd-journal.plugin | CAP_DAC_READ_SEARCH                             | setuid root                                         |
+| perf.plugin            | CAP_PERFMON                                     | setuid root                                         |
+| slabinfo.plugin        | CAP_DAC_READ_SEARCH                             | setuid root                                         |
+| go.d.plugin            | CAP_DAC_READ_SEARCH, CAP_NET_ADMIN, CAP_NET_RAW | setuid root                                         |
+| freeipmi.plugin        | setuid root                                     | setuid root                                         |
+| nfacct.plugin          | setuid root                                     | setuid root                                         |
+| xenstat.plugin         | setuid root                                     | setuid root                                         |
+| ioping                 | setuid root                                     | setuid root                                         |
+| ebpf.plugin            | setuid root                                     | setuid root                                         |
+| cgroup-network         | setuid root                                     | setuid root                                         |
+| local-listeners        | setuid root                                     | setuid root                                         |
+| network-viewer.plugin  | setuid root                                     | setuid root                                         |
+| ndsudo                 | setuid root                                     | setuid root                                         |
+
+**About ndsudo**:
+
+`ndsudo` is a purpose-built privilege escalation utility for Netdata that executes a predefined set of commands with root privileges. Unlike traditional `sudo`, it operates with a [hard-coded list of allowed commands](https://github.com/netdata/netdata/blob/master/src/collectors/utils/ndsudo.c), providing better security through reduced scope and eliminating the need for `sudo` configuration.
+
+It’s used by the `go.d.plugin` to collect data by executing certain binaries that require root access.
+
+### File Permissions and Ownership
+
+To ensure security, all plugin and helper binary files have the following permissions and ownership:
+
+- **Ownership**: `root:netdata`.
+- **Permissions**: `0750` (for non-setuid binaries) or `4750` (for setuid binaries).
+
+This configuration limits access to the files to the `netdata` user and the `root` user, while allowing execution by the `netdata` user.
