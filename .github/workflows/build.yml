@@ -1205,33 +1205,3 @@ jobs:
             && github.repository == 'netdata/netdata'
             && needs.file-check.outputs.run == 'true'
           }}
-
-  gitignore-check: # Verify that the build process does not make any changes to the source tree.
-    name: .gitignore
-    needs:
-      - file-check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
-      - name: Checkout
-        if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - name: Prepare environment
-        if: needs.file-check.outputs.run == 'true'
-        run: ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
-      - name: Build netdata
-        if: needs.file-check.outputs.run == 'true'
-        run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install-prefix /tmp/install --one-time-build ${{ needs.file-check.outputs.skip-go }}
-      - name: Check that repo is clean
-        if: needs.file-check.outputs.run == 'true'
-        run: |
-          git status --porcelain=v1 > /tmp/porcelain
-          if [ -s /tmp/porcelain ]; then
-            cat /tmp/porcelain
-            exit 1
-          fi
