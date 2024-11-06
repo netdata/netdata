@@ -48,8 +48,17 @@
                         <Directory Id="VARCACHEDIR" Name="cache" />
                         <Directory Id="VARLIBDIR" Name="lib" />
                     </Directory>
+                    <Directory Id="ETCDIR" Name="etc">
+                        <Directory Id="ETCDIRNETDATA" Name="netdata" />
+                    </Directory>
                 </Directory>
             </StandardDirectory>
+
+            <Property Id="ETCNETDATACLAIMFILE">
+                <DirectorySearch Id="NetCoreDirectoryFoundx64" Path="[ETCDIRNETDATA]" >
+                    <FileSearch Id="NetdataClaim" Name="claim.conf"/>
+                </DirectorySearch>
+            </Property>
 
             <StandardDirectory Id="System64Folder">
             </StandardDirectory>
@@ -140,7 +149,8 @@
             <Publish Dialog="ViewLicenseDlg1" Control="Next" Event="NewDialog" Value="ViewLicenseDlg2" />
 
             <Publish Dialog="ViewLicenseDlg2" Control="Back" Event="NewDialog" Value="ViewLicenseDlg1" />
-            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="NDConfigDialog" />
+            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="NDConfigDialog" Condition="NOT ETCNETDATACLAIMFILE" />
+            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="NDConfigDialog" Condition="ETCNETDATACLAIMFILE" />
 
             <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
             <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
