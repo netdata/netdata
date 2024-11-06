@@ -17,11 +17,11 @@ typedef struct rrdengine_config {
     int page_cache_mb;
     int extent_cache_mb;
     int journal_check;
+    int disk_quota_mb;
 } rrdengine_config_t;
 
 extern rrdengine_config_t rrdeng_cfg;
 
-extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
 extern bool new_dbengine_defaults;
 extern bool legacy_multihost_db_space;

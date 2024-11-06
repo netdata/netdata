@@ -1292,25 +1292,6 @@ static void get_netdata_configured_variables()
         config_set_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", rrdeng_cfg.page_cache_mb);
     }
 
-    // ------------------------------------------------------------------------
-    // get default Database Engine disk space quota in MiB
-//
-//    //    if (!config_exists(CONFIG_SECTION_DB, "dbengine disk space MB") && !config_exists(CONFIG_SECTION_DB, "dbengine multihost disk space MB"))
-//
-//    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
-//    if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-//        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
-//        default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-//        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
-//    }
-//
-//    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
-//    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-//        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
-//        default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
-//        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
-//    }
-
 #else
     if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
        error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
@@ -1633,7 +1614,7 @@ int netdata_main(int argc, char **argv) {
                             // set defaults for dbegnine unittest
                             config_set(CONFIG_SECTION_DB, "dbengine page type", "gorilla");
 #ifdef ENABLE_DBENGINE
-                            default_rrdeng_disk_quota_mb = default_multidb_disk_quota_mb = 256;
+                            rrdeng_cfg.disk_quota_mb = default_multidb_disk_quota_mb = 256;
 #endif
 
                             if (sqlite_library_init())

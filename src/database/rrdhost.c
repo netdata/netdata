@@ -297,7 +297,7 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
             ret = rrdeng_init(
                 (struct rrdengine_instance **)&host->db[0].si,
                 dbenginepath,
-                default_rrdeng_disk_quota_mb,
+                rrdeng_cfg.disk_quota_mb,
                 0,
                 0); // may fail here for legacy dbengine initialization
 

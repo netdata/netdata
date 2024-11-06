@@ -143,9 +143,9 @@ void generate_dbengine_dataset(unsigned history_seconds)
     default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
     rrdeng_cfg.page_cache_mb = 128;
     // Worst case for uncompressible data
-    default_rrdeng_disk_quota_mb = (((uint64_t)DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * history_seconds) /
+    rrdeng_cfg.disk_quota_mb = (((uint64_t)DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * history_seconds) /
                                    (1024 * 1024);
-    default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
+    rrdeng_cfg.disk_quota_mb -= rrdeng_cfg.disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
 
     nd_log_limits_unlimited();
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-dataset'");
@@ -233,7 +233,7 @@ static void query_dbengine_chart(void *arg)
 
         if (thread_info->delete_old_data) {
             /* A time window of twice the disk space is sufficient for compression space savings of up to 50% */
-            time_approx_min = time_max - (default_rrdeng_disk_quota_mb * 2 * 1024 * 1024) /
+            time_approx_min = time_max - (rrdeng_cfg.disk_quota_mb * 2 * 1024 * 1024) /
                                              (((uint64_t) DSET_DIMS * DSET_CHARTS) * sizeof(storage_number));
             time_min = MAX(time_min, time_approx_min);
         }
@@ -338,12 +338,12 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     if (DISK_SPACE_MB) {
         fprintf(stderr, "By setting disk space limit data are allowed to be deleted. "
                         "Data validation is turned off for this run.\n");
-        default_rrdeng_disk_quota_mb = DISK_SPACE_MB;
+        rrdeng_cfg.disk_quota_mb = DISK_SPACE_MB;
     } else {
         // Worst case for uncompressible data
-        default_rrdeng_disk_quota_mb =
+        rrdeng_cfg.disk_quota_mb =
             (((uint64_t) DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * HISTORY_SECONDS) / (1024 * 1024);
-        default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
+        rrdeng_cfg.disk_quota_mb -= rrdeng_cfg.disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
     }
 
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-stress-test'\n");
