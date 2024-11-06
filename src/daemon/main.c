@@ -1277,19 +1277,19 @@ static void get_netdata_configured_variables()
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    default_rrdeng_page_cache_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
-    default_rrdeng_extent_cache_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
+    rrdeng_cfg.page_cache_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", rrdeng_cfg.page_cache_mb);
+    rrdeng_cfg.extent_cache_mb  = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine extent cache size", rrdeng_cfg.extent_cache_mb);
     db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
 
-    if(default_rrdeng_extent_cache_mb < 0) {
-        default_rrdeng_extent_cache_mb = 0;
-        config_set_size_mb(CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
+    if(rrdeng_cfg.extent_cache_mb < 0) {
+        rrdeng_cfg.extent_cache_mb  = 0;
+        config_set_size_mb(CONFIG_SECTION_DB, "dbengine extent cache size", rrdeng_cfg.extent_cache_mb);
     }
 
-    if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
-        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
-        default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-        config_set_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
+    if(rrdeng_cfg.page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
+        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", rrdeng_cfg.page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
+        rrdeng_cfg.page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+        config_set_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", rrdeng_cfg.page_cache_mb);
     }
 
     // ------------------------------------------------------------------------

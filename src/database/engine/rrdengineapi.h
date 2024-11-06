@@ -13,8 +13,13 @@
 
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
-extern int default_rrdeng_page_cache_mb;
-extern int default_rrdeng_extent_cache_mb;
+typedef struct rrdengine_config {
+    int page_cache_mb;
+    int extent_cache_mb;
+} rrdengine_config_t;
+
+extern rrdengine_config_t rrdeng_cfg;
+
 extern int db_engine_journal_check;
 extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;

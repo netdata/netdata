@@ -66,13 +66,14 @@ int default_rrdeng_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
 int default_multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
 RRD_BACKFILL default_backfill = RRD_BACKFILL_NEW;
 
+rrdengine_config_t rrdeng_cfg = {
 #if defined(ENV32BIT)
-int default_rrdeng_page_cache_mb = 16;
-int default_rrdeng_extent_cache_mb = 0;
+    .page_cache_mb = 16,
 #else
-int default_rrdeng_page_cache_mb = 32;
-int default_rrdeng_extent_cache_mb = 0;
+    .page_cache_mb = 32,
 #endif
+    .extent_cache_mb = 0,
+};
 
 // ----------------------------------------------------------------------------
 // metrics groups
