@@ -1,0 +1,104 @@
+{
+  "rabbit_version": "4.0.3",
+  "rabbitmq_version": "4.0.3",
+  "product_name": "RabbitMQ",
+  "product_version": "4.0.3",
+  "users": [
+    {
+      "name": "guest",
+      "password_hash": "maIOxAU84BmwfeXh05rmrqXtLRdCx7KlsaimulGAcEcFAn5W",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": [
+        "administrator"
+      ],
+      "limits": {}
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "myFirstVhost",
+      "description": "",
+      "tags": [],
+      "default_queue_type": "classic",
+      "metadata": {
+        "description": "",
+        "tags": [],
+        "default_queue_type": "classic"
+      }
+    },
+    {
+      "name": "/",
+      "description": "Default virtual host",
+      "tags": [],
+      "metadata": {
+        "description": "Default virtual host",
+        "tags": []
+      }
+    }
+  ],
+  "permissions": [
+    {
+      "user": "guest",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "guest",
+      "vhost": "myFirstVhost",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "topic_permissions": [],
+  "parameters": [],
+  "global_parameters": [
+    {
+      "name": "internal_cluster_id",
+      "value": "rabbitmq-cluster-id-k4mxA-XhKLAErEaNk_o8_Q"
+    }
+  ],
+  "policies": [],
+  "queues": [
+    {
+      "name": "MyFirstQueue",
+      "vhost": "myFirstVhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "myFirstQueue",
+      "vhost": "myFirstVhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "MySecondQueue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "MyFirstQueue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    }
+  ],
+  "exchanges": [],
+  "bindings": []
+}

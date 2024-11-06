@@ -1,0 +1,224 @@
+[
+  {
+    "arguments": {
+      "x-queue-type": "classic"
+    },
+    "auto_delete": false,
+    "consumer_capacity": 0,
+    "consumer_utilisation": 0,
+    "consumers": 0,
+    "durable": true,
+    "effective_policy_definition": {},
+    "exclusive": false,
+    "memory": 16920,
+    "message_bytes": 0,
+    "message_bytes_paged_out": 0,
+    "message_bytes_persistent": 0,
+    "message_bytes_ram": 0,
+    "message_bytes_ready": 0,
+    "message_bytes_unacknowledged": 0,
+    "message_stats": {
+      "ack": 0,
+      "ack_details": {
+        "rate": 0
+      },
+      "deliver": 0,
+      "deliver_details": {
+        "rate": 0
+      },
+      "deliver_get": 4,
+      "deliver_get_details": {
+        "rate": 0
+      },
+      "deliver_no_ack": 0,
+      "deliver_no_ack_details": {
+        "rate": 0
+      },
+      "get": 3,
+      "get_details": {
+        "rate": 0
+      },
+      "get_empty": 2,
+      "get_empty_details": {
+        "rate": 0
+      },
+      "get_no_ack": 1,
+      "get_no_ack_details": {
+        "rate": 0
+      },
+      "publish": 1,
+      "publish_details": {
+        "rate": 0
+      },
+      "redeliver": 3,
+      "redeliver_details": {
+        "rate": 0
+      }
+    },
+    "messages": 0,
+    "messages_details": {
+      "rate": 0
+    },
+    "messages_paged_out": 0,
+    "messages_persistent": 0,
+    "messages_ram": 0,
+    "messages_ready": 0,
+    "messages_ready_details": {
+      "rate": 0
+    },
+    "messages_ready_ram": 0,
+    "messages_unacknowledged": 0,
+    "messages_unacknowledged_details": {
+      "rate": 0
+    },
+    "messages_unacknowledged_ram": 0,
+    "name": "MyFirstQueue",
+    "node": "rabbit@pve-deb-work",
+    "reductions": 21378,
+    "reductions_details": {
+      "rate": 0
+    },
+    "state": "running",
+    "storage_version": 2,
+    "type": "classic",
+    "vhost": "/"
+  },
+  {
+    "arguments": {
+      "x-queue-type": "classic"
+    },
+    "auto_delete": false,
+    "consumer_capacity": 0,
+    "consumer_utilisation": 0,
+    "consumers": 0,
+    "durable": true,
+    "effective_policy_definition": {},
+    "exclusive": false,
+    "memory": 21808,
+    "message_bytes": 0,
+    "message_bytes_paged_out": 0,
+    "message_bytes_persistent": 0,
+    "message_bytes_ram": 0,
+    "message_bytes_ready": 0,
+    "message_bytes_unacknowledged": 0,
+    "messages": 0,
+    "messages_details": {
+      "rate": 0
+    },
+    "messages_paged_out": 0,
+    "messages_persistent": 0,
+    "messages_ram": 0,
+    "messages_ready": 0,
+    "messages_ready_details": {
+      "rate": 0
+    },
+    "messages_ready_ram": 0,
+    "messages_unacknowledged": 0,
+    "messages_unacknowledged_details": {
+      "rate": 0
+    },
+    "messages_unacknowledged_ram": 0,
+    "name": "MySecondQueue",
+    "node": "rabbit@pve-deb-work",
+    "reductions": 12204,
+    "reductions_details": {
+      "rate": 0
+    },
+    "state": "running",
+    "storage_version": 2,
+    "type": "classic",
+    "vhost": "/"
+  },
+  {
+    "arguments": {
+      "x-queue-type": "classic"
+    },
+    "auto_delete": false,
+    "consumer_capacity": 0,
+    "consumer_utilisation": 0,
+    "consumers": 0,
+    "durable": true,
+    "effective_policy_definition": {},
+    "exclusive": false,
+    "memory": 42520,
+    "message_bytes": 0,
+    "message_bytes_paged_out": 0,
+    "message_bytes_persistent": 0,
+    "message_bytes_ram": 0,
+    "message_bytes_ready": 0,
+    "message_bytes_unacknowledged": 0,
+    "messages": 0,
+    "messages_details": {
+      "rate": 0
+    },
+    "messages_paged_out": 0,
+    "messages_persistent": 0,
+    "messages_ram": 0,
+    "messages_ready": 0,
+    "messages_ready_details": {
+      "rate": 0
+    },
+    "messages_ready_ram": 0,
+    "messages_unacknowledged": 0,
+    "messages_unacknowledged_details": {
+      "rate": 0
+    },
+    "messages_unacknowledged_ram": 0,
+    "name": "MyFirstQueue",
+    "node": "rabbit@ilyam-deb11-play",
+    "reductions": 9133,
+    "reductions_details": {
+      "rate": 0
+    },
+    "state": "running",
+    "storage_version": 2,
+    "type": "classic",
+    "vhost": "myFirstVhost"
+  },
+  {
+    "arguments": {
+      "x-queue-type": "classic"
+    },
+    "auto_delete": false,
+    "consumer_capacity": 0,
+    "consumer_utilisation": 0,
+    "consumers": 0,
+    "durable": true,
+    "effective_policy_definition": {},
+    "exclusive": false,
+    "memory": 142984,
+    "message_bytes": 0,
+    "message_bytes_paged_out": 0,
+    "message_bytes_persistent": 0,
+    "message_bytes_ram": 0,
+    "message_bytes_ready": 0,
+    "message_bytes_unacknowledged": 0,
+    "messages": 0,
+    "messages_details": {
+      "rate": 0
+    },
+    "messages_paged_out": 0,
+    "messages_persistent": 0,
+    "messages_ram": 0,
+    "messages_ready": 0,
+    "messages_ready_details": {
+      "rate": 0
+    },
+    "messages_ready_ram": 0,
+    "messages_unacknowledged": 0,
+    "messages_unacknowledged_details": {
+      "rate": 0
+    },
+    "messages_unacknowledged_ram": 0,
+    "name": "myFirstQueue",
+    "node": "rabbit@pve-deb-work",
+    "reductions": 8816,
+    "reductions_details": {
+      "rate": 0
+    },
+    "state": "running",
+    "storage_version": 2,
+    "type": "classic",
+    "vhost": "myFirstVhost"
+  }
+]
