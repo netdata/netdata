@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "compression.h"
+#include "../stream-conf.h"
 #include "../sender.h"
+#include "../receiver.h"
 
 #include "gzip.h"
 
@@ -17,18 +19,10 @@
 #include "brotli.h"
 #endif
 
-int rrdpush_compression_levels[COMPRESSION_ALGORITHM_MAX] = {
-        [COMPRESSION_ALGORITHM_NONE]    = 0,
-        [COMPRESSION_ALGORITHM_ZSTD]    = 3,    // 1 (faster)  - 22 (smaller)
-        [COMPRESSION_ALGORITHM_LZ4]     = 1,    // 1 (smaller) -  9 (faster)
-        [COMPRESSION_ALGORITHM_BROTLI]  = 3,    // 0 (faster)  - 11 (smaller)
-        [COMPRESSION_ALGORITHM_GZIP]    = 1,    // 1 (faster)  -  9 (smaller)
-};
-
-void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *order) {
+void rrdpush_parse_compression_order(struct stream_receiver_config *config, const char *order) {
     // empty all slots
     for(size_t i = 0; i < COMPRESSION_ALGORITHM_MAX ;i++)
-        rpt->config.compression_priorities[i] = STREAM_CAP_NONE;
+        config->compression.priorities[i] = STREAM_CAP_NONE;
 
     char *s = strdupz(order);
 
@@ -38,19 +32,19 @@ void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *ord
     STREAM_CAPABILITIES added = STREAM_CAP_NONE;
     for(size_t i = 0; i < num_words && slot < COMPRESSION_ALGORITHM_MAX ;i++) {
         if((STREAM_CAP_ZSTD_AVAILABLE) && strcasecmp(words[i], "zstd") == 0 && !(added & STREAM_CAP_ZSTD)) {
-            rpt->config.compression_priorities[slot++] = STREAM_CAP_ZSTD;
+            config->compression.priorities[slot++] = STREAM_CAP_ZSTD;
             added |= STREAM_CAP_ZSTD;
         }
         else if((STREAM_CAP_LZ4_AVAILABLE) && strcasecmp(words[i], "lz4") == 0 && !(added & STREAM_CAP_LZ4)) {
-            rpt->config.compression_priorities[slot++] = STREAM_CAP_LZ4;
+            config->compression.priorities[slot++] = STREAM_CAP_LZ4;
             added |= STREAM_CAP_LZ4;
         }
         else if((STREAM_CAP_BROTLI_AVAILABLE) && strcasecmp(words[i], "brotli") == 0 && !(added & STREAM_CAP_BROTLI)) {
-            rpt->config.compression_priorities[slot++] = STREAM_CAP_BROTLI;
+            config->compression.priorities[slot++] = STREAM_CAP_BROTLI;
             added |= STREAM_CAP_BROTLI;
         }
         else if(strcasecmp(words[i], "gzip") == 0 && !(added & STREAM_CAP_GZIP)) {
-            rpt->config.compression_priorities[slot++] = STREAM_CAP_GZIP;
+            config->compression.priorities[slot++] = STREAM_CAP_GZIP;
             added |= STREAM_CAP_GZIP;
         }
     }
@@ -59,24 +53,24 @@ void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *ord
 
     // make sure all participate
     if((STREAM_CAP_ZSTD_AVAILABLE) && slot < COMPRESSION_ALGORITHM_MAX && !(added & STREAM_CAP_ZSTD))
-        rpt->config.compression_priorities[slot++] = STREAM_CAP_ZSTD;
+        config->compression.priorities[slot++] = STREAM_CAP_ZSTD;
     if((STREAM_CAP_LZ4_AVAILABLE) && slot < COMPRESSION_ALGORITHM_MAX && !(added & STREAM_CAP_LZ4))
-        rpt->config.compression_priorities[slot++] = STREAM_CAP_LZ4;
+        config->compression.priorities[slot++] = STREAM_CAP_LZ4;
     if((STREAM_CAP_BROTLI_AVAILABLE) && slot < COMPRESSION_ALGORITHM_MAX && !(added & STREAM_CAP_BROTLI))
-        rpt->config.compression_priorities[slot++] = STREAM_CAP_BROTLI;
+        config->compression.priorities[slot++] = STREAM_CAP_BROTLI;
     if(slot < COMPRESSION_ALGORITHM_MAX && !(added & STREAM_CAP_GZIP))
-        rpt->config.compression_priorities[slot++] = STREAM_CAP_GZIP;
+        config->compression.priorities[slot++] = STREAM_CAP_GZIP;
 }
 
 void rrdpush_select_receiver_compression_algorithm(struct receiver_state *rpt) {
-    if (!rpt->config.rrdpush_compression)
+    if (!rpt->config.compression.enabled)
         rpt->capabilities &= ~STREAM_CAP_COMPRESSIONS_AVAILABLE;
 
     // select the right compression before sending our capabilities to the child
     if(stream_has_more_than_one_capability_of(rpt->capabilities, STREAM_CAP_COMPRESSIONS_AVAILABLE)) {
         STREAM_CAPABILITIES compressions = rpt->capabilities & STREAM_CAP_COMPRESSIONS_AVAILABLE;
         for(int i = 0; i < COMPRESSION_ALGORITHM_MAX; i++) {
-            STREAM_CAPABILITIES c = rpt->config.compression_priorities[i];
+            STREAM_CAPABILITIES c = rpt->config.compression.priorities[i];
 
             if(!(c & STREAM_CAP_COMPRESSIONS_AVAILABLE))
                 continue;
@@ -110,7 +104,7 @@ bool rrdpush_compression_initialize(struct sender_state *s) {
         s->compressor.algorithm = COMPRESSION_ALGORITHM_NONE;
 
     if(s->compressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
-        s->compressor.level = rrdpush_compression_levels[s->compressor.algorithm];
+        s->compressor.level = stream_send.compression.levels[s->compressor.algorithm];
         rrdpush_compressor_init(&s->compressor);
         return true;
     }

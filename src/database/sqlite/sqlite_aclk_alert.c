@@ -355,7 +355,7 @@ void health_alarm_log_populate(
     alarm_log->timezone = strdupz(rrdhost_abbrev_timezone(host));
     alarm_log->exec_path =  sqlite3_column_bytes(res, EXEC) ?
                                strdupz((char *)sqlite3_column_text(res, EXEC)) :
-                               strdupz((char *)string2str(host->health.health_default_exec));
+                               strdupz((char *)string2str(host->health.default_exec));
 
     alarm_log->conf_source = source ? strdupz(source) : strdupz("");
 
@@ -997,7 +997,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version)
         return;
     }
 
-    if (unlikely(!host->health.health_enabled)) {
+    if (unlikely(!host->health.enabled)) {
         nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK STA [%s (N/A)]: Ignoring request to stream alert state changes, health is disabled.", node_id);
         return;
     }

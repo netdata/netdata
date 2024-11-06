@@ -36,7 +36,7 @@ bool stream_parent_is_ssl(STREAM_PARENT *d) {
 
 time_t stream_parent_handshake_error_to_json(BUFFER *wb, RRDHOST *host) {
     time_t last_attempt = 0;
-    for(STREAM_PARENT *d = host->parents; d ; d = d->next) {
+    for(STREAM_PARENT *d = host->stream.snd.parents.all; d ; d = d->next) {
         if(d->since > last_attempt)
             last_attempt = d->since;
 
@@ -49,7 +49,7 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
     char buf[1024];
 
     STREAM_PARENT *d;
-    for (d = s->host->parents; d; d = d->next) {
+    for (d = s->host->stream.snd.parents.all; d; d = d->next) {
         buffer_json_add_array_item_object(wb);
         buffer_json_member_add_uint64(wb, "attempts", d->attempts);
         {
@@ -73,9 +73,9 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
 }
 
 void rrdhost_stream_parent_reset_postpone_time(RRDHOST *host) {
-    uint32_t wait = (host->sender) ? host->sender->reconnect_delay : 5;
+    uint32_t wait = stream_send.parents.reconnect_delay_s;
     time_t now = now_realtime_sec();
-    for (STREAM_PARENT *d = host->parents; d; d = d->next)
+    for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next)
         d->postpone_reconnection_until = now + wait;
 }
 
@@ -88,12 +88,13 @@ void rrdhost_stream_parent_ssl_init(RRDHOST *host) {
         return;
     }
 
-    for(STREAM_PARENT *d = host->parents; d ; d = d->next) {
+    for(STREAM_PARENT *d = host->stream.snd.parents.all; d ; d = d->next) {
         if (d->ssl) {
             // we need to initialize SSL
 
             netdata_ssl_initialize_ctx(NETDATA_SSL_STREAMING_SENDER_CTX);
-            ssl_security_location_for_context(netdata_ssl_streaming_sender_ctx, stream_conf_ssl_ca_file, stream_conf_ssl_ca_path);
+            ssl_security_location_for_context(netdata_ssl_streaming_sender_ctx,
+                                              string2str(stream_send.parents.ssl_ca_file), string2str(stream_send.parents.ssl_ca_path));
 
             // stop the loop
             break;
@@ -114,7 +115,7 @@ int stream_parent_connect_to_one(
 {
     int sock = -1;
 
-    for (STREAM_PARENT *d = host->parents; d; d = d->next) {
+    for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
         time_t now = now_realtime_sec();
 
         if(nd_thread_signaled_to_cancel())
@@ -143,8 +144,8 @@ int stream_parent_connect_to_one(
             // move the current item to the end of the list
             // without this, this destination will break the loop again and again
             // not advancing the destinations to find one that may work
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->parents, d, prev, next);
-            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(host->parents, d, prev, next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->stream.snd.parents.all, d, prev, next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(host->stream.snd.parents.all, d, prev, next);
 
             break;
         }
@@ -184,7 +185,7 @@ static bool stream_parent_add_one(char *entry, void *data) {
 }
 
 void rrdhost_stream_parents_init(RRDHOST *host) {
-    if(!host->rrdpush.send.destination) return;
+    if(!host->stream.snd.destination) return;
 
     rrdhost_stream_parents_free(host);
 
@@ -193,18 +194,18 @@ void rrdhost_stream_parents_init(RRDHOST *host) {
         .list = NULL,
         .count = 0,
     };
-    foreach_entry_in_connection_string(host->rrdpush.send.destination, stream_parent_add_one, &t);
-    host->parents = t.list;
+    foreach_entry_in_connection_string(string2str(host->stream.snd.destination), stream_parent_add_one, &t);
+    host->stream.snd.parents.all = t.list;
 }
 
 void rrdhost_stream_parents_free(RRDHOST *host) {
-    while (host->parents) {
-        STREAM_PARENT *tmp = host->parents;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->parents, tmp, prev, next);
+    while (host->stream.snd.parents.all) {
+        STREAM_PARENT *tmp = host->stream.snd.parents.all;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->stream.snd.parents.all, tmp, prev, next);
         string_freez(tmp->destination);
         freez(tmp);
         __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(STREAM_PARENT), __ATOMIC_RELAXED);
     }
 
-    host->parents = NULL;
+    host->stream.snd.parents.all = NULL;
 }

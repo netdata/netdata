@@ -891,7 +891,7 @@ bool replicate_chart_request(send_command callback, struct parser *parser, RRDHO
             r.gap.from = r.local_db.last_entry_t;
         else
             // we don't have any data, the gap is the max timeframe we are allowed to replicate
-            r.gap.from = r.local_db.wall_clock_time - r.host->rrdpush_seconds_to_replicate;
+            r.gap.from = r.local_db.wall_clock_time - r.host->stream.replication.period;
 
     }
     else {
@@ -936,9 +936,9 @@ bool replicate_chart_request(send_command callback, struct parser *parser, RRDHO
         // ok, the child can fill the entire gap we have
         r.wanted.after = r.gap.from;
 
-    if(r.gap.to - r.wanted.after > host->rrdpush_replication_step)
+    if(r.gap.to - r.wanted.after > host->stream.replication.step)
         // the duration is too big for one request - let's take the first step
-        r.wanted.before = r.wanted.after + host->rrdpush_replication_step;
+        r.wanted.before = r.wanted.after + host->stream.replication.step;
     else
         // wow, we can do it in one request
         r.wanted.before = r.gap.to;
@@ -955,7 +955,7 @@ bool replicate_chart_request(send_command callback, struct parser *parser, RRDHO
     }
 
     // the child should start streaming immediately if the wanted duration is small, or we reached the last entry of the child
-    r.wanted.start_streaming = (r.local_db.wall_clock_time - r.wanted.after <= host->rrdpush_replication_step ||
+    r.wanted.start_streaming = (r.local_db.wall_clock_time - r.wanted.after <= host->stream.replication.step ||
             r.wanted.before >= r.child_db.last_entry_t ||
             r.wanted.before >= r.child_db.wall_clock_time ||
             r.wanted.before >= r.local_db.wall_clock_time);

@@ -229,7 +229,7 @@ static bool rrdhost_set_sender(RRDHOST *host) {
     if(!host->sender->tid) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
-        host->rrdpush_sender_connection_counter++;
+        host->stream.snd.status.connections++;
         host->sender->tid = gettid_cached();
         host->sender->last_state_since_t = now_realtime_sec();
         host->sender->exit.reason = STREAM_HANDSHAKE_NEVER;
@@ -251,7 +251,7 @@ static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         host->sender->last_state_since_t = now_realtime_sec();
         stream_parent_set_disconnect_reason(
-            host->current_parent, host->sender->exit.reason, host->sender->last_state_since_t);
+            host->stream.snd.parents.current, host->sender->exit.reason, host->sender->last_state_since_t);
     }
 
     rrdhost_stream_parent_reset_postpone_time(host);
@@ -373,11 +373,9 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, "cumulative compression savings ratio", "%", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
 
-    if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->rrdpush.send.destination ||
-       !*s->host->rrdpush.send.destination || !s->host->rrdpush.send.api_key ||
-       !*s->host->rrdpush.send.api_key) {
+    if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->stream.snd.destination || !s->host->stream.snd.api_key) {
         netdata_log_error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
-              rrdhost_hostname(s->host), gettid_cached());
+                          rrdhost_hostname(s->host), gettid_cached());
         return NULL;
     }
 
@@ -391,25 +389,8 @@ void *rrdpush_sender_thread(void *ptr) {
 
     netdata_log_info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), gettid_cached());
 
-    s->timeout = (int)appconfig_get_duration_seconds(
-        &stream_config, CONFIG_SECTION_STREAM, "timeout", 600);
-
-    s->default_port = (int)appconfig_get_number(
-        &stream_config, CONFIG_SECTION_STREAM, "default port", 19999);
-
-    s->buffer->max_size = (size_t)appconfig_get_number(
-        &stream_config, CONFIG_SECTION_STREAM, "buffer size bytes", 1024 * 1024 * 10);
-
-    s->reconnect_delay = (unsigned int)appconfig_get_duration_seconds(
-        &stream_config, CONFIG_SECTION_STREAM, "reconnect delay", 5);
-
-    stream_conf_initial_clock_resync_iterations = (unsigned int)appconfig_get_number(
-        &stream_config, CONFIG_SECTION_STREAM,
-        "initial clock resync iterations",
-        stream_conf_initial_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
-
-    s->parent_using_h2o = appconfig_get_boolean(
-        &stream_config, CONFIG_SECTION_STREAM, "parent using h2o", false);
+    s->buffer->max_size = stream_send.buffer_max_size;
+    s->parent_using_h2o = stream_send.parents.h2o;
 
     // initialize rrdpush globals
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
@@ -449,12 +430,15 @@ void *rrdpush_sender_thread(void *ptr) {
             now_s = now_monotonic_sec();
 
         // If the TCP window never opened then something is wrong, restart connection
-        if(unlikely(now_s - s->last_traffic_seen_t > s->timeout &&
+        if(unlikely(now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
             !rrdpush_sender_pending_replication_requests(s) &&
             !rrdpush_sender_replicating_charts(s)
         )) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
-            netdata_log_error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection via %zu send attempts.", rrdhost_hostname(s->host), s->connected_to, s->timeout, s->sent_bytes_on_this_connection, s->send_attempts);
+            netdata_log_error("STREAM %s [send to %s]: could not send metrics for %ld seconds - closing connection - "
+                              "we have sent %zu bytes on this connection via %zu send attempts.",
+                              rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
+                              s->sent_bytes_on_this_connection, s->send_attempts);
             rrdpush_sender_thread_close_socket(s);
             continue;
         }

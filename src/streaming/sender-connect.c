@@ -196,7 +196,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     }
 
     if(version >= STREAM_HANDSHAKE_OK_V1) {
-        stream_parent_set_reconnect_delay(host->current_parent, version, now_realtime_sec() + s->reconnect_delay);
+        stream_parent_set_reconnect_delay(host->stream.snd.parents.current, version, now_realtime_sec() + stream_send.parents.reconnect_delay_s);
         s->capabilities = convert_stream_version_to_capabilities(version, host, true);
         return true;
     }
@@ -209,7 +209,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
 
     worker_is_busy(worker_job_id);
     rrdpush_sender_thread_close_socket(s);
-    stream_parent_set_reconnect_delay(host->current_parent, version, now_realtime_sec() + delay);
+    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, version, now_realtime_sec() + delay);
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
@@ -218,7 +218,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     ND_LOG_STACK_PUSH(lgs);
 
     char buf[RFC3339_MAX_LENGTH];
-    rfc3339_datetime_ut(buf, sizeof(buf), stream_parent_get_reconnection_t(host->current_parent) * USEC_PER_SEC, 0, false);
+    rfc3339_datetime_ut(buf, sizeof(buf), stream_parent_get_reconnection_t(host->stream.snd.parents.current) * USEC_PER_SEC, 0, false);
 
     nd_log(NDLS_DAEMON, priority,
            "STREAM %s [send to %s]: %s - will retry in %d secs, at %s",
@@ -236,7 +236,7 @@ unsigned char alpn_proto_list[] = {
 
 static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
     RRDHOST *host = s->host;
-    bool ssl_required = host ? stream_parent_is_ssl(host->current_parent) : false;
+    bool ssl_required = host ? stream_parent_is_ssl(host->stream.snd.parents.current) : false;
 
     netdata_ssl_close(&host->sender->ssl);
 
@@ -256,7 +256,7 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
             rrdpush_sender_thread_close_socket(s);
             stream_parent_set_reconnect_delay(
-                host->current_parent, STREAM_HANDSHAKE_ERROR_SSL_ERROR, now_realtime_sec() + 5 * 60);
+                host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_SSL_ERROR, now_realtime_sec() + 5 * 60);
             return false;
         }
 
@@ -274,7 +274,7 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
             netdata_log_error("SSL: closing the stream connection, because the server SSL certificate is not valid.");
             rrdpush_sender_thread_close_socket(s);
             stream_parent_set_reconnect_delay(
-                host->current_parent, STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE, now_realtime_sec() + 5 * 60);
+                host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE, now_realtime_sec() + 5 * 60);
             return false;
         }
 
@@ -385,7 +385,7 @@ err_cleanup:
     return 1;
 }
 
-static bool sender_send_connection_request(RRDHOST *host, int default_port, int timeout, struct sender_state *s) {
+static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port, time_t timeout, struct sender_state *s) {
 
     struct timeval tv = {
         .tv_sec = timeout,
@@ -402,7 +402,7 @@ static bool sender_send_connection_request(RRDHOST *host, int default_port, int 
         &s->reconnects_counter,
         s->connected_to,
         sizeof(s->connected_to) - 1,
-        &host->current_parent);
+        &host->stream.snd.parents.current);
 
     if(unlikely(s->rrdpush_sender_socket == -1)) {
         // netdata_log_error("STREAM %s [send to %s]: could not connect to parent node at this time.", rrdhost_hostname(host), host->rrdpush_send_destination);
@@ -470,7 +470,7 @@ static bool sender_send_connection_request(RRDHOST *host, int default_port, int 
                         HTTP_1_1 HTTP_ENDL
                         "User-Agent: %s/%s\r\n"
                         "Accept: */*\r\n\r\n"
-                        , host->rrdpush.send.api_key
+                        , string2str(host->stream.snd.api_key)
                         , rrdhost_hostname(host)
                             , rrdhost_registry_hostname(host)
                             , host->machine_guid
@@ -531,7 +531,7 @@ static bool sender_send_connection_request(RRDHOST *host, int default_port, int 
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION);
         rrdpush_sender_thread_close_socket(s);
         stream_parent_set_reconnect_delay(
-            host->current_parent, STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE, now_realtime_sec() + 1 * 60);
+            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE, now_realtime_sec() + 1 * 60);
         return false;
     }
 
@@ -559,7 +559,7 @@ static bool sender_send_connection_request(RRDHOST *host, int default_port, int 
                rrdhost_hostname(host), s->connected_to);
 
         stream_parent_set_reconnect_delay(
-            host->current_parent, STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT, now_realtime_sec() + 1 * 60);
+            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT, now_realtime_sec() + 1 * 60);
         return false;
     }
 
@@ -586,7 +586,7 @@ static bool sender_send_connection_request(RRDHOST *host, int default_port, int 
                rrdhost_hostname(host), s->connected_to);
 
         stream_parent_set_reconnect_delay(
-            host->current_parent, STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, now_realtime_sec() + 30);
+            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, now_realtime_sec() + 30);
         return false;
     }
 
@@ -635,7 +635,7 @@ bool attempt_to_connect(struct sender_state *state) {
     state->sent_bytes_on_this_connection = 0;
     memset(state->sent_bytes_on_this_connection_per_type, 0, sizeof(state->sent_bytes_on_this_connection_per_type));
 
-    if(sender_send_connection_request(state->host, state->default_port, state->timeout, state)) {
+    if(sender_send_connection_request(state->host, stream_send.parents.default_port, stream_send.parents.timeout_s, state)) {
         // reset the buffer, to properly send charts and metrics
         rrdpush_sender_on_connect(state->host);
 
@@ -660,7 +660,7 @@ bool attempt_to_connect(struct sender_state *state) {
 
     // slow re-connection on repeating errors
     usec_t now_ut = now_monotonic_usec();
-    usec_t end_ut = now_ut + USEC_PER_SEC * state->reconnect_delay;
+    usec_t end_ut = now_ut + USEC_PER_SEC * stream_send.parents.reconnect_delay_s;
     while(now_ut < end_ut) {
         if(nd_thread_signaled_to_cancel())
             return false;

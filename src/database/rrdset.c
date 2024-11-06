@@ -15,49 +15,49 @@ void rrdset_metadata_updated(RRDSET *st) {
 
 static void rrdset_rrdpush_send_chart_slot_assign(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
-    spinlock_lock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
+    spinlock_lock(&host->stream.snd.pluginsd_chart_slots.available.spinlock);
 
-    if(host->rrdpush.send.pluginsd_chart_slots.available.used > 0)
+    if(host->stream.snd.pluginsd_chart_slots.available.used > 0)
         st->rrdpush.sender.chart_slot =
-                host->rrdpush.send.pluginsd_chart_slots.available.array[--host->rrdpush.send.pluginsd_chart_slots.available.used];
+                host->stream.snd.pluginsd_chart_slots.available.array[--host->stream.snd.pluginsd_chart_slots.available.used];
     else
-        st->rrdpush.sender.chart_slot = ++host->rrdpush.send.pluginsd_chart_slots.last_used;
+        st->rrdpush.sender.chart_slot = ++host->stream.snd.pluginsd_chart_slots.last_used;
 
-    spinlock_unlock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
+    spinlock_unlock(&host->stream.snd.pluginsd_chart_slots.available.spinlock);
 }
 
 static void rrdset_rrdpush_send_chart_slot_release(RRDSET *st) {
-    if(!st->rrdpush.sender.chart_slot || st->rrdhost->rrdpush.send.pluginsd_chart_slots.available.ignore)
+    if(!st->rrdpush.sender.chart_slot || st->rrdhost->stream.snd.pluginsd_chart_slots.available.ignore)
         return;
 
     RRDHOST *host = st->rrdhost;
-    spinlock_lock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
+    spinlock_lock(&host->stream.snd.pluginsd_chart_slots.available.spinlock);
 
-    if(host->rrdpush.send.pluginsd_chart_slots.available.used >= host->rrdpush.send.pluginsd_chart_slots.available.size) {
-        uint32_t old_size = host->rrdpush.send.pluginsd_chart_slots.available.size;
+    if(host->stream.snd.pluginsd_chart_slots.available.used >= host->stream.snd.pluginsd_chart_slots.available.size) {
+        uint32_t old_size = host->stream.snd.pluginsd_chart_slots.available.size;
         uint32_t new_size = (old_size > 0) ? (old_size * 2) : 1024;
 
-        host->rrdpush.send.pluginsd_chart_slots.available.array =
-                reallocz(host->rrdpush.send.pluginsd_chart_slots.available.array, new_size * sizeof(uint32_t));
+        host->stream.snd.pluginsd_chart_slots.available.array =
+                reallocz(host->stream.snd.pluginsd_chart_slots.available.array, new_size * sizeof(uint32_t));
 
-        host->rrdpush.send.pluginsd_chart_slots.available.size = new_size;
+        host->stream.snd.pluginsd_chart_slots.available.size = new_size;
     }
 
-    host->rrdpush.send.pluginsd_chart_slots.available.array[host->rrdpush.send.pluginsd_chart_slots.available.used++] =
+    host->stream.snd.pluginsd_chart_slots.available.array[host->stream.snd.pluginsd_chart_slots.available.used++] =
             st->rrdpush.sender.chart_slot;
 
     st->rrdpush.sender.chart_slot = 0;
-    spinlock_unlock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
+    spinlock_unlock(&host->stream.snd.pluginsd_chart_slots.available.spinlock);
 }
 
 void rrdhost_pluginsd_send_chart_slots_free(RRDHOST *host) {
-    spinlock_lock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
-    host->rrdpush.send.pluginsd_chart_slots.available.ignore = true;
-    freez(host->rrdpush.send.pluginsd_chart_slots.available.array);
-    host->rrdpush.send.pluginsd_chart_slots.available.array = NULL;
-    host->rrdpush.send.pluginsd_chart_slots.available.used = 0;
-    host->rrdpush.send.pluginsd_chart_slots.available.size = 0;
-    spinlock_unlock(&host->rrdpush.send.pluginsd_chart_slots.available.spinlock);
+    spinlock_lock(&host->stream.snd.pluginsd_chart_slots.available.spinlock);
+    host->stream.snd.pluginsd_chart_slots.available.ignore = true;
+    freez(host->stream.snd.pluginsd_chart_slots.available.array);
+    host->stream.snd.pluginsd_chart_slots.available.array = NULL;
+    host->stream.snd.pluginsd_chart_slots.available.used = 0;
+    host->stream.snd.pluginsd_chart_slots.available.size = 0;
+    spinlock_unlock(&host->stream.snd.pluginsd_chart_slots.available.spinlock);
 
     // zero all the slots on all charts, so that they will not attempt to access the array
     RRDSET *st;
@@ -78,9 +78,9 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     if(st->pluginsd.last_slot >= 0 &&
-        (uint32_t)st->pluginsd.last_slot < host->rrdpush.receive.pluginsd_chart_slots.size &&
-        host->rrdpush.receive.pluginsd_chart_slots.array[st->pluginsd.last_slot] == st) {
-        host->rrdpush.receive.pluginsd_chart_slots.array[st->pluginsd.last_slot] = NULL;
+        (uint32_t)st->pluginsd.last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
+        host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] == st) {
+        host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] = NULL;
     }
 
     st->pluginsd.last_slot = -1;
@@ -113,18 +113,18 @@ static void rrdset_pluginsd_receive_slots_initialize(RRDSET *st) {
 }
 
 void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host) {
-    spinlock_lock(&host->rrdpush.receive.pluginsd_chart_slots.spinlock);
+    spinlock_lock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
 
-    if(host->rrdpush.receive.pluginsd_chart_slots.array) {
-        for (size_t s = 0; s < host->rrdpush.receive.pluginsd_chart_slots.size; s++)
-            rrdset_pluginsd_receive_unslot_and_cleanup(host->rrdpush.receive.pluginsd_chart_slots.array[s]);
+    if(host->stream.rcv.pluginsd_chart_slots.array) {
+        for (size_t s = 0; s < host->stream.rcv.pluginsd_chart_slots.size; s++)
+            rrdset_pluginsd_receive_unslot_and_cleanup(host->stream.rcv.pluginsd_chart_slots.array[s]);
 
-        freez(host->rrdpush.receive.pluginsd_chart_slots.array);
-        host->rrdpush.receive.pluginsd_chart_slots.array = NULL;
-        host->rrdpush.receive.pluginsd_chart_slots.size = 0;
+        freez(host->stream.rcv.pluginsd_chart_slots.array);
+        host->stream.rcv.pluginsd_chart_slots.array = NULL;
+        host->stream.rcv.pluginsd_chart_slots.size = 0;
     }
 
-    spinlock_unlock(&host->rrdpush.receive.pluginsd_chart_slots.spinlock);
+    spinlock_unlock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -920,7 +920,7 @@ RRDSET *rrdset_create_custom(
         , long history_entries
 ) {
     if (host != localhost)
-        host->child_last_chart_command = now_realtime_sec();
+        host->stream.rcv.status.last_chart = now_realtime_sec();
 
     if(!type || !type[0])
         fatal("Cannot create rrd stats without a type: id '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."

@@ -31,7 +31,7 @@ const struct capability *aclk_get_agent_capas()
     agent_capabilities[3].version = metric_correlations_version;
     agent_capabilities[3].enabled = 1;
 
-    agent_capabilities[7].enabled = localhost->health.health_enabled;
+    agent_capabilities[7].enabled = localhost->health.enabled;
 
     return agent_capabilities;
 }
@@ -48,7 +48,7 @@ struct capability *aclk_get_node_instance_capas(RRDHOST *host)
         { .name = "ctx",         .version = 1,                     .enabled = 1 },
         { .name = "funcs",       .version = functions ? 1 : 0,     .enabled = functions ? 1 : 0 },
         { .name = "http_api_v2", .version = HTTP_API_V2_VERSION,   .enabled = 1 },
-        { .name = "health",      .version = 2,                     .enabled = host->health.health_enabled },
+        { .name = "health",      .version = 2,                     .enabled = host->health.enabled},
         { .name = "req_cancel",  .version = 1,                     .enabled = 1 },
         { .name = "dyncfg",      .version = 2,                     .enabled = dyncfg },
         { .name = NULL,          .version = 0,                     .enabled = 0 }

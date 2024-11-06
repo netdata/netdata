@@ -1304,6 +1304,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions-exporters.h
         src/database/rrdfunctions-internals.h
         src/database/rrdcollector-internals.h
+        src/database/rrd-database-mode.h
+        src/database/rrd-database-mode.c
 )
 
 if(ENABLE_DBENGINE)

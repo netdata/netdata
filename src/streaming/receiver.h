@@ -4,9 +4,12 @@
 #define NETDATA_RECEIVER_H
 
 #include "libnetdata/libnetdata.h"
+#include "stream-conf.h"
 #include "database/rrd.h"
 
 struct parser;
+
+uint32_t stream_currently_connected_receivers(void);
 
 struct receiver_state {
     RRDHOST *host;
@@ -39,23 +42,7 @@ struct receiver_state {
         STREAM_HANDSHAKE reason;
     } exit;
 
-    struct {
-        RRD_MEMORY_MODE mode;
-        int history;
-        int update_every;
-        int health_enabled; // CONFIG_BOOLEAN_YES, CONFIG_BOOLEAN_NO, CONFIG_BOOLEAN_AUTO
-        time_t alarms_delay;
-        uint32_t alarms_history;
-        int rrdpush_enabled;
-        const char *rrdpush_api_key; // DONT FREE - it is allocated in appconfig
-        const char *rrdpush_send_charts_matching; // DONT FREE - it is allocated in appconfig
-        bool rrdpush_enable_replication;
-        time_t rrdpush_seconds_to_replicate;
-        time_t rrdpush_replication_step;
-        const char *rrdpush_destination;  // DONT FREE - it is allocated in appconfig
-        unsigned int rrdpush_compression;
-        STREAM_CAPABILITIES compression_priorities[COMPRESSION_ALGORITHM_MAX];
-    } config;
+    struct stream_receiver_config config;
 
     NETDATA_SSL ssl;
 

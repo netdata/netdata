@@ -731,6 +731,9 @@ int security_test_certificate(SSL *ssl) {
  * @return It returns 0 on success and -1 otherwise.
  */
 int ssl_security_location_for_context(SSL_CTX *ctx, const char *file, const char *path) {
+    if(file && !*file) file = NULL;
+    if(path && !*path) path = NULL;
+
     int load_custom = 1, load_default = 1;
     if (file || path) {
         if(!SSL_CTX_load_verify_locations(ctx, file, path)) {

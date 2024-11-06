@@ -133,22 +133,14 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         argv[IDX_UPDATE_EVERY] ? str2i(argv[IDX_UPDATE_EVERY]) : 1,
         argv[IDX_ENTRIES] ? str2i(argv[IDX_ENTRIES]) : 0,
         default_rrd_memory_mode,
-        0 // health
-        ,
-        0 // rrdpush enabled
-        ,
-        NULL //destination
-        ,
-        NULL // api key
-        ,
-        NULL // send charts matching
-        ,
-        false // rrdpush_enable_replication
-        ,
-        0 // rrdpush_seconds_to_replicate
-        ,
-        0 // rrdpush_replication_step
-        ,
+        0,              // health
+        0,              // rrdpush enabled
+        NULL,           // destination
+        NULL,           // api key
+        NULL,           // send charts matching
+        false,          // rrdpush_enable_replication
+        0,              // rrdpush_seconds_to_replicate
+        0,              // rrdpush_replication_step
         system_info,
         1);
 
@@ -157,10 +149,10 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
             rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
 
         if (is_ephemeral)
-            host->child_disconnected_time = now_realtime_sec();
+            host->stream.rcv.status.last_disconnected = now_realtime_sec();
 
         host->rrdlabels = sql_load_host_labels((nd_uuid_t *)argv[IDX_HOST_ID]);
-        host->last_connected = last_connected;
+        host->stream.snd.status.last_connected = last_connected;
     }
 
     (*number_of_chidren)++;

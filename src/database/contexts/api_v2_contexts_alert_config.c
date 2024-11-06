@@ -81,7 +81,7 @@ void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct sql_aler
         {
             buffer_json_member_add_string(wb, "type", "agent");
             buffer_json_member_add_string(wb, "exec", t->notification.exec ? t->notification.exec : NULL);
-            buffer_json_member_add_string(wb, "to", t->notification.to_key ? t->notification.to_key : string2str(localhost->health.health_default_recipient));
+            buffer_json_member_add_string(wb, "to", t->notification.to_key ? t->notification.to_key : string2str(localhost->health.default_recipient));
             buffer_json_member_add_string(wb, "delay", t->notification.delay);
             buffer_json_member_add_string(wb, "repeat", t->notification.repeat);
             buffer_json_member_add_string(wb, "options", t->notification.options);

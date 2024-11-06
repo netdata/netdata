@@ -232,26 +232,26 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
 // RRDHOST - add a host
 
 static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
-                                              unsigned int rrdpush_enabled,
-                                              const char *rrdpush_destination,
-                                              const char *rrdpush_api_key,
-                                              const char *rrdpush_send_charts_matching
-) {
+                                              bool stream,
+                                              STRING *parents,
+                                              STRING *api_key,
+                                              STRING *send_charts_matching) {
     if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED)) return;
 
-    if(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) {
+    if(stream && parents && api_key) {
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
 
         rrdhost_streaming_sender_structures_init(host);
 
         host->sender->ssl = NETDATA_SSL_UNSET_CONNECTION;
 
-        host->rrdpush.send.destination = strdupz(rrdpush_destination);
+        host->stream.snd.destination = string_dup(parents);
         rrdhost_stream_parents_init(host);
 
-        host->rrdpush.send.api_key = strdupz(rrdpush_api_key);
-        host->rrdpush.send.charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL,
-                                                                   SIMPLE_PATTERN_EXACT, true);
+        host->stream.snd.api_key = string_dup(api_key);
+        host->stream.snd.charts_matching =
+            simple_pattern_create(string2str(send_charts_matching),
+                                  NULL, SIMPLE_PATTERN_EXACT, true);
 
         rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
     }
@@ -326,6 +326,24 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
 }
 #endif
 
+static void rrdhost_set_replication_parameters(RRDHOST *host, RRD_MEMORY_MODE memory_mode, time_t period, time_t step) {
+    host->stream.replication.period = period;
+    host->stream.replication.step = step;
+    host->stream.rcv.status.replication.percent = 100.0;
+
+    switch(memory_mode) {
+        default:
+        case RRD_MEMORY_MODE_ALLOC:
+        case RRD_MEMORY_MODE_RAM:
+            if(host->stream.replication.period > (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every)
+                host->stream.replication.period = (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every;
+            break;
+
+        case RRD_MEMORY_MODE_DBENGINE:
+            break;
+    }
+}
+
 static RRDHOST *rrdhost_create(
         const char *hostname,
         const char *registry_hostname,
@@ -339,14 +357,14 @@ static RRDHOST *rrdhost_create(
         int update_every,
         long entries,
         RRD_MEMORY_MODE memory_mode,
-        unsigned int health_enabled,
-        unsigned int rrdpush_enabled,
-        const char *rrdpush_destination,
-        const char *rrdpush_api_key,
-        const char *rrdpush_send_charts_matching,
-        bool rrdpush_enable_replication,
-        time_t rrdpush_seconds_to_replicate,
-        time_t rrdpush_replication_step,
+        bool health,
+        bool stream,
+        STRING *parents,
+        STRING *api_key,
+        STRING *send_charts_matching,
+        bool replication,
+        time_t replication_period,
+        time_t replication_step,
         struct rrdhost_system_info *system_info,
         int is_localhost,
         bool archived
@@ -379,38 +397,24 @@ static RRDHOST *rrdhost_create(
     rrdhost_init_hostname(host, hostname, false);
 
     host->rrd_history_entries        = align_entries_to_pagesize(memory_mode, entries);
-    host->health.health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
+    host->health.enabled = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health;
 
     spinlock_init(&host->receiver_lock);
 
     if (likely(!archived)) {
         rrd_functions_host_init(host);
-        host->last_connected = now_realtime_sec();
+        host->stream.snd.status.last_connected = now_realtime_sec();
         host->rrdlabels = rrdlabels_create();
         rrdhost_initialize_rrdpush_sender(
-            host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
+            host, stream, parents, api_key, send_charts_matching);
     }
 
-    if(rrdpush_enable_replication)
+    if(replication)
         rrdhost_option_set(host, RRDHOST_OPTION_REPLICATION);
     else
         rrdhost_option_clear(host, RRDHOST_OPTION_REPLICATION);
 
-    host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
-    host->rrdpush_replication_step = rrdpush_replication_step;
-    host->rrdpush_receiver_replication_percent = 100.0;
-
-    switch(memory_mode) {
-        default:
-        case RRD_MEMORY_MODE_ALLOC:
-        case RRD_MEMORY_MODE_RAM:
-            if(host->rrdpush_seconds_to_replicate > (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every)
-                host->rrdpush_seconds_to_replicate = (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every;
-            break;
-
-        case RRD_MEMORY_MODE_DBENGINE:
-            break;
-    }
+    rrdhost_set_replication_parameters(host, memory_mode, replication_period, replication_step);
 
     host->system_info = system_info;
 
@@ -532,12 +536,12 @@ static RRDHOST *rrdhost_create(
          , rrd_memory_mode_name(host->rrd_memory_mode)
          , host->rrd_history_entries
          , rrdhost_has_rrdpush_sender_enabled(host)?"enabled":"disabled"
-         , host->rrdpush.send.destination?host->rrdpush.send.destination:""
-         , host->rrdpush.send.api_key?host->rrdpush.send.api_key:""
-         , host->health.health_enabled?"enabled":"disabled"
+         , string2str(host->stream.snd.destination)
+         , string2str(host->stream.snd.api_key)
+         , host->health.enabled ?"enabled":"disabled"
          , host->cache_dir
-         , string2str(host->health.health_default_exec)
-         , string2str(host->health.health_default_recipient)
+         , string2str(host->health.default_exec)
+         , string2str(host->health.default_recipient)
     );
 
     if(!archived) {
@@ -564,14 +568,14 @@ static void rrdhost_update(RRDHOST *host
                            , int update_every
                            , long history
                            , RRD_MEMORY_MODE mode
-                           , unsigned int health_enabled
-                           , unsigned int rrdpush_enabled
-                           , const char *rrdpush_destination
-                           , const char *rrdpush_api_key
-                           , const char *rrdpush_send_charts_matching
-                           , bool rrdpush_enable_replication
-                           , time_t rrdpush_seconds_to_replicate
-                           , time_t rrdpush_replication_step
+                           , bool health
+                           , bool stream
+                           , STRING *parents
+                           , STRING *api_key
+                           , STRING *send_charts_matching
+                           , bool replication
+                           , time_t replication_period
+                           , time_t replication_step
                            , struct rrdhost_system_info *system_info
 )
 {
@@ -579,7 +583,7 @@ static void rrdhost_update(RRDHOST *host
 
     spinlock_lock(&host->rrdhost_update_lock);
 
-    host->health.health_enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health_enabled;
+    host->health.enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health;
 
     {
         struct rrdhost_system_info *old = host->system_info;
@@ -651,7 +655,7 @@ static void rrdhost_update(RRDHOST *host
     if(!host->rrdvars)
         host->rrdvars = rrdvariables_create();
 
-    host->last_connected = now_realtime_sec();
+    host->stream.snd.status.last_connected = now_realtime_sec();
 
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
@@ -664,21 +668,16 @@ static void rrdhost_update(RRDHOST *host
         if (!host->rrdset_root_index)
             rrdset_index_init(host);
 
-        rrdhost_initialize_rrdpush_sender(host,
-                                   rrdpush_enabled,
-                                   rrdpush_destination,
-                                   rrdpush_api_key,
-                                   rrdpush_send_charts_matching);
+        rrdhost_initialize_rrdpush_sender(host, stream, parents, api_key, send_charts_matching);
 
         rrdcalc_rrdhost_index_init(host);
 
-        if(rrdpush_enable_replication)
+        if(replication)
             rrdhost_option_set(host, RRDHOST_OPTION_REPLICATION);
         else
             rrdhost_option_clear(host, RRDHOST_OPTION_REPLICATION);
 
-        host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
-        host->rrdpush_replication_step = rrdpush_replication_step;
+        rrdhost_set_replication_parameters(host, host->rrd_memory_mode, replication_period, replication_step);
 
         ml_host_new(host);
 
@@ -704,14 +703,14 @@ RRDHOST *rrdhost_find_or_create(
     , int update_every
     , long history
     , RRD_MEMORY_MODE mode
-    , unsigned int health_enabled
-    , unsigned int rrdpush_enabled
-    , const char *rrdpush_destination
-    , const char *rrdpush_api_key
-    , const char *rrdpush_send_charts_matching
-    , bool rrdpush_enable_replication
-    , time_t rrdpush_seconds_to_replicate
-    , time_t rrdpush_replication_step
+    , bool health
+    , bool stream
+    , STRING *parents
+    , STRING *api_key
+    , STRING *send_charts_matching
+    , bool replication
+    , time_t replication_period
+    , time_t replication_step
     , struct rrdhost_system_info *system_info
     , bool archived
 ) {
@@ -748,14 +747,14 @@ RRDHOST *rrdhost_find_or_create(
                 , update_every
                 , history
                 , mode
-                , health_enabled
-                , rrdpush_enabled
-                , rrdpush_destination
-                , rrdpush_api_key
-                , rrdpush_send_charts_matching
-                , rrdpush_enable_replication
-                , rrdpush_seconds_to_replicate
-                , rrdpush_replication_step
+                , health
+                , stream
+                , parents
+                , api_key
+                , send_charts_matching
+                , replication
+                , replication_period
+                , replication_step
                 , system_info
                 , 0
                 , archived
@@ -763,28 +762,29 @@ RRDHOST *rrdhost_find_or_create(
     }
     else {
         if (likely(!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
-            rrdhost_update(host
-               , hostname
-               , registry_hostname
-               , guid
-               , os
-               , timezone
-               , abbrev_timezone
-               , utc_offset
-               , prog_name
-               , prog_version
-               , update_every
-               , history
-               , mode
-               , health_enabled
-               , rrdpush_enabled
-               , rrdpush_destination
-               , rrdpush_api_key
-               , rrdpush_send_charts_matching
-               , rrdpush_enable_replication
-               , rrdpush_seconds_to_replicate
-               , rrdpush_replication_step
-               , system_info);
+            rrdhost_update(
+                host
+                , hostname
+                , registry_hostname
+                , guid
+                , os
+                , timezone
+                , abbrev_timezone
+                , utc_offset
+                , prog_name
+                , prog_version
+                , update_every
+                , history
+                , mode
+                , health
+                , stream
+                , parents
+                , api_key
+                , send_charts_matching
+                , replication
+                , replication_period
+                , replication_step
+                , system_info);
     }
 
     return host;
@@ -798,8 +798,8 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
        && !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)
        && !host->receiver
-       && host->child_disconnected_time
-       && host->child_disconnected_time + rrdhost_free_orphan_time_s < now_s)
+       && host->stream.rcv.status.last_disconnected
+       && host->stream.rcv.status.last_disconnected + rrdhost_free_orphan_time_s < now_s)
         return 1;
 
     return 0;
@@ -1094,14 +1094,14 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
             , default_rrd_history_entries
             , default_rrd_memory_mode
             , health_plugin_enabled()
-            ,
-        stream_conf_send_enabled,
-        stream_conf_send_destination,
-        stream_conf_send_api_key,
-        stream_conf_send_charts_matching,
-        stream_conf_replication_enabled,
-        stream_conf_replication_period,
-        stream_conf_replication_step, system_info
+            , stream_send.enabled
+            , stream_send.parents.destination
+            , stream_send.api_key
+            , stream_send.send_charts_matching
+            , stream_receive.replication.enabled
+            , stream_receive.replication.period
+            , stream_receive.replication.step
+            , system_info
             , 1
             , 0
     );
@@ -1184,7 +1184,7 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
     host->sender->rrdpush_sender_socket  = -1;
     host->sender->disabled_capabilities = STREAM_CAP_NONE;
 
-    if(!stream_conf_compression_enabled)
+    if(!stream_send.compression.enabled)
         host->sender->disabled_capabilities |= STREAM_CAP_COMPRESSIONS_AVAILABLE;
 
     spinlock_init(&host->sender->spinlock);
@@ -1285,13 +1285,13 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     string_freez(host->program_version);
     rrdhost_system_info_free(host->system_info);
     freez(host->cache_dir);
-    freez(host->rrdpush.send.api_key);
-    freez(host->rrdpush.send.destination);
+    string_freez(host->stream.snd.api_key);
+    string_freez(host->stream.snd.destination);
     rrdhost_stream_parents_free(host);
-    string_freez(host->health.health_default_exec);
-    string_freez(host->health.health_default_recipient);
+    string_freez(host->health.default_exec);
+    string_freez(host->health.default_recipient);
     string_freez(host->registry_hostname);
-    simple_pattern_free(host->rrdpush.send.charts_matching);
+    simple_pattern_free(host->stream.snd.charts_matching);
 
     rrd_functions_host_destroy(host);
     rrdvariables_destroy(host->rrdvars);
@@ -1429,23 +1429,23 @@ static void rrdhost_load_auto_labels(void) {
     int has_unstable_connection = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "has unstable connection", CONFIG_BOOLEAN_NO);
     rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
 
-    rrdlabels_add(labels, "_is_parent", (localhost->connected_children_count > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_is_parent", (stream_currently_connected_receivers() > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
     rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_os", string2str(localhost->os), RRDLABEL_SRC_AUTO);
 
-    if (localhost->rrdpush.send.destination)
-        rrdlabels_add(labels, "_streams_to", localhost->rrdpush.send.destination, RRDLABEL_SRC_AUTO);
+    if (localhost->stream.snd.destination)
+        rrdlabels_add(labels, "_streams_to", string2str(localhost->stream.snd.destination), RRDLABEL_SRC_AUTO);
 }
 
 void rrdhost_set_is_parent_label(void) {
-    int count = __atomic_load_n(&localhost->connected_children_count, __ATOMIC_RELAXED);
+    uint32_t count = stream_currently_connected_receivers();
 
     if (count == 0 || count == 1) {
         RRDLABELS *labels = localhost->rrdlabels;
         rrdlabels_add(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
-        //queue a node info
+        // queue a node info
         aclk_queue_node_info(localhost, false);
     }
 }

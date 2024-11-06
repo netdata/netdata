@@ -138,7 +138,7 @@ bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     rrddim_foreach_done(rd);
     rrdset_metadata_exposed_upstream(st, version);
 
-    st->rrdpush.sender.resync_time_s = st->last_collected_time.tv_sec + (stream_conf_initial_clock_resync_iterations * st->update_every);
+    st->rrdpush.sender.resync_time_s = st->last_collected_time.tv_sec + (stream_send.initial_clock_resync_iterations * st->update_every);
     return replication_progress;
 }
 
@@ -159,18 +159,18 @@ bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
             int negative = 0, positive = 0;
             SIMPLE_PATTERN_RESULT r;
 
-            r = simple_pattern_matches_string_extract(host->rrdpush.send.charts_matching, st->context, NULL, 0);
+            r = simple_pattern_matches_string_extract(host->stream.snd.charts_matching, st->context, NULL, 0);
             if(r == SP_MATCHED_POSITIVE) positive++;
             else if(r == SP_MATCHED_NEGATIVE) negative++;
 
             if(!negative) {
-                r = simple_pattern_matches_string_extract(host->rrdpush.send.charts_matching, st->name, NULL, 0);
+                r = simple_pattern_matches_string_extract(host->stream.snd.charts_matching, st->name, NULL, 0);
                 if (r == SP_MATCHED_POSITIVE) positive++;
                 else if (r == SP_MATCHED_NEGATIVE) negative++;
             }
 
             if(!negative) {
-                r = simple_pattern_matches_string_extract(host->rrdpush.send.charts_matching, st->id, NULL, 0);
+                r = simple_pattern_matches_string_extract(host->stream.snd.charts_matching, st->id, NULL, 0);
                 if (r == SP_MATCHED_POSITIVE) positive++;
                 else if (r == SP_MATCHED_NEGATIVE) negative++;
             }

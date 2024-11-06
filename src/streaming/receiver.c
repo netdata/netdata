@@ -8,6 +8,20 @@
 #define MAX_CHILD_DISC_DELAY (30000)
 #define MAX_CHILD_DISC_TOLERANCE (125 / 100)
 
+static uint32_t streaming_connected_receivers = 0;
+
+uint32_t stream_currently_connected_receivers(void) {
+    return __atomic_load_n(&streaming_connected_receivers, __ATOMIC_RELAXED);
+}
+
+static void streaming_receiver_connected(void) {
+    __atomic_add_fetch(&streaming_connected_receivers, 1, __ATOMIC_RELAXED);
+}
+
+static void streaming_receiver_disconnected(void) {
+    __atomic_sub_fetch(&streaming_connected_receivers, 1, __ATOMIC_RELAXED);
+}
+
 void receiver_state_free(struct receiver_state *rpt) {
     netdata_ssl_close(&rpt->ssl);
 
@@ -34,6 +48,11 @@ void receiver_state_free(struct receiver_state *rpt) {
     freez(rpt->client_port);
     freez(rpt->program_name);
     freez(rpt->program_version);
+
+    string_freez(rpt->config.send.api_key);
+    string_freez(rpt->config.send.parents);
+    string_freez(rpt->config.send.charts_matching);
+
     freez(rpt);
 }
 
@@ -413,28 +432,28 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     if (!host->receiver) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
 
-        host->rrdpush_receiver_connection_counter++;
-        __atomic_add_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
+        host->stream.rcv.status.connections++;
+        streaming_receiver_connected();
 
         host->receiver = rpt;
         rpt->host = host;
 
-        host->child_connect_time = now_realtime_sec();
-        host->child_disconnected_time = 0;
-        host->child_last_chart_command = 0;
-        host->trigger_chart_obsoletion_check = 1;
+        host->stream.rcv.status.last_connected = now_realtime_sec();
+        host->stream.rcv.status.last_disconnected = 0;
+        host->stream.rcv.status.last_chart = 0;
+        host->stream.rcv.status.check_obsolete = true;
 
-        if (rpt->config.health_enabled != CONFIG_BOOLEAN_NO) {
-            if (rpt->config.alarms_delay > 0) {
-                host->health.health_delay_up_to = now_realtime_sec() + rpt->config.alarms_delay;
+        if (rpt->config.health.enabled != CONFIG_BOOLEAN_NO) {
+            if (rpt->config.health.delay > 0) {
+                host->health.delay_up_to = now_realtime_sec() + rpt->config.health.delay;
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
                        "[%s]: Postponing health checks for %" PRId64 " seconds, because it was just connected.",
                        rrdhost_hostname(host),
-                       (int64_t) rpt->config.alarms_delay);
+                       (int64_t) rpt->config.health.delay);
             }
         }
 
-        host->health_log.health_log_retention_s = rpt->config.alarms_history;
+        host->health_log.health_log_retention_s = rpt->config.health.history;
 
 //         this is a test
 //        if(rpt->hops <= host->sender->hops)
@@ -477,7 +496,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
                 rrdpush_receiver_replication_reset(host);
                 rrdcontext_host_child_disconnected(host);
 
-                if (rpt->config.health_enabled)
+                if (rpt->config.health.enabled)
                     rrdcalc_child_disconnected(host);
 
                 rrdhost_stream_parent_reset_postpone_time(host);
@@ -486,15 +505,15 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
             // now we have the lock again
 
-            __atomic_sub_fetch(&localhost->connected_children_count, 1, __ATOMIC_RELAXED);
+            streaming_receiver_disconnected();
             rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
-            host->trigger_chart_obsoletion_check = 0;
-            host->child_connect_time = 0;
-            host->child_disconnected_time = now_realtime_sec();
-            host->health.health_enabled = 0;
+            host->stream.rcv.status.check_obsolete = false;
+            host->stream.rcv.status.last_connected = 0;
+            host->stream.rcv.status.last_disconnected = now_realtime_sec();
+            host->health.enabled = false;
 
-            host->rrdpush_last_receiver_exit_reason = rpt->exit.reason;
+            host->stream.rcv.status.exit_reason = rpt->exit.reason;
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
             host->receiver = NULL;
         }
@@ -583,87 +602,8 @@ static void rrdpush_receive_log_status(struct receiver_state *rpt, const char *m
                      );
 }
 
-static void rrdpush_receive(struct receiver_state *rpt)
-{
-    rpt->config.mode = default_rrd_memory_mode;
-    rpt->config.history = default_rrd_history_entries;
-
-    rpt->config.health_enabled = health_plugin_enabled();
-    rpt->config.alarms_delay = 60;
-    rpt->config.alarms_history = HEALTH_LOG_RETENTION_DEFAULT;
-
-    rpt->config.rrdpush_enabled = (int)stream_conf_send_enabled;
-    rpt->config.rrdpush_destination = stream_conf_send_destination;
-    rpt->config.rrdpush_api_key = stream_conf_send_api_key;
-    rpt->config.rrdpush_send_charts_matching = stream_conf_send_charts_matching;
-
-    rpt->config.rrdpush_enable_replication = stream_conf_replication_enabled;
-    rpt->config.rrdpush_seconds_to_replicate = stream_conf_replication_period;
-    rpt->config.rrdpush_replication_step = stream_conf_replication_step;
-
-    rpt->config.update_every = (int)appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "update every", rpt->config.update_every);
-    if(rpt->config.update_every < 0) rpt->config.update_every = 1;
-
-    rpt->config.history = (int)appconfig_get_number(&stream_config, rpt->key, "retention", rpt->config.history);
-    rpt->config.history = (int)appconfig_get_number(&stream_config, rpt->machine_guid, "retention", rpt->config.history);
-    if(rpt->config.history < 5) rpt->config.history = 5;
-
-    rpt->config.mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->key, "db", rrd_memory_mode_name(rpt->config.mode)));
-    rpt->config.mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->machine_guid, "db", rrd_memory_mode_name(rpt->config.mode)));
-
-    if (unlikely(rpt->config.mode == RRD_MEMORY_MODE_DBENGINE && !dbengine_enabled)) {
-        netdata_log_error("STREAM '%s' [receive from %s:%s]: "
-              "dbengine is not enabled, falling back to default."
-              , rpt->hostname
-              , rpt->client_ip, rpt->client_port
-              );
-
-        rpt->config.mode = default_rrd_memory_mode;
-    }
-
-    rpt->config.health_enabled = appconfig_get_boolean_ondemand(&stream_config, rpt->key, "health enabled by default", rpt->config.health_enabled);
-    rpt->config.health_enabled = appconfig_get_boolean_ondemand(&stream_config, rpt->machine_guid, "health enabled", rpt->config.health_enabled);
-
-    rpt->config.alarms_delay = appconfig_get_duration_seconds(&stream_config, rpt->key, "postpone alerts on connect", rpt->config.alarms_delay);
-    rpt->config.alarms_delay = appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "postpone alerts on connect", rpt->config.alarms_delay);
-
-    rpt->config.alarms_history = appconfig_get_duration_seconds(&stream_config, rpt->key, "health log retention", rpt->config.alarms_history);
-    rpt->config.alarms_history = appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "health log retention", rpt->config.alarms_history);
-
-    rpt->config.rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->key, "proxy enabled", rpt->config.rrdpush_enabled);
-    rpt->config.rrdpush_enabled = appconfig_get_boolean(&stream_config, rpt->machine_guid, "proxy enabled", rpt->config.rrdpush_enabled);
-
-    rpt->config.rrdpush_destination = appconfig_get(&stream_config, rpt->key, "proxy destination", rpt->config.rrdpush_destination);
-    rpt->config.rrdpush_destination = appconfig_get(&stream_config, rpt->machine_guid, "proxy destination", rpt->config.rrdpush_destination);
-
-    rpt->config.rrdpush_api_key = appconfig_get(&stream_config, rpt->key, "proxy api key", rpt->config.rrdpush_api_key);
-    rpt->config.rrdpush_api_key = appconfig_get(&stream_config, rpt->machine_guid, "proxy api key", rpt->config.rrdpush_api_key);
-
-    rpt->config.rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->key, "proxy send charts matching", rpt->config.rrdpush_send_charts_matching);
-    rpt->config.rrdpush_send_charts_matching = appconfig_get(&stream_config, rpt->machine_guid, "proxy send charts matching", rpt->config.rrdpush_send_charts_matching);
-
-    rpt->config.rrdpush_enable_replication = appconfig_get_boolean(&stream_config, rpt->key, "enable replication", rpt->config.rrdpush_enable_replication);
-    rpt->config.rrdpush_enable_replication = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable replication", rpt->config.rrdpush_enable_replication);
-
-    rpt->config.rrdpush_seconds_to_replicate = appconfig_get_duration_seconds(&stream_config, rpt->key, "replication period", rpt->config.rrdpush_seconds_to_replicate);
-    rpt->config.rrdpush_seconds_to_replicate = appconfig_get_duration_seconds(&stream_config, rpt->machine_guid, "replication period", rpt->config.rrdpush_seconds_to_replicate);
-
-    rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->key, "replication step", rpt->config.rrdpush_replication_step);
-    rpt->config.rrdpush_replication_step = appconfig_get_number(&stream_config, rpt->machine_guid, "replication step", rpt->config.rrdpush_replication_step);
-
-    rpt->config.rrdpush_compression = stream_conf_compression_enabled;
-    rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->key, "enable compression", rpt->config.rrdpush_compression);
-    rpt->config.rrdpush_compression = appconfig_get_boolean(&stream_config, rpt->machine_guid, "enable compression", rpt->config.rrdpush_compression);
-
-    bool is_ephemeral = false;
-    is_ephemeral = appconfig_get_boolean(&stream_config, rpt->key, "is ephemeral node", CONFIG_BOOLEAN_NO);
-    is_ephemeral = appconfig_get_boolean(&stream_config, rpt->machine_guid, "is ephemeral node", is_ephemeral);
-
-    if(rpt->config.rrdpush_compression) {
-        const char *order = appconfig_get(&stream_config, rpt->key, "compression algorithms order", RRDPUSH_COMPRESSION_ALGORITHMS_ORDER);
-        order = appconfig_get(&stream_config, rpt->machine_guid, "compression algorithms order", order);
-        rrdpush_parse_compression_order(rpt, order);
-    }
+static void rrdpush_receive(struct receiver_state *rpt) {
+    stream_conf_receiver_config(rpt, &rpt->config, rpt->key, rpt->machine_guid);
 
     // find the host for this receiver
     {
@@ -681,16 +621,14 @@ static void rrdpush_receive(struct receiver_state *rpt)
             rpt->config.update_every,
             rpt->config.history,
             rpt->config.mode,
-            (unsigned int)(rpt->config.health_enabled != CONFIG_BOOLEAN_NO),
-            (unsigned int)(rpt->config.rrdpush_enabled && rpt->config.rrdpush_destination &&
-                           *rpt->config.rrdpush_destination && rpt->config.rrdpush_api_key &&
-                           *rpt->config.rrdpush_api_key),
-            rpt->config.rrdpush_destination,
-            rpt->config.rrdpush_api_key,
-            rpt->config.rrdpush_send_charts_matching,
-            rpt->config.rrdpush_enable_replication,
-            rpt->config.rrdpush_seconds_to_replicate,
-            rpt->config.rrdpush_replication_step,
+            rpt->config.health.enabled != CONFIG_BOOLEAN_NO,
+            rpt->config.send.enabled && rpt->config.send.parents && rpt->config.send.api_key,
+            rpt->config.send.parents,
+            rpt->config.send.api_key,
+            rpt->config.send.charts_matching,
+            rpt->config.replication.enabled,
+            rpt->config.replication.period,
+            rpt->config.replication.step,
             rpt->system_info,
             0);
 
@@ -737,7 +675,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
          , rpt->host->rrd_update_every
          , rpt->host->rrd_history_entries
          , rrd_memory_mode_name(rpt->host->rrd_memory_mode)
-         , (rpt->config.health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((rpt->config.health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
+         , (rpt->config.health.enabled == CONFIG_BOOLEAN_NO)?"disabled":((rpt->config.health.enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
          , (rpt->ssl.conn != NULL) ? " SSL," : ""
     );
 #endif // NETDATA_INTERNAL_CHECKS
@@ -835,7 +773,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     schedule_node_state_update(rpt->host, 300);
     rrdhost_set_is_parent_label();
 
-    if (is_ephemeral)
+    if (rpt->config.ephemeral)
         rrdhost_option_set(rpt->host, RRDHOST_OPTION_EPHEMERAL_HOST);
 
     // let it reconnect to parent immediately
@@ -1150,9 +1088,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         }
     }
 
-    const char *api_key_type = appconfig_get(&stream_config, rpt->key, "type", "api");
-    if(!api_key_type || !*api_key_type) api_key_type = "unknown";
-    if(strcmp(api_key_type, "api") != 0) {
+    if(!stream_conf_is_key_type(rpt->key, "api")) {
         rrdpush_receive_log_status(
             rpt, "API key is a machine GUID",
             RRDPUSH_STATUS_INVALID_API_KEY, NDLP_WARNING);
@@ -1161,7 +1097,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         return rrdpush_receiver_permission_denied(w);
     }
 
-    if(!appconfig_get_boolean(&stream_config, rpt->key, "enabled", 0)) {
+    // the default for api keys is false, so that users
+    // have to enable them manually
+    if(!stream_conf_api_key_is_enabled(rpt->key, false)) {
         rrdpush_receive_log_status(
             rpt, "API key is not enabled",
             RRDPUSH_STATUS_API_KEY_DISABLED, NDLP_WARNING);
@@ -1170,42 +1108,27 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         return rrdpush_receiver_permission_denied(w);
     }
 
-    {
-        SIMPLE_PATTERN *key_allow_from = simple_pattern_create(
-            appconfig_get(&stream_config, rpt->key, "allow from", "*"),
-            NULL, SIMPLE_PATTERN_EXACT, true);
+    if(!stream_conf_api_key_allows_client(rpt->key, w->client_ip)) {
+        rrdpush_receive_log_status(
+            rpt, "API key is not allowed from this IP",
+            RRDPUSH_STATUS_NOT_ALLOWED_IP, NDLP_WARNING);
 
-        if(key_allow_from) {
-            if(!simple_pattern_matches(key_allow_from, w->client_ip)) {
-                simple_pattern_free(key_allow_from);
-
-                rrdpush_receive_log_status(
-                    rpt, "API key is not allowed from this IP",
-                    RRDPUSH_STATUS_NOT_ALLOWED_IP, NDLP_WARNING);
-
-                receiver_state_free(rpt);
-                return rrdpush_receiver_permission_denied(w);
-            }
-
-            simple_pattern_free(key_allow_from);
-        }
+        receiver_state_free(rpt);
+        return rrdpush_receiver_permission_denied(w);
     }
 
-    {
-        const char *machine_guid_type = appconfig_get(&stream_config, rpt->machine_guid, "type", "machine");
-        if (!machine_guid_type || !*machine_guid_type) machine_guid_type = "unknown";
+    if (!stream_conf_is_key_type(rpt->machine_guid, "machine")) {
+        rrdpush_receive_log_status(
+            rpt, "machine GUID is an API key",
+            RRDPUSH_STATUS_INVALID_MACHINE_GUID, NDLP_WARNING);
 
-        if (strcmp(machine_guid_type, "machine") != 0) {
-            rrdpush_receive_log_status(
-                rpt, "machine GUID is an API key",
-                RRDPUSH_STATUS_INVALID_MACHINE_GUID, NDLP_WARNING);
-
-            receiver_state_free(rpt);
-            return rrdpush_receiver_permission_denied(w);
-        }
+        receiver_state_free(rpt);
+        return rrdpush_receiver_permission_denied(w);
     }
 
-    if(!appconfig_get_boolean(&stream_config, rpt->machine_guid, "enabled", 1)) {
+    // the default for machine guids is true, so that users do not
+    // have to enable them manually
+    if(!stream_conf_api_key_is_enabled(rpt->machine_guid, true)) {
         rrdpush_receive_log_status(
             rpt, "machine GUID is not enabled",
             RRDPUSH_STATUS_MACHINE_GUID_DISABLED, NDLP_WARNING);
@@ -1214,29 +1137,16 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         return rrdpush_receiver_permission_denied(w);
     }
 
-    {
-        SIMPLE_PATTERN *machine_allow_from = simple_pattern_create(
-            appconfig_get(&stream_config, rpt->machine_guid, "allow from", "*"),
-            NULL, SIMPLE_PATTERN_EXACT, true);
+    if(!stream_conf_api_key_allows_client(rpt->machine_guid, w->client_ip)) {
+        rrdpush_receive_log_status(
+            rpt, "machine GUID is not allowed from this IP",
+            RRDPUSH_STATUS_NOT_ALLOWED_IP, NDLP_WARNING);
 
-        if(machine_allow_from) {
-            if(!simple_pattern_matches(machine_allow_from, w->client_ip)) {
-                simple_pattern_free(machine_allow_from);
-
-                rrdpush_receive_log_status(
-                    rpt, "machine GUID is not allowed from this IP",
-                    RRDPUSH_STATUS_NOT_ALLOWED_IP, NDLP_WARNING);
-
-                receiver_state_free(rpt);
-                return rrdpush_receiver_permission_denied(w);
-            }
-
-            simple_pattern_free(machine_allow_from);
-        }
+        receiver_state_free(rpt);
+        return rrdpush_receiver_permission_denied(w);
     }
 
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
-
         rrdpush_receiver_takeover_web_connection(w, rpt);
 
         rrdpush_receive_log_status(
@@ -1246,9 +1156,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         char initial_response[HTTP_HEADER_SIZE + 1];
         snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
 
-        if(send_timeout(
-                &rpt->ssl,
-                rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+        if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) !=
+            (ssize_t)strlen(initial_response)) {
 
             nd_log_daemon(NDLP_ERR, "STREAM '%s' [receive from [%s]:%s]: "
                                     "failed to reply."

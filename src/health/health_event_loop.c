@@ -125,7 +125,7 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 static void health_initialize_rrdhost(RRDHOST *host) {
     health_plugin_init();
 
-    if(!host->health.health_enabled ||
+    if(!host->health.enabled ||
         rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH) ||
         !service_running(SERVICE_HEALTH))
         return;
@@ -134,8 +134,8 @@ static void health_initialize_rrdhost(RRDHOST *host) {
 
     host->health_log.max = health_globals.config.health_log_entries_max;
     host->health_log.health_log_retention_s = health_globals.config.health_log_retention_s;
-    host->health.health_default_exec = string_dup(health_globals.config.default_exec);
-    host->health.health_default_recipient = string_dup(health_globals.config.default_recipient);
+    host->health.default_exec = string_dup(health_globals.config.default_exec);
+    host->health.default_recipient = string_dup(health_globals.config.default_recipient);
     host->health.use_summary_for_notifications = health_globals.config.use_summary_for_notifications;
 
     host->health_log.next_log_id = get_uint32_id();
@@ -247,7 +247,7 @@ static void health_event_loop(void) {
             if(unlikely(!service_running(SERVICE_HEALTH)))
                 break;
 
-            if (unlikely(!host->health.health_enabled))
+            if (unlikely(!host->health.enabled))
                 continue;
 
             if (unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
@@ -261,12 +261,12 @@ static void health_event_loop(void) {
                        rrdhost_hostname(host),
                        health_globals.config.postpone_alarms_during_hibernation_for_seconds);
 
-                host->health.health_delay_up_to =
+                host->health.delay_up_to =
                     now + health_globals.config.postpone_alarms_during_hibernation_for_seconds;
             }
 
-            if (unlikely(host->health.health_delay_up_to)) {
-                if (unlikely(now < host->health.health_delay_up_to)) {
+            if (unlikely(host->health.delay_up_to)) {
+                if (unlikely(now < host->health.delay_up_to)) {
                     continue;
                 }
 
@@ -274,12 +274,12 @@ static void health_event_loop(void) {
                        "[%s]: Resuming health checks after delay.",
                        rrdhost_hostname(host));
 
-                host->health.health_delay_up_to = 0;
+                host->health.delay_up_to = 0;
             }
 
             // wait until cleanup of obsolete charts on children is complete
             if (host != localhost) {
-                if (unlikely(host->trigger_chart_obsoletion_check == 1)) {
+                if (unlikely(host->stream.rcv.status.check_obsolete)) {
 
                     nd_log(NDLS_DAEMON, NDLP_DEBUG,
                            "[%s]: Waiting for chart obsoletion check.",

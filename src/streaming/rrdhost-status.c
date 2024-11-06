@@ -179,8 +179,8 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
     // --- ingest ---
 
-    s->ingest.since = MAX(host->child_connect_time, host->child_disconnected_time);
-    s->ingest.reason = (online) ? STREAM_HANDSHAKE_NEVER : host->rrdpush_last_receiver_exit_reason;
+    s->ingest.since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
+    s->ingest.reason = (online) ? STREAM_HANDSHAKE_NEVER : host->stream.rcv.status.exit_reason;
 
     spinlock_lock(&host->receiver_lock);
     s->ingest.hops = (host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
@@ -188,7 +188,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     if (host->receiver) {
         has_receiver = true;
         s->ingest.replication.instances = rrdhost_receiver_replicating_charts(host);
-        s->ingest.replication.completion = host->rrdpush_receiver_replication_percent;
+        s->ingest.replication.completion = host->stream.rcv.status.replication.percent;
         s->ingest.replication.in_progress = s->ingest.replication.instances > 0;
 
         s->ingest.capabilities = host->receiver->capabilities;
@@ -231,7 +231,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     else
         s->ingest.type = RRDHOST_INGEST_TYPE_ARCHIVED;
 
-    s->ingest.id = host->rrdpush_receiver_connection_counter;
+    s->ingest.id = host->stream.rcv.status.connections;
 
     if(!s->ingest.since)
         s->ingest.since = netdata_start_time;
@@ -283,7 +283,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
         sender_unlock(host->sender);
     }
 
-    s->stream.id = host->rrdpush_sender_connection_counter;
+    s->stream.id = host->stream.snd.status.connections;
 
     if(!s->stream.since)
         s->stream.since = netdata_start_time;
@@ -310,7 +310,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
     // --- health ---
 
-    if(host->health.health_enabled) {
+    if(host->health.enabled) {
         if(flags & RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)
             s->health.status = RRDHOST_HEALTH_STATUS_INITIALIZING;
         else {

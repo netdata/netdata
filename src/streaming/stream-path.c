@@ -29,22 +29,22 @@ static void stream_path_clear(STREAM_PATH *p) {
 }
 
 static void rrdhost_stream_path_clear_unsafe(RRDHOST *host, bool destroy) {
-    for(size_t i = 0; i < host->rrdpush.path.used ; i++)
-        stream_path_clear(&host->rrdpush.path.array[i]);
+    for(size_t i = 0; i < host->stream.path.used ; i++)
+        stream_path_clear(&host->stream.path.array[i]);
 
-    host->rrdpush.path.used = 0;
+    host->stream.path.used = 0;
 
     if(destroy) {
-        freez(host->rrdpush.path.array);
-        host->rrdpush.path.array = NULL;
-        host->rrdpush.path.size = 0;
+        freez(host->stream.path.array);
+        host->stream.path.array = NULL;
+        host->stream.path.size = 0;
     }
 }
 
 void rrdhost_stream_path_clear(RRDHOST *host, bool destroy) {
-    spinlock_lock(&host->rrdpush.path.spinlock);
+    spinlock_lock(&host->stream.path.spinlock);
     rrdhost_stream_path_clear_unsafe(host, destroy);
-    spinlock_unlock(&host->rrdpush.path.spinlock);
+    spinlock_unlock(&host->stream.path.spinlock);
 }
 
 static void stream_path_to_json_object(BUFFER *wb, STREAM_PATH *p) {
@@ -104,15 +104,15 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
 STREAM_PATH rrdhost_stream_path_fetch(RRDHOST *host) {
     STREAM_PATH p = { 0 };
 
-    spinlock_lock(&host->rrdpush.path.spinlock);
-    for (size_t i = 0; i < host->rrdpush.path.used; i++) {
-        STREAM_PATH *tmp_path = &host->rrdpush.path.array[i];
+    spinlock_lock(&host->stream.path.spinlock);
+    for (size_t i = 0; i < host->stream.path.used; i++) {
+        STREAM_PATH *tmp_path = &host->stream.path.array[i];
         if(UUIDeq(host->host_id, tmp_path->host_id)) {
             p = *tmp_path;
             break;
         }
     }
-    spinlock_unlock(&host->rrdpush.path.spinlock);
+    spinlock_unlock(&host->stream.path.spinlock);
     return p;
 }
 
@@ -120,15 +120,15 @@ void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *k
     if(add_version)
         buffer_json_member_add_uint64(wb, "version", 1);
 
-    spinlock_lock(&host->rrdpush.path.spinlock);
+    spinlock_lock(&host->stream.path.spinlock);
     buffer_json_member_add_array(wb, key);
     {
         {
             STREAM_PATH tmp = rrdhost_stream_path_self(host);
 
             bool found_self = false;
-            for (size_t i = 0; i < host->rrdpush.path.used; i++) {
-                STREAM_PATH *p = &host->rrdpush.path.array[i];
+            for (size_t i = 0; i < host->stream.path.used; i++) {
+                STREAM_PATH *p = &host->stream.path.array[i];
                 if(UUIDeq(localhost->host_id, p->host_id)) {
                     // this is us, use the current data
                     p = &tmp;
@@ -147,7 +147,7 @@ void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *k
         }
     }
     buffer_json_array_close(wb); // key
-    spinlock_unlock(&host->rrdpush.path.spinlock);
+    spinlock_unlock(&host->stream.path.spinlock);
 }
 
 static BUFFER *stream_path_payload(RRDHOST *host) {
@@ -190,17 +190,17 @@ void stream_path_child_disconnected(RRDHOST *host) {
 }
 
 void stream_path_parent_disconnected(RRDHOST *host) {
-    spinlock_lock(&host->rrdpush.path.spinlock);
+    spinlock_lock(&host->stream.path.spinlock);
 
     size_t cleared = 0;
-    size_t used = host->rrdpush.path.used;
+    size_t used = host->stream.path.used;
     for (size_t i = 0; i < used; i++) {
-        STREAM_PATH *p = &host->rrdpush.path.array[i];
+        STREAM_PATH *p = &host->stream.path.array[i];
         if(UUIDeq(localhost->host_id, p->host_id)) {
-            host->rrdpush.path.used = i + 1;
+            host->stream.path.used = i + 1;
 
             for(size_t j = i + 1; j < used ;j++) {
-                stream_path_clear(&host->rrdpush.path.array[j]);
+                stream_path_clear(&host->stream.path.array[j]);
                 cleared++;
             }
 
@@ -208,7 +208,7 @@ void stream_path_parent_disconnected(RRDHOST *host) {
         }
     }
 
-    spinlock_unlock(&host->rrdpush.path.spinlock);
+    spinlock_unlock(&host->stream.path.spinlock);
 
     if(cleared)
         stream_path_send_to_child(host);
@@ -271,10 +271,10 @@ static bool parse_single_path(json_object *jobj, const char *path, STREAM_PATH *
 }
 
 static XXH128_hash_t stream_path_hash_unsafe(RRDHOST *host) {
-    if(!host->rrdpush.path.used)
+    if(!host->stream.path.used)
         return (XXH128_hash_t){ 0 };
 
-    return XXH3_128bits(host->rrdpush.path.array, sizeof(*host->rrdpush.path.array) * host->rrdpush.path.used);
+    return XXH3_128bits(host->stream.path.array, sizeof(*host->stream.path.array) * host->stream.path.used);
 }
 
 static int compare_by_hops(const void *a, const void *b) {
@@ -300,7 +300,7 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
         return false;
     }
 
-    spinlock_lock(&host->rrdpush.path.spinlock);
+    spinlock_lock(&host->stream.path.spinlock);
     XXH128_hash_t old_hash = stream_path_hash_unsafe(host);
     rrdhost_stream_path_clear_unsafe(host, true);
 
@@ -310,8 +310,8 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
     if (json_object_object_get_ex(jobj, STREAM_PATH_JSON_MEMBER, &_jarray) &&
         json_object_is_type(_jarray, json_type_array)) {
         size_t items = json_object_array_length(_jarray);
-        host->rrdpush.path.array = callocz(items, sizeof(*host->rrdpush.path.array));
-        host->rrdpush.path.size = items;
+        host->stream.path.array = callocz(items, sizeof(*host->stream.path.array));
+        host->stream.path.size = items;
 
         for (size_t i = 0; i < items; ++i) {
             json_object *joption = json_object_array_get_idx(_jarray, i);
@@ -321,24 +321,24 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
                 continue;
             }
 
-            if(!parse_single_path(joption, "", &host->rrdpush.path.array[host->rrdpush.path.used], error)) {
-                stream_path_clear(&host->rrdpush.path.array[host->rrdpush.path.used]);
+            if(!parse_single_path(joption, "", &host->stream.path.array[host->stream.path.used], error)) {
+                stream_path_clear(&host->stream.path.array[host->stream.path.used]);
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "STREAM PATH: Array item No %zu cannot be parsed: %s: %s", i, buffer_tostring(error), json);
             }
             else
-                host->rrdpush.path.used++;
+                host->stream.path.used++;
         }
     }
 
-    if(host->rrdpush.path.used > 1) {
+    if(host->stream.path.used > 1) {
         // sorting is required in order to support stream_path_parent_disconnected()
-        qsort(host->rrdpush.path.array, host->rrdpush.path.used,
-              sizeof(*host->rrdpush.path.array), compare_by_hops);
+        qsort(host->stream.path.array, host->stream.path.used,
+              sizeof(*host->stream.path.array), compare_by_hops);
     }
 
     XXH128_hash_t new_hash = stream_path_hash_unsafe(host);
-    spinlock_unlock(&host->rrdpush.path.spinlock);
+    spinlock_unlock(&host->stream.path.spinlock);
 
     if(!XXH128_isEqual(old_hash, new_hash)) {
         if(!from_parent)
@@ -349,5 +349,5 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
         stream_path_send_to_child(host);
     }
 
-    return host->rrdpush.path.used > 0;
+    return host->stream.path.used > 0;
 }

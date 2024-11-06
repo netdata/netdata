@@ -958,8 +958,8 @@ static int store_host_metadata(RRDHOST *host)
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_program_name(host), 1));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_program_version(host), 1));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int64(res, ++param, host->rrd_history_entries));
-    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, (int ) host->health.health_enabled));
-    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int64(res, ++param, (sqlite3_int64) host->last_connected));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, (int ) host->health.enabled));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int64(res, ++param, (sqlite3_int64) host->stream.snd.status.last_connected));
 
     int store_rc = sqlite3_step_monitored(res);
 

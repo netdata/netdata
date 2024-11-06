@@ -311,9 +311,9 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
         time_t current = parser->user.replay.end_time;
 
         if(started && current > started) {
-            host->rrdpush_receiver_replication_percent = (NETDATA_DOUBLE) (current - started) * 100.0 / (NETDATA_DOUBLE) (now - started);
+            host->stream.rcv.status.replication.percent = (NETDATA_DOUBLE) (current - started) * 100.0 / (NETDATA_DOUBLE) (now - started);
             worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
-                              host->rrdpush_receiver_replication_percent);
+                              host->stream.rcv.status.replication.percent);
         }
     }
 
@@ -354,8 +354,8 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
 
         pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END);
 
-        host->rrdpush_receiver_replication_percent = 100.0;
-        worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, host->rrdpush_receiver_replication_percent);
+        host->stream.rcv.status.replication.percent = 100.0;
+        worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, host->stream.rcv.status.replication.percent);
 
         return PARSER_RC_OK;
     }

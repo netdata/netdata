@@ -183,6 +183,8 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct config_section *connector, st
 bool stream_conf_needs_dbengine(struct config *root);
 bool stream_conf_has_uuid_section(struct config *root);
 
+void appconfig_foreach_section(struct config *root, void (*cb)(struct config *root, const char *name, void *data), void *data);
+
 #include "appconfig_api_text.h"
 #include "appconfig_api_numbers.h"
 #include "appconfig_api_boolean.h"

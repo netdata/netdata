@@ -1089,14 +1089,19 @@ static void backwards_compatible_config() {
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    config_move(CONFIG_SECTION_GLOBAL,  "dbengine disk space",
-                CONFIG_SECTION_DB,      "dbengine tier 0 retention size");
+    bool found_old_config = false;
 
-    config_move(CONFIG_SECTION_GLOBAL,  "dbengine multihost disk space",
-                CONFIG_SECTION_DB,      "dbengine tier 0 retention size");
+    if(config_move(CONFIG_SECTION_GLOBAL,  "dbengine disk space",
+                    CONFIG_SECTION_DB,      "dbengine tier 0 retention size") != -1)
+        found_old_config = true;
 
-    config_move(CONFIG_SECTION_DB,      "dbengine disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 0 retention size");
+    if(config_move(CONFIG_SECTION_GLOBAL,  "dbengine multihost disk space",
+                    CONFIG_SECTION_DB,      "dbengine tier 0 retention size") != -1)
+        found_old_config = true;
+
+    if(config_move(CONFIG_SECTION_DB,      "dbengine disk space MB",
+                    CONFIG_SECTION_DB,      "dbengine tier 0 retention size") != -1)
+        found_old_config = true;
 
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
         char old_config[128], new_config[128];
@@ -1111,14 +1116,18 @@ static void backwards_compatible_config() {
         else
             snprintfz(old_config, sizeof(old_config), "dbengine tier %zu multihost disk space MB", tier);
         snprintfz(new_config, sizeof(new_config), "dbengine tier %zu retention size", tier);
-        config_move(CONFIG_SECTION_DB, old_config,
-                    CONFIG_SECTION_DB, new_config);
+        if(config_move(CONFIG_SECTION_DB, old_config,
+                        CONFIG_SECTION_DB, new_config) != -1 && tier == 0)
+            found_old_config = true;
 
         snprintfz(old_config, sizeof(old_config), "dbengine tier %zu disk space MB", tier);
         snprintfz(new_config, sizeof(new_config), "dbengine tier %zu retention size", tier);
-        config_move(CONFIG_SECTION_DB, old_config,
-                    CONFIG_SECTION_DB, new_config);
+        if(config_move(CONFIG_SECTION_DB, old_config,
+                        CONFIG_SECTION_DB, new_config) != -1 && tier == 0)
+            found_old_config = true;
     }
+
+    legacy_multihost_db_space = found_old_config;
 
     // ----------------------------------------------------------------------------------------------------------------
 
@@ -1187,15 +1196,10 @@ static int get_hostname(char *buf, size_t buf_size) {
 
 static void get_netdata_configured_variables()
 {
-#ifdef ENABLE_DBENGINE
-    legacy_multihost_db_space = config_exists(CONFIG_SECTION_DB, "dbengine multihost disk space MB");
-    if (!legacy_multihost_db_space)
-        legacy_multihost_db_space = config_exists(CONFIG_SECTION_GLOBAL, "dbengine multihost disk space");
-    if (!legacy_multihost_db_space)
-        legacy_multihost_db_space = config_exists(CONFIG_SECTION_GLOBAL, "dbengine disk space");
-#endif
-
     backwards_compatible_config();
+
+    rrdhost_free_orphan_time_s =
+        config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup orphan hosts after", rrdhost_free_orphan_time_s);
 
     // ------------------------------------------------------------------------
     // get the hostname
@@ -1503,7 +1507,7 @@ int unittest_prepare_rrd(const char **user) {
         fprintf(stderr, "rrd_init failed for unittest\n");
         return 1;
     }
-    stream_conf_send_enabled = 0;
+    stream_send.enabled = false;
 
     return 0;
 }

@@ -32,8 +32,6 @@ typedef enum {
     COMPRESSION_ALGORITHM_MAX,
 } compression_algorithm_t;
 
-extern int rrdpush_compression_levels[COMPRESSION_ALGORITHM_MAX];
-
 // this defines the order the algorithms will be selected by the receiver (parent)
 #define RRDPUSH_COMPRESSION_ALGORITHMS_ORDER "zstd lz4 brotli gzip"
 
@@ -174,10 +172,11 @@ static inline size_t rrdpush_decompressor_get(struct decompressor_state *state, 
 
 struct sender_state;
 struct receiver_state;
+struct stream_receiver_config;
 
 bool rrdpush_compression_initialize(struct sender_state *s);
 bool rrdpush_decompression_initialize(struct receiver_state *rpt);
-void rrdpush_parse_compression_order(struct receiver_state *rpt, const char *order);
+void rrdpush_parse_compression_order(struct stream_receiver_config *config, const char *order);
 void rrdpush_select_receiver_compression_algorithm(struct receiver_state *rpt);
 void rrdpush_compression_deactivate(struct sender_state *s);
 

@@ -1020,8 +1020,8 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
                 buffer_json_member_add_boolean(wb, "updated",              (sqlite3_column_int64(stmt_query, 9) & HEALTH_ENTRY_FLAG_UPDATED));
                   buffer_json_member_add_int64(wb, "exec_run",             (int64_t)sqlite3_column_int64(stmt_query, 10));
                 buffer_json_member_add_boolean(wb, "exec_failed",          (sqlite3_column_int64(stmt_query, 9) & HEALTH_ENTRY_FLAG_EXEC_FAILED));
-        buffer_json_member_add_string_or_empty(wb, "exec",                 sqlite3_column_text(stmt_query, 14) ? (const char *) sqlite3_column_text(stmt_query, 14) : string2str(host->health.health_default_exec));
-        buffer_json_member_add_string_or_empty(wb, "recipient",            sqlite3_column_text(stmt_query, 15) ? (const char *) sqlite3_column_text(stmt_query, 15) : string2str(host->health.health_default_recipient));
+        buffer_json_member_add_string_or_empty(wb, "exec",                 sqlite3_column_text(stmt_query, 14) ? (const char *) sqlite3_column_text(stmt_query, 14) : string2str(host->health.default_exec));
+        buffer_json_member_add_string_or_empty(wb, "recipient",            sqlite3_column_text(stmt_query, 15) ? (const char *) sqlite3_column_text(stmt_query, 15) : string2str(host->health.default_recipient));
                   buffer_json_member_add_int64(wb, "exec_code",            sqlite3_column_int(stmt_query, 19));
         buffer_json_member_add_string_or_empty(wb, "source",               sqlite3_column_text(stmt_query, 16) ? (const char *) sqlite3_column_text(stmt_query, 16) : (char *) "Unknown");
         buffer_json_member_add_string_or_empty(wb, "command",              edit_command);

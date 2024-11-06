@@ -619,7 +619,7 @@ cleanup:
  */
 void set_late_analytics_variables(struct rrdhost_system_info *system_info)
 {
-    analytics_set_data(&analytics_data.netdata_config_stream_enabled, stream_conf_send_enabled ? "true" : "false");
+    analytics_set_data(&analytics_data.netdata_config_stream_enabled, stream_send.enabled ? "true" : "false");
     analytics_set_data_str(&analytics_data.netdata_config_memory_mode, (char *)rrd_memory_mode_name(default_rrd_memory_mode));
     analytics_set_data(&analytics_data.netdata_host_cloud_enabled, "true");
 

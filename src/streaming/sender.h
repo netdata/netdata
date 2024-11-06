@@ -46,9 +46,6 @@ struct sender_state {
     RRDHOST *host;
     pid_t tid;                              // the thread id of the sender, from gettid_cached()
     SENDER_FLAGS flags;
-    int timeout;
-    int default_port;
-    uint32_t reconnect_delay;
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
     size_t begin;
     size_t reconnects_counter;
