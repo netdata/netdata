@@ -955,7 +955,7 @@ jobs:
           action: docker/build-push-action@v6
           with: |
             push: false
-            load: false
+            load: true
             file: .github/dockerfiles/Dockerfile.build_test
             build-args: |
               BASE=${{ matrix.distro }}
