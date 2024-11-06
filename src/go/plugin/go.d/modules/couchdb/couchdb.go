@@ -5,6 +5,7 @@ package couchdb
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -69,23 +70,20 @@ func (cdb *CouchDB) Configuration() any {
 func (cdb *CouchDB) Init() error {
 	err := cdb.validateConfig()
 	if err != nil {
-		cdb.Errorf("check configuration: %v", err)
-		return err
+		return fmt.Errorf("check configuration: %v", err)
 	}
 
 	cdb.databases = strings.Fields(cdb.Config.Databases)
 
 	httpClient, err := cdb.initHTTPClient()
 	if err != nil {
-		cdb.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	cdb.httpClient = httpClient
 
 	charts, err := cdb.initCharts()
 	if err != nil {
-		cdb.Errorf("init charts: %v", err)
-		return err
+		return fmt.Errorf("init charts: %v", err)
 	}
 	cdb.charts = charts
 
@@ -94,13 +92,11 @@ func (cdb *CouchDB) Init() error {
 
 func (cdb *CouchDB) Check() error {
 	if err := cdb.pingCouchDB(); err != nil {
-		cdb.Error(err)
 		return err
 	}
 
 	mx, err := cdb.collect()
 	if err != nil {
-		cdb.Error(err)
 		return err
 	}
 

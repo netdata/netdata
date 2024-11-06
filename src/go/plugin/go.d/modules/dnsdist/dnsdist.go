@@ -5,6 +5,7 @@ package dnsdist
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -63,21 +64,18 @@ func (d *DNSdist) Configuration() any {
 func (d *DNSdist) Init() error {
 	err := d.validateConfig()
 	if err != nil {
-		d.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	client, err := d.initHTTPClient()
 	if err != nil {
-		d.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	d.httpClient = client
 
 	cs, err := d.initCharts()
 	if err != nil {
-		d.Errorf("init charts: %v", err)
-		return err
+		return fmt.Errorf("init charts: %v", err)
 	}
 	d.charts = cs
 
@@ -87,7 +85,6 @@ func (d *DNSdist) Init() error {
 func (d *DNSdist) Check() error {
 	mx, err := d.collect()
 	if err != nil {
-		d.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

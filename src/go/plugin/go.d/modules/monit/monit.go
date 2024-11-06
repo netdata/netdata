@@ -5,6 +5,7 @@ package monit
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -65,14 +66,12 @@ func (m *Monit) Configuration() any {
 
 func (m *Monit) Init() error {
 	if m.URL == "" {
-		m.Error("config: monit url is required but not set")
-		return errors.New("config: missing URL")
+		return fmt.Errorf("config: monit url is required but not set")
 	}
 
 	httpClient, err := web.NewHTTPClient(m.ClientConfig)
 	if err != nil {
-		m.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	m.httpClient = httpClient
 
@@ -85,7 +84,6 @@ func (m *Monit) Init() error {
 func (m *Monit) Check() error {
 	mx, err := m.collect()
 	if err != nil {
-		m.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

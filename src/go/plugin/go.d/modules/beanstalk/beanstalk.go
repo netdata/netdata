@@ -85,7 +85,6 @@ func (b *Beanstalk) Init() error {
 func (b *Beanstalk) Check() error {
 	mx, err := b.collect()
 	if err != nil {
-		b.Error(err)
 		return err
 	}
 

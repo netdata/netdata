@@ -13,6 +13,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
+type lvmCLI interface {
+	lvsReportJson() ([]byte, error)
+}
+
 func newLVMCLIExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *lvmCLIExec {
 	return &lvmCLIExec{
 		Logger:     log,

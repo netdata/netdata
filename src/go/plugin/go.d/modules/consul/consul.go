@@ -5,6 +5,7 @@ package consul
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -80,21 +81,18 @@ func (c *Consul) Configuration() any {
 
 func (c *Consul) Init() error {
 	if err := c.validateConfig(); err != nil {
-		c.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	httpClient, err := c.initHTTPClient()
 	if err != nil {
-		c.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	c.httpClient = httpClient
 
 	prom, err := c.initPrometheusClient(httpClient)
 	if err != nil {
-		c.Errorf("init Prometheus client: %v", err)
-		return err
+		return fmt.Errorf("init Prometheus client: %v", err)
 	}
 	c.prom = prom
 
@@ -104,7 +102,6 @@ func (c *Consul) Init() error {
 func (c *Consul) Check() error {
 	mx, err := c.collect()
 	if err != nil {
-		c.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

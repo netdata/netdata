@@ -4,6 +4,7 @@ package vsphere
 
 import (
 	_ "embed"
+	"fmt"
 	"sync"
 	"time"
 
@@ -90,26 +91,22 @@ func (vs *VSphere) Configuration() any {
 
 func (vs *VSphere) Init() error {
 	if err := vs.validateConfig(); err != nil {
-		vs.Errorf("error on validating config: %v", err)
-		return err
+		return fmt.Errorf("error on validating config: %v", err)
 	}
 
 	vsClient, err := vs.initClient()
 	if err != nil {
-		vs.Errorf("error on creating vsphere client: %v", err)
-		return err
+		return fmt.Errorf("error on creating vsphere client: %v", err)
 	}
 
 	if err := vs.initDiscoverer(vsClient); err != nil {
-		vs.Errorf("error on creating vsphere discoverer: %v", err)
-		return err
+		return fmt.Errorf("error on creating vsphere discoverer: %v", err)
 	}
 
 	vs.initScraper(vsClient)
 
 	if err := vs.discoverOnce(); err != nil {
-		vs.Errorf("error on discovering: %v", err)
-		return err
+		return fmt.Errorf("error on discovering: %v", err)
 	}
 
 	vs.goDiscovery()

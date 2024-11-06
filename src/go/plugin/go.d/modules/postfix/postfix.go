@@ -5,6 +5,7 @@ package postfix
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -61,14 +62,12 @@ func (p *Postfix) Configuration() any {
 
 func (p *Postfix) Init() error {
 	if err := p.validateConfig(); err != nil {
-		p.Errorf("config validation: %s", err)
-		return err
+		return fmt.Errorf("config validation: %s", err)
 	}
 
 	pq, err := p.initPostqueueExec()
 	if err != nil {
-		p.Errorf("postqueue exec initialization: %v", err)
-		return err
+		return fmt.Errorf("postqueue exec initialization: %v", err)
 	}
 	p.exec = pq
 
@@ -78,7 +77,6 @@ func (p *Postfix) Init() error {
 func (p *Postfix) Check() error {
 	mx, err := p.collect()
 	if err != nil {
-		p.Error(err)
 		return err
 	}
 

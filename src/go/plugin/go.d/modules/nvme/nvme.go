@@ -7,6 +7,7 @@ package nvme
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -72,8 +73,7 @@ func (n *NVMe) Configuration() any {
 func (n *NVMe) Init() error {
 	nvmeExec, err := n.initNVMeCLIExec()
 	if err != nil {
-		n.Errorf("init nvme-cli exec: %v", err)
-		return err
+		return fmt.Errorf("init nvme-cli exec: %v", err)
 	}
 	n.exec = nvmeExec
 
@@ -83,7 +83,6 @@ func (n *NVMe) Init() error {
 func (n *NVMe) Check() error {
 	mx, err := n.collect()
 	if err != nil {
-		n.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

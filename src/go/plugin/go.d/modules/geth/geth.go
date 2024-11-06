@@ -5,6 +5,7 @@ package geth
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -60,14 +61,12 @@ func (g *Geth) Configuration() any {
 
 func (g *Geth) Init() error {
 	if err := g.validateConfig(); err != nil {
-		g.Errorf("error on validating config: %g", err)
-		return err
+		return fmt.Errorf("error on validating config: %g", err)
 	}
 
 	prom, err := g.initPrometheusClient()
 	if err != nil {
-		g.Error(err)
-		return err
+		return fmt.Errorf("error on initializing prometheus client: %g", err)
 	}
 	g.prom = prom
 
@@ -77,7 +76,6 @@ func (g *Geth) Init() error {
 func (g *Geth) Check() error {
 	mx, err := g.collect()
 	if err != nil {
-		g.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

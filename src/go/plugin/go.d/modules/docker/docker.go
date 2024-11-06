@@ -90,7 +90,6 @@ func (d *Docker) Init() error {
 func (d *Docker) Check() error {
 	mx, err := d.collect()
 	if err != nil {
-		d.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

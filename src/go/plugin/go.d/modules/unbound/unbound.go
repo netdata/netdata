@@ -5,6 +5,7 @@ package unbound
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -77,8 +78,7 @@ func (u *Unbound) Init() error {
 	}
 
 	if err := u.initClient(); err != nil {
-		u.Errorf("creating client: %v", err)
-		return err
+		return fmt.Errorf("creating client: %v", err)
 	}
 
 	u.charts = charts(u.Cumulative)
@@ -94,7 +94,6 @@ func (u *Unbound) Init() error {
 func (u *Unbound) Check() error {
 	mx, err := u.collect()
 	if err != nil {
-		u.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

@@ -62,8 +62,7 @@ func (m *Memcached) Configuration() any {
 
 func (m *Memcached) Init() error {
 	if m.Address == "" {
-		m.Error("config: 'address' not set")
-		return errors.New("address not set")
+		return errors.New("config: 'address' not set")
 	}
 
 	return nil
@@ -72,7 +71,6 @@ func (m *Memcached) Init() error {
 func (m *Memcached) Check() error {
 	mx, err := m.collect()
 	if err != nil {
-		m.Error(err)
 		return err
 	}
 

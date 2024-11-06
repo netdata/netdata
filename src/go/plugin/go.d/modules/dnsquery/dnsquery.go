@@ -4,6 +4,7 @@ package dnsquery
 
 import (
 	_ "embed"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -77,21 +78,18 @@ func (d *DNSQuery) Configuration() any {
 
 func (d *DNSQuery) Init() error {
 	if err := d.verifyConfig(); err != nil {
-		d.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	rt, err := d.initRecordTypes()
 	if err != nil {
-		d.Errorf("init record type: %v", err)
-		return err
+		return fmt.Errorf("init record type: %v", err)
 	}
 	d.recordTypes = rt
 
 	charts, err := d.initCharts()
 	if err != nil {
-		d.Errorf("init charts: %v", err)
-		return err
+		return fmt.Errorf("init charts: %v", err)
 	}
 	d.charts = charts
 

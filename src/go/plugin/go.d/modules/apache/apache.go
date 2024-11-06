@@ -5,6 +5,7 @@ package apache
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -64,14 +65,12 @@ func (a *Apache) Configuration() any {
 
 func (a *Apache) Init() error {
 	if err := a.validateConfig(); err != nil {
-		a.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	httpClient, err := a.initHTTPClient()
 	if err != nil {
-		a.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	a.httpClient = httpClient
 
@@ -84,7 +83,6 @@ func (a *Apache) Init() error {
 func (a *Apache) Check() error {
 	mx, err := a.collect()
 	if err != nil {
-		a.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

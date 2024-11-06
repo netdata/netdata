@@ -67,7 +67,6 @@ func (p *ProxySQL) Configuration() any {
 
 func (p *ProxySQL) Init() error {
 	if p.DSN == "" {
-		p.Error("dsn not set")
 		return errors.New("dsn not set")
 	}
 
@@ -79,7 +78,6 @@ func (p *ProxySQL) Init() error {
 func (p *ProxySQL) Check() error {
 	mx, err := p.collect()
 	if err != nil {
-		p.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

@@ -5,6 +5,7 @@ package cassandra
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -69,14 +70,12 @@ func (c *Cassandra) Configuration() any {
 
 func (c *Cassandra) Init() error {
 	if err := c.validateConfig(); err != nil {
-		c.Errorf("error on validating config: %v", err)
-		return err
+		return fmt.Errorf("error on validating config: %v", err)
 	}
 
 	prom, err := c.initPrometheusClient()
 	if err != nil {
-		c.Errorf("error on init prometheus client: %v", err)
-		return err
+		return fmt.Errorf("error on init prometheus client: %v", err)
 	}
 	c.prom = prom
 
@@ -86,7 +85,6 @@ func (c *Cassandra) Init() error {
 func (c *Cassandra) Check() error {
 	mx, err := c.collect()
 	if err != nil {
-		c.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

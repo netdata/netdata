@@ -7,6 +7,7 @@ package lvm
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -42,21 +43,16 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type (
-	LVM struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type LVM struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec lvmCLI
+	exec lvmCLI
 
-		lvmThinPools map[string]bool
-	}
-	lvmCLI interface {
-		lvsReportJson() ([]byte, error)
-	}
-)
+	lvmThinPools map[string]bool
+}
 
 func (l *LVM) Configuration() any {
 	return l.Config
@@ -65,8 +61,7 @@ func (l *LVM) Configuration() any {
 func (l *LVM) Init() error {
 	lvmExec, err := l.initLVMCLIExec()
 	if err != nil {
-		l.Errorf("lvm exec initialization: %v", err)
-		return err
+		return fmt.Errorf("init lvm exec: %v", err)
 	}
 	l.exec = lvmExec
 
@@ -76,7 +71,6 @@ func (l *LVM) Init() error {
 func (l *LVM) Check() error {
 	mx, err := l.collect()
 	if err != nil {
-		l.Error(err)
 		return err
 	}
 

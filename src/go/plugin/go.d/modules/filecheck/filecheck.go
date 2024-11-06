@@ -4,6 +4,7 @@ package filecheck
 
 import (
 	_ "embed"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
@@ -80,21 +81,18 @@ func (f *Filecheck) Configuration() any {
 func (f *Filecheck) Init() error {
 	err := f.validateConfig()
 	if err != nil {
-		f.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	ff, err := f.initFilesFilter()
 	if err != nil {
-		f.Errorf("files filter initialization: %v", err)
-		return err
+		return fmt.Errorf("files filter initialization: %v", err)
 	}
 	f.filesFilter = ff
 
 	df, err := f.initDirsFilter()
 	if err != nil {
-		f.Errorf("dirs filter initialization: %v", err)
-		return err
+		return fmt.Errorf("dirs filter initialization: %v", err)
 	}
 	f.dirsFilter = df
 

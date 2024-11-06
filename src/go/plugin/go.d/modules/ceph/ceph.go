@@ -84,7 +84,7 @@ func (c *Ceph) Init() error {
 
 	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("create http client: %v", err)
 	}
 	c.httpClient = httpClient
 
@@ -94,7 +94,6 @@ func (c *Ceph) Init() error {
 func (c *Ceph) Check() error {
 	mx, err := c.collect()
 	if err != nil {
-		c.Error(err)
 		return err
 	}
 

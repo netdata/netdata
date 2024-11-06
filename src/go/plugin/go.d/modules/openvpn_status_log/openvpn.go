@@ -5,6 +5,7 @@ package openvpn_status_log
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -53,14 +54,12 @@ func (o *OpenVPNStatusLog) Configuration() any {
 
 func (o *OpenVPNStatusLog) Init() error {
 	if err := o.validateConfig(); err != nil {
-		o.Errorf("error on validating config: %v", err)
-		return err
+		return fmt.Errorf("error on validating config: %v", err)
 	}
 
 	m, err := o.initPerUserStatsMatcher()
 	if err != nil {
-		o.Errorf("error on creating 'per_user_stats' matcher: %v", err)
-		return err
+		return fmt.Errorf("error on creating 'per_user_stats' matcher: %v", err)
 	}
 	if m != nil {
 		o.perUserMatcher = m
@@ -72,7 +71,6 @@ func (o *OpenVPNStatusLog) Init() error {
 func (o *OpenVPNStatusLog) Check() error {
 	mx, err := o.collect()
 	if err != nil {
-		o.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

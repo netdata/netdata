@@ -56,8 +56,7 @@ func (t *Tor) Configuration() any {
 
 func (t *Tor) Init() error {
 	if t.Address == "" {
-		t.Error("config: 'address' not set")
-		return errors.New("address not set")
+		return errors.New("config: address not set")
 	}
 
 	return nil
@@ -66,7 +65,6 @@ func (t *Tor) Init() error {
 func (t *Tor) Check() error {
 	mx, err := t.collect()
 	if err != nil {
-		t.Error(err)
 		return err
 	}
 

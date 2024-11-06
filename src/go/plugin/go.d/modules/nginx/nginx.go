@@ -79,7 +79,6 @@ func (n *Nginx) Init() error {
 func (n *Nginx) Check() error {
 	mx, err := n.collect()
 	if err != nil {
-		n.Error(err)
 		return err
 	}
 

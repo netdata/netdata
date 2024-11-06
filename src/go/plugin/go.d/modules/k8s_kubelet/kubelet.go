@@ -5,6 +5,7 @@ package k8s_kubelet
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -71,14 +72,12 @@ func (k *Kubelet) Configuration() any {
 
 func (k *Kubelet) Init() error {
 	if err := k.validateConfig(); err != nil {
-		k.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	prom, err := k.initPrometheusClient()
 	if err != nil {
-		k.Error(err)
-		return err
+		return fmt.Errorf("init prometheus client: %v", err)
 	}
 	k.prom = prom
 
@@ -92,7 +91,6 @@ func (k *Kubelet) Init() error {
 func (k *Kubelet) Check() error {
 	mx, err := k.collect()
 	if err != nil {
-		k.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

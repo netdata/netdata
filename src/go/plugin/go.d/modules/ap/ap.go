@@ -7,6 +7,7 @@ package ap
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -67,14 +68,12 @@ func (a *AP) Configuration() any {
 
 func (a *AP) Init() error {
 	if err := a.validateConfig(); err != nil {
-		a.Errorf("config validation: %s", err)
-		return err
+		return fmt.Errorf("config validation: %s", err)
 	}
 
 	iw, err := a.initIwExec()
 	if err != nil {
-		a.Errorf("iw dev exec initialization: %v", err)
-		return err
+		return fmt.Errorf("iw exec initialization: %v", err)
 	}
 	a.exec = iw
 
@@ -84,7 +83,6 @@ func (a *AP) Init() error {
 func (a *AP) Check() error {
 	mx, err := a.collect()
 	if err != nil {
-		a.Error(err)
 		return err
 	}
 

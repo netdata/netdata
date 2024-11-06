@@ -5,6 +5,7 @@ package cockroachdb
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -67,14 +68,12 @@ func (c *CockroachDB) Configuration() any {
 
 func (c *CockroachDB) Init() error {
 	if err := c.validateConfig(); err != nil {
-		c.Errorf("error on validating config: %v", err)
-		return err
+		return fmt.Errorf("error on validating config: %v", err)
 	}
 
 	prom, err := c.initPrometheusClient()
 	if err != nil {
-		c.Error(err)
-		return err
+		return fmt.Errorf("error on initializing prometheus client: %v", err)
 	}
 	c.prom = prom
 
@@ -89,7 +88,6 @@ func (c *CockroachDB) Init() error {
 func (c *CockroachDB) Check() error {
 	mx, err := c.collect()
 	if err != nil {
-		c.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

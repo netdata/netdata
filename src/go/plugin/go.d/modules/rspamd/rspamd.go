@@ -5,6 +5,7 @@ package rspamd
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -60,14 +61,12 @@ func (r *Rspamd) Configuration() any {
 
 func (r *Rspamd) Init() error {
 	if r.URL == "" {
-		r.Error("URL not set")
-		return errors.New("url not set")
+		return errors.New("config: url not set")
 	}
 
 	client, err := web.NewHTTPClient(r.ClientConfig)
 	if err != nil {
-		r.Error(err)
-		return err
+		return fmt.Errorf("create http client: %v", err)
 	}
 	r.httpClient = client
 
@@ -80,7 +79,6 @@ func (r *Rspamd) Init() error {
 func (r *Rspamd) Check() error {
 	mx, err := r.collect()
 	if err != nil {
-		r.Error(err)
 		return err
 	}
 

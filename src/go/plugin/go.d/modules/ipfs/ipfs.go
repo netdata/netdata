@@ -5,6 +5,7 @@ package ipfs
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -65,14 +66,12 @@ func (ip *IPFS) Configuration() any {
 
 func (ip *IPFS) Init() error {
 	if ip.URL == "" {
-		ip.Error("URL not set")
 		return errors.New("url not set")
 	}
 
 	client, err := web.NewHTTPClient(ip.ClientConfig)
 	if err != nil {
-		ip.Error(err)
-		return err
+		return fmt.Errorf("http client init: %w", err)
 	}
 	ip.httpClient = client
 
@@ -94,7 +93,6 @@ func (ip *IPFS) Init() error {
 func (ip *IPFS) Check() error {
 	mx, err := ip.collect()
 	if err != nil {
-		ip.Error(err)
 		return err
 	}
 

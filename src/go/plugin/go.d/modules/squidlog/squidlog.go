@@ -4,6 +4,7 @@ package squidlog
 
 import (
 	_ "embed"
+	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
@@ -72,18 +73,15 @@ func (s *SquidLog) Init() error {
 func (s *SquidLog) Check() error {
 	// Note: these inits are here to make auto-detection retry working
 	if err := s.createLogReader(); err != nil {
-		s.Warning("check failed: ", err)
-		return err
+		return fmt.Errorf("failed to create log reader: %v", err)
 	}
 
 	if err := s.createParser(); err != nil {
-		s.Warning("check failed: ", err)
-		return err
+		return fmt.Errorf("failed to create log parser: %v", err)
 	}
 
 	if err := s.createCharts(s.line); err != nil {
-		s.Warning("check failed: ", err)
-		return err
+		return fmt.Errorf("failed to create log charts: %v", err)
 	}
 
 	return nil

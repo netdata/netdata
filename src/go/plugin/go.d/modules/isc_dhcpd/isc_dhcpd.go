@@ -7,6 +7,7 @@ package isc_dhcpd
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -67,21 +68,18 @@ func (d *DHCPd) Configuration() any {
 func (d *DHCPd) Init() error {
 	err := d.validateConfig()
 	if err != nil {
-		d.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	pools, err := d.initPools()
 	if err != nil {
-		d.Errorf("ip pools init: %v", err)
-		return err
+		return fmt.Errorf("ip pools init: %v", err)
 	}
 	d.pools = pools
 
 	charts, err := d.initCharts(pools)
 	if err != nil {
-		d.Errorf("charts init: %v", err)
-		return err
+		return fmt.Errorf("charts init: %v", err)
 	}
 	d.charts = charts
 
@@ -94,7 +92,6 @@ func (d *DHCPd) Init() error {
 func (d *DHCPd) Check() error {
 	mx, err := d.collect()
 	if err != nil {
-		d.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

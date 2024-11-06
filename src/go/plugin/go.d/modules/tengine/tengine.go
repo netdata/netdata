@@ -5,6 +5,7 @@ package tengine
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -60,14 +61,12 @@ func (t *Tengine) Configuration() any {
 
 func (t *Tengine) Init() error {
 	if t.URL == "" {
-		t.Error("url not set")
-		return errors.New("url not set")
+		return errors.New("config: url not set")
 	}
 
 	httpClient, err := web.NewHTTPClient(t.ClientConfig)
 	if err != nil {
-		t.Errorf("error on creating http client : %v", err)
-		return err
+		return fmt.Errorf("error on creating http client : %v", err)
 	}
 	t.httpClient = httpClient
 
@@ -80,7 +79,6 @@ func (t *Tengine) Init() error {
 func (t *Tengine) Check() error {
 	mx, err := t.collect()
 	if err != nil {
-		t.Error(err)
 		return err
 	}
 

@@ -5,6 +5,7 @@ package pihole
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -73,14 +74,12 @@ func (p *Pihole) Configuration() any {
 
 func (p *Pihole) Init() error {
 	if err := p.validateConfig(); err != nil {
-		p.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	httpClient, err := p.initHTTPClient()
 	if err != nil {
-		p.Errorf("init http client: %v", err)
-		return err
+		return fmt.Errorf("init http client: %v", err)
 	}
 	p.httpClient = httpClient
 
@@ -97,7 +96,6 @@ func (p *Pihole) Init() error {
 func (p *Pihole) Check() error {
 	mx, err := p.collect()
 	if err != nil {
-		p.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

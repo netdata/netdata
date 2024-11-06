@@ -5,6 +5,7 @@ package nginxvts
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -70,20 +71,18 @@ func (vts *NginxVTS) Cleanup() {
 func (vts *NginxVTS) Init() error {
 	err := vts.validateConfig()
 	if err != nil {
-		vts.Errorf("check configuration: %v", err)
-		return err
+		return fmt.Errorf("config: %v", err)
 	}
 
 	httpClient, err := vts.initHTTPClient()
 	if err != nil {
-		vts.Errorf("init HTTP client: %v", err)
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	vts.httpClient = httpClient
 
 	charts, err := vts.initCharts()
 	if err != nil {
-		vts.Errorf("init charts: %v", err)
-		return err
+		return fmt.Errorf("init charts: %v", err)
 	}
 	vts.charts = charts
 
@@ -93,7 +92,6 @@ func (vts *NginxVTS) Init() error {
 func (vts *NginxVTS) Check() error {
 	mx, err := vts.collect()
 	if err != nil {
-		vts.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

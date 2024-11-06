@@ -5,6 +5,7 @@ package x509check
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -64,14 +65,12 @@ func (x *X509Check) Configuration() any {
 
 func (x *X509Check) Init() error {
 	if err := x.validateConfig(); err != nil {
-		x.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	prov, err := x.initProvider()
 	if err != nil {
-		x.Errorf("certificate provider init: %v", err)
-		return err
+		return fmt.Errorf("certificate provider init: %v", err)
 	}
 	x.prov = prov
 
@@ -83,7 +82,6 @@ func (x *X509Check) Init() error {
 func (x *X509Check) Check() error {
 	mx, err := x.collect()
 	if err != nil {
-		x.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

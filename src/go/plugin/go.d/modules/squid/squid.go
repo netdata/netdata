@@ -5,6 +5,7 @@ package squid
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -60,14 +61,12 @@ func (s *Squid) Configuration() any {
 
 func (s *Squid) Init() error {
 	if s.URL == "" {
-		s.Error("URL not set")
-		return errors.New("url not set")
+		return errors.New("config: url not set")
 	}
 
 	client, err := web.NewHTTPClient(s.ClientConfig)
 	if err != nil {
-		s.Error(err)
-		return err
+		return fmt.Errorf("init http client: %w", err)
 	}
 	s.httpClient = client
 
@@ -80,7 +79,6 @@ func (s *Squid) Init() error {
 func (s *Squid) Check() error {
 	mx, err := s.collect()
 	if err != nil {
-		s.Error(err)
 		return err
 	}
 

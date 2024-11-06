@@ -77,7 +77,6 @@ func (l *OpenLDAP) Init() error {
 func (l *OpenLDAP) Check() error {
 	mx, err := l.collect()
 	if err != nil {
-		l.Error(err)
 		return err
 	}
 

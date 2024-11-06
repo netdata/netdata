@@ -64,7 +64,6 @@ func (l *Litespeed) Init() error {
 func (l *Litespeed) Check() error {
 	mx, err := l.collect()
 	if err != nil {
-		l.Error(err)
 		return err
 	}
 
