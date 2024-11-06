@@ -994,18 +994,12 @@ jobs:
         id: load
         if: needs.file-check.outputs.run == 'true'
         run: docker load --input image.tar
-      - name: netdata-installer on ${{ matrix.distro }}, require cloud
+      - name: netdata-installer on ${{ matrix.distro }}
         id: build-cloud
         if: needs.file-check.outputs.run == 'true'
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
               /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --one-time-build ${{ needs.file-check.outputs.skip-go }}'
-      - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
-        id: build-no-jsonc
-        if: matrix.jsonc_removal != '' && needs.file-check.outputs.run == 'true'
-        run: |
-          docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
-              /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --one-time-build ${{ needs.file-check.outputs.skip-go }}'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
