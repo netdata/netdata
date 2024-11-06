@@ -1,17 +1,14 @@
+# RAM Utilization
 
-# RAM Requirements
+Using the default [Database Tier configuration](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md), Netdata needs about 16KiB per unique metric collected, independently of the data collection frequency.
 
-With default configuration about database tiers, Netdata should need about 16KiB per unique metric collected, independently of the data collection frequency.
+## Children
 
-Netdata supports memory ballooning and automatically sizes and limits the memory used, based on the metrics concurrently being collected.
-
-## On Production Systems, Netdata Children
-
-With default settings, Netdata should run with 100MB to 200MB of RAM, depending on the number of metrics being collected.
+Netdata by default should need 100MB to 200MB of RAM, depending on the number of metrics being collected.
 
 This number can be lowered by limiting the number of database tier or switching database modes. For more information, check [Disk Requirements and Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md).
 
-## On Metrics Centralization Points, Netdata Parents
+## Parents
 
 |Description|Scope|RAM Required|Notes|
 |:---|:---:|:---:|:---|
@@ -56,7 +53,7 @@ memory = UNIQUE_METRICS x 16KiB + CONFIGURED_CACHES
 
 The default `CONFIGURED_CACHES` is 32MiB.
 
-For one million concurrently collected time-series (independently of their data collection frequency), the memory required is:
+For **one million concurrently collected time-series** (independently of their data collection frequency), **the required memory is 16 GiB**. In detail:
 
 ```text
 UNIQUE_METRICS = 1000000
@@ -68,19 +65,11 @@ CONFIGURED_CACHES = 32MiB
 about 16 GiB
 ```
 
-There are two cache sizes that can be configured in `netdata.conf`:
-
-1. `[db].dbengine page cache size`: this is the main cache that keeps metrics data into memory. When data is not found in it, the extent cache is consulted, and if not found in that too, they are loaded from the disk.
-2. `[db].dbengine extent cache size`: this is the compressed extent cache. It keeps in memory compressed data blocks, as they appear on disk, to avoid reading them again. Data found in the extent cache but not in the main cache have to be uncompressed to be queried.
-
-Both of them are dynamically adjusted to use some of the total memory computed above. The configuration in `netdata.conf` allows providing additional memory to them, increasing their caching efficiency.
-
-
-## I have a Netdata Parent that is also a systemd-journal logs centralization point, what should I know?
+## Parents that also act as `systemd-journal` Logs centralization points
 
 Logs usually require significantly more disk space and I/O bandwidth than metrics. For optimal performance, we recommend to store metrics and logs on separate, independent disks.
 
-Netdata uses direct-I/O for its database, so that it does not pollute the system caches with its own data. We want Netdata to be a nice citizen when it runs side-by-side with production applications, so this was required to guarantee that Netdata does not affect the operation of databases or other sensitive applications running on the same servers.
+Netdata uses direct-I/O for its database, in order to not pollute the system caches with its own data.
 
 To optimize disk I/O, Netdata maintains its own private caches. The default settings of these caches are automatically adjusted to the minimum required size for acceptable metrics query performance.
 

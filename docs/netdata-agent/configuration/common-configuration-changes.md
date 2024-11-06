@@ -8,47 +8,75 @@ This document assumes familiarity with
 using [`edit-config`](/docs/netdata-agent/configuration/README.md) from the Netdata config
 directory.
 
-## Change dashboards and visualizations
+## Reduce data collection frequency
 
-The Netdata Agent's [local dashboard](/docs/dashboards-and-charts/README.md), accessible
-at `http://NODE:19999` is highly configurable. If
-you use [Netdata Cloud](/docs/netdata-cloud/README.md)
-for infrastructure monitoring, you
-will see many of these
-changes reflected in those visualizations due to the way Netdata Cloud proxies metric data and metadata to your browser.
+### Global
 
-### Increase the long-term metrics retention period
+Using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) open `netdata.conf` and edit the `update every` value.
 
-Read our doc on [increasing long-term metrics storage](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md) for details.
+The default is `1`, meaning that the Agent collects metrics every second.
 
-### Reduce the data collection frequency
-
-Change `update every` in
-the [`[global]` section](/src/daemon/config/README.md#global-section-options)
-of `netdata.conf` so
-that it is greater than `1`. An `update every` of `5` means the Netdata Agent enforces a _minimum_ collection frequency
-of 5 seconds.
+If you change this to `2`, Netdata enforces a minimum `update every` setting of 2 seconds, and collects metrics every other second, which will effectively halve CPU utilization.
 
 ```text
 [global]
+    update every = 2
+```
+
+Set this to `5` or `10` to collect metrics every 5 or 10 seconds, respectively.
+
+### Specific plugin or collector
+
+Every collector and plugin has its own `update every` setting, which you can also change in the plugin's configuration file, or in the individual collector configuration files.
+
+If the `update every` for an individual collector is less than the global, the Netdata Agent uses the global setting.
+
+To reduce the frequency of a [plugin](/src/collectors/README.md#collector-architecture-and-terminology), open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) and find the appropriate section. For example, to reduce the frequency of the `apps` plugin:
+
+```text
+[plugin:apps]
     update every = 5
 ```
 
-Every collector and plugin has its own `update every` setting, which you can also change in the `go.d.conf`,
-`python.d.conf` or `charts.d.conf` files, or in individual collector configuration files. If the `update
-every` for an individual collector is less than the global, the Netdata Agent uses the global setting. See
-the [enable or configure a collector](/src/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module)
-doc for details.
+To [reduce collection frequency of a collector](/src/collectors/REFERENCE.md#configure-a-collector), open its configuration file using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) and look for the `update_every` setting.
 
-### Disable a collector or plugin
+For example, to reduce the frequency of the `nginx` collector, run `sudo ./edit-config go.d/nginx.conf`:
 
-Turn off entire plugins in
-the [`[plugins]` section](/src/daemon/config/README.md#plugins-section-options)
-of
-`netdata.conf`.
+```text
+update_every: 20
 
-To disable specific collectors, open `go.d.conf`, `python.d.conf` or `charts.d.conf` and find the line
-for that specific module. Uncomment the line and change its value to `no`.
+jobs:
+...
+```
+
+## Disable a Collector or Plugin
+
+Using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config), open `netdata.conf` and scroll down to the `[plugins]` section.
+
+To disable a plugin, uncomment it and set the value to `no`. For example, to explicitly keep the `proc` and `go.d` plugins enabled while disabling `python.d` and `charts.d`, you would do:
+
+```text
+[plugins]
+    proc = yes
+    python.d = no
+    charts.d = no
+    go.d = yes
+```
+
+Disable specific collectors by opening their respective plugin configuration files, uncommenting the line for the collector, and setting its value to `no`.
+
+```bash
+sudo ./edit-config go.d.conf
+```
+
+For example, to disable a few Go collectors:
+
+```text
+modules:
+   adaptec_raid: no
+   activemq: no
+   ap: no
+```
 
 ## Modify alerts and notifications
 
@@ -139,6 +167,6 @@ The following restrictions apply to host label names:
 - Names cannot start with `_`, but it can be present in other parts of the name.
 - Names only accept alphabet letters, numbers, dots, and dashes.
 
-The policy for values is more flexible, but you cannot use exclamation marks (`!`), whitespaces (` `), single quotes
+The policy for values is more flexible, but you cannot use exclamation marks (`!`), whitespaces (``), single quotes
 (`'`), double quotes (`"`), or asterisks (`*`), because they are used to compare label values in health alerts and
 templates.

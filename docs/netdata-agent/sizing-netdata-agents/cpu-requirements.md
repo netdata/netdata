@@ -1,4 +1,4 @@
-# CPU
+# CPU Utilization
 
 Netdata's CPU usage depends on the features you enable. For details, see [resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md).
 
@@ -6,11 +6,11 @@ Netdata's CPU usage depends on the features you enable. For details, see [resour
 
 With default settings on Children, CPU utilization typically falls within the range of 1% to 5% of a single core. This includes the combined resource usage of:
 
-- Three database tiers for data storage.
-- Machine learning for anomaly detection.
-- Per-second data collection.
-- Alerts.
-- Streaming to a [Parent Agent](/docs/observability-centralization-points/metrics-centralization-points/README.md).
+- Three database tiers for data storage
+- Machine learning for anomaly detection
+- Per-second data collection
+- Alerts
+- Streaming to a [Parent Agent](/docs/observability-centralization-points/metrics-centralization-points/README.md)
 
 ## Parents
 
