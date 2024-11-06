@@ -34,6 +34,7 @@
             </Feature>
 
             <WixVariable Id="WixUIBannerBmp" Value="Top.bmp" />
+            <WixVariable Id="WixUIDialogBmp" Value="BackGround.bmp" />
             <UIRef Id="WixUI_ErrorProgressText" />
             <ui:WixUI Id="FeatureTree_ViewLicense" />
     </Package>
@@ -223,7 +224,7 @@
     <Fragment>
         <UI>
             <Dialog Id="NDConfigDialog" Width="370" Height="270" Title="Netdata Cloud">
-                <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" />
+                <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
                 <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
                 <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
                 <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Enter your Space's Claim Token and the Room IDs where you want to add the Agent." />
