@@ -8,75 +8,6 @@ This document assumes familiarity with
 using [`edit-config`](/docs/netdata-agent/configuration/README.md) from the Netdata config
 directory.
 
-## Reduce data collection frequency
-
-### Global
-
-Using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) open `netdata.conf` and edit the `update every` value.
-
-The default is `1`, meaning that the Agent collects metrics every second.
-
-If you change this to `2`, Netdata enforces a minimum `update every` setting of 2 seconds, and collects metrics every other second, which will effectively halve CPU utilization.
-
-```text
-[global]
-    update every = 2
-```
-
-Set this to `5` or `10` to collect metrics every 5 or 10 seconds, respectively.
-
-### Specific plugin or collector
-
-Every collector and plugin has its own `update every` setting, which you can also change in the plugin's configuration file, or in the individual collector configuration files.
-
-If the `update every` for an individual collector is less than the global, the Netdata Agent uses the global setting.
-
-To reduce the frequency of a [plugin](/src/collectors/README.md#collector-architecture-and-terminology), open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) and find the appropriate section. For example, to reduce the frequency of the `apps` plugin:
-
-```text
-[plugin:apps]
-    update every = 5
-```
-
-To [reduce collection frequency of a collector](/src/collectors/REFERENCE.md#configure-a-collector), open its configuration file using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) and look for the `update_every` setting.
-
-For example, to reduce the frequency of the `nginx` collector, run `sudo ./edit-config go.d/nginx.conf`:
-
-```text
-update_every: 20
-
-jobs:
-...
-```
-
-## Disable a Collector or Plugin
-
-Using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config), open `netdata.conf` and scroll down to the `[plugins]` section.
-
-To disable a plugin, uncomment it and set the value to `no`. For example, to explicitly keep the `proc` and `go.d` plugins enabled while disabling `python.d` and `charts.d`, you would do:
-
-```text
-[plugins]
-    proc = yes
-    python.d = no
-    charts.d = no
-    go.d = yes
-```
-
-Disable specific collectors by opening their respective plugin configuration files, uncommenting the line for the collector, and setting its value to `no`.
-
-```bash
-sudo ./edit-config go.d.conf
-```
-
-For example, to disable a few Go collectors:
-
-```text
-modules:
-   adaptec_raid: no
-   activemq: no
-   ap: no
-```
 
 ## Modify alerts and notifications
 
@@ -145,13 +76,6 @@ While the Netdata Agent is both [open and secure by design](https://www.netdata.
 recommend every user take some action to administer and secure their nodes.
 
 Learn more about the available options in the [security design documentation](/docs/security-and-privacy-design/README.md).
-
-## Reduce resource usage
-
-Read
-our [performance optimization guide](/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md)
-for a long list of specific changes
-that can reduce the Netdata Agent's CPU/memory footprint and IO requirements.
 
 ## Organize nodes with host labels
 

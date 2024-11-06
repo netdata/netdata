@@ -28,19 +28,19 @@ For production environments, Parent nodes outside the production infrastructure 
 
 ## Disable Plugins or Collectors
 
-If you know that you don't need an [entire plugin or a specific collector](/src/collectors/README.md#collector-architecture-and-terminology), you can disable them.
+If you know that you don't need an [entire Plugin or a specific Collector](/src/collectors/README.md#collector-architecture-and-terminology), you can disable them.
 
 > **Note**
 >
-> Keep in mind that if a plugin or a collector has nothing to collect, it simply shuts down and doesn’t consume system resources. You will only improve the Agent's performance by disabling plugins/collectors that are actively collecting metrics.
+> Keep in mind that if a Plugin or a Collector has nothing to collect, it simply shuts down and doesn’t consume system resources. You will only improve the Agent's performance by disabling Plugins/Collectors that are actively collecting metrics.
 
-Check our documentation on [instructions for disabling plugins and collectors](/docs/netdata-agent/configuration/common-configuration-changes.md#disable-a-collector-or-plugin)
+Check our documentation on [instructions for disabling Plugins and Collectors](/docs/netdata-agent/configuration/collectors/enable-or-disable-collectors-and-plugins.md)
 
 ## Reduce data collection frequency
 
 The fastest way to improve the Agent's resource utilization is to reduce how often it collects metrics.
 
-If you don't need per-second metrics, or if the Netdata Agent uses a lot of CPU even when no one is viewing that node's dashboard, [configure the Agent to collect metrics less often](/docs/netdata-agent/configuration/common-configuration-changes.md#reduce-data-collection-frequency).
+If you don't need per-second metrics, or if the Netdata Agent uses a lot of CPU even when no one is viewing that node's dashboard, [configure the Agent to collect metrics less often](/docs/netdata-agent/configuration/collectors/data-collection-frequency.md).
 
 ## Lower memory usage for metric retention
 

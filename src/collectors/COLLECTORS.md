@@ -3,7 +3,7 @@
 Netdata uses collectors to help you gather metrics from your favorite applications and services and view them in
 real-time, interactive charts. The following list includes all the integrations where Netdata can gather metrics from.
 
-Learn more about [how collectors work](/src/collectors/README.md), and then learn how to [enable or configure](/src/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module) a specific collector.
+Learn more about [how collectors work](/src/collectors/README.md), and then learn how to [enable or configure](/src/collectors/REFERENCE.md) a specific collector.
 
 > **Note**
 >
