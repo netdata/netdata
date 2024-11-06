@@ -1,32 +1,18 @@
 # go.d.plugin
 
-`go.d.plugin` is a [Netdata](https://github.com/netdata/netdata) external plugin. It is an **orchestrator** for data
-collection modules written in `go`.
+`go.d.plugin` is a [Netdata](https://github.com/netdata/netdata) external plugin:
 
-1. It runs as an independent process (`ps fax` shows it).
-2. It is started and stopped automatically by Netdata.
-3. It communicates with Netdata via a unidirectional pipe (sending data to the Netdata daemon).
-4. Supports any number of data collection modules.
-5. Allows each module to have any number of data collection jobs.
-
-## Bug reports, feature requests, and questions
-
-Are welcome! We are using [netdata/netdata](https://github.com/netdata/netdata/) repository for bugs, feature requests,
-and questions.
-
-- [GitHub Issues](https://github.com/netdata/netdata/issues/new/choose): report bugs or open a new feature request.
-- [GitHub Discussions](https://github.com/netdata/netdata/discussions): ask a question or suggest a new idea.
-
-## Install
-
-Go.d.plugin is shipped with Netdata.
+- **Independent Operation**: Runs as a separate process from Netdata core, visible in system process lists (`ps fax`).
+- **Automated Management**: Integrated with Netdata's lifecycle management, managed automatically by Netdata (start/stop operations).
+- **Efficient Communication**: Uses a unidirectional pipe for optimal data transfer to Netdata.
+- **Modular Architecture**:
+    - Supports an unlimited number of data collection modules.
+    - Each module can run multiple collection jobs simultaneously.
+    - Easy to extend with new collection modules
 
 ### Required Linux capabilities
 
-All capabilities are set automatically during Netdata installation using
-the [official installation method](/packaging/installer/methods/kickstart.md).
-No further action required. If you have used a different installation method and need to set the capabilities manually,
-see the appropriate collector readme.
+All capabilities are set automatically during Netdata installation using the [official installation method](/packaging/installer/methods/kickstart.md).
 
 | Capability          |                                               Required by                                               |
 |:--------------------|:-------------------------------------------------------------------------------------------------------:|
@@ -35,6 +21,9 @@ see the appropriate collector readme.
 | CAP_DAC_READ_SEARCH | [Filecheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/filecheck#readme) |
 
 ## Available modules
+
+<details>
+<summary>Data Collection Modules</summary>
 
 | Name                                                                                                               |           Monitors            |
 |:-------------------------------------------------------------------------------------------------------------------|:-----------------------------:|
@@ -159,6 +148,8 @@ see the appropriate collector readme.
 | [zfspool](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/zfspool)                       |           ZFS Pools           |
 | [zookeeper](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/zookeeper)                   |           ZooKeeper           |
 
+</details>
+
 ## Configuration
 
 Edit the `go.d.conf` configuration file using `edit-config` from the
@@ -194,18 +185,7 @@ modules:
   example: yes
 ```
 
-Then [restart netdata](/docs/netdata-agent/start-stop-restart.md)
-for the change to take effect.
-
-## Contributing
-
-If you want to contribute to this project, we are humbled. Please take a look at
-our [contributing guidelines](https://github.com/netdata/.github/blob/main/CONTRIBUTING.md) and don't hesitate to
-contact us in our forums.
-
-### How to develop a collector
-
-Read [how to write a Netdata collector in Go](/src/go/plugin/go.d/docs/how-to-write-a-module.md).
+Then [restart netdata](/docs/netdata-agent/start-stop-restart.md) for the change to take effect.
 
 ## Troubleshooting
 
@@ -237,10 +217,3 @@ sudo su -s /bin/bash netdata
 ```
 
 Change `<module name>` to the [module name](#available-modules) you want to debug.
-
-## Netdata Community
-
-This repository follows the Netdata Code of Conduct and is part of the Netdata Community.
-
-- [Community Forums](https://community.netdata.cloud)
-- [Netdata Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md)
