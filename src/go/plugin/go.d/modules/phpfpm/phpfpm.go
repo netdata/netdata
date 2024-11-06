@@ -5,6 +5,7 @@ package phpfpm
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -61,8 +62,7 @@ func (p *Phpfpm) Configuration() any {
 func (p *Phpfpm) Init() error {
 	c, err := p.initClient()
 	if err != nil {
-		p.Errorf("init client: %v", err)
-		return err
+		return fmt.Errorf("init client: %v", err)
 	}
 	p.client = c
 
@@ -72,7 +72,6 @@ func (p *Phpfpm) Init() error {
 func (p *Phpfpm) Check() error {
 	mx, err := p.collect()
 	if err != nil {
-		p.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

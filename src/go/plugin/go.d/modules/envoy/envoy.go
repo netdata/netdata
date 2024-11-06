@@ -5,6 +5,7 @@ package envoy
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -75,14 +76,12 @@ func (e *Envoy) Configuration() any {
 
 func (e *Envoy) Init() error {
 	if err := e.validateConfig(); err != nil {
-		e.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	prom, err := e.initPrometheusClient()
 	if err != nil {
-		e.Errorf("init Prometheus client: %v", err)
-		return err
+		return fmt.Errorf("init Prometheus client: %v", err)
 	}
 	e.prom = prom
 
@@ -92,7 +91,6 @@ func (e *Envoy) Init() error {
 func (e *Envoy) Check() error {
 	mx, err := e.collect()
 	if err != nil {
-		e.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

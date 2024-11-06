@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -69,8 +70,7 @@ func (p *PgBouncer) Configuration() any {
 func (p *PgBouncer) Init() error {
 	err := p.validateConfig()
 	if err != nil {
-		p.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	return nil
@@ -79,7 +79,6 @@ func (p *PgBouncer) Init() error {
 func (p *PgBouncer) Check() error {
 	mx, err := p.collect()
 	if err != nil {
-		p.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

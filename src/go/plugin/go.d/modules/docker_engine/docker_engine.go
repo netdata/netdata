@@ -5,6 +5,7 @@ package docker_engine
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -60,14 +61,12 @@ func (de *DockerEngine) Configuration() any {
 
 func (de *DockerEngine) Init() error {
 	if err := de.validateConfig(); err != nil {
-		de.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	prom, err := de.initPrometheusClient()
 	if err != nil {
-		de.Error(err)
-		return err
+		return fmt.Errorf("init prometheus client: %v", err)
 	}
 	de.prom = prom
 
@@ -77,7 +76,6 @@ func (de *DockerEngine) Init() error {
 func (de *DockerEngine) Check() error {
 	mx, err := de.collect()
 	if err != nil {
-		de.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

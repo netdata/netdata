@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -73,21 +74,18 @@ func (p *Pika) Configuration() any {
 func (p *Pika) Init() error {
 	err := p.validateConfig()
 	if err != nil {
-		p.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	pdb, err := p.initRedisClient()
 	if err != nil {
-		p.Errorf("init redis client: %v", err)
-		return err
+		return fmt.Errorf("init redis client: %v", err)
 	}
 	p.pdb = pdb
 
 	charts, err := p.initCharts()
 	if err != nil {
-		p.Errorf("init charts: %v", err)
-		return err
+		return fmt.Errorf("init charts: %v", err)
 	}
 	p.charts = charts
 
@@ -97,7 +95,6 @@ func (p *Pika) Init() error {
 func (p *Pika) Check() error {
 	mx, err := p.collect()
 	if err != nil {
-		p.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

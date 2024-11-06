@@ -75,14 +75,12 @@ func (n *NTPd) Configuration() any {
 
 func (n *NTPd) Init() error {
 	if n.Address == "" {
-		n.Error("config validation: 'address' can not be empty")
-		return errors.New("address not set")
+		return errors.New("config: 'address' can not be empty")
 	}
 
 	txt := "0.0.0.0 127.0.0.0/8"
 	r, err := iprange.ParseRanges(txt)
 	if err != nil {
-		n.Errorf("error on parsing ip range '%s': %v", txt, err)
 		return fmt.Errorf("error on parsing ip range '%s': %v", txt, err)
 	}
 
@@ -94,7 +92,6 @@ func (n *NTPd) Init() error {
 func (n *NTPd) Check() error {
 	mx, err := n.collect()
 	if err != nil {
-		n.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

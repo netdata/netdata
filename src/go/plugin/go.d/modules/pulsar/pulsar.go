@@ -5,6 +5,7 @@ package pulsar
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -82,21 +83,18 @@ func (p *Pulsar) Configuration() any {
 
 func (p *Pulsar) Init() error {
 	if err := p.validateConfig(); err != nil {
-		p.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	prom, err := p.initPrometheusClient()
 	if err != nil {
-		p.Error(err)
-		return err
+		return fmt.Errorf("init prometheus client: %v", err)
 	}
 	p.prom = prom
 
 	m, err := p.initTopicFilerMatcher()
 	if err != nil {
-		p.Error(err)
-		return err
+		return fmt.Errorf("init topic filer: %v", err)
 	}
 	p.topicFilter = m
 
@@ -106,7 +104,6 @@ func (p *Pulsar) Init() error {
 func (p *Pulsar) Check() error {
 	mx, err := p.collect()
 	if err != nil {
-		p.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

@@ -7,6 +7,7 @@ package dmcache
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -65,8 +66,7 @@ func (c *DmCache) Configuration() any {
 func (c *DmCache) Init() error {
 	dmsetup, err := c.initDmsetupCLI()
 	if err != nil {
-		c.Errorf("dmsetup exec initialization: %v", err)
-		return err
+		return fmt.Errorf("dmsetup exec initialization: %v", err)
 	}
 	c.exec = dmsetup
 
@@ -76,7 +76,6 @@ func (c *DmCache) Init() error {
 func (c *DmCache) Check() error {
 	mx, err := c.collect()
 	if err != nil {
-		c.Error(err)
 		return err
 	}
 

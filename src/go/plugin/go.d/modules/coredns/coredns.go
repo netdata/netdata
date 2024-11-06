@@ -5,6 +5,7 @@ package coredns
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
@@ -75,14 +76,12 @@ func (cd *CoreDNS) Configuration() any {
 
 func (cd *CoreDNS) Init() error {
 	if err := cd.validateConfig(); err != nil {
-		cd.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	sm, err := cd.initPerServerMatcher()
 	if err != nil {
-		cd.Error(err)
-		return err
+		return fmt.Errorf("init per_server_stats: %v", err)
 	}
 	if sm != nil {
 		cd.perServerMatcher = sm
@@ -90,8 +89,7 @@ func (cd *CoreDNS) Init() error {
 
 	zm, err := cd.initPerZoneMatcher()
 	if err != nil {
-		cd.Error(err)
-		return err
+		return fmt.Errorf("init per_zone_stats: %v", err)
 	}
 	if zm != nil {
 		cd.perZoneMatcher = zm
@@ -99,8 +97,7 @@ func (cd *CoreDNS) Init() error {
 
 	prom, err := cd.initPrometheusClient()
 	if err != nil {
-		cd.Error(err)
-		return err
+		return fmt.Errorf("init prometheus client: %v", err)
 	}
 	cd.prom = prom
 
@@ -110,7 +107,6 @@ func (cd *CoreDNS) Init() error {
 func (cd *CoreDNS) Check() error {
 	mx, err := cd.collect()
 	if err != nil {
-		cd.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

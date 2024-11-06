@@ -5,6 +5,7 @@ package vcsa
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -75,14 +76,12 @@ func (vc *VCSA) Configuration() any {
 
 func (vc *VCSA) Init() error {
 	if err := vc.validateConfig(); err != nil {
-		vc.Error(err)
-		return err
+		return fmt.Errorf("invalid config: %v", err)
 	}
 
 	c, err := vc.initHealthClient()
 	if err != nil {
-		vc.Errorf("error on creating health client : %vc", err)
-		return err
+		return fmt.Errorf("error on creating health client : %vc", err)
 	}
 	vc.client = c
 
@@ -95,13 +94,11 @@ func (vc *VCSA) Init() error {
 func (vc *VCSA) Check() error {
 	err := vc.client.Login()
 	if err != nil {
-		vc.Error(err)
 		return err
 	}
 
 	mx, err := vc.collect()
 	if err != nil {
-		vc.Error(err)
 		return err
 	}
 

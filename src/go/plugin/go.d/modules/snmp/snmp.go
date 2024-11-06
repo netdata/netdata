@@ -5,6 +5,7 @@ package snmp
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -85,35 +86,30 @@ func (s *SNMP) Configuration() any {
 func (s *SNMP) Init() error {
 	err := s.validateConfig()
 	if err != nil {
-		s.Errorf("config validation failed: %v", err)
-		return err
+		return fmt.Errorf("config validation failed: %v", err)
 	}
 
 	snmpClient, err := s.initSNMPClient()
 	if err != nil {
-		s.Errorf("failed to initialize SNMP client: %v", err)
-		return err
+		return fmt.Errorf("failed to initialize SNMP client: %v", err)
 	}
 
 	err = snmpClient.Connect()
 	if err != nil {
-		s.Errorf("SNMP client connection failed: %v", err)
-		return err
+		return fmt.Errorf("SNMP client connection failed: %v", err)
 	}
 	s.snmpClient = snmpClient
 
 	byName, byType, err := s.initNetIfaceFilters()
 	if err != nil {
-		s.Errorf("failed to initialize network interface filters: %v", err)
-		return err
+		return fmt.Errorf("failed to initialize network interface filters: %v", err)
 	}
 	s.netIfaceFilterByName = byName
 	s.netIfaceFilterByType = byType
 
 	charts, err := newUserInputCharts(s.ChartsInput)
 	if err != nil {
-		s.Errorf("failed to create user charts: %v", err)
-		return err
+		return fmt.Errorf("failed to create user charts: %v", err)
 	}
 	s.charts = charts
 
@@ -125,7 +121,6 @@ func (s *SNMP) Init() error {
 func (s *SNMP) Check() error {
 	mx, err := s.collect()
 	if err != nil {
-		s.Error(err)
 		return err
 	}
 

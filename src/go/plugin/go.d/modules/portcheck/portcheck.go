@@ -5,6 +5,7 @@ package portcheck
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net"
 	"time"
 
@@ -74,8 +75,7 @@ func (pc *PortCheck) Configuration() any {
 
 func (pc *PortCheck) Init() error {
 	if err := pc.validateConfig(); err != nil {
-		pc.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	pc.tcpPorts, pc.udpPorts = pc.initPorts()

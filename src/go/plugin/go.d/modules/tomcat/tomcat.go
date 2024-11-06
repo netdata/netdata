@@ -5,6 +5,7 @@ package tomcat
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -65,14 +66,12 @@ func (t *Tomcat) Configuration() any {
 
 func (t *Tomcat) Init() error {
 	if err := t.validateConfig(); err != nil {
-		t.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	httpClient, err := t.initHTTPClient()
 	if err != nil {
-		t.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 
 	t.httpClient = httpClient
@@ -86,7 +85,6 @@ func (t *Tomcat) Init() error {
 func (t *Tomcat) Check() error {
 	mx, err := t.collect()
 	if err != nil {
-		t.Error(err)
 		return err
 	}
 

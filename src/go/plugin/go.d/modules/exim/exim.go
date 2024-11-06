@@ -5,6 +5,7 @@ package exim
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -55,8 +56,7 @@ func (e *Exim) Configuration() any {
 func (e *Exim) Init() error {
 	exim, err := e.initEximExec()
 	if err != nil {
-		e.Errorf("exim exec initialization: %v", err)
-		return err
+		return fmt.Errorf("exim exec initialization: %v", err)
 	}
 	e.exec = exim
 
@@ -66,7 +66,6 @@ func (e *Exim) Init() error {
 func (e *Exim) Check() error {
 	mx, err := e.collect()
 	if err != nil {
-		e.Error(err)
 		return err
 	}
 

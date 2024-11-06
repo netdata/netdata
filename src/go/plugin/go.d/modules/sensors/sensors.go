@@ -76,7 +76,6 @@ func (s *Sensors) Init() error {
 func (s *Sensors) Check() error {
 	mx, err := s.collect()
 	if err != nil {
-		s.Error(err)
 		return err
 	}
 

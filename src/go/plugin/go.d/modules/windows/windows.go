@@ -5,6 +5,7 @@ package windows
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -123,14 +124,12 @@ func (w *Windows) Configuration() any {
 
 func (w *Windows) Init() error {
 	if err := w.validateConfig(); err != nil {
-		w.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	prom, err := w.initPrometheusClient()
 	if err != nil {
-		w.Errorf("init prometheus clients: %v", err)
-		return err
+		return fmt.Errorf("init prometheus clients: %v", err)
 	}
 	w.prom = prom
 
@@ -140,7 +139,6 @@ func (w *Windows) Init() error {
 func (w *Windows) Check() error {
 	mx, err := w.collect()
 	if err != nil {
-		w.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

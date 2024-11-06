@@ -7,6 +7,7 @@ package adaptecraid
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -68,8 +69,7 @@ func (a *AdaptecRaid) Configuration() any {
 func (a *AdaptecRaid) Init() error {
 	arcconfExec, err := a.initArcconfCliExec()
 	if err != nil {
-		a.Errorf("arcconf exec initialization: %v", err)
-		return err
+		return fmt.Errorf("arcconf exec initialization: %v", err)
 	}
 	a.exec = arcconfExec
 
@@ -79,7 +79,6 @@ func (a *AdaptecRaid) Init() error {
 func (a *AdaptecRaid) Check() error {
 	mx, err := a.collect()
 	if err != nil {
-		a.Error(err)
 		return err
 	}
 

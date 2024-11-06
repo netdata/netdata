@@ -5,6 +5,7 @@ package activemq
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
@@ -75,28 +76,24 @@ func (a *ActiveMQ) Configuration() any {
 
 func (a *ActiveMQ) Init() error {
 	if err := a.validateConfig(); err != nil {
-		a.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	qf, err := a.initQueuesFiler()
 	if err != nil {
-		a.Error(err)
-		return err
+		return fmt.Errorf("init queues filer: %v", err)
 	}
 	a.queuesFilter = qf
 
 	tf, err := a.initTopicsFilter()
 	if err != nil {
-		a.Error(err)
-		return err
+		return fmt.Errorf("init topics filter: %v", err)
 	}
 	a.topicsFilter = tf
 
 	client, err := web.NewHTTPClient(a.ClientConfig)
 	if err != nil {
-		a.Error(err)
-		return err
+		return fmt.Errorf("create http client: %v", err)
 	}
 
 	a.apiClient = newAPIClient(client, a.RequestConfig, a.Webadmin)
@@ -107,7 +104,6 @@ func (a *ActiveMQ) Init() error {
 func (a *ActiveMQ) Check() error {
 	mx, err := a.collect()
 	if err != nil {
-		a.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

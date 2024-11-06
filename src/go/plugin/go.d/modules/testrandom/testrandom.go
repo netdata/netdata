@@ -4,6 +4,7 @@ package testrandom
 
 import (
 	_ "embed"
+	"fmt"
 	"math/rand"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -74,14 +75,12 @@ func (tr *TestRandom) Configuration() any {
 func (tr *TestRandom) Init() error {
 	err := tr.validateConfig()
 	if err != nil {
-		tr.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	charts, err := tr.initCharts()
 	if err != nil {
-		tr.Errorf("charts init: %v", err)
-		return err
+		return fmt.Errorf("charts init: %v", err)
 	}
 	tr.charts = charts
 	return nil

@@ -7,6 +7,7 @@ package smartctl
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
@@ -95,21 +96,18 @@ func (s *Smartctl) Configuration() any {
 
 func (s *Smartctl) Init() error {
 	if err := s.validateConfig(); err != nil {
-		s.Errorf("config validation error: %s", err)
-		return err
+		return fmt.Errorf("config validation: %s", err)
 	}
 
 	sr, err := s.initDeviceSelector()
 	if err != nil {
-		s.Errorf("device selector initialization: %v", err)
-		return err
+		return fmt.Errorf("device selector initialization: %v", err)
 	}
 	s.deviceSr = sr
 
 	smartctlExec, err := s.initSmartctlCli()
 	if err != nil {
-		s.Errorf("smartctl exec initialization: %v", err)
-		return err
+		return fmt.Errorf("smartctl exec initialization: %v", err)
 	}
 	s.exec = smartctlExec
 
@@ -119,7 +117,6 @@ func (s *Smartctl) Init() error {
 func (s *Smartctl) Check() error {
 	mx, err := s.collect()
 	if err != nil {
-		s.Error(err)
 		return err
 	}
 

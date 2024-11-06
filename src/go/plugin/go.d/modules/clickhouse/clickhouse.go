@@ -5,6 +5,7 @@ package clickhouse
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -69,14 +70,12 @@ func (c *ClickHouse) Configuration() any {
 
 func (c *ClickHouse) Init() error {
 	if err := c.validateConfig(); err != nil {
-		c.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	httpClient, err := c.initHTTPClient()
 	if err != nil {
-		c.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	c.httpClient = httpClient
 
@@ -89,7 +88,6 @@ func (c *ClickHouse) Init() error {
 func (c *ClickHouse) Check() error {
 	mx, err := c.collect()
 	if err != nil {
-		c.Error(err)
 		return err
 	}
 

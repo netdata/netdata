@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -105,14 +106,12 @@ func (p *Postgres) Configuration() any {
 func (p *Postgres) Init() error {
 	err := p.validateConfig()
 	if err != nil {
-		p.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	sr, err := p.initDBSelector()
 	if err != nil {
-		p.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 	p.dbSr = sr
 
@@ -125,7 +124,6 @@ func (p *Postgres) Init() error {
 func (p *Postgres) Check() error {
 	mx, err := p.collect()
 	if err != nil {
-		p.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

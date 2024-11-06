@@ -5,6 +5,7 @@ package fluentd
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
@@ -64,21 +65,18 @@ func (f *Fluentd) Configuration() any {
 
 func (f *Fluentd) Init() error {
 	if err := f.validateConfig(); err != nil {
-		f.Error(err)
-		return err
+		return fmt.Errorf("invalid config: %v", err)
 	}
 
 	pm, err := f.initPermitPluginMatcher()
 	if err != nil {
-		f.Error(err)
-		return err
+		return fmt.Errorf("init permit_plugin_id: %v", err)
 	}
 	f.permitPlugin = pm
 
 	client, err := f.initApiClient()
 	if err != nil {
-		f.Error(err)
-		return err
+		return fmt.Errorf("init api client: %v", err)
 	}
 	f.apiClient = client
 
@@ -91,7 +89,6 @@ func (f *Fluentd) Init() error {
 func (f *Fluentd) Check() error {
 	mx, err := f.collect()
 	if err != nil {
-		f.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

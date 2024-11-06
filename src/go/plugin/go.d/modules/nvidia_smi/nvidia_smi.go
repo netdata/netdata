@@ -67,7 +67,6 @@ func (nv *NvidiaSmi) Init() error {
 	if nv.exec == nil {
 		smi, err := nv.initNvidiaSmiExec()
 		if err != nil {
-			nv.Error(err)
 			return err
 		}
 		nv.exec = smi
@@ -79,7 +78,6 @@ func (nv *NvidiaSmi) Init() error {
 func (nv *NvidiaSmi) Check() error {
 	mx, err := nv.collect()
 	if err != nil {
-		nv.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

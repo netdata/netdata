@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -105,24 +106,21 @@ func (m *MySQL) Init() error {
 	if m.MyCNF != "" {
 		dsn, err := dsnFromFile(m.MyCNF)
 		if err != nil {
-			m.Error(err)
 			return err
 		}
 		m.DSN = dsn
 	}
 
 	if m.DSN == "" {
-		m.Error("dsn not set")
-		return errors.New("dsn not set")
+		return errors.New("config: dsn not set")
 	}
 
 	cfg, err := mysql.ParseDSN(m.DSN)
 	if err != nil {
-		m.Errorf("error on parsing DSN: %v", err)
-		return err
+		return fmt.Errorf("error on parsing DSN: %v", err)
 	}
 
-	cfg.Passwd = strings.Repeat("*", len(cfg.Passwd))
+	cfg.Passwd = strings.Repeat("x", len(cfg.Passwd))
 	m.safeDSN = cfg.FormatDSN()
 
 	m.Debugf("using DSN [%s]", m.DSN)
@@ -133,7 +131,6 @@ func (m *MySQL) Init() error {
 func (m *MySQL) Check() error {
 	mx, err := m.collect()
 	if err != nil {
-		m.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

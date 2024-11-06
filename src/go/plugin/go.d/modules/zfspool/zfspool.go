@@ -7,6 +7,7 @@ package zfspool
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -69,14 +70,12 @@ func (z *ZFSPool) Configuration() any {
 
 func (z *ZFSPool) Init() error {
 	if err := z.validateConfig(); err != nil {
-		z.Errorf("config validation: %s", err)
-		return err
+		return fmt.Errorf("config validation: %s", err)
 	}
 
 	zpoolExec, err := z.initZPoolCLIExec()
 	if err != nil {
-		z.Errorf("zpool exec initialization: %v", err)
-		return err
+		return fmt.Errorf("zpool exec initialization: %v", err)
 	}
 	z.exec = zpoolExec
 
@@ -86,7 +85,6 @@ func (z *ZFSPool) Init() error {
 func (z *ZFSPool) Check() error {
 	mx, err := z.collect()
 	if err != nil {
-		z.Error(err)
 		return err
 	}
 

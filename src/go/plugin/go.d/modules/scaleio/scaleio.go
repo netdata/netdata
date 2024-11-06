@@ -5,6 +5,7 @@ package scaleio
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -72,14 +73,12 @@ func (s *ScaleIO) Configuration() any {
 
 func (s *ScaleIO) Init() error {
 	if s.Username == "" || s.Password == "" {
-		s.Error("username and password aren't set")
-		return errors.New("username and password aren't set")
+		return errors.New("config: username and password aren't set")
 	}
 
 	c, err := client.New(s.ClientConfig, s.RequestConfig)
 	if err != nil {
-		s.Errorf("error on creating ScaleIO client: %v", err)
-		return err
+		return fmt.Errorf("error on creating ScaleIO client: %v", err)
 	}
 	s.client = c
 
@@ -91,12 +90,10 @@ func (s *ScaleIO) Init() error {
 
 func (s *ScaleIO) Check() error {
 	if err := s.client.Login(); err != nil {
-		s.Error(err)
 		return err
 	}
 	mx, err := s.collect()
 	if err != nil {
-		s.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

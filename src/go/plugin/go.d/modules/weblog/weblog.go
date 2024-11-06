@@ -4,6 +4,7 @@ package weblog
 
 import (
 	_ "embed"
+	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
@@ -101,18 +102,15 @@ func (w *WebLog) Configuration() any {
 
 func (w *WebLog) Init() error {
 	if err := w.createURLPatterns(); err != nil {
-		w.Errorf("init failed: %v", err)
-		return err
+		return fmt.Errorf("init failed: %v", err)
 	}
 
 	if err := w.createCustomFields(); err != nil {
-		w.Errorf("init failed: %v", err)
-		return err
+		return fmt.Errorf("init failed: %v", err)
 	}
 
 	if err := w.createCustomTimeFields(); err != nil {
-		w.Errorf("init failed: %v", err)
-		return err
+		return fmt.Errorf("init failed: %v", err)
 	}
 
 	if err := w.createCustomNumericFields(); err != nil {
@@ -128,18 +126,15 @@ func (w *WebLog) Init() error {
 func (w *WebLog) Check() error {
 	// Note: these inits are here to make auto-detection retry working
 	if err := w.createLogReader(); err != nil {
-		w.Warning("check failed: ", err)
-		return err
+		return fmt.Errorf("failed to create log reader: %v", err)
 	}
 
 	if err := w.createParser(); err != nil {
-		w.Warning("check failed: ", err)
-		return err
+		return fmt.Errorf("failed to create parser: %v", err)
 	}
 
 	if err := w.createCharts(w.line); err != nil {
-		w.Warning("check failed: ", err)
-		return err
+		return fmt.Errorf("failed to create charts: %v", err)
 	}
 
 	return nil

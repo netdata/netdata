@@ -80,8 +80,7 @@ func (ks *KubeState) Configuration() any {
 func (ks *KubeState) Init() error {
 	client, err := ks.initClient()
 	if err != nil {
-		ks.Errorf("client initialization: %v", err)
-		return err
+		return fmt.Errorf("init k8s client: %v", err)
 	}
 	ks.client = client
 
@@ -94,15 +93,12 @@ func (ks *KubeState) Init() error {
 
 func (ks *KubeState) Check() error {
 	if ks.client == nil || ks.discoverer == nil {
-		ks.Error("not initialized job")
 		return errors.New("not initialized")
 	}
 
 	ver, err := ks.client.Discovery().ServerVersion()
 	if err != nil {
-		err := fmt.Errorf("failed to connect to K8s API server: %v", err)
-		ks.Error(err)
-		return err
+		return fmt.Errorf("failed to connect to K8s API server: %v", err)
 	}
 
 	ks.Infof("successfully connected to the Kubernetes API server '%s'", ver)

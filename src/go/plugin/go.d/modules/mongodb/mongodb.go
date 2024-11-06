@@ -5,6 +5,7 @@ package mongo
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -76,13 +77,11 @@ func (m *Mongo) Configuration() any {
 
 func (m *Mongo) Init() error {
 	if err := m.verifyConfig(); err != nil {
-		m.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	if err := m.initDatabaseSelector(); err != nil {
-		m.Errorf("init database selector: %v", err)
-		return err
+		return fmt.Errorf("init database selector: %v", err)
 	}
 
 	return nil
@@ -91,7 +90,6 @@ func (m *Mongo) Init() error {
 func (m *Mongo) Check() error {
 	mx, err := m.collect()
 	if err != nil {
-		m.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

@@ -5,6 +5,7 @@ package httpcheck
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"time"
@@ -81,30 +82,26 @@ func (hc *HTTPCheck) Configuration() any {
 
 func (hc *HTTPCheck) Init() error {
 	if err := hc.validateConfig(); err != nil {
-		hc.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	hc.charts = hc.initCharts()
 
 	httpClient, err := hc.initHTTPClient()
 	if err != nil {
-		hc.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	hc.httpClient = httpClient
 
 	re, err := hc.initResponseMatchRegexp()
 	if err != nil {
-		hc.Errorf("init response match regexp: %v", err)
-		return err
+		return fmt.Errorf("init response match regexp: %v", err)
 	}
 	hc.reResponse = re
 
 	hm, err := hc.initHeaderMatch()
 	if err != nil {
-		hc.Errorf("init header match: %v", err)
-		return err
+		return fmt.Errorf("init header match: %v", err)
 	}
 	hc.headerMatch = hm
 
@@ -125,7 +122,6 @@ func (hc *HTTPCheck) Init() error {
 func (hc *HTTPCheck) Check() error {
 	mx, err := hc.collect()
 	if err != nil {
-		hc.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

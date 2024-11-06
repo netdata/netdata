@@ -5,6 +5,7 @@ package supervisord
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -67,14 +68,12 @@ func (s *Supervisord) Configuration() any {
 func (s *Supervisord) Init() error {
 	err := s.verifyConfig()
 	if err != nil {
-		s.Errorf("verify config: %v", err)
-		return err
+		return fmt.Errorf("verify config: %v", err)
 	}
 
 	client, err := s.initSupervisorClient()
 	if err != nil {
-		s.Errorf("init supervisord client: %v", err)
-		return err
+		return fmt.Errorf("init supervisord client: %v", err)
 	}
 	s.client = client
 
@@ -84,7 +83,6 @@ func (s *Supervisord) Init() error {
 func (s *Supervisord) Check() error {
 	mx, err := s.collect()
 	if err != nil {
-		s.Error(err)
 		return err
 	}
 	if len(mx) == 0 {
