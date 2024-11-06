@@ -1,67 +1,23 @@
 # Collectors
 
-When Netdata starts, and with zero configuration, it auto-detects thousands of data sources and immediately collects
-per-second metrics.
+Netdata automatically collects per-second metrics from thousands of data sources without any configuration:
 
-Netdata can immediately collect metrics from these endpoints thanks to 300+ **collectors**, which all come pre-installed
-when you [install Netdata](/packaging/installer/README.md).
+- **Zero-touch setup**: All collectors are pre-installed, allowing you to start collecting detailed metrics right after Netdata starts.
+- **Universal Monitoring**: Monitor virtually anything with Netdata's extensive collector library.
 
-All collectors are **installed by default** with every installation of Netdata. You do not need to install
-collectors manually to collect metrics from new sources.
-See how you can [monitor anything with Netdata](/src/collectors/COLLECTORS.md).
+If you don't see charts for your application, check our collectors' [configuration reference](/src/collectors/REFERENCE.md) to ensure both the collector and your application are properly configured.
 
-Upon startup, Netdata will **auto-detect** any application or service that has a collector, as long as both the collector
-and the app/service are configured correctly. If you don't see charts for your application, see
-our [collectors' configuration reference](/src/collectors/REFERENCE.md).
+## Collector Types
 
-## How Netdata's metrics collectors work
+Netdata's collectors are specialized data collection plugins that gather metrics from various sources. They are divided into two main categories:
 
-Every collector has two primary jobs:
+| Type     | Description                                                           | Key Features                                                                                                                                                                                                           |
+|----------|-----------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Internal | Native collectors that gather system-level metrics                    | • Written in `C` for optimal performance<br>• Run as threads within Netdata daemon<br>• Zero external dependencies<br>• Minimal system overhead                                                                        |
+| External | Modular collectors that gather metrics from applications and services | • Support multiple programming languages<br>• Run as independent processes<br>• Communicate via pipes with Netdata<br>• Managed by [plugins.d](/src/plugins.d/README.md)<br>• Examples: MySQL, Nginx, Redis collectors |
 
-- Look for exposed metrics at a pre- or user-defined endpoint.
-- Gather exposed metrics and use additional logic to build meaningful, interactive visualizations.
 
-If the collector finds compatible metrics exposed on the configured endpoint, it begins a per-second collection job. The
-Netdata Agent gathers these metrics, sends them to the
-[database engine for storage](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md)
-, and immediately
-[visualizes them meaningfully](/docs/dashboards-and-charts/netdata-charts.md)
-on dashboards.
-
-Each collector comes with a pre-defined configuration that matches the default setup for that application. This endpoint
-can be a URL and port, a socket, a file, a web page, and more. The endpoint is user-configurable, as are many other
-specifics of what a given collector does.
-
-## Collector architecture and terminology
-
-- **Collectors** are the processes/programs that actually gather metrics from various sources.
-
-- **Plugins** help manage all the independent data collection processes in a variety of programming languages, based on
-  their purpose and performance requirements. There are three types of plugins:
-
-    - **Internal** plugins organize collectors that gather metrics from `/proc`, `/sys` and other Linux kernel sources.
-      They are written in `C`, and run as threads within the Netdata daemon.
-
-    - **External** plugins organize collectors that gather metrics from external processes, such as a MySQL database or
-      Nginx web server. They can be written in any language, and the `netdata` daemon spawns them as long-running
-      independent processes. They communicate with the daemon via pipes. All external plugins are managed by
-      [plugins.d](/src/plugins.d/README.md), which provides additional management options.
-
-- **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
-  The Go orchestrator is in active development.
-
-    - [go.d.plugin](/src/go/plugin/go.d/README.md): An orchestrator for data
-      collection modules written in `go`.
-
-    - [python.d.plugin](/src/collectors/python.d.plugin/README.md):
-      An orchestrator for data collection modules written in `python` v2/v3.
-
-    - [charts.d.plugin](/src/collectors/charts.d.plugin/README.md):
-      An orchestrator for data collection modules written in`bash` v4+.
-
-- **Modules** are the individual programs controlled by an orchestrator to collect data from a specific application, or type of endpoint.
-
-## Netdata Plugin Privileges
+## Collector Privileges
 
 Netdata uses various plugins and helper binaries that require elevated privileges to collect system metrics.
 This section outlines the required privileges and how they are configured in different environments.
