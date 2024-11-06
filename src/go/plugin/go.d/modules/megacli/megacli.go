@@ -7,6 +7,7 @@ package megacli
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -70,8 +71,7 @@ func (m *MegaCli) Configuration() any {
 func (m *MegaCli) Init() error {
 	lvmExec, err := m.initMegaCliExec()
 	if err != nil {
-		m.Errorf("megacli exec initialization: %v", err)
-		return err
+		return fmt.Errorf("init megacli exec: %v", err)
 	}
 	m.exec = lvmExec
 
@@ -81,7 +81,6 @@ func (m *MegaCli) Init() error {
 func (m *MegaCli) Check() error {
 	mx, err := m.collect()
 	if err != nil {
-		m.Error(err)
 		return err
 	}
 

@@ -5,6 +5,7 @@ package traefik
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -85,14 +86,12 @@ func (t *Traefik) Configuration() any {
 
 func (t *Traefik) Init() error {
 	if err := t.validateConfig(); err != nil {
-		t.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	prom, err := t.initPrometheusClient()
 	if err != nil {
-		t.Errorf("prometheus client initialization: %v", err)
-		return err
+		return fmt.Errorf("prometheus client initialization: %v", err)
 	}
 	t.prom = prom
 
@@ -102,7 +101,6 @@ func (t *Traefik) Init() error {
 func (t *Traefik) Check() error {
 	mx, err := t.collect()
 	if err != nil {
-		t.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

@@ -5,6 +5,7 @@ package hpssa
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -67,12 +68,11 @@ func (h *Hpssa) Configuration() any {
 }
 
 func (h *Hpssa) Init() error {
-	ssacliExec, err := h.initSsacliExec()
+	ssacli, err := h.initSsacliExec()
 	if err != nil {
-		h.Errorf("ssacli exec initialization: %v", err)
-		return err
+		return fmt.Errorf("ssacli exec initialization: %v", err)
 	}
-	h.exec = ssacliExec
+	h.exec = ssacli
 
 	return nil
 }
@@ -80,7 +80,6 @@ func (h *Hpssa) Init() error {
 func (h *Hpssa) Check() error {
 	mx, err := h.collect()
 	if err != nil {
-		h.Error(err)
 		return err
 	}
 

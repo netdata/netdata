@@ -5,6 +5,7 @@ package dockerhub
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -60,14 +61,12 @@ func (dh *DockerHub) Configuration() any {
 
 func (dh *DockerHub) Init() error {
 	if err := dh.validateConfig(); err != nil {
-		dh.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	client, err := dh.initApiClient()
 	if err != nil {
-		dh.Error(err)
-		return err
+		return fmt.Errorf("init api client: %v", err)
 	}
 	dh.client = client
 
@@ -77,7 +76,6 @@ func (dh *DockerHub) Init() error {
 func (dh *DockerHub) Check() error {
 	mx, err := dh.collect()
 	if err != nil {
-		dh.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

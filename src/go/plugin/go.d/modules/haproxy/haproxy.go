@@ -5,6 +5,7 @@ package haproxy
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -66,14 +67,12 @@ func (h *Haproxy) Configuration() any {
 
 func (h *Haproxy) Init() error {
 	if err := h.validateConfig(); err != nil {
-		h.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	prom, err := h.initPrometheusClient()
 	if err != nil {
-		h.Errorf("prometheus client initialization: %v", err)
-		return err
+		return fmt.Errorf("prometheus client initialization: %v", err)
 	}
 	h.prom = prom
 
@@ -83,7 +82,6 @@ func (h *Haproxy) Init() error {
 func (h *Haproxy) Check() error {
 	mx, err := h.collect()
 	if err != nil {
-		h.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

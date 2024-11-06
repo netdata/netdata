@@ -5,6 +5,7 @@ package ping
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -77,14 +78,12 @@ func (p *Ping) Configuration() any {
 func (p *Ping) Init() error {
 	err := p.validateConfig()
 	if err != nil {
-		p.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	pr, err := p.initProber()
 	if err != nil {
-		p.Errorf("init prober: %v", err)
-		return err
+		return fmt.Errorf("init prober: %v", err)
 	}
 	p.prober = pr
 

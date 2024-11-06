@@ -5,6 +5,7 @@ package bind
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -71,14 +72,12 @@ func (b *Bind) Configuration() any {
 
 func (b *Bind) Init() error {
 	if err := b.validateConfig(); err != nil {
-		b.Errorf("config verification: %v", err)
-		return err
+		return fmt.Errorf("config verification: %v", err)
 	}
 
 	pvm, err := b.initPermitViewMatcher()
 	if err != nil {
-		b.Error(err)
-		return err
+		return fmt.Errorf("init permit view matcher: %v", err)
 	}
 	if pvm != nil {
 		b.permitView = pvm
@@ -86,15 +85,13 @@ func (b *Bind) Init() error {
 
 	httpClient, err := web.NewHTTPClient(b.ClientConfig)
 	if err != nil {
-		b.Errorf("creating http client : %v", err)
-		return err
+		return fmt.Errorf("creating http client : %v", err)
 	}
 	b.httpClient = httpClient
 
 	bindClient, err := b.initBindApiClient(httpClient)
 	if err != nil {
-		b.Error(err)
-		return err
+		return fmt.Errorf("init bind api client: %v", err)
 	}
 	b.bindAPIClient = bindClient
 
@@ -104,7 +101,6 @@ func (b *Bind) Init() error {
 func (b *Bind) Check() error {
 	mx, err := b.collect()
 	if err != nil {
-		b.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

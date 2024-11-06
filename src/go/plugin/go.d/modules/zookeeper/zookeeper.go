@@ -5,6 +5,7 @@ package zookeeper
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -58,14 +59,12 @@ func (z *Zookeeper) Configuration() any {
 
 func (z *Zookeeper) Init() error {
 	if err := z.verifyConfig(); err != nil {
-		z.Error(err)
-		return err
+		return fmt.Errorf("invalid config: %v", err)
 	}
 
 	f, err := z.initZookeeperFetcher()
 	if err != nil {
-		z.Error(err)
-		return err
+		return fmt.Errorf("init zookeeper fetcher: %v", err)
 	}
 	z.fetcher = f
 
@@ -75,7 +74,6 @@ func (z *Zookeeper) Init() error {
 func (z *Zookeeper) Check() error {
 	mx, err := z.collect()
 	if err != nil {
-		z.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

@@ -69,13 +69,11 @@ func (o *OpenVPN) Configuration() any {
 
 func (o *OpenVPN) Init() error {
 	if err := o.validateConfig(); err != nil {
-		o.Error(err)
 		return err
 	}
 
 	m, err := o.initPerUserMatcher()
 	if err != nil {
-		o.Error(err)
 		return err
 	}
 	o.perUserMatcher = m
@@ -89,14 +87,12 @@ func (o *OpenVPN) Init() error {
 
 func (o *OpenVPN) Check() error {
 	if err := o.client.Connect(); err != nil {
-		o.Error(err)
 		return err
 	}
 	defer func() { _ = o.client.Disconnect() }()
 
 	ver, err := o.client.Version()
 	if err != nil {
-		o.Error(err)
 		o.Cleanup()
 		return err
 	}

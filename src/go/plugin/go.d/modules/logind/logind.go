@@ -65,7 +65,6 @@ func (l *Logind) Init() error {
 func (l *Logind) Check() error {
 	mx, err := l.collect()
 	if err != nil {
-		l.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

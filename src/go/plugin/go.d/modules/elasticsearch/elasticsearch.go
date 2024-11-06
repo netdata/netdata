@@ -5,6 +5,7 @@ package elasticsearch
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -87,14 +88,12 @@ func (es *Elasticsearch) Configuration() any {
 func (es *Elasticsearch) Init() error {
 	err := es.validateConfig()
 	if err != nil {
-		es.Errorf("check configuration: %v", err)
-		return err
+		return fmt.Errorf("check configuration: %v", err)
 	}
 
 	httpClient, err := es.initHTTPClient()
 	if err != nil {
-		es.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	es.httpClient = httpClient
 
@@ -104,7 +103,6 @@ func (es *Elasticsearch) Init() error {
 func (es *Elasticsearch) Check() error {
 	mx, err := es.collect()
 	if err != nil {
-		es.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

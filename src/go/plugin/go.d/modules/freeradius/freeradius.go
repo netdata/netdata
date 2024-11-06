@@ -5,6 +5,7 @@ package freeradius
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -60,8 +61,7 @@ func (f *FreeRADIUS) Configuration() any {
 
 func (f *FreeRADIUS) Init() error {
 	if err := f.validateConfig(); err != nil {
-		f.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	f.client = api.New(api.Config{
@@ -77,7 +77,6 @@ func (f *FreeRADIUS) Init() error {
 func (f *FreeRADIUS) Check() error {
 	mx, err := f.collect()
 	if err != nil {
-		f.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

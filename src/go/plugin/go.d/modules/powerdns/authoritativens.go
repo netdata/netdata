@@ -5,6 +5,7 @@ package powerdns
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -60,21 +61,18 @@ func (ns *AuthoritativeNS) Configuration() any {
 func (ns *AuthoritativeNS) Init() error {
 	err := ns.validateConfig()
 	if err != nil {
-		ns.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	client, err := ns.initHTTPClient()
 	if err != nil {
-		ns.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	ns.httpClient = client
 
 	cs, err := ns.initCharts()
 	if err != nil {
-		ns.Errorf("init charts: %v", err)
-		return err
+		return fmt.Errorf("init charts: %v", err)
 	}
 	ns.charts = cs
 
@@ -84,7 +82,6 @@ func (ns *AuthoritativeNS) Init() error {
 func (ns *AuthoritativeNS) Check() error {
 	mx, err := ns.collect()
 	if err != nil {
-		ns.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

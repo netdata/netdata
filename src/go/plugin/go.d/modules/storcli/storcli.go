@@ -7,6 +7,7 @@ package storcli
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -70,8 +71,7 @@ func (s *StorCli) Configuration() any {
 func (s *StorCli) Init() error {
 	storExec, err := s.initStorCliExec()
 	if err != nil {
-		s.Errorf("storcli exec initialization: %v", err)
-		return err
+		return fmt.Errorf("storcli exec initialization: %v", err)
 	}
 	s.exec = storExec
 
@@ -81,7 +81,6 @@ func (s *StorCli) Init() error {
 func (s *StorCli) Check() error {
 	mx, err := s.collect()
 	if err != nil {
-		s.Error(err)
 		return err
 	}
 

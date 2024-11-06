@@ -70,7 +70,6 @@ func (w *WireGuard) Init() error {
 func (w *WireGuard) Check() error {
 	mx, err := w.collect()
 	if err != nil {
-		w.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

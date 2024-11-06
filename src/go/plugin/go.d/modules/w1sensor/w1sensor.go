@@ -57,8 +57,7 @@ func (w *W1sensor) Configuration() any {
 
 func (w *W1sensor) Init() error {
 	if w.SensorsPath == "" {
-		w.Errorf("sensors_path required but not set")
-		return errors.New("no sensors path specified")
+		return errors.New("config: no sensors path specified")
 	}
 
 	return nil
@@ -67,7 +66,6 @@ func (w *W1sensor) Init() error {
 func (w *W1sensor) Check() error {
 	mx, err := w.collect()
 	if err != nil {
-		w.Error(err)
 		return err
 	}
 

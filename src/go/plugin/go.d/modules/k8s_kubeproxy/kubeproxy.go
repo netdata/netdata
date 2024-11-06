@@ -5,6 +5,7 @@ package k8s_kubeproxy
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -64,14 +65,12 @@ func (kp *KubeProxy) Configuration() any {
 
 func (kp *KubeProxy) Init() error {
 	if err := kp.validateConfig(); err != nil {
-		kp.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	prom, err := kp.initPrometheusClient()
 	if err != nil {
-		kp.Error(err)
-		return err
+		return fmt.Errorf("init prometheus client: %v", err)
 	}
 	kp.prom = prom
 
@@ -81,7 +80,6 @@ func (kp *KubeProxy) Init() error {
 func (kp *KubeProxy) Check() error {
 	mx, err := kp.collect()
 	if err != nil {
-		kp.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

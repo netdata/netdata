@@ -7,6 +7,7 @@ package dnsmasq_dhcp
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net"
 	"time"
 
@@ -69,12 +70,10 @@ func (d *DnsmasqDHCP) Configuration() any {
 
 func (d *DnsmasqDHCP) Init() error {
 	if err := d.validateConfig(); err != nil {
-		d.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 	if err := d.checkLeasesPath(); err != nil {
-		d.Errorf("leases path check: %v", err)
-		return err
+		return fmt.Errorf("leases path check: %v", err)
 	}
 
 	return nil
@@ -83,7 +82,6 @@ func (d *DnsmasqDHCP) Init() error {
 func (d *DnsmasqDHCP) Check() error {
 	mx, err := d.collect()
 	if err != nil {
-		d.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

@@ -5,6 +5,7 @@ package powerdns_recursor
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -60,21 +61,18 @@ func (r *Recursor) Configuration() any {
 func (r *Recursor) Init() error {
 	err := r.validateConfig()
 	if err != nil {
-		r.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	client, err := r.initHTTPClient()
 	if err != nil {
-		r.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	r.httpClient = client
 
 	cs, err := r.initCharts()
 	if err != nil {
-		r.Errorf("init charts: %v", err)
-		return err
+		return fmt.Errorf("init charts: %v", err)
 	}
 	r.charts = cs
 
@@ -84,7 +82,6 @@ func (r *Recursor) Init() error {
 func (r *Recursor) Check() error {
 	mx, err := r.collect()
 	if err != nil {
-		r.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

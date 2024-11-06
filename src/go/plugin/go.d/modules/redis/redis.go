@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -86,21 +87,18 @@ func (r *Redis) Configuration() any {
 func (r *Redis) Init() error {
 	err := r.validateConfig()
 	if err != nil {
-		r.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	rdb, err := r.initRedisClient()
 	if err != nil {
-		r.Errorf("init redis client: %v", err)
-		return err
+		return fmt.Errorf("init redis client: %v", err)
 	}
 	r.rdb = rdb
 
 	charts, err := r.initCharts()
 	if err != nil {
-		r.Errorf("init charts: %v", err)
-		return err
+		return fmt.Errorf("init charts: %v", err)
 	}
 	r.charts = charts
 
@@ -110,7 +108,6 @@ func (r *Redis) Init() error {
 func (r *Redis) Check() error {
 	mx, err := r.collect()
 	if err != nil {
-		r.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

@@ -57,8 +57,7 @@ func (b *Boinc) Configuration() any {
 
 func (b *Boinc) Init() error {
 	if b.Address == "" {
-		b.Error("config: 'address' not set")
-		return errors.New("address not set")
+		return errors.New("config: 'address' not set")
 	}
 
 	return nil
@@ -67,7 +66,6 @@ func (b *Boinc) Init() error {
 func (b *Boinc) Check() error {
 	mx, err := b.collect()
 	if err != nil {
-		b.Error(err)
 		return err
 	}
 

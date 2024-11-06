@@ -55,8 +55,7 @@ func (a *Apcupsd) Configuration() any {
 
 func (a *Apcupsd) Init() error {
 	if a.Address == "" {
-		a.Error("config: 'address' not set")
-		return errors.New("address not set")
+		return errors.New("config: 'address' not set")
 	}
 
 	return nil
@@ -65,7 +64,6 @@ func (a *Apcupsd) Init() error {
 func (a *Apcupsd) Check() error {
 	mx, err := a.collect()
 	if err != nil {
-		a.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

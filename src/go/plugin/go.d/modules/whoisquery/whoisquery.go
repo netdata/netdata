@@ -5,6 +5,7 @@ package whoisquery
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -58,14 +59,12 @@ func (w *WhoisQuery) Configuration() any {
 
 func (w *WhoisQuery) Init() error {
 	if err := w.validateConfig(); err != nil {
-		w.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	prov, err := w.initProvider()
 	if err != nil {
-		w.Errorf("init whois provider: %v", err)
-		return err
+		return fmt.Errorf("init whois provider: %v", err)
 	}
 	w.prov = prov
 
@@ -77,7 +76,6 @@ func (w *WhoisQuery) Init() error {
 func (w *WhoisQuery) Check() error {
 	mx, err := w.collect()
 	if err != nil {
-		w.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

@@ -5,6 +5,7 @@ package dnsmasq
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -70,21 +71,18 @@ func (d *Dnsmasq) Configuration() any {
 func (d *Dnsmasq) Init() error {
 	err := d.validateConfig()
 	if err != nil {
-		d.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	client, err := d.initDNSClient()
 	if err != nil {
-		d.Errorf("init DNS client: %v", err)
-		return err
+		return fmt.Errorf("init DNS client: %v", err)
 	}
 	d.dnsClient = client
 
 	charts, err := d.initCharts()
 	if err != nil {
-		d.Errorf("init charts: %v", err)
-		return err
+		return fmt.Errorf("init charts: %v", err)
 	}
 	d.charts = charts
 
@@ -94,7 +92,6 @@ func (d *Dnsmasq) Init() error {
 func (d *Dnsmasq) Check() error {
 	mx, err := d.collect()
 	if err != nil {
-		d.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

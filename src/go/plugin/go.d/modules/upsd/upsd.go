@@ -69,8 +69,7 @@ func (u *Upsd) Configuration() any {
 
 func (u *Upsd) Init() error {
 	if u.Address == "" {
-		u.Error("config: 'address' not set")
-		return errors.New("address not set")
+		return errors.New("config: 'address' not set")
 	}
 
 	return nil
@@ -79,7 +78,6 @@ func (u *Upsd) Init() error {
 func (u *Upsd) Check() error {
 	mx, err := u.collect()
 	if err != nil {
-		u.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

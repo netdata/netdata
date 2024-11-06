@@ -5,6 +5,7 @@ package couchbase
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -65,21 +66,18 @@ func (cb *Couchbase) Configuration() any {
 func (cb *Couchbase) Init() error {
 	err := cb.validateConfig()
 	if err != nil {
-		cb.Errorf("check configuration: %v", err)
-		return err
+		return fmt.Errorf("check configuration: %v", err)
 	}
 
 	httpClient, err := cb.initHTTPClient()
 	if err != nil {
-		cb.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	cb.httpClient = httpClient
 
 	charts, err := cb.initCharts()
 	if err != nil {
-		cb.Errorf("init charts: %v", err)
-		return err
+		return fmt.Errorf("init charts: %v", err)
 	}
 	cb.charts = charts
 
@@ -89,7 +87,6 @@ func (cb *Couchbase) Init() error {
 func (cb *Couchbase) Check() error {
 	mx, err := cb.collect()
 	if err != nil {
-		cb.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

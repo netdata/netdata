@@ -5,6 +5,7 @@ package samba
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -58,8 +59,7 @@ func (s *Samba) Configuration() any {
 func (s *Samba) Init() error {
 	smbStatus, err := s.initSmbStatusBinary()
 	if err != nil {
-		s.Errorf("smbstatus exec initialization: %v", err)
-		return err
+		return fmt.Errorf("smbstatus exec initialization: %v", err)
 	}
 	s.exec = smbStatus
 
@@ -69,7 +69,6 @@ func (s *Samba) Init() error {
 func (s *Samba) Check() error {
 	mx, err := s.collect()
 	if err != nil {
-		s.Error(err)
 		return err
 	}
 

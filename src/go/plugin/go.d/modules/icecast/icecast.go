@@ -5,6 +5,7 @@ package icecast
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -64,14 +65,12 @@ func (ic *Icecast) Configuration() any {
 
 func (ic *Icecast) Init() error {
 	if ic.URL == "" {
-		ic.Error("URL not set")
 		return errors.New("url not set")
 	}
 
 	client, err := web.NewHTTPClient(ic.ClientConfig)
 	if err != nil {
-		ic.Error(err)
-		return err
+		return fmt.Errorf("creating http client: %w", err)
 	}
 	ic.httpClient = client
 
@@ -84,7 +83,6 @@ func (ic *Icecast) Init() error {
 func (ic *Icecast) Check() error {
 	mx, err := ic.collect()
 	if err != nil {
-		ic.Error(err)
 		return err
 	}
 

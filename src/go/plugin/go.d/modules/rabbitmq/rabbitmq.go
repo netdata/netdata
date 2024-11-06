@@ -5,6 +5,7 @@ package rabbitmq
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -75,14 +76,12 @@ func (r *RabbitMQ) Configuration() any {
 
 func (r *RabbitMQ) Init() error {
 	if r.URL == "" {
-		r.Error("'url' can not be empty")
-		return errors.New("url not set")
+		return errors.New("config: url not set")
 	}
 
 	client, err := web.NewHTTPClient(r.ClientConfig)
 	if err != nil {
-		r.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	r.httpClient = client
 
@@ -95,7 +94,6 @@ func (r *RabbitMQ) Init() error {
 func (r *RabbitMQ) Check() error {
 	mx, err := r.collect()
 	if err != nil {
-		r.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

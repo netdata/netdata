@@ -7,6 +7,7 @@ package nsd
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -57,8 +58,7 @@ func (n *Nsd) Configuration() any {
 func (n *Nsd) Init() error {
 	nsdControl, err := n.initNsdControlExec()
 	if err != nil {
-		n.Errorf("nsd-control exec initialization: %v", err)
-		return err
+		return fmt.Errorf("nsd-control exec initialization: %v", err)
 	}
 	n.exec = nsdControl
 
@@ -68,7 +68,6 @@ func (n *Nsd) Init() error {
 func (n *Nsd) Check() error {
 	mx, err := n.collect()
 	if err != nil {
-		n.Error(err)
 		return err
 	}
 

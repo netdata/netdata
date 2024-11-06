@@ -5,6 +5,7 @@ package nginxplus
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -80,14 +81,12 @@ func (n *NginxPlus) Configuration() any {
 
 func (n *NginxPlus) Init() error {
 	if n.URL == "" {
-		n.Error("config validation: 'url' can not be empty'")
-		return errors.New("url not set")
+		return errors.New("config: 'url' can not be empty'")
 	}
 
 	client, err := web.NewHTTPClient(n.ClientConfig)
 	if err != nil {
-		n.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	n.httpClient = client
 
@@ -97,7 +96,6 @@ func (n *NginxPlus) Init() error {
 func (n *NginxPlus) Check() error {
 	mx, err := n.collect()
 	if err != nil {
-		n.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

@@ -56,8 +56,7 @@ func (u *Uwsgi) Configuration() any {
 
 func (u *Uwsgi) Init() error {
 	if u.Address == "" {
-		u.Error("config: 'address' not set")
-		return errors.New("address not set")
+		return errors.New("config: 'address' not set")
 	}
 
 	u.conn = newUwsgiConn(u.Config)
@@ -68,7 +67,6 @@ func (u *Uwsgi) Init() error {
 func (u *Uwsgi) Check() error {
 	mx, err := u.collect()
 	if err != nil {
-		u.Error(err)
 		return err
 	}
 

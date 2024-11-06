@@ -55,8 +55,7 @@ func (d *Dovecot) Configuration() any {
 
 func (d *Dovecot) Init() error {
 	if d.Address == "" {
-		d.Error("config: 'address' not set")
-		return errors.New("address not set")
+		return errors.New("config: 'address' not set")
 	}
 
 	return nil
@@ -65,7 +64,6 @@ func (d *Dovecot) Init() error {
 func (d *Dovecot) Check() error {
 	mx, err := d.collect()
 	if err != nil {
-		d.Error(err)
 		return err
 	}
 

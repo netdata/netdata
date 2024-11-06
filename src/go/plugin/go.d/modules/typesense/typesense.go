@@ -67,13 +67,12 @@ func (ts *Typesense) Configuration() any {
 
 func (ts *Typesense) Init() error {
 	if ts.URL == "" {
-		ts.Error("typesense URL not configured")
-		return errors.New("typesense URL not configured")
+		return errors.New("configL: url not configured")
 	}
 
 	httpClient, err := web.NewHTTPClient(ts.ClientConfig)
 	if err != nil {
-		return fmt.Errorf("initialize http client: %w", err)
+		return fmt.Errorf("init http client: %w", err)
 	}
 
 	ts.httpClient = httpClient
@@ -90,7 +89,6 @@ func (ts *Typesense) Init() error {
 func (ts *Typesense) Check() error {
 	mx, err := ts.collect()
 	if err != nil {
-		ts.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

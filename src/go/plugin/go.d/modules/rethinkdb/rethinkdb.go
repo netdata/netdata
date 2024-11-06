@@ -63,8 +63,7 @@ func (r *Rethinkdb) Configuration() any {
 
 func (r *Rethinkdb) Init() error {
 	if r.Address == "" {
-		r.Error("address is not set")
-		return errors.New("address is not set")
+		return errors.New("config: address is not set")
 	}
 	return nil
 }
@@ -72,7 +71,6 @@ func (r *Rethinkdb) Init() error {
 func (r *Rethinkdb) Check() error {
 	mx, err := r.collect()
 	if err != nil {
-		r.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

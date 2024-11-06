@@ -5,6 +5,7 @@ package logstash
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -63,14 +64,12 @@ func (l *Logstash) Configuration() any {
 
 func (l *Logstash) Init() error {
 	if l.URL == "" {
-		l.Error("config validation: 'url' cannot be empty")
-		return errors.New("url not set")
+		return errors.New("config: 'url' cannot be empty")
 	}
 
 	httpClient, err := web.NewHTTPClient(l.ClientConfig)
 	if err != nil {
-		l.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	l.httpClient = httpClient
 
@@ -83,7 +82,6 @@ func (l *Logstash) Init() error {
 func (l *Logstash) Check() error {
 	mx, err := l.collect()
 	if err != nil {
-		l.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

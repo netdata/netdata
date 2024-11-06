@@ -60,8 +60,7 @@ func (g *Gearman) Configuration() any {
 
 func (g *Gearman) Init() error {
 	if g.Address == "" {
-		g.Error("config: 'address' not set")
-		return errors.New("address not set")
+		return errors.New("config: 'address' not set")
 	}
 
 	return nil
@@ -70,7 +69,6 @@ func (g *Gearman) Init() error {
 func (g *Gearman) Check() error {
 	mx, err := g.collect()
 	if err != nil {
-		g.Error(err)
 		return err
 	}
 

@@ -5,6 +5,7 @@ package chrony
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -60,8 +61,7 @@ func (c *Chrony) Configuration() any {
 
 func (c *Chrony) Init() error {
 	if err := c.validateConfig(); err != nil {
-		c.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	var err error
@@ -75,7 +75,6 @@ func (c *Chrony) Init() error {
 func (c *Chrony) Check() error {
 	mx, err := c.collect()
 	if err != nil {
-		c.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

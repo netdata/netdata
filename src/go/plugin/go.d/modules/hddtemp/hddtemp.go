@@ -5,6 +5,7 @@ package hddtemp
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -58,8 +59,7 @@ func (h *HddTemp) Configuration() any {
 
 func (h *HddTemp) Init() error {
 	if h.Address == "" {
-		h.Error("config: 'address' not set")
-		return errors.New("address not set")
+		return fmt.Errorf("config: 'address' not set")
 	}
 
 	h.conn = newHddTempConn(h.Config)
@@ -70,7 +70,6 @@ func (h *HddTemp) Init() error {
 func (h *HddTemp) Check() error {
 	mx, err := h.collect()
 	if err != nil {
-		h.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

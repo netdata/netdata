@@ -7,6 +7,7 @@ package fail2ban
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -72,8 +73,7 @@ func (f *Fail2Ban) Configuration() any {
 func (f *Fail2Ban) Init() error {
 	f2bClientExec, err := f.initFail2banClientCliExec()
 	if err != nil {
-		f.Errorf("fail2ban-client exec initialization: %v", err)
-		return err
+		return fmt.Errorf("fail2ban-client exec initialization: %v", err)
 	}
 	f.exec = f2bClientExec
 
@@ -83,7 +83,6 @@ func (f *Fail2Ban) Init() error {
 func (f *Fail2Ban) Check() error {
 	mx, err := f.collect()
 	if err != nil {
-		f.Error(err)
 		return err
 	}
 

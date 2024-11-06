@@ -7,6 +7,7 @@ package systemdunits
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
@@ -84,14 +85,12 @@ func (s *SystemdUnits) Configuration() any {
 
 func (s *SystemdUnits) Init() error {
 	if err := s.validateConfig(); err != nil {
-		s.Errorf("config validation: %v", err)
-		return err
+		return fmt.Errorf("config validation: %v", err)
 	}
 
 	sr, err := s.initUnitSelector()
 	if err != nil {
-		s.Errorf("init unit selector: %v", err)
-		return err
+		return fmt.Errorf("init unit selector: %v", err)
 	}
 	s.unitSr = sr
 
@@ -106,7 +105,6 @@ func (s *SystemdUnits) Init() error {
 func (s *SystemdUnits) Check() error {
 	mx, err := s.collect()
 	if err != nil {
-		s.Error(err)
 		return err
 	}
 

@@ -5,7 +5,7 @@ package intelgpu
 import (
 	_ "embed"
 	"errors"
-
+	"fmt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
@@ -58,8 +58,7 @@ func (ig *IntelGPU) Configuration() any {
 func (ig *IntelGPU) Init() error {
 	topExec, err := ig.initIntelGPUTopExec()
 	if err != nil {
-		ig.Error(err)
-		return err
+		return fmt.Errorf("init intelgpu top exec: %v", err)
 	}
 
 	ig.exec = topExec
@@ -70,7 +69,6 @@ func (ig *IntelGPU) Init() error {
 func (ig *IntelGPU) Check() error {
 	mx, err := ig.collect()
 	if err != nil {
-		ig.Error(err)
 		return err
 	}
 

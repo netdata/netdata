@@ -5,6 +5,7 @@ package prometheus
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
@@ -83,28 +84,24 @@ func (p *Prometheus) Configuration() any {
 
 func (p *Prometheus) Init() error {
 	if err := p.validateConfig(); err != nil {
-		p.Errorf("validating config: %v", err)
-		return err
+		return fmt.Errorf("validating config: %v", err)
 	}
 
 	prom, err := p.initPrometheusClient()
 	if err != nil {
-		p.Errorf("init prometheus client: %v", err)
-		return err
+		return fmt.Errorf("init prometheus client: %v", err)
 	}
 	p.prom = prom
 
 	m, err := p.initFallbackTypeMatcher(p.FallbackType.Counter)
 	if err != nil {
-		p.Errorf("init counter fallback type matcher: %v", err)
-		return err
+		return fmt.Errorf("init counter fallback type matcher: %v", err)
 	}
 	p.fallbackType.counter = m
 
 	m, err = p.initFallbackTypeMatcher(p.FallbackType.Gauge)
 	if err != nil {
-		p.Errorf("init counter fallback type matcher: %v", err)
-		return err
+		return fmt.Errorf("init counter fallback type matcher: %v", err)
 	}
 	p.fallbackType.gauge = m
 
@@ -114,7 +111,6 @@ func (p *Prometheus) Init() error {
 func (p *Prometheus) Check() error {
 	mx, err := p.collect()
 	if err != nil {
-		p.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

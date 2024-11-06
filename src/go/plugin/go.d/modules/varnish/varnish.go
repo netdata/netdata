@@ -5,6 +5,7 @@ package varnish
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -64,8 +65,7 @@ func (v *Varnish) Configuration() any {
 func (v *Varnish) Init() error {
 	vs, err := v.initVarnishstatBinary()
 	if err != nil {
-		v.Errorf("varnishstat exec initialization: %v", err)
-		return err
+		return fmt.Errorf("init varnishstat exec: %v", err)
 	}
 	v.exec = vs
 
@@ -75,7 +75,6 @@ func (v *Varnish) Init() error {
 func (v *Varnish) Check() error {
 	mx, err := v.collect()
 	if err != nil {
-		v.Error(err)
 		return err
 	}
 

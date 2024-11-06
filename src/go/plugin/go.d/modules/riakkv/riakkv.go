@@ -5,6 +5,7 @@ package riakkv
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -70,14 +71,12 @@ func (r *RiakKv) Configuration() any {
 
 func (r *RiakKv) Init() error {
 	if r.URL == "" {
-		r.Errorf("url required but not set")
-		return errors.New("url not set")
+		return errors.New("config: url not set")
 	}
 
 	httpClient, err := web.NewHTTPClient(r.ClientConfig)
 	if err != nil {
-		r.Errorf("init HTTP client: %v", err)
-		return err
+		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	r.httpClient = httpClient
 
@@ -90,7 +89,6 @@ func (r *RiakKv) Init() error {
 func (r *RiakKv) Check() error {
 	mx, err := r.collect()
 	if err != nil {
-		r.Error(err)
 		return err
 	}
 	if len(mx) == 0 {

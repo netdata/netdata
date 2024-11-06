@@ -5,6 +5,7 @@ package puppet
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -60,14 +61,12 @@ func (p *Puppet) Configuration() any {
 
 func (p *Puppet) Init() error {
 	if p.URL == "" {
-		p.Error("URL not set")
 		return errors.New("url not set")
 	}
 
 	client, err := web.NewHTTPClient(p.ClientConfig)
 	if err != nil {
-		p.Error(err)
-		return err
+		return fmt.Errorf("create http client: %v", err)
 	}
 	p.httpClient = client
 
@@ -80,7 +79,6 @@ func (p *Puppet) Init() error {
 func (p *Puppet) Check() error {
 	mx, err := p.collect()
 	if err != nil {
-		p.Error(err)
 		return err
 	}
 
