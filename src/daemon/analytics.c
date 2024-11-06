@@ -629,7 +629,7 @@ void set_late_analytics_variables(struct rrdhost_system_info *system_info)
         snprintfz(b, sizeof(b) - 1, "%d", rrdeng_cfg.page_cache_mb);
         analytics_set_data(&analytics_data.netdata_config_page_cache_size, b);
 
-        snprintfz(b, sizeof(b) - 1, "%d", default_multidb_disk_quota_mb);
+        snprintfz(b, sizeof(b) - 1, "%d", rrdeng_cfg.multidb_disk_quota_mb);
         analytics_set_data(&analytics_data.netdata_config_multidb_disk_quota, b);
     }
 #endif

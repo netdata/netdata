@@ -1614,7 +1614,7 @@ int netdata_main(int argc, char **argv) {
                             // set defaults for dbegnine unittest
                             config_set(CONFIG_SECTION_DB, "dbengine page type", "gorilla");
 #ifdef ENABLE_DBENGINE
-                            rrdeng_cfg.disk_quota_mb = default_multidb_disk_quota_mb = 256;
+                            rrdeng_cfg.disk_quota_mb = rrdeng_cfg.multidb_disk_quota_mb = 256;
 #endif
 
                             if (sqlite_library_init())
