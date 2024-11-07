@@ -80,4 +80,4 @@ chmod +x ./netdata-uninstaller.sh
 
 ## Windows
 
-On a Windows system you can uninstall Netdata the same way you would uninstall any application, through the App settings or the Control Panel.
+To uninstall Netdata on Windows, use the standard application uninstaller in your **Settings** app or **Control Panel**.

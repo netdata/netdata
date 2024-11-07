@@ -2,36 +2,42 @@
 
 Netdata offers a convenient Windows installer for easy setup. This executable provides two distinct installation modes, outlined below.
 
-> **Note**
->
-> This feature is currently under beta and only available for Nightly releases, and the installer can be found in our [nightlies repo](https://github.com/netdata/netdata-nightlies). A stable version will be released soon.
+## Download the MSI Installer
+
+You can download the Netdata Windows installer (MSI) from the official releases page:
+
+| Version                                                                                          | Description                                                                                                                                                               |
+|--------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [Stable](https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi)            | This is the recommended version for most users as it provides the most reliable and well-tested features.                                                                 |
+| [Nightly](https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi) | Offers the latest features but may contain bugs or instabilities. Use this option if you require access to the newest features and are comfortable with potential issues. |
 
 ## Graphical User Interface (GUI)
 
-Double-clicking the installer initiates the installation process. Since Netdata adds a service to your system, you'll need to provide administrator privileges.
+1. **Double-click** the installer to begin the setup process.
+2. **Grant Administrator Privileges**: You'll need to provide administrator permissions to install the Netdata service.
 
-Netdata will be installed on your system and you will be able to access the dashboard from `localhost:19999` in order to Connect the node to Netdata Cloud.
+Once installed, you can access your Netdata dashboard at `localhost:19999`.
 
 ## Silent Mode (Command line)
 
-This section provides instructions for installing Netdata in silent mode running `msiexec.exe`, which is ideal for automated deployments.
+This section provides instructions for installing Netdata in silent mode, which is ideal for automated deployments.
 
 > **Info**
 >
 > Run the installer as admin to avoid the Windows prompt.
 >
-> Silent mode skips displaying license agreements, but requires explicitly accepting them using the arguments `GPLLICENSE=1` and `CLOUDUILICENSE=1`.
+> Using silent mode implicitly accepts the terms of the [GPL-3](https://raw.githubusercontent.com/netdata/netdata/refs/heads/master/LICENSE) (Netdata Agent) and [NCUL1](https://app.netdata.cloud/LICENSE.txt) (Netdata Web Interface) licenses, skipping the display of agreements.
 
 ### Available Options
 
-| Option              | Description                                                                                      |
-|---------------------|--------------------------------------------------------------------------------------------------|
-| `/qn`               | Enables silent mode installation.                                                                |
-| `/i`                | The name of MSI installer                                                                        |
-| `INSECURE=1`        | Forces insecure connections, bypassing hostname verification (use only if absolutely necessary). |
-| `TOKEN=`            | Sets the Claim Token for your Netdata Cloud Space.                                               |
-| `ROOMS=`            | Comma-separated list of Room IDs where you want your node to appear.                             |
-| `PROXY=`            | Sets the proxy server address if your network requires one.                                      |
+| Option       | Description                                                                                      |
+|--------------|--------------------------------------------------------------------------------------------------|
+| `/qn`        | Enables silent mode installation.                                                                |
+| `/i`         | Specifies the path to the MSI installer file.                                                    |
+| `INSECURE=1` | Forces insecure connections, bypassing hostname verification (use only if absolutely necessary). |
+| `TOKEN=`     | Sets the Claim Token for your Netdata Cloud Space.                                               |
+| `ROOMS=`     | Comma-separated list of Room IDs where you want your node to appear.                             |
+| `PROXY=`     | Sets the proxy server address if your network requires one.                                      |
 
 ### Example Usage
 
