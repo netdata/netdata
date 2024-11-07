@@ -16,18 +16,14 @@ function txt_to_rtf() {
     echo '}' >> "$OUTPUT"
 }
 
-if [ ! -f "gpl-3.0.txt" ]; then
-    curl -o gpl-3.0.txt "https://www.gnu.org/licenses/gpl-3.0.txt"
-fi
+function check_and_get_file() {
+    if [ ! -f "$1" ]; then
+        curl -o "tmp.txt" "$2"
+        txt_to_rtf "tmp.txt" "$1"
+        rm  "tmp.txt"
+    fi
+}
 
-if [ ! -f "cloud.txt" ]; then
-    curl -o cloud.txt "https://raw.githubusercontent.com/netdata/netdata/master/src/web/gui/v2/LICENSE.md"
-fi
+check_and_get_file "gpl-3.0.rtf" "https://www.gnu.org/licenses/gpl-3.0.txt"
+check_and_get_file "ncul1.rtf" "https://app.netdata.cloud/LICENSE.txt"
 
-if [ -f "gpl-3.0.txt" ] ; then
-    txt_to_rtf "gpl-3.0.txt" "gpl-3.0.rtf"
-fi
-
-if [ -f "cloud.txt" ] ; then
-    txt_to_rtf "cloud.txt" "cloud.rtf"
-fi
