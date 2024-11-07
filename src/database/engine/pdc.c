@@ -184,12 +184,12 @@ static struct {
                 .allocated = 0,
                 .allocated_bytes = 0,
         },
-        .max_size = MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE,
+        .max_size = MAX_PAGES_PER_EXTENT * (RRDENG_BLOCK_SIZE + RRDENG_GORILLA_32BIT_BUFFER_SIZE)
 };
 
 void extent_buffer_init(void) {
-    size_t max_extent_uncompressed = MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE;
-    size_t max_size = (size_t)LZ4_compressBound(MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE);
+    size_t max_extent_uncompressed = MAX_PAGES_PER_EXTENT * (RRDENG_BLOCK_SIZE + RRDENG_GORILLA_32BIT_BUFFER_SIZE);
+    size_t max_size = (size_t)LZ4_compressBound(MAX_PAGES_PER_EXTENT * (RRDENG_BLOCK_SIZE + RRDENG_GORILLA_32BIT_BUFFER_SIZE));
     if(max_size < max_extent_uncompressed)
         max_size = max_extent_uncompressed;
 
