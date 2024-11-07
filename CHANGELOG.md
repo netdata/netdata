@@ -1,14 +1,18 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v2.0.0](https://github.com/netdata/netdata/tree/v2.0.0) (2024-11-07)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.5...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.47.5...v2.0.0)
 
 **Merged pull requests:**
 
+- build\(deps\): update go toolchain to v1.23.3 [\#18961](https://github.com/netdata/netdata/pull/18961) ([ilyam8](https://github.com/ilyam8))
+- Adjust max possible extent size [\#18960](https://github.com/netdata/netdata/pull/18960) ([stelfrag](https://github.com/stelfrag))
+- build\(deps\): bump github.com/vmware/govmomi from 0.45.1 to 0.46.0 in /src/go [\#18959](https://github.com/netdata/netdata/pull/18959) ([dependabot[bot]](https://github.com/apps/dependabot))
 - chore\(go.d.plugin\): remove duplicate logging in init/check [\#18955](https://github.com/netdata/netdata/pull/18955) ([ilyam8](https://github.com/ilyam8))
 - Update README.md [\#18954](https://github.com/netdata/netdata/pull/18954) ([Ancairon](https://github.com/Ancairon))
 - Fix br elements [\#18952](https://github.com/netdata/netdata/pull/18952) ([Ancairon](https://github.com/Ancairon))
+- Precompile Python code on Windows. [\#18951](https://github.com/netdata/netdata/pull/18951) ([Ferroin](https://github.com/Ferroin))
 - docs: simplify go.d.plugin readme [\#18949](https://github.com/netdata/netdata/pull/18949) ([ilyam8](https://github.com/ilyam8))
 - fix memory leak when using libcurl [\#18947](https://github.com/netdata/netdata/pull/18947) ([ktsaou](https://github.com/ktsaou))
 - docs: add "Plugin Privileges" section [\#18946](https://github.com/netdata/netdata/pull/18946) ([ilyam8](https://github.com/ilyam8))
@@ -43,7 +47,9 @@
 - proc.plugin: log as info if a dir not exists [\#18909](https://github.com/netdata/netdata/pull/18909) ([ilyam8](https://github.com/ilyam8))
 - uninstall docs edits [\#18908](https://github.com/netdata/netdata/pull/18908) ([Ancairon](https://github.com/Ancairon))
 - Update uninstallation docs and remove reinstallation page [\#18907](https://github.com/netdata/netdata/pull/18907) ([Ancairon](https://github.com/Ancairon))
+- Adjust API version [\#18906](https://github.com/netdata/netdata/pull/18906) ([stelfrag](https://github.com/stelfrag))
 - Fix a potential invalid double free memory [\#18905](https://github.com/netdata/netdata/pull/18905) ([stelfrag](https://github.com/stelfrag))
+- MSI Improvements [\#18903](https://github.com/netdata/netdata/pull/18903) ([thiagoftsm](https://github.com/thiagoftsm))
 - versioning for functions [\#18902](https://github.com/netdata/netdata/pull/18902) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18901](https://github.com/netdata/netdata/pull/18901) ([netdatabot](https://github.com/netdatabot))
 - chore\(go.d.plugin\): add build tags to modules [\#18900](https://github.com/netdata/netdata/pull/18900) ([ilyam8](https://github.com/ilyam8))
@@ -418,12 +424,6 @@
 - SPAWN-SERVER: re-evaluate signals even 500ms [\#18411](https://github.com/netdata/netdata/pull/18411) ([ktsaou](https://github.com/ktsaou))
 - Claim on Windows [\#18410](https://github.com/netdata/netdata/pull/18410) ([thiagoftsm](https://github.com/thiagoftsm))
 - kickstart: fix write\_claim\_config when executed as a regular user [\#18406](https://github.com/netdata/netdata/pull/18406) ([ilyam8](https://github.com/ilyam8))
-- Fix coverity issues [\#18405](https://github.com/netdata/netdata/pull/18405) ([stelfrag](https://github.com/stelfrag))
-- remove pyyaml2 [\#18404](https://github.com/netdata/netdata/pull/18404) ([ilyam8](https://github.com/ilyam8))
-- imporve netdatacli help usage readability [\#18403](https://github.com/netdata/netdata/pull/18403) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/anomalies [\#18402](https://github.com/netdata/netdata/pull/18402) ([ilyam8](https://github.com/ilyam8))
-- go.d dnsmasqdhcp: fix potential panic in parseDHCPRangeValue [\#18401](https://github.com/netdata/netdata/pull/18401) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18400](https://github.com/netdata/netdata/pull/18400) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
