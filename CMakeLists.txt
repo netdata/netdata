@@ -2514,6 +2514,10 @@ if(OS_WINDOWS)
 
         configure_file(packaging/windows/netdata.wxs.in netdata.wxs @ONLY)
         configure_file(packaging/windows/NetdataWhite.ico NetdataWhite.ico COPYONLY)
+        configure_file(packaging/windows/gpl-3.0.rtf gpl-3.0.rtf COPYONLY)
+        configure_file(packaging/windows/ncul1.rtf ncul1.rtf COPYONLY)
+        configure_file(packaging/windows/Top.bmp Top.bmp COPYONLY)
+        configure_file(packaging/windows/BackGround.bmp BackGround.bmp COPYONLY)
 endif()
 
 add_executable(netdata
@@ -3135,6 +3139,11 @@ if(ENABLE_PLUGIN_PYTHON)
   install(DIRECTORY src/collectors/python.d.plugin/python_modules
           COMPONENT plugin-pythond
           DESTINATION usr/libexec/netdata/python.d)
+
+  if(OS_WINDOWS)
+    include(NetdataUtil)
+    precompile_python(usr/libexec/netdata/python.d plugin-pythond)
+  endif()
 
   install(FILES src/collectors/python.d.plugin/python.d.conf
           COMPONENT plugin-pythond

@@ -6,9 +6,20 @@
 
 **Merged pull requests:**
 
+- chore\(go.d.plugin\): remove duplicate logging in init/check [\#18955](https://github.com/netdata/netdata/pull/18955) ([ilyam8](https://github.com/ilyam8))
+- Update README.md [\#18954](https://github.com/netdata/netdata/pull/18954) ([Ancairon](https://github.com/Ancairon))
+- Fix br elements [\#18952](https://github.com/netdata/netdata/pull/18952) ([Ancairon](https://github.com/Ancairon))
+- docs: simplify go.d.plugin readme [\#18949](https://github.com/netdata/netdata/pull/18949) ([ilyam8](https://github.com/ilyam8))
+- fix memory leak when using libcurl [\#18947](https://github.com/netdata/netdata/pull/18947) ([ktsaou](https://github.com/ktsaou))
+- docs: add "Plugin Privileges" section [\#18946](https://github.com/netdata/netdata/pull/18946) ([ilyam8](https://github.com/ilyam8))
+- docs: fix Caddy docker compose example [\#18944](https://github.com/netdata/netdata/pull/18944) ([ilyam8](https://github.com/ilyam8))
+- docs: grammar/format fixes to `docs/netdata-agent/` [\#18942](https://github.com/netdata/netdata/pull/18942) ([ilyam8](https://github.com/ilyam8))
+- Streaming re-organization [\#18941](https://github.com/netdata/netdata/pull/18941) ([ktsaou](https://github.com/ktsaou))
+- random numbers No 3 [\#18940](https://github.com/netdata/netdata/pull/18940) ([ktsaou](https://github.com/ktsaou))
 - Random numbers improvements [\#18939](https://github.com/netdata/netdata/pull/18939) ([ktsaou](https://github.com/ktsaou))
 - fix\(go.d/prometheus\): correct unsupported protocol scheme "file" error [\#18938](https://github.com/netdata/netdata/pull/18938) ([ilyam8](https://github.com/ilyam8))
 - Improve ACLK sync CPU usage [\#18935](https://github.com/netdata/netdata/pull/18935) ([stelfrag](https://github.com/stelfrag))
+- Hyper collector fixes [\#18934](https://github.com/netdata/netdata/pull/18934) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18932](https://github.com/netdata/netdata/pull/18932) ([netdatabot](https://github.com/netdatabot))
 - better randomness for heartbeat [\#18930](https://github.com/netdata/netdata/pull/18930) ([ktsaou](https://github.com/ktsaou))
 - add randomness per thread to heartbeat [\#18929](https://github.com/netdata/netdata/pull/18929) ([ktsaou](https://github.com/ktsaou))
@@ -22,6 +33,7 @@
 - log2journal now uses libnetdata [\#18919](https://github.com/netdata/netdata/pull/18919) ([ktsaou](https://github.com/ktsaou))
 - docs: fix ui license link [\#18918](https://github.com/netdata/netdata/pull/18918) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18917](https://github.com/netdata/netdata/pull/18917) ([netdatabot](https://github.com/netdatabot))
+- Switch DEB/RPM repositories to new subdomain. [\#18916](https://github.com/netdata/netdata/pull/18916) ([Ferroin](https://github.com/Ferroin))
 - docs: fix broken links in metadata [\#18915](https://github.com/netdata/netdata/pull/18915) ([ilyam8](https://github.com/ilyam8))
 - Update CI to generate MSI installer for Windows using WiX. [\#18914](https://github.com/netdata/netdata/pull/18914) ([Ferroin](https://github.com/Ferroin))
 - Fix potential wait forever in mqtt loop [\#18913](https://github.com/netdata/netdata/pull/18913) ([stelfrag](https://github.com/stelfrag))
@@ -412,9 +424,6 @@
 - remove python.d/anomalies [\#18402](https://github.com/netdata/netdata/pull/18402) ([ilyam8](https://github.com/ilyam8))
 - go.d dnsmasqdhcp: fix potential panic in parseDHCPRangeValue [\#18401](https://github.com/netdata/netdata/pull/18401) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18400](https://github.com/netdata/netdata/pull/18400) ([netdatabot](https://github.com/netdatabot))
-- go.d boinc [\#18398](https://github.com/netdata/netdata/pull/18398) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/boinc [\#18397](https://github.com/netdata/netdata/pull/18397) ([ilyam8](https://github.com/ilyam8))
-- fix warnings in Dockerfile [\#18395](https://github.com/netdata/netdata/pull/18395) ([NicolasCARPi](https://github.com/NicolasCARPi))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
@@ -443,14 +452,6 @@
 ## [v1.47.0](https://github.com/netdata/netdata/tree/v1.47.0) (2024-08-22)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.46.3...v1.47.0)
-
-**Merged pull requests:**
-
-- go.d dnsmsasq\_dhcp: improve parsing of dhcp ranges [\#18394](https://github.com/netdata/netdata/pull/18394) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18391](https://github.com/netdata/netdata/pull/18391) ([netdatabot](https://github.com/netdatabot))
-- remove proc zfspools [\#18389](https://github.com/netdata/netdata/pull/18389) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18387](https://github.com/netdata/netdata/pull/18387) ([netdatabot](https://github.com/netdatabot))
-- Modify CLI command remove-stale-node to accept hostname [\#18386](https://github.com/netdata/netdata/pull/18386) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.46.3](https://github.com/netdata/netdata/tree/v1.46.3) (2024-07-23)
 

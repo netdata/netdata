@@ -195,3 +195,27 @@ function(subdirlist result curdir)
 
   set(${result} ${dirlist} PARENT_SCOPE)
 endfunction()
+
+# Precompile python code in the specified directory relative to the
+# CMake install prefix at install time.
+# This must be called _after_ the install directive for the python code
+# in the specified directory
+function(precompile_python dir component)
+  find_package(Python3)
+
+  if(NOT ${Python3_Interpreter_FOUND})
+    message(STATUS "Could not find Python3, skipping precompilation of Python code.")
+    return()
+  endif()
+
+  set(prefix [=[${CMAKE_INSTALL_PREFIX}]=])
+
+  install(
+    CODE "message(STATUS \"Precompiling Python3 code in ${prefix}/${dir}\")"
+    COMPONENT ${component}
+  )
+  install(
+    CODE "execute_process(COMMAND ${Python3_Interpreter} -O -m compileall -j0 -o2 ${prefix}/${dir} WORKING_DIRECTORY ${prefix}/${dir})"
+    COMPONENT ${component}
+  )
+endfunction()

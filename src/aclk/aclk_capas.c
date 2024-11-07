@@ -4,7 +4,7 @@
 
 #include "ml/ml.h"
 
-#define HTTP_API_V2_VERSION 6
+#define HTTP_API_V2_VERSION 7
 
 size_t aclk_get_http_api_version(void) {
     return HTTP_API_V2_VERSION;
