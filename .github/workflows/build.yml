@@ -652,7 +652,10 @@ jobs:
       - name: Run Updater Check
         id: check
         if: needs.file-check.outputs.run == 'true'
-        run: sudo /bin/sh -x .github/scripts/run-updater-check.sh
+        run: |
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host \
+                 -v $PWD:/netdata -w /netdata \
+                 ubuntu:latest /bin/sh -x /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
