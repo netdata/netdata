@@ -3128,6 +3128,11 @@ if(ENABLE_PLUGIN_PYTHON)
           COMPONENT plugin-pythond
           DESTINATION usr/libexec/netdata/python.d)
 
+  if(OS_WINDOWS)
+    include(NetdataUtil)
+    precompile_python(usr/libexec/netdata/python.d plugin-pythond)
+  endif()
+
   install(FILES src/collectors/python.d.plugin/python.d.conf
           COMPONENT plugin-pythond
           DESTINATION usr/lib/netdata/conf.d)
