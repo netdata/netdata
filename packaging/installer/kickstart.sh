@@ -21,8 +21,8 @@ KICKSTART_SOURCE="$(
 )"
 DEFAULT_PLUGIN_PACKAGES=""
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
-REPOCONFIG_DEB_VERSION="3-2"
-REPOCONFIG_RPM_VERSION="3-2"
+REPOCONFIG_DEB_VERSION="4-1"
+REPOCONFIG_RPM_VERSION="4-1"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l armv6l aarch64 ppc64le"
 
@@ -39,8 +39,8 @@ INSTALL_DOC_URL="https://learn.netdata.cloud/docs/install-the-netdata-agent/one-
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 RELEASE_INFO_URL="https://repo.netdata.cloud/releases"
-REPOCONFIG_DEB_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
-REPOCONFIG_RPM_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
+REPOCONFIG_DEB_URL_PREFIX="https://repository.netdata.cloud/repos/repoconfig"
+REPOCONFIG_RPM_URL_PREFIX="https://repository.netdata.cloud/repos/repoconfig"
 TELEMETRY_URL="https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events"
 
 # ======================================================================
