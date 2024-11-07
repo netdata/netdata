@@ -192,8 +192,8 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
         s->ingest.replication.in_progress = s->ingest.replication.instances > 0;
 
         s->ingest.capabilities = host->receiver->capabilities;
-        s->ingest.peers = socket_peers(host->receiver->fd);
-        s->ingest.ssl = SSL_connection(&host->receiver->ssl);
+        s->ingest.peers = nd_sock_socket_peers(&host->receiver->sock);
+        s->ingest.ssl = nd_sock_is_ssl(&host->receiver->sock);
     }
     spinlock_unlock(&host->receiver_lock);
 
@@ -251,8 +251,8 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
         sender_lock(host->sender);
 
         s->stream.since = host->sender->last_state_since_t;
-        s->stream.peers = socket_peers(host->sender->rrdpush_sender_socket);
-        s->stream.ssl = SSL_connection(&host->sender->ssl);
+        s->stream.peers = nd_sock_socket_peers(&host->sender->sock);
+        s->stream.ssl = nd_sock_is_ssl(&host->sender->sock);
 
         memcpy(s->stream.sent_bytes_on_this_connection_per_type,
                host->sender->sent_bytes_on_this_connection_per_type,

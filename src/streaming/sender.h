@@ -46,6 +46,9 @@ struct sender_state {
     RRDHOST *host;
     pid_t tid;                              // the thread id of the sender, from gettid_cached()
     SENDER_FLAGS flags;
+
+    ND_SOCK sock;
+
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
     size_t begin;
     size_t reconnects_counter;
@@ -67,7 +70,6 @@ struct sender_state {
     size_t sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX];
 
     int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
-    int rrdpush_sender_socket;
 
     uint16_t hops;
 
@@ -77,8 +79,6 @@ struct sender_state {
 #ifdef NETDATA_LOG_STREAM_SENDER
     FILE *stream_log_fp;
 #endif
-
-    NETDATA_SSL ssl;                     // structure used to encrypt the connection
 
     struct {
         bool shutdown;

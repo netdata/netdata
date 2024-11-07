@@ -879,6 +879,16 @@ set(LIBNETDATA_FILES
         src/libnetdata/xxHash/xxhash.h
         src/libnetdata/os/random.c
         src/libnetdata/os/random.h
+        src/libnetdata/socket/nd-sock.c
+        src/libnetdata/socket/nd-sock.h
+        src/libnetdata/socket/listen-sockets.c
+        src/libnetdata/socket/listen-sockets.h
+        src/libnetdata/socket/poll-events.c
+        src/libnetdata/socket/poll-events.h
+        src/libnetdata/socket/connect-to.c
+        src/libnetdata/socket/connect-to.h
+        src/libnetdata/socket/socket-peers.c
+        src/libnetdata/socket/socket-peers.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

@@ -23,13 +23,7 @@ static void streaming_receiver_disconnected(void) {
 }
 
 void receiver_state_free(struct receiver_state *rpt) {
-    netdata_ssl_close(&rpt->ssl);
-
-    if(rpt->fd != -1) {
-        internal_error(true, "closing socket...");
-        close(rpt->fd);
-    }
-
+    nd_sock_close(&rpt->sock);
     rrdpush_decompressor_destroy(&rpt->decompressor);
 
     if(rpt->system_info)
@@ -90,10 +84,7 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
     do {
         errno_clear();
 
-        switch(wait_on_socket_or_cancel_with_timeout(
-        &r->ssl,
-        r->fd, 0, POLLIN, NULL))
-        {
+        switch(wait_on_socket_or_cancel_with_timeout(&r->sock.ssl, r->sock.fd, 0, POLLIN, NULL)) {
             case 0: // data are waiting
                 break;
 
@@ -111,10 +102,7 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
                 return -2;
         }
 
-        if (SSL_connection(&r->ssl))
-            bytes_read = netdata_ssl_read(&r->ssl, buffer, size);
-        else
-            bytes_read = read(r->fd, buffer, size);
+        bytes_read = nd_sock_read_nowait(&r->sock, buffer, size);
 
     } while(bytes_read < 0 && errno == EINTR && tries--);
 
@@ -535,7 +523,7 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
         if(!host->receiver->exit.shutdown) {
             host->receiver->exit.shutdown = true;
             receiver_set_exit_reason(host->receiver, reason, true);
-            shutdown(host->receiver->fd, SHUT_RDWR);
+            shutdown(host->receiver->sock.fd, SHUT_RDWR);
         }
 
         nd_thread_signal_cancel(host->receiver->thread);
@@ -566,13 +554,7 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
 }
 
 static void rrdpush_send_error_on_taken_over_connection(struct receiver_state *rpt, const char *msg) {
-    (void) send_timeout(
-            &rpt->ssl,
-            rpt->fd,
-            (char *)msg,
-            strlen(msg),
-            0,
-            5);
+    nd_sock_send_timeout(&rpt->sock, (char *)msg, strlen(msg), 0, 5);
 }
 
 static void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status, ND_LOG_FIELD_PRIORITY priority) {
@@ -676,7 +658,7 @@ static void rrdpush_receive(struct receiver_state *rpt) {
          , rpt->host->rrd_history_entries
          , rrd_memory_mode_name(rpt->host->rrd_memory_mode)
          , (rpt->config.health.enabled == CONFIG_BOOLEAN_NO)?"disabled":((rpt->config.health.enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
-         , (rpt->ssl.conn != NULL) ? " SSL," : ""
+         , (rpt->sock.ssl.conn != NULL) ? " SSL," : ""
     );
 #endif // NETDATA_INTERNAL_CHECKS
 
@@ -725,9 +707,7 @@ static void rrdpush_receive(struct receiver_state *rpt) {
             h2o_stream_write(rpt->h2o_ctx, initial_response, strlen(initial_response));
         } else {
 #endif
-            ssize_t bytes_sent = send_timeout(
-                    &rpt->ssl,
-                    rpt->fd, initial_response, strlen(initial_response), 0, 60);
+            ssize_t bytes_sent = nd_sock_send_timeout(&rpt->sock, initial_response, strlen(initial_response), 0, 60);
 
             if(bytes_sent != (ssize_t)strlen(initial_response)) {
                 internal_error(true, "Cannot send response, got %zd bytes, expecting %zu bytes", bytes_sent, strlen(initial_response));
@@ -746,22 +726,22 @@ static void rrdpush_receive(struct receiver_state *rpt) {
 #endif
     {
         // remove the non-blocking flag from the socket
-        if(sock_delnonblock(rpt->fd) < 0)
+        if(sock_delnonblock(rpt->sock.fd) < 0)
             netdata_log_error("STREAM '%s' [receive from [%s]:%s]: "
                   "cannot remove the non-blocking flag from socket %d"
                   , rrdhost_hostname(rpt->host)
                   , rpt->client_ip, rpt->client_port
-                  , rpt->fd);
+                  , rpt->sock.fd);
 
         struct timeval timeout;
         timeout.tv_sec = 600;
         timeout.tv_usec = 0;
-        if (unlikely(setsockopt(rpt->fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout) != 0))
+        if (unlikely(setsockopt(rpt->sock.fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout) != 0))
             netdata_log_error("STREAM '%s' [receive from [%s]:%s]: "
                   "cannot set timeout for socket %d"
                   , rrdhost_hostname(rpt->host)
                   , rpt->client_ip, rpt->client_port
-                  , rpt->fd);
+                  , rpt->sock.fd);
     }
 
     rrdpush_receive_log_status(
@@ -780,7 +760,7 @@ static void rrdpush_receive(struct receiver_state *rpt) {
     rrdhost_stream_parent_reset_postpone_time(rpt->host);
 
     // receive data
-    size_t count = streaming_parser(rpt, &cd, rpt->fd, (rpt->ssl.conn) ? &rpt->ssl : NULL);
+    size_t count = streaming_parser(rpt, &cd, rpt->sock.fd, (rpt->sock.ssl.conn) ? &rpt->sock.ssl : NULL);
 
     // the parser stopped
     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
@@ -815,7 +795,7 @@ static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
     if(!rpt)
         return false;
 
-    buffer_strcat(wb, SSL_connection(&rpt->ssl) ? "https" : "http");
+    buffer_strcat(wb, nd_sock_is_ssl(&rpt->sock) ? "https" : "http");
     return true;
 }
 
@@ -881,10 +861,8 @@ int rrdpush_receiver_too_busy_now(struct web_client *w) {
 }
 
 static void rrdpush_receiver_takeover_web_connection(struct web_client *w, struct receiver_state *rpt) {
-    rpt->fd                = w->ifd;
-
-    rpt->ssl.conn          = w->ssl.conn;
-    rpt->ssl.state         = w->ssl.state;
+    rpt->sock.fd = w->ifd;
+    rpt->sock.ssl = w->ssl;
 
     w->ssl = NETDATA_SSL_UNSET_CONNECTION;
 
@@ -925,11 +903,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     rpt->system_info = callocz(1, sizeof(struct rrdhost_system_info));
     rpt->system_info->hops = rpt->hops;
 
-    rpt->fd                = -1;
+    nd_sock_init(&rpt->sock, netdata_ssl_web_server_ctx);
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
-
-    rpt->ssl = NETDATA_SSL_UNSET_CONNECTION;
 
     rpt->config.update_every = default_rrd_update_every;
 
@@ -1156,7 +1132,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         char initial_response[HTTP_HEADER_SIZE + 1];
         snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
 
-        if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) !=
+        if(nd_sock_send_timeout(&rpt->sock, initial_response, strlen(initial_response), 0, 60) !=
             (ssize_t)strlen(initial_response)) {
 
             nd_log_daemon(NDLP_ERR, "STREAM '%s' [receive from [%s]:%s]: "

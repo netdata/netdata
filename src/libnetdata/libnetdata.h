@@ -134,6 +134,11 @@ extern const char *netdata_configured_host_prefix;
 #include "os/os.h"
 
 #include "socket/socket.h"
+#include "socket/nd-sock.h"
+#include "socket/listen-sockets.h"
+#include "socket/poll-events.h"
+#include "socket/connect-to.h"
+#include "socket/socket-peers.h"
 #include "avl/avl.h"
 
 #include "line_splitter/line_splitter.h"

@@ -243,8 +243,6 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
 
         rrdhost_streaming_sender_structures_init(host);
 
-        host->sender->ssl = NETDATA_SSL_UNSET_CONNECTION;
-
         host->stream.snd.destination = string_dup(parents);
         rrdhost_stream_parents_init(host);
 
@@ -1181,7 +1179,7 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
 
     host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
     host->sender->rrdpush_sender_pipe[PIPE_WRITE] = -1;
-    host->sender->rrdpush_sender_socket  = -1;
+    nd_sock_init(&host->sender->sock, netdata_ssl_streaming_sender_ctx);
     host->sender->disabled_capabilities = STREAM_CAP_NONE;
 
     if(!stream_send.compression.enabled)

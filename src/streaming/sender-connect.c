@@ -4,13 +4,7 @@
 
 void rrdpush_sender_thread_close_socket(struct sender_state *s) {
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-
-    netdata_ssl_close(&s->ssl);
-
-    if(s->rrdpush_sender_socket != -1) {
-        close(s->rrdpush_sender_socket);
-        s->rrdpush_sender_socket = -1;
-    }
+    nd_sock_close(&s->sock);
 
     // do not flush the circular buffer here
     // this function is called sometimes with the sender lock, sometimes without the lock
@@ -227,70 +221,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     return false;
 }
 
-unsigned char alpn_proto_list[] = {
-    18, 'n', 'e', 't', 'd', 'a', 't', 'a', '_', 's', 't', 'r', 'e', 'a', 'm', '/', '2', '.', '0',
-    8, 'h', 't', 't', 'p', '/', '1', '.', '1'
-};
-
 #define CONN_UPGRADE_VAL "upgrade"
-
-static bool rrdpush_sender_connect_ssl(struct sender_state *s) {
-    RRDHOST *host = s->host;
-    bool ssl_required = stream_parent_is_ssl(host->stream.snd.parents.current);
-
-    netdata_ssl_close(&s->ssl);
-
-    if(!ssl_required)
-        return true;
-
-    if (netdata_ssl_open_ext(&s->ssl, netdata_ssl_streaming_sender_ctx, s->rrdpush_sender_socket, alpn_proto_list, sizeof(alpn_proto_list))) {
-        if(!netdata_ssl_connect(&s->ssl)) {
-            // couldn't connect
-
-            ND_LOG_STACK lgs[] = {
-                ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_SSL_ERROR),
-                ND_LOG_FIELD_END(),
-            };
-            ND_LOG_STACK_PUSH(lgs);
-
-            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
-            rrdpush_sender_thread_close_socket(s);
-            stream_parent_set_reconnect_delay(
-                host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_SSL_ERROR, now_realtime_sec() + 5 * 60);
-            return false;
-        }
-
-        if (netdata_ssl_validate_certificate_sender &&
-            security_test_certificate(s->ssl.conn)) {
-            // certificate is not valid
-
-            ND_LOG_STACK lgs[] = {
-                ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_INVALID_SSL_CERTIFICATE),
-                ND_LOG_FIELD_END(),
-            };
-            ND_LOG_STACK_PUSH(lgs);
-
-            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
-            netdata_log_error("SSL: closing the stream connection, because the server SSL certificate is not valid.");
-            rrdpush_sender_thread_close_socket(s);
-            stream_parent_set_reconnect_delay(
-                host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE, now_realtime_sec() + 5 * 60);
-            return false;
-        }
-
-        return true;
-    }
-
-    ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_CANT_ESTABLISH_SSL_CONNECTION),
-        ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
-
-    netdata_log_error("SSL: failed to establish connection.");
-    return false;
-}
-
 static int rrdpush_http_upgrade_prelude(RRDHOST *host __maybe_unused, struct sender_state *s) {
 
     char http[HTTP_HEADER_SIZE + 1];
@@ -300,22 +231,14 @@ static int rrdpush_http_upgrade_prelude(RRDHOST *host __maybe_unused, struct sen
               "Connection: Upgrade"
               HTTP_HDR_END);
 
-    ssize_t bytes = send_timeout(
-        &s->ssl,
-        s->rrdpush_sender_socket,
-        http,
-        strlen(http),
-        0,
-        1000);
+    ssize_t bytes;
+    bytes = nd_sock_send_timeout(&s->sock, http, strlen(http), 0, 1000);
+    if (bytes <= 0) {
+        error_report("Error writing to remote");
+        return 1;
+    }
 
-    bytes = recv_timeout(
-        &s->ssl,
-        s->rrdpush_sender_socket,
-        http,
-        HTTP_HEADER_SIZE,
-        0,
-        1000);
-
+    bytes = nd_sock_recv_timeout(&s->sock, http, HTTP_HEADER_SIZE, 0, 1000);
     if (bytes <= 0) {
         error_report("Error reading from remote");
         return 1;
@@ -386,30 +309,48 @@ err_cleanup:
 }
 
 static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port, time_t timeout, struct sender_state *s) {
-
-    struct timeval tv = {
-        .tv_sec = timeout,
-        .tv_usec = 0
-    };
-
     // make sure the socket is closed
     rrdpush_sender_thread_close_socket(s);
 
-    s->rrdpush_sender_socket = stream_parent_connect_to_one(
-        host,
-        default_port,
-        &tv,
-        &s->reconnects_counter,
-        s->connected_to,
-        sizeof(s->connected_to) - 1,
-        &host->stream.snd.parents.current);
+    // reset this to make sure we have its current value
+    s->sock.verify_certificate = netdata_ssl_validate_certificate_sender;
 
-    if(unlikely(s->rrdpush_sender_socket == -1)) {
-        // netdata_log_error("STREAM %s [send to %s]: could not connect to parent node at this time.", rrdhost_hostname(host), host->rrdpush_send_destination);
+    if(!stream_parent_connect_to_one(
+            &s->sock, host, default_port, timeout, &s->reconnects_counter,
+            s->connected_to, sizeof(s->connected_to) - 1,
+            &host->stream.snd.parents.current)) {
+        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
+        const char *msg = NULL;
+
+        switch(s->sock.error) {
+            default:
+                msg = ND_SOCK_ERROR_2str(s->sock.error);
+                break;
+
+            case ND_SOCK_ERR_THREAD_CANCELLED:
+            case ND_SOCK_ERR_NO_PARENT_AVAILABLE:
+                // don't log for these
+                break;
+        }
+
+        if(msg) {
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, msg),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
+            netdata_log_error("SSL: closing stream connection: %s", msg);
+
+            stream_parent_set_reconnect_delay(
+                host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_SSL_ERROR,
+                now_realtime_sec() + 5 * 60);
+        }
+
+        nd_sock_close(&s->sock);
+
         return false;
     }
-
-    // netdata_log_info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
 
     // reset our capabilities to default
     s->capabilities = stream_our_capabilities(host, true);
@@ -518,9 +459,6 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
     http[eol] = 0x00;
     rrdpush_clean_encoded(&se);
 
-    if(!rrdpush_sender_connect_ssl(s))
-        return false;
-
     if (s->parent_using_h2o && rrdpush_http_upgrade_prelude(host, s)) {
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_CANT_UPGRADE_CONNECTION),
@@ -531,19 +469,13 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION);
         rrdpush_sender_thread_close_socket(s);
         stream_parent_set_reconnect_delay(
-            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE, now_realtime_sec() + 1 * 60);
+            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE,
+            now_realtime_sec() + 1 * 60);
         return false;
     }
 
     ssize_t len = (ssize_t)strlen(http);
-    ssize_t bytes = send_timeout(
-        &s->ssl,
-        s->rrdpush_sender_socket,
-        http,
-        len,
-        0,
-        timeout);
-
+    ssize_t bytes = nd_sock_send_timeout(&s->sock, http, len, 0, timeout);
     if(bytes <= 0) { // timeout is 0
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_TIMEOUT),
@@ -559,18 +491,12 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
                rrdhost_hostname(host), s->connected_to);
 
         stream_parent_set_reconnect_delay(
-            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT, now_realtime_sec() + 1 * 60);
+            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT,
+            now_realtime_sec() + 1 * 60);
         return false;
     }
 
-    bytes = recv_timeout(
-        &s->ssl,
-        s->rrdpush_sender_socket,
-        http,
-        HTTP_HEADER_SIZE,
-        0,
-        timeout);
-
+    bytes = nd_sock_recv_timeout(&s->sock, http, HTTP_HEADER_SIZE, 0, timeout);
     if(bytes <= 0) { // timeout is 0
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_TIMEOUT),
@@ -586,17 +512,18 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
                rrdhost_hostname(host), s->connected_to);
 
         stream_parent_set_reconnect_delay(
-            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, now_realtime_sec() + 30);
+            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT,
+            now_realtime_sec() + 30);
         return false;
     }
 
-    if(sock_setnonblock(s->rrdpush_sender_socket) < 0)
+    if(sock_setnonblock(s->sock.fd) < 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM %s [send to %s]: cannot set non-blocking mode for socket.",
                rrdhost_hostname(host), s->connected_to);
-    sock_setcloexec(s->rrdpush_sender_socket);
+    sock_setcloexec(s->sock.fd);
 
-    if(sock_enlarge_out(s->rrdpush_sender_socket) < 0)
+    if(sock_enlarge_out(s->sock.fd) < 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM %s [send to %s]: cannot enlarge the socket buffer.",
                rrdhost_hostname(host), s->connected_to);

@@ -104,22 +104,25 @@ void rrdhost_stream_parent_ssl_init(RRDHOST *host) {
     spinlock_unlock(&sp);
 }
 
-int stream_parent_connect_to_one(
+bool stream_parent_connect_to_one(
+    ND_SOCK *s,
     RRDHOST *host,
     int default_port,
-    struct timeval *timeout,
+    time_t timeout,
     size_t *reconnects_counter,
     char *connected_to,
     size_t connected_to_size,
     STREAM_PARENT **destination)
 {
-    int sock = -1;
+    s->error = ND_SOCK_ERR_NO_PARENT_AVAILABLE;
 
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
         time_t now = now_realtime_sec();
 
-        if(nd_thread_signaled_to_cancel())
-            return -1;
+        if(nd_thread_signaled_to_cancel()) {
+            s->error = ND_SOCK_ERR_THREAD_CANCELLED;
+            return false;
+        }
 
         if(d->postpone_reconnection_until > now)
             continue;
@@ -133,9 +136,7 @@ int stream_parent_connect_to_one(
 
         d->since = now;
         d->attempts++;
-        sock = connect_to_this(string2str(d->destination), default_port, timeout);
-
-        if (sock != -1) {
+        if (nd_sock_connect_to_this(s, string2str(d->destination), default_port, timeout, stream_parent_is_ssl(d))) {
             if (connected_to && connected_to_size)
                 strncpyz(connected_to, string2str(d->destination), connected_to_size);
 
@@ -147,11 +148,12 @@ int stream_parent_connect_to_one(
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->stream.snd.parents.all, d, prev, next);
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(host->stream.snd.parents.all, d, prev, next);
 
-            break;
+            s->error = ND_SOCK_ERR_NONE;
+            return true;
         }
     }
 
-    return sock;
+    return false;
 }
 
 struct stream_parent_init_tmp {

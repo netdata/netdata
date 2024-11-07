@@ -106,11 +106,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     size_t outstanding = cbuffer_next_unsafe(s->buffer, &chunk);
     netdata_log_debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
 
-    if(SSL_connection(&s->ssl))
-        ret = netdata_ssl_write(&s->ssl, chunk, outstanding);
-    else
-        ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
-
+    ret = nd_sock_send_nowait(&s->sock, chunk, outstanding);
     if (likely(ret > 0)) {
         cbuffer_remove_unsafe(s->buffer, ret);
         s->sent_bytes_on_this_connection += ret;
@@ -135,12 +131,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
 }
 
 static ssize_t attempt_read(struct sender_state *s) {
-    ssize_t ret;
-
-    if (SSL_connection(&s->ssl))
-        ret = netdata_ssl_read(&s->ssl, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1);
-    else
-        ret = recv(s->rrdpush_sender_socket, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1,MSG_DONTWAIT);
+    ssize_t ret = nd_sock_revc_nowait(&s->sock, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1);
 
     if (ret > 0) {
         s->read_len += ret;
@@ -150,7 +141,7 @@ static ssize_t attempt_read(struct sender_state *s) {
     if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
         return ret;
 
-    if (SSL_connection(&s->ssl))
+    if (nd_sock_is_ssl(&s->sock))
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
     else if (ret == 0 || errno == ECONNRESET) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED);
@@ -305,26 +296,26 @@ static bool stream_sender_log_transport(BUFFER *wb, void *ptr) {
     if(!state)
         return false;
 
-    buffer_strcat(wb, SSL_connection(&state->ssl) ? "https" : "http");
+    buffer_strcat(wb, nd_sock_is_ssl(&state->sock) ? "https" : "http");
     return true;
 }
 
 static bool stream_sender_log_dst_ip(BUFFER *wb, void *ptr) {
     struct sender_state *state = ptr;
-    if(!state || state->rrdpush_sender_socket == -1)
+    if(!state || state->sock.fd == -1)
         return false;
 
-    SOCKET_PEERS peers = socket_peers(state->rrdpush_sender_socket);
+    SOCKET_PEERS peers = nd_sock_socket_peers(&state->sock);
     buffer_strcat(wb, peers.peer.ip);
     return true;
 }
 
 static bool stream_sender_log_dst_port(BUFFER *wb, void *ptr) {
     struct sender_state *state = ptr;
-    if(!state || state->rrdpush_sender_socket == -1)
+    if(!state || state->sock.fd == -1)
         return false;
 
-    SOCKET_PEERS peers = socket_peers(state->rrdpush_sender_socket);
+    SOCKET_PEERS peers = nd_sock_socket_peers(&state->sock);
     buffer_print_uint64(wb, peers.peer.port);
     return true;
 }
@@ -417,7 +408,7 @@ void *rrdpush_sender_thread(void *ptr) {
         iterations++;
 
         // The connection attempt blocks (after which we use the socket in nonblocking)
-        if(unlikely(s->rrdpush_sender_socket == -1)) {
+        if(unlikely(s->sock.fd == -1)) {
             if(was_connected)
                 rrdpush_sender_on_disconnect(s->host);
 
@@ -489,7 +480,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 .revents = 0,
             },
             [Socket] = {
-                .fd = s->rrdpush_sender_socket,
+                .fd = s->sock.fd,
                 .events = POLLIN | (outstanding ? POLLOUT : 0 ),
                 .revents = 0,
             }
@@ -506,7 +497,7 @@ void *rrdpush_sender_thread(void *ptr) {
         internal_error(fds[Collector].fd != s->rrdpush_sender_pipe[PIPE_READ],
             "STREAM %s [send to %s]: pipe changed after poll().", rrdhost_hostname(s->host), s->connected_to);
 
-        internal_error(fds[Socket].fd != s->rrdpush_sender_socket,
+        internal_error(fds[Socket].fd != s->sock.fd,
             "STREAM %s [send to %s]: socket changed after poll().", rrdhost_hostname(s->host), s->connected_to);
 
         // Spurious wake-ups without error - loop again

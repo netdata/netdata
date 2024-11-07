@@ -15,7 +15,7 @@ struct receiver_state {
     RRDHOST *host;
     pid_t tid;
     ND_THREAD *thread;
-    int fd;
+    ND_SOCK sock;
     char *key;
     char *hostname;
     char *registry_hostname;
@@ -43,8 +43,6 @@ struct receiver_state {
     } exit;
 
     struct stream_receiver_config config;
-
-    NETDATA_SSL ssl;
 
     time_t replication_first_time_t;
 

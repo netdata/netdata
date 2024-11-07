@@ -19,10 +19,11 @@ void rrdhost_stream_parent_reset_postpone_time(struct rrdhost *host);
 void rrdhost_stream_parents_init(struct rrdhost *host);
 void rrdhost_stream_parents_free(struct rrdhost *host);
 
-int stream_parent_connect_to_one(
+bool stream_parent_connect_to_one(
+    ND_SOCK *s,
     struct rrdhost *host,
     int default_port,
-    struct timeval *timeout,
+    time_t timeout,
     size_t *reconnects_counter,
     char *connected_to,
     size_t connected_to_size,
