@@ -2,134 +2,79 @@
 
 #include "rrdhost-status.h"
 
-const char *rrdhost_db_status_to_string(RRDHOST_DB_STATUS status) {
-    switch(status) {
-        default:
-        case RRDHOST_DB_STATUS_INITIALIZING:
-            return "initializing";
+ENUM_STR_MAP_DEFINE(RRDHOST_DB_STATUS) = {
+    { RRDHOST_DB_STATUS_INITIALIZING, "initializing" },
+    { RRDHOST_DB_STATUS_QUERYABLE, "online" },
+    { 0, NULL } // Sentinel
+};
 
-        case RRDHOST_DB_STATUS_QUERYABLE:
-            return "online";
-    }
-}
+ENUM_STR_MAP_DEFINE(RRDHOST_DB_LIVENESS) = {
+    { RRDHOST_DB_LIVENESS_STALE, "stale" },
+    { RRDHOST_DB_LIVENESS_LIVE, "live" },
+    { 0, NULL } // Sentinel
+};
 
-const char *rrdhost_db_liveness_to_string(RRDHOST_DB_LIVENESS status) {
-    switch(status) {
-        default:
-        case RRDHOST_DB_LIVENESS_STALE:
-            return "stale";
+ENUM_STR_MAP_DEFINE(RRDHOST_INGEST_STATUS) = {
+    { RRDHOST_INGEST_STATUS_ARCHIVED, "archived" },
+    { RRDHOST_INGEST_STATUS_INITIALIZING, "initializing" },
+    { RRDHOST_INGEST_STATUS_REPLICATING, "replicating" },
+    { RRDHOST_INGEST_STATUS_ONLINE, "online" },
+    { RRDHOST_INGEST_STATUS_OFFLINE, "offline" },
+    { 0, NULL } // Sentinel
+};
 
-        case RRDHOST_DB_LIVENESS_LIVE:
-            return "live";
-    }
-}
+ENUM_STR_MAP_DEFINE(RRDHOST_INGEST_TYPE) = {
+    { RRDHOST_INGEST_TYPE_LOCALHOST, "localhost" },
+    { RRDHOST_INGEST_TYPE_VIRTUAL, "virtual" },
+    { RRDHOST_INGEST_TYPE_CHILD, "child" },
+    { RRDHOST_INGEST_TYPE_ARCHIVED, "archived" },
+    { 0, NULL } // Sentinel
+};
 
-const char *rrdhost_ingest_status_to_string(RRDHOST_INGEST_STATUS status) {
-    switch(status) {
-        case RRDHOST_INGEST_STATUS_ARCHIVED:
-            return "archived";
+ENUM_STR_MAP_DEFINE(RRDHOST_STREAMING_STATUS) = {
+    { RRDHOST_STREAM_STATUS_DISABLED, "disabled" },
+    { RRDHOST_STREAM_STATUS_REPLICATING, "replicating" },
+    { RRDHOST_STREAM_STATUS_ONLINE, "online" },
+    { RRDHOST_STREAM_STATUS_OFFLINE, "offline" },
+    { 0, NULL } // Sentinel
+};
 
-        case RRDHOST_INGEST_STATUS_INITIALIZING:
-            return "initializing";
+ENUM_STR_MAP_DEFINE(RRDHOST_ML_STATUS) = {
+    { RRDHOST_ML_STATUS_DISABLED, "disabled" },
+    { RRDHOST_ML_STATUS_OFFLINE, "offline" },
+    { RRDHOST_ML_STATUS_RUNNING, "online" },
+    { 0, NULL } // Sentinel
+};
 
-        case RRDHOST_INGEST_STATUS_REPLICATING:
-            return "replicating";
+ENUM_STR_MAP_DEFINE(RRDHOST_ML_TYPE) = {
+    { RRDHOST_ML_TYPE_DISABLED, "disabled" },
+    { RRDHOST_ML_TYPE_SELF, "self" },
+    { RRDHOST_ML_TYPE_RECEIVED, "received" },
+    { 0, NULL } // Sentinel
+};
 
-        case RRDHOST_INGEST_STATUS_ONLINE:
-            return "online";
+ENUM_STR_MAP_DEFINE(RRDHOST_HEALTH_STATUS) = {
+    { RRDHOST_HEALTH_STATUS_DISABLED, "disabled" },
+    { RRDHOST_HEALTH_STATUS_INITIALIZING, "initializing" },
+    { RRDHOST_HEALTH_STATUS_RUNNING, "online" },
+    { 0, NULL } // Sentinel
+};
 
-        default:
-        case RRDHOST_INGEST_STATUS_OFFLINE:
-            return "offline";
-    }
-}
+ENUM_STR_MAP_DEFINE(RRDHOST_DYNCFG_STATUS) = {
+    { RRDHOST_DYNCFG_STATUS_UNAVAILABLE, "unavailable" },
+    { RRDHOST_DYNCFG_STATUS_AVAILABLE, "online" },
+    { 0, NULL } // Sentinel
+};
 
-const char *rrdhost_ingest_type_to_string(RRDHOST_INGEST_TYPE type) {
-    switch(type) {
-        case RRDHOST_INGEST_TYPE_LOCALHOST:
-            return "localhost";
-
-        case RRDHOST_INGEST_TYPE_VIRTUAL:
-            return "virtual";
-
-        case RRDHOST_INGEST_TYPE_CHILD:
-            return "child";
-
-        default:
-        case RRDHOST_INGEST_TYPE_ARCHIVED:
-            return "archived";
-    }
-}
-
-const char *rrdhost_streaming_status_to_string(RRDHOST_STREAMING_STATUS status) {
-    switch(status) {
-        case RRDHOST_STREAM_STATUS_DISABLED:
-            return "disabled";
-
-        case RRDHOST_STREAM_STATUS_REPLICATING:
-            return "replicating";
-
-        case RRDHOST_STREAM_STATUS_ONLINE:
-            return "online";
-
-        default:
-        case RRDHOST_STREAM_STATUS_OFFLINE:
-            return "offline";
-    }
-}
-
-const char *rrdhost_ml_status_to_string(RRDHOST_ML_STATUS status) {
-    switch(status) {
-        case RRDHOST_ML_STATUS_RUNNING:
-            return "online";
-
-        case RRDHOST_ML_STATUS_OFFLINE:
-            return "offline";
-
-        default:
-        case RRDHOST_ML_STATUS_DISABLED:
-            return "disabled";
-    }
-}
-
-const char *rrdhost_ml_type_to_string(RRDHOST_ML_TYPE type) {
-    switch(type) {
-        case RRDHOST_ML_TYPE_SELF:
-            return "self";
-
-        case RRDHOST_ML_TYPE_RECEIVED:
-            return "received";
-
-        default:
-        case RRDHOST_ML_TYPE_DISABLED:
-            return "disabled";
-    }
-}
-
-const char *rrdhost_health_status_to_string(RRDHOST_HEALTH_STATUS status) {
-    switch(status) {
-        default:
-        case RRDHOST_HEALTH_STATUS_DISABLED:
-            return "disabled";
-
-        case RRDHOST_HEALTH_STATUS_INITIALIZING:
-            return "initializing";
-
-        case RRDHOST_HEALTH_STATUS_RUNNING:
-            return "online";
-    }
-}
-
-const char *rrdhost_dyncfg_status_to_string(RRDHOST_DYNCFG_STATUS status) {
-    switch(status) {
-        default:
-        case RRDHOST_DYNCFG_STATUS_UNAVAILABLE:
-            return "unavailable";
-
-        case RRDHOST_DYNCFG_STATUS_AVAILABLE:
-            return "online";
-    }
-}
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_DB_STATUS, RRDHOST_DB_STATUS_INITIALIZING, "initializing");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_DB_LIVENESS, RRDHOST_DB_LIVENESS_STALE, "stale");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_INGEST_STATUS, RRDHOST_INGEST_STATUS_OFFLINE, "offline");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_INGEST_TYPE, RRDHOST_INGEST_TYPE_ARCHIVED, "archived");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_STREAMING_STATUS, RRDHOST_STREAM_STATUS_OFFLINE, "offline");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_ML_STATUS, RRDHOST_ML_STATUS_DISABLED, "disabled");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_ML_TYPE, RRDHOST_ML_TYPE_DISABLED, "disabled");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_HEALTH_STATUS, RRDHOST_HEALTH_STATUS_DISABLED, "disabled");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_DYNCFG_STATUS, RRDHOST_DYNCFG_STATUS_UNAVAILABLE, "unavailable");
 
 static NETDATA_DOUBLE rrdhost_sender_replication_completion_unsafe(RRDHOST *host, time_t now, size_t *instances) {
     size_t charts = rrdhost_sender_replicating_charts(host);

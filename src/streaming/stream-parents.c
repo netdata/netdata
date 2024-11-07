@@ -10,6 +10,18 @@ struct stream_parent {
     time_t postpone_reconnection_until;
     STREAM_HANDSHAKE reason;
 
+    struct {
+        int status;
+        size_t nodes;
+        size_t receivers;
+        RRDHOST_DB_STATUS db_status;
+        RRDHOST_DB_LIVENESS db_liveness;
+        RRDHOST_INGEST_TYPE ingest_type;
+        RRDHOST_INGEST_STATUS ingest_status;
+        time_t db_first_time_s;
+        time_t db_last_time_s;
+    } remote;
+
     STREAM_PARENT *prev;
     STREAM_PARENT *next;
 };
@@ -104,6 +116,76 @@ void rrdhost_stream_parent_ssl_init(RRDHOST *host) {
     spinlock_unlock(&sp);
 }
 
+static bool fetch_stream_info(STREAM_PARENT *d, const char *uuid, int default_port, ND_SOCK *s) {
+    char buf[HTTP_HEADER_SIZE];
+    CLEAN_ND_SOCK sock = {
+        .ctx = s->ctx,
+        .verify_certificate = s->verify_certificate,
+    };
+
+    // Build HTTP request
+    snprintf(buf, sizeof(buf),
+             "GET /api/v3/stream_info?machine_guid=%s " HTTP_1_1 HTTP_ENDL
+             "User-Agent: %s/%s" HTTP_ENDL
+             "Accept: */*" HTTP_ENDL
+             "Connection: close" HTTP_HDR_END,
+             uuid,
+             rrdhost_program_name(localhost),
+             rrdhost_program_version(localhost));
+
+    // Establish connection
+    if (!nd_sock_connect_to_this(&sock, string2str(d->destination), default_port, 5, false))
+        return false;
+
+    // Send HTTP request
+    ssize_t sent = nd_sock_send_timeout(&sock, buf, strlen(buf), 0, 5);
+    if (sent <= 0) return false;
+
+    // Receive HTTP response
+    ssize_t received = nd_sock_recv_timeout(&sock, buf, sizeof(buf) - 1, 0, 5);
+    if (received <= 0) return false;
+    buf[received] = '\0';
+
+    // Parse HTTP response and extract JSON
+    char *json_start = strstr(buf, HTTP_HDR_END);
+    if (!json_start) return false;
+    json_start += sizeof(HTTP_HDR_END) - 1; // skip the entire header
+
+    CLEAN_JSON_OBJECT *jobj = json_tokener_parse(json_start);
+    if (!jobj) return false;
+
+    CLEAN_BUFFER *error = buffer_create(0, NULL);
+
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, "", "status", d->remote.status, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, "", "nodes", d->remote.nodes, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, "", "receivers", d->remote.receivers, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, "", "first_time_s", d->remote.db_first_time_s, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, "", "last_time_s", d->remote.db_last_time_s, error, true);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, "", "db_status", RRDHOST_DB_STATUS_2id, d->remote.db_status, error, true);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, "", "db_liveness", RRDHOST_DB_LIVENESS_2id, d->remote.db_liveness, error, true);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, "", "ingest_type", RRDHOST_INGEST_TYPE_2id, d->remote.ingest_type, error, true);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, "", "ingest_status", RRDHOST_INGEST_STATUS_2id, d->remote.ingest_status, error, true);
+
+    return true;
+}
+
+static int compare_last_time(const void *a, const void *b) {
+    STREAM_PARENT *parent_a = *(STREAM_PARENT **)a;
+    STREAM_PARENT *parent_b = *(STREAM_PARENT **)b;
+
+    if (parent_a->remote.db_last_time_s < parent_b->remote.db_last_time_s) return 1;
+    else if (parent_a->remote.db_last_time_s > parent_b->remote.db_last_time_s) return -1;
+    else {
+        if(parent_a->since < parent_b->since) return -1;
+        else if(parent_a->since > parent_b->since) return 1;
+        else {
+            if(parent_a->attempts < parent_b->attempts) return -1;
+            else if(parent_a->attempts > parent_b->attempts) return 1;
+            else return 0;
+        }
+    }
+}
+
 bool stream_parent_connect_to_one(
     ND_SOCK *s,
     RRDHOST *host,
@@ -116,7 +198,61 @@ bool stream_parent_connect_to_one(
 {
     s->error = ND_SOCK_ERR_NO_PARENT_AVAILABLE;
 
+    // count the parents
+    size_t size = 0;
+    for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) size++;
+    STREAM_PARENT *array[size];
+
+    // fetch stream info for all of them and put them in the array
+    size_t count = 0;
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
+        if (nd_thread_signaled_to_cancel()) {
+            s->error = ND_SOCK_ERR_THREAD_CANCELLED;
+            return false;
+        }
+
+        if (d->postpone_reconnection_until > now_realtime_sec())
+            continue;
+
+        if(!fetch_stream_info(d, host->machine_guid, default_port, s))
+            memset(&d->remote, 0, sizeof(d->remote));
+
+        array[count++] = d;
+    }
+
+    // sort the array
+    qsort(array, count, sizeof(STREAM_PARENT *), compare_last_time);
+
+    size_t base = 0;
+    while(base < count) {
+        // find how many have similar db_last_time_s;
+        size_t similar = 1;
+        for (size_t i = base + 1; i < count; i++) {
+            if (array[i]->remote.db_last_time_s - array[i - 1]->remote.db_last_time_s <= 60)
+                similar++;
+            else
+                break;
+        }
+
+        // if we have only 1 similar, move on
+        if(similar == 1) {
+            base++;
+            continue;
+        }
+
+        // reorder the parents who have similar db_last_time
+        while (similar > 1) {
+            size_t chosen = base + os_random(similar);
+            if (chosen != base) SWAP(array[base], array[chosen]);
+            base++;
+            similar--;
+        }
+    }
+
+    // now the parents are sorted based on preference of connection
+    for(size_t i = 0; i < count ;i++) {
+        STREAM_PARENT *d = array[i];
+
         time_t now = now_realtime_sec();
 
         if(nd_thread_signaled_to_cancel()) {

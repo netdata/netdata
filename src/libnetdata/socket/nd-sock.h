@@ -83,4 +83,10 @@ ssize_t nd_sock_recv_timeout(ND_SOCK *s, void *buf, size_t len, int flags, time_
 
 bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_port, time_t timeout, bool ssl);
 
+static inline void cleanup_nd_sock_p(ND_SOCK *s) {
+    if(s)
+        nd_sock_close(s);
+}
+#define CLEAN_ND_SOCK _cleanup_(cleanup_nd_sock_p) ND_SOCK
+
 #endif //NETDATA_ND_SOCK_H

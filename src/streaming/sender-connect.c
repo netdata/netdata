@@ -409,17 +409,17 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
                         "&NETDATA_SYSTEM_TOTAL_DISK_SIZE=%s"
                         "&NETDATA_PROTOCOL_VERSION=%s"
                         HTTP_1_1 HTTP_ENDL
-                        "User-Agent: %s/%s\r\n"
-                        "Accept: */*\r\n\r\n"
+                        "User-Agent: %s/%s" HTTP_ENDL
+                        "Accept: */*" HTTP_HDR_END
                         , string2str(host->stream.snd.api_key)
                         , rrdhost_hostname(host)
-                            , rrdhost_registry_hostname(host)
-                            , host->machine_guid
+                        , rrdhost_registry_hostname(host)
+                        , host->machine_guid
                         , default_rrd_update_every
                         , rrdhost_os(host)
-                            , rrdhost_timezone(host)
-                            , rrdhost_abbrev_timezone(host)
-                            , host->utc_offset
+                        , rrdhost_timezone(host)
+                        , rrdhost_abbrev_timezone(host)
+                        , host->utc_offset
                         , s->hops
                         , host->system_info->ml_capable
                         , host->system_info->ml_enabled
@@ -454,7 +454,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
                         , (host->system_info->host_disk_space) ? host->system_info->host_disk_space : ""
                         , STREAMING_PROTOCOL_VERSION
                         , rrdhost_program_name(host)
-                            , rrdhost_program_version(host)
+                        , rrdhost_program_version(host)
     );
     http[eol] = 0x00;
     rrdpush_clean_encoded(&se);
