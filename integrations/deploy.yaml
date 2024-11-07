@@ -560,13 +560,15 @@
   install_description: |
     Netdata offers a convenient Windows installer for easy setup. This executable provides two distinct installation modes, outlined below.
 
-    The Windows installer is currently under beta, and thus it is only available in the nightly release channel. A stable version will be released soon.
-
     ## Graphical User Interface (GUI)
 
-    1. Download the Netdata [Windows installer](https://github.com/netdata/netdata-nightlies/releases) from the latest nightly release.
-    2. Run the `.exe` file and proceed with the installation process.
-    3. At a minimum, you will need your Netdata Cloud Space's claim token to connect your Agent to your Space.
+    **Download the MSI Installer**:
+      - [Stable version](https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi)
+      - [Nightly version](https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi)
+
+    Double-click the installer to start the installation process. As Netdata adds a service to your system, you'll need to provide administrator privileges.
+
+    Once installed, you can access your Netdata dashboard at `localhost:19999`.
 
     ## Silent Mode (Command line)
 
@@ -577,28 +579,24 @@
         - channel: stable
           command: |
             $ProgressPreference = 'SilentlyContinue';
-            Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe";
-            .\netdata-installer-x64.exe /S /A `
-            {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
+            Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile "netdata-x64.msi";
+            msiexec /qn /i netdata-x64.msi {% if $showClaimingOptions %}TOKEN={% claim_token %} ROOMS={% $claim_rooms %}{% /if %}
         - channel: nightly
           command: |
             $ProgressPreference = 'SilentlyContinue';
-            Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-installer-x64.exe -OutFile "netdata-installer-x64.exe";
-            .\netdata-installer-x64.exe /S /A `
-            {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
+            Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi -OutFile "netdata-x64.msi";
+            .\msiexec /qn /i netdata-x64.msi {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
   additional_info: |
-    ### Available Options
+    ### Available CLI Options
 
-    | Option    | Description                                                                                      |
-    |-----------|--------------------------------------------------------------------------------------------------|
-    | `/S`      | Enables silent mode installation.                                                                |
-    | `/A`      | Accepts all Netdata licenses. This option is mandatory for silent installations.                 |
-    | `/D`      | Specifies the desired installation directory (defaults to `C:\Program Files\Netdata`).           |
-    | `/T`      | Opens the `MSYS2` terminal after installation.                                                   |
-    | `/I`      | Forces insecure connections, bypassing hostname verification (use only if absolutely necessary). |
-    | `/TOKEN=` | Sets the Claim Token for your Netdata Cloud Space.                                               |
-    | `/ROOMS=` | Comma-separated list of Room IDs where you want your node to appear.                             |
-    | `/PROXY=` | Sets the proxy server address if your network requires one.                                      |
+    | Option       | Description                                                                                      |
+    |--------------|--------------------------------------------------------------------------------------------------|
+    | `/qn`        | Enables silent mode installation.                                                                |
+    | `/i`         | Specifies the path to the MSI installer file.                                                    |
+    | `INSECURE=1` | Forces insecure connections, bypassing hostname verification (use only if absolutely necessary). |
+    | `TOKEN=`     | Sets the Claim Token for your Netdata Cloud Space.                                               |
+    | `ROOMS=`     | Comma-separated list of Room IDs where you want your node to appear.                             |
+    | `PROXY=`     | Sets the proxy server address if your network requires one.                                      |
   related_resources: {}
   most_popular: true
   platform_info:
