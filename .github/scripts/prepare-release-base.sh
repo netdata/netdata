@@ -178,6 +178,7 @@ elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "ref=${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
     echo "type=release" >> "${GITHUB_OUTPUT}"
     echo "branch=master" >> "${GITHUB_OUTPUT}"
+    echo "new-branch=${branch_name}" >> "${GITHUB_OUTPUT}"
     echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
 else
     echo '::error::Unrecognized release type or invalid version.'
