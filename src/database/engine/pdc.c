@@ -184,12 +184,12 @@ static struct {
                 .allocated = 0,
                 .allocated_bytes = 0,
         },
-        .max_size = MAX_PAGES_PER_EXTENT * (RRDENG_BLOCK_SIZE + RRDENG_GORILLA_32BIT_BUFFER_SIZE)
+        .max_size = MAX_EXTENT_UNCOMPRESSED_SIZE
 };
 
 void extent_buffer_init(void) {
-    size_t max_extent_uncompressed = MAX_PAGES_PER_EXTENT * (RRDENG_BLOCK_SIZE + RRDENG_GORILLA_32BIT_BUFFER_SIZE);
-    size_t max_size = (size_t)LZ4_compressBound(MAX_PAGES_PER_EXTENT * (RRDENG_BLOCK_SIZE + RRDENG_GORILLA_32BIT_BUFFER_SIZE));
+    size_t max_extent_uncompressed = MAX_EXTENT_UNCOMPRESSED_SIZE;
+    size_t max_size = (size_t)LZ4_compressBound(MAX_EXTENT_UNCOMPRESSED_SIZE);
     if(max_size < max_extent_uncompressed)
         max_size = max_extent_uncompressed;
 
@@ -1010,7 +1010,7 @@ static bool epdl_populate_pages_from_extent_data(
             uncompressed_payload_length += header->descr[i].page_length;
         }
 
-        if(unlikely(uncompressed_payload_length > MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE))
+        if(unlikely(uncompressed_payload_length > MAX_EXTENT_UNCOMPRESSED_SIZE))
             have_read_error = true;
 
         if(likely(!have_read_error)) {
