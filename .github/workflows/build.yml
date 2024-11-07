@@ -416,7 +416,7 @@ jobs:
           attempt_delay: 2000
       - name: Retrieve Windows Artifacts
         id: fetch-windows
-        if: needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly'
+        if: needs.file-check.outputs.run == 'true'
         uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
