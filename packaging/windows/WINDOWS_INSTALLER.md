@@ -38,7 +38,7 @@ This section provides instructions for installing Netdata in silent mode running
 Connect your Agent to your Netdata Cloud Space with token `<YOUR_TOKEN>` and room `<YOUR_ROOM>`:
 
 ```bash
-msiexec /qn /i netdata-x64.msi /TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOM>"
+msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOM>"
 ```
 
 Replace `<YOUR_TOKEN>` and `<YOUR_ROOM>` with your Netdata Cloud Space claim token and room ID, respectively.
