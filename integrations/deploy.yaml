@@ -565,9 +565,9 @@
     **Download the MSI Installer**:
       - [Stable version](https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi)
       - [Nightly version](https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi)
-    
+
     Double-click the installer to start the installation process. As Netdata adds a service to your system, you'll need to provide administrator privileges.
-    
+
     Once installed, you can access your Netdata dashboard at `localhost:19999`.
 
     ## Silent Mode (Command line)
