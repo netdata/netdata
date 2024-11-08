@@ -136,7 +136,7 @@ static bool stream_info_parse(struct json_object *jobj, const char *path, STREAM
     return true;
 }
 
-static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_port, ND_SOCK *sender_sock, const char *hostname) {
+static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_port, ND_SOCK *sender_sock, bool ssl, const char *hostname) {
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_DST_IP, d->destination),
         ND_LOG_FIELD_I64(NDF_DST_PORT, default_port),
@@ -167,7 +167,7 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
            hostname, string2str(d->destination));
 
     // Establish connection
-    if (!nd_sock_connect_to_this(&sock, string2str(d->destination), default_port, 5, false)) {
+    if (!nd_sock_connect_to_this(&sock, string2str(d->destination), default_port, 5, ssl)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "STREAM %s: failed to connect for stream info to '%s': %s",
                hostname, string2str(d->destination),
@@ -295,7 +295,8 @@ bool stream_parent_connect_to_one(
         }
 
         bool skip = false;
-        if(stream_info_fetch(d, host->machine_guid, default_port, sender_sock, rrdhost_hostname(host))) {
+        if(stream_info_fetch(d, host->machine_guid, default_port,
+                              sender_sock, stream_parent_is_ssl(d), rrdhost_hostname(host))) {
             switch(d->remote.ingest_type) {
                 case RRDHOST_INGEST_TYPE_VIRTUAL:
                 case RRDHOST_INGEST_TYPE_LOCALHOST:
