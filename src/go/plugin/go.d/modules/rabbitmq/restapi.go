@@ -49,6 +49,7 @@ type (
 	apiNodeResp struct {
 		Name          string           `json:"name"`
 		OsPid         string           `json:"os_pid"`
+		Partitions    []string         `json:"partitions"` // network partitions https://www.rabbitmq.com/docs/partitions#detecting
 		FDTotal       int64            `json:"fd_total"`
 		FDUsed        int64            `json:"fd_used"`
 		MemLimit      int64            `json:"mem_limit"`
@@ -89,6 +90,7 @@ type apiQueueResp struct {
 	Vhost                  string          `json:"vhost"`
 	Type                   string          `json:"type"`
 	State                  string          `json:"state"`
+	IdleSince              *any            `json:"idle_since"`
 	Messages               int64           `json:"messages" stm:"messages"`
 	MessagesReady          int64           `json:"messages_ready" stm:"messages_ready"`
 	MessagesUnacknowledged int64           `json:"messages_unacknowledged" stm:"messages_unacknowledged"`
