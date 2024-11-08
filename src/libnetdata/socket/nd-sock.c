@@ -67,7 +67,7 @@ bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_por
         return false;
     }
 
-    if(ssl) {
+    if(ssl && s->ctx) {
         if (!nd_sock_open_ssl(s)) {
             close(s->fd);
             s->fd = -1;
