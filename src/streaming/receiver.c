@@ -313,7 +313,7 @@ static inline bool receiver_should_stop(struct receiver_state *rpt) {
     return false;
 }
 
-static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
+static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd) {
     size_t result = 0;
 
     PARSER *parser = NULL;
@@ -327,7 +327,8 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
                 .capabilities = rpt->capabilities,
         };
 
-        parser = parser_init(&user, fd, fd, PARSER_INPUT_SPLIT, ssl);
+        parser = parser_init(&user, rpt->sock.fd, rpt->sock.fd, PARSER_INPUT_SPLIT,
+                             (rpt->sock.ssl.conn) ? &rpt->sock.ssl : NULL);
     }
 
 #ifdef ENABLE_H2O
@@ -760,7 +761,7 @@ static void rrdpush_receive(struct receiver_state *rpt) {
     rrdhost_stream_parent_reset_postpone_time(rpt->host);
 
     // receive data
-    size_t count = streaming_parser(rpt, &cd, rpt->sock.fd, (rpt->sock.ssl.conn) ? &rpt->sock.ssl : NULL);
+    size_t count = streaming_parser(rpt, &cd);
 
     // the parser stopped
     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
