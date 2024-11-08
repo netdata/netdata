@@ -1,6 +1,7 @@
 module github.com/netdata/netdata/go/plugins
 
-go 1.22.0
+go 1.23.3
+
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.50.1
 
 require (
