@@ -14,7 +14,7 @@ ENUM_STR_MAP_DEFINE(ND_SOCK_ERROR) = {
     { .id = ND_SOCK_ERR_SSL_INVALID_CERTIFICATE,            .name = "INVALID SSL CERTIFICATE", },
     { .id = ND_SOCK_ERR_SSL_FAILED_TO_OPEN,                 .name = "FAILED TO OPEN SSL", },
     { .id = ND_SOCK_ERR_THREAD_CANCELLED,                   .name = "THREAD CANCELLED", },
-    { .id = ND_SOCK_ERR_NO_PARENT_AVAILABLE,                .name = "NO PARENT AVAILABLE", },
+    { .id = ND_SOCK_ERR_NO_DESTINATION_AVAILABLE,                .name = "NO PARENT AVAILABLE", },
     { .id = ND_SOCK_ERR_UNKNOWN_ERROR,                      .name = "UNKNOWN ERROR", },
 
     // terminator

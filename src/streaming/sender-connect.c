@@ -328,7 +328,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
                 break;
 
             case ND_SOCK_ERR_THREAD_CANCELLED:
-            case ND_SOCK_ERR_NO_PARENT_AVAILABLE:
+            case ND_SOCK_ERR_NO_DESTINATION_AVAILABLE:
                 // don't log for these
                 break;
         }

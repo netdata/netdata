@@ -17,7 +17,7 @@ typedef enum __attribute__((packed)) {
     ND_SOCK_ERR_SSL_INVALID_CERTIFICATE,
     ND_SOCK_ERR_SSL_FAILED_TO_OPEN,
     ND_SOCK_ERR_THREAD_CANCELLED,
-    ND_SOCK_ERR_NO_PARENT_AVAILABLE,
+    ND_SOCK_ERR_NO_DESTINATION_AVAILABLE,
     ND_SOCK_ERR_UNKNOWN_ERROR,
 } ND_SOCK_ERROR;
 
@@ -32,11 +32,11 @@ typedef struct nd_sock {
 } ND_SOCK;
 
 static inline void nd_sock_init(ND_SOCK *s, SSL_CTX *ctx, bool verify_certificate) {
-    memset(s, 0, sizeof(*s));
-    s->ssl = NETDATA_SSL_UNSET_CONNECTION;
-    s->fd = -1;
-    s->ctx = ctx;
     s->verify_certificate = verify_certificate;
+    s->error = ND_SOCK_ERR_NONE;
+    s->fd = -1;
+    s->ssl = NETDATA_SSL_UNSET_CONNECTION;
+    s->ctx = ctx;
 }
 
 static inline bool nd_sock_is_ssl(ND_SOCK *s) {
@@ -85,8 +85,7 @@ ssize_t nd_sock_recv_timeout(ND_SOCK *s, void *buf, size_t len, int flags, time_
 bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_port, time_t timeout, bool ssl);
 
 static inline void cleanup_nd_sock_p(ND_SOCK *s) {
-    if(s)
-        nd_sock_close(s);
+    if(s) nd_sock_close(s);
 }
 #define CLEAN_ND_SOCK _cleanup_(cleanup_nd_sock_p) ND_SOCK
 

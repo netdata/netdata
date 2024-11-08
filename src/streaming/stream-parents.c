@@ -5,10 +5,10 @@
 struct stream_parent {
     STRING *destination;
     bool ssl;
+    STREAM_HANDSHAKE reason;
     uint32_t attempts;
     time_t since;
     time_t postpone_reconnection_until;
-    STREAM_HANDSHAKE reason;
 
     struct {
         int status;
@@ -116,11 +116,24 @@ void rrdhost_stream_parent_ssl_init(RRDHOST *host) {
     spinlock_unlock(&sp);
 }
 
-static bool fetch_stream_info(STREAM_PARENT *d, const char *uuid, int default_port, ND_SOCK *s) {
+static bool stream_info_parse(struct json_object *jobj, const char *path, STREAM_PARENT *d, BUFFER *error) {
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "status", d->remote.status, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nodes", d->remote.nodes, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "receivers", d->remote.receivers, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_s", d->remote.db_first_time_s, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "last_time_s", d->remote.db_last_time_s, error, true);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_status", RRDHOST_DB_STATUS_2id, d->remote.db_status, error, true);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_liveness", RRDHOST_DB_LIVENESS_2id, d->remote.db_liveness, error, true);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_type", RRDHOST_INGEST_TYPE_2id, d->remote.ingest_type, error, true);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_status", RRDHOST_INGEST_STATUS_2id, d->remote.ingest_status, error, true);
+    return true;
+}
+
+static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_port, ND_SOCK *sender_sock) {
     char buf[HTTP_HEADER_SIZE];
     CLEAN_ND_SOCK sock = {
-        .ctx = s->ctx,
-        .verify_certificate = s->verify_certificate,
+        .ctx = sender_sock->ctx,
+        .verify_certificate = sender_sock->verify_certificate,
     };
 
     // Build HTTP request
@@ -160,15 +173,8 @@ static bool fetch_stream_info(STREAM_PARENT *d, const char *uuid, int default_po
 
     CLEAN_BUFFER *error = buffer_create(0, NULL);
 
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, "", "status", d->remote.status, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, "", "nodes", d->remote.nodes, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, "", "receivers", d->remote.receivers, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, "", "first_time_s", d->remote.db_first_time_s, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, "", "last_time_s", d->remote.db_last_time_s, error, true);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, "", "db_status", RRDHOST_DB_STATUS_2id, d->remote.db_status, error, true);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, "", "db_liveness", RRDHOST_DB_LIVENESS_2id, d->remote.db_liveness, error, true);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, "", "ingest_type", RRDHOST_INGEST_TYPE_2id, d->remote.ingest_type, error, true);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, "", "ingest_status", RRDHOST_INGEST_STATUS_2id, d->remote.ingest_status, error, true);
+    if(!stream_info_parse(jobj, "", d, error))
+        return false;
 
     return true;
 }
@@ -191,7 +197,7 @@ static int compare_last_time(const void *a, const void *b) {
 }
 
 bool stream_parent_connect_to_one(
-    ND_SOCK *s,
+    ND_SOCK *sender_sock,
     RRDHOST *host,
     int default_port,
     time_t timeout,
@@ -200,7 +206,7 @@ bool stream_parent_connect_to_one(
     size_t connected_to_size,
     STREAM_PARENT **destination)
 {
-    s->error = ND_SOCK_ERR_NO_PARENT_AVAILABLE;
+    sender_sock->error = ND_SOCK_ERR_NO_DESTINATION_AVAILABLE;
 
     // count the parents
     size_t size = 0;
@@ -212,21 +218,20 @@ bool stream_parent_connect_to_one(
 
     // fetch stream info for all of them and put them in the array
     size_t count = 0;
-    for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
+    for (STREAM_PARENT *d = host->stream.snd.parents.all; d && count < size ; d = d->next) {
         if (nd_thread_signaled_to_cancel()) {
-            s->error = ND_SOCK_ERR_THREAD_CANCELLED;
+            sender_sock->error = ND_SOCK_ERR_THREAD_CANCELLED;
             return false;
         }
 
         if (d->postpone_reconnection_until > now_realtime_sec())
             continue;
 
-        if(!fetch_stream_info(d, host->machine_guid, default_port, s))
-            memset(&d->remote, 0, sizeof(d->remote));
-        else if((d->remote.ingest_type == RRDHOST_INGEST_TYPE_CHILD || d->remote.ingest_type == RRDHOST_INGEST_TYPE_ARCHIVED)  &&
-                 (d->remote.ingest_status == RRDHOST_INGEST_STATUS_OFFLINE || d->remote.ingest_status == RRDHOST_INGEST_STATUS_ARCHIVED) &&
-                 d->remote.db_status == RRDHOST_DB_STATUS_QUERYABLE &&
-                 d->remote.db_liveness == RRDHOST_DB_LIVENESS_STALE)
+        if(!stream_info_fetch(d, host->machine_guid, default_port, sender_sock) || (
+            (d->remote.ingest_type == RRDHOST_INGEST_TYPE_CHILD || d->remote.ingest_type == RRDHOST_INGEST_TYPE_ARCHIVED)  &&
+            (d->remote.ingest_status == RRDHOST_INGEST_STATUS_OFFLINE || d->remote.ingest_status == RRDHOST_INGEST_STATUS_ARCHIVED) &&
+            d->remote.db_status == RRDHOST_DB_STATUS_QUERYABLE &&
+            d->remote.db_liveness == RRDHOST_DB_LIVENESS_STALE))
             array[count++] = d;
     }
 
@@ -268,13 +273,13 @@ bool stream_parent_connect_to_one(
 
         time_t now = now_realtime_sec();
 
-        if(nd_thread_signaled_to_cancel()) {
-            s->error = ND_SOCK_ERR_THREAD_CANCELLED;
-            return false;
-        }
-
         if(d->postpone_reconnection_until > now)
             continue;
+
+        if(nd_thread_signaled_to_cancel()) {
+            sender_sock->error = ND_SOCK_ERR_THREAD_CANCELLED;
+            return false;
+        }
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "STREAM %s: connecting to '%s' (default port: %d)...",
@@ -285,7 +290,8 @@ bool stream_parent_connect_to_one(
 
         d->since = now;
         d->attempts++;
-        if (nd_sock_connect_to_this(s, string2str(d->destination), default_port, timeout, stream_parent_is_ssl(d))) {
+        if (nd_sock_connect_to_this(sender_sock, string2str(d->destination),
+                                    default_port, timeout, stream_parent_is_ssl(d))) {
             if (connected_to && connected_to_size)
                 strncpyz(connected_to, string2str(d->destination), connected_to_size);
 
@@ -297,7 +303,7 @@ bool stream_parent_connect_to_one(
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->stream.snd.parents.all, d, prev, next);
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(host->stream.snd.parents.all, d, prev, next);
 
-            s->error = ND_SOCK_ERR_NONE;
+            sender_sock->error = ND_SOCK_ERR_NONE;
             return true;
         }
     }

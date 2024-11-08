@@ -20,7 +20,7 @@ void rrdhost_stream_parents_init(struct rrdhost *host);
 void rrdhost_stream_parents_free(struct rrdhost *host);
 
 bool stream_parent_connect_to_one(
-    ND_SOCK *s,
+    ND_SOCK *sender_sock,
     struct rrdhost *host,
     int default_port,
     time_t timeout,
