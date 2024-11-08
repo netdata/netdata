@@ -1179,7 +1179,7 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
 
     host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
     host->sender->rrdpush_sender_pipe[PIPE_WRITE] = -1;
-    nd_sock_init(&host->sender->sock, netdata_ssl_streaming_sender_ctx);
+    nd_sock_init(&host->sender->sock, netdata_ssl_streaming_sender_ctx, netdata_ssl_validate_certificate_sender);
     host->sender->disabled_capabilities = STREAM_CAP_NONE;
 
     if(!stream_send.compression.enabled)

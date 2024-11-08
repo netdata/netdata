@@ -102,8 +102,12 @@ ssize_t nd_sock_send_timeout(ND_SOCK *s, void *buf, size_t len, int flags, time_
             return -1;
     }
 
-    if (nd_sock_is_ssl(s))
-        return netdata_ssl_write(&s->ssl, buf, len);
+    if(s->ssl.conn) {
+        if (nd_sock_is_ssl(s))
+            return netdata_ssl_write(&s->ssl, buf, len);
+        else
+            return -1;
+    }
 
     return send(s->fd, buf, len, flags);
 }

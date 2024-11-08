@@ -23,7 +23,7 @@ typedef enum __attribute__((packed)) {
 
 ENUM_STR_DEFINE_FUNCTIONS_EXTERN(ND_SOCK_ERROR);
 
-typedef struct nd {
+typedef struct nd_sock {
     bool verify_certificate;
     ND_SOCK_ERROR error;
     int fd;
@@ -31,15 +31,16 @@ typedef struct nd {
     SSL_CTX *ctx;
 } ND_SOCK;
 
-static inline void nd_sock_init(ND_SOCK *s, SSL_CTX *ctx) {
+static inline void nd_sock_init(ND_SOCK *s, SSL_CTX *ctx, bool verify_certificate) {
     memset(s, 0, sizeof(*s));
     s->ssl = NETDATA_SSL_UNSET_CONNECTION;
     s->fd = -1;
     s->ctx = ctx;
+    s->verify_certificate = verify_certificate;
 }
 
 static inline bool nd_sock_is_ssl(ND_SOCK *s) {
-    return SSL_connection(&(s)->ssl);
+    return SSL_connection(&s->ssl);
 }
 
 static inline SOCKET_PEERS nd_sock_socket_peers(ND_SOCK *s) {

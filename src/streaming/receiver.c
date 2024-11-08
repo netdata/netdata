@@ -903,7 +903,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     rpt->system_info = callocz(1, sizeof(struct rrdhost_system_info));
     rpt->system_info->hops = rpt->hops;
 
-    nd_sock_init(&rpt->sock, netdata_ssl_web_server_ctx);
+    nd_sock_init(&rpt->sock, netdata_ssl_web_server_ctx, false);
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
 
