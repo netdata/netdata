@@ -612,6 +612,7 @@ static struct replication_query *replication_response_prepare(
 }
 
 void replication_response_cancel_and_finalize(struct replication_query *q) {
+    if(!q) return;
     replication_query_finalize(NULL, q, false);
 }
 
