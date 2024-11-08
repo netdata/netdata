@@ -151,7 +151,7 @@
 
             <Publish Dialog="ViewLicenseDlg2" Control="Back" Event="NewDialog" Value="ViewLicenseDlg1" />
             <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="NDConfigDialog" Condition="NOT ETCNETDATACLAIMFILE" />
-            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="NDConfigDialog" Condition="ETCNETDATACLAIMFILE" />
+            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="InstallDirDlg" Condition="ETCNETDATACLAIMFILE" />
 
             <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
             <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
