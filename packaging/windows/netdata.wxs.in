@@ -233,7 +233,7 @@
                 <Control Id="WarningLabel" Type="Text" X="10" Y="60" Width="290" Height="15" Text="Agent already claimed? Click Next." />
 
                 <Control Id="TokenLabel" Type="Text" X="10" Y="90" Width="55" Height="15" Text="Claim Token:" />
-                <Control Id="Token" Type="Edit" X="65" Y="90" Width="290" Height="18" Property="TOKEN" />
+                <Control Id="Token" Type="Edit" X="65" Y="90" Width="290" Height="18" Property="TOKEN" Text="{135}" />
             
                 <Control Id="RoomsLabel" Type="Text" X="10" Y="105" Width="55" Height="15" Text="Rooms ID(s):" />
                 <Control Id="Rooms" Type="Edit" X="65" Y="105" Width="290" Height="18" Property="ROOMS" />
