@@ -123,8 +123,6 @@ static bool fetch_stream_info(STREAM_PARENT *d, const char *uuid, int default_po
         .verify_certificate = s->verify_certificate,
     };
 
-    const char *dst = string2str(d->destination);
-
     // Build HTTP request
     snprintf(buf, sizeof(buf),
              "GET /api/v3/stream_info?machine_guid=%s" HTTP_1_1 HTTP_ENDL

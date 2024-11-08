@@ -102,7 +102,7 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
                 return -2;
         }
 
-        bytes_read = nd_sock_read_nowait(&r->sock, buffer, size);
+        bytes_read = nd_sock_read(&r->sock, buffer, size);
 
     } while(bytes_read < 0 && errno == EINTR && tries--);
 

@@ -57,7 +57,7 @@ static inline void nd_sock_close(ND_SOCK *s) {
     s->error = ND_SOCK_ERR_NONE;
 }
 
-static inline ssize_t nd_sock_read_nowait(ND_SOCK *s, void *buf, size_t num) {
+static inline ssize_t nd_sock_read(ND_SOCK *s, void *buf, size_t num) {
     if (nd_sock_is_ssl(s))
         return netdata_ssl_read(&s->ssl, buf, num);
     else
