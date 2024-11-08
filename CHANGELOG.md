@@ -1,5 +1,14 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.0.0...HEAD)
+
+**Merged pull requests:**
+
+- Regenerate integrations.js [\#18966](https://github.com/netdata/netdata/pull/18966) ([netdatabot](https://github.com/netdatabot))
+- Update Windows Documentation [\#18928](https://github.com/netdata/netdata/pull/18928) ([thiagoftsm](https://github.com/thiagoftsm))
+
 ## [v2.0.0](https://github.com/netdata/netdata/tree/v2.0.0) (2024-11-07)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.47.5...v2.0.0)
@@ -423,7 +432,6 @@
 - remove python.d/sambsa [\#18413](https://github.com/netdata/netdata/pull/18413) ([ilyam8](https://github.com/ilyam8))
 - SPAWN-SERVER: re-evaluate signals even 500ms [\#18411](https://github.com/netdata/netdata/pull/18411) ([ktsaou](https://github.com/ktsaou))
 - Claim on Windows [\#18410](https://github.com/netdata/netdata/pull/18410) ([thiagoftsm](https://github.com/thiagoftsm))
-- kickstart: fix write\_claim\_config when executed as a regular user [\#18406](https://github.com/netdata/netdata/pull/18406) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
