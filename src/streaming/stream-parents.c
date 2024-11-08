@@ -2,6 +2,8 @@
 
 #include "sender-internals.h"
 
+#define TIME_TO_CONSIDER_PARENTS_SIMILAR 120
+
 struct stream_parent {
     STRING *destination;
     bool ssl;
@@ -25,6 +27,11 @@ struct stream_parent {
     STREAM_PARENT *prev;
     STREAM_PARENT *next;
 };
+
+STREAM_HANDSHAKE stream_parent_get_disconnect_reason(STREAM_PARENT *d) {
+    if(!d) return STREAM_HANDSHAKE_INTERNAL_ERROR;
+    return d->reason;
+}
 
 void stream_parent_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t since) {
     if(!d) return;
@@ -217,53 +224,88 @@ bool stream_parent_connect_to_one(
     STREAM_PARENT *array[size];
 
     // fetch stream info for all of them and put them in the array
-    size_t count = 0;
+    size_t count = 0, skipped_but_could_use = 0;
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d && count < size ; d = d->next) {
         if (nd_thread_signaled_to_cancel()) {
             sender_sock->error = ND_SOCK_ERR_THREAD_CANCELLED;
             return false;
         }
 
-        if (d->postpone_reconnection_until > now_realtime_sec())
+        if (d->postpone_reconnection_until > now_realtime_sec()) {
+            skipped_but_could_use++;
             continue;
+        }
 
-        if(!stream_info_fetch(d, host->machine_guid, default_port, sender_sock) || (
-            (d->remote.ingest_type == RRDHOST_INGEST_TYPE_CHILD || d->remote.ingest_type == RRDHOST_INGEST_TYPE_ARCHIVED)  &&
-            (d->remote.ingest_status == RRDHOST_INGEST_STATUS_OFFLINE || d->remote.ingest_status == RRDHOST_INGEST_STATUS_ARCHIVED) &&
-            d->remote.db_status == RRDHOST_DB_STATUS_QUERYABLE &&
-            d->remote.db_liveness == RRDHOST_DB_LIVENESS_STALE))
+        bool skip = false;
+        if(stream_info_fetch(d, host->machine_guid, default_port, sender_sock)) {
+            switch(d->remote.ingest_type) {
+                case RRDHOST_INGEST_TYPE_VIRTUAL:
+                case RRDHOST_INGEST_TYPE_LOCALHOST:
+                    d->reason = STREAM_HANDSHAKE_ERROR_LOCALHOST;
+                    continue; // can't use these, ever
+
+                default:
+                case RRDHOST_INGEST_TYPE_CHILD:
+                case RRDHOST_INGEST_TYPE_ARCHIVED:
+                    break;
+            }
+
+            switch(d->remote.ingest_status) {
+                case RRDHOST_INGEST_STATUS_INITIALIZING:
+                    d->reason = STREAM_HANDSHAKE_INITIALIZATION;
+                    skip = true;
+                    break;
+
+                case RRDHOST_INGEST_STATUS_REPLICATING:
+                case RRDHOST_INGEST_STATUS_ONLINE:
+                    d->reason = STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED;
+                    skip = true;
+                    break;
+
+                default:
+                case RRDHOST_INGEST_STATUS_OFFLINE:
+                    break;
+            }
+        }
+
+        if(skip)
+            skipped_but_could_use++;
+        else
             array[count++] = d;
     }
 
     // can we use any parent?
     if(!count) return false;
 
-    // sort the array
-    qsort(array, count, sizeof(STREAM_PARENT *), compare_last_time);
+    if(count > 1) {
+        // sort the array
+        qsort(array, count, sizeof(STREAM_PARENT *), compare_last_time);
 
-    size_t base = 0;
-    while(base < count) {
-        // find how many have similar db_last_time_s;
-        size_t similar = 1;
-        for (size_t i = base + 1; i < count; i++) {
-            if (array[i]->remote.db_last_time_s - array[i - 1]->remote.db_last_time_s <= 60)
-                similar++;
-            else
-                break;
-        }
+        size_t base = 0;
+        while (base < count) {
+            // find how many have similar db_last_time_s;
+            size_t similar = 1;
+            for (size_t i = base + 1; i < count; i++) {
+                if (array[i]->remote.db_last_time_s - array[i - 1]->remote.db_last_time_s <= TIME_TO_CONSIDER_PARENTS_SIMILAR)
+                    similar++;
+                else
+                    break;
+            }
 
-        // if we have only 1 similar, move on
-        if(similar == 1) {
-            base++;
-            continue;
-        }
+            // if we have only 1 similar, move on
+            if (similar == 1) {
+                base++;
+                continue;
+            }
 
-        // reorder the parents who have similar db_last_time
-        while (similar > 1) {
-            size_t chosen = base + os_random(similar);
-            if (chosen != base) SWAP(array[base], array[chosen]);
-            base++;
-            similar--;
+            // reorder the parents who have similar db_last_time
+            while (similar > 1) {
+                size_t chosen = base + os_random(similar);
+                if (chosen != base)
+                    SWAP(array[base], array[chosen]);
+                base++;
+                similar--;
+            }
         }
     }
 
@@ -305,6 +347,54 @@ bool stream_parent_connect_to_one(
 
             sender_sock->error = ND_SOCK_ERR_NONE;
             return true;
+        }
+        else {
+            d->postpone_reconnection_until = now_realtime_sec() + 5 * 60;
+
+            switch(sender_sock->error) {
+                case ND_SOCK_ERR_CONNECTION_REFUSED:
+                    d->reason = STREAM_HANDSHAKE_CONNECTION_REFUSED;
+                    break;
+
+                case ND_SOCK_ERR_CANNOT_RESOLVE_HOSTNAME:
+                    d->reason = STREAM_HANDSHAKE_CANT_RESOLVE_HOSTNAME;
+                    break;
+
+                case ND_SOCK_ERR_NO_HOST_IN_DEFINITION:
+                    d->reason = STREAM_HANDSHAKE_NO_HOST_IN_DESTINATION;
+                    break;
+
+                case ND_SOCK_ERR_TIMEOUT:
+                    d->reason = STREAM_HANDSHAKE_CONNECT_TIMEOUT;
+                    break;
+
+                case ND_SOCK_ERR_SSL_INVALID_CERTIFICATE:
+                    d->reason = STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE;
+                    break;
+
+                case ND_SOCK_ERR_SSL_CANT_ESTABLISH_SSL_CONNECTION:
+                case ND_SOCK_ERR_SSL_FAILED_TO_OPEN:
+                    d->reason = STREAM_HANDSHAKE_ERROR_SSL_ERROR;
+                    break;
+
+                default:
+                case ND_SOCK_ERR_POLL_ERROR:
+                case ND_SOCK_ERR_FAILED_TO_CREATE_SOCKET:
+                case ND_SOCK_ERR_UNKNOWN_ERROR:
+                    d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
+                    break;
+
+                case ND_SOCK_ERR_THREAD_CANCELLED:
+                case ND_SOCK_ERR_NO_DESTINATION_AVAILABLE:
+                    d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
+                    break;
+            }
+
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "STREAM %s: stream connection to '%s' failed (default port: %d): %s",
+                   rrdhost_hostname(host),
+                   string2str(d->destination), default_port,
+                   ND_SOCK_ERROR_2str(sender_sock->error));
         }
     }
 

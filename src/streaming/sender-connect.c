@@ -319,36 +319,9 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
             &s->sock, host, default_port, timeout, &s->reconnects_counter,
             s->connected_to, sizeof(s->connected_to) - 1,
             &host->stream.snd.parents.current)) {
-        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
-        const char *msg = NULL;
-
-        switch(s->sock.error) {
-            default:
-                msg = ND_SOCK_ERROR_2str(s->sock.error);
-                break;
-
-            case ND_SOCK_ERR_THREAD_CANCELLED:
-            case ND_SOCK_ERR_NO_DESTINATION_AVAILABLE:
-                // don't log for these
-                break;
-        }
-
-        if(msg) {
-            ND_LOG_STACK lgs[] = {
-                ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, msg),
-                ND_LOG_FIELD_END(),
-            };
-            ND_LOG_STACK_PUSH(lgs);
-
-            netdata_log_error("SSL: closing stream connection: %s", msg);
-
-            stream_parent_set_reconnect_delay(
-                host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_SSL_ERROR,
-                now_realtime_sec() + 5 * 60);
-        }
-
+        const char *msg = ND_SOCK_ERROR_2str(s->sock.error);
+        netdata_log_error("SSL: can't connect to parent: %s", msg);
         nd_sock_close(&s->sock);
-
         return false;
     }
 

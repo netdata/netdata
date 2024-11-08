@@ -30,6 +30,7 @@ bool stream_parent_connect_to_one(
     STREAM_PARENT **destination);
 
 void rrdhost_stream_parents_to_json(BUFFER *wb, struct rrdhost_status *s);
+STREAM_HANDSHAKE stream_parent_get_disconnect_reason(STREAM_PARENT *d);
 void stream_parent_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t since);
 void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t postpone_reconnection_until);
 time_t stream_parent_get_reconnection_t(STREAM_PARENT *d);
