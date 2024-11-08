@@ -98,22 +98,25 @@ void rrdhost_stream_parent_reset_postpone_time(RRDHOST *host) {
         d->postpone_reconnection_until = now + wait;
 }
 
-void rrdhost_stream_parent_ssl_init(RRDHOST *host) {
+void rrdhost_stream_parent_ssl_init(struct sender_state *s) {
     static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
     spinlock_lock(&sp);
 
-    if(netdata_ssl_streaming_sender_ctx || !host) {
+    if(netdata_ssl_streaming_sender_ctx || !s->host) {
         spinlock_unlock(&sp);
-        return;
+        goto cleanup;
     }
 
-    for(STREAM_PARENT *d = host->stream.snd.parents.all; d ; d = d->next) {
+    for(STREAM_PARENT *d = s->host->stream.snd.parents.all; d ; d = d->next) {
         if (d->ssl) {
             // we need to initialize SSL
 
             netdata_ssl_initialize_ctx(NETDATA_SSL_STREAMING_SENDER_CTX);
-            ssl_security_location_for_context(netdata_ssl_streaming_sender_ctx,
-                                              string2str(stream_send.parents.ssl_ca_file), string2str(stream_send.parents.ssl_ca_path));
+
+            ssl_security_location_for_context(
+                netdata_ssl_streaming_sender_ctx,
+                string2str(stream_send.parents.ssl_ca_file),
+                string2str(stream_send.parents.ssl_ca_path));
 
             // stop the loop
             break;
@@ -121,6 +124,10 @@ void rrdhost_stream_parent_ssl_init(RRDHOST *host) {
     }
 
     spinlock_unlock(&sp);
+
+cleanup:
+    s->sock.ctx = netdata_ssl_streaming_sender_ctx;
+    s->sock.verify_certificate = netdata_ssl_validate_certificate_sender;
 }
 
 static bool stream_info_parse(struct json_object *jobj, const char *path, STREAM_PARENT *d, BUFFER *error) {

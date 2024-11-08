@@ -378,7 +378,7 @@ void *rrdpush_sender_thread(void *ptr) {
         return NULL;
     }
 
-    rrdhost_stream_parent_ssl_init(s->host);
+    rrdhost_stream_parent_ssl_init(s);
 
     netdata_log_info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), gettid_cached());
 

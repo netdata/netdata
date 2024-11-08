@@ -12,7 +12,7 @@ struct rrdhost_status;
 struct stream_parent;
 typedef struct stream_parent STREAM_PARENT;
 
-void rrdhost_stream_parent_ssl_init(struct rrdhost *host);
+void rrdhost_stream_parent_ssl_init(struct sender_state *s);
 
 void rrdhost_stream_parent_reset_postpone_time(struct rrdhost *host);
 
