@@ -237,7 +237,9 @@ void rrdpush_sender_execute_commands(struct sender_state *s) {
         }
         else if (command && strcmp(command, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_REPLAY_REQUEST);
-            nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
+
+            // do not log replication commands received - way too many!
+            // nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
             const char *chart_id = get_word(s->line.words, s->line.num_words, 1);
             const char *start_streaming = get_word(s->line.words, s->line.num_words, 2);
