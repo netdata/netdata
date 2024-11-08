@@ -1,6 +1,7 @@
 module github.com/netdata/netdata/go/plugins
 
-go 1.22.0
+go 1.23.3
+
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.50.1
 
 require (
@@ -9,14 +10,14 @@ require (
 	github.com/Wing924/ltsv v0.4.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
-	github.com/axiomhq/hyperloglog v0.1.0
+	github.com/axiomhq/hyperloglog v0.2.0
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bmatcuk/doublestar/v4 v4.7.1
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/docker/docker v27.3.1+incompatible
-	github.com/facebook/time v0.0.0-20241003211043-324a0f2e94c0
+	github.com/facebook/time v0.0.0-20241106150441-cd750f39df58
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-ldap/ldap/v3 v3.4.8
 	github.com/go-sql-driver/mysql v1.8.1
