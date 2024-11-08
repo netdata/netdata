@@ -102,6 +102,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | rabbitmq.node_avail_status | running, down | status |
+| rabbitmq.node_network_partition_status | clear, detected | status |
 | rabbitmq.node_mem_alarm_status | clear, triggered | status |
 | rabbitmq.node_disk_free_alarm_status | clear, triggered | status |
 | rabbitmq.node_file_descriptors_usage | used | fd |
@@ -147,9 +148,9 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
+| rabbitmq.vhost_status | running, stopped, partial | status |
 | rabbitmq.vhost_messages_count | ready, unacknowledged | messages |
 | rabbitmq.vhost_messages_rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
-| rabbitmq.vhost_status | running, stopped, partial | status |
 
 ### Per queue
 
@@ -169,6 +170,7 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
+| rabbitmq.queue_status | running, down, idle, crashed, stopped, minority, terminated | status |
 | rabbitmq.queue_messages_count | ready, unacknowledged, paged_out, persistent | messages |
 | rabbitmq.queue_messages_rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
 
@@ -182,9 +184,12 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ rabbitmq_node_avail_status_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_avail_status | RabbitMQ node is down (node ${label:node} cluster ${label:cluster_id}) |
+| [ rabbitmq_node_network_partition_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_network_partition_status | RabbitMQ network partition detected (node ${label:node} cluster ${label:cluster_id}) |
 | [ rabbitmq_node_mem_alarm_status_triggered ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_mem_alarm_status | RabbitMQ mem alarm triggered (node ${label:node} cluster ${label:cluster_id}) |
 | [ rabbitmq.node_disk_free_alarm_status_triggered ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_disk_free_alarm_status | RabbitMQ disk free alarm triggered (node ${label:node} cluster ${label:cluster_id}) |
 | [ rabbitmq_vhost_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.vhost_status | RabbitMQ vhost is not healthy (vhost ${label:vhost} cluster ${label:cluster_id}) |
+| [ rabbitmq_queue_status_minority ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.queue_status | RabbitMQ queue insufficient online members (queue ${label:queue} node ${label:node} cluster ${label:cluster_id}) |
+| [ rabbitmq_queue_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.queue_status | RabbitMQ queue is unhealthy (queue ${label:queue} node ${label:node} cluster ${label:cluster_id}) |
 
 
 ## Setup
