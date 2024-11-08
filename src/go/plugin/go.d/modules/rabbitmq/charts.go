@@ -19,6 +19,7 @@ const (
 	prioQueueChurnRate
 
 	prioNodeAvailStatus
+	prioNodeNetworkPartitioningStatus
 	prioNodeMemAlarmStatus
 	prioNodeDiskFreeAlarmStatus
 	prioNodeFileDescriptorsUsage
@@ -30,10 +31,11 @@ const (
 	prioNodeClusterLinkPeerTraffic
 	prioNodeUptime
 
+	prioVhostStatus
 	prioVhostMessagesCount
 	prioVhostMessagesRate
-	prioVhostStatus
 
+	prioQueueStatus
 	prioQueueMessagesCount
 	prioQueueMessagesRate
 )
@@ -141,6 +143,7 @@ var (
 
 var nodeChartsTmpl = module.Charts{
 	nodeAvailStatusChartTmpl.Copy(),
+	nodeNetworkPartitionStatusChartTmpl.Copy(),
 	nodeMemAlarmStatusChartTmpl.Copy(),
 	nodeDiskFreeAlarmStatusChartTmpl.Copy(),
 	nodeFileDescriptorsUsageChartTmpl.Copy(),
@@ -164,6 +167,19 @@ var (
 		Dims: module.Dims{
 			{ID: "node_%s_avail_status_running", Name: "running"},
 			{ID: "node_%s_avail_status_down", Name: "down"},
+		},
+	}
+	nodeNetworkPartitionStatusChartTmpl = module.Chart{
+		ID:       "node_%s_network_partition_status",
+		Title:    "Node Network Partitioning Status",
+		Units:    "status",
+		Fam:      "node status",
+		Ctx:      "rabbitmq.node_network_partition_status",
+		Type:     module.Line,
+		Priority: prioNodeNetworkPartitioningStatus,
+		Dims: module.Dims{
+			{ID: "node_%s_network_partition_status_clear", Name: "clear"},
+			{ID: "node_%s_network_partition_status_detected", Name: "detected"},
 		},
 	}
 	nodeMemAlarmStatusChartTmpl = module.Chart{
@@ -198,7 +214,7 @@ var (
 		Units:    "fd",
 		Fam:      "node fds",
 		Ctx:      "rabbitmq.node_file_descriptors_usage",
-		Type:     module.Stacked,
+		Type:     module.Line,
 		Priority: prioNodeFileDescriptorsUsage,
 		Dims: module.Dims{
 			{ID: "node_%s_fds_used", Name: "used"},
@@ -210,7 +226,7 @@ var (
 		Units:    "sockets",
 		Fam:      "node sockets",
 		Ctx:      "rabbitmq.node_sockets_usage",
-		Type:     module.Stacked,
+		Type:     module.Line,
 		Priority: prioNodeSocketsUsage,
 		Dims: module.Dims{
 			{ID: "node_%s_sockets_used", Name: "used"},
@@ -222,7 +238,7 @@ var (
 		Units:    "processes",
 		Fam:      "node erlang",
 		Ctx:      "rabbitmq.node_erlang_processes_usage",
-		Type:     module.Stacked,
+		Type:     module.Line,
 		Priority: prioNodeErlangProcessesUsage,
 		Dims: module.Dims{
 			{ID: "node_%s_procs_used", Name: "used"},
@@ -234,6 +250,7 @@ var (
 		Units:    "processes",
 		Fam:      "node erlang",
 		Ctx:      "rabbitmq.node_erlang_run_queue_processes_count",
+		Type:     module.Line,
 		Priority: prioNodeErlangRunQueueProcessesCount,
 		Dims: module.Dims{
 			{ID: "node_%s_run_queue", Name: "length"},
@@ -298,12 +315,26 @@ var (
 )
 
 var vhostChartsTmpl = module.Charts{
+	vhostStatusChartTmpl.Copy(),
 	vhostMessageCountChartTmpl.Copy(),
 	vhostMessagesRateChartTmpl.Copy(),
-	vhostStatusChartTmpl.Copy(),
 }
 
 var (
+	vhostStatusChartTmpl = module.Chart{
+		ID:       "vhost_%s_status",
+		Title:    "Vhost Status",
+		Units:    "status",
+		Fam:      "vhost status",
+		Ctx:      "rabbitmq.vhost_status",
+		Type:     module.Line,
+		Priority: prioVhostStatus,
+		Dims: module.Dims{
+			{ID: "vhost_%s_status_running", Name: "running"},
+			{ID: "vhost_%s_status_stopped", Name: "stopped"},
+			{ID: "vhost_%s_status_partial", Name: "partial"},
+		},
+	}
 	vhostMessageCountChartTmpl = module.Chart{
 		ID:       "vhost_%s_message_count",
 		Title:    "Vhost messages",
@@ -336,28 +367,33 @@ var (
 			{ID: "vhost_%s_message_stats_return_unroutable", Name: "return_unroutable", Algo: module.Incremental},
 		},
 	}
-	vhostStatusChartTmpl = module.Chart{
-		ID:       "vhost_%s_status",
-		Title:    "Vhost Status",
-		Units:    "status",
-		Fam:      "vhost status",
-		Ctx:      "rabbitmq.vhost_status",
-		Type:     module.Line,
-		Priority: prioVhostStatus,
-		Dims: module.Dims{
-			{ID: "vhost_%s_status_running", Name: "running"},
-			{ID: "vhost_%s_status_stopped", Name: "stopped"},
-			{ID: "vhost_%s_status_partial", Name: "partial"},
-		},
-	}
 )
 
 var queueChartsTmpl = module.Charts{
+	queueStatusChartTmpl.Copy(),
 	queueMessagesCountChartTmpl.Copy(),
 	queueMessagesRateChartTmpl.Copy(),
 }
 
 var (
+	queueStatusChartTmpl = module.Chart{
+		ID:       "queue_%s_vhost_%s_node_%s_status",
+		Title:    "Queue status",
+		Units:    "status",
+		Fam:      "queue status",
+		Ctx:      "rabbitmq.queue_status",
+		Type:     module.Line,
+		Priority: prioQueueStatus,
+		Dims: module.Dims{
+			{ID: "queue_%s_vhost_%s_node_%s_status_running", Name: "running"},
+			{ID: "queue_%s_vhost_%s_node_%s_status_down", Name: "down"},
+			{ID: "queue_%s_vhost_%s_node_%s_status_idle", Name: "idle"},
+			{ID: "queue_%s_vhost_%s_node_%s_status_crashed", Name: "crashed"},
+			{ID: "queue_%s_vhost_%s_node_%s_status_stopped", Name: "stopped"},
+			{ID: "queue_%s_vhost_%s_node_%s_status_minority", Name: "minority"},
+			{ID: "queue_%s_vhost_%s_node_%s_status_terminated", Name: "terminated"},
+		},
+	}
 	queueMessagesCountChartTmpl = module.Chart{
 		ID:       "queue_%s_vhost_%s_node_%s_message_count",
 		Title:    "Queue messages",
