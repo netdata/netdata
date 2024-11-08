@@ -38,7 +38,7 @@ func New() *RabbitMQ {
 					Timeout: confopt.Duration(time.Second),
 				},
 			},
-			CollectQueues: true,
+			CollectQueues: false,
 		},
 
 		charts: &module.Charts{},
