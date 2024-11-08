@@ -321,8 +321,11 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
             &s->sock, host, default_port, timeout, &s->reconnects_counter,
             s->connected_to, sizeof(s->connected_to) - 1,
             &host->stream.snd.parents.current)) {
-        const char *msg = ND_SOCK_ERROR_2str(s->sock.error);
-        netdata_log_error("can't connect to parent: %s", msg);
+
+        if(s->sock.error != ND_SOCK_ERR_NO_DESTINATION_AVAILABLE)
+            nd_log(NDLS_DAEMON, NDLP_WARNING, "can't connect to a parent, last error: %s",
+                   ND_SOCK_ERROR_2str(s->sock.error));
+
         nd_sock_close(&s->sock);
         return false;
     }

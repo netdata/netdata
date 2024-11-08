@@ -137,6 +137,14 @@ static bool stream_info_parse(struct json_object *jobj, const char *path, STREAM
 }
 
 static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_port, ND_SOCK *sender_sock, const char *hostname) {
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_STR(NDF_DST_IP, d->destination),
+        ND_LOG_FIELD_I64(NDF_DST_PORT, default_port),
+        ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, "GET"),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
     char buf[HTTP_HEADER_SIZE];
     CLEAN_ND_SOCK sock = ND_SOCK_INIT(sender_sock->ctx, sender_sock->verify_certificate);
 
@@ -278,7 +286,7 @@ bool stream_parent_connect_to_one(
         if (d->postpone_reconnection_until > now_realtime_sec()) {
             skipped_but_useful++;
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "STREAM %s: skipping useful parent '%s': POSTPONED FOR %ld SECS MORE DUE TO: %s",
+                   "STREAM %s: skipping useful parent '%s': POSTPONED FOR %ld SECS MORE: %s",
                    rrdhost_hostname(host),
                    string2str(d->destination),
                    d->postpone_reconnection_until - now_realtime_sec(),
@@ -408,6 +416,13 @@ bool stream_parent_connect_to_one(
 
         if (reconnects_counter)
             *reconnects_counter += 1;
+
+        ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_STR(NDF_DST_IP, d->destination),
+            ND_LOG_FIELD_I64(NDF_DST_PORT, default_port),
+            ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
 
         d->since = now;
         d->attempts++;
