@@ -1,0 +1,61 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package rabbitmq
+
+import (
+	"fmt"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+)
+
+func (r *RabbitMQ) collectNodes(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(r.RequestConfig, urlPathAPINodes)
+	if err != nil {
+		return fmt.Errorf("failed to create node stats request: %w", err)
+	}
+
+	var resp []apiNodeResp
+
+	if err := r.webClient().RequestJSON(req, &resp); err != nil {
+		return err
+	}
+
+	for _, node := range resp {
+		r.cache.getNode(node).seen = true
+
+		px := fmt.Sprintf("node_%s_", node.Name)
+
+		mx[px+"avail_status_running"] = boolToInt(node.Running)
+		mx[px+"avail_status_down"] = boolToInt(!node.Running)
+
+		if !node.Running || node.OsPid == "" {
+			continue
+		}
+
+		mx[px+"mem_alarm_status_clear"] = boolToInt(!node.MemAlarm)
+		mx[px+"mem_alarm_status_triggered"] = boolToInt(node.MemAlarm)
+		mx[px+"disk_free_alarm_status_clear"] = boolToInt(!node.DiskFreeAlarm)
+		mx[px+"disk_free_alarm_status_triggered"] = boolToInt(node.DiskFreeAlarm)
+
+		mx[px+"fds_available"] = node.FDTotal - node.FDUsed
+		mx[px+"fds_used"] = node.FDUsed
+		mx[px+"mem_available"] = node.MemLimit - node.MemUsed
+		mx[px+"mem_used"] = node.MemUsed
+		mx[px+"sockets_available"] = node.SocketsTotal - node.SocketsUsed
+		mx[px+"sockets_used"] = node.SocketsUsed
+		mx[px+"procs_available"] = node.ProcTotal - node.ProcUsed
+		mx[px+"procs_used"] = node.ProcUsed
+		mx[px+"disk_free_bytes"] = node.DiskFree
+		mx[px+"run_queue"] = node.RunQueue
+		mx[px+"uptime"] = node.Uptime / 1000 // ms to seconds
+
+		for _, peer := range node.ClusterLinks {
+			r.cache.getNodeClusterPeer(node, peer).seen = true
+
+			mx[px+"peer_"+peer.Name+"_cluster_link_recv_bytes"] = peer.RecvBytes
+			mx[px+"peer_"+peer.Name+"_cluster_link_send_bytes"] = peer.SendBytes
+		}
+	}
+
+	return nil
+}

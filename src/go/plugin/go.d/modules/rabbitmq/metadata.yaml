@@ -27,8 +27,9 @@ modules:
           It collects data using an HTTP-based API provided by the [management plugin](https://www.rabbitmq.com/management.html).
           The following endpoints are used:
           
+          - `/api/definitions` (one-time retrieval, used to obtain the cluster ID and name)
           - `/api/overview`
-          - `/api/node/{node_name}`
+          - `/api/nodes`
           - `/api/vhosts`
           - `/api/queues` (disabled by default)
         method_description: ""
@@ -168,7 +169,23 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
+    alerts:
+      - name: rabbitmq_node_avail_status_down
+        metric: rabbitmq.node_avail_status
+        info: RabbitMQ node is down (node ${label:node} cluster ${label:cluster_id})
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
+      - name: rabbitmq_node_mem_alarm_status_triggered
+        metric: rabbitmq.node_mem_alarm_status
+        info: RabbitMQ mem alarm triggered (node ${label:node} cluster ${label:cluster_id})
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
+      - name: rabbitmq.node_disk_free_alarm_status_triggered
+        metric: rabbitmq.node_disk_free_alarm_status
+        info: RabbitMQ disk free alarm triggered (node ${label:node} cluster ${label:cluster_id})
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
+      - name: rabbitmq_vhost_status_unhealthy
+        metric: rabbitmq.vhost_status
+        info: RabbitMQ vhost is not healthy (vhost ${label:vhost} cluster ${label:cluster_id})
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
     metrics:
       folding:
         title: Metrics
@@ -176,9 +193,13 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: These metrics refer to the entire monitored application.
-          labels: []
+        - name: cluster
+          description: These metrics refer to the RabbitMQ Cluster.
+          labels:
+            - name: cluster_id
+              description: Unique identifier for the cluster, automatically assigned by RabbitMQ.
+            - name: cluster_name
+              description: User-defined name of the cluster as set using `rabbitmqctl set_cluster_name`. If not set, it will be "unset".
           metrics:
             - name: rabbitmq.messages_count
               description: Messages
@@ -200,6 +221,7 @@ modules:
                 - name: deliver
                 - name: deliver_no_ack
                 - name: get
+                - name: get_empty
                 - name: get_no_ack
                 - name: deliver_get
                 - name: redeliver
@@ -236,55 +258,112 @@ modules:
                 - name: created
                 - name: deleted
                 - name: declared
-            - name: rabbitmq.file_descriptors_count
-              description: File descriptors
+        - name: node
+          description: These metrics refer to the RabbitMQ node.
+          labels:
+            - name: cluster_id
+              description: Unique identifier for the cluster, automatically assigned by RabbitMQ.
+            - name: cluster_name
+              description: User-defined name of the cluster as set using `rabbitmqctl set_cluster_name <NAME>`. If not set, it will be "unset".
+            - name: node
+              description: Name of the node.
+          metrics:
+            - name: rabbitmq.node_avail_status
+              description: Node Availability Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: running
+                - name: down
+            - name: rabbitmq.node_mem_alarm_status
+              description: Node Memory Alarm Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: triggered
+            - name: rabbitmq.node_disk_free_alarm_status
+              description: Node Disk Free Alarm Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: triggered
+            - name: rabbitmq.node_file_descriptors_usage
+              description: Node File Descriptors Usage
               unit: fd
-              chart_type: stacked
+              chart_type: line
               dimensions:
-                - name: available
                 - name: used
-            - name: rabbitmq.sockets_count
-              description: Used sockets
+            - name: rabbitmq.node_sockets_usage
+              description: Node Sockets Usage
               unit: sockets
-              chart_type: stacked
+              chart_type: line
               dimensions:
-                - name: available
                 - name: used
-            - name: rabbitmq.erlang_processes_count
-              description: Erlang processes
+            - name: rabbitmq.node_erlang_processes_usage
+              description: Node Erlang Processes Usage
               unit: processes
-              chart_type: stacked
+              chart_type: line
               dimensions:
-                - name: available
                 - name: used
-            - name: rabbitmq.erlang_run_queue_processes_count
-              description: Erlang run queue
+            - name: rabbitmq.node_erlang_run_queue_processes_count
+              description: Node Erlang Run Queue
               unit: processes
               chart_type: line
               dimensions:
                 - name: length
-            - name: rabbitmq.memory_usage
-              description: Memory
+            - name: rabbitmq.node_memory_usage
+              description: Node Memory Usage
               unit: bytes
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: used
-            - name: rabbitmq.disk_space_free_size
-              description: Free disk space
+            - name: rabbitmq.node_disk_space_free_size
+              description: Node Disk Free Space
               unit: bytes
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: free
+            - name: rabbitmq.node_uptime
+              description: Node Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: cluster peer
+          description: These metrics refer to the RabbiMQ cluster peer.
+          labels:
+            - name: cluster_id
+              description: Unique identifier for the cluster, automatically assigned by RabbitMQ.
+            - name: cluster_name
+              description: User-defined name of the cluster as set using `rabbitmqctl set_cluster_name <NAME>`. If not set, it will be "unset".
+            - name: node
+              description: Name of the node.
+            - name: peer
+              description: Name of the remote node in the cluster.
+          metrics:
+            - name: rabbitmq.node_peer_cluster_link_traffic
+              description: Node Cluster Link Peer Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
         - name: vhost
           description: These metrics refer to the virtual host.
           labels:
+            - name: cluster_id
+              description: Unique identifier for the cluster, automatically assigned by RabbitMQ.
+            - name: cluster_name
+              description: User-defined name of the cluster as set using `rabbitmqctl set_cluster_name <NAME>`. If not set, it will be "unset".
             - name: vhost
-              description: virtual host name
+              description: Name of the virtual host.
           metrics:
             - name: rabbitmq.vhost_messages_count
               description: Vhost messages
               unit: messages
-              chart_type: line
+              chart_type: stacked
               dimensions:
                 - name: ready
                 - name: unacknowledged
@@ -305,18 +384,32 @@ modules:
                 - name: deliver_get
                 - name: redeliver
                 - name: return_unroutable
+            - name: rabbitmq.vhost_status
+              description: Vhost Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: running
+                - name: stopped
+                - name: partial
         - name: queue
           description: These metrics refer to the virtual host queue.
           labels:
+            - name: cluster_id
+              description: Unique identifier for the cluster, automatically assigned by RabbitMQ.
+            - name: cluster_name
+              description: User-defined name of the cluster as set using `rabbitmqctl set_cluster_name <NAME>`. If not set, it will be "unset".
+            - name: node
+              description: Name of the node.
             - name: vhost
-              description: virtual host name
+              description: Name of the virtual host.
             - name: queue
-              description: queue name
+              description: Name of the queue.
           metrics:
             - name: rabbitmq.queue_messages_count
               description: Queue messages
               unit: messages
-              chart_type: line
+              chart_type: stacked
               dimensions:
                 - name: ready
                 - name: unacknowledged

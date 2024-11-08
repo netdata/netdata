@@ -1,0 +1,107 @@
+[
+  {
+    "cluster_state": {
+      "rabbit@ilyam-deb11-play": "running",
+      "rabbit@pve-deb-work": "running"
+    },
+    "default_queue_type": "undefined",
+    "description": "Default virtual host",
+    "message_stats": {
+      "ack": 0,
+      "ack_details": {
+        "rate": 0
+      },
+      "confirm": 1,
+      "confirm_details": {
+        "rate": 0
+      },
+      "deliver": 0,
+      "deliver_details": {
+        "rate": 0
+      },
+      "deliver_get": 4,
+      "deliver_get_details": {
+        "rate": 0
+      },
+      "deliver_no_ack": 0,
+      "deliver_no_ack_details": {
+        "rate": 0
+      },
+      "drop_unroutable": 0,
+      "drop_unroutable_details": {
+        "rate": 0
+      },
+      "get": 3,
+      "get_details": {
+        "rate": 0
+      },
+      "get_empty": 2,
+      "get_empty_details": {
+        "rate": 0
+      },
+      "get_no_ack": 1,
+      "get_no_ack_details": {
+        "rate": 0
+      },
+      "publish": 1,
+      "publish_details": {
+        "rate": 0
+      },
+      "redeliver": 3,
+      "redeliver_details": {
+        "rate": 0
+      },
+      "return_unroutable": 0,
+      "return_unroutable_details": {
+        "rate": 0
+      }
+    },
+    "messages": 0,
+    "messages_details": {
+      "rate": 0
+    },
+    "messages_ready": 0,
+    "messages_ready_details": {
+      "rate": 0
+    },
+    "messages_unacknowledged": 0,
+    "messages_unacknowledged_details": {
+      "rate": 0
+    },
+    "metadata": {
+      "description": "Default virtual host",
+      "tags": []
+    },
+    "name": "/",
+    "tags": [],
+    "tracing": false
+  },
+  {
+    "cluster_state": {
+      "rabbit@ilyam-deb11-play": "running",
+      "rabbit@pve-deb-work": "running"
+    },
+    "default_queue_type": "classic",
+    "description": "",
+    "messages": 0,
+    "messages_details": {
+      "rate": 0
+    },
+    "messages_ready": 0,
+    "messages_ready_details": {
+      "rate": 0
+    },
+    "messages_unacknowledged": 0,
+    "messages_unacknowledged_details": {
+      "rate": 0
+    },
+    "metadata": {
+      "description": "",
+      "tags": [],
+      "default_queue_type": "classic"
+    },
+    "name": "myFirstVhost",
+    "tags": [],
+    "tracing": false
+  }
+]

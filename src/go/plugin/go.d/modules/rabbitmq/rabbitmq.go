@@ -40,9 +40,9 @@ func New() *RabbitMQ {
 			},
 			CollectQueues: false,
 		},
-		charts: baseCharts.Copy(),
-		vhosts: make(map[string]bool),
-		queues: make(map[string]queueCache),
+
+		charts: &module.Charts{},
+		cache:  newCache(),
 	}
 }
 
@@ -61,12 +61,9 @@ type (
 
 		httpClient *http.Client
 
-		nodeName string
-		vhosts   map[string]bool
-		queues   map[string]queueCache
-	}
-	queueCache struct {
-		name, vhost string
+		clusterName string
+		clusterId   string
+		cache       *cache
 	}
 )
 
