@@ -36,7 +36,7 @@ ssize_t send_to_plugin(const char *txt, PARSER *parser) {
         do {
             sent = write(parser->fd_output, &txt[bytes], total - bytes);
             if(sent <= 0) {
-                netdata_log_error("PLUGINSD: cannot send command (fd)");
+                netdata_log_error("PLUGINSD: cannot send command (fd = %d)", parser->fd_output);
                 spinlock_unlock(&parser->writer.spinlock);
                 return -3;
             }

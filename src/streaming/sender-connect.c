@@ -190,7 +190,8 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     }
 
     if(version >= STREAM_HANDSHAKE_OK_V1) {
-        stream_parent_set_reconnect_delay(host->stream.snd.parents.current, version, now_realtime_sec() + stream_send.parents.reconnect_delay_s);
+        stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_RECONNECT_DELAY,
+                                          now_realtime_sec() + stream_send.parents.reconnect_delay_s);
         s->capabilities = convert_stream_version_to_capabilities(version, host, true);
         return true;
     }
@@ -203,7 +204,8 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
 
     worker_is_busy(worker_job_id);
     rrdpush_sender_thread_close_socket(s);
-    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, version, now_realtime_sec() + delay);
+    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_RECONNECT_DELAY,
+                                      now_realtime_sec() + delay);
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
@@ -320,7 +322,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
             s->connected_to, sizeof(s->connected_to) - 1,
             &host->stream.snd.parents.current)) {
         const char *msg = ND_SOCK_ERROR_2str(s->sock.error);
-        netdata_log_error("SSL: can't connect to parent: %s", msg);
+        netdata_log_error("can't connect to parent: %s", msg);
         nd_sock_close(&s->sock);
         return false;
     }

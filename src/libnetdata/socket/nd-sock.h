@@ -31,6 +31,14 @@ typedef struct nd_sock {
     SSL_CTX *ctx;
 } ND_SOCK;
 
+#define ND_SOCK_INIT(ssl_ctx, ssl_verify) (ND_SOCK){ \
+        .verify_certificate = ssl_verify,            \
+        .error = ND_SOCK_ERR_NONE,                   \
+        .fd = -1,                                    \
+        .ssl = NETDATA_SSL_UNSET_CONNECTION,         \
+        .ctx = ssl_ctx,                              \
+}
+
 static inline void nd_sock_init(ND_SOCK *s, SSL_CTX *ctx, bool verify_certificate) {
     s->verify_certificate = verify_certificate;
     s->error = ND_SOCK_ERR_NONE;

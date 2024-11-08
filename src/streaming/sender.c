@@ -145,11 +145,13 @@ static ssize_t attempt_read(struct sender_state *s) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
     else if (ret == 0 || errno == ECONNRESET) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED);
-        netdata_log_error("STREAM %s [send to %s]: connection closed by far end.", rrdhost_hostname(s->host), s->connected_to);
+        netdata_log_error("STREAM %s [send to %s]: connection (fd %d) closed by far end.",
+                          rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
     }
     else {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
-        netdata_log_error("STREAM %s [send to %s]: error during receive (%zd) - closing connection.", rrdhost_hostname(s->host), s->connected_to, ret);
+        netdata_log_error("STREAM %s [send to %s]: error during receive (%zd, on fd %d) - closing connection.",
+                          rrdhost_hostname(s->host), s->connected_to, ret, s->sock.fd);
     }
 
     rrdpush_sender_thread_close_socket(s);

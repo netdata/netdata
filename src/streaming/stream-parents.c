@@ -136,12 +136,9 @@ static bool stream_info_parse(struct json_object *jobj, const char *path, STREAM
     return true;
 }
 
-static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_port, ND_SOCK *sender_sock) {
+static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_port, ND_SOCK *sender_sock, const char *hostname) {
     char buf[HTTP_HEADER_SIZE];
-    CLEAN_ND_SOCK sock = {
-        .ctx = sender_sock->ctx,
-        .verify_certificate = sender_sock->verify_certificate,
-    };
+    CLEAN_ND_SOCK sock = ND_SOCK_INIT(sender_sock->ctx, sender_sock->verify_certificate);
 
     // Build HTTP request
     snprintf(buf, sizeof(buf),
@@ -157,17 +154,38 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
              rrdhost_program_name(localhost),
              rrdhost_program_version(localhost));
 
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "STREAM %s: fetching stream info from '%s'...",
+           hostname, string2str(d->destination));
+
     // Establish connection
-    if (!nd_sock_connect_to_this(&sock, string2str(d->destination), default_port, 5, false))
+    if (!nd_sock_connect_to_this(&sock, string2str(d->destination), default_port, 5, false)) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "STREAM %s: failed to connect for stream info to '%s': %s",
+               hostname, string2str(d->destination),
+               ND_SOCK_ERROR_2str(sock.error));
         return false;
+    }
 
     // Send HTTP request
     ssize_t sent = nd_sock_send_timeout(&sock, buf, strlen(buf), 0, 5);
-    if (sent <= 0) return false;
+    if (sent <= 0) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "STREAM %s: failed to send stream info request to '%s': %s",
+               hostname, string2str(d->destination),
+               ND_SOCK_ERROR_2str(sock.error));
+        return false;
+    }
 
     // Receive HTTP response
     ssize_t received = nd_sock_recv_timeout(&sock, buf, sizeof(buf) - 1, 0, 5);
-    if (received <= 0) return false;
+    if (received <= 0) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "STREAM %s: failed to receive stream info response from '%s': %s",
+               hostname, string2str(d->destination),
+               ND_SOCK_ERROR_2str(sock.error));
+        return false;
+    }
     buf[received] = '\0';
 
     // Parse HTTP response and extract JSON
@@ -176,12 +194,34 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
     json_start += sizeof(HTTP_HDR_END) - 1; // skip the entire header
 
     CLEAN_JSON_OBJECT *jobj = json_tokener_parse(json_start);
-    if (!jobj) return false;
+    if (!jobj) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "STREAM %s: failed to parse JSON stream info response from '%s'",
+               hostname, string2str(d->destination));
+        return false;
+    }
 
     CLEAN_BUFFER *error = buffer_create(0, NULL);
 
-    if(!stream_info_parse(jobj, "", d, error))
+    if(!stream_info_parse(jobj, "", d, error)) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "STREAM %s: failed to extract fields from JSON stream info response from '%s': %s",
+               hostname, string2str(d->destination),
+               buffer_tostring(error));
         return false;
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "STREAM %s: received stream_info data from '%s': "
+           "status: %d, nodes: %zu, receivers: %zu, first_time_s: %ld, last_time_s: %ld, "
+           "db status: %s, db liveness: %s, ingest type: %s, ingest status: %s",
+           hostname, string2str(d->destination),
+           d->remote.status, d->remote.nodes, d->remote.receivers,
+           d->remote.db_first_time_s, d->remote.db_last_time_s,
+           RRDHOST_DB_STATUS_2str(d->remote.db_status),
+           RRDHOST_DB_LIVENESS_2str(d->remote.db_liveness),
+           RRDHOST_INGEST_TYPE_2str(d->remote.ingest_type),
+           RRDHOST_INGEST_STATUS_2str(d->remote.ingest_status));
 
     return true;
 }
@@ -220,11 +260,15 @@ bool stream_parent_connect_to_one(
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) size++;
 
     // do we have any parents?
-    if(!size) return false;
+    if(!size) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM %s: no parents configured", rrdhost_hostname(host));
+        return false;
+    }
+
     STREAM_PARENT *array[size];
 
     // fetch stream info for all of them and put them in the array
-    size_t count = 0, skipped_but_could_use = 0;
+    size_t count = 0, skipped_but_useful = 0, skipped_not_useful = 0;
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d && count < size ; d = d->next) {
         if (nd_thread_signaled_to_cancel()) {
             sender_sock->error = ND_SOCK_ERR_THREAD_CANCELLED;
@@ -232,16 +276,23 @@ bool stream_parent_connect_to_one(
         }
 
         if (d->postpone_reconnection_until > now_realtime_sec()) {
-            skipped_but_could_use++;
+            skipped_but_useful++;
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "STREAM %s: skipping useful parent '%s': POSTPONED FOR %ld SECS MORE DUE TO: %s",
+                   rrdhost_hostname(host),
+                   string2str(d->destination),
+                   d->postpone_reconnection_until - now_realtime_sec(),
+                   stream_handshake_error_to_string(d->reason));
             continue;
         }
 
         bool skip = false;
-        if(stream_info_fetch(d, host->machine_guid, default_port, sender_sock)) {
+        if(stream_info_fetch(d, host->machine_guid, default_port, sender_sock, rrdhost_hostname(host))) {
             switch(d->remote.ingest_type) {
                 case RRDHOST_INGEST_TYPE_VIRTUAL:
                 case RRDHOST_INGEST_TYPE_LOCALHOST:
                     d->reason = STREAM_HANDSHAKE_ERROR_LOCALHOST;
+                    skipped_not_useful++;
                     continue; // can't use these, ever
 
                 default:
@@ -268,14 +319,26 @@ bool stream_parent_connect_to_one(
             }
         }
 
-        if(skip)
-            skipped_but_could_use++;
+        if(skip) {
+            skipped_but_useful++;
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "STREAM %s: skipping useful parent '%s': %s",
+                   rrdhost_hostname(host),
+                   string2str(d->destination),
+                   stream_handshake_error_to_string(d->reason));
+        }
         else
             array[count++] = d;
     }
 
     // can we use any parent?
-    if(!count) return false;
+    if(!count) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "STREAM %s: no parents available (%zu skipped but useful, %zu skipped not useful)",
+               rrdhost_hostname(host),
+            skipped_but_useful, skipped_not_useful);
+        return false;
+    }
 
     if(count > 1) {
         // sort the array
@@ -294,6 +357,9 @@ bool stream_parent_connect_to_one(
 
             // if we have only 1 similar, move on
             if (similar == 1) {
+                nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                       "STREAM %s: reordering keeps parent No %zu, '%s'",
+                       rrdhost_hostname(host), base, string2str(array[base]->destination));
                 base++;
                 continue;
             }
@@ -303,10 +369,22 @@ bool stream_parent_connect_to_one(
                 size_t chosen = base + os_random(similar);
                 if (chosen != base)
                     SWAP(array[base], array[chosen]);
+
+                nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                       "STREAM %s: random reordering of %zu similar parents (slots %zu to %zu), No %zu is '%s'",
+                       rrdhost_hostname(host),
+                       similar, base, base + similar,
+                       base, string2str(array[base]->destination));
+
                 base++;
                 similar--;
             }
         }
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "STREAM %s: only 1 parent is available: '%s'",
+               rrdhost_hostname(host), string2str(array[0]->destination));
     }
 
     // now the parents are sorted based on preference of connection
@@ -324,8 +402,9 @@ bool stream_parent_connect_to_one(
         }
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM %s: connecting to '%s' (default port: %d)...",
-               rrdhost_hostname(host), string2str(d->destination), default_port);
+               "STREAM %s: connecting to '%s' (default port: %d, parent %zu of %zu)...",
+               rrdhost_hostname(host), string2str(d->destination), default_port,
+               i + 1, count);
 
         if (reconnects_counter)
             *reconnects_counter += 1;
@@ -344,6 +423,11 @@ bool stream_parent_connect_to_one(
             // not advancing the destinations to find one that may work
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->stream.snd.parents.all, d, prev, next);
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(host->stream.snd.parents.all, d, prev, next);
+
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "STREAM %s: connected to '%s' (default port: %d, fd %d)...",
+                   rrdhost_hostname(host), string2str(d->destination), default_port,
+                   sender_sock->fd);
 
             sender_sock->error = ND_SOCK_ERR_NONE;
             return true;
@@ -426,7 +510,8 @@ static bool stream_parent_add_one(char *entry, void *data) {
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(t->list, d, prev, next);
 
     t->count++;
-    nd_log_daemon(NDLP_INFO, "STREAM: added streaming destination No %d: '%s' to host '%s'", t->count, string2str(d->destination), rrdhost_hostname(t->host));
+    nd_log_daemon(NDLP_INFO, "STREAM %s: added streaming destination No %d: '%s'",
+                  rrdhost_hostname(t->host), t->count, string2str(d->destination));
 
     return false; // we return false, so that we will get all defined destinations
 }
