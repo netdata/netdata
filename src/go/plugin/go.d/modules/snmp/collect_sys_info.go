@@ -36,6 +36,7 @@ func (s *SNMP) getSysInfo() (*sysInfo, error) {
 	}
 
 	si := &sysInfo{
+		name:         "unknown",
 		organization: "Unknown",
 	}
 
@@ -65,10 +66,6 @@ func (s *SNMP) getSysInfo() (*sysInfo, error) {
 		if err != nil {
 			return nil, fmt.Errorf("OID '%s': %v", pdu.Name, err)
 		}
-	}
-
-	if si.name == "" {
-		return nil, errors.New("no system name")
 	}
 
 	return si, nil
