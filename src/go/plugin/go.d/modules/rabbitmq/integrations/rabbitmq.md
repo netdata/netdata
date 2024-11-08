@@ -176,7 +176,15 @@ Metrics:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ rabbitmq_node_avail_status_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_avail_status | RabbitMQ node is down (node ${label:node} cluster ${label:cluster_id}) |
+| [ rabbitmq_node_mem_alarm_status_triggered ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_mem_alarm_status | RabbitMQ mem alarm triggered (node ${label:node} cluster ${label:cluster_id}) |
+| [ rabbitmq.node_disk_free_alarm_status_triggered ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_disk_free_alarm_status | RabbitMQ disk free alarm triggered (node ${label:node} cluster ${label:cluster_id}) |
+| [ rabbitmq_vhost_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.vhost_status | RabbitMQ vhost is not healthy (vhost ${label:vhost} cluster ${label:cluster_id}) |
 
 
 ## Setup
