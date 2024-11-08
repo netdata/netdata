@@ -365,10 +365,11 @@ bool stream_parent_connect_to_one(
             // find how many have similar db_last_time_s;
             size_t similar = 1;
             for (size_t i = base + 1; i < count; i++) {
-                if (array[i]->remote.db_last_time_s - array[i - 1]->remote.db_last_time_s <= TIME_TO_CONSIDER_PARENTS_SIMILAR)
-                    similar++;
-                else
-                    break;
+//                if (array[i]->remote.db_last_time_s - array[i - 1]->remote.db_last_time_s <= TIME_TO_CONSIDER_PARENTS_SIMILAR)
+//                    similar++;
+//                else
+//                    break;
+                similar++;
             }
 
             // if we have only 1 similar, move on
@@ -379,21 +380,27 @@ bool stream_parent_connect_to_one(
                 base++;
                 continue;
             }
+            else {
+                // reorder the parents who have similar db_last_time
 
-            // reorder the parents who have similar db_last_time
-            while (similar > 1) {
-                size_t chosen = base + os_random(similar);
-                if (chosen != base)
-                    SWAP(array[base], array[chosen]);
+                while (similar > 1) {
+                    size_t chosen = base + os_random(similar);
+                    if (chosen != base)
+                        SWAP(array[base], array[chosen]);
 
-                nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                       "STREAM %s: random reordering of %zu similar parents (slots %zu to %zu), No %zu is '%s'",
-                       rrdhost_hostname(host),
-                       similar, base, base + similar,
-                       base, string2str(array[base]->destination));
+                    const char *selected = string2str(array[base]->destination);
 
-                base++;
-                similar--;
+                    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                           "STREAM %s: random reordering of %zu similar parents (slots %zu to %zu), No %zu is '%s'",
+                           rrdhost_hostname(host),
+                           similar, base, base + similar,
+                           base, string2str(array[base]->destination));
+
+                    base++;
+                    similar--;
+                }
+
+                base++; // skip the last one
             }
         }
     }
