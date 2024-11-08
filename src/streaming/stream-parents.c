@@ -22,6 +22,7 @@ struct stream_parent {
         RRDHOST_INGEST_STATUS ingest_status;
         time_t db_first_time_s;
         time_t db_last_time_s;
+        uint32_t nonce;
     } remote;
 
     STREAM_PARENT *prev;
@@ -134,6 +135,7 @@ static bool stream_info_parse(struct json_object *jobj, const char *path, STREAM
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "status", d->remote.status, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nodes", d->remote.nodes, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "receivers", d->remote.receivers, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nonce", d->remote.nonce, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_s", d->remote.db_first_time_s, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "last_time_s", d->remote.db_last_time_s, error, true);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_status", RRDHOST_DB_STATUS_2id, d->remote.db_status, error, true);
@@ -364,11 +366,14 @@ bool stream_parent_connect_to_one(
         while (base < count) {
             // find how many have similar db_last_time_s;
             size_t similar = 1;
+            if(!array[base]->remote.nonce) array[base]->remote.nonce = os_random32();
             for (size_t i = base + 1; i < count; i++) {
 //                if (array[i]->remote.db_last_time_s - array[i - 1]->remote.db_last_time_s <= TIME_TO_CONSIDER_PARENTS_SIMILAR)
 //                    similar++;
 //                else
 //                    break;
+
+                if(!array[i]->remote.nonce) array[i]->remote.nonce = os_random32();
                 similar++;
             }
 
@@ -384,7 +389,13 @@ bool stream_parent_connect_to_one(
                 // reorder the parents who have similar db_last_time
 
                 while (similar > 1) {
-                    size_t chosen = base + os_random(similar);
+                    size_t best = base;
+                    for(size_t i = base + 1 ; i < base + similar ;i++) {
+                        if((array[i]->remote.nonce | os_random32()) > (array[best]->remote.nonce | os_random32()))
+                            best = i;
+                    }
+
+                    size_t chosen = best;
                     if (chosen != base)
                         SWAP(array[base], array[chosen]);
 

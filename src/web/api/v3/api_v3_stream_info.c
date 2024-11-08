@@ -34,6 +34,7 @@ int api_v3_stream_info(RRDHOST *host __maybe_unused, struct web_client *w, char 
     buffer_json_member_add_uint64(wb, "status", ret);
     buffer_json_member_add_uint64(wb, "nodes", dictionary_entries(rrdhost_root_index));
     buffer_json_member_add_uint64(wb, "receivers", stream_currently_connected_receivers());
+    buffer_json_member_add_uint64(wb, "nonce", os_random32());
 
     if(ret == HTTP_RESP_OK) {
         buffer_json_member_add_string(wb, "db_status", rrdhost_db_status_to_string(status.db.status));

@@ -1437,7 +1437,7 @@ set(WEB_PLUGIN_FILES
         src/web/server/static/static-threaded.h
         src/web/server/web_client_cache.c
         src/web/server/web_client_cache.h
-        src/web/api/v3/api_v3_stream_nfo.c
+        src/web/api/v3/api_v3_stream_info.c
 )
 
 set(CLAIM_PLUGIN_FILES
