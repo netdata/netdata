@@ -123,13 +123,19 @@ static bool fetch_stream_info(STREAM_PARENT *d, const char *uuid, int default_po
         .verify_certificate = s->verify_certificate,
     };
 
+    const char *dst = string2str(d->destination);
+
     // Build HTTP request
     snprintf(buf, sizeof(buf),
-             "GET /api/v3/stream_info?machine_guid=%s " HTTP_1_1 HTTP_ENDL
+             "GET /api/v3/stream_info?machine_guid=%s" HTTP_1_1 HTTP_ENDL
+             "Host: %s" HTTP_ENDL
              "User-Agent: %s/%s" HTTP_ENDL
              "Accept: */*" HTTP_ENDL
+             "Pragma: no-cache" HTTP_ENDL
+             "Cache-Control: no-cache" HTTP_ENDL
              "Connection: close" HTTP_HDR_END,
              uuid,
+             string2str(d->destination),
              rrdhost_program_name(localhost),
              rrdhost_program_version(localhost));
 
@@ -201,6 +207,9 @@ bool stream_parent_connect_to_one(
     // count the parents
     size_t size = 0;
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) size++;
+
+    // do we have any parents?
+    if(!size) return false;
     STREAM_PARENT *array[size];
 
     // fetch stream info for all of them and put them in the array
@@ -216,9 +225,15 @@ bool stream_parent_connect_to_one(
 
         if(!fetch_stream_info(d, host->machine_guid, default_port, s))
             memset(&d->remote, 0, sizeof(d->remote));
-
-        array[count++] = d;
+        else if((d->remote.ingest_type == RRDHOST_INGEST_TYPE_CHILD || d->remote.ingest_type == RRDHOST_INGEST_TYPE_ARCHIVED)  &&
+                 (d->remote.ingest_status == RRDHOST_INGEST_STATUS_OFFLINE || d->remote.ingest_status == RRDHOST_INGEST_STATUS_ARCHIVED) &&
+                 d->remote.db_status == RRDHOST_DB_STATUS_QUERYABLE &&
+                 d->remote.db_liveness == RRDHOST_DB_LIVENESS_STALE)
+            array[count++] = d;
     }
+
+    // can we use any parent?
+    if(!count) return false;
 
     // sort the array
     qsort(array, count, sizeof(STREAM_PARENT *), compare_last_time);
