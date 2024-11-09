@@ -89,7 +89,7 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
     if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
         p.flags |= STREAM_PATH_FLAG_VIRTUAL;
 
-    if(host->health.health_enabled)
+    if(host->health.enabled)
         p.flags |= STREAM_PATH_FLAG_HEALTH;
 
     if(ml_enabled(host))
