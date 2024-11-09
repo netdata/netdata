@@ -32,6 +32,7 @@ struct stream_parent {
         size_t batch;
         size_t order;
         bool random;
+        bool info;
     } selection;
 
     STREAM_PARENT *prev;
@@ -121,6 +122,7 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
             buffer_json_member_add_uint64(wb, "batch", d->selection.batch);
             buffer_json_member_add_uint64(wb, "order", d->selection.order);
             buffer_json_member_add_boolean(wb, "random", d->selection.random);
+            buffer_json_member_add_boolean(wb, "info", d->selection.info);
         }
         buffer_json_object_close(wb); // each candidate
     }
@@ -344,6 +346,8 @@ bool stream_parent_connect_to_one(
         d->reason = STREAM_HANDSHAKE_CONNECTING;
         if(stream_info_fetch(d, host->machine_guid, default_port,
                               sender_sock, stream_parent_is_ssl(d), rrdhost_hostname(host))) {
+            d->selection.info = true;
+
             switch(d->remote.ingest_type) {
                 case RRDHOST_INGEST_TYPE_VIRTUAL:
                 case RRDHOST_INGEST_TYPE_LOCALHOST:
@@ -392,6 +396,8 @@ bool stream_parent_connect_to_one(
                     break;
             }
         }
+        else
+            d->selection.info = false;
 
         if(skip) {
             skipped_but_useful++;
