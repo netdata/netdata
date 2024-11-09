@@ -106,10 +106,6 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
             else
                 buffer_json_member_add_string(wb, "destination", string2str(d->destination));
 
-            buffer_json_member_add_string(wb, "ban",
-                                          d->banned_permanently ? "permanent" :
-                                          (d->banned_for_this_session ? "session" : "none"));
-
             buffer_json_member_add_uint64(wb, "since", d->since_ut / USEC_PER_SEC);
             buffer_json_member_add_uint64(wb, "age", d->since_ut ? s->now - (d->since_ut / USEC_PER_SEC) : 0);
 
@@ -117,14 +113,18 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
                 buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
 
                 if (d->postpone_until_ut > (usec_t)(s->now * USEC_PER_SEC)) {
-                    buffer_json_member_add_uint64(wb, "next_check", d->postpone_until_ut / USEC_PER_SEC);
-                    buffer_json_member_add_uint64(wb, "next_in", (d->postpone_until_ut / USEC_PER_SEC) - s->now);
+                    buffer_json_member_add_datetime_rfc3339(wb, "next_check", d->postpone_until_ut, false);
+                    buffer_json_member_add_duration_ut(wb, "next_in", (int64_t)d->postpone_until_ut - (int64_t)(s->now * USEC_PER_SEC));
                 }
 
                 buffer_json_member_add_uint64(wb, "batch", d->selection.batch);
                 buffer_json_member_add_uint64(wb, "order", d->selection.order);
                 buffer_json_member_add_boolean(wb, "random", d->selection.random);
                 buffer_json_member_add_boolean(wb, "info", d->selection.info);
+            }
+            else {
+                buffer_json_member_add_string(
+                    wb, "ban", d->banned_permanently ? "permanent" : (d->banned_for_this_session ? "session" : "none"));
             }
         }
         buffer_json_object_close(wb); // each candidate
@@ -356,6 +356,7 @@ bool stream_parent_connect_to_one(
                 case RRDHOST_INGEST_TYPE_LOCALHOST:
                     d->reason = STREAM_HANDSHAKE_ERROR_LOCALHOST;
                     if(rrdhost_is_host_in_stream_path(host, d->remote.host_id, host->sender->hops)) {
+                        d->since_ut = now_ut;
                         d->banned_permanently = true;
                         skipped_not_useful++;
                         nd_log(NDLS_DAEMON, NDLP_NOTICE,
@@ -383,6 +384,7 @@ bool stream_parent_connect_to_one(
                 case RRDHOST_INGEST_STATUS_ONLINE:
                     d->reason = STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED;
                     if(rrdhost_is_host_in_stream_path(host, d->remote.host_id, host->sender->hops)) {
+                        d->since_ut = now_ut;
                         d->banned_for_this_session = true;
                         skipped_not_useful++;
                         nd_log(NDLS_DAEMON, NDLP_NOTICE,
@@ -423,8 +425,8 @@ bool stream_parent_connect_to_one(
         return false;
     }
 
+    // order the parents in the array the way we want to connect
     if(count > 1) {
-        // sort the array
         qsort(array, count, sizeof(STREAM_PARENT *), compare_last_time);
 
         size_t base = 0, batch = 0;
@@ -446,8 +448,8 @@ bool stream_parent_connect_to_one(
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
                        "STREAM %s: reordering keeps parent No %zu, '%s'",
                        rrdhost_hostname(host), base, string2str(array[base]->destination));
-                array[base]->selection.order = base;
-                array[base]->selection.batch = batch;
+                array[base]->selection.order = base + 1;
+                array[base]->selection.batch = batch + 1;
                 array[base]->selection.random = false;
                 base++;
                 batch++;
@@ -475,17 +477,18 @@ bool stream_parent_connect_to_one(
                            similar, base, base + similar,
                            base, string2str(array[base]->destination));
 
-                    array[base]->selection.order = base;
-                    array[base]->selection.batch = batch;
+                    array[base]->selection.order = base + 1;
+                    array[base]->selection.batch = batch + 1;
                     array[base]->selection.random = true;
                     base++;
                     similar--;
                 }
 
-                array[base]->selection.order = base;
-                array[base]->selection.batch = batch;
+                // the last one of the similar
+                array[base]->selection.order = base + 1;
+                array[base]->selection.batch = batch + 1;
                 array[base]->selection.random = true;
-                base++; // skip the last one of the similar
+                base++;
                 batch++;
             }
         }
