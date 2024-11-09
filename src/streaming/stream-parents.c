@@ -355,7 +355,9 @@ bool stream_parent_connect_to_one(
                 case RRDHOST_INGEST_TYPE_VIRTUAL:
                 case RRDHOST_INGEST_TYPE_LOCALHOST:
                     d->reason = STREAM_HANDSHAKE_ERROR_LOCALHOST;
-                    if(rrdhost_is_host_in_stream_path(host, d->remote.host_id, host->sender->hops)) {
+                    if(rrdhost_is_host_in_stream_path(host, d->remote.host_id, 1)) {
+                        // we passed hops == 1, to make sure this succeeds only when the parent
+                        // is the origin child of this node
                         d->since_ut = now_ut;
                         d->banned_permanently = true;
                         skipped_not_useful++;
