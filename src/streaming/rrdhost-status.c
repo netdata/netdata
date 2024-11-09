@@ -258,42 +258,41 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     if(host->health.enabled) {
         if(flags & RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)
             s->health.status = RRDHOST_HEALTH_STATUS_INITIALIZING;
-        else {
+        else
             s->health.status = RRDHOST_HEALTH_STATUS_RUNNING;
 
-            RRDCALC *rc;
-            foreach_rrdcalc_in_rrdhost_read(host, rc) {
-                if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
-                    continue;
+        RRDCALC *rc;
+        foreach_rrdcalc_in_rrdhost_read(host, rc) {
+            if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+                continue;
 
-                switch (rc->status) {
-                    default:
-                    case RRDCALC_STATUS_REMOVED:
-                        break;
+            switch (rc->status) {
+                default:
+                case RRDCALC_STATUS_REMOVED:
+                    break;
 
-                    case RRDCALC_STATUS_CLEAR:
-                        s->health.alerts.clear++;
-                        break;
+                case RRDCALC_STATUS_CLEAR:
+                    s->health.alerts.clear++;
+                    break;
 
-                    case RRDCALC_STATUS_WARNING:
-                        s->health.alerts.warning++;
-                        break;
+                case RRDCALC_STATUS_WARNING:
+                    s->health.alerts.warning++;
+                    break;
 
-                    case RRDCALC_STATUS_CRITICAL:
-                        s->health.alerts.critical++;
-                        break;
+                case RRDCALC_STATUS_CRITICAL:
+                    s->health.alerts.critical++;
+                    break;
 
-                    case RRDCALC_STATUS_UNDEFINED:
-                        s->health.alerts.undefined++;
-                        break;
+                case RRDCALC_STATUS_UNDEFINED:
+                    s->health.alerts.undefined++;
+                    break;
 
-                    case RRDCALC_STATUS_UNINITIALIZED:
-                        s->health.alerts.uninitialized++;
-                        break;
-                }
+                case RRDCALC_STATUS_UNINITIALIZED:
+                    s->health.alerts.uninitialized++;
+                    break;
             }
-            foreach_rrdcalc_in_rrdhost_done(rc);
         }
+        foreach_rrdcalc_in_rrdhost_done(rc);
     }
     else
         s->health.status = RRDHOST_HEALTH_STATUS_DISABLED;

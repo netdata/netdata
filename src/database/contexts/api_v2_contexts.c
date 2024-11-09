@@ -269,15 +269,13 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
         if (s->stream.status == RRDHOST_STREAM_STATUS_OFFLINE)
             buffer_json_member_add_string(wb, "reason", stream_handshake_error_to_string(s->stream.reason));
 
-        if (s->stream.status == RRDHOST_STREAM_STATUS_REPLICATING) {
-            buffer_json_member_add_object(wb, "replication");
-            {
-                buffer_json_member_add_boolean(wb, "in_progress", s->stream.replication.in_progress);
-                buffer_json_member_add_double(wb, "completion", s->stream.replication.completion);
-                buffer_json_member_add_uint64(wb, "instances", s->stream.replication.instances);
-            }
-            buffer_json_object_close(wb);
+        buffer_json_member_add_object(wb, "replication");
+        {
+            buffer_json_member_add_boolean(wb, "in_progress", s->stream.replication.in_progress);
+            buffer_json_member_add_double(wb, "completion", s->stream.replication.completion);
+            buffer_json_member_add_uint64(wb, "instances", s->stream.replication.instances);
         }
+        buffer_json_object_close(wb); // replication
 
         buffer_json_member_add_object(wb, "destination");
         {
@@ -301,9 +299,9 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
             }
             buffer_json_object_close(wb); // traffic
 
-            buffer_json_member_add_array(wb, "candidates");
+            buffer_json_member_add_array(wb, "parents");
             rrdhost_stream_parents_to_json(wb, s);
-            buffer_json_array_close(wb); // candidates
+            buffer_json_array_close(wb); // parents
         }
         buffer_json_object_close(wb); // destination
     }
@@ -340,7 +338,7 @@ static inline void rrdhost_health_to_json_v2(BUFFER *wb, const char *key, RRDHOS
     buffer_json_member_add_object(wb, key);
     {
         buffer_json_member_add_string(wb, "status", rrdhost_health_status_to_string(s->health.status));
-        if (s->health.status == RRDHOST_HEALTH_STATUS_RUNNING) {
+        if (s->health.status == RRDHOST_HEALTH_STATUS_RUNNING || s->health.status == RRDHOST_HEALTH_STATUS_INITIALIZING) {
             buffer_json_member_add_object(wb, "alerts");
             {
                 buffer_json_member_add_uint64(wb, "critical", s->health.alerts.critical);

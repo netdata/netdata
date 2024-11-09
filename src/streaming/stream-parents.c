@@ -106,8 +106,8 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
             else
                 buffer_json_member_add_string(wb, "destination", string2str(d->destination));
 
-            buffer_json_member_add_uint64(wb, "since", d->since_ut / USEC_PER_SEC);
-            buffer_json_member_add_uint64(wb, "age", d->since_ut ? s->now - (d->since_ut / USEC_PER_SEC) : 0);
+            buffer_json_member_add_datetime_rfc3339(wb, "since", d->since_ut, false);
+            buffer_json_member_add_duration_ut(wb, "age", d->since_ut ? (int64_t)(now_realtime_usec() -d->since_ut) : 0);
 
             if(!d->banned_for_this_session && !d->banned_permanently) {
                 buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
@@ -621,6 +621,7 @@ static bool stream_parent_add_one(char *entry, void *data) {
         d->ssl = false;
 
     d->destination = string_strdupz(entry);
+    d->since_ut = now_realtime_usec();
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(STREAM_PARENT), __ATOMIC_RELAXED);
 
