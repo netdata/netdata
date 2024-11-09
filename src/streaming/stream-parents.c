@@ -44,10 +44,10 @@ void stream_parent_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reas
 }
 
 static inline usec_t randomize_wait_ut(time_t secs) {
-    uint32_t delay_ut = (secs < SENDER_MIN_RECONNECT_DELAY ? SENDER_MIN_RECONNECT_DELAY : secs) * USEC_PER_SEC;
-    return now_realtime_usec() +
-           (SENDER_MIN_RECONNECT_DELAY * USEC_PER_SEC) +
-           os_random(delay_ut - SENDER_MIN_RECONNECT_DELAY * USEC_PER_SEC);
+    usec_t delay_ut = (secs < SENDER_MIN_RECONNECT_DELAY ? SENDER_MIN_RECONNECT_DELAY : secs) * USEC_PER_SEC;
+    usec_t wait_ut = (SENDER_MIN_RECONNECT_DELAY * USEC_PER_SEC) +
+                     os_random(delay_ut - (SENDER_MIN_RECONNECT_DELAY * USEC_PER_SEC));
+    return now_realtime_usec() + wait_ut;
 }
 
 void rrdhost_stream_parents_reset(RRDHOST *host) {
@@ -99,11 +99,11 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
                 buffer_json_member_add_string(wb, "destination", string2str(d->destination));
 
             buffer_json_member_add_uint64(wb, "since", d->since_ut / USEC_PER_SEC);
-            buffer_json_member_add_uint64(wb, "age", s->now - d->since_ut / USEC_PER_SEC);
+            buffer_json_member_add_uint64(wb, "age", d->since_ut ? s->now - (d->since_ut / USEC_PER_SEC) : 0);
             buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
-            if(d->postpone_until_ut > (usec_t)s->now * USEC_PER_SEC) {
+            if(d->postpone_until_ut > (usec_t)(s->now * USEC_PER_SEC)) {
                 buffer_json_member_add_uint64(wb, "next_check", d->postpone_until_ut / USEC_PER_SEC);
-                buffer_json_member_add_uint64(wb, "next_in", d->postpone_until_ut - (usec_t)s->now * USEC_PER_SEC);
+                buffer_json_member_add_uint64(wb, "next_in", (d->postpone_until_ut / USEC_PER_SEC) - s->now);
             }
         }
         buffer_json_object_close(wb); // each candidate
@@ -295,7 +295,7 @@ bool stream_parent_connect_to_one(
     }
 
     STREAM_PARENT *array[size];
-    usec_t now_ut = now_monotonic_usec();
+    usec_t now_ut = now_realtime_usec();
 
     // fetch stream info for all of them and put them in the array
     size_t count = 0, skipped_but_useful = 0, skipped_not_useful = 0;
