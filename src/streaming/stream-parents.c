@@ -471,8 +471,6 @@ bool stream_parent_connect_to_one(
                     if (chosen != base)
                         SWAP(array[base], array[chosen]);
 
-                    const char *selected = string2str(array[base]->destination);
-
                     nd_log(NDLS_DAEMON, NDLP_DEBUG,
                            "STREAM %s: random reordering of %zu similar parents (slots %zu to %zu), No %zu is '%s'",
                            rrdhost_hostname(host),
@@ -552,32 +550,37 @@ bool stream_parent_connect_to_one(
             return true;
         }
         else {
-            d->postpone_until_ut = now_ut + 5 * 60 * USEC_PER_SEC;
-
             switch(sender_sock->error) {
                 case ND_SOCK_ERR_CONNECTION_REFUSED:
                     d->reason = STREAM_HANDSHAKE_CONNECTION_REFUSED;
+                    d->postpone_until_ut = randomize_wait_ut(30);
                     break;
 
                 case ND_SOCK_ERR_CANNOT_RESOLVE_HOSTNAME:
                     d->reason = STREAM_HANDSHAKE_CANT_RESOLVE_HOSTNAME;
+                    d->postpone_until_ut = randomize_wait_ut(10);
                     break;
 
                 case ND_SOCK_ERR_NO_HOST_IN_DEFINITION:
                     d->reason = STREAM_HANDSHAKE_NO_HOST_IN_DESTINATION;
+                    d->banned_for_this_session = true;
+                    d->postpone_until_ut = randomize_wait_ut(600);
                     break;
 
                 case ND_SOCK_ERR_TIMEOUT:
                     d->reason = STREAM_HANDSHAKE_CONNECT_TIMEOUT;
+                    d->postpone_until_ut = randomize_wait_ut(d->remote.nodes < 10 ? 30 : 300);
                     break;
 
                 case ND_SOCK_ERR_SSL_INVALID_CERTIFICATE:
                     d->reason = STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE;
+                    d->postpone_until_ut = randomize_wait_ut(600);
                     break;
 
                 case ND_SOCK_ERR_SSL_CANT_ESTABLISH_SSL_CONNECTION:
                 case ND_SOCK_ERR_SSL_FAILED_TO_OPEN:
                     d->reason = STREAM_HANDSHAKE_ERROR_SSL_ERROR;
+                    d->postpone_until_ut = randomize_wait_ut(600);
                     break;
 
                 default:
@@ -585,11 +588,13 @@ bool stream_parent_connect_to_one(
                 case ND_SOCK_ERR_FAILED_TO_CREATE_SOCKET:
                 case ND_SOCK_ERR_UNKNOWN_ERROR:
                     d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
+                    d->postpone_until_ut = randomize_wait_ut(30);
                     break;
 
                 case ND_SOCK_ERR_THREAD_CANCELLED:
                 case ND_SOCK_ERR_NO_DESTINATION_AVAILABLE:
                     d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
+                    d->postpone_until_ut = randomize_wait_ut(60);
                     break;
             }
 
