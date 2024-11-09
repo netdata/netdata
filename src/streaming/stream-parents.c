@@ -55,6 +55,7 @@ void rrdhost_stream_parents_reset(RRDHOST *host) {
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
         d->postpone_until_ut = until_ut;
         d->banned_for_this_session = false;
+        d->reason = STREAM_HANDSHAKE_RECONNECT_DELAY;
     }
 }
 
