@@ -28,6 +28,12 @@ struct stream_parent {
         uint32_t nonce;
     } remote;
 
+    struct {
+        size_t batch;
+        size_t order;
+        bool random;
+    } selection;
+
     STREAM_PARENT *prev;
     STREAM_PARENT *next;
 };
@@ -50,12 +56,12 @@ static inline usec_t randomize_wait_ut(time_t secs) {
     return now_realtime_usec() + wait_ut;
 }
 
-void rrdhost_stream_parents_reset(RRDHOST *host) {
+void rrdhost_stream_parents_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
     usec_t until_ut = randomize_wait_ut(stream_send.parents.reconnect_delay_s);
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
         d->postpone_until_ut = until_ut;
         d->banned_for_this_session = false;
-        d->reason = STREAM_HANDSHAKE_RECONNECT_DELAY;
+        d->reason = reason;
     }
 }
 
@@ -99,13 +105,22 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
             else
                 buffer_json_member_add_string(wb, "destination", string2str(d->destination));
 
+            buffer_json_member_add_string(wb, "ban",
+                                          d->banned_permanently ? "permanent" :
+                                          (d->banned_for_this_session ? "session" : "none"));
+
             buffer_json_member_add_uint64(wb, "since", d->since_ut / USEC_PER_SEC);
             buffer_json_member_add_uint64(wb, "age", d->since_ut ? s->now - (d->since_ut / USEC_PER_SEC) : 0);
             buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
+
             if(d->postpone_until_ut > (usec_t)(s->now * USEC_PER_SEC)) {
                 buffer_json_member_add_uint64(wb, "next_check", d->postpone_until_ut / USEC_PER_SEC);
                 buffer_json_member_add_uint64(wb, "next_in", (d->postpone_until_ut / USEC_PER_SEC) - s->now);
             }
+
+            buffer_json_member_add_uint64(wb, "batch", d->selection.batch);
+            buffer_json_member_add_uint64(wb, "order", d->selection.order);
+            buffer_json_member_add_boolean(wb, "random", d->selection.random);
         }
         buffer_json_object_close(wb); // each candidate
     }
@@ -326,6 +341,7 @@ bool stream_parent_connect_to_one(
         }
 
         bool skip = false;
+        d->reason = STREAM_HANDSHAKE_CONNECTING;
         if(stream_info_fetch(d, host->machine_guid, default_port,
                               sender_sock, stream_parent_is_ssl(d), rrdhost_hostname(host))) {
             switch(d->remote.ingest_type) {
@@ -402,7 +418,7 @@ bool stream_parent_connect_to_one(
         // sort the array
         qsort(array, count, sizeof(STREAM_PARENT *), compare_last_time);
 
-        size_t base = 0;
+        size_t base = 0, batch = 0;
         while (base < count) {
             // find how many have similar db_last_time_s;
             size_t similar = 1;
@@ -421,7 +437,11 @@ bool stream_parent_connect_to_one(
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
                        "STREAM %s: reordering keeps parent No %zu, '%s'",
                        rrdhost_hostname(host), base, string2str(array[base]->destination));
+                array[base]->selection.order = base;
+                array[base]->selection.batch = batch;
+                array[base]->selection.random = false;
                 base++;
+                batch++;
                 continue;
             }
             else {
@@ -446,11 +466,18 @@ bool stream_parent_connect_to_one(
                            similar, base, base + similar,
                            base, string2str(array[base]->destination));
 
+                    array[base]->selection.order = base;
+                    array[base]->selection.batch = batch;
+                    array[base]->selection.random = true;
                     base++;
                     similar--;
                 }
 
+                array[base]->selection.order = base;
+                array[base]->selection.batch = batch;
+                array[base]->selection.random = true;
                 base++; // skip the last one of the similar
+                batch++;
             }
         }
     }

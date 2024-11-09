@@ -14,7 +14,7 @@ typedef struct stream_parent STREAM_PARENT;
 
 void rrdhost_stream_parent_ssl_init(struct sender_state *s);
 
-void rrdhost_stream_parents_reset(RRDHOST *host);
+void rrdhost_stream_parents_reset(RRDHOST *host, STREAM_HANDSHAKE reason);
 
 void rrdhost_stream_parents_init(struct rrdhost *host);
 void rrdhost_stream_parents_free(struct rrdhost *host);

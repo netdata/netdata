@@ -190,7 +190,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     }
 
     if(version >= STREAM_HANDSHAKE_OK_V1) {
-        stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_RECONNECT_DELAY,
+        stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_CONNECTED,
                                           stream_send.parents.reconnect_delay_s);
         s->capabilities = convert_stream_version_to_capabilities(version, host, true);
         return true;
@@ -204,7 +204,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
 
     worker_is_busy(worker_job_id);
     rrdpush_sender_thread_close_socket(s);
-    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_RECONNECT_DELAY, delay);
+    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_CONNECTED, delay);
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
@@ -313,8 +313,11 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
     // make sure the socket is closed
     rrdpush_sender_thread_close_socket(s);
 
+    s->hops = (int16_t)(host->system_info->hops + 1);
+
     // reset this to make sure we have its current value
     s->sock.verify_certificate = netdata_ssl_validate_certificate_sender;
+    s->sock.ctx = netdata_ssl_streaming_sender_ctx;
 
     if(!stream_parent_connect_to_one(
             &s->sock, host, default_port, timeout, &s->reconnects_counter,
@@ -337,8 +340,6 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
     */
     stream_encoded_t se;
     rrdpush_encode_variable(&se, host);
-
-    s->hops = (int16_t)(host->system_info->hops + 1);
 
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
