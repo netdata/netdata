@@ -438,8 +438,11 @@ bool stream_parent_connect_to_one(
             // find how many have similar db_last_time_s;
             size_t similar = 1;
             if(!array[base]->remote.nonce) array[base]->remote.nonce = os_random32();
+            time_t tB = array[base]->remote.db_last_time_s;
             for (size_t i = base + 1; i < count; i++) {
-                if (array[i]->remote.db_last_time_s - array[i - 1]->remote.db_last_time_s <= TIME_TO_CONSIDER_PARENTS_SIMILAR)
+                time_t tN = array[i]->remote.db_last_time_s;
+                if ((tN > tB && tN - tB <= TIME_TO_CONSIDER_PARENTS_SIMILAR) ||
+                               (tB - tN <= TIME_TO_CONSIDER_PARENTS_SIMILAR))
                     similar++;
                 else
                     break;
