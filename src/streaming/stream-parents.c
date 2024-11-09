@@ -112,17 +112,20 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
 
             buffer_json_member_add_uint64(wb, "since", d->since_ut / USEC_PER_SEC);
             buffer_json_member_add_uint64(wb, "age", d->since_ut ? s->now - (d->since_ut / USEC_PER_SEC) : 0);
-            buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
 
-            if(d->postpone_until_ut > (usec_t)(s->now * USEC_PER_SEC)) {
-                buffer_json_member_add_uint64(wb, "next_check", d->postpone_until_ut / USEC_PER_SEC);
-                buffer_json_member_add_uint64(wb, "next_in", (d->postpone_until_ut / USEC_PER_SEC) - s->now);
+            if(!d->banned_for_this_session && !d->banned_permanently) {
+                buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
+
+                if (d->postpone_until_ut > (usec_t)(s->now * USEC_PER_SEC)) {
+                    buffer_json_member_add_uint64(wb, "next_check", d->postpone_until_ut / USEC_PER_SEC);
+                    buffer_json_member_add_uint64(wb, "next_in", (d->postpone_until_ut / USEC_PER_SEC) - s->now);
+                }
+
+                buffer_json_member_add_uint64(wb, "batch", d->selection.batch);
+                buffer_json_member_add_uint64(wb, "order", d->selection.order);
+                buffer_json_member_add_boolean(wb, "random", d->selection.random);
+                buffer_json_member_add_boolean(wb, "info", d->selection.info);
             }
-
-            buffer_json_member_add_uint64(wb, "batch", d->selection.batch);
-            buffer_json_member_add_uint64(wb, "order", d->selection.order);
-            buffer_json_member_add_boolean(wb, "random", d->selection.random);
-            buffer_json_member_add_boolean(wb, "info", d->selection.info);
         }
         buffer_json_object_close(wb); // each candidate
     }
