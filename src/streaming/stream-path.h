@@ -8,8 +8,12 @@
 #define STREAM_PATH_JSON_MEMBER "streaming_path"
 
 typedef enum __attribute__((packed)) {
-    STREAM_PATH_FLAG_NONE = 0,
-    STREAM_PATH_FLAG_ACLK = (1 << 0),
+    STREAM_PATH_FLAG_NONE       = 0,
+    STREAM_PATH_FLAG_ACLK       = (1 << 0),
+    STREAM_PATH_FLAG_HEALTH     = (1 << 1),
+    STREAM_PATH_FLAG_ML         = (1 << 2),
+    STREAM_PATH_FLAG_EPHEMERAL  = (1 << 3),
+    STREAM_PATH_FLAG_VIRTUAL    = (1 << 4),
 } STREAM_PATH_FLAGS;
 
 typedef struct stream_path {

@@ -1081,11 +1081,11 @@ typedef struct alarm_log {
 } ALARM_LOG;
 
 typedef struct health {
-    time_t delay_up_to;                             // a timestamp to delay alarms processing up to
-    STRING *default_exec;                           // the full path of the alarms notifications program
-    STRING *default_recipient;                      // the default recipient for all alarms
-    bool enabled;                                   // 1 when this host has health enabled
-    bool use_summary_for_notifications;             // whether to use the summary field as a subject for notifications
+    time_t health_delay_up_to;                     // a timestamp to delay alarms processing up to
+    STRING *health_default_exec;                   // the full path of the alarms notifications program
+    STRING *health_default_recipient;              // the default recipient for all alarms
+    bool health_enabled;                           // 1 when this host has health enabled
+    bool use_summary_for_notifications;            // whether to use the summary field as a subject for notifications
 } HEALTH;
 
 // ----------------------------------------------------------------------------

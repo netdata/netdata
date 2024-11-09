@@ -5,7 +5,11 @@
 #include "plugins.d/pluginsd_internals.h"
 
 ENUM_STR_MAP_DEFINE(STREAM_PATH_FLAGS) = {
-    { .id = STREAM_PATH_FLAG_ACLK, .name = "aclk" },
+    { .id = STREAM_PATH_FLAG_ACLK,      .name = "aclk" },
+    { .id = STREAM_PATH_FLAG_HEALTH,    .name = "health" },
+    { .id = STREAM_PATH_FLAG_ML,        .name = "ml" },
+    { .id = STREAM_PATH_FLAG_EPHEMERAL, .name = "ephemeral" },
+    { .id = STREAM_PATH_FLAG_VIRTUAL,   .name = "virtual" },
 
     // terminator
     { . id = 0, .name = NULL }
@@ -79,19 +83,28 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
     if(!UUIDiszero(p.claim_id))
         p.flags |= STREAM_PATH_FLAG_ACLK;
 
-    bool has_receiver = false;
+    if(rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST))
+        p.flags |= STREAM_PATH_FLAG_EPHEMERAL;
+
+    if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
+        p.flags |= STREAM_PATH_FLAG_VIRTUAL;
+
+    if(host->health.health_enabled)
+        p.flags |= STREAM_PATH_FLAG_HEALTH;
+
+    if(ml_enabled(host))
+        p.flags |= STREAM_PATH_FLAG_ML;
+
     spinlock_lock(&host->receiver_lock);
     if(host->receiver) {
-        has_receiver = true;
         p.hops = (int16_t)host->receiver->hops;
         p.since = host->receiver->connected_since_s;
     }
-    spinlock_unlock(&host->receiver_lock);
-
-    if(!has_receiver) {
+    else {
         p.hops = (is_localhost) ? 0 : -1; // -1 for stale nodes
         p.since = netdata_start_time;
     }
+    spinlock_unlock(&host->receiver_lock);
 
     // the following may get the receiver lock again!
     p.capabilities = stream_our_capabilities(host, true);

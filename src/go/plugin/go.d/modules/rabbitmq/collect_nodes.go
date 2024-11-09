@@ -28,9 +28,15 @@ func (r *RabbitMQ) collectNodes(mx map[string]int64) error {
 		mx[px+"avail_status_running"] = boolToInt(node.Running)
 		mx[px+"avail_status_down"] = boolToInt(!node.Running)
 
-		if !node.Running || node.OsPid == "" {
+		if node.OsPid == "" {
 			continue
 		}
+
+		for _, v := range []string{"clear", "detected"} {
+			mx[px+"network_partition_status_"+v] = 0
+		}
+		mx[px+"network_partition_status_clear"] = boolToInt(len(node.Partitions) == 0)
+		mx[px+"network_partition_status_detected"] = boolToInt(len(node.Partitions) > 0)
 
 		mx[px+"mem_alarm_status_clear"] = boolToInt(!node.MemAlarm)
 		mx[px+"mem_alarm_status_triggered"] = boolToInt(node.MemAlarm)

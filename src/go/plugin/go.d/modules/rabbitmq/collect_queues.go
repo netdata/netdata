@@ -29,6 +29,16 @@ func (r *RabbitMQ) collectQueues(mx map[string]int64) error {
 		for k, v := range stm.ToMap(q) {
 			mx[px+k] = v
 		}
+
+		// https://github.com/rabbitmq/rabbitmq-server/blob/8b554474a65857aa60b72b2dda4b6fa9b78f349b/deps/rabbitmq_management/priv/www/js/formatters.js#L552
+		s := q.State
+		if q.IdleSince != nil {
+			s = "idle"
+		}
+		for _, v := range []string{"running", "idle", "terminated", "down", "crashed", "stopped", "minority"} {
+			mx[px+"status_"+v] = 0
+		}
+		mx[px+"status_"+s] = 1
 	}
 
 	return nil

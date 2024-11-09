@@ -6,8 +6,19 @@
 
 **Merged pull requests:**
 
+- ci: fix win jobs [\#18979](https://github.com/netdata/netdata/pull/18979) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18977](https://github.com/netdata/netdata/pull/18977) ([netdatabot](https://github.com/netdatabot))
+- improvement\(go.d/rabbitmq\): add queue status and net partitions [\#18976](https://github.com/netdata/netdata/pull/18976) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18973](https://github.com/netdata/netdata/pull/18973) ([netdatabot](https://github.com/netdatabot))
+- add rabbitmq alerts [\#18972](https://github.com/netdata/netdata/pull/18972) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#18971](https://github.com/netdata/netdata/pull/18971) ([netdatabot](https://github.com/netdatabot))
+- fix\(go.d/snmp\): don't return error if no sysName [\#18970](https://github.com/netdata/netdata/pull/18970) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump golang.org/x/text from 0.19.0 to 0.20.0 in /src/go [\#18968](https://github.com/netdata/netdata/pull/18968) ([dependabot[bot]](https://github.com/apps/dependabot))
+- go mod tidy [\#18967](https://github.com/netdata/netdata/pull/18967) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18966](https://github.com/netdata/netdata/pull/18966) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d/rabbitmq\): add cluster support [\#18965](https://github.com/netdata/netdata/pull/18965) ([ilyam8](https://github.com/ilyam8))
 - Update Windows Documentation [\#18928](https://github.com/netdata/netdata/pull/18928) ([thiagoftsm](https://github.com/thiagoftsm))
+- Bump github.com/Wing924/ltsv from 0.3.1 to 0.4.0 in /src/go [\#18636](https://github.com/netdata/netdata/pull/18636) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.0.0](https://github.com/netdata/netdata/tree/v2.0.0) (2024-11-07)
 
@@ -423,15 +434,6 @@
 - remove charts.d/sensors [\#18426](https://github.com/netdata/netdata/pull/18426) ([ilyam8](https://github.com/ilyam8))
 - Reset last connected when removing stale nodes with netdatacli [\#18425](https://github.com/netdata/netdata/pull/18425) ([stelfrag](https://github.com/stelfrag))
 - remove checks.plugin dir [\#18424](https://github.com/netdata/netdata/pull/18424) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18421](https://github.com/netdata/netdata/pull/18421) ([netdatabot](https://github.com/netdatabot))
-- fix hyperlink in go.d samba meta [\#18420](https://github.com/netdata/netdata/pull/18420) ([ilyam8](https://github.com/ilyam8))
-- add go.d samba [\#18418](https://github.com/netdata/netdata/pull/18418) ([ilyam8](https://github.com/ilyam8))
-- ACLK code cleanup [\#18417](https://github.com/netdata/netdata/pull/18417) ([stelfrag](https://github.com/stelfrag))
-- restore /api/v1/badge.svg [\#18416](https://github.com/netdata/netdata/pull/18416) ([ktsaou](https://github.com/ktsaou))
-- add "smbstatus -P" to ndsudo [\#18414](https://github.com/netdata/netdata/pull/18414) ([ilyam8](https://github.com/ilyam8))
-- remove python.d/sambsa [\#18413](https://github.com/netdata/netdata/pull/18413) ([ilyam8](https://github.com/ilyam8))
-- SPAWN-SERVER: re-evaluate signals even 500ms [\#18411](https://github.com/netdata/netdata/pull/18411) ([ktsaou](https://github.com/ktsaou))
-- Claim on Windows [\#18410](https://github.com/netdata/netdata/pull/18410) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

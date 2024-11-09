@@ -174,6 +174,10 @@ modules:
         metric: rabbitmq.node_avail_status
         info: RabbitMQ node is down (node ${label:node} cluster ${label:cluster_id})
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
+      - name: rabbitmq_node_network_partition_status
+        metric: rabbitmq.node_network_partition_status
+        info: RabbitMQ network partition detected (node ${label:node} cluster ${label:cluster_id})
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
       - name: rabbitmq_node_mem_alarm_status_triggered
         metric: rabbitmq.node_mem_alarm_status
         info: RabbitMQ mem alarm triggered (node ${label:node} cluster ${label:cluster_id})
@@ -185,6 +189,14 @@ modules:
       - name: rabbitmq_vhost_status_unhealthy
         metric: rabbitmq.vhost_status
         info: RabbitMQ vhost is not healthy (vhost ${label:vhost} cluster ${label:cluster_id})
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
+      - name: rabbitmq_queue_status_minority
+        metric: rabbitmq.queue_status
+        info: RabbitMQ queue insufficient online members (queue ${label:queue} node ${label:node} cluster ${label:cluster_id})
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
+      - name: rabbitmq_queue_status_unhealthy
+        metric: rabbitmq.queue_status
+        info: RabbitMQ queue is unhealthy (queue ${label:queue} node ${label:node} cluster ${label:cluster_id})
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf
     metrics:
       folding:
@@ -275,6 +287,13 @@ modules:
               dimensions:
                 - name: running
                 - name: down
+            - name: rabbitmq.node_network_partition_status
+              description: Node Network Partitioning Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: detected
             - name: rabbitmq.node_mem_alarm_status
               description: Node Memory Alarm Status
               unit: status
@@ -360,6 +379,14 @@ modules:
             - name: vhost
               description: Name of the virtual host.
           metrics:
+            - name: rabbitmq.vhost_status
+              description: Vhost Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: running
+                - name: stopped
+                - name: partial
             - name: rabbitmq.vhost_messages_count
               description: Vhost messages
               unit: messages
@@ -384,14 +411,6 @@ modules:
                 - name: deliver_get
                 - name: redeliver
                 - name: return_unroutable
-            - name: rabbitmq.vhost_status
-              description: Vhost Status
-              unit: status
-              chart_type: line
-              dimensions:
-                - name: running
-                - name: stopped
-                - name: partial
         - name: queue
           description: These metrics refer to the virtual host queue.
           labels:
@@ -406,6 +425,18 @@ modules:
             - name: queue
               description: Name of the queue.
           metrics:
+            - name: rabbitmq.queue_status
+              description: Queue status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: running
+                - name: down
+                - name: idle
+                - name: crashed
+                - name: stopped
+                - name: minority
+                - name: terminated
             - name: rabbitmq.queue_messages_count
               description: Queue messages
               unit: messages

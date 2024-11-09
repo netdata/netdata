@@ -358,11 +358,11 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
     buffer_json_node_add_v2(wb, host, node_id, 0,
                             (ctl->mode & CONTEXTS_V2_AGENTS) && !(ctl->mode & CONTEXTS_V2_NODE_INSTANCES));
 
-    if(ctl->mode & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODE_INSTANCES)) {
+    if(ctl->mode & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH | CONTEXTS_V2_NODE_INSTANCES)) {
         RRDHOST_STATUS s;
         rrdhost_status(host, ctl->now, &s);
 
-        if (ctl->mode & (CONTEXTS_V2_NODES_INFO)) {
+        if (ctl->mode & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH)) {
             buffer_json_member_add_string(wb, "v", rrdhost_program_version(host));
 
             host_labels2json(host, wb, "labels");
@@ -399,9 +399,14 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
             // reachable    - connected with live data
             // pruned       - not connected for some time and has been removed
             buffer_json_member_add_string(wb, "state", rrdhost_is_online(host) ? "reachable" : "stale");
+        }
 
+        if (ctl->mode & (CONTEXTS_V2_NODES_INFO)) {
             rrdhost_health_to_json_v2(wb, "health", &s);
             agent_capabilities_to_json(wb, host, "capabilities");
+        }
+
+        if (ctl->mode & (CONTEXTS_V2_NODES_STREAM_PATH)) {
             rrdhost_stream_path_to_json(wb, host, STREAM_PATH_JSON_MEMBER, false);
         }
 
@@ -584,6 +589,9 @@ static void buffer_json_contexts_v2_mode_to_array(BUFFER *wb, const char *key, C
     if(mode & CONTEXTS_V2_NODES_INFO)
         buffer_json_add_array_item_string(wb, "nodes-info");
 
+    if(mode & CONTEXTS_V2_NODES_STREAM_PATH)
+        buffer_json_add_array_item_string(wb, "nodes-stream-path");
+
     if(mode & CONTEXTS_V2_NODE_INSTANCES)
         buffer_json_add_array_item_string(wb, "nodes-instances");
 
@@ -726,7 +734,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     if(mode & (CONTEXTS_V2_AGENTS_INFO))
         mode |= CONTEXTS_V2_AGENTS;
 
-    if(mode & (CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODE_INSTANCES))
+    if(mode & (CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH | CONTEXTS_V2_NODE_INSTANCES))
         mode |= CONTEXTS_V2_NODES;
 
     if(mode & CONTEXTS_V2_ALERTS) {
