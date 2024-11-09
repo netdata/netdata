@@ -302,6 +302,8 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
             buffer_json_member_add_array(wb, "parents");
             rrdhost_stream_parents_to_json(wb, s);
             buffer_json_array_close(wb); // parents
+
+            rrdhost_stream_path_to_json(wb, s->host, STREAM_PATH_JSON_MEMBER, false);
         }
         buffer_json_object_close(wb); // destination
     }
