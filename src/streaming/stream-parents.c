@@ -94,6 +94,8 @@ usec_t stream_parent_handshake_error_to_json(BUFFER *wb, RRDHOST *host) {
 void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
     char buf[1024];
 
+    usec_t now_ut = now_realtime_usec();
+
     STREAM_PARENT *d;
     for (d = s->host->stream.snd.parents.all; d; d = d->next) {
         buffer_json_add_array_item_object(wb);
@@ -107,14 +109,14 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
                 buffer_json_member_add_string(wb, "destination", string2str(d->destination));
 
             buffer_json_member_add_datetime_rfc3339(wb, "since", d->since_ut, false);
-            buffer_json_member_add_duration_ut(wb, "age", d->since_ut ? (int64_t)(now_realtime_usec() -d->since_ut) : 0);
+            buffer_json_member_add_duration_ut(wb, "age", d->since_ut < now_ut ? (int64_t)(now_ut - d->since_ut) : 0);
 
             if(!d->banned_for_this_session && !d->banned_permanently) {
                 buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
 
-                if (d->postpone_until_ut > (usec_t)(s->now * USEC_PER_SEC)) {
+                if (d->postpone_until_ut > now_ut) {
                     buffer_json_member_add_datetime_rfc3339(wb, "next_check", d->postpone_until_ut, false);
-                    buffer_json_member_add_duration_ut(wb, "next_in", (int64_t)d->postpone_until_ut - (int64_t)(s->now * USEC_PER_SEC));
+                    buffer_json_member_add_duration_ut(wb, "next_in", (int64_t)(d->postpone_until_ut - now_ut));
                 }
 
                 buffer_json_member_add_uint64(wb, "batch", d->selection.batch);
