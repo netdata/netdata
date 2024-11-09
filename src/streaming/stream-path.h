@@ -51,4 +51,6 @@ STREAM_PATH rrdhost_stream_path_fetch(struct rrdhost *host);
 
 bool stream_path_set_from_json(struct rrdhost *host, const char *json, bool from_parent);
 
+bool rrdhost_is_host_in_stream_path(struct rrdhost *host, ND_UUID remote_agent_host_id, int16_t our_hops);
+
 #endif //NETDATA_STREAM_PATH_H

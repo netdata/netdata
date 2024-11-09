@@ -32,6 +32,7 @@ int api_v3_stream_info(RRDHOST *host __maybe_unused, struct web_client *w, char 
         rrdhost_status(host, now_realtime_sec(), &status);
 
     buffer_json_member_add_uint64(wb, "status", ret);
+    buffer_json_member_add_uuid(wb, "host_id", localhost->host_id.uuid);
     buffer_json_member_add_uint64(wb, "nodes", dictionary_entries(rrdhost_root_index));
     buffer_json_member_add_uint64(wb, "receivers", stream_currently_connected_receivers());
     buffer_json_member_add_uint64(wb, "nonce", os_random32());

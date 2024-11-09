@@ -191,7 +191,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
 
     if(version >= STREAM_HANDSHAKE_OK_V1) {
         stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_RECONNECT_DELAY,
-                                          now_realtime_sec() + stream_send.parents.reconnect_delay_s);
+                                          stream_send.parents.reconnect_delay_s);
         s->capabilities = convert_stream_version_to_capabilities(version, host, true);
         return true;
     }
@@ -204,8 +204,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
 
     worker_is_busy(worker_job_id);
     rrdpush_sender_thread_close_socket(s);
-    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_RECONNECT_DELAY,
-                                      now_realtime_sec() + delay);
+    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_RECONNECT_DELAY, delay);
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
@@ -214,7 +213,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
     ND_LOG_STACK_PUSH(lgs);
 
     char buf[RFC3339_MAX_LENGTH];
-    rfc3339_datetime_ut(buf, sizeof(buf), stream_parent_get_reconnection_t(host->stream.snd.parents.current) * USEC_PER_SEC, 0, false);
+    rfc3339_datetime_ut(buf, sizeof(buf), stream_parent_get_reconnection_ut(host->stream.snd.parents.current), 0, false);
 
     nd_log(NDLS_DAEMON, priority,
            "STREAM %s [send to %s]: %s - will retry in %d secs, at %s",
@@ -339,7 +338,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
     stream_encoded_t se;
     rrdpush_encode_variable(&se, host);
 
-    s->hops = host->system_info->hops + 1;
+    s->hops = (int16_t)(host->system_info->hops + 1);
 
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
@@ -447,8 +446,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION);
         rrdpush_sender_thread_close_socket(s);
         stream_parent_set_reconnect_delay(
-            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE,
-            now_realtime_sec() + 1 * 60);
+            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE, 60);
         return false;
     }
 
@@ -469,8 +467,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
                rrdhost_hostname(host), s->connected_to);
 
         stream_parent_set_reconnect_delay(
-            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT,
-            now_realtime_sec() + 1 * 60);
+            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT, 60);
         return false;
     }
 
@@ -490,8 +487,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
                rrdhost_hostname(host), s->connected_to);
 
         stream_parent_set_reconnect_delay(
-            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT,
-            now_realtime_sec() + 30);
+            host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, 30);
         return false;
     }
 

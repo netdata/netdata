@@ -215,7 +215,7 @@ static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *
     buffer_json_member_add_object(wb, key);
     {
         buffer_json_member_add_uint64(wb, "id", s->ingest.id);
-        buffer_json_member_add_uint64(wb, "hops", s->ingest.hops);
+        buffer_json_member_add_int64(wb, "hops", s->ingest.hops);
         buffer_json_member_add_string(wb, "type", rrdhost_ingest_type_to_string(s->ingest.type));
         buffer_json_member_add_string(wb, "status", rrdhost_ingest_status_to_string(s->ingest.status));
         buffer_json_member_add_time_t(wb, "since", s->ingest.since);

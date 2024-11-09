@@ -71,7 +71,7 @@ struct sender_state {
 
     int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
 
-    uint16_t hops;
+    int16_t hops;
 
     struct line_splitter line;
     struct compressor_state compressor;

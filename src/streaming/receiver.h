@@ -35,7 +35,7 @@ struct receiver_state {
 
     struct buffered_reader reader;
 
-    uint16_t hops;
+    int16_t hops;
 
     struct {
         bool shutdown;      // signal the streaming parser to exit

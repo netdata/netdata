@@ -128,7 +128,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     s->ingest.reason = (online) ? STREAM_HANDSHAKE_NEVER : host->stream.rcv.status.exit_reason;
 
     spinlock_lock(&host->receiver_lock);
-    s->ingest.hops = (host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+    s->ingest.hops = (int16_t)(host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
     bool has_receiver = false;
     if (host->receiver) {
         has_receiver = true;
@@ -190,7 +190,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
     if (!host->sender) {
         s->stream.status = RRDHOST_STREAM_STATUS_DISABLED;
-        s->stream.hops = s->ingest.hops + 1;
+        s->stream.hops = (int16_t)(s->ingest.hops + 1);
     }
     else {
         sender_lock(host->sender);
@@ -221,7 +221,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
         }
         else {
             s->stream.status = RRDHOST_STREAM_STATUS_OFFLINE;
-            s->stream.hops = s->ingest.hops + 1;
+            s->stream.hops = (int16_t)(s->ingest.hops + 1);
             s->stream.reason = host->sender->exit.reason;
         }
 

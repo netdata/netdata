@@ -110,7 +110,7 @@ typedef struct rrdhost_status {
     } ml;
 
     struct {
-        size_t hops;
+        int16_t hops;
         RRDHOST_INGEST_TYPE  type;
         RRDHOST_INGEST_STATUS status;
         SOCKET_PEERS peers;
@@ -128,7 +128,7 @@ typedef struct rrdhost_status {
     } ingest;
 
     struct {
-        size_t hops;
+        int16_t hops;
         RRDHOST_STREAMING_STATUS status;
         SOCKET_PEERS peers;
         bool ssl;

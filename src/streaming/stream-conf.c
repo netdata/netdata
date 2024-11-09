@@ -17,7 +17,7 @@ struct _stream_send stream_send = {
         .default_port = 19999,
         .h2o = false,
         .timeout_s = 600,
-        .reconnect_delay_s = 5,
+        .reconnect_delay_s = 15,
         .ssl_ca_path = NULL,
         .ssl_ca_file = NULL,
     },
@@ -120,6 +120,8 @@ bool stream_conf_init() {
     stream_send.parents.reconnect_delay_s = (unsigned int)appconfig_get_duration_seconds(
         &stream_config, CONFIG_SECTION_STREAM, "reconnect delay",
         stream_send.parents.reconnect_delay_s);
+    if(stream_send.parents.reconnect_delay_s < SENDER_MIN_RECONNECT_DELAY)
+        stream_send.parents.reconnect_delay_s = SENDER_MIN_RECONNECT_DELAY;
 
     stream_send.compression.enabled =
         appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable compression",

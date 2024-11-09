@@ -230,7 +230,7 @@ static bool rrdhost_set_sender(RRDHOST *host) {
     }
     sender_unlock(host->sender);
 
-    rrdhost_stream_parent_reset_postpone_time(host);
+    rrdhost_stream_parents_reset(host);
 
     return ret;
 }
@@ -247,7 +247,7 @@ static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
             host->stream.snd.parents.current, host->sender->exit.reason, host->sender->last_state_since_t);
     }
 
-    rrdhost_stream_parent_reset_postpone_time(host);
+    rrdhost_stream_parents_reset(host);
 }
 
 bool rrdhost_sender_should_exit(struct sender_state *s) {

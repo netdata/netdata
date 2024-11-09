@@ -8,6 +8,8 @@
 #include "stream-capabilities.h"
 #include "database/rrd-database-mode.h"
 
+#define SENDER_MIN_RECONNECT_DELAY 5
+
 struct _stream_send {
     bool enabled;
 

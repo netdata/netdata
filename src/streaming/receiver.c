@@ -454,7 +454,7 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
         aclk_queue_node_info(rpt->host, true);
 
-        rrdhost_stream_parent_reset_postpone_time(host);
+        rrdhost_stream_parents_reset(host);
 
         set_this = true;
     }
@@ -488,7 +488,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
                 if (rpt->config.health.enabled)
                     rrdcalc_child_disconnected(host);
 
-                rrdhost_stream_parent_reset_postpone_time(host);
+                rrdhost_stream_parents_reset(host);
             }
             spinlock_lock(&host->receiver_lock);
 
@@ -757,8 +757,8 @@ static void rrdpush_receive(struct receiver_state *rpt) {
     if (rpt->config.ephemeral)
         rrdhost_option_set(rpt->host, RRDHOST_OPTION_EPHEMERAL_HOST);
 
-    // let it reconnect to parent immediately
-    rrdhost_stream_parent_reset_postpone_time(rpt->host);
+    // let it reconnect to parent asap
+    rrdhost_stream_parents_reset(rpt->host);
 
     // receive data
     size_t count = streaming_parser(rpt, &cd);
@@ -948,7 +948,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             rpt->utc_offset = (int32_t)strtol(value, NULL, 0);
 
         else if(!strcmp(name, "hops"))
-            rpt->hops = rpt->system_info->hops = (uint16_t) strtoul(value, NULL, 0);
+            rpt->hops = rpt->system_info->hops = (int16_t)strtol(value, NULL, 0);
 
         else if(!strcmp(name, "ml_capable"))
             rpt->system_info->ml_capable = strtoul(value, NULL, 0);

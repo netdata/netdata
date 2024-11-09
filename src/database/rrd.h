@@ -1121,7 +1121,7 @@ struct rrdhost_system_info {
     char *container;
     char *container_detection;
     char *is_k8s_node;
-    uint16_t hops;
+    int16_t hops;
     bool ml_capable;
     bool ml_enabled;
     char *install_type;

@@ -14,7 +14,7 @@ typedef struct stream_parent STREAM_PARENT;
 
 void rrdhost_stream_parent_ssl_init(struct sender_state *s);
 
-void rrdhost_stream_parent_reset_postpone_time(struct rrdhost *host);
+void rrdhost_stream_parents_reset(RRDHOST *host);
 
 void rrdhost_stream_parents_init(struct rrdhost *host);
 void rrdhost_stream_parents_free(struct rrdhost *host);
@@ -32,10 +32,10 @@ bool stream_parent_connect_to_one(
 void rrdhost_stream_parents_to_json(BUFFER *wb, struct rrdhost_status *s);
 STREAM_HANDSHAKE stream_parent_get_disconnect_reason(STREAM_PARENT *d);
 void stream_parent_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t since);
-void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t postpone_reconnection_until);
-time_t stream_parent_get_reconnection_t(STREAM_PARENT *d);
+void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t secs);
+usec_t stream_parent_get_reconnection_ut(STREAM_PARENT *d);
 bool stream_parent_is_ssl(STREAM_PARENT *d);
 
-time_t stream_parent_handshake_error_to_json(BUFFER *wb, struct rrdhost *host);
+usec_t stream_parent_handshake_error_to_json(BUFFER *wb, struct rrdhost *host);
 
 #endif //NETDATA_STREAM_PARENTS_H

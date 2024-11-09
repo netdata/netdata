@@ -7,12 +7,15 @@
 struct stream_parent {
     STRING *destination;
     bool ssl;
+    bool banned_permanently;
+    bool banned_for_this_session;
     STREAM_HANDSHAKE reason;
     uint32_t attempts;
-    time_t since;
-    time_t postpone_reconnection_until;
+    usec_t since_ut;
+    usec_t postpone_until_ut;
 
     struct {
+        ND_UUID host_id;
         int status;
         size_t nodes;
         size_t receivers;
@@ -36,29 +39,44 @@ STREAM_HANDSHAKE stream_parent_get_disconnect_reason(STREAM_PARENT *d) {
 
 void stream_parent_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t since) {
     if(!d) return;
-    d->since = since;
+    d->since_ut = since * USEC_PER_SEC;
     d->reason = reason;
 }
 
-void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t postpone_reconnection_until) {
+static inline usec_t randomize_wait_ut(time_t secs) {
+    uint32_t delay_ut = (secs < SENDER_MIN_RECONNECT_DELAY ? SENDER_MIN_RECONNECT_DELAY : secs) * USEC_PER_SEC;
+    return now_realtime_usec() +
+           (SENDER_MIN_RECONNECT_DELAY * USEC_PER_SEC) +
+           os_random(delay_ut - SENDER_MIN_RECONNECT_DELAY * USEC_PER_SEC);
+}
+
+void rrdhost_stream_parents_reset(RRDHOST *host) {
+    usec_t until_ut = randomize_wait_ut(stream_send.parents.reconnect_delay_s);
+    for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
+        d->postpone_until_ut = until_ut;
+        d->banned_for_this_session = false;
+    }
+}
+
+void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t secs) {
     if(!d) return;
     d->reason = reason;
-    d->postpone_reconnection_until = postpone_reconnection_until;
+    d->postpone_until_ut = randomize_wait_ut(secs);
 }
 
-time_t stream_parent_get_reconnection_t(STREAM_PARENT *d) {
-    return d ? d->postpone_reconnection_until : 0;
+usec_t stream_parent_get_reconnection_ut(STREAM_PARENT *d) {
+    return d ? d->postpone_until_ut : 0;
 }
 
 bool stream_parent_is_ssl(STREAM_PARENT *d) {
     return d ? d->ssl : false;
 }
 
-time_t stream_parent_handshake_error_to_json(BUFFER *wb, RRDHOST *host) {
-    time_t last_attempt = 0;
+usec_t stream_parent_handshake_error_to_json(BUFFER *wb, RRDHOST *host) {
+    usec_t last_attempt = 0;
     for(STREAM_PARENT *d = host->stream.snd.parents.all; d ; d = d->next) {
-        if(d->since > last_attempt)
-            last_attempt = d->since;
+        if(d->since_ut > last_attempt)
+            last_attempt = d->since_ut;
 
         buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(d->reason));
     }
@@ -80,23 +98,16 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
             else
                 buffer_json_member_add_string(wb, "destination", string2str(d->destination));
 
-            buffer_json_member_add_time_t(wb, "since", d->since);
-            buffer_json_member_add_time_t(wb, "age", s->now - d->since);
+            buffer_json_member_add_uint64(wb, "since", d->since_ut / USEC_PER_SEC);
+            buffer_json_member_add_uint64(wb, "age", s->now - d->since_ut / USEC_PER_SEC);
             buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
-            if(d->postpone_reconnection_until > s->now) {
-                buffer_json_member_add_time_t(wb, "next_check", d->postpone_reconnection_until);
-                buffer_json_member_add_time_t(wb, "next_in", d->postpone_reconnection_until - s->now);
+            if(d->postpone_until_ut > (usec_t)s->now * USEC_PER_SEC) {
+                buffer_json_member_add_uint64(wb, "next_check", d->postpone_until_ut / USEC_PER_SEC);
+                buffer_json_member_add_uint64(wb, "next_in", d->postpone_until_ut - (usec_t)s->now * USEC_PER_SEC);
             }
         }
         buffer_json_object_close(wb); // each candidate
     }
-}
-
-void rrdhost_stream_parent_reset_postpone_time(RRDHOST *host) {
-    uint32_t wait = stream_send.parents.reconnect_delay_s;
-    time_t now = now_realtime_sec();
-    for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next)
-        d->postpone_reconnection_until = now + wait;
 }
 
 void rrdhost_stream_parent_ssl_init(struct sender_state *s) {
@@ -133,6 +144,7 @@ cleanup:
 
 static bool stream_info_parse(struct json_object *jobj, const char *path, STREAM_PARENT *d, BUFFER *error) {
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "status", d->remote.status, error, true);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "host_id", d->remote.host_id.uuid, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nodes", d->remote.nodes, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "receivers", d->remote.receivers, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nonce", d->remote.nonce, error, true);
@@ -250,8 +262,8 @@ static int compare_last_time(const void *a, const void *b) {
     if (parent_a->remote.db_last_time_s < parent_b->remote.db_last_time_s) return 1;
     else if (parent_a->remote.db_last_time_s > parent_b->remote.db_last_time_s) return -1;
     else {
-        if(parent_a->since < parent_b->since) return -1;
-        else if(parent_a->since > parent_b->since) return 1;
+        if(parent_a->since_ut < parent_b->since_ut) return -1;
+        else if(parent_a->since_ut > parent_b->since_ut) return 1;
         else {
             if(parent_a->attempts < parent_b->attempts) return -1;
             else if(parent_a->attempts > parent_b->attempts) return 1;
@@ -283,6 +295,7 @@ bool stream_parent_connect_to_one(
     }
 
     STREAM_PARENT *array[size];
+    usec_t now_ut = now_monotonic_usec();
 
     // fetch stream info for all of them and put them in the array
     size_t count = 0, skipped_but_useful = 0, skipped_not_useful = 0;
@@ -292,13 +305,21 @@ bool stream_parent_connect_to_one(
             return false;
         }
 
-        if (d->postpone_reconnection_until > now_realtime_sec()) {
+        // make sure they all have a random number
+        // this is taken from the parent, but if the stream_info call fails
+        // we generate a random number for every parent here
+        d->remote.nonce = os_random32();
+
+        if (d->banned_permanently || d->banned_for_this_session)
+            continue;
+
+        if (d->postpone_until_ut > now_ut) {
             skipped_but_useful++;
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "STREAM %s: skipping useful parent '%s': POSTPONED FOR %ld SECS MORE: %s",
                    rrdhost_hostname(host),
                    string2str(d->destination),
-                   d->postpone_reconnection_until - now_realtime_sec(),
+                   (time_t)((d->postpone_until_ut - now_ut) / USEC_PER_SEC),
                    stream_handshake_error_to_string(d->reason));
             continue;
         }
@@ -310,8 +331,17 @@ bool stream_parent_connect_to_one(
                 case RRDHOST_INGEST_TYPE_VIRTUAL:
                 case RRDHOST_INGEST_TYPE_LOCALHOST:
                     d->reason = STREAM_HANDSHAKE_ERROR_LOCALHOST;
-                    skipped_not_useful++;
-                    continue; // can't use these, ever
+                    if(rrdhost_is_host_in_stream_path(host, d->remote.host_id, host->sender->hops)) {
+                        d->banned_permanently = true;
+                        skipped_not_useful++;
+                        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                               "STREAM %s: destination '%s' is banned permanently because it is the origin server",
+                               rrdhost_hostname(host), string2str(d->destination));
+                        continue;
+                    }
+                    else
+                        skip = true;
+                    break;
 
                 default:
                 case RRDHOST_INGEST_TYPE_CHILD:
@@ -328,7 +358,16 @@ bool stream_parent_connect_to_one(
                 case RRDHOST_INGEST_STATUS_REPLICATING:
                 case RRDHOST_INGEST_STATUS_ONLINE:
                     d->reason = STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED;
-                    skip = true;
+                    if(rrdhost_is_host_in_stream_path(host, d->remote.host_id, host->sender->hops)) {
+                        d->banned_for_this_session = true;
+                        skipped_not_useful++;
+                        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                               "STREAM %s: destination '%s' is banned for this session, because it is in our path before us.",
+                               rrdhost_hostname(host), string2str(d->destination));
+                        continue;
+                    }
+                    else
+                        skip = true;
                     break;
 
                 default:
@@ -368,12 +407,11 @@ bool stream_parent_connect_to_one(
             size_t similar = 1;
             if(!array[base]->remote.nonce) array[base]->remote.nonce = os_random32();
             for (size_t i = base + 1; i < count; i++) {
-//                if (array[i]->remote.db_last_time_s - array[i - 1]->remote.db_last_time_s <= TIME_TO_CONSIDER_PARENTS_SIMILAR)
-//                    similar++;
-//                else
-//                    break;
+                if (array[i]->remote.db_last_time_s - array[i - 1]->remote.db_last_time_s <= TIME_TO_CONSIDER_PARENTS_SIMILAR)
+                    similar++;
+                else
+                    break;
 
-                if(!array[i]->remote.nonce) array[i]->remote.nonce = os_random32();
                 similar++;
             }
 
@@ -411,7 +449,7 @@ bool stream_parent_connect_to_one(
                     similar--;
                 }
 
-                base++; // skip the last one
+                base++; // skip the last one of the similar
             }
         }
     }
@@ -425,9 +463,7 @@ bool stream_parent_connect_to_one(
     for(size_t i = 0; i < count ;i++) {
         STREAM_PARENT *d = array[i];
 
-        time_t now = now_realtime_sec();
-
-        if(d->postpone_reconnection_until > now)
+        if(d->postpone_until_ut > now_ut)
             continue;
 
         if(nd_thread_signaled_to_cancel()) {
@@ -450,7 +486,7 @@ bool stream_parent_connect_to_one(
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        d->since = now;
+        d->since_ut = now_ut;
         d->attempts++;
         if (nd_sock_connect_to_this(sender_sock, string2str(d->destination),
                                     default_port, timeout, stream_parent_is_ssl(d))) {
@@ -474,7 +510,7 @@ bool stream_parent_connect_to_one(
             return true;
         }
         else {
-            d->postpone_reconnection_until = now_realtime_sec() + 5 * 60;
+            d->postpone_until_ut = now_ut + 5 * 60 * USEC_PER_SEC;
 
             switch(sender_sock->error) {
                 case ND_SOCK_ERR_CONNECTION_REFUSED:

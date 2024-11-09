@@ -116,6 +116,23 @@ STREAM_PATH rrdhost_stream_path_fetch(RRDHOST *host) {
     return p;
 }
 
+bool rrdhost_is_host_in_stream_path(struct rrdhost *host, ND_UUID remote_agent_host_id, int16_t our_hops) {
+    if(UUIDiszero(remote_agent_host_id)) return false;
+    if(UUIDeq(localhost->host_id, remote_agent_host_id)) return true;
+
+    bool rc = false;
+    spinlock_lock(&host->stream.path.spinlock);
+    for (size_t i = 0; i < host->stream.path.used; i++) {
+        STREAM_PATH *p = &host->stream.path.array[i];
+        if(UUIDeq(remote_agent_host_id, p->host_id) && p->hops < our_hops) {
+            rc = true;
+            break;
+        }
+    }
+    spinlock_unlock(&host->stream.path.spinlock);
+    return rc;
+}
+
 void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *key, bool add_version) {
     if(add_version)
         buffer_json_member_add_uint64(wb, "version", 1);
