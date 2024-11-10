@@ -63,11 +63,12 @@ challenges:
 2. **Preventing Premature Connections**  
    Child nodes should not connect to the new parent until it has completed data
    replication. Premature connections could lead to data gaps, as the child may
-   lack the necessary historical data.  
+   lack the necessary historical data.
+
    In Netdata v2.1+, a balancing feature allows children to query parent
    retention and prioritize connections to parents with the most recent data.
    However, children will still connect to the first available parent,
-   potentially disrupting the new parent’s replication process.  
+   potentially introducing gaps to the new parent's database.  
    **Solution:** Keep the new parent isolated from children until its
    replication process is complete. Only then should children be configured to
    include the new parent.
@@ -79,15 +80,15 @@ challenges:
 Resource usage on parent nodes depends on three key factors:
 
 1. **Ingestion Rate**  
-   All parent nodes ingest data equally from their connected children. The
-   resource load is balanced across all parents.
+   All parent nodes ingest all data of all children (not just their own). The
+   resource load is the same across all parents.
 
 2. **Machine Learning**  
    Machine learning is CPU-intensive and affects memory usage.
     - **Before Netdata 2.1:** Every node in a cluster independently trained
       machine learning models for all children, increasing resource consumption
       exponentially.
-    - **Netdata 2.1+:** The first node (child or parent) to train a model
+    - **Netdata 2.1+:** The first node (child or parent) to train ML models
       propagates the trained data to other nodes, significantly reducing resource
       requirements. This allows flexibility: machine learning can either run at
       the edge (child nodes) or on the first parent receiving the data.
@@ -124,7 +125,7 @@ evaluates the parents and prioritizes those with the most recent data.
   before attempting to reconnect. This cooldown period reduces the risk of
   repeated disconnections and ensures smoother reconnections.
 
-#### **Rebalancing After Cluster Changes**
+#### **Re-balancing After Cluster Changes**
 
 Once connected, child nodes begin streaming data and replicating metrics to
 their parent. The parent, in turn, propagates this data to its grandparent. Once
