@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- improvement\(go.d.plugin\): add data collection status chart [\#18981](https://github.com/netdata/netdata/pull/18981) ([ilyam8](https://github.com/ilyam8))
 - ci: fix win jobs [\#18979](https://github.com/netdata/netdata/pull/18979) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18977](https://github.com/netdata/netdata/pull/18977) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/rabbitmq\): add queue status and net partitions [\#18976](https://github.com/netdata/netdata/pull/18976) ([ilyam8](https://github.com/ilyam8))
@@ -17,6 +18,7 @@
 - go mod tidy [\#18967](https://github.com/netdata/netdata/pull/18967) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18966](https://github.com/netdata/netdata/pull/18966) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/rabbitmq\): add cluster support [\#18965](https://github.com/netdata/netdata/pull/18965) ([ilyam8](https://github.com/ilyam8))
+- added /api/v3/stream\_path [\#18943](https://github.com/netdata/netdata/pull/18943) ([ktsaou](https://github.com/ktsaou))
 - Update Windows Documentation [\#18928](https://github.com/netdata/netdata/pull/18928) ([thiagoftsm](https://github.com/thiagoftsm))
 - Bump github.com/Wing924/ltsv from 0.3.1 to 0.4.0 in /src/go [\#18636](https://github.com/netdata/netdata/pull/18636) ([dependabot[bot]](https://github.com/apps/dependabot))
 
@@ -432,8 +434,6 @@
 - ci fix InvalidDefaultArgInFrom warn [\#18428](https://github.com/netdata/netdata/pull/18428) ([ilyam8](https://github.com/ilyam8))
 - vendor https://github.com/mdlayher/lmsensors [\#18427](https://github.com/netdata/netdata/pull/18427) ([ilyam8](https://github.com/ilyam8))
 - remove charts.d/sensors [\#18426](https://github.com/netdata/netdata/pull/18426) ([ilyam8](https://github.com/ilyam8))
-- Reset last connected when removing stale nodes with netdatacli [\#18425](https://github.com/netdata/netdata/pull/18425) ([stelfrag](https://github.com/stelfrag))
-- remove checks.plugin dir [\#18424](https://github.com/netdata/netdata/pull/18424) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
