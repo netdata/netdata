@@ -38,6 +38,10 @@
                 <ComponentRef Id="NetdataService" />
             </Feature>
 
+            <UI Id="FeatureTree_ViewLicense_X64">
+            </UI>
+            <UIRef Id="FeatureTree_ViewLicense" />
+
             <WixVariable Id="WixUIBannerBmp" Value="Top.bmp" />
             <WixVariable Id="WixUIDialogBmp" Value="BackGround.bmp" />
             <UIRef Id="WixUI_ErrorProgressText" />
@@ -118,15 +122,6 @@
                                 Name="Netdata"
                                 Wait="yes" />
             </Component>
-    </Fragment>
-
-    <Fragment>
-            <UI Id="FeatureTree_ViewLicense_X64">
-                <Publish Dialog="ViewLicenseDlg1" Control="Print" Event="DoAction" Value="WixUIPrintEula_X64" />
-                <Publish Dialog="ViewLicenseDlg2" Control="Print" Event="DoAction" Value="WixUIPrintEula_X64" />
-            </UI>
-
-            <UIRef Id="FeatureTree_ViewLicense" />
     </Fragment>
 
     <Fragment>
