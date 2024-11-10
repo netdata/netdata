@@ -2,9 +2,9 @@
 
 ### Streaming Connection Overview
 
-Each Netdata Child has `[stream].destination` configuration in stream.conf to define the parents it should stream to.
+Each Netdata Child has the `[stream].destination` configuration in `stream.conf` to define the parents it should stream to.
 
-Netdata Children connect to one parent at a time. When multiple parents are defined in `[stream].destination`, Netdata Children will select one of them to connect to. If this connection is not possible for any reason, they will connect to the next, until they find a working one. When the whole list of Netdata Parents has been tried without a successful connection, Netdata Children will restart trying the list from the beginning.
+Netdata Children connect to one parent at a time. When multiple parents are defined in `[stream].destination`, Netdata Children will select one of them to connect to. If this connection is not possible for any reason, they will connect to the next one, until they find a working parent. When the whole list of Netdata Parents has been tried without a successful connection Netdata Children will restart trying the list from the beginning.
 
 Once Netdata Parents have their children connected, they now become children themselves, to propagate the data they receive to their Netdata Parents (grandparents).
 
@@ -68,7 +68,7 @@ Since Netdata 1.45, anomaly information embedded in the samples is propagated ac
 
 However, prior to Netdata 2.1, when machine learning was enabled on parents, all nodes in a cluster had to train their own machine learning data. So, significant compute resources were spend on all parents on a cluster, for training machine learning for all the children (of all the parents), multiplying the computational resources required to run machine learning.
 
-With the release of Netdata 2.1, the first Netdata Agent (child or parent) that trains machine learning data for the metrics of a node, propagates this machine learning data forward (to the next nodes in a chain), reducing the computational resources on parent clusters significantly.
+With the release of Netdata 2.1, the first Netdata Agent (child or parent) that trains machine learning data for the metrics of a node, propagates this machine learning data forward (to the next nodes in a chain). This reduces the computational resources on parent clusters.
 
 With this feature, users have the option:
 
@@ -77,15 +77,15 @@ With this feature, users have the option:
 
 Practically, the resources for machine learning, prior to Netdata 2.1 were `N` where `N` is the number of nodes in a cluster. Starting with Netdata 2.1 they are `1` (so just one of the parents spends the resources for machine learning).
 
-#### Restreaming rate
+#### Re-streaming rate
 
 Propagating samples to another parent requires significant resources too. This includes formatting the messages, compressing the traffic and sending it.
 
 Generally, the best vertical scalability on a parent can be achieved with machine learning and grandparent streaming disabled (standalone, no clustering, no grandparent).
 
-When parents are in a cluster the restreaming resources required will be `N - 1` where `N` is the number of parents in the cluster. So, the grandparent of each child node, will not use any restreaming resources.
+When parents are in a cluster the re-streaming, the resources required will be `N - 1` where `N` is the number of parents in the cluster. So, only the last grandparent for each child streaming chain, will not re-stream.
 
-### Balancing Parent
+### Balancing Parents
 
 Netdata v2.1 introduces a balancing algorithm for child nodes.
 
@@ -99,6 +99,6 @@ When parents are considered equal, each child picks a parent randomly.
 
 This logic can be influenced by network disruptions. So, on every disconnection and depending on the reason of disconnection, children block the same parent for a few seconds (and some randomness), to avoid bombarding it with requests. This logic may interfere with the best parent selection.
 
-#### Rebalancing after cluster node changes
+#### Re-balancing after cluster node changes
 
 TBD
