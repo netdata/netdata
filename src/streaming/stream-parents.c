@@ -361,8 +361,10 @@ bool stream_parent_connect_to_one(
 
         bool skip = false;
         d->reason = STREAM_HANDSHAKE_CONNECTING;
+        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - before stream_info");
         if(stream_info_fetch(d, host->machine_guid, default_port,
                               sender_sock, stream_parent_is_ssl(d), rrdhost_hostname(host))) {
+            rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - successful stream_info");
             d->selection.info = true;
 
             switch(d->remote.ingest_type) {
@@ -417,8 +419,11 @@ bool stream_parent_connect_to_one(
                     break;
             }
         }
-        else
+        else {
+            rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - failed stream_info");
             d->selection.info = false;
+        }
+
 
         if(skip) {
             skipped_but_useful++;
@@ -447,6 +452,7 @@ bool stream_parent_connect_to_one(
 
     // order the parents in the array the way we want to connect
     if(count > 1) {
+        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - before sorting parents");
         qsort(array, count, sizeof(STREAM_PARENT *), compare_last_time);
 
         size_t base = 0, batch = 0;
@@ -551,6 +557,8 @@ bool stream_parent_connect_to_one(
         };
         ND_LOG_STACK_PUSH(lgs);
 
+        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - before stream connection");
+
         d->since_ut = now_ut;
         d->attempts++;
         if (nd_sock_connect_to_this(sender_sock, string2str(d->destination),
@@ -573,6 +581,7 @@ bool stream_parent_connect_to_one(
                    sender_sock->fd);
 
             sender_sock->error = ND_SOCK_ERR_NONE;
+            rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - stream connected");
             return true;
         }
         else {
@@ -632,6 +641,7 @@ bool stream_parent_connect_to_one(
         }
     }
 
+    rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - final failure");
     return false;
 }
 
