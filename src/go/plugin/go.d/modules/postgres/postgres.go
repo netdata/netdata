@@ -13,7 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -115,8 +115,8 @@ func (p *Postgres) Init() error {
 	}
 	p.dbSr = sr
 
-	p.mx.xactTimeHist = metrics.NewHistogramWithRangeBuckets(p.XactTimeHistogram)
-	p.mx.queryTimeHist = metrics.NewHistogramWithRangeBuckets(p.QueryTimeHistogram)
+	p.mx.xactTimeHist = metrix.NewHistogramWithRangeBuckets(p.XactTimeHistogram)
+	p.mx.queryTimeHist = metrix.NewHistogramWithRangeBuckets(p.QueryTimeHistogram)
 
 	return nil
 }

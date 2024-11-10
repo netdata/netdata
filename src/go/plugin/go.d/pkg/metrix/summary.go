@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package metrics
+package metrix
 
 import (
 	"math"
