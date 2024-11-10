@@ -25,6 +25,11 @@
 
             <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
+            <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Access Netdata dashboard" />
+            <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+            <Property Id="WixShellExecTarget" Value="http://localhost:19999" />
+            <CustomAction Id="LaunchApplication" DllEntry="WixShellExec" Impersonate="yes" BinaryRef="Wix4UtilCA_X86" />
+
             <Feature Id="Main">
                 <ComponentGroupRef Id="NetdataComponents" />
                 <ComponentRef Id="NetdataVarCache" />
@@ -142,6 +147,7 @@
             <DialogRef Id="UserExit" />
 
             <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+            <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
 
             <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ViewLicenseDlg1" Condition="NOT Installed" />
             <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
