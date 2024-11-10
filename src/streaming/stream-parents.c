@@ -361,10 +361,8 @@ bool stream_parent_connect_to_one(
 
         bool skip = false;
         d->reason = STREAM_HANDSHAKE_CONNECTING;
-        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - before stream_info");
         if(stream_info_fetch(d, host->machine_guid, default_port,
                               sender_sock, stream_parent_is_ssl(d), rrdhost_hostname(host))) {
-            rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - successful stream_info");
             d->selection.info = true;
 
             switch(d->remote.ingest_type) {
@@ -420,7 +418,6 @@ bool stream_parent_connect_to_one(
             }
         }
         else {
-            rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - failed stream_info");
             d->selection.info = false;
         }
 
@@ -452,9 +449,7 @@ bool stream_parent_connect_to_one(
 
     // order the parents in the array the way we want to connect
     if(count > 1) {
-        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - before sorting parents");
         qsort(array, count, sizeof(STREAM_PARENT *), compare_last_time);
-        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - after qsort before randomization");
 
         size_t base = 0, batch = 0;
         while (base < count) {
@@ -481,13 +476,11 @@ bool stream_parent_connect_to_one(
                 array[base]->selection.random = false;
                 base++;
                 batch++;
-                rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - similar == 1");
                 continue;
             }
             else {
                 // reorder the parents who have similar db_last_time
 
-                rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - before randomizer");
                 while (similar > 1) {
                     size_t chosen = base;
                     for(size_t i = base + 1 ; i < base + similar ;i++) {
@@ -511,7 +504,6 @@ bool stream_parent_connect_to_one(
                     base++;
                     similar--;
                 }
-                rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - after randomizer");
 
                 // the last one of the similar
                 array[base]->selection.order = base + 1;
@@ -521,8 +513,6 @@ bool stream_parent_connect_to_one(
                 batch++;
             }
         }
-
-        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - after randomization");
     }
     else {
         array[0]->selection.order = 1;
@@ -532,14 +522,10 @@ bool stream_parent_connect_to_one(
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "STREAM %s: only 1 parent is available: '%s'",
                rrdhost_hostname(host), string2str(array[0]->destination));
-
-        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - after count = 1");
     }
 
     // now the parents are sorted based on preference of connection
     for(size_t i = 0; i < count ;i++) {
-        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - trying parent");
-
         STREAM_PARENT *d = array[i];
 
         if(d->postpone_until_ut > now_ut)
@@ -565,8 +551,6 @@ bool stream_parent_connect_to_one(
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - before stream connection");
-
         d->since_ut = now_ut;
         d->attempts++;
         if (nd_sock_connect_to_this(sender_sock, string2str(d->destination),
@@ -589,7 +573,6 @@ bool stream_parent_connect_to_one(
                    sender_sock->fd);
 
             sender_sock->error = ND_SOCK_ERR_NONE;
-            rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - stream connected");
             return true;
         }
         else {
@@ -649,7 +632,6 @@ bool stream_parent_connect_to_one(
         }
     }
 
-    rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - final failure");
     return false;
 }
 

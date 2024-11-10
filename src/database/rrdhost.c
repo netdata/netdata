@@ -49,7 +49,6 @@ RRDHOST *find_host_by_node_id(char *node_id) {
     }
     dfe_done(host);
 
-    rrdhost_stream_path_check_corruption(ret, __FUNCTION__);
     return ret;
 }
 
@@ -113,13 +112,10 @@ static inline RRDHOST *rrdhost_index_add_by_guid(RRDHOST *host) {
                host->machine_guid);
     }
 
-    rrdhost_stream_path_check_corruption(host, __FUNCTION__);
     return host;
 }
 
 static void rrdhost_index_del_by_guid(RRDHOST *host) {
-    rrdhost_stream_path_check_corruption(host, __FUNCTION__);
-
     if(rrdhost_option_check(host, RRDHOST_OPTION_INDEXED_MACHINE_GUID)) {
         if(!dictionary_del(rrdhost_root_index, host->machine_guid))
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
@@ -138,7 +134,6 @@ inline RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
         return localhost;
 
     RRDHOST *host = dictionary_get(rrdhost_root_index_hostname, hostname);
-    rrdhost_stream_path_check_corruption(host, __FUNCTION__);
     return host;
 }
 
@@ -556,7 +551,6 @@ static RRDHOST *rrdhost_create(
     } else
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
 
-    rrdhost_stream_path_check_corruption(host, __FUNCTION__);
     return host;
 }
 
@@ -693,8 +687,6 @@ static void rrdhost_update(RRDHOST *host
     }
 
     spinlock_unlock(&host->rrdhost_update_lock);
-
-    rrdhost_stream_path_check_corruption(host, __FUNCTION__);
 }
 
 RRDHOST *rrdhost_find_or_create(
@@ -794,13 +786,10 @@ RRDHOST *rrdhost_find_or_create(
                 , system_info);
     }
 
-    rrdhost_stream_path_check_corruption(host, __FUNCTION__);
     return host;
 }
 
 inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s) {
-    rrdhost_stream_path_check_corruption(host, __FUNCTION__);
-
     if(host != protected_host
        && host != localhost
        && rrdhost_receiver_replicating_charts(host) == 0
@@ -1220,14 +1209,10 @@ static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
     freez(host->sender);
     host->sender = NULL;
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
-
-    rrdhost_stream_path_check_corruption(host, __FUNCTION__);
 }
 
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     if(!host) return;
-
-    rrdhost_stream_path_check_corruption(host, __FUNCTION__);
 
     if (netdata_exit || force) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,

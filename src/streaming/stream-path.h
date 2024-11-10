@@ -31,7 +31,6 @@ typedef struct stream_path {
 } STREAM_PATH;
 
 typedef struct rrdhost_stream_path {
-    uint8_t pad[256];
     SPINLOCK spinlock;
     uint16_t size;
     uint16_t used;
@@ -58,7 +57,5 @@ void stream_path_cleanup(STREAM_PATH *p);
 bool stream_path_set_from_json(struct rrdhost *host, const char *json, bool from_parent);
 
 bool rrdhost_is_host_in_stream_path(struct rrdhost *host, ND_UUID remote_agent_host_id, int16_t our_hops);
-
-void rrdhost_stream_path_check_corruption(struct rrdhost *host, const char *func);
 
 #endif //NETDATA_STREAM_PATH_H

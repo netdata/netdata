@@ -149,35 +149,12 @@ bool rrdhost_is_host_in_stream_path(struct rrdhost *host, ND_UUID remote_agent_h
     return rc;
 }
 
-void rrdhost_stream_path_check_corruption(struct rrdhost *host, const char *func) {
-    if(!host) return;
-
-    static uint8_t pad[sizeof(host->stream.path.pad)] = { 0 };
-    if(memcmp(pad, host->stream.path.pad, sizeof(host->stream.path.pad)) != 0) {
-        CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        for(size_t i = 0; i < sizeof(host->stream.path.pad) ;i++) {
-            if(!host->stream.path.pad[i])
-                buffer_putc(wb, ' ');
-            else
-                buffer_print_uint64_hex(wb, host->stream.path.pad[i]);
-        }
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM_PATH_CORRUPTION: PAD CORRUPTED - HOST '%s' - on %s() - data: '%s'",
-              rrdhost_hostname(host), func, buffer_tostring(wb));
-    }
-    else
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM_PATH_CORRUPTION: PAD OK - HOST '%s' - on %s()",
-               rrdhost_hostname(host), func);
-}
-
 void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *key, bool add_version) {
     if(add_version)
         buffer_json_member_add_uint64(wb, "version", 1);
 
     STREAM_PATH tmp = rrdhost_stream_path_self(host);
 
-    rrdhost_stream_path_check_corruption(host, __FUNCTION__);
     spinlock_lock(&host->stream.path.spinlock);
     buffer_json_member_add_array(wb, key);
     {
