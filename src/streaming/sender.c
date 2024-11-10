@@ -372,6 +372,7 @@ void *rrdpush_sender_thread(void *ptr) {
         return NULL;
     }
 
+    rrdhost_stream_path_check_corruption(s->host, "rrdpush_sender_thread1");
     if(!rrdhost_set_sender(s->host)) {
         netdata_log_error("STREAM %s [send]: thread created (task id %d), but there is another sender running for this host.",
               rrdhost_hostname(s->host), gettid_cached());
@@ -411,11 +412,15 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->sock.fd == -1)) {
+            rrdhost_stream_path_check_corruption(s->host, "rrdpush_sender_thread - before connection");
+
             if(was_connected)
                 rrdpush_sender_on_disconnect(s->host);
 
             was_connected = rrdpush_sender_connect(s);
             now_s = s->last_traffic_seen_t;
+
+            rrdhost_stream_path_check_corruption(s->host, "rrdpush_sender_thread - after connection");
             continue;
         }
 
