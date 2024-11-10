@@ -1,104 +1,146 @@
-## Notes on Netdata Active-Active Parent Clusters
+### Notes on Netdata Active-Active Parent Clusters
 
-### Streaming Connection Overview
+#### **Streaming Connection Overview**
 
-Each Netdata Child has the `[stream].destination` configuration in `stream.conf` to define the parents it should stream to.
+Each Netdata child node specifies its parent nodes through the
+`[stream].destination` configuration in `stream.conf`. While a child can list
+multiple parents, it will connect to only one at a time. If the connection to
+the first parent fails, the child will try the next parent in the list,
+continuing this process until a successful connection is established. If no
+connection can be made, the child will retry the list in order.
 
-Netdata Children connect to one parent at a time. When multiple parents are defined in `[stream].destination`, Netdata Children will select one of them to connect to. If this connection is not possible for any reason, they will connect to the next one, until they find a working parent. When the whole list of Netdata Parents has been tried without a successful connection Netdata Children will restart trying the list from the beginning.
+Once a Netdata parent receives data from its child nodes, it can also act as a
+child to another parent (or "grandparent") to propagate the data further up the
+hierarchy.
 
-Once Netdata Parents have their children connected, they now become children themselves, to propagate the data they receive to their Netdata Parents (grandparents).
+#### **Active-Active Parent Clusters Overview**
 
-### Active-Active Parent Clusters Overview
+Active-active parent clusters involve circular data propagation among parent
+nodes. For example, parent A streams its data to parent B (its grandparent),
+while parent B streams back to parent A, creating redundancy. This configuration
+ensures that each parent node has the same data, allowing child nodes to connect
+to any available parent.
 
-Active-active parent clusters are configured with circular propagation of the data. So parent A has parent B as grandparent, and parent B has parent A as grandparent.
+This setup can be expanded to more than two parents by configuring all parents
+as grandparents of each other.
 
-This setup allows both parents to have the same data for all their children and the children are free to connect to any of the two parents.
+---
 
-This method works for any number of 2+ parents, as long as all the parents have all the others as grandparents.
+### **Data Replication**
 
-### Replication Overview
+When a child node connects to a parent, it enters a negotiation phase to
+announce the metrics it will stream, including their retention period. The
+parent checks its database for missing data. If data gaps exist, the parent
+requests replication of the missing metrics from the child before transitioning
+to streaming fresh data.
 
-When a child Netdata Child connects to a Netdata Parent, they first enter a negotiation phase. The child announces the metrics it wants to stream, including the retention it has for them. The parent checks its own database for missing information. If there are samples missing, it first asks the children to replicate past data, before streaming fresh data.
+Replication occurs at the instance (metric group) level, meaning some metrics
+may replicate historical data while others stream in real time. Only high-
+resolution (`tier0`) data is replicated since higher-tier data can be derived
+from `tier0`. Therefore, maintaining sufficient `tier0` retention on the child
+is crucial to prevent gaps in the parent’s database.
 
-This replication happens per instance (group of metrics). So, while some metrics are replicated, others are streaming fresh data.
+---
 
-Replication is only triggered when fresh data are collected. Children nodes do not announce archived metrics they may have. Archived metrics will be replicated only when they start being collected again.
+### **Challenges in Active-Active Clusters**
 
-Only `tier0` (high-resolution) samples are replicated (higher tiers are always derived from `tier0`), this means that the retention of `tier0` on children is critical in ensuring the parents will not have gaps in their databases.
+#### **Adding a New Parent**
 
-## Challenges
+Introducing a new parent to an active-active cluster involves two major
+challenges:
 
-### A new parent in an active-active cluster
+1. **Replicating Existing Data**  
+   Since Netdata replication only propagates currently collected metrics,
+   archived data such as metrics from stopped containers or disconnected devices
+   will not be replicated. To ensure the new parent has complete historical
+   data:
+    - Copy the existing database from another parent (`/var/cache/netdata`) using
+      tools like `rsync` for dbengine files (safe for hot-copy) and `sqlite3` for
+      SQLite databases.
+    - Perform multiple copies and start the new parent promptly to minimize the
+      data gap.
 
-Adding a new parent to the cluster is a challenge for 2 reasons:
+2. **Preventing Premature Connections**  
+   Child nodes should not connect to the new parent until it has completed data
+   replication. Premature connections could lead to data gaps, as the child may
+   lack the necessary historical data.  
+   In Netdata v2.1+, a balancing feature allows children to query parent
+   retention and prioritize connections to parents with the most recent data.
+   However, children will still connect to the first available parent,
+   potentially disrupting the new parent’s replication process.  
+   **Solution:** Keep the new parent isolated from children until its
+   replication process is complete. Only then should children be configured to
+   include the new parent.
 
-#### How to get all the data of the existing parent replicated to the new one?
+---
 
-The running parents have both fresh and archived metrics. However replication will propagate only the currently collected ones, ignoring the archived ones. This means that the new parent will be missing metrics of stopped containers, disconnected disks or network interfaces, etc.
+### **Resource Management in Clusters**
 
-The only viable solution today, is to copy the database of another parent to the new one. By copying the files in `/var/cache/netdata` to the new parent and then starting it up, all the existing data will copied to the new server. This copy of all files can be done while the existing parent runs (hot-copy), but it requires using `rsync` to copy the dbengine files (these files are append-only, so it is safe to copy them while they are used) and `sqlite3` to dump the SQLite3 databases while they are hot.
+Resource usage on parent nodes depends on three key factors:
 
-There is still a (smaller) window for missing data in the new parent, especially on systems with significant ephemerality. Repeating the copy a couple of times and starting the parent immediately after, can minimize it.
+1. **Ingestion Rate**  
+   All parent nodes ingest data equally from their connected children. The
+   resource load is balanced across all parents.
 
-####  How to make sure than children do not connect to the new parent before it finishes replicating old data?
+2. **Machine Learning**  
+   Machine learning is CPU-intensive and affects memory usage.
+    - **Before Netdata 2.1:** Every node in a cluster independently trained
+      machine learning models for all children, increasing resource consumption
+      exponentially.
+    - **Netdata 2.1+:** The first node (child or parent) to train a model
+      propagates the trained data to other nodes, significantly reducing resource
+      requirements. This allows flexibility: machine learning can either run at
+      the edge (child nodes) or on the first parent receiving the data.
 
-When adding a new parent in a cluster, it is important not to reconfigure the children to use it, until the new parent has finished replicating old data.
+3. **Re-Streaming Rate**  
+   Propagating data to other parents consumes CPU and bandwidth for formatting,
+   compressing, and transmitting data. Each parent except the last grandparent
+   in the chain contributes to this workload.
 
-Network disruptions while a new parent is synchronizing can lead to missing data in that parent. For example, if a child connects to the new parent before this parent has finished replicating with the others, the parent will ask from the child to replicate a much larger duration, which the child may not have. This will leave a gaps in the new parent's database.
+---
 
-In Netdata 2.1+ (or 2.0 nightly) we added a balancing feature in Netdata Children. This balancing allows the children to query their parents for their retention, before connecting to them, and to prefer the parents having more recent data. However, the children will still connect to the first available parent (starting from the one having most recent data), which means that in case of network disruptions they may still end up connecting prematurely to the new parent.
+### **Parent Balancing**
 
-The only viable solution is to have a parent join a cluster without offering this parent to the children. Once the new parent finishes replicating, then the children can be reconfigured to use the new parent too.
+Netdata v2.1 introduces a balancing algorithm for child nodes to optimize parent
+connections. This feature is designed to ensure that child nodes connect to the
+most suitable parent, balancing the load across the cluster and reducing the
+likelihood of data gaps or resource bottlenecks.
 
-### Resources on the Nodes of a Cluster
+#### **Initial Balancing**
 
-CPU and memory resources consumption on parents, depend on 3 activities:
+Before establishing a connection, each child node queries its candidate parents
+to retrieve their retention details. Based on this information, the child
+evaluates the parents and prioritizes those with the most recent data.
 
-#### Ingestion rate
+- **Retention Difference Threshold**:  
+  Parents are considered equivalent if their retention times differ by less than
+  two minutes. In such cases, the child selects a parent randomly to avoid
+  overloading a single node. This randomness ensures an even distribution of
+  connections when all candidate parents are equally suitable.
 
-All nodes in a cluster will always ingest all the metrics from all children streaming to any of them.
+- **Disconnection Handling**:  
+  To prevent overloading a parent during network disruptions, children
+  temporarily block a recently disconnected parent for a randomized duration
+  before attempting to reconnect. This cooldown period reduces the risk of
+  repeated disconnections and ensures smoother reconnections.
 
-So, the compute resources required on all nodes in a cluster is balanced and equal.
+#### **Rebalancing After Cluster Changes**
 
-#### **Machine learning**
+Once connected, child nodes begin streaming data and replicating metrics to
+their parent. The parent, in turn, propagates this data to its grandparent. Once
+the replication chain completes, the parent signals the child that it can now
+consider other parents for reconnection, if available.
 
-This is the most CPU intensive task in a cluster, and it also has a noticeable memory impact.
+After receiving this signal, the child evaluates the other candidate parents
+again. The child may switch its connection to another parent, randomly.
 
-Since Netdata 1.45, anomaly information embedded in the samples is propagated across parent nodes, so that even with machine learning disabled, parents can still provide anomaly information for all metrics, using anomaly detection performed at the child.
+---
 
-However, prior to Netdata 2.1, when machine learning was enabled on parents, all nodes in a cluster had to train their own machine learning data. So, significant compute resources were spend on all parents on a cluster, for training machine learning for all the children (of all the parents), multiplying the computational resources required to run machine learning.
+### **Summary**
 
-With the release of Netdata 2.1, the first Netdata Agent (child or parent) that trains machine learning data for the metrics of a node, propagates this machine learning data forward (to the next nodes in a chain). This reduces the computational resources on parent clusters.
-
-With this feature, users have the option:
-
-1. Train machine learning at the edge (children), so that vertical scalability on the parents can be maximized.
-2. Train machine learning at the parents, but this time only the first parent (who will receive the direct connection from the child) will train ML for this child. The other parents will receive a copy of it from the parent that is training it.
-
-Practically, the resources for machine learning, prior to Netdata 2.1 were `N` where `N` is the number of nodes in a cluster. Starting with Netdata 2.1 they are `1` (so just one of the parents spends the resources for machine learning).
-
-#### Re-streaming rate
-
-Propagating samples to another parent requires significant resources too. This includes formatting the messages, compressing the traffic and sending it.
-
-Generally, the best vertical scalability on a parent can be achieved with machine learning and grandparent streaming disabled (standalone, no clustering, no grandparent).
-
-When parents are in a cluster the re-streaming, the resources required will be `N - 1` where `N` is the number of parents in the cluster. So, only the last grandparent for each child streaming chain, will not re-stream.
-
-### Balancing Parents
-
-Netdata v2.1 introduces a balancing algorithm for child nodes.
-
-#### Initial balancing
-
-Before connecting to a parent, child nodes execute an API query to each candidate parent to receive information about their retention on the parents.
-
-The goal is to prefer parent nodes that have the most latest data. However, since parents will always have slight differences in retention time, children consider parents equal, if they have less than 2 minutes of difference in retention.
-
-When parents are considered equal, each child picks a parent randomly.
-
-This logic can be influenced by network disruptions. So, on every disconnection and depending on the reason of disconnection, children block the same parent for a few seconds (and some randomness), to avoid bombarding it with requests. This logic may interfere with the best parent selection.
-
-#### Re-balancing after cluster node changes
-
-TBD
+Active-active parent clusters in Netdata provide robust data redundancy and
+flexibility. Properly configuring replication, balancing resources, and managing
+parent-child connections ensures optimal performance and data integrity. With
+improvements in v2.1, including machine learning propagation and connection
+balancing, Netdata clusters are more efficient and scalable, catering to complex
+and dynamic environments.

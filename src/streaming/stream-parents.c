@@ -33,6 +33,7 @@ struct stream_parent {
         size_t order;
         bool random;
         bool info;
+        bool skipped;
     } selection;
 
     STREAM_PARENT *prev;
@@ -119,10 +120,14 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
                     buffer_json_member_add_duration_ut(wb, "next_in", (int64_t)(d->postpone_until_ut - now_ut));
                 }
 
-                buffer_json_member_add_uint64(wb, "batch", d->selection.batch);
-                buffer_json_member_add_uint64(wb, "order", d->selection.order);
-                buffer_json_member_add_boolean(wb, "random", d->selection.random);
+                if(d->selection.batch) {
+                    buffer_json_member_add_uint64(wb, "batch", d->selection.batch);
+                    buffer_json_member_add_uint64(wb, "order", d->selection.order);
+                    buffer_json_member_add_boolean(wb, "random", d->selection.random);
+                }
+
                 buffer_json_member_add_boolean(wb, "info", d->selection.info);
+                buffer_json_member_add_boolean(wb, "skipped", d->selection.skipped);
             }
             else {
                 buffer_json_member_add_string(
@@ -309,7 +314,14 @@ bool stream_parent_connect_to_one(
 
     // count the parents
     size_t size = 0;
-    for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) size++;
+    for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
+        d->selection.order = 0;
+        d->selection.batch = 0;
+        d->selection.random = false;
+        d->selection.info = false;
+        d->selection.skipped = true;
+        size++;
+    }
 
     // do we have any parents?
     if(!size) {
@@ -416,8 +428,12 @@ bool stream_parent_connect_to_one(
                    string2str(d->destination),
                    stream_handshake_error_to_string(d->reason));
         }
-        else
+        else {
+            d->selection.skipped = false;
+            d->selection.batch = count + 1;
+            d->selection.order = count + 1;
             array[count++] = d;
+        }
     }
 
     // can we use any parent?
@@ -499,6 +515,10 @@ bool stream_parent_connect_to_one(
         }
     }
     else {
+        array[0]->selection.order = 1;
+        array[0]->selection.batch = 1;
+        array[0]->selection.random = false;
+
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "STREAM %s: only 1 parent is available: '%s'",
                rrdhost_hostname(host), string2str(array[0]->destination));
@@ -535,6 +555,7 @@ bool stream_parent_connect_to_one(
         d->attempts++;
         if (nd_sock_connect_to_this(sender_sock, string2str(d->destination),
                                     default_port, timeout, stream_parent_is_ssl(d))) {
+
             if (connected_to && connected_to_size)
                 strncpyz(connected_to, string2str(d->destination), connected_to_size);
 
