@@ -151,18 +151,16 @@
             <Publish Dialog="ViewLicenseDlg1" Control="Next" Event="NewDialog" Value="ViewLicenseDlg2" />
 
             <Publish Dialog="ViewLicenseDlg2" Control="Back" Event="NewDialog" Value="ViewLicenseDlg1" />
-            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="NDConfigDialog" Condition="NOT ETCNETDATACLAIMFILE" />
-            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="InstallDirDlg" Condition="ETCNETDATACLAIMFILE" />
+            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
 
-            <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
-            <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="InstallDirDlg" Condition="((TOKEN = &quot;&quot;) AND (ROOMS = &quot;&quot;)) OR ((NOT (TOKEN = &quot;&quot;)) AND (NOT (ROOMS = &quot;&quot;)))" />
-
-            <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="NDConfigDialog" />
-            <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="20" />
+            <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
+            <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="NDConfigDialog" Order="20" />
             <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="10" />
             <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="10" />
             <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="20" />
 
+            <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="InstallDirDlg" />
+            <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="((TOKEN = &quot;&quot;) AND (ROOMS = &quot;&quot;)) OR ((NOT (TOKEN = &quot;&quot;)) AND (NOT (ROOMS = &quot;&quot;)))" />
 
             <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" Order="1" Condition="NOT Installed OR WixUI_InstallMode = &quot;Change&quot;" />
             <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
