@@ -4,6 +4,7 @@ package consul
 
 import (
 	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 	"math"
 	"strconv"
 	"strings"
@@ -142,8 +143,8 @@ func (c *Consul) collectGaugeBool(mx map[string]int64, mfs prometheus.MetricFami
 	v := mf.Metrics()[0].Gauge().Value()
 
 	if !math.IsNaN(v) {
-		mx[name+"_yes"] = boolToInt(v == 1)
-		mx[name+"_no"] = boolToInt(v == 0)
+		mx[name+"_yes"] = metrix.Bool(v == 1)
+		mx[name+"_no"] = metrix.Bool(v == 0)
 	}
 }
 

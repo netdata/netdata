@@ -10,3 +10,10 @@ type Observer interface {
 	stm.Value
 	Observe(v float64)
 }
+
+func Bool(b bool) int64 {
+	if b {
+		return 1
+	}
+	return 0
+}

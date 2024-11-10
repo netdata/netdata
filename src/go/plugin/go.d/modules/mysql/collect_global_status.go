@@ -4,6 +4,8 @@ package mysql
 
 import (
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 const queryShowGlobalStatus = "SHOW GLOBAL STATUS;"
@@ -31,20 +33,20 @@ func (m *MySQL) collectGlobalStatus(mx map[string]int64) error {
 			case "wsrep_local_state":
 				// https://mariadb.com/kb/en/galera-cluster-status-variables/#wsrep_local_state
 				// https://github.com/codership/wsrep-API/blob/eab2d5d5a31672c0b7d116ef1629ff18392fd7d0/wsrep_api.h#L256
-				mx[name+"_undefined"] = boolToInt(value == "0")
-				mx[name+"_joiner"] = boolToInt(value == "1")
-				mx[name+"_donor"] = boolToInt(value == "2")
-				mx[name+"_joined"] = boolToInt(value == "3")
-				mx[name+"_synced"] = boolToInt(value == "4")
-				mx[name+"_error"] = boolToInt(parseInt(value) >= 5)
+				mx[name+"_undefined"] = metrix.Bool(value == "0")
+				mx[name+"_joiner"] = metrix.Bool(value == "1")
+				mx[name+"_donor"] = metrix.Bool(value == "2")
+				mx[name+"_joined"] = metrix.Bool(value == "3")
+				mx[name+"_synced"] = metrix.Bool(value == "4")
+				mx[name+"_error"] = metrix.Bool(parseInt(value) >= 5)
 			case "wsrep_cluster_status":
 				// https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_cluster_status
 				// https://github.com/codership/wsrep-API/blob/eab2d5d5a31672c0b7d116ef1629ff18392fd7d0/wsrep_api.h
 				// https://github.com/codership/wsrep-API/blob/f71cd270414ee70dde839cfc59c1731eea4230ea/examples/node/wsrep.c#L80
 				value = strings.ToUpper(value)
-				mx[name+"_primary"] = boolToInt(value == "PRIMARY")
-				mx[name+"_non_primary"] = boolToInt(value == "NON-PRIMARY")
-				mx[name+"_disconnected"] = boolToInt(value == "DISCONNECTED")
+				mx[name+"_primary"] = metrix.Bool(value == "PRIMARY")
+				mx[name+"_non_primary"] = metrix.Bool(value == "NON-PRIMARY")
+				mx[name+"_disconnected"] = metrix.Bool(value == "DISCONNECTED")
 			default:
 				mx[strings.ToLower(name)] = parseInt(value)
 			}
@@ -75,13 +77,6 @@ func convertWsrepReady(val string) string {
 	default:
 		return "-1"
 	}
-}
-
-func boolToInt(v bool) int64 {
-	if v {
-		return 1
-	}
-	return 0
 }
 
 var globalStatusKeys = map[string]bool{

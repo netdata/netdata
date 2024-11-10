@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 func (n *NginxPlus) collect() (map[string]int64, error) {
@@ -98,8 +100,8 @@ func (n *NginxPlus) collectHTTPCache(mx map[string]int64, ms *nginxMetrics) {
 	for name, cache := range *ms.httpCaches {
 		n.cache.putHTTPCache(name)
 		px := fmt.Sprintf("http_cache_%s_", name)
-		mx[px+"state_cold"] = boolToInt(cache.Cold)
-		mx[px+"state_warm"] = boolToInt(!cache.Cold)
+		mx[px+"state_cold"] = metrix.Bool(cache.Cold)
+		mx[px+"state_warm"] = metrix.Bool(!cache.Cold)
 		mx[px+"size"] = cache.Size
 		mx[px+"served_responses"] = cache.Hit.Responses + cache.Stale.Responses + cache.Updating.Responses + cache.Revalidated.Responses
 		mx[px+"written_responses"] = cache.Miss.ResponsesWritten + cache.Expired.ResponsesWritten + cache.Bypass.ResponsesWritten
@@ -170,12 +172,9 @@ func (n *NginxPlus) collectHTTPUpstreams(mx map[string]int64, ms *nginxMetrics) 
 
 			px = fmt.Sprintf("http_upstream_%s_server_%s_zone_%s_", name, peer.Server, upstream.Zone)
 			mx[px+"active"] = peer.Active
-			mx[px+"state_up"] = boolToInt(peer.State == "up")
-			mx[px+"state_down"] = boolToInt(peer.State == "down")
-			mx[px+"state_draining"] = boolToInt(peer.State == "draining")
-			mx[px+"state_unavail"] = boolToInt(peer.State == "unavail")
-			mx[px+"state_checking"] = boolToInt(peer.State == "checking")
-			mx[px+"state_unhealthy"] = boolToInt(peer.State == "unhealthy")
+			for _, v := range []string{"up", "down", "draining", "unavail", "checking", "unhealthy"} {
+				mx[px+"state_"+v] = metrix.Bool(peer.State == v)
+			}
 			mx[px+"bytes_received"] = peer.Received
 			mx[px+"bytes_sent"] = peer.Sent
 			mx[px+"requests"] = peer.Requests
@@ -227,13 +226,12 @@ func (n *NginxPlus) collectStreamUpstreams(mx map[string]int64, ms *nginxMetrics
 			n.cache.putStreamUpstreamServer(name, peer.Server, peer.Name, upstream.Zone)
 
 			px = fmt.Sprintf("stream_upstream_%s_server_%s_zone_%s_", name, peer.Server, upstream.Zone)
+
 			mx[px+"active"] = peer.Active
 			mx[px+"connections"] = peer.Connections
-			mx[px+"state_up"] = boolToInt(peer.State == "up")
-			mx[px+"state_down"] = boolToInt(peer.State == "down")
-			mx[px+"state_unavail"] = boolToInt(peer.State == "unavail")
-			mx[px+"state_checking"] = boolToInt(peer.State == "checking")
-			mx[px+"state_unhealthy"] = boolToInt(peer.State == "unhealthy")
+			for _, v := range []string{"up", "down", "unavail", "checking", "unhealthy"} {
+				mx[px+"state_"+v] = metrix.Bool(peer.State == v)
+			}
 			mx[px+"bytes_received"] = peer.Received
 			mx[px+"bytes_sent"] = peer.Sent
 			mx[px+"downtime"] = peer.Downtime / 1000
@@ -383,11 +381,4 @@ func (n *NginxPlus) updateCharts() {
 			}
 		}
 	}
-}
-
-func boolToInt(v bool) int64 {
-	if v {
-		return 1
-	}
-	return 0
 }

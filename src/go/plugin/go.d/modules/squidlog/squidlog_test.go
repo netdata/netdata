@@ -9,6 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

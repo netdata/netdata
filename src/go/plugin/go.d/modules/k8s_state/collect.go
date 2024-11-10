@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -144,25 +145,25 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 			ns.stats.podsCondPodScheduled += condStatusToInt(ps.condPodScheduled)
 			ns.stats.podsCondPodInitialized += condStatusToInt(ps.condPodInitialized)
 			ns.stats.podsCondContainersReady += condStatusToInt(ps.condContainersReady)
-			ns.stats.podsReadinessReady += boolToInt(ps.condPodReady == corev1.ConditionTrue)
-			ns.stats.podsReadinessUnready += boolToInt(ps.condPodReady != corev1.ConditionTrue)
-			ns.stats.podsPhasePending += boolToInt(ps.phase == corev1.PodPending)
-			ns.stats.podsPhaseRunning += boolToInt(ps.phase == corev1.PodRunning)
-			ns.stats.podsPhaseSucceeded += boolToInt(ps.phase == corev1.PodSucceeded)
-			ns.stats.podsPhaseFailed += boolToInt(ps.phase == corev1.PodFailed)
+			ns.stats.podsReadinessReady += metrix.Bool(ps.condPodReady == corev1.ConditionTrue)
+			ns.stats.podsReadinessUnready += metrix.Bool(ps.condPodReady != corev1.ConditionTrue)
+			ns.stats.podsPhasePending += metrix.Bool(ps.phase == corev1.PodPending)
+			ns.stats.podsPhaseRunning += metrix.Bool(ps.phase == corev1.PodRunning)
+			ns.stats.podsPhaseSucceeded += metrix.Bool(ps.phase == corev1.PodSucceeded)
+			ns.stats.podsPhaseFailed += metrix.Bool(ps.phase == corev1.PodFailed)
 
 			for _, cs := range ps.initContainers {
 				ns.stats.initContainers++
-				ns.stats.initContStateRunning += boolToInt(cs.stateRunning)
-				ns.stats.initContStateWaiting += boolToInt(cs.stateWaiting)
-				ns.stats.initContStateTerminated += boolToInt(cs.stateTerminated)
+				ns.stats.initContStateRunning += metrix.Bool(cs.stateRunning)
+				ns.stats.initContStateWaiting += metrix.Bool(cs.stateWaiting)
+				ns.stats.initContStateTerminated += metrix.Bool(cs.stateTerminated)
 			}
 
 			for _, cs := range ps.containers {
 				ns.stats.containers++
-				ns.stats.contStateRunning += boolToInt(cs.stateRunning)
-				ns.stats.contStateWaiting += boolToInt(cs.stateWaiting)
-				ns.stats.contStateTerminated += boolToInt(cs.stateTerminated)
+				ns.stats.contStateRunning += metrix.Bool(cs.stateRunning)
+				ns.stats.contStateWaiting += metrix.Bool(cs.stateWaiting)
+				ns.stats.contStateTerminated += metrix.Bool(cs.stateTerminated)
 			}
 		}
 
@@ -172,10 +173,10 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 		mx[px+"cond_podscheduled"] = condStatusToInt(ps.condPodScheduled)
 		mx[px+"cond_podinitialized"] = condStatusToInt(ps.condPodInitialized)
 		mx[px+"cond_containersready"] = condStatusToInt(ps.condContainersReady)
-		mx[px+"phase_running"] = boolToInt(ps.phase == corev1.PodRunning)
-		mx[px+"phase_failed"] = boolToInt(ps.phase == corev1.PodFailed)
-		mx[px+"phase_succeeded"] = boolToInt(ps.phase == corev1.PodSucceeded)
-		mx[px+"phase_pending"] = boolToInt(ps.phase == corev1.PodPending)
+		mx[px+"phase_running"] = metrix.Bool(ps.phase == corev1.PodRunning)
+		mx[px+"phase_failed"] = metrix.Bool(ps.phase == corev1.PodFailed)
+		mx[px+"phase_succeeded"] = metrix.Bool(ps.phase == corev1.PodSucceeded)
+		mx[px+"phase_pending"] = metrix.Bool(ps.phase == corev1.PodPending)
 		mx[px+"age"] = int64(now.Sub(ps.creationTime).Seconds())
 
 		for _, v := range podStatusReasons {
@@ -201,9 +202,9 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 		mx[px+"init_containers_state_terminated"] = 0
 
 		for _, cs := range ps.initContainers {
-			mx[px+"init_containers_state_running"] += boolToInt(cs.stateRunning)
-			mx[px+"init_containers_state_waiting"] += boolToInt(cs.stateWaiting)
-			mx[px+"init_containers_state_terminated"] += boolToInt(cs.stateTerminated)
+			mx[px+"init_containers_state_running"] += metrix.Bool(cs.stateRunning)
+			mx[px+"init_containers_state_waiting"] += metrix.Bool(cs.stateWaiting)
+			mx[px+"init_containers_state_terminated"] += metrix.Bool(cs.stateTerminated)
 		}
 		mx[px+"containers_state_running"] = 0
 		mx[px+"containers_state_waiting"] = 0
@@ -214,15 +215,15 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 				cs.new = false
 				ks.addContainerCharts(ps, cs)
 			}
-			mx[px+"containers_state_running"] += boolToInt(cs.stateRunning)
-			mx[px+"containers_state_waiting"] += boolToInt(cs.stateWaiting)
-			mx[px+"containers_state_terminated"] += boolToInt(cs.stateTerminated)
+			mx[px+"containers_state_running"] += metrix.Bool(cs.stateRunning)
+			mx[px+"containers_state_waiting"] += metrix.Bool(cs.stateWaiting)
+			mx[px+"containers_state_terminated"] += metrix.Bool(cs.stateTerminated)
 
 			ppx := fmt.Sprintf("%scontainer_%s_", px, cs.name)
-			mx[ppx+"state_running"] = boolToInt(cs.stateRunning)
-			mx[ppx+"state_waiting"] = boolToInt(cs.stateWaiting)
-			mx[ppx+"state_terminated"] = boolToInt(cs.stateTerminated)
-			mx[ppx+"readiness"] = boolToInt(cs.ready)
+			mx[ppx+"state_running"] = metrix.Bool(cs.stateRunning)
+			mx[ppx+"state_waiting"] = metrix.Bool(cs.stateWaiting)
+			mx[ppx+"state_terminated"] = metrix.Bool(cs.stateTerminated)
+			mx[ppx+"readiness"] = metrix.Bool(cs.ready)
 			mx[ppx+"restarts"] = cs.restarts
 
 			for _, v := range containerWaitingStateReasons {
@@ -284,8 +285,8 @@ func (ks *KubeState) collectNodesState(mx map[string]int64) {
 		mx[px+"pods_cond_podinitialized"] = ns.stats.podsCondPodInitialized
 		mx[px+"pods_cond_containersready"] = ns.stats.podsCondContainersReady
 		mx[px+"pods_cond_containersready"] = ns.stats.podsCondContainersReady
-		mx[px+"schedulability_schedulable"] = boolToInt(!ns.unSchedulable)
-		mx[px+"schedulability_unschedulable"] = boolToInt(ns.unSchedulable)
+		mx[px+"schedulability_schedulable"] = metrix.Bool(!ns.unSchedulable)
+		mx[px+"schedulability_unschedulable"] = metrix.Bool(ns.unSchedulable)
 		mx[px+"alloc_pods_available"] = ns.allocatablePods - ns.stats.pods
 		mx[px+"alloc_pods_allocated"] = ns.stats.pods
 		mx[px+"alloc_cpu_requests_util"] = calcPercentage(ns.stats.reqCPU, ns.allocatableCPU)
@@ -305,13 +306,6 @@ func (ks *KubeState) collectNodesState(mx map[string]int64) {
 		mx[px+"init_containers_state_waiting"] = ns.stats.initContStateWaiting
 		mx[px+"init_containers_state_terminated"] = ns.stats.initContStateTerminated
 	}
-}
-
-func boolToInt(v bool) int64 {
-	if v {
-		return 1
-	}
-	return 0
 }
 
 func condStatusToInt(cs corev1.ConditionStatus) int64 {
