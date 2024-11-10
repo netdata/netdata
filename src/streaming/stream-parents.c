@@ -466,13 +466,13 @@ bool stream_parent_connect_to_one(
                 // reorder the parents who have similar db_last_time
 
                 while (similar > 1) {
-                    size_t best = base;
-                    for(size_t i = base + 1 ; i < base + similar ;i++) {
-                        if((array[i]->remote.nonce | os_random32()) > (array[best]->remote.nonce | os_random32()))
-                            best = i;
+                    size_t chosen = base;
+                    for(size_t i = base + 1 ; i < base + similar && i < count ;i++) {
+                        uint32_t i_nonce = array[i]->remote.nonce | os_random32();
+                        uint32_t chosen_nonce = array[chosen]->remote.nonce | os_random32();
+                        if(i_nonce > chosen_nonce) chosen = i;
                     }
 
-                    size_t chosen = best;
                     if (chosen != base)
                         SWAP(array[base], array[chosen]);
 
