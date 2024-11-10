@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
-	"regexp"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -34,26 +32,31 @@ func shouldObsoleteCharts() bool {
 	return obsoleteCharts
 }
 
-var reSpace = regexp.MustCompile(`\s+`)
-
-var ndInternalMonitoringDisabled = os.Getenv("NETDATA_INTERNALS_MONITORING") == "NO"
-
-func newRuntimeChart(pluginName string) *Chart {
-	// this is needed to keep the same name as we had before https://github.com/netdata/netdata/go/plugins/plugin/go.d/issues/650
-	ctxName := pluginName
-	if ctxName == "go.d" {
-		ctxName = "go"
-	}
-	ctxName = reSpace.ReplaceAllString(ctxName, "_")
+func newCollectStatusChart(pluginName string) *Chart {
 	return &Chart{
 		typ:      "netdata",
-		Title:    "Execution time",
+		Title:    "Data Collection Status",
+		Units:    "status",
+		Fam:      pluginName,
+		Ctx:      "netdata.plugin_data_collection_status",
+		Priority: 144000,
+		Dims: Dims{
+			{ID: "success"},
+			{ID: "failed"},
+		},
+	}
+}
+
+func newCollectDurationChart(pluginName string) *Chart {
+	return &Chart{
+		typ:      "netdata",
+		Title:    "Data Collection Duration",
 		Units:    "ms",
 		Fam:      pluginName,
-		Ctx:      fmt.Sprintf("netdata.%s_plugin_execution_time", ctxName),
+		Ctx:      "netdata.plugin_data_collection_duration",
 		Priority: 145000,
 		Dims: Dims{
-			{ID: "time"},
+			{ID: "duration"},
 		},
 	}
 }
@@ -93,21 +96,22 @@ func NewJob(cfg JobConfig) *Job {
 		AutoDetectEvery: cfg.AutoDetectEvery,
 		AutoDetectTries: infTries,
 
-		pluginName:  cfg.PluginName,
-		name:        cfg.Name,
-		moduleName:  cfg.ModuleName,
-		fullName:    cfg.FullName,
-		updateEvery: cfg.UpdateEvery,
-		priority:    cfg.Priority,
-		isStock:     cfg.IsStock,
-		module:      cfg.Module,
-		labels:      cfg.Labels,
-		out:         cfg.Out,
-		runChart:    newRuntimeChart(cfg.PluginName),
-		stop:        make(chan struct{}),
-		tick:        make(chan int),
-		buf:         &buf,
-		api:         netdataapi.New(&buf),
+		pluginName:           cfg.PluginName,
+		name:                 cfg.Name,
+		moduleName:           cfg.ModuleName,
+		fullName:             cfg.FullName,
+		updateEvery:          cfg.UpdateEvery,
+		priority:             cfg.Priority,
+		isStock:              cfg.IsStock,
+		module:               cfg.Module,
+		labels:               cfg.Labels,
+		out:                  cfg.Out,
+		collectStatusChart:   newCollectStatusChart(cfg.PluginName),
+		collectDurationChart: newCollectDurationChart(cfg.PluginName),
+		stop:                 make(chan struct{}),
+		tick:                 make(chan int),
+		buf:                  &buf,
+		api:                  netdataapi.New(&buf),
 
 		vnodeGUID:     cfg.VnodeGUID,
 		vnodeHostname: cfg.VnodeHostname,
@@ -149,12 +153,13 @@ type Job struct {
 	initialized bool
 	panicked    bool
 
-	runChart *Chart
-	charts   *Charts
-	tick     chan int
-	out      io.Writer
-	buf      *bytes.Buffer
-	api      *netdataapi.API
+	collectStatusChart   *Chart
+	collectDurationChart *Chart
+	charts               *Charts
+	tick                 chan int
+	out                  io.Writer
+	buf                  *bytes.Buffer
+	api                  *netdataapi.API
 
 	retries int
 	prevRun time.Time
@@ -304,10 +309,15 @@ func (j *Job) Cleanup() {
 	}
 	_ = j.api.HOST(j.vnodeGUID)
 
-	if j.runChart.created {
-		j.runChart.MarkRemove()
-		j.createChart(j.runChart)
+	if j.collectStatusChart.created {
+		j.collectStatusChart.MarkRemove()
+		j.createChart(j.collectStatusChart)
 	}
+	if j.collectDurationChart.created {
+		j.collectDurationChart.MarkRemove()
+		j.createChart(j.collectDurationChart)
+	}
+
 	if j.charts != nil {
 		for _, chart := range *j.charts {
 			if chart.created {
@@ -410,9 +420,14 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 
 	_ = j.api.HOST(j.vnodeGUID)
 
-	if !ndInternalMonitoringDisabled && !j.runChart.created {
-		j.runChart.ID = fmt.Sprintf("execution_time_of_%s", j.FullName())
-		j.createChart(j.runChart)
+	if !j.collectStatusChart.created {
+		j.collectStatusChart.ID = fmt.Sprintf("%s_%s_data_collection_status", cleanPluginName(j.pluginName), j.FullName())
+		j.createChart(j.collectStatusChart)
+	}
+
+	if !j.collectDurationChart.created {
+		j.collectDurationChart.ID = fmt.Sprintf("%s_%s_data_collection_duration", cleanPluginName(j.pluginName), j.FullName())
+		j.createChart(j.collectDurationChart)
 	}
 
 	elapsed := int64(durationTo(time.Since(startTime), time.Millisecond))
@@ -442,12 +457,17 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 	}
 	*j.charts = (*j.charts)[:i]
 
+	j.updateChart(
+		j.collectStatusChart,
+		map[string]int64{"success": boolToInt(updated > 0), "failed": boolToInt(updated == 0)},
+		sinceLastRun,
+	)
+
 	if updated == 0 {
 		return false
 	}
-	if !ndInternalMonitoringDisabled {
-		j.updateChart(j.runChart, map[string]int64{"time": elapsed}, sinceLastRun)
-	}
+
+	j.updateChart(j.collectDurationChart, map[string]int64{"duration": elapsed}, sinceLastRun)
 
 	return true
 }
@@ -646,6 +666,18 @@ func handleZero(v int) int {
 		return 1
 	}
 	return v
+}
+
+func boolToInt(b bool) int64 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func cleanPluginName(name string) string {
+	r := strings.NewReplacer(" ", "_", ".", "_")
+	return r.Replace(name)
 }
 
 var lblReplacer = strings.NewReplacer("'", "")
