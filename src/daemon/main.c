@@ -2304,6 +2304,7 @@ int netdata_main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // spawn the threads
 
+    get_agent_event_time_median_init();
     bearer_tokens_init();
 
     delta_startup_time("start the static threads");

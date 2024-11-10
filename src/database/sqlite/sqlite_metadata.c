@@ -2378,6 +2378,15 @@ void cleanup_agent_event_log(void)
 
 usec_t get_agent_event_time_median(event_log_type_t event_id)
 {
+    static bool initialized[EVENT_AGENT_MAX] = { 0 };
+    static usec_t median[EVENT_AGENT_MAX] = { 0 };
+
+    if(event_id >= EVENT_AGENT_MAX)
+        return 0;
+
+    if(initialized[event_id])
+        return median[event_id];
+
     sqlite3_stmt *res = NULL;
     if (!PREPARE_STATEMENT(db_meta, SQL_GET_AGENT_EVENT_TYPE_MEDIAN, &res))
         return 0;
@@ -2393,7 +2402,15 @@ usec_t get_agent_event_time_median(event_log_type_t event_id)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+
+    median[event_id] = avg_time;
+    initialized[event_id] = true;
     return avg_time;
+}
+
+void get_agent_event_time_median_init(void) {
+    for(event_log_type_t event_id = 1; event_id < EVENT_AGENT_MAX; event_id++)
+        get_agent_event_time_median(event_id);
 }
 
 //

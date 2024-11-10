@@ -17,7 +17,7 @@ ENUM_STR_MAP_DEFINE(STREAM_PATH_FLAGS) = {
 
 BITMAP_STR_DEFINE_FUNCTIONS(STREAM_PATH_FLAGS, STREAM_PATH_FLAG_NONE, "");
 
-static void stream_path_clear(STREAM_PATH *p) {
+void stream_path_cleanup(STREAM_PATH *p) {
     string_freez(p->hostname);
     p->hostname = NULL;
     p->host_id = UUID_ZERO;
@@ -34,7 +34,7 @@ static void stream_path_clear(STREAM_PATH *p) {
 
 static void rrdhost_stream_path_clear_unsafe(RRDHOST *host, bool destroy) {
     for(size_t i = 0; i < host->stream.path.used ; i++)
-        stream_path_clear(&host->stream.path.array[i]);
+        stream_path_cleanup(&host->stream.path.array[i]);
 
     host->stream.path.used = 0;
 
@@ -53,17 +53,19 @@ void rrdhost_stream_path_clear(RRDHOST *host, bool destroy) {
 
 static void stream_path_to_json_object(BUFFER *wb, STREAM_PATH *p) {
     buffer_json_add_array_item_object(wb);
-    buffer_json_member_add_string(wb, "hostname", string2str(p->hostname));
-    buffer_json_member_add_uuid(wb, "host_id", p->host_id.uuid);
-    buffer_json_member_add_uuid(wb, "node_id", p->node_id.uuid);
-    buffer_json_member_add_uuid(wb, "claim_id", p->claim_id.uuid);
-    buffer_json_member_add_int64(wb, "hops", p->hops);
-    buffer_json_member_add_uint64(wb, "since", p->since);
-    buffer_json_member_add_uint64(wb, "first_time_t", p->first_time_t);
-    buffer_json_member_add_uint64(wb, "start_time", p->start_time_ms);
-    buffer_json_member_add_uint64(wb, "shutdown_time", p->shutdown_time_ms);
-    stream_capabilities_to_json_array(wb, p->capabilities, "capabilities");
-    STREAM_PATH_FLAGS_2json(wb, "flags", p->flags);
+    {
+        buffer_json_member_add_string(wb, "hostname", string2str(p->hostname));
+        buffer_json_member_add_uuid(wb, "host_id", p->host_id.uuid);
+        buffer_json_member_add_uuid(wb, "node_id", p->node_id.uuid);
+        buffer_json_member_add_uuid(wb, "claim_id", p->claim_id.uuid);
+        buffer_json_member_add_int64(wb, "hops", p->hops);
+        buffer_json_member_add_uint64(wb, "since", p->since);
+        buffer_json_member_add_uint64(wb, "first_time_t", p->first_time_t);
+        buffer_json_member_add_uint64(wb, "start_time", p->start_time_ms);
+        buffer_json_member_add_uint64(wb, "shutdown_time", p->shutdown_time_ms);
+        stream_capabilities_to_json_array(wb, p->capabilities, "capabilities");
+        STREAM_PATH_FLAGS_2json(wb, "flags", p->flags);
+    }
     buffer_json_object_close(wb);
 }
 
@@ -114,7 +116,7 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
     return p;
 }
 
-STREAM_PATH rrdhost_stream_path_fetch(RRDHOST *host) {
+STREAM_PATH rrdhost_stream_path_get_copy_of_origin(RRDHOST *host) {
     STREAM_PATH p = { 0 };
 
     spinlock_lock(&host->stream.path.spinlock);
@@ -122,6 +124,7 @@ STREAM_PATH rrdhost_stream_path_fetch(RRDHOST *host) {
         STREAM_PATH *tmp_path = &host->stream.path.array[i];
         if(UUIDeq(host->host_id, tmp_path->host_id)) {
             p = *tmp_path;
+            p.hostname = string_dup(tmp_path->hostname);
             break;
         }
     }
@@ -146,16 +149,23 @@ bool rrdhost_is_host_in_stream_path(struct rrdhost *host, ND_UUID remote_agent_h
     return rc;
 }
 
+void rrdhost_stream_path_check_corruption(struct rrdhost *host) {
+    static uint8_t pad[sizeof(host->stream.path.pad)] = { 0 };
+    if(memcmp(pad, host->stream.path.pad, sizeof(host->stream.path.pad)) != 0)
+        fatal("STREAM PATH PAD CORRUPTED!");
+}
+
 void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *key, bool add_version) {
     if(add_version)
         buffer_json_member_add_uint64(wb, "version", 1);
 
+    STREAM_PATH tmp = rrdhost_stream_path_self(host);
+
+    rrdhost_stream_path_check_corruption(host);
     spinlock_lock(&host->stream.path.spinlock);
     buffer_json_member_add_array(wb, key);
     {
         {
-            STREAM_PATH tmp = rrdhost_stream_path_self(host);
-
             bool found_self = false;
             for (size_t i = 0; i < host->stream.path.used; i++) {
                 STREAM_PATH *p = &host->stream.path.array[i];
@@ -172,12 +182,12 @@ void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *k
                 // append us.
                 stream_path_to_json_object(wb, &tmp);
             }
-
-            stream_path_clear(&tmp);
         }
     }
     buffer_json_array_close(wb); // key
     spinlock_unlock(&host->stream.path.spinlock);
+
+    stream_path_cleanup(&tmp);
 }
 
 static BUFFER *stream_path_payload(RRDHOST *host) {
@@ -230,7 +240,7 @@ void stream_path_parent_disconnected(RRDHOST *host) {
             host->stream.path.used = i + 1;
 
             for(size_t j = i + 1; j < used ;j++) {
-                stream_path_clear(&host->stream.path.array[j]);
+                stream_path_cleanup(&host->stream.path.array[j]);
                 cleared++;
             }
 
@@ -352,7 +362,7 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
             }
 
             if(!parse_single_path(joption, "", &host->stream.path.array[host->stream.path.used], error)) {
-                stream_path_clear(&host->stream.path.array[host->stream.path.used]);
+                stream_path_cleanup(&host->stream.path.array[host->stream.path.used]);
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "STREAM PATH: Array item No %zu cannot be parsed: %s: %s", i, buffer_tostring(error), json);
             }

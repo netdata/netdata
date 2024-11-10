@@ -9,7 +9,11 @@
 typedef enum event_log_type {
     EVENT_AGENT_START_TIME  = 1,
     EVENT_AGENT_SHUTDOWN_TIME,
+
+    // terminator
+    EVENT_AGENT_MAX,
 } event_log_type_t;
+void get_agent_event_time_median_init(void);
 
 // return a node list
 struct node_instance_list {
