@@ -151,7 +151,7 @@ bool rrdhost_is_host_in_stream_path(struct rrdhost *host, ND_UUID remote_agent_h
 
 void rrdhost_stream_path_check_corruption(struct rrdhost *host, const char *func) {
     if(!host) return;
-    
+
     static uint8_t pad[sizeof(host->stream.path.pad)] = { 0 };
     if(memcmp(pad, host->stream.path.pad, sizeof(host->stream.path.pad)) != 0) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -161,8 +161,14 @@ void rrdhost_stream_path_check_corruption(struct rrdhost *host, const char *func
             else
                 buffer_print_uint64_hex(wb, host->stream.path.pad[i]);
         }
-        fatal("STREAM PATH PAD CORRUPTED - detected on %s() - data: '%s'", func, buffer_tostring(wb));
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM_PATH_CORRUPTION: PAD CORRUPTED - HOST '%s' - on %s() - data: '%s'",
+              rrdhost_hostname(host), func, buffer_tostring(wb));
     }
+    else
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM_PATH_CORRUPTION: PAD OK - HOST '%s' - on %s()",
+               rrdhost_hostname(host), func);
 }
 
 void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *key, bool add_version) {
