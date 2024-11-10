@@ -5,6 +5,7 @@ package rabbitmq
 import (
 	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
@@ -31,14 +32,13 @@ func (r *RabbitMQ) collectQueues(mx map[string]int64) error {
 		}
 
 		// https://github.com/rabbitmq/rabbitmq-server/blob/8b554474a65857aa60b72b2dda4b6fa9b78f349b/deps/rabbitmq_management/priv/www/js/formatters.js#L552
-		s := q.State
+		st := q.State
 		if q.IdleSince != nil {
-			s = "idle"
+			st = "idle"
 		}
 		for _, v := range []string{"running", "idle", "terminated", "down", "crashed", "stopped", "minority"} {
-			mx[px+"status_"+v] = 0
+			mx[px+"status_"+v] = metrix.Bool(v == st)
 		}
-		mx[px+"status_"+s] = 1
 	}
 
 	return nil

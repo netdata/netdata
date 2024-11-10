@@ -9,8 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrics"
-
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -266,7 +265,7 @@ func ensureChartsDynamicDimsCreated(t *testing.T, squid *SquidLog) {
 	ensureDynamicDimsCreated(t, squid, mimeTypeChart.ID, pxMimeType, squid.mx.MimeType)
 }
 
-func ensureDynamicDimsCreated(t *testing.T, squid *SquidLog, chartID, dimPrefix string, data metrics.CounterVec) {
+func ensureDynamicDimsCreated(t *testing.T, squid *SquidLog, chartID, dimPrefix string, data metrix.CounterVec) {
 	chart := squid.Charts().Get(chartID)
 	assert.NotNilf(t, chart, "chart '%s' is not created", chartID)
 	if chart == nil {

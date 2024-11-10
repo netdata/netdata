@@ -2,6 +2,8 @@
 
 package consul
 
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+
 const (
 	// https://www.consul.io/api-docs/agent/check#list-checks
 	urlPathAgentChecks = "/v1/agent/checks"
@@ -35,10 +37,10 @@ func (c *Consul) collectChecks(mx map[string]int64) error {
 			c.addHealthCheckCharts(check)
 		}
 
-		mx["health_check_"+id+"_passing_status"] = boolToInt(check.Status == "passing")
-		mx["health_check_"+id+"_warning_status"] = boolToInt(check.Status == "warning")
-		mx["health_check_"+id+"_critical_status"] = boolToInt(check.Status == "critical")
-		mx["health_check_"+id+"_maintenance_status"] = boolToInt(check.Status == "maintenance")
+		mx["health_check_"+id+"_passing_status"] = metrix.Bool(check.Status == "passing")
+		mx["health_check_"+id+"_warning_status"] = metrix.Bool(check.Status == "warning")
+		mx["health_check_"+id+"_critical_status"] = metrix.Bool(check.Status == "critical")
+		mx["health_check_"+id+"_maintenance_status"] = metrix.Bool(check.Status == "maintenance")
 	}
 
 	for id := range c.checks {

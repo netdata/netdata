@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 // https://www.mongodb.com/docs/manual/reference/replica-states/#replica-set-member-states
@@ -41,11 +42,11 @@ func (m *Mongo) collectReplSetStatus(mx map[string]int64) error {
 		mx[px+"replication_lag"] = s.Date.Sub(member.OptimeDate).Milliseconds()
 
 		for k, v := range replicaSetMemberStates {
-			mx[px+"state_"+k] = boolToInt(member.State == v)
+			mx[px+"state_"+k] = metrix.Bool(member.State == v)
 		}
 
-		mx[px+"health_status_up"] = boolToInt(member.Health == 1)
-		mx[px+"health_status_down"] = boolToInt(member.Health == 0)
+		mx[px+"health_status_up"] = metrix.Bool(member.Health == 1)
+		mx[px+"health_status_down"] = metrix.Bool(member.Health == 0)
 
 		if member.Self == nil {
 			mx[px+"uptime"] = member.Uptime

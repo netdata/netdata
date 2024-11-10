@@ -12,7 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
 
 	"github.com/blang/semver/v4"
@@ -40,7 +40,7 @@ func New() *Redis {
 
 		addAOFChartsOnce:       &sync.Once{},
 		addReplSlaveChartsOnce: &sync.Once{},
-		pingSummary:            metrics.NewSummary(),
+		pingSummary:            metrix.NewSummary(),
 		collectedCommands:      make(map[string]bool),
 		collectedDbs:           make(map[string]bool),
 	}
@@ -69,7 +69,7 @@ type (
 
 		server            string
 		version           *semver.Version
-		pingSummary       metrics.Summary
+		pingSummary       metrix.Summary
 		collectedCommands map[string]bool
 		collectedDbs      map[string]bool
 	}

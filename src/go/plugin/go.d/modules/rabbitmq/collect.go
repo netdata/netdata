@@ -89,10 +89,3 @@ func (r *RabbitMQ) webClient() *web.Client {
 		return false, nil
 	})
 }
-
-func boolToInt(b bool) int64 {
-	if b {
-		return 1
-	}
-	return 0
-}

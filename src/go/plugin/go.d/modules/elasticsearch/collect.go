@@ -5,6 +5,7 @@ package elasticsearch
 import (
 	"errors"
 	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 	"math"
 	"slices"
 	"strconv"
@@ -82,9 +83,9 @@ func (es *Elasticsearch) collectClusterHealth(mx map[string]int64, ms *esMetrics
 
 	merge(mx, stm.ToMap(ms.ClusterHealth), "cluster")
 
-	mx["cluster_status_green"] = boolToInt(ms.ClusterHealth.Status == "green")
-	mx["cluster_status_yellow"] = boolToInt(ms.ClusterHealth.Status == "yellow")
-	mx["cluster_status_red"] = boolToInt(ms.ClusterHealth.Status == "red")
+	mx["cluster_status_green"] = metrix.Bool(ms.ClusterHealth.Status == "green")
+	mx["cluster_status_yellow"] = metrix.Bool(ms.ClusterHealth.Status == "yellow")
+	mx["cluster_status_red"] = metrix.Bool(ms.ClusterHealth.Status == "red")
 }
 
 func (es *Elasticsearch) collectClusterStats(mx map[string]int64, ms *esMetrics) {
@@ -114,9 +115,9 @@ func (es *Elasticsearch) collectLocalIndicesStats(mx map[string]int64, ms *esMet
 
 		px := fmt.Sprintf("node_index_%s_stats_", v.Index)
 
-		mx[px+"health_green"] = boolToInt(v.Health == "green")
-		mx[px+"health_yellow"] = boolToInt(v.Health == "yellow")
-		mx[px+"health_red"] = boolToInt(v.Health == "red")
+		mx[px+"health_green"] = metrix.Bool(v.Health == "green")
+		mx[px+"health_yellow"] = metrix.Bool(v.Health == "yellow")
+		mx[px+"health_red"] = metrix.Bool(v.Health == "red")
 		mx[px+"shards_count"] = strToInt(v.Rep)
 		mx[px+"docs_count"] = strToInt(v.DocsCount)
 		mx[px+"store_size_in_bytes"] = convertIndexStoreSizeToBytes(v.StoreSize)
@@ -252,13 +253,6 @@ func convertIndexStoreSizeToBytes(size string) int64 {
 func strToInt(s string) int64 {
 	v, _ := strconv.Atoi(s)
 	return int64(v)
-}
-
-func boolToInt(v bool) int64 {
-	if v {
-		return 1
-	}
-	return 0
 }
 
 func removeSystemIndices(indices []esIndexStats) []esIndexStats {

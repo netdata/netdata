@@ -13,7 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1104,13 +1104,13 @@ func testCustomNumericFieldCharts(t *testing.T, w *WebLog) {
 
 var (
 	emptySummary   = newWebLogSummary()
-	emptyHistogram = metrics.NewHistogram(metrics.DefBuckets)
+	emptyHistogram = metrix.NewHistogram(metrix.DefBuckets)
 )
 
-func isEmptySummary(s metrics.Summary) bool     { return reflect.DeepEqual(s, emptySummary) }
-func isEmptyHistogram(h metrics.Histogram) bool { return reflect.DeepEqual(h, emptyHistogram) }
+func isEmptySummary(s metrix.Summary) bool     { return reflect.DeepEqual(s, emptySummary) }
+func isEmptyHistogram(h metrix.Histogram) bool { return reflect.DeepEqual(h, emptyHistogram) }
 
-func isEmptyCounterVec(cv metrics.CounterVec) bool {
+func isEmptyCounterVec(cv metrix.CounterVec) bool {
 	for _, c := range cv {
 		if c.Value() > 0 {
 			return false
@@ -1179,10 +1179,10 @@ func prepareWebLogCollectFull(t *testing.T) *WebLog {
 		CustomTimeFields: []customTimeField{
 			{
 				Name:      "random_time_field",
-				Histogram: metrics.DefBuckets,
+				Histogram: metrix.DefBuckets,
 			},
 		},
-		Histogram:      metrics.DefBuckets,
+		Histogram:      metrix.DefBuckets,
 		GroupRespCodes: true,
 	}
 	weblog := New()
@@ -1313,11 +1313,11 @@ func prepareWebLogCollectCustomTimeFields(t *testing.T) *WebLog {
 		CustomTimeFields: []customTimeField{
 			{
 				Name:      "time1",
-				Histogram: metrics.DefBuckets,
+				Histogram: metrix.DefBuckets,
 			},
 			{
 				Name:      "time2",
-				Histogram: metrics.DefBuckets,
+				Histogram: metrix.DefBuckets,
 			},
 		},
 		Path:           "testdata/custom_time_fields.log",

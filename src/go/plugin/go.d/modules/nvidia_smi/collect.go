@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 func (nv *NvidiaSmi) collect() (map[string]int64, error) {
@@ -83,12 +85,12 @@ func (nv *NvidiaSmi) collectGPUInfo(mx map[string]int64) error {
 		addMetric(mx, px+"voltage", gpu.Voltage.GraphicsVolt, 0)
 		for i := 0; i < 16; i++ {
 			s := "P" + strconv.Itoa(i)
-			mx[px+"performance_state_"+s] = boolToInt(gpu.PerformanceState == s)
+			mx[px+"performance_state_"+s] = metrix.Bool(gpu.PerformanceState == s)
 		}
 		if isValidValue(gpu.MIGMode.CurrentMIG) {
 			mode := strings.ToLower(gpu.MIGMode.CurrentMIG)
-			mx[px+"mig_current_mode_enabled"] = boolToInt(mode == "enabled")
-			mx[px+"mig_current_mode_disabled"] = boolToInt(mode == "disabled")
+			mx[px+"mig_current_mode_enabled"] = metrix.Bool(mode == "enabled")
+			mx[px+"mig_current_mode_disabled"] = metrix.Bool(mode == "disabled")
 			mx[px+"mig_devices_count"] = int64(len(gpu.MIGDevices.MIGDevice))
 		}
 
@@ -194,11 +196,4 @@ func removeUnits(s string) string {
 		s = s[:i]
 	}
 	return s
-}
-
-func boolToInt(v bool) int64 {
-	if v {
-		return 1
-	}
-	return 0
 }

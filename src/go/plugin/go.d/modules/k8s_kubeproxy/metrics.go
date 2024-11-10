@@ -3,7 +3,7 @@
 package k8s_kubeproxy
 
 import (
-	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrics"
+	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 func newMetrics() *metrics {
