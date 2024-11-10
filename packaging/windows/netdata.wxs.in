@@ -155,7 +155,7 @@
             <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="InstallDirDlg" Condition="ETCNETDATACLAIMFILE" />
 
             <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
-            <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
+            <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="InstallDirDlg" Condition="((TOKEN = &quot;&quot;) AND (ROOMS = &quot;&quot;)) OR ((NOT (TOKEN = &quot;&quot;)) AND (NOT (ROOMS = &quot;&quot;)))" />
 
             <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="NDConfigDialog" />
             <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="20" />
@@ -231,21 +231,22 @@
                 <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Enter your Space's Claim Token and the Room IDs where you want to add the Agent." />
                 <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Connect to the Cloud" />
 
-                <Control Id="WarningLabel" Type="Text" X="10" Y="60" Width="290" Height="15" Text="Agent already claimed? Click Next." />
+                <Control Id="WarningLabel1" Type="Text" X="10" Y="60" Width="290" Height="15" Text="Agent already claimed? Click 'Next'. For a first-time installation, please complete" />
+                <Control Id="WarningLabel2" Type="Text" X="10" Y="75" Width="290" Height="15" Text="the 'Claim Token' and 'Rooms ID(s)' fields." />
 
-                <Control Id="TokenLabel" Type="Text" X="10" Y="90" Width="55" Height="15" Text="Claim Token:" />
-                <Control Id="Token" Type="Edit" X="65" Y="90" Width="290" Height="18" Property="TOKEN" Text="{135}" />
+                <Control Id="TokenLabel" Type="Text" X="10" Y="100" Width="55" Height="15" Text="Claim Token:" />
+                <Control Id="Token" Type="Edit" X="65" Y="100" Width="290" Height="18" Property="TOKEN" Text="{135}" />
             
-                <Control Id="RoomsLabel" Type="Text" X="10" Y="105" Width="55" Height="15" Text="Rooms ID(s):" />
-                <Control Id="Rooms" Type="Edit" X="65" Y="105" Width="290" Height="18" Property="ROOMS" />
+                <Control Id="RoomsLabel" Type="Text" X="10" Y="115" Width="55" Height="15" Text="Rooms ID(s):" />
+                <Control Id="Rooms" Type="Edit" X="65" Y="115" Width="290" Height="18" Property="ROOMS" />
             
-                <Control Id="ProxyLabel" Type="Text" X="10" Y="120" Width="55" Height="15" Text="Proxy URL:" />
-                <Control Id="Proxy" Type="Edit" X="65" Y="120" Width="290" Height="18" Property="PROXY" />
+                <Control Id="ProxyLabel" Type="Text" X="10" Y="130" Width="55" Height="15" Text="Proxy URL:" />
+                <Control Id="Proxy" Type="Edit" X="65" Y="130" Width="290" Height="18" Property="PROXY" />
             
-                <Control Id="URLLabel" Type="Text" X="10" Y="135" Width="55" Height="15" Text="Cloud URL:" />
-                <Control Id="URL" Type="Edit" X="65" Y="135" Width="290" Height="18" Property="URL" />
+                <Control Id="URLLabel" Type="Text" X="10" Y="145" Width="55" Height="15" Text="Cloud URL:" />
+                <Control Id="URL" Type="Edit" X="65" Y="145" Width="290" Height="18" Property="URL" />
 
-                <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="150" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" />
+                <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="160" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" />
             
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
