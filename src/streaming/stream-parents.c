@@ -454,6 +454,7 @@ bool stream_parent_connect_to_one(
     if(count > 1) {
         rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - before sorting parents");
         qsort(array, count, sizeof(STREAM_PARENT *), compare_last_time);
+        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - after qsort before randomization");
 
         size_t base = 0, batch = 0;
         while (base < count) {
@@ -482,11 +483,13 @@ bool stream_parent_connect_to_one(
                 array[base]->selection.random = false;
                 base++;
                 batch++;
+                rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - similar == 1");
                 continue;
             }
             else {
                 // reorder the parents who have similar db_last_time
 
+                rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - before randomizer");
                 while (similar > 1) {
                     size_t chosen = base;
                     for(size_t i = base + 1 ; i < base + similar && i < count ;i++) {
@@ -510,6 +513,7 @@ bool stream_parent_connect_to_one(
                     base++;
                     similar--;
                 }
+                rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - after randomizer");
 
                 // the last one of the similar
                 array[base]->selection.order = base + 1;
@@ -519,6 +523,8 @@ bool stream_parent_connect_to_one(
                 batch++;
             }
         }
+
+        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - after randomization");
     }
     else {
         array[0]->selection.order = 1;
@@ -528,10 +534,14 @@ bool stream_parent_connect_to_one(
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "STREAM %s: only 1 parent is available: '%s'",
                rrdhost_hostname(host), string2str(array[0]->destination));
+
+        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - after count = 1");
     }
 
     // now the parents are sorted based on preference of connection
     for(size_t i = 0; i < count ;i++) {
+        rrdhost_stream_path_check_corruption(host, "stream_parent_connect_to_one - trying parent");
+
         STREAM_PARENT *d = array[i];
 
         if(d->postpone_until_ut > now_ut)

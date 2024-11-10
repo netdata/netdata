@@ -493,7 +493,6 @@ void *rrdpush_sender_thread(void *ptr) {
             }
         };
 
-        rrdhost_stream_path_check_corruption(s->host, "rrdpush_sender_thread - after connection");
         int poll_rc = poll(fds, 2, 50); // timeout in milliseconds
 
         netdata_log_debug(D_STREAM, "STREAM: poll() finished collector=%d socket=%d (current chunk %zu bytes)...",
