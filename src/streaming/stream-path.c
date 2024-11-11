@@ -54,6 +54,7 @@ void rrdhost_stream_path_clear(RRDHOST *host, bool destroy) {
 static void stream_path_to_json_object(BUFFER *wb, STREAM_PATH *p) {
     buffer_json_add_array_item_object(wb);
     {
+        buffer_json_member_add_uint64(wb, "version", 1);
         buffer_json_member_add_string(wb, "hostname", string2str(p->hostname));
         buffer_json_member_add_uuid(wb, "host_id", p->host_id.uuid);
         buffer_json_member_add_uuid(wb, "node_id", p->node_id.uuid);
@@ -263,6 +264,9 @@ void stream_path_node_id_updated(RRDHOST *host) {
 
 
 static bool parse_single_path(json_object *jobj, const char *path, STREAM_PATH *p, BUFFER *error) {
+    uint32_t version = 0;
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, false);
+
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "hostname", p->hostname, error, true);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "host_id", p->host_id.uuid, error, true);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "node_id", p->node_id.uuid, error, true);
