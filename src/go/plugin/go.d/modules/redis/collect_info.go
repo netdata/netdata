@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 const (
@@ -81,8 +82,8 @@ func (r *Redis) collectInfo(mx map[string]int64, info string) {
 		case field == "aof_enabled" && value == "1":
 			r.addAOFChartsOnce.Do(r.addAOFCharts)
 		case field == "master_link_status":
-			mx["master_link_status_up"] = boolToInt(value == "up")
-			mx["master_link_status_down"] = boolToInt(value == "down")
+			mx["master_link_status_up"] = metrix.Bool(value == "up")
+			mx["master_link_status_down"] = metrix.Bool(value == "down")
 		default:
 			collectNumericValue(mx, field, value)
 		}
@@ -248,11 +249,4 @@ func has(m map[string]int64, key string, keys ...string) bool {
 	default:
 		return ok && has(m, keys[0], keys[1:]...)
 	}
-}
-
-func boolToInt(v bool) int64 {
-	if v {
-		return 1
-	}
-	return 0
 }

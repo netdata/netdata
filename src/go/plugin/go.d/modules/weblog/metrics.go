@@ -3,15 +3,15 @@
 package weblog
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
-func newWebLogSummary() metrics.Summary {
-	return &weblogSummary{metrics.NewSummary()}
+func newWebLogSummary() metrix.Summary {
+	return &weblogSummary{metrix.NewSummary()}
 }
 
 type weblogSummary struct {
-	metrics.Summary
+	metrix.Summary
 }
 
 // WriteTo redefines metrics.Summary.WriteTo
@@ -27,82 +27,82 @@ func (s weblogSummary) WriteTo(rv map[string]int64, key string, mul, div int) {
 
 type (
 	metricsData struct {
-		Requests     metrics.Counter `stm:"requests"`
-		ReqUnmatched metrics.Counter `stm:"req_unmatched"`
+		Requests     metrix.Counter `stm:"requests"`
+		ReqUnmatched metrix.Counter `stm:"req_unmatched"`
 
-		RespCode metrics.CounterVec `stm:"resp_code"`
-		Resp1xx  metrics.Counter    `stm:"resp_1xx"`
-		Resp2xx  metrics.Counter    `stm:"resp_2xx"`
-		Resp3xx  metrics.Counter    `stm:"resp_3xx"`
-		Resp4xx  metrics.Counter    `stm:"resp_4xx"`
-		Resp5xx  metrics.Counter    `stm:"resp_5xx"`
+		RespCode metrix.CounterVec `stm:"resp_code"`
+		Resp1xx  metrix.Counter    `stm:"resp_1xx"`
+		Resp2xx  metrix.Counter    `stm:"resp_2xx"`
+		Resp3xx  metrix.Counter    `stm:"resp_3xx"`
+		Resp4xx  metrix.Counter    `stm:"resp_4xx"`
+		Resp5xx  metrix.Counter    `stm:"resp_5xx"`
 
-		ReqSuccess  metrics.Counter `stm:"req_type_success"`
-		ReqRedirect metrics.Counter `stm:"req_type_redirect"`
-		ReqBad      metrics.Counter `stm:"req_type_bad"`
-		ReqError    metrics.Counter `stm:"req_type_error"`
+		ReqSuccess  metrix.Counter `stm:"req_type_success"`
+		ReqRedirect metrix.Counter `stm:"req_type_redirect"`
+		ReqBad      metrix.Counter `stm:"req_type_bad"`
+		ReqError    metrix.Counter `stm:"req_type_error"`
 
-		UniqueIPv4      metrics.UniqueCounter `stm:"uniq_ipv4"`
-		UniqueIPv6      metrics.UniqueCounter `stm:"uniq_ipv6"`
-		BytesSent       metrics.Counter       `stm:"bytes_sent"`
-		BytesReceived   metrics.Counter       `stm:"bytes_received"`
-		ReqProcTime     metrics.Summary       `stm:"req_proc_time"`
-		ReqProcTimeHist metrics.Histogram     `stm:"req_proc_time_hist"`
-		UpsRespTime     metrics.Summary       `stm:"upstream_resp_time"`
-		UpsRespTimeHist metrics.Histogram     `stm:"upstream_resp_time_hist"`
+		UniqueIPv4      metrix.UniqueCounter `stm:"uniq_ipv4"`
+		UniqueIPv6      metrix.UniqueCounter `stm:"uniq_ipv6"`
+		BytesSent       metrix.Counter       `stm:"bytes_sent"`
+		BytesReceived   metrix.Counter       `stm:"bytes_received"`
+		ReqProcTime     metrix.Summary       `stm:"req_proc_time"`
+		ReqProcTimeHist metrix.Histogram     `stm:"req_proc_time_hist"`
+		UpsRespTime     metrix.Summary       `stm:"upstream_resp_time"`
+		UpsRespTimeHist metrix.Histogram     `stm:"upstream_resp_time_hist"`
 
-		ReqVhost          metrics.CounterVec `stm:"req_vhost"`
-		ReqPort           metrics.CounterVec `stm:"req_port"`
-		ReqMethod         metrics.CounterVec `stm:"req_method"`
-		ReqURLPattern     metrics.CounterVec `stm:"req_url_ptn"`
-		ReqVersion        metrics.CounterVec `stm:"req_version"`
-		ReqSSLProto       metrics.CounterVec `stm:"req_ssl_proto"`
-		ReqSSLCipherSuite metrics.CounterVec `stm:"req_ssl_cipher_suite"`
-		ReqHTTPScheme     metrics.Counter    `stm:"req_http_scheme"`
-		ReqHTTPSScheme    metrics.Counter    `stm:"req_https_scheme"`
-		ReqIPv4           metrics.Counter    `stm:"req_ipv4"`
-		ReqIPv6           metrics.Counter    `stm:"req_ipv6"`
+		ReqVhost          metrix.CounterVec `stm:"req_vhost"`
+		ReqPort           metrix.CounterVec `stm:"req_port"`
+		ReqMethod         metrix.CounterVec `stm:"req_method"`
+		ReqURLPattern     metrix.CounterVec `stm:"req_url_ptn"`
+		ReqVersion        metrix.CounterVec `stm:"req_version"`
+		ReqSSLProto       metrix.CounterVec `stm:"req_ssl_proto"`
+		ReqSSLCipherSuite metrix.CounterVec `stm:"req_ssl_cipher_suite"`
+		ReqHTTPScheme     metrix.Counter    `stm:"req_http_scheme"`
+		ReqHTTPSScheme    metrix.Counter    `stm:"req_https_scheme"`
+		ReqIPv4           metrix.Counter    `stm:"req_ipv4"`
+		ReqIPv6           metrix.Counter    `stm:"req_ipv6"`
 
-		ReqCustomField  map[string]metrics.CounterVec `stm:"custom_field"`
-		URLPatternStats map[string]*patternMetrics    `stm:"url_ptn"`
+		ReqCustomField  map[string]metrix.CounterVec `stm:"custom_field"`
+		URLPatternStats map[string]*patternMetrics   `stm:"url_ptn"`
 
 		ReqCustomTimeField    map[string]*customTimeFieldMetrics    `stm:"custom_time_field"`
 		ReqCustomNumericField map[string]*customNumericFieldMetrics `stm:"custom_numeric_field"`
 	}
 	customTimeFieldMetrics struct {
-		Time     metrics.Summary   `stm:"time"`
-		TimeHist metrics.Histogram `stm:"time_hist"`
+		Time     metrix.Summary   `stm:"time"`
+		TimeHist metrix.Histogram `stm:"time_hist"`
 	}
 	customNumericFieldMetrics struct {
-		Summary metrics.Summary `stm:"summary"`
+		Summary metrix.Summary `stm:"summary"`
 
 		multiplier int
 		divisor    int
 	}
 	patternMetrics struct {
-		RespCode      metrics.CounterVec `stm:"resp_code"`
-		ReqMethod     metrics.CounterVec `stm:"req_method"`
-		BytesSent     metrics.Counter    `stm:"bytes_sent"`
-		BytesReceived metrics.Counter    `stm:"bytes_received"`
-		ReqProcTime   metrics.Summary    `stm:"req_proc_time"`
+		RespCode      metrix.CounterVec `stm:"resp_code"`
+		ReqMethod     metrix.CounterVec `stm:"req_method"`
+		BytesSent     metrix.Counter    `stm:"bytes_sent"`
+		BytesReceived metrix.Counter    `stm:"bytes_received"`
+		ReqProcTime   metrix.Summary    `stm:"req_proc_time"`
 	}
 )
 
 func newMetricsData(config Config) *metricsData {
 	return &metricsData{
-		ReqVhost:              metrics.NewCounterVec(),
-		ReqPort:               metrics.NewCounterVec(),
-		ReqMethod:             metrics.NewCounterVec(),
-		ReqVersion:            metrics.NewCounterVec(),
-		RespCode:              metrics.NewCounterVec(),
-		ReqSSLProto:           metrics.NewCounterVec(),
-		ReqSSLCipherSuite:     metrics.NewCounterVec(),
+		ReqVhost:              metrix.NewCounterVec(),
+		ReqPort:               metrix.NewCounterVec(),
+		ReqMethod:             metrix.NewCounterVec(),
+		ReqVersion:            metrix.NewCounterVec(),
+		RespCode:              metrix.NewCounterVec(),
+		ReqSSLProto:           metrix.NewCounterVec(),
+		ReqSSLCipherSuite:     metrix.NewCounterVec(),
 		ReqProcTime:           newWebLogSummary(),
-		ReqProcTimeHist:       metrics.NewHistogram(convHistOptionsToMicroseconds(config.Histogram)),
+		ReqProcTimeHist:       metrix.NewHistogram(convHistOptionsToMicroseconds(config.Histogram)),
 		UpsRespTime:           newWebLogSummary(),
-		UpsRespTimeHist:       metrics.NewHistogram(convHistOptionsToMicroseconds(config.Histogram)),
-		UniqueIPv4:            metrics.NewUniqueCounter(true),
-		UniqueIPv6:            metrics.NewUniqueCounter(true),
+		UpsRespTimeHist:       metrix.NewHistogram(convHistOptionsToMicroseconds(config.Histogram)),
+		UniqueIPv4:            metrix.NewUniqueCounter(true),
+		UniqueIPv6:            metrix.NewUniqueCounter(true),
 		ReqURLPattern:         newCounterVecFromPatterns(config.URLPatterns),
 		ReqCustomField:        newReqCustomField(config.CustomFields),
 		URLPatternStats:       newURLPatternStats(config.URLPatterns),
@@ -127,8 +127,8 @@ func (m *metricsData) reset() {
 	}
 }
 
-func newCounterVecFromPatterns(patterns []userPattern) metrics.CounterVec {
-	c := metrics.NewCounterVec()
+func newCounterVecFromPatterns(patterns []userPattern) metrix.CounterVec {
+	c := metrix.NewCounterVec()
 	for _, p := range patterns {
 		_, _ = c.GetP(p.Name)
 	}
@@ -139,16 +139,16 @@ func newURLPatternStats(patterns []userPattern) map[string]*patternMetrics {
 	stats := make(map[string]*patternMetrics)
 	for _, p := range patterns {
 		stats[p.Name] = &patternMetrics{
-			RespCode:    metrics.NewCounterVec(),
-			ReqMethod:   metrics.NewCounterVec(),
+			RespCode:    metrix.NewCounterVec(),
+			ReqMethod:   metrix.NewCounterVec(),
 			ReqProcTime: newWebLogSummary(),
 		}
 	}
 	return stats
 }
 
-func newReqCustomField(fields []customField) map[string]metrics.CounterVec {
-	cf := make(map[string]metrics.CounterVec)
+func newReqCustomField(fields []customField) map[string]metrix.CounterVec {
+	cf := make(map[string]metrix.CounterVec)
 	for _, f := range fields {
 		cf[f.Name] = newCounterVecFromPatterns(f.Patterns)
 	}
@@ -160,7 +160,7 @@ func newReqCustomTimeField(fields []customTimeField) map[string]*customTimeField
 	for _, f := range fields {
 		cf[f.Name] = &customTimeFieldMetrics{
 			Time:     newWebLogSummary(),
-			TimeHist: metrics.NewHistogram(convHistOptionsToMicroseconds(f.Histogram)),
+			TimeHist: metrix.NewHistogram(convHistOptionsToMicroseconds(f.Histogram)),
 		}
 	}
 	return cf

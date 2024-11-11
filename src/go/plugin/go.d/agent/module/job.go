@@ -15,6 +15,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 var obsoleteLock = &sync.Mutex{}
@@ -459,7 +460,7 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 
 	j.updateChart(
 		j.collectStatusChart,
-		map[string]int64{"success": boolToInt(updated > 0), "failed": boolToInt(updated == 0)},
+		map[string]int64{"success": metrix.Bool(updated > 0), "failed": metrix.Bool(updated == 0)},
 		sinceLastRun,
 	)
 
@@ -666,13 +667,6 @@ func handleZero(v int) int {
 		return 1
 	}
 	return v
-}
-
-func boolToInt(b bool) int64 {
-	if b {
-		return 1
-	}
-	return 0
 }
 
 func cleanPluginName(name string) string {

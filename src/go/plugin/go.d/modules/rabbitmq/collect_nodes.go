@@ -4,6 +4,7 @@ package rabbitmq
 
 import (
 	"fmt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
@@ -25,8 +26,8 @@ func (r *RabbitMQ) collectNodes(mx map[string]int64) error {
 
 		px := fmt.Sprintf("node_%s_", node.Name)
 
-		mx[px+"avail_status_running"] = boolToInt(node.Running)
-		mx[px+"avail_status_down"] = boolToInt(!node.Running)
+		mx[px+"avail_status_running"] = metrix.Bool(node.Running)
+		mx[px+"avail_status_down"] = metrix.Bool(!node.Running)
 
 		if node.OsPid == "" {
 			continue
@@ -35,13 +36,13 @@ func (r *RabbitMQ) collectNodes(mx map[string]int64) error {
 		for _, v := range []string{"clear", "detected"} {
 			mx[px+"network_partition_status_"+v] = 0
 		}
-		mx[px+"network_partition_status_clear"] = boolToInt(len(node.Partitions) == 0)
-		mx[px+"network_partition_status_detected"] = boolToInt(len(node.Partitions) > 0)
+		mx[px+"network_partition_status_clear"] = metrix.Bool(len(node.Partitions) == 0)
+		mx[px+"network_partition_status_detected"] = metrix.Bool(len(node.Partitions) > 0)
 
-		mx[px+"mem_alarm_status_clear"] = boolToInt(!node.MemAlarm)
-		mx[px+"mem_alarm_status_triggered"] = boolToInt(node.MemAlarm)
-		mx[px+"disk_free_alarm_status_clear"] = boolToInt(!node.DiskFreeAlarm)
-		mx[px+"disk_free_alarm_status_triggered"] = boolToInt(node.DiskFreeAlarm)
+		mx[px+"mem_alarm_status_clear"] = metrix.Bool(!node.MemAlarm)
+		mx[px+"mem_alarm_status_triggered"] = metrix.Bool(node.MemAlarm)
+		mx[px+"disk_free_alarm_status_clear"] = metrix.Bool(!node.DiskFreeAlarm)
+		mx[px+"disk_free_alarm_status_triggered"] = metrix.Bool(node.DiskFreeAlarm)
 
 		mx[px+"fds_available"] = node.FDTotal - node.FDUsed
 		mx[px+"fds_used"] = node.FDUsed

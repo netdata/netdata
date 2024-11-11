@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 const (
@@ -161,10 +163,10 @@ func (p *ProxySQL) collectStatsMySQLConnectionPool(mx map[string]int64) error {
 			p.cache.getBackend(hg, host, port).updated = true
 			px = "backend_" + backendID(hg, host, port) + "_"
 		case "status":
-			mx[px+"status_ONLINE"] = boolToInt(value == "1")
-			mx[px+"status_SHUNNED"] = boolToInt(value == "2")
-			mx[px+"status_OFFLINE_SOFT"] = boolToInt(value == "3")
-			mx[px+"status_OFFLINE_HARD"] = boolToInt(value == "4")
+			mx[px+"status_ONLINE"] = metrix.Bool(value == "1")
+			mx[px+"status_SHUNNED"] = metrix.Bool(value == "2")
+			mx[px+"status_OFFLINE_SOFT"] = metrix.Bool(value == "3")
+			mx[px+"status_OFFLINE_HARD"] = metrix.Bool(value == "4")
 		default:
 			mx[px+column] = parseInt(value)
 		}
@@ -292,13 +294,6 @@ func calcPercentage(value, total int64) (v int64) {
 		v = -v
 	}
 	return v
-}
-
-func boolToInt(v bool) int64 {
-	if v {
-		return 1
-	}
-	return 0
 }
 
 func backendID(hg, host, port string) string {

@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- chore\(go.d.plugin\): fix duplicate boolToInt [\#18987](https://github.com/netdata/netdata/pull/18987) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump golang.org/x/net from 0.30.0 to 0.31.0 in /src/go [\#18986](https://github.com/netdata/netdata/pull/18986) ([dependabot[bot]](https://github.com/apps/dependabot))
 - improvement\(go.d.plugin\): add data collection status chart [\#18981](https://github.com/netdata/netdata/pull/18981) ([ilyam8](https://github.com/ilyam8))
 - ci: fix win jobs [\#18979](https://github.com/netdata/netdata/pull/18979) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18977](https://github.com/netdata/netdata/pull/18977) ([netdatabot](https://github.com/netdatabot))
@@ -431,9 +433,6 @@
 - go.d/sensors: add sysfs scan method to collect metrics [\#18431](https://github.com/netdata/netdata/pull/18431) ([ilyam8](https://github.com/ilyam8))
 - stream paths propagated to children and parents [\#18430](https://github.com/netdata/netdata/pull/18430) ([ktsaou](https://github.com/ktsaou))
 - go.d lmsensors improve performance [\#18429](https://github.com/netdata/netdata/pull/18429) ([ilyam8](https://github.com/ilyam8))
-- ci fix InvalidDefaultArgInFrom warn [\#18428](https://github.com/netdata/netdata/pull/18428) ([ilyam8](https://github.com/ilyam8))
-- vendor https://github.com/mdlayher/lmsensors [\#18427](https://github.com/netdata/netdata/pull/18427) ([ilyam8](https://github.com/ilyam8))
-- remove charts.d/sensors [\#18426](https://github.com/netdata/netdata/pull/18426) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

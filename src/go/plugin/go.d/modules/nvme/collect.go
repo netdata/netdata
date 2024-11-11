@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 func (n *NVMe) collect() (map[string]int64, error) {
@@ -67,12 +69,12 @@ func (n *NVMe) collectNVMeDevice(mx map[string]int64, devicePath string) error {
 	mx["device_"+dev+"_thm_temp1_total_time"] = parseValue(stats.ThmTemp1TotalTime) // seconds
 	mx["device_"+dev+"_thm_temp2_total_time"] = parseValue(stats.ThmTemp2TotalTime) // seconds
 
-	mx["device_"+dev+"_critical_warning_available_spare"] = boolToInt(parseValue(stats.CriticalWarning)&1 != 0)
-	mx["device_"+dev+"_critical_warning_temp_threshold"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<1) != 0)
-	mx["device_"+dev+"_critical_warning_nvm_subsystem_reliability"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<2) != 0)
-	mx["device_"+dev+"_critical_warning_read_only"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<3) != 0)
-	mx["device_"+dev+"_critical_warning_volatile_mem_backup_failed"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<4) != 0)
-	mx["device_"+dev+"_critical_warning_persistent_memory_read_only"] = boolToInt(parseValue(stats.CriticalWarning)&(1<<5) != 0)
+	mx["device_"+dev+"_critical_warning_available_spare"] = metrix.Bool(parseValue(stats.CriticalWarning)&1 != 0)
+	mx["device_"+dev+"_critical_warning_temp_threshold"] = metrix.Bool(parseValue(stats.CriticalWarning)&(1<<1) != 0)
+	mx["device_"+dev+"_critical_warning_nvm_subsystem_reliability"] = metrix.Bool(parseValue(stats.CriticalWarning)&(1<<2) != 0)
+	mx["device_"+dev+"_critical_warning_read_only"] = metrix.Bool(parseValue(stats.CriticalWarning)&(1<<3) != 0)
+	mx["device_"+dev+"_critical_warning_volatile_mem_backup_failed"] = metrix.Bool(parseValue(stats.CriticalWarning)&(1<<4) != 0)
+	mx["device_"+dev+"_critical_warning_persistent_memory_read_only"] = metrix.Bool(parseValue(stats.CriticalWarning)&(1<<5) != 0)
 
 	return nil
 }
@@ -108,13 +110,6 @@ func (n *NVMe) listNVMeDevices() error {
 func extractDeviceFromPath(devicePath string) string {
 	_, name := filepath.Split(devicePath)
 	return name
-}
-
-func boolToInt(v bool) int64 {
-	if v {
-		return 1
-	}
-	return 0
 }
 
 func parseValue(s nvmeNumber) int64 {

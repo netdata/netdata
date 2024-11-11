@@ -5,6 +5,7 @@ package windows
 import (
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
 )
 
@@ -143,8 +144,8 @@ func (w *Windows) collectExchangeAddWorkloadMetric(mx map[string]int64, pms prom
 	for _, pm := range pms.FindByName(metricExchangeWorkloadIsActive) {
 		if name := pm.Labels.Get("name"); name != "" {
 			seen[name] = true
-			mx["exchange_workload_"+name+"_is_active"] += boolToInt(pm.Value == 1)
-			mx["exchange_workload_"+name+"_is_paused"] += boolToInt(pm.Value == 0)
+			mx["exchange_workload_"+name+"_is_active"] += metrix.Bool(pm.Value == 1)
+			mx["exchange_workload_"+name+"_is_paused"] += metrix.Bool(pm.Value == 0)
 		}
 	}
 

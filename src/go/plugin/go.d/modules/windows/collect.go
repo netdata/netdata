@@ -154,10 +154,3 @@ func hasKey(mx map[string]int64, key string, keys ...string) bool {
 		return ok && hasKey(mx, keys[0], keys[1:]...)
 	}
 }
-
-func boolToInt(v bool) int64 {
-	if v {
-		return 1
-	}
-	return 0
-}

@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 const scaleFactor = 1000000000
@@ -58,10 +60,10 @@ func (c *Chrony) collectTracking(mx map[string]int64) error {
 	}
 
 	mx["stratum"] = int64(reply.Stratum)
-	mx["leap_status_normal"] = boolToInt(reply.LeapStatus == leapStatusNormal)
-	mx["leap_status_insert_second"] = boolToInt(reply.LeapStatus == leapStatusInsertSecond)
-	mx["leap_status_delete_second"] = boolToInt(reply.LeapStatus == leapStatusDeleteSecond)
-	mx["leap_status_unsynchronised"] = boolToInt(reply.LeapStatus == leapStatusUnsynchronised)
+	mx["leap_status_normal"] = metrix.Bool(reply.LeapStatus == leapStatusNormal)
+	mx["leap_status_insert_second"] = metrix.Bool(reply.LeapStatus == leapStatusInsertSecond)
+	mx["leap_status_delete_second"] = metrix.Bool(reply.LeapStatus == leapStatusDeleteSecond)
+	mx["leap_status_unsynchronised"] = metrix.Bool(reply.LeapStatus == leapStatusUnsynchronised)
 	mx["root_delay"] = int64(reply.RootDelay * scaleFactor)
 	mx["root_dispersion"] = int64(reply.RootDispersion * scaleFactor)
 	mx["skew"] = int64(reply.SkewPPM * scaleFactor)
@@ -130,13 +132,6 @@ func (c *Chrony) collectServerStats(mx map[string]int64) error {
 	}
 
 	return nil
-}
-
-func boolToInt(v bool) int64 {
-	if v {
-		return 1
-	}
-	return 0
 }
 
 func abs(v int64) int64 {

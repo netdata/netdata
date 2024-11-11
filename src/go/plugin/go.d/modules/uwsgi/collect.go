@@ -5,6 +5,8 @@ package uwsgi
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 type statsResponse struct {
@@ -87,10 +89,10 @@ func (u *Uwsgi) collectStats(mx map[string]int64, stats []byte) error {
 		mx[px+"memory_vsz"] = w.VSZ
 
 		for _, v := range []string{"idle", "busy", "cheap", "pause", "sig"} {
-			mx[px+"status_"+v] = boolToInt(w.Status == v)
+			mx[px+"status_"+v] = metrix.Bool(w.Status == v)
 		}
-		mx[px+"request_handling_status_accepting"] = boolToInt(w.Accepting == 1)
-		mx[px+"request_handling_status_not_accepting"] = boolToInt(w.Accepting == 0)
+		mx[px+"request_handling_status_accepting"] = metrix.Bool(w.Accepting == 1)
+		mx[px+"request_handling_status_not_accepting"] = metrix.Bool(w.Accepting == 0)
 	}
 
 	for id := range u.seenWorkers {
@@ -101,11 +103,4 @@ func (u *Uwsgi) collectStats(mx map[string]int64, stats []byte) error {
 	}
 
 	return nil
-}
-
-func boolToInt(b bool) int64 {
-	if b {
-		return 1
-	}
-	return 0
 }

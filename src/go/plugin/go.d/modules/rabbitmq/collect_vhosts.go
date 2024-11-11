@@ -5,6 +5,7 @@ package rabbitmq
 import (
 	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
@@ -30,10 +31,10 @@ func (r *RabbitMQ) collectVhosts(mx map[string]int64) error {
 			mx[px+k] = v
 		}
 
+		st := getVhostStatus(vhost)
 		for _, v := range []string{"running", "stopped", "partial"} {
-			mx[px+"status_"+v] = 0
+			mx[px+"status_"+v] = metrix.Bool(v == st)
 		}
-		mx[px+"status_"+getVhostStatus(vhost)] = 1
 	}
 
 	return nil

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
@@ -72,8 +73,8 @@ func (p *Pihole) collectMetrics(mx map[string]int64, pmx *piholeMetrics) {
 		mx["queries_forwarded"] = pmx.summary.QueriesForwarded
 		mx["queries_cached"] = pmx.summary.QueriesCached
 		mx["unique_clients"] = pmx.summary.UniqueClients
-		mx["blocking_status_enabled"] = boolToInt(pmx.summary.Status == "enabled")
-		mx["blocking_status_disabled"] = boolToInt(pmx.summary.Status != "enabled")
+		mx["blocking_status_enabled"] = metrix.Bool(pmx.summary.Status == "enabled")
+		mx["blocking_status_disabled"] = metrix.Bool(pmx.summary.Status != "enabled")
 
 		tot := pmx.summary.QueriesCached + pmx.summary.AdsBlockedToday + pmx.summary.QueriesForwarded
 		mx["queries_cached_perc"] = calcPercentage(pmx.summary.QueriesCached, tot)
@@ -239,13 +240,6 @@ func (p *Pihole) doHTTP(req *http.Request, dst any) error {
 func isEmptyArray(data []byte) bool {
 	empty := "[]"
 	return len(data) == len(empty) && string(data) == empty
-}
-
-func boolToInt(b bool) int64 {
-	if !b {
-		return 0
-	}
-	return 1
 }
 
 func calcPercentage(value, total int64) (v int64) {
