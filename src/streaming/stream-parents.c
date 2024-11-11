@@ -63,11 +63,13 @@ static inline usec_t randomize_wait_ut(time_t secs) {
 
 void rrdhost_stream_parents_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
     usec_t until_ut = randomize_wait_ut(stream_send.parents.reconnect_delay_s);
+    rw_spinlock_write_lock(&host->stream.snd.parents.spinlock);
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
         d->postpone_until_ut = until_ut;
         d->banned_for_this_session = false;
         d->reason = reason;
     }
+    rw_spinlock_write_unlock(&host->stream.snd.parents.spinlock);
 }
 
 void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t secs) {
@@ -86,20 +88,23 @@ bool stream_parent_is_ssl(STREAM_PARENT *d) {
 
 usec_t stream_parent_handshake_error_to_json(BUFFER *wb, RRDHOST *host) {
     usec_t last_attempt = 0;
+    rw_spinlock_read_lock(&host->stream.snd.parents.spinlock);
     for(STREAM_PARENT *d = host->stream.snd.parents.all; d ; d = d->next) {
         if(d->since_ut > last_attempt)
             last_attempt = d->since_ut;
 
         buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(d->reason));
     }
+    rw_spinlock_read_unlock(&host->stream.snd.parents.spinlock);
     return last_attempt;
 }
 
 void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
     char buf[1024];
 
-    usec_t now_ut = now_realtime_usec();
+    rw_spinlock_read_lock(&s->host->stream.snd.parents.spinlock);
 
+    usec_t now_ut = now_realtime_usec();
     STREAM_PARENT *d;
     for (d = s->host->stream.snd.parents.all; d; d = d->next) {
         buffer_json_add_array_item_object(wb);
@@ -139,6 +144,8 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
         }
         buffer_json_object_close(wb); // each candidate
     }
+
+    rw_spinlock_read_unlock(&s->host->stream.snd.parents.spinlock);
 }
 
 void rrdhost_stream_parent_ssl_init(struct sender_state *s) {
@@ -149,6 +156,8 @@ void rrdhost_stream_parent_ssl_init(struct sender_state *s) {
         spinlock_unlock(&sp);
         goto cleanup;
     }
+
+    rw_spinlock_read_lock(&s->host->stream.snd.parents.spinlock);
 
     for(STREAM_PARENT *d = s->host->stream.snd.parents.all; d ; d = d->next) {
         if (d->ssl) {
@@ -166,6 +175,7 @@ void rrdhost_stream_parent_ssl_init(struct sender_state *s) {
         }
     }
 
+    rw_spinlock_read_unlock(&s->host->stream.snd.parents.spinlock);
     spinlock_unlock(&sp);
 
 cleanup:
@@ -412,7 +422,7 @@ static int compare_last_time(const void *a, const void *b) {
     }
 }
 
-bool stream_parent_connect_to_one(
+bool stream_parent_connect_to_one_unsafe(
     ND_SOCK *sender_sock,
     RRDHOST *host,
     int default_port,
@@ -478,7 +488,7 @@ bool stream_parent_connect_to_one(
                 case RRDHOST_INGEST_TYPE_VIRTUAL:
                 case RRDHOST_INGEST_TYPE_LOCALHOST:
                     d->reason = STREAM_HANDSHAKE_ERROR_LOCALHOST;
-                    if(rrdhost_is_host_in_stream_path(host, d->remote.host_id, 1)) {
+                    if(rrdhost_is_host_in_stream_path_before_us(host, d->remote.host_id, 1)) {
                         // we passed hops == 1, to make sure this succeeds only when the parent
                         // is the origin child of this node
                         d->since_ut = now_ut;
@@ -508,7 +518,7 @@ bool stream_parent_connect_to_one(
                 case RRDHOST_INGEST_STATUS_REPLICATING:
                 case RRDHOST_INGEST_STATUS_ONLINE:
                     d->reason = STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED;
-                    if(rrdhost_is_host_in_stream_path(host, d->remote.host_id, host->sender->hops)) {
+                    if(rrdhost_is_host_in_stream_path_before_us(host, d->remote.host_id, host->sender->hops)) {
                         d->since_ut = now_ut;
                         d->banned_for_this_session = true;
                         skipped_not_useful++;
@@ -693,6 +703,23 @@ bool stream_parent_connect_to_one(
     return false;
 }
 
+bool stream_parent_connect_to_one(
+    ND_SOCK *sender_sock,
+    RRDHOST *host,
+    int default_port,
+    time_t timeout,
+    size_t *reconnects_counter,
+    char *connected_to,
+    size_t connected_to_size,
+    STREAM_PARENT **destination) {
+
+    rw_spinlock_read_lock(&host->stream.snd.parents.spinlock);
+    bool rc = stream_parent_connect_to_one_unsafe(
+        sender_sock, host, default_port, timeout, reconnects_counter, connected_to, connected_to_size, destination);
+    rw_spinlock_read_unlock(&host->stream.snd.parents.spinlock);
+    return rc;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // create stream parents linked list
 
@@ -702,7 +729,7 @@ struct stream_parent_init_tmp {
     int count;
 };
 
-static bool stream_parent_add_one(char *entry, void *data) {
+static bool stream_parent_add_one_unsafe(char *entry, void *data) {
     struct stream_parent_init_tmp *t = data;
 
     STREAM_PARENT *d = callocz(1, sizeof(STREAM_PARENT));
@@ -728,21 +755,27 @@ static bool stream_parent_add_one(char *entry, void *data) {
     return false; // we return false, so that we will get all defined destinations
 }
 
-void rrdhost_stream_parents_init(RRDHOST *host) {
-    if(!host->stream.snd.destination) return;
+void rrdhost_stream_parents_update_from_destination(RRDHOST *host) {
+    rw_spinlock_write_lock(&host->stream.snd.parents.spinlock);
+    rrdhost_stream_parents_free(host, true);
 
-    rrdhost_stream_parents_free(host);
+    if(host->stream.snd.destination) {
+        struct stream_parent_init_tmp t = {
+            .host = host,
+            .list = NULL,
+            .count = 0,
+        };
+        foreach_entry_in_connection_string(string2str(host->stream.snd.destination), stream_parent_add_one_unsafe, &t);
+        host->stream.snd.parents.all = t.list;
+    }
 
-    struct stream_parent_init_tmp t = {
-        .host = host,
-        .list = NULL,
-        .count = 0,
-    };
-    foreach_entry_in_connection_string(string2str(host->stream.snd.destination), stream_parent_add_one, &t);
-    host->stream.snd.parents.all = t.list;
+    rw_spinlock_write_unlock(&host->stream.snd.parents.spinlock);
 }
 
-void rrdhost_stream_parents_free(RRDHOST *host) {
+void rrdhost_stream_parents_free(RRDHOST *host, bool having_write_lock) {
+    if(!having_write_lock)
+        rw_spinlock_write_lock(&host->stream.snd.parents.spinlock);
+
     while (host->stream.snd.parents.all) {
         STREAM_PARENT *tmp = host->stream.snd.parents.all;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->stream.snd.parents.all, tmp, prev, next);
@@ -752,4 +785,11 @@ void rrdhost_stream_parents_free(RRDHOST *host) {
     }
 
     host->stream.snd.parents.all = NULL;
+
+    if(!having_write_lock)
+        rw_spinlock_write_unlock(&host->stream.snd.parents.spinlock);
+}
+
+void rrdhost_stream_parents_init(RRDHOST *host) {
+    rw_spinlock_init(&host->stream.snd.parents.spinlock);
 }

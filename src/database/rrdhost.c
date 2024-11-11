@@ -245,7 +245,7 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
         rrdhost_streaming_sender_structures_init(host);
 
         host->stream.snd.destination = string_dup(parents);
-        rrdhost_stream_parents_init(host);
+        rrdhost_stream_parents_update_from_destination(host);
 
         host->stream.snd.api_key = string_dup(api_key);
         host->stream.snd.charts_matching =
@@ -380,6 +380,8 @@ static RRDHOST *rrdhost_create(
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
     strncpyz(host->machine_guid, guid, GUID_LEN + 1);
+    rrdhost_stream_path_init(host);
+    rrdhost_stream_parents_init(host);
 
     set_host_properties(
         host,
@@ -1286,7 +1288,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     freez(host->cache_dir);
     string_freez(host->stream.snd.api_key);
     string_freez(host->stream.snd.destination);
-    rrdhost_stream_parents_free(host);
+    rrdhost_stream_parents_free(host, false);
     string_freez(host->health.default_exec);
     string_freez(host->health.default_recipient);
     string_freez(host->registry_hostname);

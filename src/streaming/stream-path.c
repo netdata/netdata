@@ -46,9 +46,9 @@ static void rrdhost_stream_path_clear_unsafe(RRDHOST *host, bool destroy) {
 }
 
 void rrdhost_stream_path_clear(RRDHOST *host, bool destroy) {
-    spinlock_lock(&host->stream.path.spinlock);
+    rw_spinlock_write_lock(&host->stream.path.spinlock);
     rrdhost_stream_path_clear_unsafe(host, destroy);
-    spinlock_unlock(&host->stream.path.spinlock);
+    rw_spinlock_write_unlock(&host->stream.path.spinlock);
 }
 
 static void stream_path_to_json_object(BUFFER *wb, STREAM_PATH *p) {
@@ -119,7 +119,7 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
 STREAM_PATH rrdhost_stream_path_get_copy_of_origin(RRDHOST *host) {
     STREAM_PATH p = { 0 };
 
-    spinlock_lock(&host->stream.path.spinlock);
+    rw_spinlock_read_lock(&host->stream.path.spinlock);
     for (size_t i = 0; i < host->stream.path.used; i++) {
         STREAM_PATH *tmp_path = &host->stream.path.array[i];
         if(UUIDeq(host->host_id, tmp_path->host_id)) {
@@ -128,16 +128,16 @@ STREAM_PATH rrdhost_stream_path_get_copy_of_origin(RRDHOST *host) {
             break;
         }
     }
-    spinlock_unlock(&host->stream.path.spinlock);
+    rw_spinlock_read_unlock(&host->stream.path.spinlock);
     return p;
 }
 
-bool rrdhost_is_host_in_stream_path(struct rrdhost *host, ND_UUID remote_agent_host_id, int16_t our_hops) {
+bool rrdhost_is_host_in_stream_path_before_us(struct rrdhost *host, ND_UUID remote_agent_host_id, int16_t our_hops) {
     if(UUIDiszero(remote_agent_host_id)) return false;
     if(UUIDeq(localhost->host_id, remote_agent_host_id)) return true;
 
     bool rc = false;
-    spinlock_lock(&host->stream.path.spinlock);
+    rw_spinlock_read_lock(&host->stream.path.spinlock);
     for (size_t i = 0; i < host->stream.path.used; i++) {
         STREAM_PATH *p = &host->stream.path.array[i];
         if(UUIDeq(remote_agent_host_id, p->host_id) && p->hops < our_hops) {
@@ -145,7 +145,7 @@ bool rrdhost_is_host_in_stream_path(struct rrdhost *host, ND_UUID remote_agent_h
             break;
         }
     }
-    spinlock_unlock(&host->stream.path.spinlock);
+    rw_spinlock_read_unlock(&host->stream.path.spinlock);
     return rc;
 }
 
@@ -155,7 +155,7 @@ void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *k
 
     STREAM_PATH tmp = rrdhost_stream_path_self(host);
 
-    spinlock_lock(&host->stream.path.spinlock);
+    rw_spinlock_read_lock(&host->stream.path.spinlock);
     buffer_json_member_add_array(wb, key);
     {
         {
@@ -178,7 +178,7 @@ void rrdhost_stream_path_to_json(BUFFER *wb, struct rrdhost *host, const char *k
         }
     }
     buffer_json_array_close(wb); // key
-    spinlock_unlock(&host->stream.path.spinlock);
+    rw_spinlock_read_unlock(&host->stream.path.spinlock);
 
     stream_path_cleanup(&tmp);
 }
@@ -223,7 +223,7 @@ void stream_path_child_disconnected(RRDHOST *host) {
 }
 
 void stream_path_parent_disconnected(RRDHOST *host) {
-    spinlock_lock(&host->stream.path.spinlock);
+    rw_spinlock_write_lock(&host->stream.path.spinlock);
 
     size_t cleared = 0;
     size_t used = host->stream.path.used;
@@ -241,7 +241,7 @@ void stream_path_parent_disconnected(RRDHOST *host) {
         }
     }
 
-    spinlock_unlock(&host->stream.path.spinlock);
+    rw_spinlock_write_unlock(&host->stream.path.spinlock);
 
     if(cleared)
         stream_path_send_to_child(host);
@@ -333,7 +333,7 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
         return false;
     }
 
-    spinlock_lock(&host->stream.path.spinlock);
+    rw_spinlock_write_lock(&host->stream.path.spinlock);
     XXH128_hash_t old_hash = stream_path_hash_unsafe(host);
     rrdhost_stream_path_clear_unsafe(host, true);
 
@@ -371,7 +371,7 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
     }
 
     XXH128_hash_t new_hash = stream_path_hash_unsafe(host);
-    spinlock_unlock(&host->stream.path.spinlock);
+    rw_spinlock_write_unlock(&host->stream.path.spinlock);
 
     if(!XXH128_isEqual(old_hash, new_hash)) {
         if(!from_parent)
@@ -383,4 +383,8 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
     }
 
     return host->stream.path.used > 0;
+}
+
+void rrdhost_stream_path_init(RRDHOST *host) {
+    rw_spinlock_init(&host->stream.path.spinlock);
 }

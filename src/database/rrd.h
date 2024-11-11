@@ -1207,14 +1207,10 @@ struct rrdhost {
                 } replication;
             } status;
 
-            struct {
-                struct stream_parent *all;         // a linked list of possible destinations
-                struct stream_parent *current;     // the current destination from the above list
-            } parents;
-
             STRING *destination;                    // where to send metrics to
             STRING *api_key;                        // the api key at the receiving netdata
             SIMPLE_PATTERN *charts_matching;        // pattern to match the charts to be sent
+            RRDHOST_STREAM_PARENTS parents;         // the list of parents (extracted from destination)
         } snd;
 
         // --- receiver ---
