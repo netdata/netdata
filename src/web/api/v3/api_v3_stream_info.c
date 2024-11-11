@@ -20,5 +20,5 @@ int api_v3_stream_info(RRDHOST *host __maybe_unused, struct web_client *w, char 
             machine_guid = value;
     }
 
-    return stream_info_json_generate(w->response.data, machine_guid);
+    return stream_info_to_json_v1(w->response.data, machine_guid);
 }

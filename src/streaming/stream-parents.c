@@ -5,35 +5,38 @@
 #define TIME_TO_CONSIDER_PARENTS_SIMILAR 120
 
 struct stream_parent {
-    STRING *destination;
-    bool ssl;
-    bool banned_permanently;
-    bool banned_for_this_session;
+    STRING *destination;                        // the parent destination
+    bool ssl;                                   // the parent uses SSL
+
+    bool banned_permanently;                    // when the parent is the origin of this host
+    bool banned_for_this_session;               // when the parent is before us in the streaming path
     STREAM_HANDSHAKE reason;
-    uint32_t attempts;
-    usec_t since_ut;
-    usec_t postpone_until_ut;
+    uint32_t attempts;                          // how many times we have tried to connect to this parent
+    usec_t since_ut;                            // the last time we tried to connect to it
+    usec_t postpone_until_ut;                   // based on the reason, a randomized time to wait for reconnection
 
     struct {
-        ND_UUID host_id;
-        int status;
-        size_t nodes;
-        size_t receivers;
+        ND_UUID host_id;                        // the machine_guid of the agent
+        int status;                             // the response code of the stream_info call
+        uint32_t nonce;                         // a random 32-bit number
+        size_t nodes;                           // how many nodes the parent has
+        size_t receivers;                       // how many receivers the parent has
+
+        // these are from RRDHOST_STATUS and can only be used when status == 200
         RRDHOST_DB_STATUS db_status;
         RRDHOST_DB_LIVENESS db_liveness;
         RRDHOST_INGEST_TYPE ingest_type;
         RRDHOST_INGEST_STATUS ingest_status;
-        time_t db_first_time_s;
-        time_t db_last_time_s;
-        uint32_t nonce;
+        time_t db_first_time_s;                 // the oldest timestamp for us in the parent's database
+        time_t db_last_time_s;                  // the latest timestamp for us in the parent's database
     } remote;
 
     struct {
-        size_t batch;
-        size_t order;
-        bool random;
-        bool info;
-        bool skipped;
+        size_t batch;                           // the batch priority (>= 1, 0 == excluded)
+        size_t order;                           // the final order of the parent (>= 1, 0 == excluded)
+        bool random;                            // this batch has more than 1 parents, so we flipped coins to select order
+        bool info;                              // we go stream info from the parent
+        bool skipped;                           // we skipped this parent for some reason
     } selection;
 
     STREAM_PARENT *prev;
@@ -220,7 +223,7 @@ static void stream_parent_nd_sock_error_to_reason(STREAM_PARENT *d, ND_SOCK *soc
     }
 }
 
-int stream_info_json_generate(BUFFER *wb, const char *machine_guid) {
+int stream_info_to_json_v1(BUFFER *wb, const char *machine_guid) {
     buffer_reset(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
@@ -232,6 +235,7 @@ int stream_info_json_generate(BUFFER *wb, const char *machine_guid) {
     else
         rrdhost_status(host, now_realtime_sec(), &status);
 
+    buffer_json_member_add_uint64(wb, "version", 1);
     buffer_json_member_add_uint64(wb, "status", ret);
     buffer_json_member_add_uuid(wb, "host_id", localhost->host_id.uuid);
     buffer_json_member_add_uint64(wb, "nodes", dictionary_entries(rrdhost_root_index));
@@ -251,19 +255,33 @@ int stream_info_json_generate(BUFFER *wb, const char *machine_guid) {
     return ret;
 }
 
-static bool stream_info_json_parse(struct json_object *jobj, const char *path, STREAM_PARENT *d, BUFFER *error) {
+static bool stream_info_json_parse_v1(struct json_object *jobj, const char *path, STREAM_PARENT *d, BUFFER *error) {
+    uint32_t version = 0; (void)version;
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, true);
+
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "status", d->remote.status, error, true);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "host_id", d->remote.host_id.uuid, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nodes", d->remote.nodes, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "receivers", d->remote.receivers, error, true);
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nonce", d->remote.nonce, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_s", d->remote.db_first_time_s, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "last_time_s", d->remote.db_last_time_s, error, true);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_status", RRDHOST_DB_STATUS_2id, d->remote.db_status, error, true);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_liveness", RRDHOST_DB_LIVENESS_2id, d->remote.db_liveness, error, true);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_type", RRDHOST_INGEST_TYPE_2id, d->remote.ingest_type, error, true);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_status", RRDHOST_INGEST_STATUS_2id, d->remote.ingest_status, error, true);
-    return true;
+
+    if(d->remote.status == HTTP_RESP_OK) {
+        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_s", d->remote.db_first_time_s, error, true);
+        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "last_time_s", d->remote.db_last_time_s, error, true);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_status", RRDHOST_DB_STATUS_2id, d->remote.db_status, error, true);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_liveness", RRDHOST_DB_LIVENESS_2id, d->remote.db_liveness, error, true);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_type", RRDHOST_INGEST_TYPE_2id, d->remote.ingest_type, error, true);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_status", RRDHOST_INGEST_STATUS_2id, d->remote.ingest_status, error, true);
+        return true;
+    }
+
+    d->remote.db_first_time_s = 0;
+    d->remote.db_last_time_s = 0;
+    d->remote.db_status = 0;
+    d->remote.db_liveness = 0;
+    d->remote.ingest_type = 0;
+    d->remote.ingest_status = 0;
+    return false;
 }
 
 static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_port, ND_SOCK *sender_sock, bool ssl, const char *hostname) {
@@ -350,7 +368,7 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
 
     CLEAN_BUFFER *error = buffer_create(0, NULL);
 
-    if(!stream_info_json_parse(jobj, "", d, error)) {
+    if(!stream_info_json_parse_v1(jobj, "", d, error)) {
         d->selection.info = false;
         d->reason = STREAM_HANDSHAKE_NO_STREAM_INFO;
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
