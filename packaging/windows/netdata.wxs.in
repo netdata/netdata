@@ -38,17 +38,6 @@
                 <ComponentRef Id="NetdataService" />
             </Feature>
 
-            <UI Id="FeatureTree_ViewLicense_X64">
-            </UI>
-            <UIRef Id="FeatureTree_ViewLicense" />
-
-            <WixVariable Id="WixUIBannerBmp" Value="Top.bmp" />
-            <WixVariable Id="WixUIDialogBmp" Value="BackGround.bmp" />
-            <UIRef Id="WixUI_ErrorProgressText" />
-            <ui:WixUI Id="FeatureTree_ViewLicense" />
-    </Package>
-
-    <Fragment>
             <StandardDirectory Id="ProgramFiles64Folder">
                 <Directory Id="INSTALLFOLDER" Name="Netdata">
                     <Directory Id="USRDIR" Name="usr">
@@ -64,12 +53,23 @@
                 </Directory>
             </StandardDirectory>
 
-            <Property Id="ETCNETDATACLAIMFILE">
-                <DirectorySearch Id="NetCoreDirectoryFoundx64" Path="[ETCDIRNETDATA]" >
+            <Property Id="OS_HAS_FILE" Secure="yes">
+                <DirectorySearch Id="NetCoreDirectoryFoundx64" Path="[ETCDIRNETDATA]" AssignToProperty="yes" >
                     <FileSearch Id="NetdataClaim" Name="claim.conf"/>
                 </DirectorySearch>
             </Property>
 
+            <UI Id="FeatureTree_ViewLicense_X64">
+            </UI>
+            <UIRef Id="FeatureTree_ViewLicense" />
+
+            <WixVariable Id="WixUIBannerBmp" Value="Top.bmp" />
+            <WixVariable Id="WixUIDialogBmp" Value="BackGround.bmp" />
+            <UIRef Id="WixUI_ErrorProgressText" />
+            <ui:WixUI Id="FeatureTree_ViewLicense" />
+    </Package>
+
+    <Fragment>
             <StandardDirectory Id="System64Folder">
             </StandardDirectory>
 
@@ -229,22 +229,22 @@
                 <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Enter your Space's Claim Token and the Room IDs where you want to add the Agent." />
                 <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Connect to the Cloud" />
 
-                <Control Id="WarningLabel1" Type="Text" X="10" Y="60" Width="290" Height="15" Text="Agent already claimed? Click 'Next'. For a first-time installation, please complete" />
-                <Control Id="WarningLabel2" Type="Text" X="10" Y="75" Width="290" Height="15" Text="the 'Claim Token' and 'Rooms ID(s)' fields." />
+                <Control Id="WarningLabelOld" Type="Text" X="10" Y="60" Width="350" Height="15" Text="Your host was already claimed. Click 'Next'." HideCondition="NOT (OS_HAS_FILE = &quot;&quot;)" />
+                <Control Id="WarningLabelNew" Type="Text" X="10" Y="60" Width="350" Height="15" Text="For a first-time installation, please complete the 'Claim Token' and 'Rooms ID(s)' fields." HideCondition="(OS_HAS_FILE = &quot;&quot;)" />
 
-                <Control Id="TokenLabel" Type="Text" X="10" Y="100" Width="55" Height="15" Text="Claim Token:" />
-                <Control Id="Token" Type="Edit" X="65" Y="100" Width="290" Height="18" Property="TOKEN" Text="{135}" />
+                <Control Id="TokenLabel" Type="Text" X="10" Y="100" Width="55" Height="15" Text="Claim Token:" HideCondition="(OS_HAS_FILE = &quot;&quot;)"  />
+                <Control Id="Token" Type="Edit" X="65" Y="100" Width="290" Height="18" Property="TOKEN" Text="{135}" HideCondition="(OS_HAS_FILE = &quot;&quot;)"  />
             
-                <Control Id="RoomsLabel" Type="Text" X="10" Y="115" Width="55" Height="15" Text="Rooms ID(s):" />
-                <Control Id="Rooms" Type="Edit" X="65" Y="115" Width="290" Height="18" Property="ROOMS" />
+                <Control Id="RoomsLabel" Type="Text" X="10" Y="115" Width="55" Height="15" Text="Rooms ID(s):" HideCondition="(OS_HAS_FILE = &quot;&quot;)"  />
+                <Control Id="Rooms" Type="Edit" X="65" Y="115" Width="290" Height="18" Property="ROOMS" HideCondition="(OS_HAS_FILE = &quot;&quot;)"  />
             
-                <Control Id="ProxyLabel" Type="Text" X="10" Y="130" Width="55" Height="15" Text="Proxy URL:" />
-                <Control Id="Proxy" Type="Edit" X="65" Y="130" Width="290" Height="18" Property="PROXY" />
+                <Control Id="ProxyLabel" Type="Text" X="10" Y="130" Width="55" Height="15" Text="Proxy URL:" HideCondition="(OS_HAS_FILE = &quot;&quot;)"  />
+                <Control Id="Proxy" Type="Edit" X="65" Y="130" Width="290" Height="18" Property="PROXY" HideCondition="(OS_HAS_FILE = &quot;&quot;)"  />
             
-                <Control Id="URLLabel" Type="Text" X="10" Y="145" Width="55" Height="15" Text="Cloud URL:" />
-                <Control Id="URL" Type="Edit" X="65" Y="145" Width="290" Height="18" Property="URL" />
+                <Control Id="URLLabel" Type="Text" X="10" Y="145" Width="55" Height="15" Text="Cloud URL:" HideCondition="(OS_HAS_FILE = &quot;&quot;)"  />
+                <Control Id="URL" Type="Edit" X="65" Y="145" Width="290" Height="18" Property="URL" HideCondition="(OS_HAS_FILE = &quot;&quot;)"  />
 
-                <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="160" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" />
+                <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="160" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" HideCondition="(OS_HAS_FILE = &quot;&quot;)"  />
             
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
@@ -255,3 +255,4 @@
         </UI>
     </Fragment>
 </Wix>
+
