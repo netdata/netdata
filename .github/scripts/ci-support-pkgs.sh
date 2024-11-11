@@ -16,6 +16,6 @@ case "${ID}" in
         pacman -S --noconfirm cronie curl
         ;;
     debian|ubuntu)
-        apt update && apt install -y procps-ng cronie anacron curl
+        apt-get update && apt-get install -y cronie anacron curl
         ;;
 esac
