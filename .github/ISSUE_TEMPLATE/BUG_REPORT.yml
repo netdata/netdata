@@ -9,7 +9,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        <img src="https://img.shields.io/github/v/release/netdata/netdata.svg?label=latest%20stable"> <img src="https://img.shields.io/badge/dynamic/xml?url=https://storage.googleapis.com/netdata-nightlies/latest-version.txt&label=latest%20nightly&query=/text()">
+        <img src="https://img.shields.io/github/v/release/netdata/netdata.svg?label=latest%20stable"> <img src="https://img.shields.io/github/v/release/netdata/netdata-nightlies.svg?label=latest%20nightly">
   - type: markdown
     attributes:
       value: |
@@ -51,6 +51,7 @@ body:
         Describe the method in the "Additional info" section if you chose "other".
       options:
         - "kickstart.sh"
+        - "windows MSI"
         - "docker"
         - "helmchart (kubernetes)"
         - "manual setup of official DEB/RPM packages"
@@ -64,17 +65,15 @@ body:
     attributes:
       label: System info
       description: |
-        Provide information about your system. To get this information, execute one of the following commands based on your OS:
-        ```shell
-        # Linux
-        uname -a; grep -HvE "^#|URL" /etc/*release
-        # BSD
-        uname -a; uname -K
-        # macOS
-        uname -a; sw_vers
-        # Windows (prompt)
-        ver
-        ```
+        Provide information about your system:
+
+        | OS               | Command                                       |
+        |------------------|-----------------------------------------------|
+        | Linux            | `uname -a; grep -HvE "^#\|URL" /etc/*release` |
+        | Windows (prompt) | `systeminfo \| findstr /B /C:"OS"`            |
+        | BSD              | `uname -a; uname -K`                          |
+        | macOS            | ` uname -a; sw_vers`                          |
+
         > NOTE: This will be automatically formatted into code, so no need for backticks.
       render: shell
     validations:
