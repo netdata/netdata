@@ -221,7 +221,7 @@ static void rrdhost_clear_sender(RRDHOST *host, bool having_sender_lock) {
 #endif
 }
 
-static bool rrdhost_is_sender_stopped(struct sender_state *s) {
+bool rrdhost_is_sender_stopped(struct sender_state *s) {
     return __atomic_load_n(&s->stop, __ATOMIC_RELAXED);
 }
 

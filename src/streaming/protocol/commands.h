@@ -30,7 +30,7 @@ void rrdpush_send_host_labels(RRDHOST *host);
 void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host);
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva);
 
-bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st);
+bool rrdpush_chart_definition_to_pluginsd(BUFFER *wb, RRDSET *st);
 bool rrdset_push_chart_definition_now(RRDSET *st);
 bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags);
 

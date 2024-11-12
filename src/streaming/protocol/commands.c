@@ -42,7 +42,8 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
 
     if(unlikely(!exposed_upstream)) {
         BUFFER *wb = sender_start(host->sender);
-        replication_in_progress = rrdpush_send_chart_definition(wb, st);
+        replication_in_progress = rrdpush_chart_definition_to_pluginsd(wb, st);
+        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
     }
 
     if(replication_in_progress)

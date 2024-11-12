@@ -167,6 +167,7 @@ pid_t sender_tid(RRDHOST *host);
 int sender_write_pipe_fd(struct sender_state *s);
 
 void stream_sender_cancel_threads(void);
+bool rrdhost_is_sender_stopped(struct sender_state *s);
 
 #include "replication.h"
 

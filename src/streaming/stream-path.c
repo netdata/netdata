@@ -216,7 +216,11 @@ static BUFFER *stream_path_payload(RRDHOST *host) {
 
 void stream_path_send_to_parent(RRDHOST *host) {
     struct sender_state *s = host->sender;
-    if(!s || !stream_has_capability(s, STREAM_CAP_PATHS)) return;
+    if(!s ||
+        !stream_has_capability(s, STREAM_CAP_PATHS) ||
+        rrdhost_is_sender_stopped(s) ||
+        rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
+        return;
 
     CLEAN_BUFFER *payload = stream_path_payload(host);
 
@@ -232,7 +236,8 @@ void stream_path_send_to_child(RRDHOST *host) {
     CLEAN_BUFFER *payload = stream_path_payload(host);
 
     spinlock_lock(&host->receiver_lock);
-    if(host->receiver && stream_has_capability(host->receiver, STREAM_CAP_PATHS)) {
+    if(stream_has_capability(host->receiver, STREAM_CAP_PATHS) &&
+        !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED)) {
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         buffer_sprintf(wb, PLUGINSD_KEYWORD_JSON " " PLUGINSD_KEYWORD_JSON_CMD_STREAM_PATH "\n%s\n" PLUGINSD_KEYWORD_JSON_END "\n", buffer_tostring(payload));

@@ -10,6 +10,7 @@ void sender_thread_buffer_free(void) {
     buffer_free(sender_thread_buffer);
     sender_thread_buffer = NULL;
     sender_thread_buffer_used = false;
+    sender_thread_buffer_last_reset_s = 0;
 }
 
 // Collector thread starting a transmission

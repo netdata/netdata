@@ -19,7 +19,7 @@ static void rrdpush_send_clabels(BUFFER *wb, RRDSET *st) {
 
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
-bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
+bool rrdpush_chart_definition_to_pluginsd(BUFFER *wb, RRDSET *st) {
     uint32_t version = rrdset_metadata_version(st);
 
     RRDHOST *host = st->rrdhost;
@@ -128,8 +128,6 @@ bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 #endif
     }
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-
     // we can set the exposed flag, after we commit the buffer
     // because replication may pick it up prematurely
     rrddim_foreach_read(rd, st) {
@@ -192,15 +190,13 @@ bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
 bool rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)
-                 || !should_send_chart_matching(st, rrdset_flag_get(st)))) {
+    if(unlikely(!rrdhost_can_send_definitions_to_parent(host) || !should_send_chart_matching(st, rrdset_flag_get(st))))
         return false;
-    }
 
     BUFFER *wb = sender_start(host->sender);
-    rrdpush_send_chart_definition(wb, st);
+    rrdpush_chart_definition_to_pluginsd(wb, st);
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
     sender_thread_buffer_free();
 
     return true;
 }
-

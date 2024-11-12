@@ -392,6 +392,10 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd) {
         buffer->buffer[0] = '\0';
     }
 
+    // cleanup the sender buffer, because we may end-up reusing an incomplete buffer
+    sender_thread_buffer_free();
+    parser->user.v2.stream_buffer.wb = NULL;
+
     // make sure send_to_plugin() will not write any data to the socket
     spinlock_lock(&parser->writer.spinlock);
     parser->fd_output = -1;
@@ -476,6 +480,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
 
         if (host->receiver == rpt) {
+            rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
             spinlock_unlock(&host->receiver_lock);
             {
                 // run all these without having the receiver lock
@@ -495,7 +500,6 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             // now we have the lock again
 
             streaming_receiver_disconnected();
-            rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
             host->stream.rcv.status.check_obsolete = false;
             host->stream.rcv.status.last_connected = 0;
