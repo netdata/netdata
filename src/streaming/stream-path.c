@@ -4,6 +4,29 @@
 #include "rrdpush.h"
 #include "plugins.d/pluginsd_internals.h"
 
+typedef enum __attribute__((packed)) {
+    STREAM_PATH_FLAG_NONE       = 0,
+    STREAM_PATH_FLAG_ACLK       = (1 << 0),
+    STREAM_PATH_FLAG_HEALTH     = (1 << 1),
+    STREAM_PATH_FLAG_ML         = (1 << 2),
+    STREAM_PATH_FLAG_EPHEMERAL  = (1 << 3),
+    STREAM_PATH_FLAG_VIRTUAL    = (1 << 4),
+} STREAM_PATH_FLAGS;
+
+typedef struct stream_path {
+    STRING *hostname;               // the hostname of the agent
+    ND_UUID host_id;                // the machine guid of the agent
+    ND_UUID node_id;                // the cloud node id of the agent
+    ND_UUID claim_id;               // the cloud claim id of the agent
+    time_t since;                   // the timestamp of the last update
+    time_t first_time_t;            // the oldest timestamp in the db
+    int16_t hops;                   // -1 = stale node, 0 = localhost, >0 the hops count
+    STREAM_PATH_FLAGS flags;        // ACLK or NONE for the moment
+    STREAM_CAPABILITIES capabilities; // streaming connection capabilities
+    uint32_t start_time_ms;         // median time in ms the agent needs to start
+    uint32_t shutdown_time_ms;      // median time in ms the agent needs to shutdown
+} STREAM_PATH;
+
 ENUM_STR_MAP_DEFINE(STREAM_PATH_FLAGS) = {
     { .id = STREAM_PATH_FLAG_ACLK,      .name = "aclk" },
     { .id = STREAM_PATH_FLAG_HEALTH,    .name = "health" },
@@ -17,7 +40,7 @@ ENUM_STR_MAP_DEFINE(STREAM_PATH_FLAGS) = {
 
 BITMAP_STR_DEFINE_FUNCTIONS(STREAM_PATH_FLAGS, STREAM_PATH_FLAG_NONE, "");
 
-void stream_path_cleanup(STREAM_PATH *p) {
+static void stream_path_cleanup(STREAM_PATH *p) {
     string_freez(p->hostname);
     p->hostname = NULL;
     p->host_id = UUID_ZERO;
@@ -117,20 +140,19 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
     return p;
 }
 
-STREAM_PATH rrdhost_stream_path_get_copy_of_origin(RRDHOST *host) {
-    STREAM_PATH p = { 0 };
+uint64_t rrdhost_stream_path_total_reboot_time_ms(RRDHOST *host) {
+    uint64_t total_ms = 0;
 
     rw_spinlock_read_lock(&host->stream.path.spinlock);
     for (size_t i = 0; i < host->stream.path.used; i++) {
         STREAM_PATH *tmp_path = &host->stream.path.array[i];
         if(UUIDeq(host->host_id, tmp_path->host_id)) {
-            p = *tmp_path;
-            p.hostname = string_dup(tmp_path->hostname);
+            total_ms = tmp_path->start_time_ms + tmp_path->shutdown_time_ms;
             break;
         }
     }
     rw_spinlock_read_unlock(&host->stream.path.spinlock);
-    return p;
+    return total_ms;
 }
 
 bool rrdhost_is_host_in_stream_path_before_us(struct rrdhost *host, ND_UUID remote_agent_host_id, int16_t our_hops) {

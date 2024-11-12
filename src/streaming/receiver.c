@@ -774,10 +774,8 @@ static void rrdpush_receive(struct receiver_state *rpt) {
 
     // in case we have cloud connection we inform cloud
     // a child disconnected
-    STREAM_PATH tmp = rrdhost_stream_path_get_copy_of_origin(rpt->host);
-    uint64_t total_reboot = (tmp.start_time_ms + tmp.shutdown_time_ms);
+    uint64_t total_reboot = rrdhost_stream_path_total_reboot_time_ms(rpt->host);
     schedule_node_state_update(rpt->host, MIN((total_reboot * MAX_CHILD_DISC_TOLERANCE), MAX_CHILD_DISC_DELAY));
-    stream_path_cleanup(&tmp);
 
 cleanup:
     ;
