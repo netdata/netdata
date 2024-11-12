@@ -16,7 +16,7 @@ type (
 	CSVConfig struct {
 		FieldsPerRecord  int                              `yaml:"fields_per_record,omitempty" json:"fields_per_record"`
 		Delimiter        string                           `yaml:"delimiter,omitempty" json:"delimiter"`
-		TrimLeadingSpace bool                             `yaml:"trim_leading_space" json:"trim_leading_space"`
+		TrimLeadingSpace bool                             `yaml:"trim_leading_space,omitempty" json:"trim_leading_space"`
 		Format           string                           `yaml:"format,omitempty" json:"format"`
 		CheckField       func(string) (string, int, bool) `yaml:"-" json:"-"`
 	}

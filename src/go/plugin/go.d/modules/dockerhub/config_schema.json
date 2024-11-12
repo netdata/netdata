@@ -121,7 +121,7 @@
       "url",
       "repositories"
     ],
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }
