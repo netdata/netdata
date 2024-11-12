@@ -33,21 +33,22 @@ func init() {
 func New() *X509Check {
 	return &X509Check{
 		Config: Config{
-			Timeout:           confopt.Duration(time.Second * 2),
-			DaysUntilWarn:     14,
-			DaysUntilCritical: 7,
+			Timeout:        confopt.Duration(time.Second * 2),
+			CheckFullChain: false,
 		},
+
+		charts:    &module.Charts{},
+		seenCerts: make(map[string]bool),
 	}
 }
 
 type Config struct {
-	UpdateEvery       int              `yaml:"update_every,omitempty" json:"update_every"`
-	Source            string           `yaml:"source" json:"source"`
-	Timeout           confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	DaysUntilWarn     int64            `yaml:"days_until_expiration_warning,omitempty" json:"days_until_expiration_warning"`
-	DaysUntilCritical int64            `yaml:"days_until_expiration_critical,omitempty" json:"days_until_expiration_critical"`
-	CheckRevocation   bool             `yaml:"check_revocation_status" json:"check_revocation_status"`
-	tlscfg.TLSConfig  `yaml:",inline" json:""`
+	UpdateEvery      int              `yaml:"update_every,omitempty" json:"update_every"`
+	Source           string           `yaml:"source" json:"source"`
+	Timeout          confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	CheckFullChain   bool             `yaml:"check_full_chain" json:"check_full_chain"`
+	CheckRevocation  bool             `yaml:"check_revocation_status" json:"check_revocation_status"`
+	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 
 type X509Check struct {
@@ -57,6 +58,8 @@ type X509Check struct {
 	charts *module.Charts
 
 	prov provider
+
+	seenCerts map[string]bool
 }
 
 func (x *X509Check) Configuration() any {
@@ -73,8 +76,6 @@ func (x *X509Check) Init() error {
 		return fmt.Errorf("certificate provider init: %v", err)
 	}
 	x.prov = prov
-
-	x.charts = x.initCharts()
 
 	return nil
 }

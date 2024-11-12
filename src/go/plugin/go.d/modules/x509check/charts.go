@@ -2,42 +2,64 @@
 
 package x509check
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+)
+
+var certChartsTmpl = module.Charts{
+	certTimeUntilExpirationChartTmpl.Copy(),
+	certRevocationStatusChartTmpl.Copy(),
+}
 
 var (
-	baseCharts = module.Charts{
-		timeUntilExpirationChart.Copy(),
-	}
-	withRevocationCharts = module.Charts{
-		timeUntilExpirationChart.Copy(),
-		revocationStatusChart.Copy(),
-	}
-
-	timeUntilExpirationChart = module.Chart{
-		ID:    "time_until_expiration",
+	certTimeUntilExpirationChartTmpl = module.Chart{
+		ID:    "cert_depth%d_time_until_expiration",
 		Title: "Time Until Certificate Expiration",
 		Units: "seconds",
 		Fam:   "expiration time",
 		Ctx:   "x509check.time_until_expiration",
 		Opts:  module.Opts{StoreFirst: true},
 		Dims: module.Dims{
-			{ID: "expiry"},
-		},
-		Vars: module.Vars{
-			{ID: "days_until_expiration_warning"},
-			{ID: "days_until_expiration_critical"},
+			{ID: "cert_depth%d_expiry", Name: "expiry"},
 		},
 	}
-	revocationStatusChart = module.Chart{
-		ID:    "revocation_status",
+	certRevocationStatusChartTmpl = module.Chart{
+		ID:    "cert_depth%d_revocation_status",
 		Title: "Revocation Status",
 		Units: "boolean",
 		Fam:   "revocation",
 		Ctx:   "x509check.revocation_status",
 		Opts:  module.Opts{StoreFirst: true},
 		Dims: module.Dims{
-			{ID: "not_revoked"},
-			{ID: "revoked"},
+			{ID: "cert_depth%d_not_revoked", Name: "not_revoked"},
+			{ID: "cert_depth%d_revoked", Name: "revoked"},
 		},
 	}
 )
+
+func (x *X509Check) addCertCharts(commonName string, depth int) {
+	charts := certChartsTmpl.Copy()
+
+	if depth > 0 || !x.CheckRevocation {
+		_ = charts.Remove(certRevocationStatusChartTmpl.ID)
+	}
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, depth)
+		chart.Labels = []module.Label{
+			{Key: "source", Value: x.Source},
+			{Key: "common_name", Value: commonName},
+			{Key: "depth", Value: strconv.Itoa(depth)},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, depth)
+		}
+	}
+
+	if err := x.Charts().Add(*charts...); err != nil {
+		x.Warningf("failed to add charts for '%s': %v", commonName, err)
+	}
+}

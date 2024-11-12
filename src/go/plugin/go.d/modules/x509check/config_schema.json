@@ -23,24 +23,15 @@
         "minimum": 0.5,
         "default": 1
       },
-      "check_revocation_status": {
-        "title": "Revocation status check",
-        "description": "Whether to check the revocation status of the certificate.",
+      "check_full_chain": {
+        "title": "Full chain",
+        "description": "Monitor expiration time for all certificates in the SSL/TLS chain, including intermediate and root certificates.",
         "type": "boolean"
       },
-      "days_until_expiration_warning": {
-        "title": "Days until warning",
-        "description": "Number of days before the alarm status is set to warning.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 14
-      },
-      "days_until_expiration_critical": {
-        "title": "Days until critical",
-        "description": "Number of days before the alarm status is set to critical.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 7
+      "check_revocation_status": {
+        "title": "Revocation status",
+        "description": "Whether to check the revocation status of the certificate.",
+        "type": "boolean"
       },
       "tls_skip_verify": {
         "title": "Skip TLS verification",
@@ -94,9 +85,8 @@
             "update_every",
             "source",
             "timeout",
-            "check_revocation_status",
-            "days_until_expiration_warning",
-            "days_until_expiration_critical"
+            "check_full_chain",
+            "check_revocation_status"
           ]
         },
         {

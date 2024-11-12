@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+
 	"github.com/cloudflare/cfssl/revoke"
 )
 
@@ -22,37 +24,45 @@ func (x *X509Check) collect() (map[string]int64, error) {
 
 	mx := make(map[string]int64)
 
-	x.collectExpiration(mx, certs)
-	if x.CheckRevocation {
-		x.collectRevocation(mx, certs)
+	if err := x.collectCertificates(mx, certs); err != nil {
+		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (x *X509Check) collectExpiration(mx map[string]int64, certs []*x509.Certificate) {
-	expiry := time.Until(certs[0].NotAfter).Seconds()
-	mx["expiry"] = int64(expiry)
-	mx["days_until_expiration_warning"] = x.DaysUntilWarn
-	mx["days_until_expiration_critical"] = x.DaysUntilCritical
+func (x *X509Check) collectCertificates(mx map[string]int64, certs []*x509.Certificate) error {
+	for i, cert := range certs {
+		cn := cert.Subject.CommonName
 
-}
+		if !x.seenCerts[cn] {
+			x.seenCerts[cn] = true
+			x.addCertCharts(cn, i)
+		}
 
-func (x *X509Check) collectRevocation(mx map[string]int64, certs []*x509.Certificate) {
-	rev, ok, err := revoke.VerifyCertificateError(certs[0])
-	if err != nil {
-		x.Debug(err)
+		px := fmt.Sprintf("cert_depth%d_", i)
+
+		expiry := int64(time.Until(cert.NotAfter).Seconds())
+
+		mx[px+"expiry"] = expiry
+
+		if i == 0 && x.CheckRevocation {
+			rev, ok, err := revoke.VerifyCertificateError(certs[0])
+			if err != nil {
+				x.Debug(err)
+				continue
+			}
+			if !ok {
+				continue
+			}
+			mx[px+"revoked"] = metrix.Bool(rev)
+			mx[px+"not_revoked"] = metrix.Bool(!rev)
+		}
+
+		if !x.CheckFullChain {
+			break
+		}
 	}
-	if !ok {
-		return
-	}
 
-	mx["revoked"] = 0
-	mx["not_revoked"] = 0
-
-	if rev {
-		mx["revoked"] = 1
-	} else {
-		mx["not_revoked"] = 1
-	}
+	return nil
 }
