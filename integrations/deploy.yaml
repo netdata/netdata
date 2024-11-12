@@ -585,7 +585,7 @@
           command: |
             $ProgressPreference = 'SilentlyContinue';
             Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi -OutFile "netdata-x64.msi";
-            .\msiexec /qn /i netdata-x64.msi {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
+            msiexec /qn /i netdata-x64.msi {% if $showClaimingOptions %}/TOKEN={% claim_token %} /ROOMS={% $claim_rooms %}{% /if %}
   additional_info: |
     ### Available CLI Options
 
