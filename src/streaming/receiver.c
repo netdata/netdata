@@ -495,7 +495,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             // now we have the lock again
 
             streaming_receiver_disconnected();
-            rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+            rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
             host->stream.rcv.status.check_obsolete = false;
             host->stream.rcv.status.last_connected = 0;

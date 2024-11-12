@@ -21,7 +21,7 @@ static struct {
     {STREAM_CAP_BINARY,       "BINARY" },
     {STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
     {STREAM_CAP_IEEE754,      "IEEE754" },
-    {STREAM_CAP_DATA_WITH_ML, "ML" },
+    {STREAM_CAP_ML_MODELS,    "MLMODELS" },
     {STREAM_CAP_DYNCFG,       "DYNCFG" },
     {STREAM_CAP_SLOTS,        "SLOTS" },
     {STREAM_CAP_ZSTD,         "ZSTD" },
@@ -97,8 +97,8 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
         // this can happen under these conditions: 1. we don't run ML, and 2. we don't receive ML
         spinlock_lock(&host->receiver_lock);
 
-        if(!ml_host_running(host) && !stream_has_capability(host->receiver, STREAM_CAP_DATA_WITH_ML))
-            disabled_capabilities |= STREAM_CAP_DATA_WITH_ML;
+        if (!ml_host_running(host) && !stream_has_capability(host->receiver, STREAM_CAP_ML_MODELS))
+            disabled_capabilities |= STREAM_CAP_ML_MODELS;
 
         spinlock_unlock(&host->receiver_lock);
 
@@ -124,7 +124,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_NODE_ID |
             STREAM_CAP_PATHS |
             STREAM_CAP_IEEE754 |
-            STREAM_CAP_DATA_WITH_ML |
+            STREAM_CAP_ML_MODELS |
             0) & ~disabled_capabilities;
 }
 
@@ -151,7 +151,7 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
 
     if(!(common_caps & STREAM_CAP_INTERPOLATED))
         // DATA WITH ML requires INTERPOLATED
-        common_caps &= ~STREAM_CAP_DATA_WITH_ML;
+        common_caps &= ~(STREAM_CAP_ML_MODELS);
 
     return common_caps;
 }

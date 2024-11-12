@@ -70,6 +70,7 @@ struct rrdengine_instance;
 #endif
 
 // ----------------------------------------------------------------------------
+
 struct ml_metrics_statistics {
     size_t anomalous;
     size_t normal;

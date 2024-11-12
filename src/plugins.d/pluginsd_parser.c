@@ -922,7 +922,7 @@ static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *
     // ------------------------------------------------------------------------
     // check value and ML
 
-    if(stream_has_capability(&parser->user, STREAM_CAP_DATA_WITH_ML)) {
+    if(stream_has_capability(&parser->user, STREAM_CAP_ML_MODELS)) {
         // we receive anomaly information, no need for prediction on this node
         if (unlikely(!netdata_double_isnumber(value) || (flags == SN_EMPTY_SLOT))) {
             value = NAN;
@@ -1093,6 +1093,11 @@ static void pluginsd_json_stream_paths(PARSER *parser, void *action_data __maybe
     buffer_free(parser->defer.response);
 }
 
+static void pluginsd_json_ml_model(PARSER *parser, void *action_data __maybe_unused) {
+    ml_model_received_from_child(parser->user.host, buffer_tostring(parser->defer.response));
+    buffer_free(parser->defer.response);
+}
+
 static void pluginsd_json_dev_null(PARSER *parser, void *action_data __maybe_unused) {
     buffer_free(parser->defer.response);
 }
@@ -1109,8 +1114,10 @@ static PARSER_RC pluginsd_json(char **words __maybe_unused, size_t num_words __m
     parser->defer.action_data = NULL;
     parser->flags |= PARSER_DEFER_UNTIL_KEYWORD;
 
-    if(strcmp(keyword, PLUGINSD_KEYWORD_STREAM_PATH) == 0)
+    if(strcmp(keyword, PLUGINSD_KEYWORD_JSON_CMD_STREAM_PATH) == 0)
         parser->defer.action = pluginsd_json_stream_paths;
+    else if(strcmp(keyword, PLUGINSD_KEYWORD_JSON_CMD_ML_MODEL) == 0)
+        parser->defer.action = pluginsd_json_ml_model;
     else
         netdata_log_error("PLUGINSD: invalid JSON payload keyword '%s'", keyword);
 

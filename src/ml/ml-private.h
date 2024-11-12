@@ -366,4 +366,6 @@ void ml_config_load(ml_config_t *cfg);
 
 extern ml_config_t Cfg;
 
+void ml_send_model_to_parent(RRDDIM *rd, ml_kmeans_t model);
+
 #endif /* NETDATA_ML_PRIVATE_H */

@@ -236,16 +236,15 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     // --- ml ---
 
     if(ml_host_get_host_status(host, &s->ml.metrics)) {
-        s->ml.type = RRDHOST_ML_TYPE_SELF;
+        if(stream_has_capability(&s->ingest, STREAM_CAP_ML_MODELS))
+            s->ml.type = RRDHOST_ML_TYPE_RECEIVED;
+        else
+            s->ml.type = RRDHOST_ML_TYPE_SELF;
 
         if(s->ingest.status == RRDHOST_INGEST_STATUS_OFFLINE || s->ingest.status == RRDHOST_INGEST_STATUS_ARCHIVED)
             s->ml.status = RRDHOST_ML_STATUS_OFFLINE;
         else
             s->ml.status = RRDHOST_ML_STATUS_RUNNING;
-    }
-    else if(stream_has_capability(&s->ingest, STREAM_CAP_DATA_WITH_ML)) {
-        s->ml.type = RRDHOST_ML_TYPE_RECEIVED;
-        s->ml.status = RRDHOST_ML_STATUS_RUNNING;
     }
     else {
         // does not receive ML, does not run ML

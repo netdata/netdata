@@ -1900,3 +1900,27 @@ void ml_stop_threads()
         netdata_mutex_destroy(&training_thread->nd_mutex);
     }
 }
+
+void ml_send_model_to_parent(RRDDIM *rd, ml_kmeans_t model __maybe_unused) {
+    struct sender_state *s = rd->rrdset->rrdhost->sender;
+    if (!s)
+        return;
+
+//    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+//    buffer_json_initialize(payload, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+//
+//    buffer_json_finalize(payload);
+//
+//    BUFFER *wb = sender_start(s);
+//
+//    buffer_sprintf(
+//        wb, PLUGINSD_KEYWORD_JSON " " PLUGINSD_KEYWORD_JSON_CMD_STREAM_PATH "\n%s\n" PLUGINSD_KEYWORD_JSON_END "\n",
+//        buffer_tostring(payload));
+//
+//    sender_commit(s, wb, STREAM_TRAFFIC_TYPE_METADATA);
+}
+
+
+void ml_model_received_from_child(RRDHOST *host __maybe_unused, const char *json __maybe_unused) {
+    // already hooked
+}

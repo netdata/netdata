@@ -49,6 +49,8 @@ bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm);
 bool ml_host_running(RRDHOST *rh);
 uint64_t sqlite_get_ml_space(void);
 
+void ml_model_received_from_child(RRDHOST *host, const char *json);
+
 #ifdef __cplusplus
 };
 #endif
