@@ -730,7 +730,7 @@ void *stream_sender_connector_thread(void *ptr __maybe_unused) {
 
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
         worker_is_idle();
-        job_id = completion_wait_for_a_job(&sender.connector.completion, job_id);
+        job_id = completion_wait_for_a_job_with_timeout(&sender.connector.completion, job_id, 1);
 
         spinlock_lock(&sender.connector.spinlock);
         struct sender_state *next;
@@ -1142,8 +1142,7 @@ void rrdpush_sender_thread_spawn(RRDHOST *host) {
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
 
         if(!rrdhost_set_sender(host)) {
-            netdata_log_error("STREAM %s [send]: sender is already occupied.",
-                              rrdhost_hostname(host));
+            netdata_log_error("STREAM %s [send]: sender is already occupied.", rrdhost_hostname(host));
             return;
         }
 
