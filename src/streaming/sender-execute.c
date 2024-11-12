@@ -147,8 +147,6 @@ void rrdpush_sender_execute_commands_cleanup(struct sender_state *s) {
 
 // This is just a placeholder until the gap filling state machine is inserted
 void rrdpush_sender_execute_commands(struct sender_state *s) {
-    worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
-
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &s->line),
         ND_LOG_FIELD_END(),

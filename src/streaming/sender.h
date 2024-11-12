@@ -44,9 +44,10 @@ typedef void (*rrdpush_defer_cleanup_t)(struct sender_state *s, void *data);
 
 struct sender_state {
     RRDHOST *host;
-    pid_t tid;                              // the thread id of the sender, from gettid_cached()
+    uint64_t sender_magic;
     SENDER_FLAGS flags;
 
+    bool stop;                                  // when set, the sender should stop sending this host
     ND_SOCK sock;
 
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
@@ -68,8 +69,6 @@ struct sender_state {
     STREAM_CAPABILITIES disabled_capabilities;
 
     size_t sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX];
-
-    int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
 
     int16_t hops;
 
@@ -114,6 +113,9 @@ struct sender_state {
     } defer;
 
     bool parent_using_h2o;
+
+    // for the sender/connector threads
+    struct sender_state *prev, *next;
 };
 
 #define sender_lock(sender) spinlock_lock(&(sender)->spinlock)
@@ -159,6 +161,10 @@ bool rrdpush_sender_connect(struct sender_state *s);
 void rrdpush_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force);
 bool rrdhost_sender_should_exit(struct sender_state *s);
 void rrdpush_sender_thread_spawn(RRDHOST *host);
+
+uint64_t sender_magic(RRDHOST *host);
+pid_t sender_tid(RRDHOST *host);
+int sender_write_pipe_fd(struct sender_state *s);
 
 #include "replication.h"
 

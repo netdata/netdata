@@ -1574,6 +1574,20 @@ void ml_dimension_delete(RRDDIM *rd)
     rd->ml_dimension = NULL;
 }
 
+void ml_dimension_received_anomaly(RRDDIM *rd, bool is_anomalous) {
+    ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
+    if (!dim)
+        return;
+
+    ml_host_t *host = (ml_host_t *) rd->rrdset->rrdhost->ml_host;
+    if (!host->ml_running)
+        return;
+
+    ml_chart_t *chart = (ml_chart_t *) rd->rrdset->ml_chart;
+
+    ml_chart_update_dimension(chart, dim, is_anomalous);
+}
+
 bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool exists)
 {
     ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;

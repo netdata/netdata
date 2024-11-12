@@ -159,59 +159,17 @@ static ssize_t attempt_read(struct sender_state *s) {
     return ret;
 }
 
-static bool rrdpush_sender_pipe_close(RRDHOST *host, int *pipe_fds, bool reopen) {
-    static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
-
-    bool ret = true;
-
-    netdata_mutex_lock(&mutex);
-
-    int new_pipe_fds[2];
-    if(reopen) {
-        if(pipe(new_pipe_fds) != 0) {
-            netdata_log_error("STREAM %s [send]: cannot create required pipe.", rrdhost_hostname(host));
-            new_pipe_fds[PIPE_READ] = -1;
-            new_pipe_fds[PIPE_WRITE] = -1;
-            ret = false;
-        }
-    }
-
-    int old_pipe_fds[2];
-    old_pipe_fds[PIPE_READ] = pipe_fds[PIPE_READ];
-    old_pipe_fds[PIPE_WRITE] = pipe_fds[PIPE_WRITE];
-
-    if(reopen) {
-        pipe_fds[PIPE_READ] = new_pipe_fds[PIPE_READ];
-        pipe_fds[PIPE_WRITE] = new_pipe_fds[PIPE_WRITE];
-    }
-    else {
-        pipe_fds[PIPE_READ] = -1;
-        pipe_fds[PIPE_WRITE] = -1;
-    }
-
-    if(old_pipe_fds[PIPE_READ] > 2)
-        close(old_pipe_fds[PIPE_READ]);
-
-    if(old_pipe_fds[PIPE_WRITE] > 2)
-        close(old_pipe_fds[PIPE_WRITE]);
-
-    netdata_mutex_unlock(&mutex);
-    return ret;
-}
-
 void rrdpush_signal_sender_to_wake_up(struct sender_state *s) {
-    if(unlikely(s->tid == gettid_cached()))
+    if(unlikely(sender_tid(s->host) == gettid_cached()))
         return;
 
     RRDHOST *host = s->host;
 
-    int pipe_fd = s->rrdpush_sender_pipe[PIPE_WRITE];
+    int pipe_fd = sender_write_pipe_fd(s);
 
     // signal the sender there are more data
-    if (pipe_fd != -1 && write(pipe_fd, " ", 1) == -1) {
+    if (pipe_fd != -1 && write(pipe_fd, " ", 1) == -1)
         netdata_log_error("STREAM %s [send]: cannot write to internal pipe.", rrdhost_hostname(host));
-        rrdpush_sender_pipe_close(host, s->rrdpush_sender_pipe, true);
-    }
 }
 
 static bool rrdhost_set_sender(RRDHOST *host) {
@@ -219,11 +177,11 @@ static bool rrdhost_set_sender(RRDHOST *host) {
 
     bool ret = false;
     sender_lock(host->sender);
-    if(!host->sender->tid) {
+    if(!host->sender->sender_magic) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
         host->stream.snd.status.connections++;
-        host->sender->tid = gettid_cached();
+        host->sender->sender_magic = sender_magic(host);
         host->sender->last_state_since_t = now_realtime_sec();
         host->sender->exit.reason = STREAM_HANDSHAKE_NEVER;
         ret = true;
@@ -238,8 +196,8 @@ static bool rrdhost_set_sender(RRDHOST *host) {
 static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
     if(unlikely(!host->sender)) return;
 
-    if(host->sender->tid == gettid_cached()) {
-        host->sender->tid = 0;
+    if(host->sender->sender_magic == sender_magic(host)) {
+        host->sender->sender_magic = 0;
         host->sender->exit.shutdown = false;
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         host->sender->last_state_since_t = now_realtime_sec();
@@ -250,8 +208,12 @@ static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
     rrdhost_stream_parents_reset(host, STREAM_HANDSHAKE_EXITING);
 }
 
+static bool rrdhost_is_sender_stopped(struct sender_state *s) {
+    return __atomic_load_n(&s->stop, __ATOMIC_RELAXED);
+}
+
 bool rrdhost_sender_should_exit(struct sender_state *s) {
-    if(unlikely(nd_thread_signaled_to_cancel())) {
+    if(unlikely(rrdhost_is_sender_stopped(s))) {
         if(!s->exit.reason)
             s->exit.reason = STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN;
         return true;
@@ -322,6 +284,7 @@ static bool stream_sender_log_dst_port(BUFFER *wb, void *ptr) {
     return true;
 }
 
+/*
 void *rrdpush_sender_thread(void *ptr) {
     struct sender_state *s = ptr;
 
@@ -626,21 +589,532 @@ void *rrdpush_sender_thread(void *ptr) {
 
     return NULL;
 }
+*/
+
+static struct {
+    struct {
+        ND_THREAD *thread;
+        SPINLOCK spinlock;
+        size_t count;
+        struct sender_state *queue;
+        struct completion completion;
+    } connector;
+
+    struct {
+        uint64_t magic;
+        pid_t tid;
+
+        int pipe_fds[2];
+        ND_THREAD *thread;
+        SPINLOCK spinlock;
+        size_t count;
+        struct sender_state *queue;
+
+        struct {
+            size_t used;
+            size_t size;
+            struct pollfd *array;
+            struct sender_state **running;
+        } pollfd;
+    } dispatcher;
+} sender = {
+    .dispatcher = {
+        .pipe_fds = { -1, -1 },
+    }
+};
+
+int sender_write_pipe_fd(struct sender_state *s __maybe_unused) {
+    return sender.dispatcher.pipe_fds[PIPE_WRITE];
+}
+
+uint64_t sender_magic(RRDHOST *host __maybe_unused) {
+    return sender.dispatcher.magic;
+}
+
+pid_t sender_tid(RRDHOST *host __maybe_unused) {
+    return sender.dispatcher.tid;
+}
+
+void stream_sender_connector_add(struct sender_state *s) {
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+        ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+        ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+        ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+        ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->stream.snd.destination || !s->host->stream.snd.api_key) {
+        netdata_log_error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
+                          rrdhost_hostname(s->host), gettid_cached());
+        return;
+    }
+
+    rrdhost_stream_parent_ssl_init(s);
+
+    s->buffer->max_size = stream_send.buffer_max_size;
+    s->parent_using_h2o = stream_send.parents.h2o;
+
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+
+    spinlock_lock(&sender.connector.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
+    sender.connector.count++;
+    spinlock_unlock(&sender.connector.spinlock);
+
+    completion_mark_complete_a_job(&sender.connector.completion);
+}
+
+void *stream_sender_connector_thread(void *ptr __maybe_unused) {
+    unsigned job_id = 0;
+
+    while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
+        job_id = completion_wait_for_a_job(&sender.connector.completion, job_id);
+
+        spinlock_lock(&sender.connector.spinlock);
+        struct sender_state *next;
+        for(struct sender_state *s = sender.connector.queue; s ; s = next) {
+            next = s->next;
+
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+                ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+                ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+                ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
+            spinlock_unlock(&sender.connector.spinlock);
+            bool move_to_dispatcher = rrdpush_sender_connect(s);
+            spinlock_lock(&sender.connector.spinlock);
+
+            if(move_to_dispatcher) {
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
+                spinlock_unlock(&sender.connector.spinlock);
+
+                spinlock_lock(&sender.dispatcher.spinlock);
+                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sender.dispatcher.queue, s, prev, next);
+                spinlock_unlock(&sender.dispatcher.spinlock);
+
+                spinlock_lock(&sender.connector.spinlock);
+            }
+        }
+        spinlock_unlock(&sender.connector.spinlock);
+
+        sleep_usec(10 * USEC_PER_MS);
+    }
+
+    return NULL;
+}
+
+static void stream_sender_dispatcher_realloc_arrays_unsafe(size_t slot) {
+    if(slot >= sender.dispatcher.pollfd.size) {
+        size_t new_size = sender.dispatcher.pollfd.size > 0 ? sender.dispatcher.pollfd.size * 2 : 8;
+        sender.dispatcher.pollfd.array = reallocz(sender.dispatcher.pollfd.array, new_size * sizeof(*sender.dispatcher.pollfd.array));
+        sender.dispatcher.pollfd.running = reallocz(sender.dispatcher.pollfd.running, new_size * sizeof(*sender.dispatcher.pollfd.running));
+        sender.dispatcher.pollfd.size = new_size;
+        sender.dispatcher.pollfd.used = slot + 1;
+    }
+    else if(slot >= sender.dispatcher.pollfd.used)
+        sender.dispatcher.pollfd.used = slot + 1;
+}
+
+static void stream_sender_dispatcher_move_queue_to_running(void) {
+    size_t first_slot = 1;
+
+    // process the queue
+    spinlock_lock(&sender.dispatcher.spinlock);
+    stream_sender_dispatcher_realloc_arrays_unsafe(0); // our pipe
+    while(sender.dispatcher.queue) {
+        struct sender_state *s = sender.dispatcher.queue;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.dispatcher.queue, s, prev, next);
+
+        // slot 0 is our pipe
+        size_t slot = sender.dispatcher.pollfd.used > 0 ? sender.dispatcher.pollfd.used : 1;
+
+        // find an empty slot
+        for(size_t i = first_slot; i < slot && i < sender.dispatcher.pollfd.used ;i++) {
+            if(!sender.dispatcher.pollfd.running[i]) {
+                slot = i;
+                break;
+            }
+        }
+
+        stream_sender_dispatcher_realloc_arrays_unsafe(slot);
+
+        sender.dispatcher.pollfd.running[slot] = s;
+        sender.dispatcher.pollfd.array[slot] = (struct pollfd){
+            .fd = s->sock.fd,
+            .events = POLLIN,
+            .revents = 0,
+        };
+
+        first_slot = slot + 1;
+    }
+    spinlock_unlock(&sender.dispatcher.spinlock);
+}
+
+static void stream_sender_dispatcher_move_running_to_connector(size_t slot) {
+    sender.dispatcher.pollfd.array[slot] = (struct pollfd) {
+        .fd = -1,
+        .events = 0,
+        .revents = 0,
+    };
+
+    struct sender_state *s = sender.dispatcher.pollfd.running[slot];
+    if(!s) return;
+
+    sender.dispatcher.pollfd.running[slot] = NULL;
+
+    sender_lock(s);
+    {
+        rrdpush_sender_thread_close_socket(s);
+        rrdpush_sender_on_disconnect(s->host);
+        rrdpush_sender_execute_commands_cleanup(s);
+
+        if (s->stop) {
+            rrdhost_clear_sender___while_having_sender_mutex(s->host);
+
+#ifdef NETDATA_LOG_STREAM_SENDER
+            if (s->stream_log_fp) {
+                fclose(s->stream_log_fp);
+                s->stream_log_fp = NULL;
+            }
+#endif
+        }
+        else
+            stream_sender_connector_add(s);
+    }
+    sender_unlock(s);
+}
+
+void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
+    sender.dispatcher.tid = gettid_cached();
+
+    worker_register("STREAMSND");
+    worker_register_job_name(WORKER_SENDER_JOB_CONNECT, "connect");
+    worker_register_job_name(WORKER_SENDER_JOB_PIPE_READ, "pipe read");
+    worker_register_job_name(WORKER_SENDER_JOB_SOCKET_RECEIVE, "receive");
+    worker_register_job_name(WORKER_SENDER_JOB_EXECUTE, "execute");
+    worker_register_job_name(WORKER_SENDER_JOB_SOCKET_SEND, "send");
+
+    // disconnection reasons
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR, "disconnect poll error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR, "disconnect socket error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW, "disconnect overflow");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR, "disconnect ssl error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED, "disconnect parent closed");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION, "disconnect no compression");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE, "disconnect bad handshake");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION, "disconnect cant upgrade");
+
+    worker_register_job_name(WORKER_SENDER_JOB_REPLAY_REQUEST, "replay request");
+    worker_register_job_name(WORKER_SENDER_JOB_FUNCTION_REQUEST, "function");
+
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BUFFER_RATIO, "used buffer ratio", "%", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, "bytes received", "bytes/s", WORKER_METRIC_INCREMENT);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT, "bytes sent", "bytes/s", WORKER_METRIC_INCREMENT);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, "bytes compressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, "bytes uncompressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, "cumulative compression savings ratio", "%", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
+
+    size_t pipe_buffer_size = 10 * 1024;
+    char *pipe_buffer = mallocz(pipe_buffer_size);
+    if(pipe(sender.dispatcher.pipe_fds) != 0) {
+        netdata_log_error("STREAM dispatcher: cannot create required pipe.");
+        sender.dispatcher.pipe_fds[PIPE_READ] = -1;
+        sender.dispatcher.pipe_fds[PIPE_WRITE] = -1;
+        return NULL;
+    }
+
+    while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
+        stream_sender_dispatcher_move_queue_to_running();
+
+        time_t now_s = now_monotonic_sec();
+
+        size_t bytes_uncompressed = 0;
+        size_t bytes_compressed = 0;
+        NETDATA_DOUBLE buffer_ratio = 0.0;
+
+        for(size_t slot = 1; slot < sender.dispatcher.pollfd.used ; slot++) {
+            struct sender_state *s = sender.dispatcher.pollfd.running[slot];
+            if(!s) continue;
+
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+                ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+                ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+                ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
+            if(s->sock.fd == -1 || rrdhost_is_sender_stopped(s) || rrdhost_sender_should_exit(s)) {
+                stream_sender_dispatcher_move_running_to_connector(slot);
+                continue;
+            }
+
+            // If the TCP window never opened then something is wrong, restart connection
+            if(unlikely(now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
+                         !rrdpush_sender_pending_replication_requests(s) &&
+                         !rrdpush_sender_replicating_charts(s)
+                             )) {
+                worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
+                netdata_log_error("STREAM %s [send to %s]: could not send metrics for %ld seconds - closing connection - "
+                                  "we have sent %zu bytes on this connection via %zu send attempts.",
+                                  rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
+                                  s->sent_bytes_on_this_connection, s->send_attempts);
+                stream_sender_dispatcher_move_running_to_connector(slot);
+                continue;
+            }
+
+            sender_lock(s);
+            size_t outstanding = cbuffer_next_unsafe(s->buffer, NULL);
+            size_t available = cbuffer_available_size_unsafe(s->buffer);
+            if (unlikely(!outstanding)) {
+                rrdpush_sender_pipe_clear_pending_data(s);
+                rrdpush_sender_cbuffer_recreate_timed(s, now_s, true, false);
+            }
+            if(s->buffer->max_size) {
+                NETDATA_DOUBLE ratio = (NETDATA_DOUBLE)(s->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size;
+                if (ratio > buffer_ratio) buffer_ratio = ratio;
+            }
+
+            if(s->compressor.initialized) {
+                bytes_uncompressed += s->compressor.sender_locked.total_uncompressed;
+                bytes_compressed += s->compressor.sender_locked.total_compressed + s->compressor.sender_locked.total_compressions * sizeof(rrdpush_signature_t);
+            }
+            sender_unlock(s);
+
+            if(outstanding) {
+                sender.dispatcher.pollfd.array[slot].events = POLLIN | POLLOUT;
+                s->send_attempts++;
+            }
+            else
+                sender.dispatcher.pollfd.array[slot].events = POLLIN;
+
+            sender.dispatcher.pollfd.array[slot].fd = s->sock.fd;
+            sender.dispatcher.pollfd.array[slot].revents = 0;
+        }
+
+        if(bytes_compressed && bytes_uncompressed) {
+            NETDATA_DOUBLE compression_ratio = 100.0 - ((NETDATA_DOUBLE)bytes_compressed * 100.0 / (NETDATA_DOUBLE)bytes_uncompressed);
+            worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, compression_ratio);
+        }
+
+        worker_set_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
+        worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
+        worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, buffer_ratio);
+
+        worker_is_idle();
+
+        sender.dispatcher.pollfd.array[0] = (struct pollfd) {
+            .fd = sender.dispatcher.pipe_fds[PIPE_READ],
+            .events = POLLIN,
+            .revents = 0,
+        };
+
+        // timeout in milliseconds
+        int poll_rc = poll(sender.dispatcher.pollfd.array, sender.dispatcher.pollfd.used, 50);
+
+        // Spurious wake-ups without error - loop again
+        if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR)))
+            continue;
+
+        if(unlikely(poll_rc == -1)) {
+            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR);
+            nd_log_limit_static_thread_var(erl, 1, 1 * USEC_PER_MS);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "poll() returned error");
+            continue;
+        }
+
+        now_s = now_monotonic_sec();
+
+        // If the collector woke us up then empty the pipe to remove the signal
+        if(sender.dispatcher.pollfd.array[0].revents) {
+            short revents = sender.dispatcher.pollfd.array[0].revents;
+
+            if (revents & (POLLIN | POLLPRI)) {
+                worker_is_busy(WORKER_SENDER_JOB_PIPE_READ);
+                if (read(sender.dispatcher.pollfd.array[0].fd, pipe_buffer, pipe_buffer_size) == -1)
+                    netdata_log_error("STREAM dispatcher: cannot read from internal pipe.");
+            }
+            else if(revents & (POLLERR|POLLHUP|POLLNVAL)) {
+                char *error = NULL;
+
+                if (revents & POLLERR)
+                    error = "pipe reports errors (POLLERR)";
+                else if (revents & POLLHUP)
+                    error = "pipe closed (POLLHUP)";
+                else if (revents & POLLNVAL)
+                    error = "pipe is invalid (POLLNVAL)";
+
+                if(error) {
+                    close(sender.dispatcher.pipe_fds[PIPE_READ]); sender.dispatcher.pipe_fds[PIPE_READ] = -1;
+                    close(sender.dispatcher.pipe_fds[PIPE_WRITE]); sender.dispatcher.pipe_fds[PIPE_WRITE] = -1;
+                    if(pipe(sender.dispatcher.pipe_fds) != 0)
+                        netdata_log_error("STREAM dispatcher: cannot create required pipe.");
+                    else
+                        netdata_log_error("STREAM dispatcher: restarted internal pipe.");
+                }
+            }
+        }
+
+        size_t replay_entries = 0;
+        size_t bytes_received = 0;
+        size_t bytes_sent = 0;
+
+        for(size_t slot = 1; slot < sender.dispatcher.pollfd.used ; slot++) {
+            struct sender_state *s = sender.dispatcher.pollfd.running[slot];
+            if(!s || !sender.dispatcher.pollfd.array[slot].revents)
+                continue;
+
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+                ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+                ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+                ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
+            short revents = sender.dispatcher.pollfd.array[slot].revents;
+
+            if(revents & POLLOUT) {
+                worker_is_busy(WORKER_SENDER_JOB_SOCKET_SEND);
+                ssize_t bytes = attempt_to_send(s);
+                if(bytes > 0) {
+                    s->last_traffic_seen_t = now_s;
+                    bytes_sent += bytes;
+                }
+            }
+
+            if(revents & POLLIN) {
+                worker_is_busy(WORKER_SENDER_JOB_SOCKET_RECEIVE);
+                ssize_t bytes = attempt_read(s);
+                if(bytes > 0) {
+                    s->last_traffic_seen_t = now_s;
+                    bytes_received += bytes;
+                }
+            }
+
+            if(unlikely(s->read_len)) {
+                worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
+                rrdpush_sender_execute_commands(s);
+            }
+
+            if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
+                char *error = NULL;
+
+                if (revents & POLLERR)
+                    error = "socket reports errors (POLLERR)";
+                else if (revents & POLLHUP)
+                    error = "connection closed by remote end (POLLHUP)";
+                else if (revents & POLLNVAL)
+                    error = "connection is invalid (POLLNVAL)";
+
+                if(error) {
+                    worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR);
+                    netdata_log_error("STREAM %s [send to %s]: restarting connection: %s - %zu bytes transmitted.",
+                                      rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
+
+                    stream_sender_dispatcher_move_running_to_connector(slot);
+                }
+            }
+
+            replay_entries += dictionary_entries(s->replication.requests);
+        }
+
+        worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)bytes_received);
+        worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, (NETDATA_DOUBLE)bytes_sent);
+        worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
+    }
+
+    while(sender.dispatcher.queue) {
+        stream_sender_dispatcher_move_queue_to_running();
+    }
+
+    for(size_t slot = 0; slot < sender.dispatcher.pollfd.used ;slot++) {
+        struct sender_state *s = sender.dispatcher.pollfd.running[slot];
+        if(!s) continue;
+
+        s->stop = true;
+        stream_sender_dispatcher_move_running_to_connector(slot);
+    }
+
+    freez(pipe_buffer);
+    close(sender.dispatcher.pipe_fds[PIPE_READ]); sender.dispatcher.pipe_fds[PIPE_READ] = -1;
+    close(sender.dispatcher.pipe_fds[PIPE_WRITE]); sender.dispatcher.pipe_fds[PIPE_WRITE] = -1;
+
+    return NULL;
+}
 
 void rrdpush_sender_thread_spawn(RRDHOST *host) {
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static bool dispatcher_running = false;
+    static bool connector_running = false;
+
+    spinlock_lock(&spinlock);
     sender_lock(host->sender);
 
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
-        char tag[NETDATA_THREAD_TAG_MAX + 1];
-        snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "[%s]", rrdhost_hostname(host));
+        sender.dispatcher.magic = 1 + os_random64();
 
-        host->rrdpush_sender_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
-                                                       rrdpush_sender_thread, (void *)host->sender);
-        if(!host->rrdpush_sender_thread)
-            nd_log_daemon(NDLP_ERR, "STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
-        else
-            rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
+        if(!dispatcher_running) {
+            int id = 0;
+            char tag[NETDATA_THREAD_TAG_MAX + 1];
+            snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "-DP" "[%d]", id);
+
+            sender.dispatcher.thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_sender_dispacther_thread, &id);
+            if (!sender.dispatcher.thread)
+                nd_log_daemon(NDLP_ERR, "STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
+            else
+                dispatcher_running = true;
+        }
+
+        if(!connector_running) {
+            int id = 0;
+            char tag[NETDATA_THREAD_TAG_MAX + 1];
+            snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "-CN" "[%d]", id);
+
+            sender.connector.thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_sender_connector_thread, &id);
+            if (!sender.connector.thread)
+                nd_log_daemon(NDLP_ERR, "STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
+            else
+                connector_running = true;
+        }
     }
 
     sender_unlock(host->sender);
+
+    if(dispatcher_running && connector_running) {
+        rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
+
+        if(!rrdhost_set_sender(host)) {
+            netdata_log_error("STREAM %s [send]: sender is already occupied.",
+                              rrdhost_hostname(host));
+            return;
+        }
+
+        stream_sender_connector_add(host->sender);
+    }
+
+    spinlock_unlock(&spinlock);
+}
+
+void *rrdpush_sender_thread(void *ptr __maybe_unused) {
+    if(!localhost) return NULL;
+
+    rrdpush_sender_thread_spawn(localhost);
+    return NULL;
 }

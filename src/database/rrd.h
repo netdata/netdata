@@ -1252,7 +1252,6 @@ struct rrdhost {
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
     struct sender_state *sender;
-    ND_THREAD *rrdpush_sender_thread;               // the sender thread
 
     struct receiver_state *receiver;
     SPINLOCK receiver_lock;

@@ -560,17 +560,6 @@ static bool attempt_to_connect(struct sender_state *state) {
     // increase the failed connections counter
     state->not_connected_loops++;
 
-    // slow re-connection on repeating errors
-    usec_t now_ut = now_monotonic_usec();
-    usec_t end_ut = now_ut + USEC_PER_SEC * stream_send.parents.reconnect_delay_s;
-    while(now_ut < end_ut) {
-        if(nd_thread_signaled_to_cancel())
-            return false;
-
-        sleep_usec(100 * USEC_PER_MS); // seconds
-        now_ut = now_monotonic_usec();
-    }
-
     return false;
 }
 
@@ -623,14 +612,14 @@ void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wai
         host->sender->exit.reason = reason;
 
         // signal it to cancel
-        nd_thread_signal_cancel(host->rrdpush_sender_thread);
+        __atomic_store_n(&host->sender->stop, true, __ATOMIC_RELAXED);
     }
 
     sender_unlock(host->sender);
 
     if(wait) {
         sender_lock(host->sender);
-        while(host->sender->tid) {
+        while(host->sender->sender_magic) {
             sender_unlock(host->sender);
             sleep_usec(10 * USEC_PER_MS);
             sender_lock(host->sender);
