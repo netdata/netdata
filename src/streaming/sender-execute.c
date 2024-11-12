@@ -15,11 +15,9 @@ static void stream_execute_function_callback(BUFFER *func_wb, int code, void *da
     if(rrdhost_can_send_definitions_to_parent(s->host)) {
         BUFFER *wb = sender_start(s);
 
-        pluginsd_function_result_begin_to_buffer(wb
-                                                 , string2str(tmp->transaction)
-                                                     , code
-                                                 , content_type_id2string(func_wb->content_type)
-                                                     , func_wb->expires);
+        pluginsd_function_result_begin_to_buffer(
+            wb, string2str(tmp->transaction), code,
+            content_type_id2string(func_wb->content_type), func_wb->expires);
 
         buffer_fast_strcat(wb, buffer_tostring(func_wb), buffer_strlen(func_wb));
         pluginsd_function_result_end_to_buffer(wb);

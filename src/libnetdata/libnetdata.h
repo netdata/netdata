@@ -109,6 +109,7 @@ extern const char *netdata_configured_host_prefix;
 // safe includes before O/S specific functions
 #include "template-enum.h"
 #include "libjudy/src/Judy.h"
+#include "libjudy/judyl-typed.h"
 #include "july/july.h"
 
 #include "string/string.h"

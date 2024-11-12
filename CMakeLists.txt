@@ -889,6 +889,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/socket/connect-to.h
         src/libnetdata/socket/socket-peers.c
         src/libnetdata/socket/socket-peers.h
+        src/libnetdata/libjudy/judyl-typed.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

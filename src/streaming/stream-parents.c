@@ -43,6 +43,44 @@ struct stream_parent {
     STREAM_PARENT *next;
 };
 
+// --------------------------------------------------------------------------------------------------------------------
+// block unresponsive parents for some time, to allow speeding up the connection of the rest
+
+struct blocked_parent {
+    STRING *destination;
+    usec_t until;
+};
+
+DEFINE_JUDYL_TYPED(BLOCKED_PARENTS, struct blocked_parent *);
+static BLOCKED_PARENTS_JudyLSet blocked_parents_set = { 0 };
+static RW_SPINLOCK blocked_parents_spinlock = NETDATA_RW_SPINLOCK_INITIALIZER;
+
+static void block_parent_for_all_nodes(STREAM_PARENT *d, time_t duration_s) {
+    rw_spinlock_write_lock(&blocked_parents_spinlock);
+
+    struct blocked_parent *p = BLOCKED_PARENTS_Get(&blocked_parents_set, (Word_t)d->destination);
+    if(!p) {
+        p = callocz(1, sizeof(*p));
+        p->destination = string_dup(d->destination);
+        BLOCKED_PARENTS_Add(&blocked_parents_set, (Word_t)p->destination, p);
+    }
+    p->until = now_monotonic_usec() + duration_s * USEC_PER_SEC;
+
+    rw_spinlock_write_unlock(&blocked_parents_spinlock);
+}
+
+static bool is_a_blocked_parent(STREAM_PARENT *d) {
+    rw_spinlock_read_lock(&blocked_parents_spinlock);
+
+    struct blocked_parent *p = BLOCKED_PARENTS_Get(&blocked_parents_set, (Word_t)d->destination);
+    bool ret = p && p->until > now_monotonic_usec();
+
+    rw_spinlock_read_unlock(&blocked_parents_spinlock);
+    return ret;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 STREAM_HANDSHAKE stream_parent_get_disconnect_reason(STREAM_PARENT *d) {
     if(!d) return STREAM_HANDSHAKE_INTERNAL_ERROR;
     return d->reason;
@@ -188,33 +226,39 @@ static void stream_parent_nd_sock_error_to_reason(STREAM_PARENT *d, ND_SOCK *soc
         case ND_SOCK_ERR_CONNECTION_REFUSED:
             d->reason = STREAM_HANDSHAKE_CONNECTION_REFUSED;
             d->postpone_until_ut = randomize_wait_ut(30);
+            block_parent_for_all_nodes(d, 60);
             break;
 
         case ND_SOCK_ERR_CANNOT_RESOLVE_HOSTNAME:
             d->reason = STREAM_HANDSHAKE_CANT_RESOLVE_HOSTNAME;
             d->postpone_until_ut = randomize_wait_ut(10);
+            block_parent_for_all_nodes(d, 30);
             break;
 
         case ND_SOCK_ERR_NO_HOST_IN_DEFINITION:
             d->reason = STREAM_HANDSHAKE_NO_HOST_IN_DESTINATION;
             d->banned_for_this_session = true;
             d->postpone_until_ut = randomize_wait_ut(600);
+            block_parent_for_all_nodes(d, 30);
             break;
 
         case ND_SOCK_ERR_TIMEOUT:
             d->reason = STREAM_HANDSHAKE_CONNECT_TIMEOUT;
             d->postpone_until_ut = randomize_wait_ut(d->remote.nodes < 10 ? 30 : 300);
+            block_parent_for_all_nodes(d, 600);
             break;
 
         case ND_SOCK_ERR_SSL_INVALID_CERTIFICATE:
             d->reason = STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE;
             d->postpone_until_ut = randomize_wait_ut(600);
+            block_parent_for_all_nodes(d, 600);
             break;
 
         case ND_SOCK_ERR_SSL_CANT_ESTABLISH_SSL_CONNECTION:
         case ND_SOCK_ERR_SSL_FAILED_TO_OPEN:
             d->reason = STREAM_HANDSHAKE_ERROR_SSL_ERROR;
             d->postpone_until_ut = randomize_wait_ut(600);
+            block_parent_for_all_nodes(d, 600);
             break;
 
         default:
@@ -467,7 +511,7 @@ bool stream_parent_connect_to_one_unsafe(
         // we generate a random number for every parent here
         d->remote.nonce = os_random32();
 
-        if (d->banned_permanently || d->banned_for_this_session)
+        if (d->banned_permanently || d->banned_for_this_session || is_a_blocked_parent(d))
             continue;
 
         if (d->postpone_until_ut > now_ut) {
