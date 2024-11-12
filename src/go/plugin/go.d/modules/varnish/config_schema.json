@@ -30,7 +30,7 @@
       }
     },
     "required": [],
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }
