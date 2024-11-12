@@ -44,7 +44,7 @@ typedef void (*rrdpush_defer_cleanup_t)(struct sender_state *s, void *data);
 
 struct sender_state {
     RRDHOST *host;
-    uint64_t sender_magic;
+    uint64_t magic;
     SENDER_FLAGS flags;
 
     bool stop;                                  // when set, the sender should stop sending this host

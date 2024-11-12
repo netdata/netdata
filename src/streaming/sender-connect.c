@@ -619,7 +619,7 @@ void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wai
 
     if(wait) {
         sender_lock(host->sender);
-        while(host->sender->sender_magic) {
+        while(host->sender->magic) {
             sender_unlock(host->sender);
             sleep_usec(10 * USEC_PER_MS);
             sender_lock(host->sender);

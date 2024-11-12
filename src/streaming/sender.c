@@ -177,11 +177,11 @@ static bool rrdhost_set_sender(RRDHOST *host) {
 
     bool ret = false;
     sender_lock(host->sender);
-    if(!host->sender->sender_magic) {
+    if(!host->sender->magic) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
         host->stream.snd.status.connections++;
-        host->sender->sender_magic = sender_magic(host);
+        host->sender->magic = sender_magic(host);
         host->sender->last_state_since_t = now_realtime_sec();
         host->sender->exit.reason = STREAM_HANDSHAKE_NEVER;
         ret = true;
@@ -199,8 +199,8 @@ static void rrdhost_clear_sender(RRDHOST *host, bool having_sender_lock) {
     if(!having_sender_lock)
         sender_lock(host->sender);
 
-    if(host->sender->sender_magic == sender_magic(host)) {
-        host->sender->sender_magic = 0;
+    if(host->sender->magic == sender_magic(host)) {
+        host->sender->magic = 0;
         host->sender->exit.shutdown = false;
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         host->sender->last_state_since_t = now_realtime_sec();
@@ -653,38 +653,6 @@ pid_t sender_tid(RRDHOST *host __maybe_unused) {
     return sender.dispatcher.tid;
 }
 
-void stream_sender_connector_add(struct sender_state *s) {
-    ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
-        ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
-        ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
-        ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
-        ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
-        ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
-
-    if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->stream.snd.destination || !s->host->stream.snd.api_key) {
-        netdata_log_error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
-                          rrdhost_hostname(s->host), gettid_cached());
-        return;
-    }
-
-    rrdhost_stream_parent_ssl_init(s);
-
-    s->buffer->max_size = stream_send.buffer_max_size;
-    s->parent_using_h2o = stream_send.parents.h2o;
-
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-
-    spinlock_lock(&sender.connector.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
-    sender.connector.count++;
-    spinlock_unlock(&sender.connector.spinlock);
-
-    completion_mark_complete_a_job(&sender.connector.completion);
-}
-
 static void stream_sender_dispatcher_workers(void) {
     worker_register("STREAMSND");
     worker_register_job_name(WORKER_SENDER_JOB_CONNECT, "connect");
@@ -723,59 +691,36 @@ static void stream_sender_dispatcher_workers(void) {
     worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
 }
 
-void *stream_sender_connector_thread(void *ptr __maybe_unused) {
-    // stream_sender_dispatcher_workers();
+void stream_sender_connector_add(struct sender_state *s) {
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+        ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+        ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+        ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+        ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
-    unsigned job_id = 0;
-
-    while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
-        worker_is_idle();
-        job_id = completion_wait_for_a_job_with_timeout(&sender.connector.completion, job_id, 1);
-
-        spinlock_lock(&sender.connector.spinlock);
-        struct sender_state *next;
-        for(struct sender_state *s = sender.connector.queue; s ; s = next) {
-            next = s->next;
-
-            ND_LOG_STACK lgs[] = {
-                ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
-                ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
-                ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
-                ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
-                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
-                ND_LOG_FIELD_END(),
-            };
-            ND_LOG_STACK_PUSH(lgs);
-
-            if(rrdhost_is_sender_stopped(s)) {
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
-                rrdhost_clear_sender(s->host, false);
-                continue;
-            }
-
-            spinlock_unlock(&sender.connector.spinlock);
-            // worker_is_busy(WORKER_SENDER_JOB_CONNECT);
-            bool move_to_dispatcher = rrdpush_sender_connect(s);
-            spinlock_lock(&sender.connector.spinlock);
-
-            if(move_to_dispatcher) {
-                // worker_is_busy(WORKER_SENDER_JOB_CONNECTED);
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
-                spinlock_unlock(&sender.connector.spinlock);
-
-                spinlock_lock(&sender.dispatcher.spinlock);
-                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sender.dispatcher.queue, s, prev, next);
-                spinlock_unlock(&sender.dispatcher.spinlock);
-
-                spinlock_lock(&sender.connector.spinlock);
-            }
-
-            // worker_is_idle();
-        }
-        spinlock_unlock(&sender.connector.spinlock);
+    if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->stream.snd.destination || !s->host->stream.snd.api_key) {
+        netdata_log_error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
+                          rrdhost_hostname(s->host), gettid_cached());
+        return;
     }
 
-    return NULL;
+    rrdhost_stream_parent_ssl_init(s);
+
+    s->buffer->max_size = stream_send.buffer_max_size;
+    s->parent_using_h2o = stream_send.parents.h2o;
+
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+
+    spinlock_lock(&sender.connector.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
+    sender.connector.count++;
+    spinlock_unlock(&sender.connector.spinlock);
+
+    completion_mark_complete_a_job(&sender.connector.completion);
 }
 
 static void stream_sender_dispatcher_realloc_arrays_unsafe(size_t slot) {
@@ -851,6 +796,61 @@ static void stream_sender_dispatcher_move_running_to_connector(size_t slot) {
         rrdhost_clear_sender(s->host, false);
     else
         stream_sender_connector_add(s);
+}
+
+void *stream_sender_connector_thread(void *ptr __maybe_unused) {
+    // stream_sender_dispatcher_workers();
+
+    unsigned job_id = 0;
+
+    while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
+        worker_is_idle();
+        job_id = completion_wait_for_a_job_with_timeout(&sender.connector.completion, job_id, 1);
+
+        spinlock_lock(&sender.connector.spinlock);
+        struct sender_state *next;
+        for(struct sender_state *s = sender.connector.queue; s ; s = next) {
+            next = s->next;
+
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+                ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+                ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+                ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
+            if(rrdhost_is_sender_stopped(s)) {
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
+                rrdhost_clear_sender(s->host, false);
+                continue;
+            }
+
+            spinlock_unlock(&sender.connector.spinlock);
+            // worker_is_busy(WORKER_SENDER_JOB_CONNECT);
+            bool move_to_dispatcher = rrdpush_sender_connect(s);
+            spinlock_lock(&sender.connector.spinlock);
+
+            if(move_to_dispatcher) {
+                // worker_is_busy(WORKER_SENDER_JOB_CONNECTED);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
+                spinlock_unlock(&sender.connector.spinlock);
+
+                spinlock_lock(&sender.dispatcher.spinlock);
+                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sender.dispatcher.queue, s, prev, next);
+                spinlock_unlock(&sender.dispatcher.spinlock);
+
+                spinlock_lock(&sender.connector.spinlock);
+            }
+
+            // worker_is_idle();
+        }
+        spinlock_unlock(&sender.connector.spinlock);
+    }
+
+    return NULL;
 }
 
 void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
