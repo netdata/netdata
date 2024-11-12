@@ -9,32 +9,37 @@
 #include "stream-parents.h"
 
 #define WORKER_SENDER_JOB_CONNECT                                0
-#define WORKER_SENDER_JOB_PIPE_READ                              1
-#define WORKER_SENDER_JOB_SOCKET_RECEIVE                         2
-#define WORKER_SENDER_JOB_EXECUTE                                3
-#define WORKER_SENDER_JOB_SOCKET_SEND                            4
-#define WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE               5
-#define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW                    6
-#define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT                     7
-#define WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR                  8
-#define WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR                9
-#define WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR                  10
-#define WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED              11
-#define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR              12
-#define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR                 13
-#define WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION             14
-#define WORKER_SENDER_JOB_BUFFER_RATIO                          15
-#define WORKER_SENDER_JOB_BYTES_RECEIVED                        16
-#define WORKER_SENDER_JOB_BYTES_SENT                            17
-#define WORKER_SENDER_JOB_BYTES_COMPRESSED                      18
-#define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED                    19
-#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO               20
-#define WORKER_SENDER_JOB_REPLAY_REQUEST                        21
-#define WORKER_SENDER_JOB_FUNCTION_REQUEST                      22
-#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE                      23
-#define WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION    24
+#define WORKER_SENDER_JOB_CONNECTED                              1
+#define WORKER_SENDER_JOB_LIST                                   2
+#define WORKER_SENDER_JOB_DEQUEUE                                3
+#define WORKER_SENDER_JOB_PIPE_READ                              4
+#define WORKER_SENDER_JOB_SOCKET_RECEIVE                         5
+#define WORKER_SENDER_JOB_EXECUTE                                6
+#define WORKER_SENDER_JOB_SOCKET_SEND                            7
+#define WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE               8
+#define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW                    9
+#define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT                    10
+#define WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR                 11
+#define WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR               12
+#define WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR                  13
+#define WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED              14
+#define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR              15
+#define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR                 16
+#define WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION             17
+#define WORKER_SENDER_JOB_DISCONNECT_STOPPED                    18
+#define WORKER_SENDER_JOB_BUFFER_RATIO                          19
+#define WORKER_SENDER_JOB_BYTES_RECEIVED                        20
+#define WORKER_SENDER_JOB_BYTES_SENT                            21
+#define WORKER_SENDER_JOB_BYTES_COMPRESSED                      22
+#define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED                    23
+#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO               24
+#define WORKER_SENDER_JOB_REPLAY_REQUEST                        25
+#define WORKER_SENDER_JOB_FUNCTION_REQUEST                      26
+#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE                      27
+#define WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION    28
+#define WORKER_SENDER_JOB_NODES                                 29
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 25
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 30
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 25
 #endif
 

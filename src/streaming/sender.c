@@ -667,10 +667,51 @@ void stream_sender_connector_add(struct sender_state *s) {
     completion_mark_complete_a_job(&sender.connector.completion);
 }
 
+static void stream_sender_dispatcher_workers(void) {
+    worker_register("STREAMSND");
+    worker_register_job_name(WORKER_SENDER_JOB_CONNECT, "connect");
+    worker_register_job_name(WORKER_SENDER_JOB_CONNECTED, "connected");
+    worker_register_job_name(WORKER_SENDER_JOB_DEQUEUE, "dequeue");
+    worker_register_job_name(WORKER_SENDER_JOB_LIST, "list");
+    worker_register_job_name(WORKER_SENDER_JOB_PIPE_READ, "pipe read");
+    worker_register_job_name(WORKER_SENDER_JOB_SOCKET_RECEIVE, "receive");
+    worker_register_job_name(WORKER_SENDER_JOB_EXECUTE, "execute");
+    worker_register_job_name(WORKER_SENDER_JOB_SOCKET_SEND, "send");
+
+    // disconnection reasons
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR, "disconnect poll error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR, "disconnect socket error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW, "disconnect overflow");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR, "disconnect ssl error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED, "disconnect parent closed");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION, "disconnect no compression");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE, "disconnect bad handshake");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION, "disconnect cant upgrade");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_STOPPED, "disconnect stopped");
+
+    worker_register_job_name(WORKER_SENDER_JOB_REPLAY_REQUEST, "replay request");
+    worker_register_job_name(WORKER_SENDER_JOB_FUNCTION_REQUEST, "function");
+
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_NODES, "nodes", "nodes", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BUFFER_RATIO, "used buffer ratio", "%", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, "bytes received", "bytes/s", WORKER_METRIC_INCREMENT);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT, "bytes sent", "bytes/s", WORKER_METRIC_INCREMENT);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, "bytes compressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, "bytes uncompressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, "cumulative compression savings ratio", "%", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
+}
+
 void *stream_sender_connector_thread(void *ptr __maybe_unused) {
+    // stream_sender_dispatcher_workers();
+
     unsigned job_id = 0;
 
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
+        worker_is_idle();
         job_id = completion_wait_for_a_job(&sender.connector.completion, job_id);
 
         spinlock_lock(&sender.connector.spinlock);
@@ -689,10 +730,12 @@ void *stream_sender_connector_thread(void *ptr __maybe_unused) {
             ND_LOG_STACK_PUSH(lgs);
 
             spinlock_unlock(&sender.connector.spinlock);
+            // worker_is_busy(WORKER_SENDER_JOB_CONNECT);
             bool move_to_dispatcher = rrdpush_sender_connect(s);
             spinlock_lock(&sender.connector.spinlock);
 
             if(move_to_dispatcher) {
+                // worker_is_busy(WORKER_SENDER_JOB_CONNECTED);
                 DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
                 spinlock_unlock(&sender.connector.spinlock);
 
@@ -702,10 +745,10 @@ void *stream_sender_connector_thread(void *ptr __maybe_unused) {
 
                 spinlock_lock(&sender.connector.spinlock);
             }
+
+            // worker_is_idle();
         }
         spinlock_unlock(&sender.connector.spinlock);
-
-        sleep_usec(10 * USEC_PER_MS);
     }
 
     return NULL;
@@ -730,6 +773,8 @@ static void stream_sender_dispatcher_move_queue_to_running(void) {
     spinlock_lock(&sender.dispatcher.spinlock);
     stream_sender_dispatcher_realloc_arrays_unsafe(0); // our pipe
     while(sender.dispatcher.queue) {
+        worker_is_busy(WORKER_SENDER_JOB_DEQUEUE);
+
         struct sender_state *s = sender.dispatcher.queue;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.dispatcher.queue, s, prev, next);
 
@@ -793,38 +838,9 @@ static void stream_sender_dispatcher_move_running_to_connector(size_t slot) {
 }
 
 void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
+    stream_sender_dispatcher_workers();
+
     sender.dispatcher.tid = gettid_cached();
-
-    worker_register("STREAMSND");
-    worker_register_job_name(WORKER_SENDER_JOB_CONNECT, "connect");
-    worker_register_job_name(WORKER_SENDER_JOB_PIPE_READ, "pipe read");
-    worker_register_job_name(WORKER_SENDER_JOB_SOCKET_RECEIVE, "receive");
-    worker_register_job_name(WORKER_SENDER_JOB_EXECUTE, "execute");
-    worker_register_job_name(WORKER_SENDER_JOB_SOCKET_SEND, "send");
-
-    // disconnection reasons
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR, "disconnect poll error");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR, "disconnect socket error");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW, "disconnect overflow");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR, "disconnect ssl error");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED, "disconnect parent closed");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION, "disconnect no compression");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE, "disconnect bad handshake");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION, "disconnect cant upgrade");
-
-    worker_register_job_name(WORKER_SENDER_JOB_REPLAY_REQUEST, "replay request");
-    worker_register_job_name(WORKER_SENDER_JOB_FUNCTION_REQUEST, "function");
-
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_BUFFER_RATIO, "used buffer ratio", "%", WORKER_METRIC_ABSOLUTE);
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, "bytes received", "bytes/s", WORKER_METRIC_INCREMENT);
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT, "bytes sent", "bytes/s", WORKER_METRIC_INCREMENT);
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, "bytes compressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, "bytes uncompressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, "cumulative compression savings ratio", "%", WORKER_METRIC_ABSOLUTE);
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
 
     size_t pipe_buffer_size = 10 * 1024;
     char *pipe_buffer = mallocz(pipe_buffer_size);
@@ -844,9 +860,13 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
         size_t bytes_compressed = 0;
         NETDATA_DOUBLE buffer_ratio = 0.0;
 
+        size_t nodes = 0;
         for(size_t slot = 1; slot < sender.dispatcher.pollfd.used ; slot++) {
             struct sender_state *s = sender.dispatcher.pollfd.running[slot];
             if(!s) continue;
+
+            worker_is_busy(WORKER_SENDER_JOB_LIST);
+            nodes++;
 
             ND_LOG_STACK lgs[] = {
                 ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
@@ -859,6 +879,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
             ND_LOG_STACK_PUSH(lgs);
 
             if(s->sock.fd == -1 || rrdhost_is_sender_stopped(s) || rrdhost_sender_should_exit(s)) {
+                worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_STOPPED);
                 stream_sender_dispatcher_move_running_to_connector(slot);
                 continue;
             }
@@ -911,6 +932,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
             worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO, compression_ratio);
         }
 
+        worker_set_metric(WORKER_SENDER_JOB_NODES, (NETDATA_DOUBLE)nodes);
         worker_set_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
         worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
         worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, buffer_ratio);

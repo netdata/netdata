@@ -922,20 +922,33 @@ static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *
     // ------------------------------------------------------------------------
     // check value and ML
 
-    if (unlikely(!netdata_double_isnumber(value) || (flags == SN_EMPTY_SLOT))) {
-        value = NAN;
-        flags = SN_EMPTY_SLOT;
+    if(stream_has_capability(&parser->user, STREAM_CAP_DATA_WITH_ML)) {
+        // we receive anomaly information, no need for prediction on this node
+        if (unlikely(!netdata_double_isnumber(value) || (flags == SN_EMPTY_SLOT))) {
+            value = NAN;
+            flags = SN_EMPTY_SLOT;
+        }
 
         if(parser->user.v2.ml_locked)
-            ml_dimension_is_anomalous(rd, parser->user.v2.end_time, 0, false);
+            ml_dimension_received_anomaly(rd, !(flags & SN_FLAG_NOT_ANOMALOUS));
     }
-    else if(parser->user.v2.ml_locked) {
-        if (ml_dimension_is_anomalous(rd, parser->user.v2.end_time, value, true)) {
-            // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
-            flags &= ~((storage_number) SN_FLAG_NOT_ANOMALOUS);
+    else {
+        // we don't receive anomaly information, we need to run prediction on this node
+        if (unlikely(!netdata_double_isnumber(value) || (flags == SN_EMPTY_SLOT))) {
+            value = NAN;
+            flags = SN_EMPTY_SLOT;
+
+            if(parser->user.v2.ml_locked)
+                ml_dimension_is_anomalous(rd, parser->user.v2.end_time, 0, false);
         }
-        else
-            flags |= SN_FLAG_NOT_ANOMALOUS;
+        else if(parser->user.v2.ml_locked) {
+            if (ml_dimension_is_anomalous(rd, parser->user.v2.end_time, value, true)) {
+                // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
+                flags &= ~((storage_number) SN_FLAG_NOT_ANOMALOUS);
+            }
+            else
+                flags |= SN_FLAG_NOT_ANOMALOUS;
+        }
     }
 
     timing_step(TIMING_STEP_SET2_ML);
