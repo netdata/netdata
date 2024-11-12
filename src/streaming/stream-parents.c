@@ -10,6 +10,7 @@ struct stream_parent {
 
     bool banned_permanently;                    // when the parent is the origin of this host
     bool banned_for_this_session;               // when the parent is before us in the streaming path
+    bool banned_temporarily_erroneous;          // when the parent is blocked by another node we host
     STREAM_HANDSHAKE reason;
     uint32_t attempts;                          // how many times we have tried to connect to this parent
     usec_t since_ut;                            // the last time we tried to connect to it
@@ -158,7 +159,7 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
             buffer_json_member_add_datetime_rfc3339(wb, "since", d->since_ut, false);
             buffer_json_member_add_duration_ut(wb, "age", d->since_ut < now_ut ? (int64_t)(now_ut - d->since_ut) : 0);
 
-            if(!d->banned_for_this_session && !d->banned_permanently) {
+            if(!d->banned_for_this_session && !d->banned_permanently && !d->banned_temporarily_erroneous) {
                 buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
 
                 if (d->postpone_until_ut > now_ut) {
@@ -176,8 +177,12 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
                 buffer_json_member_add_boolean(wb, "skipped", d->selection.skipped);
             }
             else {
-                buffer_json_member_add_string(
-                    wb, "ban", d->banned_permanently ? "permanent" : (d->banned_for_this_session ? "session" : "none"));
+                if(d->banned_permanently)
+                    buffer_json_member_add_string(wb, "ban", "it is the localhost");
+                else if(d->banned_for_this_session)
+                    buffer_json_member_add_string(wb, "ban", "it is our parent");
+                else if(d->banned_temporarily_erroneous)
+                    buffer_json_member_add_string(wb, "ban", "it is erroneous");
             }
         }
         buffer_json_object_close(wb); // each candidate
@@ -510,8 +515,9 @@ bool stream_parent_connect_to_one_unsafe(
         // this is taken from the parent, but if the stream_info call fails
         // we generate a random number for every parent here
         d->remote.nonce = os_random32();
+        d->banned_temporarily_erroneous = is_a_blocked_parent(d);
 
-        if (d->banned_permanently || d->banned_for_this_session || is_a_blocked_parent(d))
+        if (d->banned_permanently || d->banned_for_this_session || d->banned_temporarily_erroneous)
             continue;
 
         if (d->postpone_until_ut > now_ut) {
