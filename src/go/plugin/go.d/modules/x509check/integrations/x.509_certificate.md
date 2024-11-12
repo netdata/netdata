@@ -56,13 +56,15 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 ### Per source
 
-These metrics refer to the configured source.
+These metrics refer to the SSL certificate.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| source | Configured source. |
+| source | Same as the "source" configuration option. |
+| common_name | The common name (CN) extracted from the certificate. |
+| depth | The depth of the certificate within the certificate chain. The leaf certificate has a depth of 0, and subsequent certificates (intermediate certificates) have increasing depth values. The root certificate is at the highest depth. |
 
 Metrics:
 
@@ -80,8 +82,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ x509check_days_until_expiration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf) | x509check.time_until_expiration | Time until x509 certificate expires for ${label:source} |
-| [ x509check_revocation_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf) | x509check.revocation_status | x509 certificate revocation status for ${label:source} |
+| [ x509check_days_until_expiration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf) | x509check.time_until_expiration | SSL cert expiring soon (${label:source} cn:${label:common_name}) |
+| [ x509check_revocation_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf) | x509check.revocation_status | SSL cert revoked (${label:source}) |
 
 
 ## Setup
@@ -116,8 +118,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | source | Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file, smtp. |  | no |
-| days_until_expiration_warning | Number of days before the alarm status is warning. | 30 | no |
-| days_until_expiration_critical | Number of days before the alarm status is critical. | 15 | no |
+| check_full_chain | Monitor expiration time for all certificates in the SSL/TLS chain, including intermediate and root certificates. | no | no |
 | check_revocation_status | Whether to check the revocation status of the certificate. | no | no |
 | timeout | SSL connection timeout. | 2 | no |
 | tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | no | no |
