@@ -233,7 +233,6 @@
                 <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Connect to the Cloud" />
 
                 <Control Id="WarningLabelOld" Type="Text" X="10" Y="60" Width="350" Height="15" Text="Agent already claimed? Click Next." />
-                <Control Id="WarningLabelNew0" Type="Text" X="10" Y="75" Width="350" Height="15" Text="If you want to connect to Netdata Cloud, enter your Claim Token and Room ID(s)." />
 
                 <Control Id="TokenLabel" Type="Text" X="10" Y="100" Width="55" Height="15" Text="Claim Token:" />
                 <Control Id="Token" Type="Edit" X="65" Y="100" Width="290" Height="18" Property="TOKEN" Text="{135}" />
