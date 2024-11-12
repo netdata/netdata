@@ -1012,6 +1012,26 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
 
             short revents = sender.dispatcher.pollfd.array[slot].revents;
 
+            if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
+                char *error = NULL;
+
+                if (revents & POLLERR)
+                    error = "socket reports errors (POLLERR)";
+                else if (revents & POLLHUP)
+                    error = "connection closed by remote end (POLLHUP)";
+                else if (revents & POLLNVAL)
+                    error = "connection is invalid (POLLNVAL)";
+
+                if(error) {
+                    worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR);
+                    netdata_log_error("STREAM %s [send to %s]: restarting connection: %s - %zu bytes transmitted.",
+                                      rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
+
+                    stream_sender_dispatcher_move_running_to_connector(slot);
+                    continue;
+                }
+            }
+
             if(revents & POLLOUT) {
                 worker_is_busy(WORKER_SENDER_JOB_SOCKET_SEND);
                 ssize_t bytes = attempt_to_send(s);
@@ -1033,25 +1053,6 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
             if(unlikely(s->read_len)) {
                 worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
                 rrdpush_sender_execute_commands(s);
-            }
-
-            if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
-                char *error = NULL;
-
-                if (revents & POLLERR)
-                    error = "socket reports errors (POLLERR)";
-                else if (revents & POLLHUP)
-                    error = "connection closed by remote end (POLLHUP)";
-                else if (revents & POLLNVAL)
-                    error = "connection is invalid (POLLNVAL)";
-
-                if(error) {
-                    worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR);
-                    netdata_log_error("STREAM %s [send to %s]: restarting connection: %s - %zu bytes transmitted.",
-                                      rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
-
-                    stream_sender_dispatcher_move_running_to_connector(slot);
-                }
             }
 
             replay_entries += dictionary_entries(s->replication.requests);
