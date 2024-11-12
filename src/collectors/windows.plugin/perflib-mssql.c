@@ -7,6 +7,8 @@
 #define NETDATA_MAX_INSTANCE_NAME 32
 #define NETDATA_MAX_INSTANCE_OBJECT 128
 
+BOOL is_sqlexpress = FALSE;
+
 enum netdata_mssql_metrics {
     NETDATA_MSSQL_GENERAL_STATS,
     NETDATA_MSSQL_SQL_ERRORS,
@@ -146,8 +148,11 @@ static void initialize_mssql_objects(struct mssql_instance *p, const char *insta
     char prefix[NETDATA_MAX_INSTANCE_NAME];
     if (!strcmp(instance, "MSSQLSERVER")) {
         strncpyz(prefix, "SQLServer:", sizeof(prefix) -1);
+    } else if (!strcmp(instance, "SQLEXPRESS")) {
+        strncpyz(prefix, "MSSQL$SQLEXPRESS:", sizeof(prefix) -1);
     } else {
-        snprintfz(prefix, sizeof(prefix) -1, "MSSQL$:%s:", instance);
+        char *express = (!is_sqlexpress) ? "" : "SQLEXPRESS" ;
+        snprintfz(prefix, sizeof(prefix) -1, "MSSQL$%s:%s:", express, instance);
     }
 
     size_t length = strlen(prefix);
@@ -286,6 +291,10 @@ static int mssql_fill_dictionary() {
         ret = RegEnumValue(hKey, i, avalue, &length, NULL, NULL, NULL, NULL);
         if (ret != ERROR_SUCCESS)
             continue;
+
+        if (!strcmp(avalue, "SQLEXPRESS")) {
+            is_sqlexpress = TRUE;
+        }
 
         struct mssql_instance *p = dictionary_set(mssql_instances, avalue, NULL, sizeof(*p));
     }
