@@ -115,7 +115,7 @@
     "required": [
       "url"
     ],
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

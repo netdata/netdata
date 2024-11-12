@@ -178,7 +178,7 @@
       "url",
       "status_accepted"
     ],
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

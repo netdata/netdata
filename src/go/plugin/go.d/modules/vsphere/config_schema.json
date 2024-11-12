@@ -153,7 +153,7 @@
       "host_include",
       "vm_include"
     ],
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

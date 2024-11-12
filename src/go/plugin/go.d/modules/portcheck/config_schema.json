@@ -57,7 +57,7 @@
     "required": [
       "host"
     ],
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

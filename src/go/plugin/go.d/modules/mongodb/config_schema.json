@@ -64,7 +64,7 @@
     "required": [
       "uri"
     ],
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

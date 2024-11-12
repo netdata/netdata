@@ -69,7 +69,7 @@
     "required": [
       "source"
     ],
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

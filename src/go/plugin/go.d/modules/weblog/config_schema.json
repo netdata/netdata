@@ -23,6 +23,12 @@
         "type": "string",
         "default": "*.gz"
       },
+      "group_response_codes": {
+        "title": "Group response codes",
+        "description": "Controls how HTTP response codes are grouped in charts.",
+        "type": "boolean",
+        "default": true
+      },
       "histogram": {
         "title": "Request processing time histogram",
         "description": "Buckets for the histogram in milliseconds.",
@@ -248,7 +254,7 @@
       "path",
       "log_type"
     ],
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     },
@@ -285,6 +291,18 @@
                     "description": "Delimiter used to separate fields in the log file. Default: space (' ').",
                     "type": "string",
                     "default": " "
+                  },
+                  "trim_leading_space": {
+                    "title": "Trim leading space",
+                    "description": "If true, leading white space in a field is ignored.",
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "fields_per_record": {
+                    "title": "Fields per record",
+                    "description": "The number of expected fields per record.",
+                    "type": "integer",
+                    "default": -1
                   }
                 },
                 "required": [
@@ -399,6 +417,12 @@
     "uiOptions": {
       "fullPage": true
     },
+    "group_response_codes": {
+      "ui:help": "When true, creates separate charts for each response code family (1xx, 2xx, 3xx, etc.), with individual response codes (200, 201, etc.) as dimensions within each family. When false, creates a single chart with all response codes as separate dimensions."
+    },
+    "fields_per_record": {
+      "ui:help": "If negative, no check is made and records may have a variable number of fields."
+    },
     "log_type": {
       "ui:widget": "radio",
       "ui:options": {
@@ -420,6 +444,7 @@
             "update_every",
             "path",
             "exclude_path",
+            "group_response_codes",
             "histogram"
           ]
         },
