@@ -64,7 +64,7 @@
       "url",
       "username"
     ],
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

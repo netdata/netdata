@@ -57,7 +57,7 @@
       "leases_path",
       "pools"
     ],
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

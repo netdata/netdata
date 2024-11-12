@@ -17,7 +17,7 @@
         "type": "string"
       }
     },
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

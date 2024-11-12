@@ -19,7 +19,7 @@
         "default": 2
       }
     },
-    "additionalProperties": false,
+    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }
