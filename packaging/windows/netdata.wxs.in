@@ -164,7 +164,7 @@
             <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
             <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="((TOKEN = &quot;&quot;) AND (ROOMS = &quot;&quot;)) OR ((NOT (TOKEN = &quot;&quot;)) AND (NOT (ROOMS = &quot;&quot;)))" />
 
-            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" Order="1" Condition="NOT Installed OR WixUI_InstallMode = &quot;Change&quot;" />
+            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="NDConfigDialog" Order="1" Condition="NOT Installed OR WixUI_InstallMode = &quot;Change&quot;" />
             <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
             <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="3" Condition="Installed AND PATCH" />
             <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
@@ -172,6 +172,7 @@
             <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
             <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
             <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+
         </UI>
 
         <UIRef Id="WixUI_Common" />
@@ -231,8 +232,8 @@
                 <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Enter your Space's Claim Token and the Room IDs where you want to add the Agent." />
                 <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Connect to the Cloud" />
 
-                <Control Id="WarningLabelOld" Type="Text" X="10" Y="60" Width="350" Height="15" Text="Agent already claimed. Click Next." />
-                <Control Id="WarningLabelNew0" Type="Text" X="10" Y="75" Width="350" Height="15" Text="If you want to connectto Netdata Cloud, enter your Claim Token and Room ID(s)." />
+                <Control Id="WarningLabelOld" Type="Text" X="10" Y="60" Width="350" Height="15" Text="Agent already claimed? Click Next." />
+                <Control Id="WarningLabelNew0" Type="Text" X="10" Y="75" Width="350" Height="15" Text="If you want to connect to Netdata Cloud, enter your Claim Token and Room ID(s)." />
 
                 <Control Id="TokenLabel" Type="Text" X="10" Y="100" Width="55" Height="15" Text="Claim Token:" />
                 <Control Id="Token" Type="Edit" X="65" Y="100" Width="290" Height="18" Property="TOKEN" Text="{135}" />
