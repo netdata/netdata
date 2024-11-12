@@ -193,11 +193,10 @@ static bool rrdhost_set_sender(RRDHOST *host) {
     return ret;
 }
 
-static void rrdhost_clear_sender(RRDHOST *host, bool having_sender_lock) {
+static void rrdhost_clear_sender(RRDHOST *host) {
     if(unlikely(!host->sender)) return;
 
-    if(!having_sender_lock)
-        sender_lock(host->sender);
+    sender_lock(host->sender);
 
     if(host->sender->magic == sender_magic(host)) {
         host->sender->magic = 0;
@@ -210,8 +209,7 @@ static void rrdhost_clear_sender(RRDHOST *host, bool having_sender_lock) {
 
     rrdhost_stream_parents_reset(host, STREAM_HANDSHAKE_EXITING);
 
-    if(!having_sender_lock)
-        sender_unlock(host->sender);
+    sender_unlock(host->sender);
 
 #ifdef NETDATA_LOG_STREAM_SENDER
     if (s->stream_log_fp) {
@@ -772,7 +770,7 @@ static void stream_sender_dispatcher_move_queue_to_running(void) {
     spinlock_unlock(&sender.dispatcher.spinlock);
 }
 
-static void stream_sender_dispatcher_move_running_to_connector(size_t slot) {
+static void stream_sender_dispatcher_move_running_to_connector_or_remove(size_t slot) {
     sender.dispatcher.pollfd.array[slot] = (struct pollfd) {
         .fd = -1,
         .events = 0,
@@ -793,7 +791,7 @@ static void stream_sender_dispatcher_move_running_to_connector(size_t slot) {
     sender_unlock(s);
 
     if (rrdhost_is_sender_stopped(s))
-        rrdhost_clear_sender(s->host, false);
+        rrdhost_clear_sender(s->host);
     else
         stream_sender_connector_add(s);
 }
@@ -824,7 +822,7 @@ void *stream_sender_connector_thread(void *ptr __maybe_unused) {
 
             if(rrdhost_is_sender_stopped(s)) {
                 DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
-                rrdhost_clear_sender(s->host, false);
+                rrdhost_clear_sender(s->host);
                 continue;
             }
 
@@ -896,7 +894,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
 
             if(s->sock.fd == -1 || rrdhost_is_sender_stopped(s) || rrdhost_sender_should_exit(s)) {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_STOPPED);
-                stream_sender_dispatcher_move_running_to_connector(slot);
+                stream_sender_dispatcher_move_running_to_connector_or_remove(slot);
                 continue;
             }
 
@@ -910,7 +908,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
                                   "we have sent %zu bytes on this connection via %zu send attempts.",
                                   rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
                                   s->sent_bytes_on_this_connection, s->send_attempts);
-                stream_sender_dispatcher_move_running_to_connector(slot);
+                stream_sender_dispatcher_move_running_to_connector_or_remove(slot);
                 continue;
             }
 
@@ -1043,7 +1041,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
                     netdata_log_error("STREAM %s [send to %s]: restarting connection: %s - %zu bytes transmitted.",
                                       rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
 
-                    stream_sender_dispatcher_move_running_to_connector(slot);
+                    stream_sender_dispatcher_move_running_to_connector_or_remove(slot);
                     continue;
                 }
             }
@@ -1084,15 +1082,19 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
         stream_sender_dispatcher_move_queue_to_running();
 
     // stop all hosts
-    for(size_t slot = 0; slot < sender.dispatcher.pollfd.used ;slot++) {
+    for(size_t slot = 1; slot < sender.dispatcher.pollfd.used ;slot++) {
         struct sender_state *s = sender.dispatcher.pollfd.running[slot];
         if(!s) continue;
 
         __atomic_store_n(&s->stop, true, __ATOMIC_RELAXED);
-        stream_sender_dispatcher_move_running_to_connector(slot);
+        stream_sender_dispatcher_move_running_to_connector_or_remove(slot);
     }
 
     // cleanup
+    freez(sender.dispatcher.pollfd.array);
+    freez(sender.dispatcher.pollfd.running);
+    memset(&sender.dispatcher.pollfd, 0, sizeof(sender.dispatcher.pollfd));
+
     freez(pipe_buffer);
     close(sender.dispatcher.pipe_fds[PIPE_READ]); sender.dispatcher.pipe_fds[PIPE_READ] = -1;
     close(sender.dispatcher.pipe_fds[PIPE_WRITE]); sender.dispatcher.pipe_fds[PIPE_WRITE] = -1;
