@@ -62,13 +62,9 @@ modules:
               description: "Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file, smtp."
               default_value: ""
               required: false
-            - name: days_until_expiration_warning
-              description: Number of days before the alarm status is warning.
-              default_value: 30
-              required: false
-            - name: days_until_expiration_critical
-              description: Number of days before the alarm status is critical.
-              default_value: 15
+            - name: check_full_chain
+              description: Monitor expiration time for all certificates in the SSL/TLS chain, including intermediate and root certificates.
+              default_value: false
               required: false
             - name: check_revocation_status
               description: Whether to check the revocation status of the certificate.
@@ -138,11 +134,11 @@ modules:
     alerts:
       - name: x509check_days_until_expiration
         metric: x509check.time_until_expiration
-        info: "Time until x509 certificate expires for ${label:source}"
+        info: "SSL cert expiring soon (${label:source} cn:${label:common_name})"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf
       - name: x509check_revocation_status
         metric: x509check.revocation_status
-        info: "x509 certificate revocation status for ${label:source}"
+        info: "SSL cert revoked (${label:source})"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf
     metrics:
       folding:
@@ -152,10 +148,14 @@ modules:
       availability: []
       scopes:
         - name: source
-          description: These metrics refer to the configured source.
+          description: These metrics refer to the SSL certificate.
           labels:
             - name: source
-              description: Configured source.
+              description: Same as the "source" configuration option.
+            - name: common_name
+              description: The common name (CN) extracted from the certificate.
+            - name: depth
+              description: The depth of the certificate within the certificate chain. The leaf certificate has a depth of 0, and subsequent certificates (intermediate certificates) have increasing depth values. The root certificate is at the highest depth.
           metrics:
             - name: x509check.time_until_expiration
               description: Time Until Certificate Expiration

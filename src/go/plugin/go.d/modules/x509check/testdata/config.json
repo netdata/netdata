@@ -6,7 +6,6 @@
   "tls_cert": "ok",
   "tls_key": "ok",
   "tls_skip_verify": true,
-  "days_until_expiration_warning": 123,
-  "days_until_expiration_critical": 123,
+  "check_full_chain": true,
   "check_revocation_status": true
 }
