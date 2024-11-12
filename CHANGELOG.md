@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- update plugin\_data\_collection\_status alert summary/info [\#18990](https://github.com/netdata/netdata/pull/18990) ([ilyam8](https://github.com/ilyam8))
+- health: enable go.d data collection job status alert [\#18989](https://github.com/netdata/netdata/pull/18989) ([ilyam8](https://github.com/ilyam8))
+- update GH bug report [\#18988](https://github.com/netdata/netdata/pull/18988) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d.plugin\): fix duplicate boolToInt [\#18987](https://github.com/netdata/netdata/pull/18987) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump golang.org/x/net from 0.30.0 to 0.31.0 in /src/go [\#18986](https://github.com/netdata/netdata/pull/18986) ([dependabot[bot]](https://github.com/apps/dependabot))
 - improvement\(go.d.plugin\): add data collection status chart [\#18981](https://github.com/netdata/netdata/pull/18981) ([ilyam8](https://github.com/ilyam8))
@@ -430,9 +433,6 @@
 - go.d remove duplicates in testing [\#18435](https://github.com/netdata/netdata/pull/18435) ([ilyam8](https://github.com/ilyam8))
 - Improve agent shutdown time [\#18434](https://github.com/netdata/netdata/pull/18434) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18432](https://github.com/netdata/netdata/pull/18432) ([netdatabot](https://github.com/netdatabot))
-- go.d/sensors: add sysfs scan method to collect metrics [\#18431](https://github.com/netdata/netdata/pull/18431) ([ilyam8](https://github.com/ilyam8))
-- stream paths propagated to children and parents [\#18430](https://github.com/netdata/netdata/pull/18430) ([ktsaou](https://github.com/ktsaou))
-- go.d lmsensors improve performance [\#18429](https://github.com/netdata/netdata/pull/18429) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
