@@ -193,8 +193,11 @@ static bool rrdhost_set_sender(RRDHOST *host) {
     return ret;
 }
 
-static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
+static void rrdhost_clear_sender(RRDHOST *host, bool having_sender_lock) {
     if(unlikely(!host->sender)) return;
+
+    if(!having_sender_lock)
+        sender_lock(host->sender);
 
     if(host->sender->sender_magic == sender_magic(host)) {
         host->sender->sender_magic = 0;
@@ -206,6 +209,16 @@ static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
     }
 
     rrdhost_stream_parents_reset(host, STREAM_HANDSHAKE_EXITING);
+
+    if(!having_sender_lock)
+        sender_unlock(host->sender);
+
+#ifdef NETDATA_LOG_STREAM_SENDER
+    if (s->stream_log_fp) {
+        fclose(s->stream_log_fp);
+        s->stream_log_fp = NULL;
+    }
+#endif
 }
 
 static bool rrdhost_is_sender_stopped(struct sender_state *s) {
@@ -623,6 +636,11 @@ static struct {
     }
 };
 
+void stream_sender_cancel_threads(void) {
+    nd_thread_signal_cancel(sender.connector.thread);
+    nd_thread_signal_cancel(sender.dispatcher.thread);
+}
+
 int sender_write_pipe_fd(struct sender_state *s __maybe_unused) {
     return sender.dispatcher.pipe_fds[PIPE_WRITE];
 }
@@ -729,6 +747,12 @@ void *stream_sender_connector_thread(void *ptr __maybe_unused) {
             };
             ND_LOG_STACK_PUSH(lgs);
 
+            if(rrdhost_is_sender_stopped(s)) {
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
+                rrdhost_clear_sender(s->host, false);
+                continue;
+            }
+
             spinlock_unlock(&sender.connector.spinlock);
             // worker_is_busy(WORKER_SENDER_JOB_CONNECT);
             bool move_to_dispatcher = rrdpush_sender_connect(s);
@@ -820,21 +844,13 @@ static void stream_sender_dispatcher_move_running_to_connector(size_t slot) {
         rrdpush_sender_thread_close_socket(s);
         rrdpush_sender_on_disconnect(s->host);
         rrdpush_sender_execute_commands_cleanup(s);
-
-        if (s->stop) {
-            rrdhost_clear_sender___while_having_sender_mutex(s->host);
-
-#ifdef NETDATA_LOG_STREAM_SENDER
-            if (s->stream_log_fp) {
-                fclose(s->stream_log_fp);
-                s->stream_log_fp = NULL;
-            }
-#endif
-        }
-        else
-            stream_sender_connector_add(s);
     }
     sender_unlock(s);
+
+    if (rrdhost_is_sender_stopped(s))
+        rrdhost_clear_sender(s->host, false);
+    else
+        stream_sender_connector_add(s);
 }
 
 void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
@@ -1063,18 +1079,20 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
         worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
     }
 
-    while(sender.dispatcher.queue) {
+    // dequeue
+    while(sender.dispatcher.queue)
         stream_sender_dispatcher_move_queue_to_running();
-    }
 
+    // stop all hosts
     for(size_t slot = 0; slot < sender.dispatcher.pollfd.used ;slot++) {
         struct sender_state *s = sender.dispatcher.pollfd.running[slot];
         if(!s) continue;
 
-        s->stop = true;
+        __atomic_store_n(&s->stop, true, __ATOMIC_RELAXED);
         stream_sender_dispatcher_move_running_to_connector(slot);
     }
 
+    // cleanup
     freez(pipe_buffer);
     close(sender.dispatcher.pipe_fds[PIPE_READ]); sender.dispatcher.pipe_fds[PIPE_READ] = -1;
     close(sender.dispatcher.pipe_fds[PIPE_WRITE]); sender.dispatcher.pipe_fds[PIPE_WRITE] = -1;

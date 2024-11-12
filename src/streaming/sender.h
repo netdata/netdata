@@ -166,6 +166,8 @@ uint64_t sender_magic(RRDHOST *host);
 pid_t sender_tid(RRDHOST *host);
 int sender_write_pipe_fd(struct sender_state *s);
 
+void stream_sender_cancel_threads(void);
+
 #include "replication.h"
 
 #endif //NETDATA_SENDER_H
