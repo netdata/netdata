@@ -42,21 +42,21 @@ func (x *X509Check) collectCertificates(mx map[string]int64, certs []*x509.Certi
 
 		px := fmt.Sprintf("cert_depth%d_", i)
 
-		expiry := int64(time.Until(cert.NotAfter).Seconds())
-
-		mx[px+"expiry"] = expiry
+		mx[px+"expiry"] = int64(time.Until(cert.NotAfter).Seconds())
 
 		if i == 0 && x.CheckRevocation {
-			rev, ok, err := revoke.VerifyCertificateError(certs[0])
-			if err != nil {
-				x.Debug(err)
-				continue
-			}
-			if !ok {
-				continue
-			}
-			mx[px+"revoked"] = metrix.Bool(rev)
-			mx[px+"not_revoked"] = metrix.Bool(!rev)
+			func() {
+				rev, ok, err := revoke.VerifyCertificateError(cert)
+				if err != nil {
+					x.Debug(err)
+					return
+				}
+				if !ok {
+					return
+				}
+				mx[px+"revoked"] = metrix.Bool(rev)
+				mx[px+"not_revoked"] = metrix.Bool(!rev)
+			}()
 		}
 
 		if !x.CheckFullChain {

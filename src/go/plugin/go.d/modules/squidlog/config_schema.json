@@ -40,7 +40,6 @@
       "path",
       "log_type"
     ],
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     },

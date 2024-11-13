@@ -135,7 +135,6 @@
     "required": [
       "url"
     ],
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

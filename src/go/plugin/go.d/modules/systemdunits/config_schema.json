@@ -75,7 +75,6 @@
     "required": [
       "include"
     ],
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }
