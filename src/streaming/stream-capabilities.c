@@ -2,12 +2,15 @@
 
 #include "rrdpush.h"
 
-static STREAM_CAPABILITIES globally_disabled_capabilities = STREAM_CAP_NONE;
+static STREAM_CAPABILITIES globally_disabled_capabilities = STREAM_CAP_ALWAYS_DISABLED;
 
 static struct {
     STREAM_CAPABILITIES cap;
     const char *str;
 } capability_names[] = {
+    // DO NOT CHANGE NAMES
+    // THEY ARE USED BY STREAM_PATH, SO CONNECTING OF DIFFERENT NODES WILL BREAK
+
     {STREAM_CAP_V1,           "V1" },
     {STREAM_CAP_V2,           "V2" },
     {STREAM_CAP_VN,           "VN" },
@@ -21,6 +24,7 @@ static struct {
     {STREAM_CAP_BINARY,       "BINARY" },
     {STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
     {STREAM_CAP_IEEE754,      "IEEE754" },
+    {STREAM_CAP_DATA_WITH_ML, "ML"},            // do not remove this - stream_path fails to parse old nodes
     {STREAM_CAP_ML_MODELS,    "MLMODELS" },
     {STREAM_CAP_DYNCFG,       "DYNCFG" },
     {STREAM_CAP_SLOTS,        "SLOTS" },
@@ -30,6 +34,8 @@ static struct {
     {STREAM_CAP_PROGRESS,     "PROGRESS" },
     {STREAM_CAP_NODE_ID,      "NODEID" },
     {STREAM_CAP_PATHS,        "PATHS" },
+
+    // terminator
     {0 , NULL },
 };
 
