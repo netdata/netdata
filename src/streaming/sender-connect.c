@@ -204,7 +204,7 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
 
     worker_is_busy(worker_job_id);
     rrdpush_sender_thread_close_socket(s);
-    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_CONNECTED, delay);
+    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, version, delay);
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
