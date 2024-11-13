@@ -348,7 +348,6 @@
       "community",
       "options"
     ],
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

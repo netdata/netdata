@@ -125,7 +125,6 @@
     "required": [
       "charts"
     ],
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

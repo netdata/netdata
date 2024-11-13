@@ -39,7 +39,6 @@
       "address",
       "protocol"
     ],
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

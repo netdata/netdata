@@ -19,7 +19,6 @@
       }
     },
     "required": [],
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

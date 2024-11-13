@@ -91,7 +91,6 @@
     "required": [
       "dsn"
     ],
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }
