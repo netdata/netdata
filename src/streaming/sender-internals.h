@@ -8,38 +8,44 @@
 #include "aclk/https_client.h"
 #include "stream-parents.h"
 
-#define WORKER_SENDER_JOB_CONNECT                                0
-#define WORKER_SENDER_JOB_CONNECTED                              1
-#define WORKER_SENDER_JOB_LIST                                   2
-#define WORKER_SENDER_JOB_DEQUEUE                                3
-#define WORKER_SENDER_JOB_PIPE_READ                              4
-#define WORKER_SENDER_JOB_SOCKET_RECEIVE                         5
-#define WORKER_SENDER_JOB_EXECUTE                                6
-#define WORKER_SENDER_JOB_SOCKET_SEND                            7
-#define WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE               8
-#define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW                    9
-#define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT                    10
-#define WORKER_SENDER_JOB_DISCONNECT_POLL_ERROR                 11
-#define WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR               12
-#define WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR                  13
-#define WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED              14
-#define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR              15
-#define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR                 16
-#define WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION             17
-#define WORKER_SENDER_JOB_DISCONNECT_STOPPED                    18
-#define WORKER_SENDER_JOB_BUFFER_RATIO                          19
-#define WORKER_SENDER_JOB_BYTES_RECEIVED                        20
-#define WORKER_SENDER_JOB_BYTES_SENT                            21
-#define WORKER_SENDER_JOB_BYTES_COMPRESSED                      22
-#define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED                    23
-#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO               24
-#define WORKER_SENDER_JOB_REPLAY_REQUEST                        25
-#define WORKER_SENDER_JOB_FUNCTION_REQUEST                      26
-#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE                      27
-#define WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION    28
-#define WORKER_SENDER_JOB_NODES                                 29
+// connector thread
+#define WORKER_SENDER_CONNECTOR_JOB_CONNECTING                          0
+#define WORKER_SENDER_CONNECTOR_JOB_CONNECTED                           1
+#define WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE            2
+#define WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT                  3
+#define WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION  4
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 30
+// dispatcher thread
+#define WORKER_SENDER_DISPATCHER_JOB_LIST                               0
+#define WORKER_SENDER_DISPATCHER_JOB_DEQUEUE                            1
+#define WORKER_SENDER_DISPATCHER_JOB_POLL_ERROR                         2
+#define WORKER_SENDER_DISPATCHER_JOB_PIPE_READ                          3
+#define WORKER_SENDER_DISPATCHER_JOB_SOCKET_RECEIVE                     4
+#define WORKER_SENDER_DISPATCHER_JOB_SOCKET_SEND                        5
+#define WORKER_SENDER_DISPATCHER_JOB_EXECUTE                            6
+#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_OVERFLOW                7
+#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_TIMEOUT                 8
+#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SOCKET_ERROR            9
+#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED           10
+#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR           11
+#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR              12
+#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_STOPPED                 13
+
+// dispatcher execute requests
+#define WORKER_SENDER_DISPATCHER_JOB_REPLAY_REQUEST                     14
+#define WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST                   15
+
+// dispatcher metrics
+#define WORKER_SENDER_DISPATCHER_JOB_NODES                              16
+#define WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO                       17
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED                     18
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT                         19
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED                   20
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED                 21
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO            22
+#define WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE                   23
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 24
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 25
 #endif
 

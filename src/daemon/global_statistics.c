@@ -3499,6 +3499,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "MLDETECT",    .family = "workers ML detection",            .priority = 1000000 },
     { .name = "STREAMRCV",   .family = "workers streaming receive",       .priority = 1000000 },
     { .name = "STREAMSND",   .family = "workers streaming send",          .priority = 1000000 },
+    { .name = "STREAMCNT",   .family = "workers streaming connect",       .priority = 1000000 },
     { .name = "DBENGINE",    .family = "workers dbengine instances",      .priority = 1000000 },
     { .name = "LIBUV",       .family = "workers libuv threadpool",        .priority = 1000000 },
     { .name = "WEB",         .family = "workers web server",              .priority = 1000000 },

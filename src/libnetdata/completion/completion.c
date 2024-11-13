@@ -83,18 +83,20 @@ unsigned completion_wait_for_a_job(struct completion *p, unsigned completed_jobs
 
 unsigned completion_wait_for_a_job_with_timeout(struct completion *p, unsigned completed_jobs, uint64_t timeout_s)
 {
-    timeout_s *= NSEC_PER_SEC;
+    uint64_t timeout_ns = timeout_s * NSEC_PER_SEC;
+    if(!timeout_ns) timeout_ns = 1;
 
-    uint64_t start_time = uv_hrtime();
+    uint64_t start_time_ns = uv_hrtime();
 
     uv_mutex_lock(&p->mutex);
-    while (timeout_s > 0 && p->completed_jobs <= completed_jobs) {
-        if(uv_cond_timedwait(&p->cond, &p->mutex, timeout_s) == UV_ETIMEDOUT)
+    while (0 == p->completed && p->completed_jobs <= completed_jobs) {
+        int rc = uv_cond_timedwait(&p->cond, &p->mutex, timeout_ns);
+        if(rc == UV_ETIMEDOUT)
             break;
 
-        uint64_t elapsed = uv_hrtime() - start_time;
-        if (elapsed >= timeout_s) break;
-        timeout_s -= elapsed;
+        uint64_t elapsed = uv_hrtime() - start_time_ns;
+        if (elapsed >= timeout_ns) break;
+        timeout_ns -= elapsed;
     }
     completed_jobs = p->completed_jobs;
     uv_mutex_unlock(&p->mutex);

@@ -117,7 +117,6 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                     netdata_log_error("STREAM %s [send to %s]: COMPRESSION failed again. Deactivating compression",
                                       rrdhost_hostname(s->host), s->connected_to);
 
-                    worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION);
                     rrdpush_compression_deactivate(s);
                     rrdpush_sender_thread_close_socket(s);
                     sender_unlock(s);

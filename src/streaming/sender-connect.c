@@ -96,7 +96,7 @@ struct {
         .version = STREAM_HANDSHAKE_ERROR_LOCALHOST,
         .dynamic = false,
         .error = "remote server rejected this stream, the host we are trying to stream is its localhost",
-        .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
+        .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 60 * 60, // the IP may change, try it every hour
         .priority = NDLP_DEBUG,
     },
@@ -107,7 +107,7 @@ struct {
         .version = STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED,
         .dynamic = false,
         .error = "remote server rejected this stream, the host we are trying to stream is already streamed to it",
-        .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
+        .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 2 * 60, // 2 minutes
         .priority = NDLP_DEBUG,
     },
@@ -118,7 +118,7 @@ struct {
         .version = STREAM_HANDSHAKE_ERROR_DENIED,
         .dynamic = false,
         .error = "remote server denied access, probably we don't have the right API key?",
-        .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
+        .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 1 * 60, // 1 minute
         .priority = NDLP_ERR,
     },
@@ -129,7 +129,7 @@ struct {
         .version = STREAM_HANDSHAKE_BUSY_TRY_LATER,
         .dynamic = false,
         .error = "remote server is currently busy, we should try later",
-        .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
+        .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 2 * 60, // 2 minutes
         .priority = NDLP_NOTICE,
     },
@@ -140,7 +140,7 @@ struct {
         .version = STREAM_HANDSHAKE_INTERNAL_ERROR,
         .dynamic = false,
         .error = "remote server is encountered an internal error, we should try later",
-        .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
+        .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 5 * 60, // 5 minutes
         .priority = NDLP_CRIT,
     },
@@ -151,7 +151,7 @@ struct {
         .version = STREAM_HANDSHAKE_INITIALIZATION,
         .dynamic = false,
         .error = "remote server is initializing, we should try later",
-        .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
+        .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 2 * 60, // 2 minute
         .priority = NDLP_NOTICE,
     },
@@ -164,7 +164,7 @@ struct {
         .version = STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE,
         .dynamic = false,
         .error = "remote node response is not understood, is it Netdata?",
-        .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
+        .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
         .postpone_reconnect_seconds = 1 * 60, // 1 minute
         .priority = NDLP_ERR,
     }
@@ -444,7 +444,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION);
+        worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION);
         rrdpush_sender_thread_close_socket(s);
         stream_parent_set_reconnect_delay(
             host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE, 60);
@@ -460,7 +460,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
+        worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT);
         rrdpush_sender_thread_close_socket(s);
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -480,7 +480,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
+        worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT);
         rrdpush_sender_thread_close_socket(s);
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -564,7 +564,7 @@ static bool attempt_to_connect(struct sender_state *state) {
 }
 
 bool rrdpush_sender_connect(struct sender_state *s) {
-    worker_is_busy(WORKER_SENDER_JOB_CONNECT);
+    worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
 
     time_t now_s = now_monotonic_sec();
     rrdpush_sender_cbuffer_recreate_timed(s, now_s, false, true);
