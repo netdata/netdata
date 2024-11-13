@@ -33,7 +33,6 @@
     "required": [
       "address"
     ],
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

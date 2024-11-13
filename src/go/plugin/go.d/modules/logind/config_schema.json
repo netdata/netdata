@@ -19,7 +19,6 @@
         "default": 1
       }
     },
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

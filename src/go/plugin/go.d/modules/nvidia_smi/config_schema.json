@@ -34,7 +34,6 @@
     "required": [
       "binary_path"
     ],
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }
