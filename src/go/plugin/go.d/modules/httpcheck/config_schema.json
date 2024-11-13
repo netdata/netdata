@@ -178,7 +178,6 @@
       "url",
       "status_accepted"
     ],
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }

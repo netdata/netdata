@@ -140,7 +140,6 @@
       "url",
       "webadmin"
     ],
-    "additionalProperties": true,
     "patternProperties": {
       "^name$": {}
     }
