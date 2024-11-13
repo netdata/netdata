@@ -49,11 +49,22 @@
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 25
 #endif
 
+void stream_sender_start_host_routing(RRDHOST *host);
+
 void rrdpush_sender_on_connect(RRDHOST *host);
-void rrdpush_sender_after_connect(RRDHOST *host);
 void rrdpush_sender_thread_close_socket(struct sender_state *s);
 
 void rrdpush_sender_execute_commands_cleanup(struct sender_state *s);
 void rrdpush_sender_execute_commands(struct sender_state *s);
+
+bool stream_sender_connect_to_parent(struct sender_state *s);
+void stream_sender_dispatcher_wake_up(struct sender_state *s);
+
+void stream_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force);
+
+bool stream_sender_is_host_stopped(struct sender_state *s);
+
+uint64_t stream_sender_magic(RRDHOST *host);
+pid_t stream_sender_tid(RRDHOST *host);
 
 #endif //NETDATA_SENDER_INTERNALS_H

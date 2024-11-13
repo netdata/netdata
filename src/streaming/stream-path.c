@@ -217,8 +217,7 @@ static BUFFER *stream_path_payload(RRDHOST *host) {
 void stream_path_send_to_parent(RRDHOST *host) {
     struct sender_state *s = host->sender;
     if(!s ||
-        !stream_has_capability(s, STREAM_CAP_PATHS) ||
-        rrdhost_is_sender_stopped(s) ||
+        !stream_has_capability(s, STREAM_CAP_PATHS) || stream_sender_is_signaled_to_stop(s) ||
         rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
         return;
 

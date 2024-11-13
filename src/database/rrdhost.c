@@ -1197,7 +1197,8 @@ static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
     if (unlikely(!host->sender))
         return;
 
-    rrdpush_sender_thread_stop(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true); // stop a possibly running thread
+    stream_sender_signal_to_stop_and_wait(
+        host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
 
     rrdpush_compressor_destroy(&host->sender->compressor);

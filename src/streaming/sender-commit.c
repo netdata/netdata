@@ -164,5 +164,5 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     sender_unlock(s);
 
     if(signal_sender && (!stream_has_capability(s, STREAM_CAP_INTERPOLATED) || type != STREAM_TRAFFIC_TYPE_DATA))
-        rrdpush_signal_sender_to_wake_up(s);
+        stream_sender_dispatcher_wake_up(s);
 }

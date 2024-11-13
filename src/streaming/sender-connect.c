@@ -45,7 +45,7 @@ void rrdpush_clean_encoded(stream_encoded_t *se) {
     }
 }
 
-struct {
+static struct {
     const char *response;
     const char *status;
     size_t length;
@@ -170,60 +170,8 @@ struct {
     }
 };
 
-static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender_state *s, char *http, size_t http_length) {
-    int32_t version = STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE;
-
-    int i;
-    for(i = 0; stream_responses[i].response ; i++) {
-        if(stream_responses[i].dynamic &&
-            http_length > stream_responses[i].length && http_length < (stream_responses[i].length + 30) &&
-            strncmp(http, stream_responses[i].response, stream_responses[i].length) == 0) {
-
-            version = str2i(&http[stream_responses[i].length]);
-            break;
-        }
-        else if(http_length == stream_responses[i].length && strcmp(http, stream_responses[i].response) == 0) {
-            version = stream_responses[i].version;
-
-            break;
-        }
-    }
-
-    if(version >= STREAM_HANDSHAKE_OK_V1) {
-        stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_CONNECTED,
-                                          stream_send.parents.reconnect_delay_s);
-        s->capabilities = convert_stream_version_to_capabilities(version, host, true);
-        return true;
-    }
-
-    ND_LOG_FIELD_PRIORITY priority = stream_responses[i].priority;
-    const char *error = stream_responses[i].error;
-    const char *status = stream_responses[i].status;
-    int worker_job_id = stream_responses[i].worker_job_id;
-    int delay = stream_responses[i].postpone_reconnect_seconds;
-
-    worker_is_busy(worker_job_id);
-    rrdpush_sender_thread_close_socket(s);
-    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, version, delay);
-
-    ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
-        ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
-
-    char buf[RFC3339_MAX_LENGTH];
-    rfc3339_datetime_ut(buf, sizeof(buf), stream_parent_get_reconnection_ut(host->stream.snd.parents.current), 0, false);
-
-    nd_log(NDLS_DAEMON, priority,
-           "STREAM %s [send to %s]: %s - will retry in %d secs, at %s",
-           rrdhost_hostname(host), s->connected_to, error, delay, buf);
-
-    return false;
-}
-
 #define CONN_UPGRADE_VAL "upgrade"
-static int rrdpush_http_upgrade_prelude(RRDHOST *host __maybe_unused, struct sender_state *s) {
+static int stream_sender_connect_upgrade_prelude(RRDHOST *host __maybe_unused, struct sender_state *s) {
 
     char http[HTTP_HEADER_SIZE + 1];
     snprintfz(http, HTTP_HEADER_SIZE,
@@ -309,7 +257,59 @@ err_cleanup:
     return 1;
 }
 
-static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port, time_t timeout, struct sender_state *s) {
+static inline bool stream_sender_connect_validate_first_response(RRDHOST *host, struct sender_state *s, char *http, size_t http_length) {
+    int32_t version = STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE;
+
+    int i;
+    for(i = 0; stream_responses[i].response ; i++) {
+        if(stream_responses[i].dynamic &&
+            http_length > stream_responses[i].length && http_length < (stream_responses[i].length + 30) &&
+            strncmp(http, stream_responses[i].response, stream_responses[i].length) == 0) {
+
+            version = str2i(&http[stream_responses[i].length]);
+            break;
+        }
+        else if(http_length == stream_responses[i].length && strcmp(http, stream_responses[i].response) == 0) {
+            version = stream_responses[i].version;
+
+            break;
+        }
+    }
+
+    if(version >= STREAM_HANDSHAKE_OK_V1) {
+        stream_parent_set_reconnect_delay(host->stream.snd.parents.current, STREAM_HANDSHAKE_CONNECTED,
+                                          stream_send.parents.reconnect_delay_s);
+        s->capabilities = convert_stream_version_to_capabilities(version, host, true);
+        return true;
+    }
+
+    ND_LOG_FIELD_PRIORITY priority = stream_responses[i].priority;
+    const char *error = stream_responses[i].error;
+    const char *status = stream_responses[i].status;
+    int worker_job_id = stream_responses[i].worker_job_id;
+    int delay = stream_responses[i].postpone_reconnect_seconds;
+
+    worker_is_busy(worker_job_id);
+    rrdpush_sender_thread_close_socket(s);
+    stream_parent_set_reconnect_delay(host->stream.snd.parents.current, version, delay);
+
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    char buf[RFC3339_MAX_LENGTH];
+    rfc3339_datetime_ut(buf, sizeof(buf), stream_parent_get_reconnection_ut(host->stream.snd.parents.current), 0, false);
+
+    nd_log(NDLS_DAEMON, priority,
+           "STREAM %s [send to %s]: %s - will retry in %d secs, at %s",
+           rrdhost_hostname(host), s->connected_to, error, delay, buf);
+
+    return false;
+}
+
+static bool stream_sender_connection_send_request(RRDHOST *host, uint16_t default_port, time_t timeout, struct sender_state *s) {
     // make sure the socket is closed
     rrdpush_sender_thread_close_socket(s);
 
@@ -437,7 +437,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
     http[eol] = 0x00;
     rrdpush_clean_encoded(&se);
 
-    if (s->parent_using_h2o && rrdpush_http_upgrade_prelude(host, s)) {
+    if (s->parent_using_h2o && stream_sender_connect_upgrade_prelude(host, s)) {
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_CANT_UPGRADE_CONNECTION),
             ND_LOG_FIELD_END(),
@@ -504,7 +504,7 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
                rrdhost_hostname(host), s->connected_to);
 
     http[bytes] = '\0';
-    if(!rrdpush_sender_validate_response(host, s, http, bytes))
+    if(!stream_sender_connect_validate_first_response(host, s, http, bytes))
         return false;
 
     rrdpush_compression_initialize(s);
@@ -524,50 +524,11 @@ static bool sender_send_connection_request(RRDHOST *host, uint16_t default_port,
     return true;
 }
 
-static bool attempt_to_connect(struct sender_state *state) {
-    ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
-        ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
-
-    state->send_attempts = 0;
-
-    // reset the bytes we have sent for this session
-    state->sent_bytes_on_this_connection = 0;
-    memset(state->sent_bytes_on_this_connection_per_type, 0, sizeof(state->sent_bytes_on_this_connection_per_type));
-
-    if(sender_send_connection_request(state->host, stream_send.parents.default_port, stream_send.parents.timeout_s, state)) {
-        // reset the buffer, to properly send charts and metrics
-        rrdpush_sender_on_connect(state->host);
-
-        // send from the beginning
-        state->begin = 0;
-
-        // make sure the next reconnection will be immediate
-        state->not_connected_loops = 0;
-
-        // let the data collection threads know we are ready
-        rrdhost_flag_set(state->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
-
-        rrdpush_sender_after_connect(state->host);
-
-        return true;
-    }
-
-    // we couldn't connect
-
-    // increase the failed connections counter
-    state->not_connected_loops++;
-
-    return false;
-}
-
-bool rrdpush_sender_connect(struct sender_state *s) {
+bool stream_sender_connect_to_parent(struct sender_state *s) {
     worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
 
     time_t now_s = now_monotonic_sec();
-    rrdpush_sender_cbuffer_recreate_timed(s, now_s, false, true);
+    stream_sender_cbuffer_recreate_timed(s, now_s, false, true);
     rrdpush_sender_execute_commands_cleanup(s);
 
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
@@ -576,13 +537,44 @@ bool rrdpush_sender_connect(struct sender_state *s) {
     s->buffer->read = 0;
     s->buffer->write = 0;
 
-    if(!attempt_to_connect(s))
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    s->send_attempts = 0;
+
+    // reset the bytes we have sent for this session
+    s->sent_bytes_on_this_connection = 0;
+    memset(s->sent_bytes_on_this_connection_per_type, 0, sizeof(s->sent_bytes_on_this_connection_per_type));
+
+    if(!stream_sender_connection_send_request(s->host, stream_send.parents.default_port, stream_send.parents.timeout_s, s)) {
+        // we couldn't connect
+
+        // increase the failed connections counter
+        s->not_connected_loops++;
+
+        return false;
+    }
+
+    if(stream_sender_is_host_stopped(s))
         return false;
 
-    if(rrdhost_sender_should_exit(s))
-        return false;
+    // reset the buffer, to properly send charts and metrics
+    rrdpush_sender_on_connect(s->host);
+
+    // send from the beginning
+    s->begin = 0;
+
+    // make sure the next reconnection will be immediate
+    s->not_connected_loops = 0;
+
+    // let the data collection threads know we are ready
+    rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
 
     s->last_traffic_seen_t = now_monotonic_sec();
+    rrdpush_sender_thread_send_custom_host_variables(s->host);
     stream_path_send_to_parent(s->host);
     rrdpush_sender_send_claimed_id(s->host);
     rrdpush_send_host_labels(s->host);
@@ -596,34 +588,4 @@ bool rrdpush_sender_connect(struct sender_state *s) {
            rrdhost_hostname(s->host), s->connected_to);
 
     return true;
-}
-
-// Either the receiver lost the connection or the host is being destroyed.
-// The sender mutex guards thread creation, any spurious data is wiped on reconnection.
-void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wait) {
-    if (!host->sender)
-        return;
-
-    sender_lock(host->sender);
-
-    if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
-
-        host->sender->exit.shutdown = true;
-        host->sender->exit.reason = reason;
-
-        // signal it to cancel
-        __atomic_store_n(&host->sender->stop, true, __ATOMIC_RELAXED);
-    }
-
-    sender_unlock(host->sender);
-
-    if(wait) {
-        sender_lock(host->sender);
-        while(host->sender->magic) {
-            sender_unlock(host->sender);
-            sleep_usec(10 * USEC_PER_MS);
-            sender_lock(host->sender);
-        }
-        sender_unlock(host->sender);
-    }
 }

@@ -1427,6 +1427,7 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/rrdhost-status.c
         src/streaming/rrdhost-status.h
         src/streaming/receiver.h
+        src/streaming/sender-api.c
 )
 
 set(WEB_PLUGIN_FILES

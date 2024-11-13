@@ -150,24 +150,17 @@ struct sender_state {
 BUFFER *sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type);
 
-void *rrdpush_sender_thread(void *ptr);
-void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wait);
+void *stream_sender_start_localhost(void *ptr);
+void stream_sender_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE reason, bool wait);
 
 void sender_thread_buffer_free(void);
 
-void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
+void stream_sender_start_host(RRDHOST *host);
 
-bool rrdpush_sender_connect(struct sender_state *s);
-void rrdpush_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force);
-bool rrdhost_sender_should_exit(struct sender_state *s);
-void rrdpush_sender_thread_spawn(RRDHOST *host);
-
-uint64_t sender_magic(RRDHOST *host);
-pid_t sender_tid(RRDHOST *host);
 int sender_write_pipe_fd(struct sender_state *s);
 
 void stream_sender_cancel_threads(void);
-bool rrdhost_is_sender_stopped(struct sender_state *s);
+bool stream_sender_is_signaled_to_stop(struct sender_state *s);
 
 #include "replication.h"
 
