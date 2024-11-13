@@ -8,6 +8,7 @@ enum netdata_netframework_metrics {
     NETDATA_NETFRAMEWORK_INTEROP,
     NETDATA_NETFRAMEWORK_JIT,
     NETDATA_NETFRAMEWORK_LOADING,
+    NETDATA_NETFRAMEWORK_REMOTING,
     NETDATA_NETFRAMEWORK_SECURITY,
 
     NETDATA_NETFRAMEWORK_END
@@ -65,6 +66,24 @@ struct net_framework_instances {
     RRDSET *st_clrloading_class_load_failure;
     RRDDIM *rd_clrloading_class_load_failure;
 
+    RRDSET *st_clrremoting_channels;
+    RRDDIM *rd_clrremoting_channels;
+
+    RRDSET *st_clrremoting_context_bound_classes_loaded;
+    RRDDIM *rd_clrremoting_context_bound_classes_loaded;
+
+    RRDSET *st_clrremoting_context_bound_objects;
+    RRDDIM *rd_clrremoting_context_bound_objects;
+
+    RRDSET *st_clrremoting_context_proxies;
+    RRDDIM *rd_clrremoting_context_proxies;
+
+    RRDSET *st_clrremoting_contexts;
+    RRDDIM *rd_clrremoting_contexts;
+
+    RRDSET *st_clrremoting_remote_calls;
+    RRDDIM *rd_clrremoting_remote_calls;
+
     RRDSET *st_clrsecurity_link_time_checks;
     RRDDIM *rd_clrsecurity_link_time_checks;
 
@@ -99,6 +118,13 @@ struct net_framework_instances {
     COUNTER_DATA NETFrameworkCLRLoadingClassesLoaded;
     COUNTER_DATA NETFrameworkCLRLoadingClassLoadFailure;
 
+    COUNTER_DATA NETFrameworkCLRRemotingChannels;
+    COUNTER_DATA NETFrameworkCLRRemotingContextBoundClassesLoaded;
+    COUNTER_DATA NETFrameworkCLRRemotingContextBoundObjects;
+    COUNTER_DATA NETFrameworkCLRRemotingContextProxies;
+    COUNTER_DATA NETFrameworkCLRRemotingContexts;
+    COUNTER_DATA NETFrameworkCLRRemotingRemoteCalls;
+
     COUNTER_DATA NETFrameworkCLRSecurityLinkTimeChecks;
     COUNTER_DATA NETFrameworkCLRSecurityPercentTimeinRTChecks;
     COUNTER_DATA NETFrameworkCLRSecurityFrequency_PerfTime;
@@ -128,6 +154,13 @@ static inline void initialize_net_framework_processes_keys(struct net_framework_
     p->NETFrameworkCLRLoadingAssembliesLoaded.key = "Total Assemblies";
     p->NETFrameworkCLRLoadingClassesLoaded.key = "Total Classes Loaded";
     p->NETFrameworkCLRLoadingClassLoadFailure.key = "Total # of Load Failures";
+
+    p->NETFrameworkCLRRemotingChannels.key = "Channels";
+    p->NETFrameworkCLRRemotingContextBoundClassesLoaded.key = "Context-Bound Classes Loaded";
+    p->NETFrameworkCLRRemotingContextBoundObjects.key = "Context-Bound Objects Alloc / sec";
+    p->NETFrameworkCLRRemotingContextProxies.key = "Context Proxies";
+    p->NETFrameworkCLRRemotingContexts.key = "Contexts";
+    p->NETFrameworkCLRRemotingRemoteCalls.key = "Total Remote Calls";
 
     p->NETFrameworkCLRSecurityLinkTimeChecks.key = "# Link Time Checks";
     p->NETFrameworkCLRSecurityPercentTimeinRTChecks.key = "% Time Sig. Authenticating";
@@ -779,6 +812,243 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->rd_clrloading_class_load_failure,
                 (collected_number)p->NETFrameworkCLRLoadingClassLoadFailure.current.Data);
             rrdset_done(p->st_clrloading_class_load_failure);
+        }
+    }
+}
+
+static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock,
+                                           PERF_OBJECT_TYPE *pObjectType,
+                                           int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+        if (strcasecmp(windows_shared_buffer, "_Global_") == 0)
+            continue;
+
+        netdata_fix_chart_name(windows_shared_buffer);
+        struct net_framework_instances *p = dictionary_set(processes, windows_shared_buffer, NULL, sizeof(*p));
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRRemotingChannels)) {
+            if (!p->st_clrremoting_channels) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_channels", windows_shared_buffer);
+                p->st_clrremoting_channels = rrdset_create_localhost("netframework"
+                                                                     , id, NULL
+                                                                     , "remoting"
+                                                                     , "netframework.clrremoting_channels"
+                                                                     , "Registered channels"
+                                                                     , "channels/s"
+                                                                     , PLUGIN_WINDOWS_NAME
+                                                                     , "PerflibNetFramework"
+                                                                     , PRIO_NETFRAMEWORK_CLR_REMOTING_CHANNELS
+                                                                     , update_every
+                                                                     , RRDSET_TYPE_LINE
+                                                                     );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrremoting_channels_total", windows_shared_buffer);
+                p->rd_clrremoting_channels  = rrddim_add(p->st_clrremoting_channels,
+                                                        id,
+                                                        "registered",
+                                                        1,
+                                                        1,
+                                                        RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_clrremoting_channels->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrremoting_channels,
+                                  p->rd_clrremoting_channels,
+                                  (collected_number)p->NETFrameworkCLRRemotingChannels.current.Data);
+            rrdset_done(p->st_clrremoting_channels);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRRemotingContextBoundClassesLoaded)) {
+            if (!p->st_clrremoting_context_bound_classes_loaded) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_context_bound_classes_loaded", windows_shared_buffer);
+                p->st_clrremoting_context_bound_classes_loaded = rrdset_create_localhost("netframework"
+                                                                                         , id, NULL
+                                                                                         , "remoting"
+                                                                                         , "netframework.clrremoting_context_bound_classes_loaded"
+                                                                                         , "Loaded context-bound classes"
+                                                                                         , "classes"
+                                                                                         , PLUGIN_WINDOWS_NAME
+                                                                                         , "PerflibNetFramework"
+                                                                                         , PRIO_NETFRAMEWORK_CLR_REMOTING_CONTEXT_BOUND_CLASSES_LOADED
+                                                                                         , update_every
+                                                                                         , RRDSET_TYPE_LINE
+                                                                                         );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrremoting_context_bound_classes_loaded", windows_shared_buffer);
+                p->rd_clrremoting_context_bound_classes_loaded  = rrddim_add(p->st_clrremoting_context_bound_classes_loaded,
+                                                                            id,
+                                                                            "loaded",
+                                                                            1,
+                                                                            1,
+                                                                            RRD_ALGORITHM_ABSOLUTE);
+
+                rrdlabels_add(p->st_clrremoting_context_bound_classes_loaded->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrremoting_context_bound_classes_loaded,
+                                  p->rd_clrremoting_context_bound_classes_loaded,
+                                  (collected_number)p->NETFrameworkCLRRemotingContextBoundClassesLoaded.current.Data);
+            rrdset_done(p->st_clrremoting_context_bound_classes_loaded);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRRemotingContextBoundObjects)) {
+            if (!p->st_clrremoting_context_bound_objects) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_context_bound_objects", windows_shared_buffer);
+                p->st_clrremoting_context_bound_objects = rrdset_create_localhost("netframework"
+                                                                                  , id, NULL
+                                                                                  , "remoting"
+                                                                                  , "netframework.clrremoting_context_bound_objects"
+                                                                                  , "Allocated context-bound objects"
+                                                                                  , "objects/s"
+                                                                                  , PLUGIN_WINDOWS_NAME
+                                                                                  , "PerflibNetFramework"
+                                                                                  , PRIO_NETFRAMEWORK_CLR_REMOTING_CONTEXT_BOUND_OBJECTS
+                                                                                  , update_every
+                                                                                  , RRDSET_TYPE_LINE
+                                                                                  );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrremoting_context_bound_objects_total", windows_shared_buffer);
+                p->rd_clrremoting_context_bound_objects  = rrddim_add(p->st_clrremoting_context_bound_objects,
+                                                                     id,
+                                                                     "allocated",
+                                                                     1,
+                                                                     1,
+                                                                     RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_clrremoting_context_bound_objects->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrremoting_context_bound_objects,
+                                  p->rd_clrremoting_context_bound_objects,
+                                  (collected_number)p->NETFrameworkCLRRemotingContextBoundObjects.current.Data);
+            rrdset_done(p->st_clrremoting_context_bound_objects);
+        }
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRRemotingContextProxies)) {
+            if (!p->st_clrremoting_context_proxies) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_context_proxies", windows_shared_buffer);
+                p->st_clrremoting_context_proxies = rrdset_create_localhost("netframework"
+                                                                            , id, NULL
+                                                                            , "remoting"
+                                                                            , "netframework.clrremoting_context_proxies"
+                                                                            , "Remoting proxy objects"
+                                                                            , "objects/s"
+                                                                            , PLUGIN_WINDOWS_NAME
+                                                                            , "PerflibNetFramework"
+                                                                            , PRIO_NETFRAMEWORK_CLR_REMOTING_CONTEXTS_PROXIES
+                                                                            , update_every
+                                                                            , RRDSET_TYPE_LINE
+                                                                            );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrremoting_context_proxies_total", windows_shared_buffer);
+                p->rd_clrremoting_context_proxies  = rrddim_add(p->st_clrremoting_context_proxies,
+                                                               id,
+                                                               "objects",
+                                                               1,
+                                                               1,
+                                                               RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_clrremoting_context_proxies->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrremoting_context_proxies,
+                                  p->rd_clrremoting_context_proxies,
+                                  (collected_number)p->NETFrameworkCLRRemotingContextProxies.current.Data);
+            rrdset_done(p->st_clrremoting_context_proxies);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRRemotingContexts)) {
+            if (!p->st_clrremoting_contexts) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_contexts", windows_shared_buffer);
+                p->st_clrremoting_contexts = rrdset_create_localhost("netframework"
+                                                                     , id, NULL
+                                                                     , "remoting"
+                                                                     , "netframework.clrremoting_contexts"
+                                                                     , "Total of remoting contexts"
+                                                                     , "contexts"
+                                                                     , PLUGIN_WINDOWS_NAME
+                                                                     , "PerflibNetFramework"
+                                                                     , PRIO_NETFRAMEWORK_CLR_REMOTING_CONTEXTS
+                                                                     , update_every
+                                                                     , RRDSET_TYPE_LINE
+                                                                     );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrremoting_contexts", windows_shared_buffer);
+                p->rd_clrremoting_contexts  = rrddim_add(p->st_clrremoting_contexts,
+                                                        id,
+                                                        "contexts",
+                                                        1,
+                                                        1,
+                                                        RRD_ALGORITHM_ABSOLUTE);
+
+                rrdlabels_add(p->st_clrremoting_contexts->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrremoting_contexts,
+                                  p->rd_clrremoting_contexts,
+                                  (collected_number)p->NETFrameworkCLRRemotingContexts.current.Data);
+            rrdset_done(p->st_clrremoting_contexts);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRRemotingRemoteCalls)) {
+            if (!p->st_clrremoting_remote_calls) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_calls", windows_shared_buffer);
+                p->st_clrremoting_remote_calls = rrdset_create_localhost("netframework"
+                                                                         , id, NULL
+                                                                         , "remoting"
+                                                                         , "netframework.clrremoting_remote_calls"
+                                                                         , "Remote Procedure Calls (RPC) invoked"
+                                                                         , "calls/s"
+                                                                         , PLUGIN_WINDOWS_NAME
+                                                                         , "PerflibNetFramework"
+                                                                         , PRIO_NETFRAMEWORK_CLR_REMOTING_REMOTE_CALLS
+                                                                         , update_every
+                                                                         , RRDSET_TYPE_LINE
+                                                                         );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrremoting_remote_calls_total", windows_shared_buffer);
+                p->rd_clrremoting_remote_calls  = rrddim_add(p->st_clrremoting_remote_calls,
+                                                            id,
+                                                            "contexts",
+                                                            1,
+                                                            1,
+                                                            RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_clrremoting_remote_calls->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrremoting_remote_calls,
+                                  p->rd_clrremoting_remote_calls,
+                                  (collected_number)p->NETFrameworkCLRRemotingContexts.current.Data);
+            rrdset_done(p->st_clrremoting_remote_calls);
         }
     }
 }
