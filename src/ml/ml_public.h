@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_ML_H
-#define NETDATA_ML_H
+#ifndef NETDATA_ML_PUBLIC_H
+#define NETDATA_ML_PUBLIC_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,16 +43,19 @@ void ml_dimension_received_anomaly(RRDDIM *rd, bool is_anomalous);
 
 int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **stmt);
 
-void ml_update_global_statistics_charts(uint64_t models_consulted);
+void ml_update_global_statistics_charts(uint64_t models_consulted,
+                                        uint64_t models_received,
+                                        uint64_t models_sent,
+                                        uint64_t models_deserialization_failures);
 
 bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm);
 bool ml_host_running(RRDHOST *rh);
 uint64_t sqlite_get_ml_space(void);
 
-void ml_model_received_from_child(RRDHOST *host, const char *json);
+bool ml_model_received_from_child(RRDHOST *host, const char *json);
 
 #ifdef __cplusplus
 };
 #endif
 
-#endif /* NETDATA_ML_H */
+#endif /* NETDATA_ML_PUBLIC_H */

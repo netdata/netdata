@@ -1204,15 +1204,30 @@ if(ENABLE_ML)
         set(ML_FILES
                 src/ml/ad_charts.h
                 src/ml/ad_charts.cc
-                src/ml/Config.cc
                 src/ml/dlib/dlib/all/source.cpp
-                src/ml/ml.h
                 src/ml/ml.cc
-                src/ml/ml-private.h
+                src/ml/ml_calculated_number.h
+                src/ml/ml_host.h
+                src/ml/ml_config.h
+                src/ml/ml_config.cc
+                src/ml/ml_dimension.h
+                src/ml/ml_enums.h
+                src/ml/ml_enums.cc
+                src/ml/ml_features.h
+                src/ml/ml_features.cc
+                src/ml/ml_kmeans.h
+                src/ml/ml_kmeans.cc
+                src/ml/ml_queue.h
+                src/ml/ml_worker.h
+                src/ml/ml_string_wrapper.h
+                src/ml/ml_queue.cc
+                src/ml/ml_private.h
+                src/ml/ml_public.h
+                src/ml/ml_public.cc
         )
 else()
         set(ML_FILES
-                src/ml/ml.h
+                src/ml/ml_public.h
                 src/ml/ml-dummy.c
         )
 endif()

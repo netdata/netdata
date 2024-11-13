@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "ml.h"
+#include "ml_public.h"
 
 #if !defined(ENABLE_ML)
 
@@ -38,18 +38,6 @@ void ml_host_start(RRDHOST *rh) {
 }
 
 void ml_host_stop(RRDHOST *rh) {
-    UNUSED(rh);
-}
-
-void ml_host_start_training_thread(RRDHOST *rh) {
-    UNUSED(rh);
-}
-
-void ml_host_stop_training_thread(RRDHOST *rh) {
-    UNUSED(rh);
-}
-
-void ml_host_cancel_training_thread(RRDHOST *rh) {
     UNUSED(rh);
 }
 
@@ -105,8 +93,19 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **stmp __maybe_unused) {
     return 0;
 }
 
-void ml_update_global_statistics_charts(uint64_t models_consulted) {
+void ml_dimension_received_anomaly(RRDDIM *rd, bool is_anomalous) {
+    UNUSED(rd);
+    UNUSED(is_anomalous);
+}
+
+void ml_update_global_statistics_charts(uint64_t models_consulted,
+                                        uint64_t models_received,
+                                        uint64_t models_sent,
+                                        uint64_t models_deserialization_failures) {
     UNUSED(models_consulted);
+    UNUSED(models_received);
+    UNUSED(models_sent);
+    UNUSED(models_deserialization_failures);
 }
 
 bool ml_host_get_host_status(RRDHOST *rh __maybe_unused, struct ml_metrics_statistics *mlm) {
@@ -115,6 +114,12 @@ bool ml_host_get_host_status(RRDHOST *rh __maybe_unused, struct ml_metrics_stati
 }
 
 bool ml_host_running(RRDHOST *rh __maybe_unused) {
+    return false;
+}
+
+bool ml_model_received_from_child(RRDHOST *host, const char *json) {
+    UNUSED(host);
+    UNUSED(json);
     return false;
 }
 

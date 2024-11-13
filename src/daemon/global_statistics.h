@@ -38,6 +38,10 @@ extern size_t rrddim_db_memory_size;
 
 void global_statistics_ml_query_completed(size_t points_read);
 void global_statistics_ml_models_consulted(size_t models_consulted);
+void global_statistics_ml_models_received();
+void global_statistics_ml_models_sent();
+void global_statistics_ml_models_deserialization_failures();
+
 void global_statistics_exporters_query_completed(size_t points_read);
 void global_statistics_backfill_query_completed(size_t points_read);
 void global_statistics_rrdr_query_completed(size_t queries, uint64_t db_points_read, uint64_t result_points_generated, QUERY_SOURCE query_source);

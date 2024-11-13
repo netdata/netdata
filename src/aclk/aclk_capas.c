@@ -2,7 +2,7 @@
 
 #include "aclk_capas.h"
 
-#include "ml/ml.h"
+#include "ml/ml_public.h"
 
 #define HTTP_API_V2_VERSION 7
 

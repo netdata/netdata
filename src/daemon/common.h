@@ -33,7 +33,7 @@
 #include "streaming/rrdpush.h"
 
 // anomaly detection
-#include "ml/ml.h"
+#include "ml/ml_public.h"
 
 // the netdata registry
 // the registry is actually an API feature

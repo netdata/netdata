@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ad_charts.h"
+#include "ml_config.h"
 
 void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats_t &mls) {
     /*
@@ -399,19 +400,19 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
     }
 }
 
-void ml_update_training_statistics_chart(ml_training_thread_t *training_thread, const ml_training_stats_t &ts) {
+void ml_update_training_statistics_chart(ml_worker_t *worker, const ml_queue_stats_t &stats) {
     /*
      * queue stats
     */
     {
-        if (!training_thread->queue_stats_rs) {
+        if (!worker->queue_stats_rs) {
             char id_buf[1024];
             char name_buf[1024];
 
-            snprintfz(id_buf, 1024, "training_queue_%zu_stats", training_thread->id);
-            snprintfz(name_buf, 1024, "training_queue_%zu_stats", training_thread->id);
+            snprintfz(id_buf, 1024, "training_queue_%zu_stats", worker->id);
+            snprintfz(name_buf, 1024, "training_queue_%zu_stats", worker->id);
 
-            training_thread->queue_stats_rs = rrdset_create(
+            worker->queue_stats_rs = rrdset_create(
                     localhost,
                     "netdata", // type
                     id_buf, // id
@@ -426,34 +427,34 @@ void ml_update_training_statistics_chart(ml_training_thread_t *training_thread, 
                     localhost->rrd_update_every, // update_every
                     RRDSET_TYPE_LINE// chart_type
             );
-            rrdset_flag_set(training_thread->queue_stats_rs, RRDSET_FLAG_ANOMALY_DETECTION);
+            rrdset_flag_set(worker->queue_stats_rs, RRDSET_FLAG_ANOMALY_DETECTION);
 
-            training_thread->queue_stats_queue_size_rd =
-                rrddim_add(training_thread->queue_stats_rs, "queue_size", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            training_thread->queue_stats_popped_items_rd =
-                rrddim_add(training_thread->queue_stats_rs, "popped_items", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            worker->queue_stats_queue_size_rd =
+                rrddim_add(worker->queue_stats_rs, "queue_size", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            worker->queue_stats_popped_items_rd =
+                rrddim_add(worker->queue_stats_rs, "popped_items", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(training_thread->queue_stats_rs,
-                              training_thread->queue_stats_queue_size_rd, ts.queue_size);
-        rrddim_set_by_pointer(training_thread->queue_stats_rs,
-                              training_thread->queue_stats_popped_items_rd, ts.num_popped_items);
+        rrddim_set_by_pointer(worker->queue_stats_rs,
+                              worker->queue_stats_queue_size_rd, stats.queue_size);
+        rrddim_set_by_pointer(worker->queue_stats_rs,
+                              worker->queue_stats_popped_items_rd, stats.num_popped_items);
 
-        rrdset_done(training_thread->queue_stats_rs);
+        rrdset_done(worker->queue_stats_rs);
     }
 
     /*
      * training stats
     */
     {
-        if (!training_thread->training_time_stats_rs) {
+        if (!worker->training_time_stats_rs) {
             char id_buf[1024];
             char name_buf[1024];
 
-            snprintfz(id_buf, 1024, "training_queue_%zu_time_stats", training_thread->id);
-            snprintfz(name_buf, 1024, "training_queue_%zu_time_stats", training_thread->id);
+            snprintfz(id_buf, 1024, "training_queue_%zu_time_stats", worker->id);
+            snprintfz(name_buf, 1024, "training_queue_%zu_time_stats", worker->id);
 
-            training_thread->training_time_stats_rs = rrdset_create(
+            worker->training_time_stats_rs = rrdset_create(
                     localhost,
                     "netdata", // type
                     id_buf, // id
@@ -468,38 +469,38 @@ void ml_update_training_statistics_chart(ml_training_thread_t *training_thread, 
                     localhost->rrd_update_every, // update_every
                     RRDSET_TYPE_LINE// chart_type
             );
-            rrdset_flag_set(training_thread->training_time_stats_rs, RRDSET_FLAG_ANOMALY_DETECTION);
+            rrdset_flag_set(worker->training_time_stats_rs, RRDSET_FLAG_ANOMALY_DETECTION);
 
-            training_thread->training_time_stats_allotted_rd =
-                rrddim_add(training_thread->training_time_stats_rs, "allotted", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-            training_thread->training_time_stats_consumed_rd =
-                rrddim_add(training_thread->training_time_stats_rs, "consumed", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-            training_thread->training_time_stats_remaining_rd =
-                rrddim_add(training_thread->training_time_stats_rs, "remaining", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            worker->training_time_stats_allotted_rd =
+                rrddim_add(worker->training_time_stats_rs, "allotted", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            worker->training_time_stats_consumed_rd =
+                rrddim_add(worker->training_time_stats_rs, "consumed", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            worker->training_time_stats_remaining_rd =
+                rrddim_add(worker->training_time_stats_rs, "remaining", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(training_thread->training_time_stats_rs,
-                              training_thread->training_time_stats_allotted_rd, ts.allotted_ut);
-        rrddim_set_by_pointer(training_thread->training_time_stats_rs,
-                              training_thread->training_time_stats_consumed_rd, ts.consumed_ut);
-        rrddim_set_by_pointer(training_thread->training_time_stats_rs,
-                              training_thread->training_time_stats_remaining_rd, ts.remaining_ut);
+        rrddim_set_by_pointer(worker->training_time_stats_rs,
+                              worker->training_time_stats_allotted_rd, stats.allotted_ut);
+        rrddim_set_by_pointer(worker->training_time_stats_rs,
+                              worker->training_time_stats_consumed_rd, stats.consumed_ut);
+        rrddim_set_by_pointer(worker->training_time_stats_rs,
+                              worker->training_time_stats_remaining_rd, stats.remaining_ut);
 
-        rrdset_done(training_thread->training_time_stats_rs);
+        rrdset_done(worker->training_time_stats_rs);
     }
 
     /*
      * training result stats
     */
     {
-        if (!training_thread->training_results_rs) {
+        if (!worker->training_results_rs) {
             char id_buf[1024];
             char name_buf[1024];
 
-            snprintfz(id_buf, 1024, "training_queue_%zu_results", training_thread->id);
-            snprintfz(name_buf, 1024, "training_queue_%zu_results", training_thread->id);
+            snprintfz(id_buf, 1024, "training_queue_%zu_results", worker->id);
+            snprintfz(name_buf, 1024, "training_queue_%zu_results", worker->id);
 
-            training_thread->training_results_rs = rrdset_create(
+            worker->training_results_rs = rrdset_create(
                     localhost,
                     "netdata", // type
                     id_buf, // id
@@ -514,37 +515,44 @@ void ml_update_training_statistics_chart(ml_training_thread_t *training_thread, 
                     localhost->rrd_update_every, // update_every
                     RRDSET_TYPE_LINE// chart_type
             );
-            rrdset_flag_set(training_thread->training_results_rs, RRDSET_FLAG_ANOMALY_DETECTION);
+            rrdset_flag_set(worker->training_results_rs, RRDSET_FLAG_ANOMALY_DETECTION);
 
-            training_thread->training_results_ok_rd =
-                rrddim_add(training_thread->training_results_rs, "ok", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            training_thread->training_results_invalid_query_time_range_rd =
-                rrddim_add(training_thread->training_results_rs, "invalid-queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            training_thread->training_results_not_enough_collected_values_rd =
-                rrddim_add(training_thread->training_results_rs, "not-enough-values", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            training_thread->training_results_null_acquired_dimension_rd =
-                rrddim_add(training_thread->training_results_rs, "null-acquired-dimensions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            training_thread->training_results_chart_under_replication_rd =
-                rrddim_add(training_thread->training_results_rs, "chart-under-replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            worker->training_results_ok_rd =
+                rrddim_add(worker->training_results_rs, "ok", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            worker->training_results_invalid_query_time_range_rd =
+                rrddim_add(worker->training_results_rs, "invalid-queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            worker->training_results_not_enough_collected_values_rd =
+                rrddim_add(worker->training_results_rs, "not-enough-values", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            worker->training_results_null_acquired_dimension_rd =
+                rrddim_add(worker->training_results_rs, "null-acquired-dimensions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            worker->training_results_chart_under_replication_rd =
+                rrddim_add(worker->training_results_rs, "chart-under-replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(training_thread->training_results_rs,
-                              training_thread->training_results_ok_rd, ts.training_result_ok);
-        rrddim_set_by_pointer(training_thread->training_results_rs,
-                              training_thread->training_results_invalid_query_time_range_rd, ts.training_result_invalid_query_time_range);
-        rrddim_set_by_pointer(training_thread->training_results_rs,
-                              training_thread->training_results_not_enough_collected_values_rd, ts.training_result_not_enough_collected_values);
-        rrddim_set_by_pointer(training_thread->training_results_rs,
-                              training_thread->training_results_null_acquired_dimension_rd, ts.training_result_null_acquired_dimension);
-        rrddim_set_by_pointer(training_thread->training_results_rs,
-                              training_thread->training_results_chart_under_replication_rd, ts.training_result_chart_under_replication);
+        rrddim_set_by_pointer(worker->training_results_rs,
+                              worker->training_results_ok_rd, stats.item_result_ok);
+        rrddim_set_by_pointer(worker->training_results_rs,
+                              worker->training_results_invalid_query_time_range_rd, stats.item_result_invalid_query_time_range);
+        rrddim_set_by_pointer(worker->training_results_rs,
+                              worker->training_results_not_enough_collected_values_rd, stats.item_result_not_enough_collected_values);
+        rrddim_set_by_pointer(worker->training_results_rs,
+                              worker->training_results_null_acquired_dimension_rd, stats.item_result_null_acquired_dimension);
+        rrddim_set_by_pointer(worker->training_results_rs,
+                              worker->training_results_chart_under_replication_rd, stats.item_result_chart_under_replication);
 
-        rrdset_done(training_thread->training_results_rs);
+        rrdset_done(worker->training_results_rs);
     }
 }
 
-void ml_update_global_statistics_charts(uint64_t models_consulted) {
-    if (Cfg.enable_statistics_charts) {
+void ml_update_global_statistics_charts(uint64_t models_consulted,
+                                        uint64_t models_received,
+                                        uint64_t models_sent,
+                                        uint64_t models_deserialization_failures)
+{
+    if (!Cfg.enable_statistics_charts)
+        return;
+
+    {
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
@@ -568,6 +576,40 @@ void ml_update_global_statistics_charts(uint64_t models_consulted) {
         }
 
         rrddim_set_by_pointer(st, rd, (collected_number) models_consulted);
+
+        rrdset_done(st);
+    }
+
+    {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_received = NULL;
+        static RRDDIM *rd_sent = NULL;
+        static RRDDIM *rd_deserialization_failures = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "netdata" // type
+                    , "ml_models_streamed" // id
+                    , NULL // name
+                    , NETDATA_ML_CHART_FAMILY // family
+                    , NULL // context
+                    , "KMeans models streamed" // title
+                    , "models" // units
+                    , NETDATA_ML_PLUGIN // plugin
+                    , NETDATA_ML_MODULE_DETECTION // module
+                    , NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS // priority
+                    , localhost->rrd_update_every // update_every
+                    , RRDSET_TYPE_LINE // chart_type
+            );
+
+            rd_received = rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_sent = rrddim_add(st, "sent", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_deserialization_failures = rrddim_add(st, "deserialization failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st, rd_received, (collected_number) models_received);
+        rrddim_set_by_pointer(st, rd_sent, (collected_number) models_sent);
+        rrddim_set_by_pointer(st, rd_deserialization_failures, (collected_number) models_deserialization_failures);
 
         rrdset_done(st);
     }
