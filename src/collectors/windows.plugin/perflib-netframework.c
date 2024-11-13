@@ -8,6 +8,7 @@ enum netdata_netframework_metrics {
     NETDATA_NETFRAMEWORK_INTEROP,
     NETDATA_NETFRAMEWORK_JIT,
     NETDATA_NETFRAMEWORK_LOADING,
+    NETDATA_NETFRAMEWORK_SECURITY,
 
     NETDATA_NETFRAMEWORK_END
 };
@@ -64,6 +65,18 @@ struct net_framework_instances {
     RRDSET *st_clrloading_class_load_failure;
     RRDDIM *rd_clrloading_class_load_failure;
 
+    RRDSET *st_clrsecurity_link_time_checks;
+    RRDDIM *rd_clrsecurity_link_time_checks;
+
+    RRDSET *st_clrsecurity_rt_checks_time;
+    RRDDIM *rd_clrsecurity_rt_checks_time;
+
+    RRDSET *st_clrsecurity_stack_walk_depth;
+    RRDDIM *rd_clrsecurity_stack_walk_depth;
+
+    RRDSET *st_clrsecurity_run_time_checks;
+    RRDDIM *rd_clrsecurity_run_time_checks;
+
     COUNTER_DATA NETFrameworkCLRExceptionThrown;
     COUNTER_DATA NETFrameworkCLRExceptionFilters;
     COUNTER_DATA NETFrameworkCLRExceptionFinallys;
@@ -85,6 +98,12 @@ struct net_framework_instances {
     COUNTER_DATA NETFrameworkCLRLoadingAssembliesLoaded;
     COUNTER_DATA NETFrameworkCLRLoadingClassesLoaded;
     COUNTER_DATA NETFrameworkCLRLoadingClassLoadFailure;
+
+    COUNTER_DATA NETFrameworkCLRSecurityLinkTimeChecks;
+    COUNTER_DATA NETFrameworkCLRSecurityPercentTimeinRTChecks;
+    COUNTER_DATA NETFrameworkCLRSecurityFrequency_PerfTime;
+    COUNTER_DATA NETFrameworkCLRSecurityStackWalkDepth;
+    COUNTER_DATA NETFrameworkCLRSecurityRunTimeChecks;
 };
 
 static inline void initialize_net_framework_processes_keys(struct net_framework_instances *p) {
@@ -109,6 +128,12 @@ static inline void initialize_net_framework_processes_keys(struct net_framework_
     p->NETFrameworkCLRLoadingAssembliesLoaded.key = "Total Assemblies";
     p->NETFrameworkCLRLoadingClassesLoaded.key = "Total Classes Loaded";
     p->NETFrameworkCLRLoadingClassLoadFailure.key = "Total # of Load Failures";
+
+    p->NETFrameworkCLRSecurityLinkTimeChecks.key = "# Link Time Checks";
+    p->NETFrameworkCLRSecurityPercentTimeinRTChecks.key = "% Time Sig. Authenticating";
+    p->NETFrameworkCLRSecurityFrequency_PerfTime.key = "% Time in RT checks";
+    p->NETFrameworkCLRSecurityStackWalkDepth.key = "Stack Walk Depth";
+    p->NETFrameworkCLRSecurityRunTimeChecks.key = "Total Runtime Checks";
 }
 
 void dict_net_framework_processes_insert_cb(
@@ -754,6 +779,176 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->rd_clrloading_class_load_failure,
                 (collected_number)p->NETFrameworkCLRLoadingClassLoadFailure.current.Data);
             rrdset_done(p->st_clrloading_class_load_failure);
+        }
+    }
+}
+
+static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock,
+                                           PERF_OBJECT_TYPE *pObjectType,
+                                           int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+        if (strcasecmp(windows_shared_buffer, "_Global_") == 0)
+            continue;
+
+        netdata_fix_chart_name(windows_shared_buffer);
+        struct net_framework_instances *p = dictionary_set(processes, windows_shared_buffer, NULL, sizeof(*p));
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRSecurityLinkTimeChecks)) {
+            if (!p->st_clrsecurity_link_time_checks) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_link_time_checks", windows_shared_buffer);
+                p->st_clrsecurity_link_time_checks = rrdset_create_localhost("netframework"
+                                                                             , id, NULL
+                                                                             , "security"
+                                                                             , "netframework.clrsecurity_link_time_checks"
+                                                                             , "Link-time code access security checks"
+                                                                             , "checks/s"
+                                                                             , PLUGIN_WINDOWS_NAME
+                                                                             , "PerflibNetFramework"
+                                                                             , PRIO_NETFRAMEWORK_CLR_SECURITY_LINK_TIME_CHECKS
+                                                                             , update_every
+                                                                             , RRDSET_TYPE_LINE
+                                                                             );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrsecurity_link_time_checks_total", windows_shared_buffer);
+                p->rd_clrsecurity_link_time_checks  = rrddim_add(p->st_clrsecurity_link_time_checks,
+                                                                id,
+                                                                "linktime",
+                                                                1,
+                                                                1,
+                                                                RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_clrsecurity_link_time_checks->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrsecurity_link_time_checks,
+                                  p->rd_clrsecurity_link_time_checks,
+                                  (collected_number)p->NETFrameworkCLRSecurityLinkTimeChecks.current.Data);
+            rrdset_done(p->st_clrsecurity_link_time_checks);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRSecurityPercentTimeinRTChecks) &&
+            perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRSecurityFrequency_PerfTime)) {
+            if (!p->st_clrsecurity_link_time_checks) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_checks_time", windows_shared_buffer);
+                p->st_clrsecurity_link_time_checks = rrdset_create_localhost("netframework"
+                                                                             , id, NULL
+                                                                             , "security"
+                                                                             , "netframework.clrsecurity_checks_time"
+                                                                             , "Time spent performing runtime code access security checks."
+                                                                             , "percentage"
+                                                                             , PLUGIN_WINDOWS_NAME
+                                                                             , "PerflibNetFramework"
+                                                                             , PRIO_NETFRAMEWORK_CLR_SECURITY_RT_CHECKS_TIME
+                                                                             , update_every
+                                                                             , RRDSET_TYPE_LINE
+                                                                             );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrsecurity_checks_time_percent", windows_shared_buffer);
+                p->rd_clrsecurity_link_time_checks  = rrddim_add(p->st_clrsecurity_link_time_checks,
+                                                                id,
+                                                                "time",
+                                                                1,
+                                                                100,
+                                                                RRD_ALGORITHM_ABSOLUTE);
+
+                rrdlabels_add(p->st_clrsecurity_link_time_checks->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            NETDATA_DOUBLE value = (NETDATA_DOUBLE)p->NETFrameworkCLRSecurityPercentTimeinRTChecks.current.Data;
+            value /= (NETDATA_DOUBLE)p->NETFrameworkCLRSecurityFrequency_PerfTime.current.Data;
+
+            rrddim_set_by_pointer(p->st_clrsecurity_link_time_checks,
+                                  p->rd_clrsecurity_link_time_checks,
+                                  (collected_number)(value * 100.0));
+            rrdset_done(p->st_clrsecurity_link_time_checks);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRSecurityStackWalkDepth)) {
+            if (!p->st_clrsecurity_stack_walk_depth) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_stack_walk_depth", windows_shared_buffer);
+                p->st_clrsecurity_stack_walk_depth = rrdset_create_localhost("netframework"
+                                                                             , id, NULL
+                                                                             , "security"
+                                                                             , "netframework.clrsecurity_stack_walk_depth"
+                                                                             , "Depth of the stack"
+                                                                             , "depth"
+                                                                             , PLUGIN_WINDOWS_NAME
+                                                                             , "PerflibNetFramework"
+                                                                             , PRIO_NETFRAMEWORK_CLR_SECURITY_STACK_WALK_DEPTH
+                                                                             , update_every
+                                                                             , RRDSET_TYPE_LINE
+                                                                             );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrsecurity_stack_walk_depth", windows_shared_buffer);
+                p->rd_clrsecurity_stack_walk_depth  = rrddim_add(p->st_clrsecurity_stack_walk_depth,
+                                                                 id,
+                                                                 "stack",
+                                                                 1,
+                                                                 1,
+                                                                 RRD_ALGORITHM_ABSOLUTE);
+
+                rrdlabels_add(p->st_clrsecurity_stack_walk_depth->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrsecurity_stack_walk_depth,
+                                  p->rd_clrsecurity_stack_walk_depth,
+                                  (collected_number)p->NETFrameworkCLRSecurityStackWalkDepth.current.Data);
+            rrdset_done(p->st_clrsecurity_stack_walk_depth);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRSecurityRunTimeChecks)) {
+            if (!p->st_clrsecurity_stack_walk_depth) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_runtime_checks", windows_shared_buffer);
+                p->st_clrsecurity_stack_walk_depth = rrdset_create_localhost("netframework"
+                                                                             , id, NULL
+                                                                             , "security"
+                                                                             , "netframework.clrsecurity_runtime_checks"
+                                                                             , "Runtime code access security checks performed"
+                                                                             , "checks/s"
+                                                                             , PLUGIN_WINDOWS_NAME
+                                                                             , "PerflibNetFramework"
+                                                                             , PRIO_NETFRAMEWORK_CLR_SECURITY_RUNTIME_CHECKS
+                                                                             , update_every
+                                                                             , RRDSET_TYPE_LINE
+                                                                             );
+
+                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrsecurity_runtime_checks_total", windows_shared_buffer);
+                p->rd_clrsecurity_stack_walk_depth  = rrddim_add(p->st_clrsecurity_stack_walk_depth,
+                                                                 id,
+                                                                 "runtime",
+                                                                 1,
+                                                                 1,
+                                                                 RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_clrsecurity_stack_walk_depth->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrsecurity_stack_walk_depth,
+                                  p->rd_clrsecurity_stack_walk_depth,
+                                  (collected_number)p->NETFrameworkCLRSecurityRunTimeChecks.current.Data);
+            rrdset_done(p->st_clrsecurity_stack_walk_depth);
         }
     }
 }
