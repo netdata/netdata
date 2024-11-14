@@ -282,7 +282,7 @@ void stream_sender_update_dispatcher_sent_data_unsafe(struct sender_state *s, ui
     replication_recalculate_buffer_used_ratio_unsafe(s);
 }
 
-bool stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, uint64_t bytes_compressed, uint64_t bytes_uncompressed) {
+void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, uint64_t bytes_compressed, uint64_t bytes_uncompressed) {
     // calculate the statistics for our dispatcher
     s->dispatcher.bytes_uncompressed += bytes_uncompressed;
     s->dispatcher.bytes_compressed += bytes_compressed;
@@ -290,14 +290,6 @@ bool stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, u
     s->dispatcher.bytes_available = cbuffer_available_size_unsafe(s->buffer);
     s->dispatcher.buffer_ratio = (NETDATA_DOUBLE)(s->buffer->max_size -  s->dispatcher.bytes_available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size;
     replication_recalculate_buffer_used_ratio_unsafe(s);
-
-    // return true when the buffer is more than 50% used
-    if(!s->dispatcher.interactive_sent && s->dispatcher.bytes_outstanding >= s->dispatcher.bytes_available) {
-        s->dispatcher.interactive_sent = true;
-        return true;
-    }
-
-    return false;
 }
 
 void stream_sender_reconnect(struct sender_state *s) {
@@ -557,6 +549,8 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
     uint64_t messages = 0;
 
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
+        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_LIST);
+
         stream_sender_dispatcher_move_queue_to_running();
 
         now_ut = now_monotonic_usec();
@@ -564,15 +558,13 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
 
         bool do_all = false;
         if(next_all_ut < now_ut) {
-            next_all_ut = now_ut + 10 * USEC_PER_MS;
+            next_all_ut += now_ut + 50 * USEC_PER_MS;
             do_all = true;
         }
 
         size_t bytes_uncompressed = 0;
         size_t bytes_compressed = 0;
         NETDATA_DOUBLE buffer_ratio = 0.0;
-
-        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_LIST);
 
         size_t nodes = 0;
         for(size_t slot = 1; slot < sender.dispatcher.pollfd.used ; slot++) {
@@ -605,7 +597,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
                 ND_LOG_STACK_PUSH(lgs);
 
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_TIMEOUT);
-                netdata_log_error("STREAM %s [send to %s]: could not send metrics for %ld seconds - closing connection - "
+                netdata_log_error("STREAM dispatcher %s [send to %s]: could not send metrics for %ld seconds - closing connection - "
                                   "we have sent %zu bytes on this connection via %zu send attempts.",
                                   rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
                                   s->sent_bytes_on_this_connection, s->send_attempts);
@@ -736,7 +728,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
             if(unlikely(s->flags & SENDER_FLAG_OVERFLOW)) {
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_OVERFLOW);
                 errno_clear();
-                netdata_log_error("STREAM %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. Restarting connection",
+                netdata_log_error("STREAM dispatcher %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. Restarting connection",
                                   rrdhost_hostname(s->host), s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);
                 stream_sender_dispatcher_move_running_to_connector_or_remove(slot, true);
                 continue;
@@ -757,7 +749,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
                     error = "connection is invalid (POLLNVAL)";
 
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SOCKET_ERROR);
-                netdata_log_error("STREAM %s [send to %s]: restarting connection: %s - %zu bytes transmitted.",
+                netdata_log_error("STREAM dispatcher %s [send to %s]: restarting connection: %s - %zu bytes transmitted.",
                                   rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
                 stream_sender_dispatcher_move_running_to_connector_or_remove(slot, true);
                 continue;
@@ -793,7 +785,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
 
                 if(disconnect) {
                     worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR);
-                    netdata_log_error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.",
+                    netdata_log_error("STREAM dispatcher %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.",
                                       rrdhost_hostname(s->host), s->connected_to, s->sent_bytes_on_this_connection);
                     stream_sender_dispatcher_move_running_to_connector_or_remove(slot, true);
                     continue;
@@ -812,14 +804,14 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
                 }
                 else if (bytes == 0 || errno == ECONNRESET) {
                     worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED);
-                    netdata_log_error("STREAM %s [send to %s]: connection (fd %d) closed by far end.",
+                    netdata_log_error("STREAM dispatcher %s [send to %s]: connection (fd %d) closed by far end.",
                                       rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
                     stream_sender_dispatcher_move_running_to_connector_or_remove(slot, true);
                     continue;
                 }
                 else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
                     worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR);
-                    netdata_log_error("STREAM %s [send to %s]: error during receive (%zd, on fd %d) - closing connection.",
+                    netdata_log_error("STREAM dispatcher %s [send to %s]: error during receive (%zd, on fd %d) - closing connection.",
                                       rrdhost_hostname(s->host), s->connected_to, bytes, s->sock.fd);
                     stream_sender_dispatcher_move_running_to_connector_or_remove(slot, true);
                     continue;

@@ -170,11 +170,25 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
         compressed_len = uncompressed_len;
     }
 
-    bool interactive = stream_sender_update_dispatcher_added_data_unsafe(s, uncompressed_len, compressed_len);
+    stream_sender_update_dispatcher_added_data_unsafe(s, uncompressed_len, compressed_len);
+
+    // decide if this has interactive data
+    bool interactive = !s->dispatcher.interactive_sent &&
+                       (
+                           s->dispatcher.bytes_outstanding >= s->dispatcher.bytes_available ||
+                           !stream_has_capability(s, STREAM_CAP_INTERPOLATED) ||
+                           (type != STREAM_TRAFFIC_TYPE_DATA &&
+                            type != STREAM_TRAFFIC_TYPE_REPLICATION &&
+                            type != STREAM_TRAFFIC_TYPE_METADATA)
+                       );
+
+    if(interactive)
+        s->dispatcher.interactive_sent = true;
+
     struct pipe_msg msg = s->dispatcher.pollfd;
     sender_unlock(s);
 
-    if(interactive || !stream_has_capability(s, STREAM_CAP_INTERPOLATED) || type != STREAM_TRAFFIC_TYPE_DATA) {
+    if(interactive) {
         msg.msg = SENDER_MSG_INTERACTIVE;
         stream_sender_send_msg_to_dispatcher(s, msg);
     }

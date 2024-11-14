@@ -71,7 +71,7 @@ uint64_t stream_sender_magic(struct sender_state *s);
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_msg msg);
 
 void stream_sender_update_dispatcher_reset_unsafe(struct sender_state *s);
-bool stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
+void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
 void stream_sender_update_dispatcher_sent_data_unsafe(struct sender_state *s, uint64_t bytes_sent);
 
 #endif //NETDATA_SENDER_INTERNALS_H
