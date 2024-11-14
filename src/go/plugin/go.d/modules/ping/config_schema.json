@@ -58,7 +58,7 @@
       },
       "interface": {
         "title": "Interface",
-        "description": "The name of the network interface whose IP address will be used as the source for sending ping packets.",
+        "description": "The network device name (e.g., `eth0`, `wlan0`) used as the source for ICMP echo requests.",
         "type": "string",
         "default": ""
       }

@@ -89,6 +89,10 @@ modules:
               description: "Allows configuration of DNS resolution. Supported options: ip (select IPv4 or IPv6), ip4 (select IPv4), ip6 (select IPv6)."
               default_value: "ip"
               required: false
+            - name: interface
+              description: "The network device name (e.g., `eth0`, `wlan0`) used as the source for ICMP echo requests."
+              default_value: ""
+              required: false
             - name: privileged
               description: Ping packets type. "no" means send an "unprivileged" UDP ping,  "yes" - raw ICMP ping.
               default_value: true

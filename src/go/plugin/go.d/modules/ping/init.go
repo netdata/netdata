@@ -30,7 +30,7 @@ func (p *Ping) initProber() (prober, error) {
 	conf := pingProberConfig{
 		privileged: p.Privileged,
 		packets:    p.SendPackets,
-		iface:      p.Interface,
+		ifaceName:  p.Interface,
 		interval:   p.Interval.Duration(),
 		deadline:   deadline,
 	}
