@@ -224,7 +224,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
     if(host == localhost)
         s->ingest.type = RRDHOST_INGEST_TYPE_LOCALHOST;
-    else if(has_receiver || rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
+    else if(has_receiver || !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
         s->ingest.type = RRDHOST_INGEST_TYPE_CHILD;
     else if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
         s->ingest.type = RRDHOST_INGEST_TYPE_VIRTUAL;

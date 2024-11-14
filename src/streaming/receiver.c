@@ -384,6 +384,10 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         buffer->buffer[0] = '\0';
     }
 
+    // cleanup the sender buffer, because we may end-up reusing an incomplete buffer
+    sender_thread_buffer_free();
+    parser->user.v2.stream_buffer.wb = NULL;
+
     // make sure send_to_plugin() will not write any data to the socket
     spinlock_lock(&parser->writer.spinlock);
     parser->fd_output = -1;
