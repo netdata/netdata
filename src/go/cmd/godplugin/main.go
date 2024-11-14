@@ -23,6 +23,7 @@ import (
 	"golang.org/x/net/http/httpproxy"
 
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules"
+	_ "go.uber.org/automaxprocs"
 )
 
 var (
