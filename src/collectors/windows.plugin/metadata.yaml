@@ -347,9 +347,11 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: IIS
-          description: "These metrics refer to the entire monitored instance."
-          labels: []
+        - name: IIS website
+          description: "These metrics refer to the IIS website."
+          labels:
+            - name: website
+              description: The name of the IIS website.
           metrics:
             - name: iis.website_traffic
               description: Website traffic
