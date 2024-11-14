@@ -551,7 +551,8 @@ static int mysendfile(struct web_client *w, char *filename) {
     w->response.data->date = statbuf.st_mtimespec.tv_sec;
 #else
     w->response.data->date = statbuf.st_mtim.tv_sec;
-#endif 
+#endif
+    w->response.data->expires = now_realtime_sec() + 86400;
     buffer_cacheable(w->response.data);
 
     return HTTP_RESP_OK;
