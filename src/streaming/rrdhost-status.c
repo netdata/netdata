@@ -185,7 +185,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     spinlock_lock(&host->receiver_lock);
     s->ingest.hops = (host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
     bool has_receiver = false;
-    if (host->receiver) {
+    if (host->receiver && !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED)) {
         has_receiver = true;
         s->ingest.replication.instances = rrdhost_receiver_replicating_charts(host);
         s->ingest.replication.completion = host->rrdpush_receiver_replication_percent;
@@ -224,7 +224,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
     if(host == localhost)
         s->ingest.type = RRDHOST_INGEST_TYPE_LOCALHOST;
-    else if(has_receiver || !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
+    else if(has_receiver)
         s->ingest.type = RRDHOST_INGEST_TYPE_CHILD;
     else if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
         s->ingest.type = RRDHOST_INGEST_TYPE_VIRTUAL;
