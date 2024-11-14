@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- fix\(go.d/dyncfg\): remove additionalProperties [\#19006](https://github.com/netdata/netdata/pull/19006) ([ilyam8](https://github.com/ilyam8))
+- Set expires header when serving files [\#19005](https://github.com/netdata/netdata/pull/19005) ([stelfrag](https://github.com/stelfrag))
 - fix\(go.d/x509check\): correct check revocation code [\#19004](https://github.com/netdata/netdata/pull/19004) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/dyncfg\): remove additionalProperties check [\#19003](https://github.com/netdata/netdata/pull/19003) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#19002](https://github.com/netdata/netdata/pull/19002) ([netdatabot](https://github.com/netdatabot))
@@ -427,11 +429,6 @@
 - Bump github.com/Masterminds/sprig/v3 from 3.2.3 to 3.3.0 in /src/go [\#18453](https://github.com/netdata/netdata/pull/18453) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/prometheus/common from 0.55.0 to 0.57.0 in /src/go [\#18452](https://github.com/netdata/netdata/pull/18452) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/docker/docker from 27.1.2+incompatible to 27.2.0+incompatible in /src/go [\#18451](https://github.com/netdata/netdata/pull/18451) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Regenerate integrations.js [\#18450](https://github.com/netdata/netdata/pull/18450) ([netdatabot](https://github.com/netdatabot))
-- go.d sensors add parsing intrusion to exec method [\#18449](https://github.com/netdata/netdata/pull/18449) ([ilyam8](https://github.com/ilyam8))
-- Exit slabinfo.plugin on EPIPE [\#18448](https://github.com/netdata/netdata/pull/18448) ([teqwve](https://github.com/teqwve))
-- ilert Integration [\#18447](https://github.com/netdata/netdata/pull/18447) ([DaTiMy](https://github.com/DaTiMy))
-- go.d remove vnode disable [\#18446](https://github.com/netdata/netdata/pull/18446) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
