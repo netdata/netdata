@@ -44,10 +44,7 @@ This collector supports collecting metrics from multiple instances of this integ
 
 #### Auto-Detection
 
-It detects Windows exporter instances running on localhost (requires using [Netdata MSI installer](https://github.com/netdata/msi-installer#instructions)).
-
-Using the Netdata MSI installer is recommended for testing purposes only. For production use, you need to install Netdata on a Linux host and configure it to collect metrics remotely.
-
+This integration doesn't support auto-detection.
 
 #### Limits
 
