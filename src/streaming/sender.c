@@ -453,16 +453,23 @@ void *stream_sender_connector_thread(void *ptr __maybe_unused) {
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT, "timeout");
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION, "cant upgrade");
 
+    worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_QUEUED_NODES, "queued nodes", "nodes", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_CONNECTED_NODES, "connected nodes", "nodes", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_FAILED_NODES, "failed nodes", "nodes", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_CANCELLED_NODES, "cancelled nodes", "nodes", WORKER_METRIC_ABSOLUTE);
+
     unsigned job_id = 0;
 
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
         worker_is_idle();
         job_id = completion_wait_for_a_job_with_timeout(&sender.connector.completion, job_id, 1);
+        size_t nodes = 0, connected_nodes = 0, failed_nodes = 0, cancelled_nodes = 0;
 
         spinlock_lock(&sender.connector.spinlock);
         struct sender_state *next;
         for(struct sender_state *s = sender.connector.queue; s ; s = next) {
             next = s->next;
+            nodes++;
 
             ND_LOG_STACK lgs[] = {
                 ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
@@ -475,6 +482,7 @@ void *stream_sender_connector_thread(void *ptr __maybe_unused) {
             ND_LOG_STACK_PUSH(lgs);
 
             if(stream_sender_is_signaled_to_stop(s)) {
+                cancelled_nodes++;
                 DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
                 rrdhost_clear_sender(s->host);
                 continue;
@@ -486,6 +494,7 @@ void *stream_sender_connector_thread(void *ptr __maybe_unused) {
             spinlock_lock(&sender.connector.spinlock);
 
             if(move_to_dispatcher) {
+                connected_nodes++;
                 worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTED);
                 DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
                 spinlock_unlock(&sender.connector.spinlock);
@@ -496,10 +505,17 @@ void *stream_sender_connector_thread(void *ptr __maybe_unused) {
 
                 spinlock_lock(&sender.connector.spinlock);
             }
+            else
+                failed_nodes++;
 
             worker_is_idle();
         }
         spinlock_unlock(&sender.connector.spinlock);
+
+        worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_QUEUED_NODES, (NETDATA_DOUBLE)nodes);
+        worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_CONNECTED_NODES, (NETDATA_DOUBLE)connected_nodes);
+        worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_FAILED_NODES, (NETDATA_DOUBLE)failed_nodes);
+        worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_CANCELLED_NODES, (NETDATA_DOUBLE)cancelled_nodes);
     }
 
     return NULL;
