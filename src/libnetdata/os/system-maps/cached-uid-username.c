@@ -14,11 +14,11 @@
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 
 static struct {
-    uint32_t version;
     bool initialized;
     SPINLOCK spinlock;
     SIMPLE_HASHTABLE_USERNAMES_CACHE ht;
 } user_cache = {
+    .initialized = false,
     .spinlock = NETDATA_SPINLOCK_INITIALIZER,
     .ht = { 0 },
 };
@@ -144,9 +144,6 @@ void cached_usernames_delete_old_versions(uint32_t version) {
             simple_hashtable_del_slot_USERNAMES_CACHE(&user_cache.ht, sl);
         }
     }
-
-    simple_hashtable_destroy_USERNAMES_CACHE(&user_cache.ht);
-    user_cache.initialized = false;
 
     spinlock_unlock(&user_cache.spinlock);
 }
