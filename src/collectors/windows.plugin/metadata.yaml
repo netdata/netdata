@@ -296,7 +296,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors the current number of processes, threads, and context switches on Windows systems.
+          This collector monitors website requests and logins.
         method_description: |
           It queries the 'System' object from Perflib in order to gather the metrics.
       supported_platforms:
