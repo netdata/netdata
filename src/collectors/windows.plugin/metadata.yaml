@@ -298,7 +298,7 @@ modules:
         metrics_description: |
           This collector monitors website requests and logins.
         method_description: |
-          It queries the 'System' object from Perflib in order to gather the metrics.
+          It queries the 'Web Service' object from Perflib in order to gather the metrics.
       supported_platforms:
         include: ["windows"]
         exclude: []
