@@ -62,13 +62,13 @@ void rrdpush_sender_execute_commands_cleanup(struct sender_state *s);
 void rrdpush_sender_execute_commands(struct sender_state *s);
 
 bool stream_sender_connect_to_parent(struct sender_state *s);
-void stream_sender_dispatcher_wake_up(struct sender_state *s);
 
 void stream_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force);
 
 bool stream_sender_is_host_stopped(struct sender_state *s);
 
-uint64_t stream_sender_magic(RRDHOST *host);
-pid_t stream_sender_tid(RRDHOST *host);
+uint64_t stream_sender_magic(struct sender_state *s);
+pid_t stream_sender_tid(struct sender_state *s);
+void sender_dispatcher_signal_updates(struct sender_state *s, STREAM_TRAFFIC_TYPE type);
 
 #endif //NETDATA_SENDER_INTERNALS_H

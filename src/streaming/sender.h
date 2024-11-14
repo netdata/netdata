@@ -50,7 +50,9 @@ struct sender_state {
     bool stop;                                  // when set, the sender should stop sending this host
     ND_SOCK sock;
 
-    size_t pollfd_slot;
+    struct {
+        uint32_t pollfd_slot;
+    } dispatcher;
 
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
     size_t begin;
@@ -100,7 +102,6 @@ struct sender_state {
     } replication;
 
     struct {
-        bool pending_data;
         size_t buffer_used_percentage;          // the current utilization of the sending buffer
         usec_t last_flush_time_ut;              // the last time the sender flushed the sending buffer in USEC
         time_t last_buffer_recreate_s;          // true when the sender buffer should be re-created
@@ -122,10 +123,6 @@ struct sender_state {
 
 #define sender_lock(sender) spinlock_lock(&(sender)->spinlock)
 #define sender_unlock(sender) spinlock_unlock(&(sender)->spinlock)
-
-#define rrdpush_sender_pipe_has_pending_data(sender) __atomic_load_n(&(sender)->atomic.pending_data, __ATOMIC_RELAXED)
-#define rrdpush_sender_pipe_set_pending_data(sender) __atomic_store_n(&(sender)->atomic.pending_data, true, __ATOMIC_RELAXED)
-#define rrdpush_sender_pipe_clear_pending_data(sender) __atomic_store_n(&(sender)->atomic.pending_data, false, __ATOMIC_RELAXED)
 
 #define rrdpush_sender_last_buffer_recreate_get(sender) __atomic_load_n(&(sender)->atomic.last_buffer_recreate_s, __ATOMIC_RELAXED)
 #define rrdpush_sender_last_buffer_recreate_set(sender, value) __atomic_store_n(&(sender)->atomic.last_buffer_recreate_s, value, __ATOMIC_RELAXED)

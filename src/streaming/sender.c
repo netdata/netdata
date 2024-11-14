@@ -153,19 +153,6 @@ static ssize_t attempt_read(struct sender_state *s) {
     return ret;
 }
 
-void stream_sender_dispatcher_wake_up(struct sender_state *s) {
-    if(unlikely(stream_sender_tid(s->host) == gettid_cached()))
-        return;
-
-    RRDHOST *host = s->host;
-
-    int pipe_fd = sender_write_pipe_fd(s);
-
-    // signal the sender there are more data
-    if (pipe_fd != -1 && write(pipe_fd, " ", 1) == -1)
-        netdata_log_error("STREAM %s [send]: cannot write to internal pipe.", rrdhost_hostname(host));
-}
-
 static bool rrdhost_set_sender(RRDHOST *host) {
     if(unlikely(!host->sender)) return false;
 
@@ -175,7 +162,7 @@ static bool rrdhost_set_sender(RRDHOST *host) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
         host->stream.snd.status.connections++;
-        host->sender->magic = stream_sender_magic(host);
+        host->sender->magic = stream_sender_magic(host->sender);
         host->sender->last_state_since_t = now_realtime_sec();
         host->sender->exit.reason = STREAM_HANDSHAKE_NEVER;
         ret = true;
@@ -192,7 +179,7 @@ static void rrdhost_clear_sender(RRDHOST *host) {
 
     sender_lock(host->sender);
 
-    if(host->sender->magic == stream_sender_magic(host)) {
+    if(host->sender->magic == stream_sender_magic(host->sender)) {
         host->sender->magic = 0;
         host->sender->exit.shutdown = false;
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
@@ -297,6 +284,8 @@ static struct {
         struct completion completion;
 
         struct {
+            // the incoming queue of the connector thread
+            // all other threads leave new senders here, to be connected to their parents
             SPINLOCK spinlock;
             struct sender_state *ll;
         } queue;
@@ -309,11 +298,19 @@ static struct {
         ND_THREAD *thread;
 
         struct {
+            // the incoming queue of the dispatcher thread
+            // the connector thread leaves the connected senders in this list, for the dispatcher to pick them up
             SPINLOCK spinlock;
             struct sender_state *ll;
         } queue;
 
         struct {
+            // this is to prevent sending a vast amount of pipe messages
+            size_t pipe_pending;
+        } updates;
+
+        struct {
+            // private fields for the dispatcher thread only - DO NOT USE ON OTHER THREADS
             size_t used;
             size_t size;
             struct pollfd *array;
@@ -341,15 +338,32 @@ void stream_sender_cancel_threads(void) {
     nd_thread_signal_cancel(sender.dispatcher.thread);
 }
 
+void sender_dispatcher_signal_updates(struct sender_state *s, STREAM_TRAFFIC_TYPE type) {
+    if(unlikely(stream_sender_tid(s) == gettid_cached()))
+        return;
+
+    if((!stream_has_capability(s, STREAM_CAP_INTERPOLATED) || type != STREAM_TRAFFIC_TYPE_DATA) &&
+        __atomic_add_fetch(&sender.dispatcher.updates.pipe_pending, 1, __ATOMIC_RELAXED) == 1) {
+        // signal the sender there are more data
+        int pipe_fd = sender_write_pipe_fd(s);
+        if (pipe_fd != -1 && write(pipe_fd, " ", 1) == -1)
+            netdata_log_error("STREAM %s [send]: cannot write to internal pipe.", rrdhost_hostname(s->host));
+    }
+}
+
+static void sender_dispatcher_signaled_updates(void) {
+    __atomic_store_n(&sender.dispatcher.updates.pipe_pending, 0, __ATOMIC_RELAXED);
+}
+
 int sender_write_pipe_fd(struct sender_state *s __maybe_unused) {
     return sender.dispatcher.pipe_fds[PIPE_WRITE];
 }
 
-uint64_t stream_sender_magic(RRDHOST *host __maybe_unused) {
+uint64_t stream_sender_magic(struct sender_state *s __maybe_unused) {
     return sender.dispatcher.magic;
 }
 
-pid_t stream_sender_tid(RRDHOST *host __maybe_unused) {
+pid_t stream_sender_tid(struct sender_state *s __maybe_unused) {
     return sender.dispatcher.tid;
 }
 
@@ -427,6 +441,7 @@ static void stream_sender_dispatcher_move_queue_to_running(void) {
             .events = POLLIN,
             .revents = 0,
         };
+        s->dispatcher.pollfd_slot = slot;
 
         first_slot = slot + 1;
     }
@@ -444,6 +459,7 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(size_t 
     if(!s) return;
 
     sender.dispatcher.pollfd.running[slot] = NULL;
+    s->dispatcher.pollfd_slot = 0;
 
     sender_lock(s);
     {
@@ -579,6 +595,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
 
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
         stream_sender_dispatcher_move_queue_to_running();
+        sender_dispatcher_signaled_updates();
 
         time_t now_s = now_monotonic_sec();
 
@@ -628,10 +645,9 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
             sender_lock(s);
             size_t outstanding = cbuffer_next_unsafe(s->buffer, NULL);
             size_t available = cbuffer_available_size_unsafe(s->buffer);
-            if (unlikely(!outstanding)) {
-                rrdpush_sender_pipe_clear_pending_data(s);
+            if (unlikely(!outstanding))
                 stream_sender_cbuffer_recreate_timed(s, now_s, true, false);
-            }
+
             if(s->buffer->max_size) {
                 NETDATA_DOUBLE ratio = (NETDATA_DOUBLE)(s->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size;
                 if (ratio > buffer_ratio) buffer_ratio = ratio;

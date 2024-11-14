@@ -154,15 +154,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
         s->sent_bytes_on_this_connection_per_type[type] += src_len;
 
     replication_recalculate_buffer_used_ratio_unsafe(s);
-
-    bool signal_sender = false;
-    if(!rrdpush_sender_pipe_has_pending_data(s)) {
-        rrdpush_sender_pipe_set_pending_data(s);
-        signal_sender = true;
-    }
-
     sender_unlock(s);
 
-    if(signal_sender && (!stream_has_capability(s, STREAM_CAP_INTERPOLATED) || type != STREAM_TRAFFIC_TYPE_DATA))
-        stream_sender_dispatcher_wake_up(s);
+    sender_dispatcher_signal_updates(s, type);
 }
