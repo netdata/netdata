@@ -335,7 +335,7 @@ Metrics:
 | iis.website_ftp_file_transfer_rate | received, sent | files/s |
 | iis.website_logon_attempts_rate | logon | attempts/s |
 | iis.website_errors_rate | document_locked, document_not_found | errors/s |
-| iis.website_uptime | document_locked, document_not_found | seconds |
+| iis.website_uptime | uptime | seconds |
 
 ### Per mssql instance
 

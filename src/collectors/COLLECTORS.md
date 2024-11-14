@@ -1161,6 +1161,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [HyperV](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/windows/integrations/hyperv.md)
 
+- [IIS (Internet Information Services) statistics](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/iis_internet_information_services_statistics.md)
+
 - [MS Exchange](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/windows/integrations/ms_exchange.md)
 
 - [MS SQL Server](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/windows/integrations/ms_sql_server.md)
