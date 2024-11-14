@@ -562,14 +562,12 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
             next_all_ut = now_ut + 10 * USEC_PER_MS;
             do_all = true;
         }
-        else {
-            int x = 0;
-            x++;
-        }
 
         size_t bytes_uncompressed = 0;
         size_t bytes_compressed = 0;
         NETDATA_DOUBLE buffer_ratio = 0.0;
+
+        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_LIST);
 
         size_t nodes = 0;
         for(size_t slot = 1; slot < sender.dispatcher.pollfd.used ; slot++) {
@@ -584,7 +582,6 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
                 continue;
 
             s->dispatcher.interactive = false;
-            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_LIST);
             nodes++;
 
             // If the TCP window never opened then something is wrong, restart connection
