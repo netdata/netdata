@@ -162,7 +162,7 @@
             <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="20" / -->
 
             <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
-            <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="((TOKEN = &quot;&quot;) AND (ROOMS = &quot;&quot;)) OR ((NOT (TOKEN = &quot;&quot;)) AND (NOT (ROOMS = &quot;&quot;)))" />
+            <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
 
             <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="NDConfigDialog" Order="1" Condition="NOT Installed OR WixUI_InstallMode = &quot;Change&quot;" />
             <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
