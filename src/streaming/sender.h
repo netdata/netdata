@@ -50,6 +50,8 @@ struct sender_state {
     bool stop;                                  // when set, the sender should stop sending this host
     ND_SOCK sock;
 
+    size_t pollfd_slot;
+
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
     size_t begin;
     size_t reconnects_counter;

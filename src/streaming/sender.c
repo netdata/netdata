@@ -289,24 +289,29 @@ static bool stream_sender_log_dst_port(BUFFER *wb, void *ptr) {
     return true;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+
 static struct {
     struct {
         ND_THREAD *thread;
-        SPINLOCK spinlock;
-        size_t count;
-        struct sender_state *queue;
         struct completion completion;
+
+        struct {
+            SPINLOCK spinlock;
+            struct sender_state *ll;
+        } queue;
     } connector;
 
     struct {
         uint64_t magic;
         pid_t tid;
-
         int pipe_fds[2];
         ND_THREAD *thread;
-        SPINLOCK spinlock;
-        size_t count;
-        struct sender_state *queue;
+
+        struct {
+            SPINLOCK spinlock;
+            struct sender_state *ll;
+        } queue;
 
         struct {
             size_t used;
@@ -316,8 +321,18 @@ static struct {
         } pollfd;
     } dispatcher;
 } sender = {
+    .connector = {
+        .queue = {
+            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+            .ll = NULL,
+        },
+    },
     .dispatcher = {
         .pipe_fds = { -1, -1 },
+        .queue = {
+            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+            .ll = NULL,
+        },
     }
 };
 
@@ -362,10 +377,9 @@ void stream_sender_connector_add(struct sender_state *s) {
 
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
 
-    spinlock_lock(&sender.connector.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
-    sender.connector.count++;
-    spinlock_unlock(&sender.connector.spinlock);
+    spinlock_lock(&sender.connector.queue.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sender.connector.queue.ll, s, prev, next);
+    spinlock_unlock(&sender.connector.queue.spinlock);
 
     completion_mark_complete_a_job(&sender.connector.completion);
 }
@@ -386,13 +400,13 @@ static void stream_sender_dispatcher_move_queue_to_running(void) {
     size_t first_slot = 1;
 
     // process the queue
-    spinlock_lock(&sender.dispatcher.spinlock);
+    spinlock_lock(&sender.dispatcher.queue.spinlock);
     stream_sender_dispatcher_realloc_arrays_unsafe(0); // our pipe
-    while(sender.dispatcher.queue) {
+    while(sender.dispatcher.queue.ll) {
         worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DEQUEUE);
 
-        struct sender_state *s = sender.dispatcher.queue;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.dispatcher.queue, s, prev, next);
+        struct sender_state *s = sender.dispatcher.queue.ll;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.dispatcher.queue.ll, s, prev, next);
 
         // slot 0 is our pipe
         size_t slot = sender.dispatcher.pollfd.used > 0 ? sender.dispatcher.pollfd.used : 1;
@@ -416,7 +430,7 @@ static void stream_sender_dispatcher_move_queue_to_running(void) {
 
         first_slot = slot + 1;
     }
-    spinlock_unlock(&sender.dispatcher.spinlock);
+    spinlock_unlock(&sender.dispatcher.queue.spinlock);
 }
 
 static void stream_sender_dispatcher_move_running_to_connector_or_remove(size_t slot) {
@@ -465,9 +479,9 @@ void *stream_sender_connector_thread(void *ptr __maybe_unused) {
         job_id = completion_wait_for_a_job_with_timeout(&sender.connector.completion, job_id, 1);
         size_t nodes = 0, connected_nodes = 0, failed_nodes = 0, cancelled_nodes = 0;
 
-        spinlock_lock(&sender.connector.spinlock);
+        spinlock_lock(&sender.connector.queue.spinlock);
         struct sender_state *next;
-        for(struct sender_state *s = sender.connector.queue; s ; s = next) {
+        for(struct sender_state *s = sender.connector.queue.ll; s ; s = next) {
             next = s->next;
             nodes++;
 
@@ -483,34 +497,34 @@ void *stream_sender_connector_thread(void *ptr __maybe_unused) {
 
             if(stream_sender_is_signaled_to_stop(s)) {
                 cancelled_nodes++;
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue.ll, s, prev, next);
                 rrdhost_clear_sender(s->host);
                 continue;
             }
 
-            spinlock_unlock(&sender.connector.spinlock);
+            spinlock_unlock(&sender.connector.queue.spinlock);
             worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
             bool move_to_dispatcher = stream_sender_connect_to_parent(s);
-            spinlock_lock(&sender.connector.spinlock);
+            spinlock_lock(&sender.connector.queue.spinlock);
 
             if(move_to_dispatcher) {
                 connected_nodes++;
                 worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTED);
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue, s, prev, next);
-                spinlock_unlock(&sender.connector.spinlock);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sender.connector.queue.ll, s, prev, next);
+                spinlock_unlock(&sender.connector.queue.spinlock);
 
-                spinlock_lock(&sender.dispatcher.spinlock);
-                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sender.dispatcher.queue, s, prev, next);
-                spinlock_unlock(&sender.dispatcher.spinlock);
+                spinlock_lock(&sender.dispatcher.queue.spinlock);
+                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sender.dispatcher.queue.ll, s, prev, next);
+                spinlock_unlock(&sender.dispatcher.queue.spinlock);
 
-                spinlock_lock(&sender.connector.spinlock);
+                spinlock_lock(&sender.connector.queue.spinlock);
             }
             else
                 failed_nodes++;
 
             worker_is_idle();
         }
-        spinlock_unlock(&sender.connector.spinlock);
+        spinlock_unlock(&sender.connector.queue.spinlock);
 
         worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_QUEUED_NODES, (NETDATA_DOUBLE)nodes);
         worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_CONNECTED_NODES, (NETDATA_DOUBLE)connected_nodes);
@@ -785,7 +799,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
     }
 
     // dequeue
-    while(sender.dispatcher.queue)
+    while(sender.dispatcher.queue.ll)
         stream_sender_dispatcher_move_queue_to_running();
 
     // stop all hosts
