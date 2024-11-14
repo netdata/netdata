@@ -292,7 +292,12 @@ bool stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, u
     replication_recalculate_buffer_used_ratio_unsafe(s);
 
     // return true when the buffer is more than 50% used
-    return s->dispatcher.bytes_outstanding >= s->dispatcher.bytes_available;
+    if(!s->dispatcher.interactive_sent && s->dispatcher.bytes_outstanding >= s->dispatcher.bytes_available) {
+        s->dispatcher.interactive_sent = true;
+        return true;
+    }
+
+    return false;
 }
 
 void stream_sender_reconnect(struct sender_state *s) {
@@ -581,7 +586,6 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
             if(!do_all && !s->dispatcher.interactive)
                 continue;
 
-            s->dispatcher.interactive = false;
             nodes++;
 
             // If the TCP window never opened then something is wrong, restart connection
@@ -776,6 +780,11 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
                         stream_sender_update_dispatcher_sent_data_unsafe(s, bytes);
                         s->last_traffic_seen_t = now_s;
                         bytes_sent += bytes;
+
+                        if(!s->dispatcher.bytes_outstanding) {
+                            s->dispatcher.interactive = false;
+                            s->dispatcher.interactive_sent = false;
+                        }
                     }
                     else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
                         disconnect = true;

@@ -63,6 +63,7 @@ struct sender_state {
 
     struct {
         bool interactive;                       // used internally by the dispatcher to optimize sending in batches
+        bool interactive_sent;
         size_t bytes_compressed;
         size_t bytes_uncompressed;
         size_t bytes_outstanding;
