@@ -42,15 +42,33 @@ typedef struct {
 typedef void (*rrdpush_defer_action_t)(struct sender_state *s, void *data);
 typedef void (*rrdpush_defer_cleanup_t)(struct sender_state *s, void *data);
 
+typedef enum __attribute__((packed)) {
+    SENDER_MSG_INTERACTIVE = 0,
+    SENDER_MSG_RECONNECT,
+    SENDER_MSG_STOP,
+} SENDER_MSG;
+
+struct pipe_msg {
+    uint32_t magic;
+    uint32_t slot;
+    SENDER_MSG msg;
+};
+
 struct sender_state {
     RRDHOST *host;
     uint64_t magic;
     SENDER_FLAGS flags;
 
-    bool stop;                                  // when set, the sender should stop sending this host
     ND_SOCK sock;
 
     struct {
+        bool interactive;                       // used internally by the dispatcher to optimize sending in batches
+        size_t bytes_compressed;
+        size_t bytes_uncompressed;
+        size_t bytes_outstanding;
+        size_t bytes_available;
+        NETDATA_DOUBLE buffer_ratio;
+        struct pipe_msg pollfd;
         uint32_t pollfd_slot;
     } dispatcher;
 
@@ -84,8 +102,8 @@ struct sender_state {
 #endif
 
     struct {
-        bool shutdown;
-        STREAM_HANDSHAKE reason;
+        bool shutdown;                          // when set, the sender should stop sending this host
+        STREAM_HANDSHAKE reason;                // the reason we decided to stop this sender
     } exit;
 
     struct {
@@ -160,6 +178,8 @@ int sender_write_pipe_fd(struct sender_state *s);
 
 void stream_sender_cancel_threads(void);
 bool stream_sender_is_signaled_to_stop(struct sender_state *s);
+
+void stream_sender_reconnect(struct sender_state *s);
 
 #include "replication.h"
 

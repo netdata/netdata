@@ -546,7 +546,7 @@ bool stream_sender_connect_to_parent(struct sender_state *s) {
     s->send_attempts = 0;
 
     // reset the bytes we have sent for this session
-    s->sent_bytes_on_this_connection = 0;
+    stream_sender_update_dispatcher_reset_unsafe(s);
     memset(s->sent_bytes_on_this_connection_per_type, 0, sizeof(s->sent_bytes_on_this_connection_per_type));
 
     if(!stream_sender_connection_send_request(s->host, stream_send.parents.default_port, stream_send.parents.timeout_s, s)) {

@@ -54,8 +54,10 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     if(unlikely(!src || !src_len))
         return;
 
-    sender_lock(s);
+    size_t uncompressed_len = src_len;
+    size_t compressed_len = 0;
 
+    sender_lock(s);
 #ifdef NETDATA_LOG_STREAM_SENDER
     if(type == STREAM_TRAFFIC_TYPE_METADATA) {
         if(!s->stream_log_fp) {
@@ -118,12 +120,13 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                                       rrdhost_hostname(s->host), s->connected_to);
 
                     rrdpush_compression_deactivate(s);
-                    rrdpush_sender_thread_close_socket(s);
+                    stream_sender_reconnect(s);
                     sender_unlock(s);
                     return;
                 }
             }
 
+            compressed_len += dst_len;
             rrdpush_signature_t signature = rrdpush_compress_encode_signature(dst_len);
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -135,11 +138,19 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                       size_to_compress, dst_len, decoded_dst_len);
 #endif
 
-            if(cbuffer_add_unsafe(s->buffer, (const char *)&signature, sizeof(signature)))
+            if(cbuffer_add_unsafe(s->buffer, (const char *)&signature, sizeof(signature))) {
                 s->flags |= SENDER_FLAG_OVERFLOW;
+                stream_sender_reconnect(s);
+                sender_unlock(s);
+                return;
+            }
             else {
-                if(cbuffer_add_unsafe(s->buffer, dst, dst_len))
+                if(cbuffer_add_unsafe(s->buffer, dst, dst_len)) {
                     s->flags |= SENDER_FLAG_OVERFLOW;
+                    stream_sender_reconnect(s);
+                    sender_unlock(s);
+                    return;
+                }
                 else
                     s->sent_bytes_on_this_connection_per_type[type] += dst_len + sizeof(signature);
             }
@@ -148,13 +159,23 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
             src_len -= size_to_compress;
         }
     }
-    else if(cbuffer_add_unsafe(s->buffer, src, src_len))
+    else if(cbuffer_add_unsafe(s->buffer, src, src_len)) {
         s->flags |= SENDER_FLAG_OVERFLOW;
-    else
+        stream_sender_reconnect(s);
+        sender_unlock(s);
+        return;
+    }
+    else {
         s->sent_bytes_on_this_connection_per_type[type] += src_len;
+        compressed_len = uncompressed_len;
+    }
 
-    replication_recalculate_buffer_used_ratio_unsafe(s);
+    bool interactive = stream_sender_update_dispatcher_added_data_unsafe(s, uncompressed_len, compressed_len);
+    struct pipe_msg msg = s->dispatcher.pollfd;
     sender_unlock(s);
 
-    sender_dispatcher_signal_updates(s, type);
+    if(interactive || !stream_has_capability(s, STREAM_CAP_INTERPOLATED) || type != STREAM_TRAFFIC_TYPE_DATA) {
+        msg.msg = SENDER_MSG_INTERACTIVE;
+        stream_sender_send_msg_to_dispatcher(s, msg);
+    }
 }

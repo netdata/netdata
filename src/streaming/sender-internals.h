@@ -33,21 +33,21 @@
 #define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED           10
 #define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR           11
 #define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR              12
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_STOPPED                 13
 
 // dispatcher execute requests
-#define WORKER_SENDER_DISPATCHER_JOB_REPLAY_REQUEST                     14
-#define WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST                   15
+#define WORKER_SENDER_DISPATCHER_JOB_REPLAY_REQUEST                     13
+#define WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST                   14
 
 // dispatcher metrics
-#define WORKER_SENDER_DISPATCHER_JOB_NODES                              16
-#define WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO                       17
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED                     18
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT                         19
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED                   20
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED                 21
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO            22
-#define WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE                   23
+#define WORKER_SENDER_DISPATCHER_JOB_NODES                              15
+#define WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO                       16
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED                     17
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT                         18
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED                   19
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED                 20
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO            21
+#define WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE                   22
+#define WORKER_SENDER_DISPATHCER_JOB_MESSAGES                           23
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 24
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 25
@@ -68,7 +68,10 @@ void stream_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, 
 bool stream_sender_is_host_stopped(struct sender_state *s);
 
 uint64_t stream_sender_magic(struct sender_state *s);
-pid_t stream_sender_tid(struct sender_state *s);
-void sender_dispatcher_signal_updates(struct sender_state *s, STREAM_TRAFFIC_TYPE type);
+void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_msg msg);
+
+void stream_sender_update_dispatcher_reset_unsafe(struct sender_state *s);
+bool stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
+void stream_sender_update_dispatcher_sent_data_unsafe(struct sender_state *s, uint64_t bytes_sent);
 
 #endif //NETDATA_SENDER_INTERNALS_H

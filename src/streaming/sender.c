@@ -56,7 +56,7 @@ static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
     // flush the output buffer from any data it may have
     cbuffer_flush(host->sender->buffer);
     stream_sender_cbuffer_recreate_timed(host->sender, now_monotonic_sec(), true, true);
-    replication_recalculate_buffer_used_ratio_unsafe(host->sender);
+    stream_sender_update_dispatcher_reset_unsafe(host->sender);
 
     sender_unlock(host->sender);
 }
@@ -89,70 +89,6 @@ static void rrdpush_sender_on_disconnect(RRDHOST *host) {
     stream_path_parent_disconnected(host);
 }
 
-// TCP window is open, and we have data to transmit.
-static ssize_t attempt_to_send(struct sender_state *s) {
-    ssize_t ret;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    struct circular_buffer *cb = s->buffer;
-#endif
-
-    sender_lock(s);
-    char *chunk;
-    size_t outstanding = cbuffer_next_unsafe(s->buffer, &chunk);
-    netdata_log_debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
-
-    ret = nd_sock_send_nowait(&s->sock, chunk, outstanding);
-    if (likely(ret > 0)) {
-        cbuffer_remove_unsafe(s->buffer, ret);
-        s->sent_bytes_on_this_connection += ret;
-        s->sent_bytes += ret;
-        netdata_log_debug(D_STREAM, "STREAM %s [send to %s]: Sent %zd bytes", rrdhost_hostname(s->host), s->connected_to, ret);
-    }
-    else if (ret == -1 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK))
-        netdata_log_debug(D_STREAM, "STREAM %s [send to %s]: unavailable after polling POLLOUT", rrdhost_hostname(s->host), s->connected_to);
-    else if (ret == -1) {
-        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR);
-        netdata_log_debug(D_STREAM, "STREAM: Send failed - closing socket...");
-        netdata_log_error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.",  rrdhost_hostname(s->host), s->connected_to, s->sent_bytes_on_this_connection);
-        rrdpush_sender_thread_close_socket(s);
-    }
-    else
-        netdata_log_debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
-
-    replication_recalculate_buffer_used_ratio_unsafe(s);
-    sender_unlock(s);
-
-    return ret;
-}
-
-static ssize_t attempt_read(struct sender_state *s) {
-    ssize_t ret = nd_sock_revc_nowait(&s->sock, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1);
-
-    if (ret > 0) {
-        s->read_len += ret;
-        return ret;
-    }
-
-    if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
-        return ret;
-
-    if (ret == 0 || errno == ECONNRESET) {
-        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED);
-        netdata_log_error("STREAM %s [send to %s]: connection (fd %d) closed by far end.",
-                          rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
-    }
-    else {
-        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR);
-        netdata_log_error("STREAM %s [send to %s]: error during receive (%zd, on fd %d) - closing connection.",
-                          rrdhost_hostname(s->host), s->connected_to, ret, s->sock.fd);
-    }
-
-    rrdpush_sender_thread_close_socket(s);
-
-    return ret;
-}
-
 static bool rrdhost_set_sender(RRDHOST *host) {
     if(unlikely(!host->sender)) return false;
 
@@ -181,7 +117,7 @@ static void rrdhost_clear_sender(RRDHOST *host) {
 
     if(host->sender->magic == stream_sender_magic(host->sender)) {
         host->sender->magic = 0;
-        host->sender->exit.shutdown = false;
+        __atomic_store_n(&host->sender->exit.shutdown, false, __ATOMIC_RELAXED);
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         host->sender->last_state_since_t = now_realtime_sec();
         stream_parent_set_disconnect_reason(
@@ -201,7 +137,7 @@ static void rrdhost_clear_sender(RRDHOST *host) {
 }
 
 bool stream_sender_is_signaled_to_stop(struct sender_state *s) {
-    return __atomic_load_n(&s->stop, __ATOMIC_RELAXED);
+    return __atomic_load_n(&s->exit.shutdown, __ATOMIC_RELAXED);
 }
 
 bool stream_sender_is_host_stopped(struct sender_state *s) {
@@ -220,12 +156,6 @@ bool stream_sender_is_host_stopped(struct sender_state *s) {
     if(unlikely(!rrdhost_has_rrdpush_sender_enabled(s->host))) {
         if(!s->exit.reason)
             s->exit.reason = STREAM_HANDSHAKE_NON_STREAMABLE_HOST;
-        return true;
-    }
-
-    if(unlikely(s->exit.shutdown)) {
-        if(!s->exit.reason)
-            s->exit.reason = STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN;
         return true;
     }
 
@@ -305,11 +235,6 @@ static struct {
         } queue;
 
         struct {
-            // this is to prevent sending a vast amount of pipe messages
-            size_t pipe_pending;
-        } updates;
-
-        struct {
             // private fields for the dispatcher thread only - DO NOT USE ON OTHER THREADS
             size_t used;
             size_t size;
@@ -338,21 +263,51 @@ void stream_sender_cancel_threads(void) {
     nd_thread_signal_cancel(sender.dispatcher.thread);
 }
 
-void sender_dispatcher_signal_updates(struct sender_state *s, STREAM_TRAFFIC_TYPE type) {
-    if(unlikely(stream_sender_tid(s) == gettid_cached()))
-        return;
-
-    if((!stream_has_capability(s, STREAM_CAP_INTERPOLATED) || type != STREAM_TRAFFIC_TYPE_DATA) &&
-        __atomic_add_fetch(&sender.dispatcher.updates.pipe_pending, 1, __ATOMIC_RELAXED) == 1) {
-        // signal the sender there are more data
-        int pipe_fd = sender_write_pipe_fd(s);
-        if (pipe_fd != -1 && write(pipe_fd, " ", 1) == -1)
-            netdata_log_error("STREAM %s [send]: cannot write to internal pipe.", rrdhost_hostname(s->host));
-    }
+void stream_sender_update_dispatcher_reset_unsafe(struct sender_state *s) {
+    s->sent_bytes_on_this_connection = 0;
+    s->dispatcher.bytes_uncompressed = 0;
+    s->dispatcher.bytes_compressed = 0;
+    s->dispatcher.bytes_outstanding = 0;
+    s->dispatcher.bytes_available = 0;
+    s->dispatcher.buffer_ratio = 0.0;
+    replication_recalculate_buffer_used_ratio_unsafe(s);
 }
 
-static void sender_dispatcher_signaled_updates(void) {
-    __atomic_store_n(&sender.dispatcher.updates.pipe_pending, 0, __ATOMIC_RELAXED);
+void stream_sender_update_dispatcher_sent_data_unsafe(struct sender_state *s, uint64_t bytes_sent) {
+    s->sent_bytes_on_this_connection += bytes_sent;
+    s->sent_bytes += bytes_sent;
+    s->dispatcher.bytes_outstanding = cbuffer_next_unsafe(s->buffer, NULL);
+    s->dispatcher.bytes_available = cbuffer_available_size_unsafe(s->buffer);
+    s->dispatcher.buffer_ratio = (NETDATA_DOUBLE)(s->buffer->max_size -  s->dispatcher.bytes_available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size;
+    replication_recalculate_buffer_used_ratio_unsafe(s);
+}
+
+bool stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, uint64_t bytes_compressed, uint64_t bytes_uncompressed) {
+    // calculate the statistics for our dispatcher
+    s->dispatcher.bytes_uncompressed += bytes_uncompressed;
+    s->dispatcher.bytes_compressed += bytes_compressed;
+    s->dispatcher.bytes_outstanding = cbuffer_next_unsafe(s->buffer, NULL);
+    s->dispatcher.bytes_available = cbuffer_available_size_unsafe(s->buffer);
+    s->dispatcher.buffer_ratio = (NETDATA_DOUBLE)(s->buffer->max_size -  s->dispatcher.bytes_available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size;
+    replication_recalculate_buffer_used_ratio_unsafe(s);
+
+    // return true when the buffer is more than 50% used
+    return s->dispatcher.bytes_outstanding >= s->dispatcher.bytes_available;
+}
+
+void stream_sender_reconnect(struct sender_state *s) {
+    struct pipe_msg msg = s->dispatcher.pollfd;
+    msg.msg = SENDER_MSG_RECONNECT;
+    stream_sender_send_msg_to_dispatcher(s, msg);
+}
+
+void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_msg msg) {
+    if(!msg.slot || !msg.magic) return;
+
+    int pipe_fd = sender_write_pipe_fd(s);
+    if (pipe_fd != -1 && write(pipe_fd, &msg, sizeof(msg)) != sizeof(msg))
+        netdata_log_error("STREAM %s [send]: cannot write to internal pipe.",
+                          rrdhost_hostname(s->host));
 }
 
 int sender_write_pipe_fd(struct sender_state *s __maybe_unused) {
@@ -361,10 +316,6 @@ int sender_write_pipe_fd(struct sender_state *s __maybe_unused) {
 
 uint64_t stream_sender_magic(struct sender_state *s __maybe_unused) {
     return sender.dispatcher.magic;
-}
-
-pid_t stream_sender_tid(struct sender_state *s __maybe_unused) {
-    return sender.dispatcher.tid;
 }
 
 void stream_sender_connector_add(struct sender_state *s) {
@@ -441,14 +392,16 @@ static void stream_sender_dispatcher_move_queue_to_running(void) {
             .events = POLLIN,
             .revents = 0,
         };
-        s->dispatcher.pollfd_slot = slot;
+
+        s->dispatcher.pollfd.slot = slot;
+        s->dispatcher.pollfd.magic = os_random32();
 
         first_slot = slot + 1;
     }
     spinlock_unlock(&sender.dispatcher.queue.spinlock);
 }
 
-static void stream_sender_dispatcher_move_running_to_connector_or_remove(size_t slot) {
+static void stream_sender_dispatcher_move_running_to_connector_or_remove(size_t slot, bool reconnect) {
     sender.dispatcher.pollfd.array[slot] = (struct pollfd) {
         .fd = -1,
         .events = 0,
@@ -459,7 +412,7 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(size_t 
     if(!s) return;
 
     sender.dispatcher.pollfd.running[slot] = NULL;
-    s->dispatcher.pollfd_slot = 0;
+    s->dispatcher.pollfd.slot = 0;
 
     sender_lock(s);
     {
@@ -469,7 +422,7 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(size_t 
     }
     sender_unlock(s);
 
-    if (stream_sender_is_signaled_to_stop(s))
+    if (!reconnect || stream_sender_is_signaled_to_stop(s))
         rrdhost_clear_sender(s->host);
     else
         stream_sender_connector_add(s);
@@ -568,7 +521,6 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED, "disconnect parent closed");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_STOPPED, "disconnect stopped");
 
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_REPLAY_REQUEST, "replay request");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST, "function");
@@ -581,11 +533,10 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
     worker_register_job_custom_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED, "bytes uncompressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
     worker_register_job_custom_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO, "cumulative compression savings ratio", "%", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, "pipe messages received", "messages", WORKER_METRIC_INCREMENT);
 
     sender.dispatcher.tid = gettid_cached();
 
-    size_t pipe_buffer_size = 10 * 1024;
-    char *pipe_buffer = mallocz(pipe_buffer_size);
     if(pipe(sender.dispatcher.pipe_fds) != 0) {
         netdata_log_error("STREAM dispatcher: cannot create required pipe.");
         sender.dispatcher.pipe_fds[PIPE_READ] = -1;
@@ -593,11 +544,28 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
         return NULL;
     }
 
+    size_t pipe_messages_size = 32768;
+    struct pipe_msg *pipe_messages_buf = mallocz(pipe_messages_size * sizeof(*pipe_messages_buf));
+
+    usec_t now_ut = now_monotonic_usec();
+    usec_t next_all_ut = now_ut;
+    uint64_t messages = 0;
+
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
         stream_sender_dispatcher_move_queue_to_running();
-        sender_dispatcher_signaled_updates();
 
-        time_t now_s = now_monotonic_sec();
+        now_ut = now_monotonic_usec();
+        time_t now_s = (time_t)(now_ut / USEC_PER_SEC);
+
+        bool do_all = false;
+        if(next_all_ut < now_ut) {
+            next_all_ut = now_ut + 10 * USEC_PER_MS;
+            do_all = true;
+        }
+        else {
+            int x = 0;
+            x++;
+        }
 
         size_t bytes_uncompressed = 0;
         size_t bytes_compressed = 0;
@@ -608,77 +576,65 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
             struct sender_state *s = sender.dispatcher.pollfd.running[slot];
             if(!s) continue;
 
+            sender.dispatcher.pollfd.array[slot].events = POLLIN;
+            sender.dispatcher.pollfd.array[slot].fd = s->sock.fd;
+            sender.dispatcher.pollfd.array[slot].revents = 0;
+
+            if(!do_all && !s->dispatcher.interactive)
+                continue;
+
+            s->dispatcher.interactive = false;
             worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_LIST);
             nodes++;
 
-            ND_LOG_STACK lgs[] = {
-                ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
-                ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
-                ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
-                ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
-                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
-                ND_LOG_FIELD_END(),
-            };
-            ND_LOG_STACK_PUSH(lgs);
-
-            if(s->sock.fd == -1 || stream_sender_is_signaled_to_stop(s) || stream_sender_is_host_stopped(s)) {
-                // the socket may be closed due to not compression available too (in sender_commit())
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_STOPPED);
-                stream_sender_dispatcher_move_running_to_connector_or_remove(slot);
-                continue;
-            }
-
             // If the TCP window never opened then something is wrong, restart connection
-            if(unlikely(now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
+            if(unlikely(do_all &&
+                         now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
                          !rrdpush_sender_pending_replication_requests(s) &&
                          !rrdpush_sender_replicating_charts(s)
                              )) {
+                ND_LOG_STACK lgs[] = {
+                    ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+                    ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+                    ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+                    ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+                    ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
+                    ND_LOG_FIELD_END(),
+                };
+                ND_LOG_STACK_PUSH(lgs);
+
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_TIMEOUT);
                 netdata_log_error("STREAM %s [send to %s]: could not send metrics for %ld seconds - closing connection - "
                                   "we have sent %zu bytes on this connection via %zu send attempts.",
                                   rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
                                   s->sent_bytes_on_this_connection, s->send_attempts);
-                stream_sender_dispatcher_move_running_to_connector_or_remove(slot);
+                stream_sender_dispatcher_move_running_to_connector_or_remove(slot, true);
                 continue;
             }
 
             sender_lock(s);
-            size_t outstanding = cbuffer_next_unsafe(s->buffer, NULL);
-            size_t available = cbuffer_available_size_unsafe(s->buffer);
-            if (unlikely(!outstanding))
-                stream_sender_cbuffer_recreate_timed(s, now_s, true, false);
-
-            if(s->buffer->max_size) {
-                NETDATA_DOUBLE ratio = (NETDATA_DOUBLE)(s->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size;
-                if (ratio > buffer_ratio) buffer_ratio = ratio;
-            }
-
-            if(s->compressor.initialized) {
-                bytes_uncompressed += s->compressor.sender_locked.total_uncompressed;
-                bytes_compressed += s->compressor.sender_locked.total_compressed + s->compressor.sender_locked.total_compressions * sizeof(rrdpush_signature_t);
-            }
+            bytes_compressed += s->dispatcher.bytes_compressed;
+            bytes_uncompressed += s->dispatcher.bytes_uncompressed;
+            uint64_t outstanding = s->dispatcher.bytes_outstanding;
+            if (s->dispatcher.buffer_ratio > buffer_ratio) buffer_ratio = s->dispatcher.buffer_ratio;
             sender_unlock(s);
 
             if(outstanding)
-                sender.dispatcher.pollfd.array[slot].events = POLLIN | POLLOUT;
-            else
-                sender.dispatcher.pollfd.array[slot].events = POLLIN;
-
-            sender.dispatcher.pollfd.array[slot].fd = s->sock.fd;
-            sender.dispatcher.pollfd.array[slot].revents = 0;
+                sender.dispatcher.pollfd.array[slot].events |= POLLOUT;
         }
 
-        if(bytes_compressed && bytes_uncompressed) {
-            NETDATA_DOUBLE compression_ratio = 100.0 - ((NETDATA_DOUBLE)bytes_compressed * 100.0 / (NETDATA_DOUBLE)bytes_uncompressed);
-            worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO, compression_ratio);
+        if(do_all) {
+            if (bytes_compressed && bytes_uncompressed) {
+                NETDATA_DOUBLE compression_ratio = 100.0 - ((NETDATA_DOUBLE)bytes_compressed * 100.0 / (NETDATA_DOUBLE)bytes_uncompressed);
+                worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO, compression_ratio);
+            }
+
+            worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_NODES, (NETDATA_DOUBLE)nodes);
+            worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
+            worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
+            worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO, buffer_ratio);
+            worker_set_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, (NETDATA_DOUBLE)messages);
         }
-
-        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_NODES, (NETDATA_DOUBLE)nodes);
-        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
-        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
-        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO, buffer_ratio);
-
-        worker_is_idle();
 
         sender.dispatcher.pollfd.array[0] = (struct pollfd) {
             .fd = sender.dispatcher.pipe_fds[PIPE_READ],
@@ -686,14 +642,15 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
             .revents = 0,
         };
 
-        // timeout in milliseconds
-        int poll_rc = poll(sender.dispatcher.pollfd.array, sender.dispatcher.pollfd.used, 50);
+        worker_is_idle();
+        int poll_rc = poll(sender.dispatcher.pollfd.array, sender.dispatcher.pollfd.used, 50); // timeout in milliseconds
 
-        // Spurious wake-ups without error - loop again
         if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR)))
+            // timeout
             continue;
 
         if(unlikely(poll_rc == -1)) {
+            // poll() error
             worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_POLL_ERROR);
             nd_log_limit_static_thread_var(erl, 1, 1 * USEC_PER_MS);
             nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "poll() returned error");
@@ -706,29 +663,53 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
         if(sender.dispatcher.pollfd.array[0].revents) {
             short revents = sender.dispatcher.pollfd.array[0].revents;
 
-            if (revents & (POLLIN | POLLPRI)) {
+            if (likely(revents & (POLLIN | POLLPRI))) {
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_PIPE_READ);
-                if (read(sender.dispatcher.pollfd.array[0].fd, pipe_buffer, pipe_buffer_size) == -1)
-                    netdata_log_error("STREAM dispatcher: cannot read from internal pipe.");
-            }
-            else if(revents & (POLLERR|POLLHUP|POLLNVAL)) {
-                char *error = NULL;
+                ssize_t bytes = read(sender.dispatcher.pollfd.array[0].fd, pipe_messages_buf, sizeof(*pipe_messages_buf) * pipe_messages_size);
+                if(bytes > 0) {
+                    size_t count = bytes / sizeof(*pipe_messages_buf);
+                    if(bytes % count)
+                        netdata_log_error("STREAM dispatcher: received partial number of messages from pipe by %zu bytes", bytes % count);
 
-                if (revents & POLLERR)
-                    error = "pipe reports errors (POLLERR)";
-                else if (revents & POLLHUP)
-                    error = "pipe closed (POLLHUP)";
-                else if (revents & POLLNVAL)
-                    error = "pipe is invalid (POLLNVAL)";
+                    messages += count;
 
-                if(error) {
-                    close(sender.dispatcher.pipe_fds[PIPE_READ]); sender.dispatcher.pipe_fds[PIPE_READ] = -1;
-                    close(sender.dispatcher.pipe_fds[PIPE_WRITE]); sender.dispatcher.pipe_fds[PIPE_WRITE] = -1;
-                    if(pipe(sender.dispatcher.pipe_fds) != 0)
-                        netdata_log_error("STREAM dispatcher: cannot create required pipe.");
-                    else
-                        netdata_log_error("STREAM dispatcher: restarted internal pipe.");
+                    for(size_t i = 0; i < count ; i++) {
+                        struct pipe_msg *msg = &pipe_messages_buf[i];
+                        if (msg->slot > 0 && msg->slot < sender.dispatcher.pollfd.used &&
+                            sender.dispatcher.pollfd.running[msg->slot]->dispatcher.pollfd.magic == msg->magic) {
+                            switch (msg->msg) {
+                                case SENDER_MSG_INTERACTIVE:
+                                    sender.dispatcher.pollfd.running[msg->slot]->dispatcher.interactive = true;
+                                    break;
+
+                                case SENDER_MSG_RECONNECT:
+                                    stream_sender_dispatcher_move_running_to_connector_or_remove(msg->slot, true);
+                                    break;
+
+                                case SENDER_MSG_STOP:
+                                    stream_sender_dispatcher_move_running_to_connector_or_remove(msg->slot, false);
+                                    break;
+
+                                default:
+                                    netdata_log_error("STREAM dispatcher: invalid msg id %u", (unsigned)msg->msg);
+                                    break;
+                            }
+                        } else
+                            netdata_log_error("STREAM dispatcher: invalid slot %" PRIu32 " read from pipe", msg->slot);
+                    }
                 }
+            }
+            else if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
+                // we have errors on this pipe
+
+                close(sender.dispatcher.pipe_fds[PIPE_READ]); sender.dispatcher.pipe_fds[PIPE_READ] = -1;
+                close(sender.dispatcher.pipe_fds[PIPE_WRITE]); sender.dispatcher.pipe_fds[PIPE_WRITE] = -1;
+                if(pipe(sender.dispatcher.pipe_fds) != 0) {
+                    netdata_log_error("STREAM dispatcher: cannot create required pipe.");
+                    break; // exit the dispatcher thread
+                }
+                else
+                    netdata_log_error("STREAM dispatcher: restarted internal pipe.");
             }
         }
 
@@ -756,14 +737,16 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
                 errno_clear();
                 netdata_log_error("STREAM %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. Restarting connection",
                                   rrdhost_hostname(s->host), s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);
-                stream_sender_dispatcher_move_running_to_connector_or_remove(slot);
+                stream_sender_dispatcher_move_running_to_connector_or_remove(slot, true);
                 continue;
             }
 
             short revents = sender.dispatcher.pollfd.array[slot].revents;
 
             if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
-                char *error = NULL;
+                // we have errors on this socket
+
+                char *error = "unknown error";
 
                 if (revents & POLLERR)
                     error = "socket reports errors (POLLERR)";
@@ -772,32 +755,68 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
                 else if (revents & POLLNVAL)
                     error = "connection is invalid (POLLNVAL)";
 
-                if(error) {
-                    worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SOCKET_ERROR);
-                    netdata_log_error("STREAM %s [send to %s]: restarting connection: %s - %zu bytes transmitted.",
-                                      rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
+                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SOCKET_ERROR);
+                netdata_log_error("STREAM %s [send to %s]: restarting connection: %s - %zu bytes transmitted.",
+                                  rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
+                stream_sender_dispatcher_move_running_to_connector_or_remove(slot, true);
+                continue;
+            }
 
-                    stream_sender_dispatcher_move_running_to_connector_or_remove(slot);
+            if(revents & POLLOUT) {
+                // we can send data on this socket
+
+                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_SOCKET_SEND);
+                s->send_attempts++;
+                bool disconnect = false;
+
+                sender_lock(s);
+                {
+                    char *chunk;
+                    size_t outstanding = cbuffer_next_unsafe(s->buffer, &chunk);
+                    ssize_t bytes = nd_sock_send_nowait(&s->sock, chunk, outstanding);
+                    if (likely(bytes > 0)) {
+                        cbuffer_remove_unsafe(s->buffer, bytes);
+                        stream_sender_update_dispatcher_sent_data_unsafe(s, bytes);
+                        s->last_traffic_seen_t = now_s;
+                        bytes_sent += bytes;
+                    }
+                    else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
+                        disconnect = true;
+                }
+                sender_unlock(s);
+
+                if(disconnect) {
+                    worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR);
+                    netdata_log_error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.",
+                                      rrdhost_hostname(s->host), s->connected_to, s->sent_bytes_on_this_connection);
+                    stream_sender_dispatcher_move_running_to_connector_or_remove(slot, true);
                     continue;
                 }
             }
 
-            if(revents & POLLOUT) {
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_SOCKET_SEND);
-                s->send_attempts++;
-                ssize_t bytes = attempt_to_send(s);
-                if(bytes > 0) {
-                    s->last_traffic_seen_t = now_s;
-                    bytes_sent += bytes;
-                }
-            }
-
             if(revents & POLLIN) {
+                // we can receive data from this socket
+
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_SOCKET_RECEIVE);
-                ssize_t bytes = attempt_read(s);
-                if(bytes > 0) {
+                ssize_t bytes = nd_sock_revc_nowait(&s->sock, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1);
+                if (bytes > 0) {
+                    s->read_len += bytes;
                     s->last_traffic_seen_t = now_s;
                     bytes_received += bytes;
+                }
+                else if (bytes == 0 || errno == ECONNRESET) {
+                    worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED);
+                    netdata_log_error("STREAM %s [send to %s]: connection (fd %d) closed by far end.",
+                                      rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
+                    stream_sender_dispatcher_move_running_to_connector_or_remove(slot, true);
+                    continue;
+                }
+                else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
+                    worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR);
+                    netdata_log_error("STREAM %s [send to %s]: error during receive (%zd, on fd %d) - closing connection.",
+                                      rrdhost_hostname(s->host), s->connected_to, bytes, s->sock.fd);
+                    stream_sender_dispatcher_move_running_to_connector_or_remove(slot, true);
+                    continue;
                 }
             }
 
@@ -823,8 +842,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
         struct sender_state *s = sender.dispatcher.pollfd.running[slot];
         if(!s) continue;
 
-        __atomic_store_n(&s->stop, true, __ATOMIC_RELAXED);
-        stream_sender_dispatcher_move_running_to_connector_or_remove(slot);
+        stream_sender_dispatcher_move_running_to_connector_or_remove(slot, false);
     }
 
     // cleanup
@@ -832,7 +850,7 @@ void *stream_sender_dispacther_thread(void *ptr __maybe_unused) {
     freez(sender.dispatcher.pollfd.running);
     memset(&sender.dispatcher.pollfd, 0, sizeof(sender.dispatcher.pollfd));
 
-    freez(pipe_buffer);
+    freez(pipe_messages_buf);
     close(sender.dispatcher.pipe_fds[PIPE_READ]); sender.dispatcher.pipe_fds[PIPE_READ] = -1;
     close(sender.dispatcher.pipe_fds[PIPE_WRITE]); sender.dispatcher.pipe_fds[PIPE_WRITE] = -1;
 

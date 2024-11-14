@@ -21,15 +21,15 @@ void stream_sender_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE reaso
     sender_lock(host->sender);
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
-
-        host->sender->exit.shutdown = true;
+        __atomic_store_n(&host->sender->exit.shutdown, true, __ATOMIC_RELAXED);
         host->sender->exit.reason = reason;
-
-        // signal it to cancel
-        __atomic_store_n(&host->sender->stop, true, __ATOMIC_RELAXED);
     }
 
+    struct pipe_msg msg = host->sender->dispatcher.pollfd;
     sender_unlock(host->sender);
+
+    msg.msg = SENDER_MSG_STOP;
+    stream_sender_send_msg_to_dispatcher(host->sender, msg);
 
     if(wait) {
         sender_lock(host->sender);

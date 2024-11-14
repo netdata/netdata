@@ -618,7 +618,7 @@ void replication_response_cancel_and_finalize(struct replication_query *q) {
 
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq);
 
-bool replication_response_execute_and_finalize(struct replication_query *q, size_t max_msg_size) {
+bool replication_response_execute_and_finalize(struct replication_query *q, size_t max_msg_size, bool workers) {
     bool with_slots = (q->query.capabilities & STREAM_CAP_SLOTS) ? true : false;
     NUMBER_ENCODING integer_encoding = (q->query.capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     struct replication_request *rq = q->rq;
@@ -679,9 +679,9 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     buffer_print_uint64_encoded(wb, integer_encoding, wall_clock_time);
     buffer_fast_strcat(wb, "\n", 1);
 
-    worker_is_busy(WORKER_JOB_BUFFER_COMMIT);
+    if(workers) worker_is_busy(WORKER_JOB_BUFFER_COMMIT);
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_REPLICATION);
-    worker_is_busy(WORKER_JOB_CLEANUP);
+    if(workers) worker_is_busy(WORKER_JOB_CLEANUP);
 
     if(enable_streaming) {
         if(sender_is_still_connected_for_this_request(rq)) {
@@ -1433,9 +1433,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     bool ret = false;
 
     if(!rq->st) {
-        if(likely(workers))
-            worker_is_busy(WORKER_JOB_FIND_CHART);
-
+        if(likely(workers)) worker_is_busy(WORKER_JOB_FIND_CHART);
         rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
     }
 
@@ -1447,9 +1445,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     }
 
     if(!rq->q) {
-        if(likely(workers))
-            worker_is_busy(WORKER_JOB_PREPARE_QUERY);
-
+        if(likely(workers)) worker_is_busy(WORKER_JOB_PREPARE_QUERY);
         rq->q = replication_response_prepare(
                 rq->st,
                 rq->start_streaming,
@@ -1458,13 +1454,12 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
                 rq->sender->capabilities);
     }
 
-    if(likely(workers))
-        worker_is_busy(WORKER_JOB_QUERYING);
+    if(likely(workers)) worker_is_busy(WORKER_JOB_QUERYING);
 
     // send the replication data
     rq->q->rq = rq;
     replication_response_execute_and_finalize(
-            rq->q, (size_t)((unsigned long long)rq->sender->host->sender->buffer->max_size * MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER / 100ULL));
+            rq->q, (size_t)((unsigned long long)rq->sender->host->sender->buffer->max_size * MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER / 100ULL), workers);
 
     rq->q = NULL;
 
