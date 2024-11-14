@@ -20,10 +20,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/cli"
 
 	"github.com/jessevdk/go-flags"
+	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/modules"
-	_ "go.uber.org/automaxprocs"
 )
 
 var (
@@ -126,6 +126,8 @@ func init() {
 }
 
 func main() {
+	_, _ = maxprocs.Set(maxprocs.Logger(func(s string, args ...interface{}) {}))
+
 	opts := parseCLI()
 
 	if opts.Version {
