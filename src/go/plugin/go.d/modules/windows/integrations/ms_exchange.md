@@ -21,6 +21,14 @@ Module: windows
 
 ## Overview
 
+**Deprecation Notice**: This collector is no longer the recommended method for Windows monitoring and will be removed in a future release.
+
+The official Netdata Agent for Windows now provides a robust and user-friendly solution for real-time system and application performance monitoring. By installing Netdata on your Windows host, you'll gain access to a wide range of metrics and visualizations without the need for additional collectors or complex configurations.
+
+To get started with Netdata on Windows, see the [Netdata Windows Installer](https://github.com/netdata/netdata/blob/master/packaging/windows/WINDOWS_INSTALLER.md).
+
+---
+
 This collector monitors the performance of Windows machines, collects both host metrics and metrics from various Windows applications (e.g. Active Directory, MSSQL).
 
 
