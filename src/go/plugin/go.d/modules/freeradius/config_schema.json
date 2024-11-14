@@ -41,7 +41,6 @@
       "port",
       "secret"
     ],
-    "additionalProperties": false,
     "patternProperties": {
       "^name$": {}
     }

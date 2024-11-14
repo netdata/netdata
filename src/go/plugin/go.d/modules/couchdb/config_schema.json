@@ -117,7 +117,6 @@
       "url",
       "node"
     ],
-    "additionalProperties": false,
     "patternProperties": {
       "^name$": {}
     }

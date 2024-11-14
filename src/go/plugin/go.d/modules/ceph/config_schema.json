@@ -108,7 +108,6 @@
       "username",
       "password"
     ],
-    "additionalProperties": false,
     "patternProperties": {
       "^name$": {}
     }

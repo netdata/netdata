@@ -37,7 +37,6 @@
       "leases_path",
       "conf_path"
     ],
-    "additionalProperties": false,
     "patternProperties": {
       "^name$": {}
     }

@@ -105,7 +105,6 @@
       "servers",
       "network"
     ],
-    "additionalProperties": false,
     "patternProperties": {
       "^name$": {}
     }

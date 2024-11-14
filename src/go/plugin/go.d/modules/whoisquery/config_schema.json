@@ -41,7 +41,6 @@
     "required": [
       "source"
     ],
-    "additionalProperties": false,
     "patternProperties": {
       "^name$": {}
     }

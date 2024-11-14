@@ -72,7 +72,6 @@
     "required": [
       "address"
     ],
-    "additionalProperties": false,
     "patternProperties": {
       "^name$": {}
     }

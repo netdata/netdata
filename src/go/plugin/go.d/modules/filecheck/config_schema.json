@@ -107,7 +107,6 @@
         ]
       }
     },
-    "additionalProperties": false,
     "patternProperties": {
       "^name$": {}
     }

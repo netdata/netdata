@@ -21,7 +21,6 @@
     "required": [
       "reports_dir"
     ],
-    "additionalProperties": false,
     "patternProperties": {
       "^name$": {}
     }

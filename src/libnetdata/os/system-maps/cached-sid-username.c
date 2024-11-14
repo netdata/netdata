@@ -35,7 +35,8 @@ static struct {
     SPINLOCK spinlock;
     struct simple_hashtable_SID hashtable;
 } sid_globals = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+    .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+    .hashtable = { 0 },
 };
 
 static inline SID_KEY *sid_value_to_key(SID_VALUE *s) {

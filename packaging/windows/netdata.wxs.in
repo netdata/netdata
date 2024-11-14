@@ -25,6 +25,11 @@
 
             <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
+            <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Access Netdata dashboard" />
+            <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+            <Property Id="WixShellExecTarget" Value="http://localhost:19999" />
+            <CustomAction Id="LaunchApplication" DllEntry="WixShellExec" Impersonate="yes" BinaryRef="Wix4UtilCA_X86" />
+
             <Feature Id="Main">
                 <ComponentGroupRef Id="NetdataComponents" />
                 <ComponentRef Id="NetdataVarCache" />
@@ -33,13 +38,6 @@
                 <ComponentRef Id="NetdataService" />
             </Feature>
 
-            <WixVariable Id="WixUIBannerBmp" Value="Top.bmp" />
-            <WixVariable Id="WixUIDialogBmp" Value="BackGround.bmp" />
-            <UIRef Id="WixUI_ErrorProgressText" />
-            <ui:WixUI Id="FeatureTree_ViewLicense" />
-    </Package>
-
-    <Fragment>
             <StandardDirectory Id="ProgramFiles64Folder">
                 <Directory Id="INSTALLFOLDER" Name="Netdata">
                     <Directory Id="USRDIR" Name="usr">
@@ -55,12 +53,23 @@
                 </Directory>
             </StandardDirectory>
 
-            <Property Id="ETCNETDATACLAIMFILE">
-                <DirectorySearch Id="NetCoreDirectoryFoundx64" Path="[ETCDIRNETDATA]" >
+            <!-- Property Id="OS_HAS_FILE" Secure="yes">
+                <DirectorySearch Id="NetCoreDirectoryFoundx64" Path="[ETCDIRNETDATA]" AssignToProperty="yes" >
                     <FileSearch Id="NetdataClaim" Name="claim.conf"/>
                 </DirectorySearch>
-            </Property>
+            </Property -->
 
+            <UI Id="FeatureTree_ViewLicense_X64">
+            </UI>
+            <UIRef Id="FeatureTree_ViewLicense" />
+
+            <WixVariable Id="WixUIBannerBmp" Value="Top.bmp" />
+            <WixVariable Id="WixUIDialogBmp" Value="BackGround.bmp" />
+            <UIRef Id="WixUI_ErrorProgressText" />
+            <ui:WixUI Id="FeatureTree_ViewLicense" />
+    </Package>
+
+    <Fragment>
             <StandardDirectory Id="System64Folder">
             </StandardDirectory>
 
@@ -116,15 +125,6 @@
     </Fragment>
 
     <Fragment>
-            <UI Id="FeatureTree_ViewLicense_X64">
-                <Publish Dialog="ViewLicenseDlg1" Control="Print" Event="DoAction" Value="WixUIPrintEula_X64" />
-                <Publish Dialog="ViewLicenseDlg2" Control="Print" Event="DoAction" Value="WixUIPrintEula_X64" />
-            </UI>
-
-            <UIRef Id="FeatureTree_ViewLicense" />
-    </Fragment>
-
-    <Fragment>
         <UI Id="file FeatureTree_ViewLicense">
             <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
             <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
@@ -142,6 +142,7 @@
             <DialogRef Id="UserExit" />
 
             <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+            <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
 
             <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ViewLicenseDlg1" Condition="NOT Installed" />
             <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
@@ -150,20 +151,20 @@
             <Publish Dialog="ViewLicenseDlg1" Control="Next" Event="NewDialog" Value="ViewLicenseDlg2" />
 
             <Publish Dialog="ViewLicenseDlg2" Control="Back" Event="NewDialog" Value="ViewLicenseDlg1" />
-            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="NDConfigDialog" Condition="NOT ETCNETDATACLAIMFILE" />
-            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="NDConfigDialog" Condition="ETCNETDATACLAIMFILE" />
+            <Publish Dialog="ViewLicenseDlg2" Control="Next" Event="NewDialog" Value="NDConfigDialog" />
 
-            <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
-            <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="InstallDirDlg" />
+            <!-- We are hidden for while the directory to install netdata and forcing a default, because it is still necessary adjusts to test claim.conf in different directories -->
 
-            <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="NDConfigDialog" />
-            <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="20" />
+            <!-- Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
+            <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="NDConfigDialog" Order="20" />
             <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="10" />
             <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="10" />
-            <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="20" />
+            <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="20" / -->
 
+            <Publish Dialog="NDConfigDialog" Control="Back" Event="NewDialog" Value="ViewLicenseDlg2" />
+            <Publish Dialog="NDConfigDialog" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" />
 
-            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" Order="1" Condition="NOT Installed OR WixUI_InstallMode = &quot;Change&quot;" />
+            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="NDConfigDialog" Order="1" Condition="NOT Installed OR WixUI_InstallMode = &quot;Change&quot;" />
             <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
             <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="3" Condition="Installed AND PATCH" />
             <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
@@ -171,6 +172,7 @@
             <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
             <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
             <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+
         </UI>
 
         <UIRef Id="WixUI_Common" />
@@ -230,21 +232,21 @@
                 <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Enter your Space's Claim Token and the Room IDs where you want to add the Agent." />
                 <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Connect to the Cloud" />
 
-                <Control Id="WarningLabel" Type="Text" X="10" Y="60" Width="290" Height="15" Text="Agent already claimed? Click Next." />
+                <Control Id="WarningLabelOld" Type="Text" X="10" Y="60" Width="350" Height="15" Text="Agent already claimed? Click Next." />
 
-                <Control Id="TokenLabel" Type="Text" X="10" Y="90" Width="55" Height="15" Text="Claim Token:" />
-                <Control Id="Token" Type="Edit" X="65" Y="90" Width="290" Height="18" Property="TOKEN" />
+                <Control Id="TokenLabel" Type="Text" X="10" Y="100" Width="55" Height="15" Text="Claim Token:" />
+                <Control Id="Token" Type="Edit" X="65" Y="100" Width="290" Height="18" Property="TOKEN" Text="{135}" />
             
-                <Control Id="RoomsLabel" Type="Text" X="10" Y="105" Width="55" Height="15" Text="Rooms ID(s):" />
-                <Control Id="Rooms" Type="Edit" X="65" Y="105" Width="290" Height="18" Property="ROOMS" />
+                <Control Id="RoomsLabel" Type="Text" X="10" Y="115" Width="55" Height="15" Text="Rooms ID(s):" />
+                <Control Id="Rooms" Type="Edit" X="65" Y="115" Width="290" Height="18" Property="ROOMS" />
             
-                <Control Id="ProxyLabel" Type="Text" X="10" Y="120" Width="55" Height="15" Text="Proxy URL:" />
-                <Control Id="Proxy" Type="Edit" X="65" Y="120" Width="290" Height="18" Property="PROXY" />
+                <Control Id="ProxyLabel" Type="Text" X="10" Y="130" Width="55" Height="15" Text="Proxy URL:" />
+                <Control Id="Proxy" Type="Edit" X="65" Y="130" Width="290" Height="18" Property="PROXY" />
             
-                <Control Id="URLLabel" Type="Text" X="10" Y="135" Width="55" Height="15" Text="Cloud URL:" />
-                <Control Id="URL" Type="Edit" X="65" Y="135" Width="290" Height="18" Property="URL" />
+                <Control Id="URLLabel" Type="Text" X="10" Y="145" Width="55" Height="15" Text="Cloud URL:" />
+                <Control Id="URL" Type="Edit" X="65" Y="145" Width="290" Height="18" Property="URL" />
 
-                <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="150" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" />
+                <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="160" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" />
             
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
@@ -255,3 +257,4 @@
         </UI>
     </Fragment>
 </Wix>
+
