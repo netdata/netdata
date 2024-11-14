@@ -17,7 +17,7 @@ static struct {
     bool initialized;
     SPINLOCK spinlock;
     SIMPLE_HASHTABLE_GROUPNAMES_CACHE ht;
-} uc = {
+} group_cache = {
     .spinlock = NETDATA_SPINLOCK_INITIALIZER,
     .ht = { 0 },
 };
@@ -31,13 +31,13 @@ static bool compar_gid_ptr(gid_t *a, gid_t *b) {
 }
 
 void cached_groupname_populate_by_gid(gid_t gid, const char *groupname, uint32_t version) {
-    internal_fatal(!uc.initialized, "system-users cache needs to be initialized");
+    internal_fatal(!group_cache.initialized, "system-users cache needs to be initialized");
     if(!groupname || !*groupname) return;
 
-    spinlock_lock(&uc.spinlock);
+    spinlock_lock(&group_cache.spinlock);
 
     XXH64_hash_t hash = XXH3_64bits(&gid, sizeof(gid));
-    SIMPLE_HASHTABLE_SLOT_GROUPNAMES_CACHE *sl = simple_hashtable_get_slot_GROUPNAMES_CACHE(&uc.ht, hash, &gid, true);
+    SIMPLE_HASHTABLE_SLOT_GROUPNAMES_CACHE *sl = simple_hashtable_get_slot_GROUPNAMES_CACHE(&group_cache.ht, hash, &gid, true);
     CACHED_GROUPNAME *cg = SIMPLE_HASHTABLE_SLOT_DATA(sl);
     if(!cg || (cg->version && version > cg->version)) {
         internal_fatal(cg && cg->gid != gid, "invalid gid matched from cache");
@@ -50,19 +50,19 @@ void cached_groupname_populate_by_gid(gid_t gid, const char *groupname, uint32_t
         cg->version = version;
         cg->gid = gid;
         cg->groupname = string_strdupz(groupname);
-        simple_hashtable_set_slot_GROUPNAMES_CACHE(&uc.ht, sl, hash, cg);
+        simple_hashtable_set_slot_GROUPNAMES_CACHE(&group_cache.ht, sl, hash, cg);
     }
 
-    spinlock_unlock(&uc.spinlock);
+    spinlock_unlock(&group_cache.spinlock);
 }
 
 CACHED_GROUPNAME cached_groupname_get_by_gid(gid_t gid) {
-    internal_fatal(!uc.initialized, "system-users cache needs to be initialized");
+    internal_fatal(!group_cache.initialized, "system-users cache needs to be initialized");
 
-    spinlock_lock(&uc.spinlock);
+    spinlock_lock(&group_cache.spinlock);
 
     XXH64_hash_t hash = XXH3_64bits(&gid, sizeof(gid));
-    SIMPLE_HASHTABLE_SLOT_GROUPNAMES_CACHE *sl = simple_hashtable_get_slot_GROUPNAMES_CACHE(&uc.ht, hash, &gid, true);
+    SIMPLE_HASHTABLE_SLOT_GROUPNAMES_CACHE *sl = simple_hashtable_get_slot_GROUPNAMES_CACHE(&group_cache.ht, hash, &gid, true);
     CACHED_GROUPNAME *cg = SIMPLE_HASHTABLE_SLOT_DATA(sl);
     if(!cg) {
         cg = callocz(1, sizeof(*cg));
@@ -79,7 +79,7 @@ CACHED_GROUPNAME cached_groupname_get_by_gid(gid_t gid) {
             cg->groupname = string_strdupz(gr.gr_name);
 
         cg->gid = gid;
-        simple_hashtable_set_slot_GROUPNAMES_CACHE(&uc.ht, sl, hash, cg);
+        simple_hashtable_set_slot_GROUPNAMES_CACHE(&group_cache.ht, sl, hash, cg);
     }
 
     internal_fatal(cg->gid != gid, "invalid gid matched from cache");
@@ -90,7 +90,7 @@ CACHED_GROUPNAME cached_groupname_get_by_gid(gid_t gid) {
         .groupname = string_dup(cg->groupname),
     };
 
-    spinlock_unlock(&uc.spinlock);
+    spinlock_unlock(&group_cache.spinlock);
     return rc;
 }
 
@@ -99,21 +99,21 @@ void cached_groupname_release(CACHED_GROUPNAME cg) {
 }
 
 void cached_groupnames_init(void) {
-    if(uc.initialized) return;
-    uc.initialized = true;
+    if(group_cache.initialized) return;
+    group_cache.initialized = true;
 
-    spinlock_init(&uc.spinlock);
-    simple_hashtable_init_GROUPNAMES_CACHE(&uc.ht, 100);
+    spinlock_init(&group_cache.spinlock);
+    simple_hashtable_init_GROUPNAMES_CACHE(&group_cache.ht, 100);
 }
 
 void cached_groupnames_destroy(void) {
-    if(!uc.initialized) return;
+    if(!group_cache.initialized) return;
 
-    spinlock_lock(&uc.spinlock);
+    spinlock_lock(&group_cache.spinlock);
 
-    for(SIMPLE_HASHTABLE_SLOT_GROUPNAMES_CACHE *sl = simple_hashtable_first_read_only_GROUPNAMES_CACHE(&uc.ht);
+    for(SIMPLE_HASHTABLE_SLOT_GROUPNAMES_CACHE *sl = simple_hashtable_first_read_only_GROUPNAMES_CACHE(&group_cache.ht);
          sl;
-         sl = simple_hashtable_next_read_only_GROUPNAMES_CACHE(&uc.ht, sl)) {
+         sl = simple_hashtable_next_read_only_GROUPNAMES_CACHE(&group_cache.ht, sl)) {
         CACHED_GROUPNAME *u = SIMPLE_HASHTABLE_SLOT_DATA(sl);
         if(u) {
             string_freez(u->groupname);
@@ -122,26 +122,30 @@ void cached_groupnames_destroy(void) {
         }
     }
 
-    simple_hashtable_destroy_GROUPNAMES_CACHE(&uc.ht);
-    uc.initialized = false;
+    simple_hashtable_destroy_GROUPNAMES_CACHE(&group_cache.ht);
+    group_cache.initialized = false;
+
+    spinlock_unlock(&group_cache.spinlock);
 }
 
 void cached_groupnames_delete_old_versions(uint32_t version) {
-    if(!uc.initialized) return;
+    if(!group_cache.initialized) return;
 
-    spinlock_lock(&uc.spinlock);
+    spinlock_lock(&group_cache.spinlock);
 
-    for(SIMPLE_HASHTABLE_SLOT_GROUPNAMES_CACHE *sl = simple_hashtable_first_read_only_GROUPNAMES_CACHE(&uc.ht);
+    for(SIMPLE_HASHTABLE_SLOT_GROUPNAMES_CACHE *sl = simple_hashtable_first_read_only_GROUPNAMES_CACHE(&group_cache.ht);
          sl;
-         sl = simple_hashtable_next_read_only_GROUPNAMES_CACHE(&uc.ht, sl)) {
+         sl = simple_hashtable_next_read_only_GROUPNAMES_CACHE(&group_cache.ht, sl)) {
         CACHED_GROUPNAME *cg = SIMPLE_HASHTABLE_SLOT_DATA(sl);
         if(cg && cg->version && cg->version < version) {
             string_freez(cg->groupname);
             freez(cg);
-            simple_hashtable_del_slot_GROUPNAMES_CACHE(&uc.ht, sl);
+            simple_hashtable_del_slot_GROUPNAMES_CACHE(&group_cache.ht, sl);
         }
     }
 
-    simple_hashtable_destroy_GROUPNAMES_CACHE(&uc.ht);
-    uc.initialized = false;
+    simple_hashtable_destroy_GROUPNAMES_CACHE(&group_cache.ht);
+    group_cache.initialized = false;
+
+    spinlock_unlock(&group_cache.spinlock);
 }
