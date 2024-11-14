@@ -10,6 +10,7 @@ enum netdata_netframework_metrics {
     NETDATA_NETFRAMEWORK_LOADING,
     NETDATA_NETFRAMEWORK_REMOTING,
     NETDATA_NETFRAMEWORK_SECURITY,
+    NETDATA_NETFRAMEWORK_LOCKS_THREADS,
 
     NETDATA_NETFRAMEWORK_END
 };
@@ -96,6 +97,21 @@ struct net_framework_instances {
     RRDSET *st_clrsecurity_run_time_checks;
     RRDDIM *rd_clrsecurity_run_time_checks;
 
+    RRDSET *st_clrlocksandthreads_queue_length;
+    RRDDIM *rd_locksandthreads_queue_length;
+
+    RRDSET *st_clrlocksandthreads_current_logical_threads;
+    RRDDIM *rd_locksandthreads_current_logical_threads;
+
+    RRDSET *st_clrlocksandthreads_current_physical_threads;
+    RRDDIM *rd_locksandthreads_current_physical_threads;
+
+    RRDSET *st_clrlocksandthreads_recognized_threads;
+    RRDDIM *rd_locksandthreads_recognized_threads;
+
+    RRDSET *st_clrlocksandthreads_contentions;
+    RRDDIM *rd_locksandthreads_contentions;
+
     COUNTER_DATA NETFrameworkCLRExceptionThrown;
     COUNTER_DATA NETFrameworkCLRExceptionFilters;
     COUNTER_DATA NETFrameworkCLRExceptionFinallys;
@@ -130,6 +146,12 @@ struct net_framework_instances {
     COUNTER_DATA NETFrameworkCLRSecurityFrequency_PerfTime;
     COUNTER_DATA NETFrameworkCLRSecurityStackWalkDepth;
     COUNTER_DATA NETFrameworkCLRSecurityRunTimeChecks;
+
+    COUNTER_DATA NETFrameworkCLRLocksAndThreadsQueueLength;
+    COUNTER_DATA NETFrameworkCLRLocksAndThreadsCurrentLogicalThreads;
+    COUNTER_DATA NETFrameworkCLRLocksAndThreadsCurrentPhysicalThreads;
+    COUNTER_DATA NETFrameworkCLRLocksAndThreadsRecognizedThreads;
+    COUNTER_DATA NETFrameworkCLRLocksAndThreadsContentions;
 };
 
 static inline void initialize_net_framework_processes_keys(struct net_framework_instances *p) {
@@ -167,6 +189,12 @@ static inline void initialize_net_framework_processes_keys(struct net_framework_
     p->NETFrameworkCLRSecurityFrequency_PerfTime.key = "% Time in RT checks";
     p->NETFrameworkCLRSecurityStackWalkDepth.key = "Stack Walk Depth";
     p->NETFrameworkCLRSecurityRunTimeChecks.key = "Total Runtime Checks";
+
+    p->NETFrameworkCLRLocksAndThreadsQueueLength.key = "Queue Length / sec";
+    p->NETFrameworkCLRLocksAndThreadsCurrentLogicalThreads.key = "# of current logical Threads";
+    p->NETFrameworkCLRLocksAndThreadsCurrentPhysicalThreads.key = "# of current physical Threads";
+    p->NETFrameworkCLRLocksAndThreadsRecognizedThreads.key = "# of total recognized threads";
+    p->NETFrameworkCLRLocksAndThreadsContentions.key = "Total # of Contentions";
 }
 
 void dict_net_framework_processes_insert_cb(
@@ -1219,6 +1247,224 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock,
                                   p->rd_clrsecurity_stack_walk_depth,
                                   (collected_number)p->NETFrameworkCLRSecurityRunTimeChecks.current.Data);
             rrdset_done(p->st_clrsecurity_stack_walk_depth);
+        }
+    }
+}
+
+static void netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock,
+                                                    PERF_OBJECT_TYPE *pObjectType,
+                                                    int update_every)
+{
+    char id[RRD_ID_LENGTH_MAX + 1];
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+
+        if (strcasecmp(windows_shared_buffer, "_Global_") == 0)
+            continue;
+
+        netdata_fix_chart_name(windows_shared_buffer);
+        struct net_framework_instances *p = dictionary_set(processes, windows_shared_buffer, NULL, sizeof(*p));
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLocksAndThreadsQueueLength)) {
+            if (!p->st_clrlocksandthreads_queue_length) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrlocksandthreads_queue_length", windows_shared_buffer);
+                p->st_clrlocksandthreads_queue_length = rrdset_create_localhost(
+                    "netframework",
+                    id,
+                    NULL,
+                    "locks threads",
+                    "netframework.clrlocksandthreads_queue_length",
+                    "Threads waited to acquire a managed lock",
+                    "threads/s",
+                    PLUGIN_WINDOWS_NAME,
+                    "PerflibNetFramework",
+                    PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_QUEUE_LENGTH,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                snprintfz(
+                    id,
+                    RRD_ID_LENGTH_MAX,
+                    "netframework_%s_clrlocksandthreads_recognized_threads_total",
+                    windows_shared_buffer);
+                p->rd_locksandthreads_queue_length =
+                    rrddim_add(p->st_clrlocksandthreads_queue_length, id, "threads", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(
+                    p->st_clrlocksandthreads_queue_length->rrdlabels,
+                    "process",
+                    windows_shared_buffer,
+                    RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(
+                p->st_clrlocksandthreads_queue_length,
+                p->rd_locksandthreads_queue_length,
+                (collected_number)p->NETFrameworkCLRLocksAndThreadsQueueLength.current.Data);
+            rrdset_done(p->st_clrlocksandthreads_queue_length);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLocksAndThreadsCurrentLogicalThreads)) {
+            if (!p->st_clrlocksandthreads_current_logical_threads) {
+                snprintfz(
+                    id, RRD_ID_LENGTH_MAX, "%s_clrlocksandthreads_current_logical_threads", windows_shared_buffer);
+                p->st_clrlocksandthreads_current_logical_threads = rrdset_create_localhost(
+                    "netframework",
+                    id,
+                    NULL,
+                    "locks threads",
+                    "netframework.clrlocksandthreads_current_logical_threads",
+                    "Logical threads",
+                    "threads",
+                    PLUGIN_WINDOWS_NAME,
+                    "PerflibNetFramework",
+                    PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_LOGICAL_THREADS,
+                    update_every,
+                    RRDSET_TYPE_LINE);
+
+                snprintfz(
+                    id,
+                    RRD_ID_LENGTH_MAX,
+                    "netframework_%s_clrlocksandthreads_current_logical_threads",
+                    windows_shared_buffer);
+                p->rd_locksandthreads_current_logical_threads = rrddim_add(
+                    p->st_clrlocksandthreads_current_logical_threads, id, "logical", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(
+                    p->st_clrlocksandthreads_current_logical_threads->rrdlabels,
+                    "process",
+                    windows_shared_buffer,
+                    RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(
+                p->st_clrlocksandthreads_current_logical_threads,
+                p->rd_locksandthreads_current_logical_threads,
+                (collected_number)p->NETFrameworkCLRLocksAndThreadsCurrentLogicalThreads.current.Data);
+            rrdset_done(p->st_clrlocksandthreads_current_logical_threads);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLocksAndThreadsCurrentPhysicalThreads)) {
+            if (!p->st_clrlocksandthreads_current_physical_threads) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrlocksandthreads_current_physical_threads", windows_shared_buffer);
+                p->st_clrlocksandthreads_current_physical_threads = rrdset_create_localhost("netframework",
+                                                                                            id,
+                                                                                            NULL,
+                                                                                            "locks threads",
+                                                                                            "netframework.clrlocksandthreads_current_physical_threads",
+                                                                                            "Physical threads",
+                                                                                            "threads",
+                                                                                            PLUGIN_WINDOWS_NAME,
+                                                                                            "PerflibNetFramework",
+                                                                                            PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_CURRENT_PHYSICAL_THREADS,
+                                                                                            update_every,
+                                                                                            RRDSET_TYPE_LINE);
+
+                snprintfz(id,
+                          RRD_ID_LENGTH_MAX,
+                          "netframework_%s_clrlocksandthreads_physical_threads_current",
+                          windows_shared_buffer);
+                p->rd_locksandthreads_current_physical_threads = rrddim_add(p->st_clrlocksandthreads_current_physical_threads,
+                                                                            id,
+                                                                            "physical",
+                                                                            1,
+                                                                            1,
+                                                                            RRD_ALGORITHM_ABSOLUTE);
+
+                rrdlabels_add(p->st_clrlocksandthreads_current_physical_threads->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrlocksandthreads_current_physical_threads,
+                                  p->rd_locksandthreads_current_physical_threads,
+                                  (collected_number)p->NETFrameworkCLRLocksAndThreadsCurrentPhysicalThreads.current.Data);
+            rrdset_done(p->st_clrlocksandthreads_current_physical_threads);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLocksAndThreadsRecognizedThreads)) {
+            if (!p->st_clrlocksandthreads_recognized_threads) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrlocksandthreads_recognized_threads", windows_shared_buffer);
+                p->st_clrlocksandthreads_recognized_threads = rrdset_create_localhost("netframework",
+                                                                                      id,
+                                                                                      NULL,
+                                                                                      "locks threads",
+                                                                                      "netframework.clrlocksandthreads_recognized_threads",
+                                                                                      "Threads recognized by the runtime",
+                                                                                      "threads/s",
+                                                                                      PLUGIN_WINDOWS_NAME,
+                                                                                      "PerflibNetFramework",
+                                                                                      PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_RECOGNIZED_THREADS,
+                                                                                      update_every,
+                                                                                      RRDSET_TYPE_LINE);
+
+                snprintfz(id,
+                          RRD_ID_LENGTH_MAX,
+                          "netframework_%s_clrlocksandthreads_recognized_threads_total",
+                          windows_shared_buffer);
+                p->rd_locksandthreads_recognized_threads = rrddim_add(p->st_clrlocksandthreads_recognized_threads,
+                                                                      id,
+                                                                      "threads",
+                                                                      1,
+                                                                      1,
+                                                                      RRD_ALGORITHM_ABSOLUTE);
+
+                rrdlabels_add(p->st_clrlocksandthreads_recognized_threads->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrlocksandthreads_recognized_threads,
+                                  p->rd_locksandthreads_recognized_threads,
+                                  (collected_number)p->NETFrameworkCLRLocksAndThreadsRecognizedThreads.current.Data);
+            rrdset_done(p->st_clrlocksandthreads_recognized_threads);
+        }
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRLocksAndThreadsContentions)) {
+            if (!p->st_clrlocksandthreads_contentions) {
+                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrlocksandthreads_contentions", windows_shared_buffer);
+                p->st_clrlocksandthreads_contentions = rrdset_create_localhost("netframework",
+                                                                               id,
+                                                                               NULL,
+                                                                               "locks threads",
+                                                                               "netframework.clrlocksandthreads_contentions",
+                                                                               "Fails to acquire a managed lock",
+                                                                               "contentions/s",
+                                                                               PLUGIN_WINDOWS_NAME,
+                                                                               "PerflibNetFramework",
+                                                                               PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_CONTENTIONS,
+                                                                               update_every,
+                                                                               RRDSET_TYPE_LINE);
+
+                snprintfz(id,
+                          RRD_ID_LENGTH_MAX,
+                          "netframework_%s_clrlocksandthreads_contentions_total",
+                          windows_shared_buffer);
+                p->rd_locksandthreads_contentions = rrddim_add(p->st_clrlocksandthreads_contentions,
+                                                               id,
+                                                               "contentions",
+                                                               1,
+                                                               1,
+                                                               RRD_ALGORITHM_INCREMENTAL);
+
+                rrdlabels_add(p->st_clrlocksandthreads_contentions->rrdlabels,
+                              "process",
+                              windows_shared_buffer,
+                              RRDLABEL_SRC_AUTO);
+            }
+
+            rrddim_set_by_pointer(p->st_clrlocksandthreads_contentions,
+                                  p->rd_locksandthreads_contentions,
+                                  (collected_number)p->NETFrameworkCLRLocksAndThreadsContentions.current.Data);
+            rrdset_done(p->st_clrlocksandthreads_contentions);
         }
     }
 }
