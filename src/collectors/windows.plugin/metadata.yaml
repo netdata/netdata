@@ -366,6 +366,27 @@ modules:
               chart_type: line
               dimensions:
                 - name: requests
+            - name: iis.website_requests_by_type_rate
+              description: Website requests rate
+              unit: "requests/s"
+              chart_type: stacked
+              dimensions:
+                - name: options
+                - name: get
+                - name: post
+                - name: head
+                - name: put
+                - name: delete
+                - name: trace
+                - name: move
+                - name: copy
+                - name: mkcol
+                - name: propfind
+                - name: proppatch
+                - name: search
+                - name: lock
+                - name: unlock
+                - name: other
             - name: iis.website_active_connections_count
               description: Website active connections
               unit: "connections"
