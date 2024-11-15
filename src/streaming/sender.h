@@ -56,7 +56,6 @@ struct pipe_msg {
 
 struct sender_state {
     RRDHOST *host;
-    uint64_t magic;
     SENDER_FLAGS flags;
 
     ND_SOCK sock;
@@ -74,14 +73,12 @@ struct sender_state {
     } dispatcher;
 
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
-    size_t begin;
-    size_t reconnects_counter;
-    size_t sent_bytes;
-    size_t sent_bytes_on_this_connection;
     size_t send_attempts;
+
+    size_t sent_bytes_on_this_connection;
     time_t last_traffic_seen_t;
     time_t last_state_since_t;              // the timestamp of the last state (online/offline) change
-    size_t not_connected_loops;
+
     // Metrics are collected asynchronously by collector threads calling rrdset_done_push(). This can also trigger
     // the lazy creation of the sender thread - both cases (buffer access and thread creation) are guarded here.
     SPINLOCK spinlock;
@@ -178,7 +175,6 @@ void stream_sender_start_host(RRDHOST *host);
 int sender_write_pipe_fd(struct sender_state *s);
 
 void stream_sender_cancel_threads(void);
-bool stream_sender_is_signaled_to_stop(struct sender_state *s);
 
 void stream_sender_reconnect(struct sender_state *s);
 

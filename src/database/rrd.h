@@ -935,7 +935,7 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 
     // Streaming sender
     RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED     = (1 << 12), // the host has initialized rrdpush structures
-    RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN           = (1 << 13), // When set, the sender thread is running
+    RRDHOST_FLAG_RRDPUSH_SENDER_ADDED           = (1 << 13), // When set, the sender thread is running
     RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED       = (1 << 14), // When set, the host is connected to a parent
     RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS = (1 << 15), // when set, rrdset_done() should push metrics to parent
     RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS   = (1 << 16), // when set, we have logged the status of metrics streaming
@@ -995,7 +995,12 @@ typedef enum __attribute__ ((__packed__)) {
 
 #define rrdhost_has_rrdpush_sender_enabled(host) (rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED) && (host)->sender)
 
-#define rrdhost_can_send_definitions_to_parent(host) (rrdhost_has_rrdpush_sender_enabled(host) && rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED))
+#define rrdhost_can_send_metadata_to_parent(host)                                   \
+    (                                                                               \
+        rrdhost_has_rrdpush_sender_enabled(host) &&                                 \
+        rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS) &&    \
+        !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED)       \
+    )
 
 // ----------------------------------------------------------------------------
 // Health data

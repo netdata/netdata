@@ -12,7 +12,7 @@ static void stream_execute_function_callback(BUFFER *func_wb, int code, void *da
     struct inflight_stream_function *tmp = data;
     struct sender_state *s = tmp->sender;
 
-    if(rrdhost_can_send_definitions_to_parent(s->host)) {
+    if(rrdhost_can_send_metadata_to_parent(s->host)) {
         BUFFER *wb = sender_start(s);
 
         pluginsd_function_result_begin_to_buffer(
@@ -41,7 +41,7 @@ static void stream_execute_function_progress_callback(void *data, size_t done, s
     struct inflight_stream_function *tmp = data;
     struct sender_state *s = tmp->sender;
 
-    if(rrdhost_can_send_definitions_to_parent(s->host)) {
+    if(rrdhost_can_send_metadata_to_parent(s->host)) {
         BUFFER *wb = sender_start(s);
 
         buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION_PROGRESS " '%s' %zu %zu\n",

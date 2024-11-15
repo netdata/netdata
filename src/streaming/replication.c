@@ -1507,6 +1507,7 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
 void replication_sender_delete_pending_requests(struct sender_state *sender) {
     // allow the dictionary destructor to go faster on locks
     dictionary_flush(sender->replication.requests);
+    sender->replication.oldest_request_after_t = 0;
 }
 
 void replication_init_sender(struct sender_state *sender) {

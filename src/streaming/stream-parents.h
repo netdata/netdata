@@ -33,7 +33,6 @@ bool stream_parent_connect_to_one(
     struct rrdhost *host,
     int default_port,
     time_t timeout,
-    size_t *reconnects_counter,
     char *connected_to,
     size_t connected_to_size,
     STREAM_PARENT **destination);

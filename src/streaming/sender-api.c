@@ -3,6 +3,10 @@
 #include "sender-internals.h"
 
 void stream_sender_start_host(RRDHOST *host) {
+    internal_fatal(!rrdhost_has_rrdpush_sender_enabled(host),
+                   "Host '%s' does not have streaming enabled, but %s() was called",
+                   rrdhost_hostname(host), __FUNCTION__);
+
     stream_sender_start_host_routing(host);
 }
 
@@ -20,7 +24,7 @@ void stream_sender_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE reaso
 
     sender_lock(host->sender);
 
-    if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED)) {
         __atomic_store_n(&host->sender->exit.shutdown, true, __ATOMIC_RELAXED);
         host->sender->exit.reason = reason;
     }
@@ -31,13 +35,6 @@ void stream_sender_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE reaso
     msg.msg = SENDER_MSG_STOP;
     stream_sender_send_msg_to_dispatcher(host->sender, msg);
 
-    if(wait) {
-        sender_lock(host->sender);
-        while(host->sender->magic) {
-            sender_unlock(host->sender);
-            sleep_usec(10 * USEC_PER_MS);
-            sender_lock(host->sender);
-        }
-        sender_unlock(host->sender);
-    }
+    while(wait && rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED))
+        sleep_usec(10 * USEC_PER_MS);
 }

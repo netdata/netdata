@@ -476,7 +476,6 @@ bool stream_parent_connect_to_one_unsafe(
     RRDHOST *host,
     int default_port,
     time_t timeout,
-    size_t *reconnects_counter,
     char *connected_to,
     size_t connected_to_size,
     STREAM_PARENT **destination)
@@ -706,9 +705,6 @@ bool stream_parent_connect_to_one_unsafe(
                rrdhost_hostname(host), string2str(d->destination), default_port,
                i + 1, count);
 
-        if (reconnects_counter)
-            *reconnects_counter += 1;
-
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_STR(NDF_DST_IP, d->destination),
             ND_LOG_FIELD_I64(NDF_DST_PORT, default_port),
@@ -758,14 +754,13 @@ bool stream_parent_connect_to_one(
     RRDHOST *host,
     int default_port,
     time_t timeout,
-    size_t *reconnects_counter,
     char *connected_to,
     size_t connected_to_size,
     STREAM_PARENT **destination) {
 
     rw_spinlock_read_lock(&host->stream.snd.parents.spinlock);
     bool rc = stream_parent_connect_to_one_unsafe(
-        sender_sock, host, default_port, timeout, reconnects_counter, connected_to, connected_to_size, destination);
+        sender_sock, host, default_port, timeout, connected_to, connected_to_size, destination);
     rw_spinlock_read_unlock(&host->stream.snd.parents.spinlock);
     return rc;
 }

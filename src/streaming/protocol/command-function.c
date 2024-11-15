@@ -7,7 +7,7 @@ void rrdpush_send_global_functions(RRDHOST *host) {
     if(!stream_has_capability(host->sender, STREAM_CAP_FUNCTIONS))
         return;
 
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)))
+    if(unlikely(!rrdhost_can_send_metadata_to_parent(host)))
         return;
 
     BUFFER *wb = sender_start(host->sender);

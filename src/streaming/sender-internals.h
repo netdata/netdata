@@ -55,23 +55,17 @@
 
 void stream_sender_start_host_routing(RRDHOST *host);
 
-void rrdpush_sender_on_connect(RRDHOST *host);
-void rrdpush_sender_thread_close_socket(struct sender_state *s);
-
 void rrdpush_sender_execute_commands_cleanup(struct sender_state *s);
 void rrdpush_sender_execute_commands(struct sender_state *s);
 
-bool stream_sender_connect_to_parent(struct sender_state *s);
+bool stream_sender_connect(struct sender_state *s, uint16_t default_port, time_t timeout);
 
 void stream_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force);
 
 bool stream_sender_is_host_stopped(struct sender_state *s);
 
-uint64_t stream_sender_magic(struct sender_state *s);
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_msg msg);
 
-void stream_sender_update_dispatcher_reset_unsafe(struct sender_state *s);
 void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
-void stream_sender_update_dispatcher_sent_data_unsafe(struct sender_state *s, uint64_t bytes_sent);
 
 #endif //NETDATA_SENDER_INTERNALS_H

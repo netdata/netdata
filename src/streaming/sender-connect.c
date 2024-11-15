@@ -2,14 +2,6 @@
 
 #include "sender-internals.h"
 
-void rrdpush_sender_thread_close_socket(struct sender_state *s) {
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-    nd_sock_close(&s->sock);
-
-    // do not flush the circular buffer here
-    // this function is called sometimes with the sender lock, sometimes without the lock
-}
-
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host) {
     se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):strdupz("");
     se->os_id = (host->system_info->host_os_id)?url_encode(host->system_info->host_os_id):strdupz("");
@@ -257,7 +249,7 @@ err_cleanup:
     return 1;
 }
 
-static inline bool stream_sender_connect_validate_first_response(RRDHOST *host, struct sender_state *s, char *http, size_t http_length) {
+static bool stream_sender_connect_validate_first_response(RRDHOST *host, struct sender_state *s, char *http, size_t http_length) {
     int32_t version = STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE;
 
     int i;
@@ -290,7 +282,6 @@ static inline bool stream_sender_connect_validate_first_response(RRDHOST *host, 
     int delay = stream_responses[i].postpone_reconnect_seconds;
 
     worker_is_busy(worker_job_id);
-    rrdpush_sender_thread_close_socket(s);
     stream_parent_set_reconnect_delay(host->stream.snd.parents.current, version, delay);
 
     ND_LOG_STACK lgs[] = {
@@ -309,9 +300,13 @@ static inline bool stream_sender_connect_validate_first_response(RRDHOST *host, 
     return false;
 }
 
-static bool stream_sender_connection_send_request(RRDHOST *host, uint16_t default_port, time_t timeout, struct sender_state *s) {
+bool stream_sender_connect(struct sender_state *s, uint16_t default_port, time_t timeout) {
+    worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
+
+    RRDHOST *host = s->host;
+
     // make sure the socket is closed
-    rrdpush_sender_thread_close_socket(s);
+    nd_sock_close(&s->sock);
 
     s->hops = (int16_t)(host->system_info->hops + 1);
 
@@ -320,7 +315,7 @@ static bool stream_sender_connection_send_request(RRDHOST *host, uint16_t defaul
     s->sock.ctx = netdata_ssl_streaming_sender_ctx;
 
     if(!stream_parent_connect_to_one(
-            &s->sock, host, default_port, timeout, &s->reconnects_counter,
+            &s->sock, host, default_port, timeout,
             s->connected_to, sizeof(s->connected_to) - 1,
             &host->stream.snd.parents.current)) {
 
@@ -445,7 +440,7 @@ static bool stream_sender_connection_send_request(RRDHOST *host, uint16_t defaul
         ND_LOG_STACK_PUSH(lgs);
 
         worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION);
-        rrdpush_sender_thread_close_socket(s);
+        nd_sock_close(&s->sock);
         stream_parent_set_reconnect_delay(
             host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_HTTP_UPGRADE, 60);
         return false;
@@ -461,7 +456,7 @@ static bool stream_sender_connection_send_request(RRDHOST *host, uint16_t defaul
         ND_LOG_STACK_PUSH(lgs);
 
         worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT);
-        rrdpush_sender_thread_close_socket(s);
+        nd_sock_close(&s->sock);
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s]: failed to send HTTP header to remote netdata.",
@@ -474,6 +469,8 @@ static bool stream_sender_connection_send_request(RRDHOST *host, uint16_t defaul
 
     bytes = nd_sock_recv_timeout(&s->sock, http, HTTP_HEADER_SIZE, 0, timeout);
     if(bytes <= 0) { // timeout is 0
+        nd_sock_close(&s->sock);
+
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_TIMEOUT),
             ND_LOG_FIELD_END(),
@@ -481,7 +478,6 @@ static bool stream_sender_connection_send_request(RRDHOST *host, uint16_t defaul
         ND_LOG_STACK_PUSH(lgs);
 
         worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT);
-        rrdpush_sender_thread_close_socket(s);
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s]: remote netdata does not respond.",
@@ -489,13 +485,16 @@ static bool stream_sender_connection_send_request(RRDHOST *host, uint16_t defaul
 
         stream_parent_set_reconnect_delay(
             host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, 30);
+
         return false;
     }
+    http[bytes] = '\0';
 
     if(sock_setnonblock(s->sock.fd) < 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM %s [send to %s]: cannot set non-blocking mode for socket.",
                rrdhost_hostname(host), s->connected_to);
+
     sock_setcloexec(s->sock.fd);
 
     if(sock_enlarge_out(s->sock.fd) < 0)
@@ -503,9 +502,10 @@ static bool stream_sender_connection_send_request(RRDHOST *host, uint16_t defaul
                "STREAM %s [send to %s]: cannot enlarge the socket buffer.",
                rrdhost_hostname(host), s->connected_to);
 
-    http[bytes] = '\0';
-    if(!stream_sender_connect_validate_first_response(host, s, http, bytes))
+    if(!stream_sender_connect_validate_first_response(host, s, http, bytes)) {
+        nd_sock_close(&s->sock);
         return false;
+    }
 
     rrdpush_compression_initialize(s);
 
@@ -520,72 +520,6 @@ static bool stream_sender_connection_send_request(RRDHOST *host, uint16_t defaul
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM %s: connected to %s...",
            rrdhost_hostname(host), s->connected_to);
-
-    return true;
-}
-
-bool stream_sender_connect_to_parent(struct sender_state *s) {
-    worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
-
-    time_t now_s = now_monotonic_sec();
-    stream_sender_cbuffer_recreate_timed(s, now_s, false, true);
-    rrdpush_sender_execute_commands_cleanup(s);
-
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-    s->flags &= ~SENDER_FLAG_OVERFLOW;
-    s->read_len = 0;
-    s->buffer->read = 0;
-    s->buffer->write = 0;
-
-    ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
-        ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
-
-    s->send_attempts = 0;
-
-    // reset the bytes we have sent for this session
-    stream_sender_update_dispatcher_reset_unsafe(s);
-    memset(s->sent_bytes_on_this_connection_per_type, 0, sizeof(s->sent_bytes_on_this_connection_per_type));
-
-    if(!stream_sender_connection_send_request(s->host, stream_send.parents.default_port, stream_send.parents.timeout_s, s)) {
-        // we couldn't connect
-
-        // increase the failed connections counter
-        s->not_connected_loops++;
-
-        return false;
-    }
-
-    if(stream_sender_is_host_stopped(s))
-        return false;
-
-    // reset the buffer, to properly send charts and metrics
-    rrdpush_sender_on_connect(s->host);
-
-    // send from the beginning
-    s->begin = 0;
-
-    // make sure the next reconnection will be immediate
-    s->not_connected_loops = 0;
-
-    // let the data collection threads know we are ready
-    rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
-
-    s->last_traffic_seen_t = now_monotonic_sec();
-    rrdpush_sender_thread_send_custom_host_variables(s->host);
-    stream_path_send_to_parent(s->host);
-    rrdpush_sender_send_claimed_id(s->host);
-    rrdpush_send_host_labels(s->host);
-    rrdpush_send_global_functions(s->host);
-    s->replication.oldest_request_after_t = 0;
-
-    rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM %s [send to %s]: enabling metrics streaming...",
-           rrdhost_hostname(s->host), s->connected_to);
 
     return true;
 }

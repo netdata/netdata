@@ -190,7 +190,7 @@ bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
 bool rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host) || !should_send_chart_matching(st, rrdset_flag_get(st))))
+    if(unlikely(!rrdhost_can_send_metadata_to_parent(host) || !should_send_chart_matching(st, rrdset_flag_get(st))))
         return false;
 
     BUFFER *wb = sender_start(host->sender);
