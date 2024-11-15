@@ -593,6 +593,10 @@ static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                 (collected_number)p->IISRequestsHead.current.Data);
             rrddim_set_by_pointer(
                 p->st_request_by_type_rate,
+                p->rd_request_put_rate,
+                (collected_number)p->IISRequestsPut.current.Data);
+            rrddim_set_by_pointer(
+                p->st_request_by_type_rate,
                 p->rd_request_delete_rate,
                 (collected_number)p->IISRequestsDelete.current.Data);
             rrddim_set_by_pointer(
