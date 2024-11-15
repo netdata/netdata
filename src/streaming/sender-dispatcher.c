@@ -496,7 +496,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
     dp->tid = gettid_cached();
 
     const size_t pipe_messages_size = set_pipe_size(dp->pipe.fds[PIPE_READ], 16384 * sizeof(struct pipe_msg)) / sizeof(struct pipe_msg);
-    const struct pipe_msg *pipe_messages_buf = mallocz(pipe_messages_size * sizeof(struct pipe_msg));
+    struct pipe_msg *pipe_messages_buf = mallocz(pipe_messages_size * sizeof(struct pipe_msg));
 
     usec_t now_ut = now_monotonic_usec();
     usec_t next_all_ut = now_ut;
