@@ -526,7 +526,7 @@ bool stream_sender_connect(struct sender_state *s, uint16_t default_port, time_t
     ND_LOG_STACK_PUSH(lgs);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM %s: connected to %s...",
+           "STREAM [connector] %s: connected to %s...",
            rrdhost_hostname(host), s->connected_to);
 
     return true;
@@ -553,7 +553,11 @@ static struct {
     },
 };
 
-void stream_sender_connector_add_to_queue(struct sender_state *s) {
+void stream_sender_connector_requeue(struct sender_state *s) {
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "STREAM [connector] [%s]: adding host in connector queue...",
+           rrdhost_hostname(s->host));
+
     spinlock_lock(&connector_globals.connector.queue.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(connector_globals.connector.queue.ll, s, prev, next);
     spinlock_unlock(&connector_globals.connector.queue.spinlock);
@@ -562,12 +566,49 @@ void stream_sender_connector_add_to_queue(struct sender_state *s) {
     completion_mark_complete_a_job(&connector_globals.connector.completion);
 }
 
+void stream_sender_connector_add_unlinked(struct sender_state *s) {
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    // multiple threads may come here - only one should be able to pass through
+    sender_lock(s);
+    if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->stream.snd.destination || !s->host->stream.snd.api_key) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM %s [send]: host has streaming disabled - not sending data to a parent.",
+               rrdhost_hostname(s->host));
+        sender_unlock(s);
+        return;
+    }
+    if(rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED)) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM %s [send]: host has already added to sender - ignoring request",
+               rrdhost_hostname(s->host));
+        sender_unlock(s);
+        return;
+    }
+    rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED);
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+    sender_unlock(s);
+
+    nd_sock_close(&s->sock);
+    s->sbuf.cb->max_size = stream_send.buffer_max_size;
+    s->parent_using_h2o = stream_send.parents.h2o;
+
+    // do not call this with any locks held
+    stream_sender_connector_requeue(s);
+}
+
 void stream_sender_connector_remove_unlinked(struct sender_state *s) {
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
+
+    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+           "STREAM [connector] [%s]: stopped streaming for host!",
+           rrdhost_hostname(s->host));
 
     sender_lock(s);
 

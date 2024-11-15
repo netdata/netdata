@@ -210,7 +210,8 @@ void stream_sender_dispatcher_add_to_queue(struct sender_state *s);
 bool stream_sender_connector_init(void);
 void stream_sender_connector_cancel_threads(void);
 void stream_sender_connector_remove_unlinked(struct sender_state *s);
-void stream_sender_connector_add_to_queue(struct sender_state *s);
+void stream_sender_connector_add_unlinked(struct sender_state *s);
+void stream_sender_connector_requeue(struct sender_state *s);
 
 bool stream_sender_is_signaled_to_stop(struct sender_state *s);
 void stream_sender_on_connect(struct sender_state *s);
