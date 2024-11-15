@@ -787,6 +787,16 @@ done:
 
 static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *wc, uint64_t cloud_version)
 {
+    if (cloud_version == 1) {
+        nd_log(
+            NDLS_ACCESS,
+            NDLP_NOTICE,
+            "Cloud requested not to verify alert version for host \"%s\", node \"%s\"",
+            rrdhost_hostname(wc->host),
+            wc->node_id);
+        return;
+    }
+
     uint64_t local_version = calculate_node_alert_version(wc->host);
     if (local_version != cloud_version) {
         nd_log(
