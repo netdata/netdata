@@ -2,10 +2,25 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.0.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.0.1...HEAD)
 
 **Merged pull requests:**
 
+- chore\(go.d.plugin\): set nooplogger for automaxprocs [\#19026](https://github.com/netdata/netdata/pull/19026) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#19025](https://github.com/netdata/netdata/pull/19025) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/windows\): remove references to old MSI [\#19024](https://github.com/netdata/netdata/pull/19024) ([ilyam8](https://github.com/ilyam8))
+- improvement\(go.d.plugin\): automatically set GOMAXPROCS [\#19023](https://github.com/netdata/netdata/pull/19023) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#19022](https://github.com/netdata/netdata/pull/19022) ([netdatabot](https://github.com/netdatabot))
+- docs: just iis [\#19021](https://github.com/netdata/netdata/pull/19021) ([ilyam8](https://github.com/ilyam8))
+- chore\(windows.plugin\): format win collectors code [\#19019](https://github.com/netdata/netdata/pull/19019) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#19018](https://github.com/netdata/netdata/pull/19018) ([netdatabot](https://github.com/netdatabot))
+- fix\(go.d/ping\): fix "interface" option [\#19016](https://github.com/netdata/netdata/pull/19016) ([ilyam8](https://github.com/ilyam8))
+- Remove MSI test [\#19015](https://github.com/netdata/netdata/pull/19015) ([thiagoftsm](https://github.com/thiagoftsm))
+- fix has\_receiver condition in rrdhost\_status\(\) [\#19014](https://github.com/netdata/netdata/pull/19014) ([ktsaou](https://github.com/ktsaou))
+- backport of fixes from balance-parents [\#19012](https://github.com/netdata/netdata/pull/19012) ([ktsaou](https://github.com/ktsaou))
+- add missing spinlock unlocks on containers [\#19011](https://github.com/netdata/netdata/pull/19011) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations.js [\#19010](https://github.com/netdata/netdata/pull/19010) ([netdatabot](https://github.com/netdatabot))
+- docs\(go.d/windows\): add deprecation notice [\#19009](https://github.com/netdata/netdata/pull/19009) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/dyncfg\): remove additionalProperties [\#19006](https://github.com/netdata/netdata/pull/19006) ([ilyam8](https://github.com/ilyam8))
 - Set expires header when serving files [\#19005](https://github.com/netdata/netdata/pull/19005) ([stelfrag](https://github.com/stelfrag))
 - fix\(go.d/x509check\): correct check revocation code [\#19004](https://github.com/netdata/netdata/pull/19004) ([ilyam8](https://github.com/ilyam8))
@@ -16,6 +31,7 @@
 - Regenerate integrations.js [\#18997](https://github.com/netdata/netdata/pull/18997) ([netdatabot](https://github.com/netdatabot))
 - docs: win deploy remove `./` [\#18996](https://github.com/netdata/netdata/pull/18996) ([ilyam8](https://github.com/ilyam8))
 - docs: single line win deploy [\#18994](https://github.com/netdata/netdata/pull/18994) ([ilyam8](https://github.com/ilyam8))
+- Add SQL Express Metrics [\#18992](https://github.com/netdata/netdata/pull/18992) ([thiagoftsm](https://github.com/thiagoftsm))
 - Do not intentionally abort on non-0 exit code. [\#18991](https://github.com/netdata/netdata/pull/18991) ([vkalintiris](https://github.com/vkalintiris))
 - update plugin\_data\_collection\_status alert summary/info [\#18990](https://github.com/netdata/netdata/pull/18990) ([ilyam8](https://github.com/ilyam8))
 - health: enable go.d data collection job status alert [\#18989](https://github.com/netdata/netdata/pull/18989) ([ilyam8](https://github.com/ilyam8))
@@ -37,7 +53,12 @@
 - feat\(go.d/rabbitmq\): add cluster support [\#18965](https://github.com/netdata/netdata/pull/18965) ([ilyam8](https://github.com/ilyam8))
 - added /api/v3/stream\_path [\#18943](https://github.com/netdata/netdata/pull/18943) ([ktsaou](https://github.com/ktsaou))
 - Update Windows Documentation [\#18928](https://github.com/netdata/netdata/pull/18928) ([thiagoftsm](https://github.com/thiagoftsm))
+- IIS Metadata [\#18765](https://github.com/netdata/netdata/pull/18765) ([thiagoftsm](https://github.com/thiagoftsm))
 - Bump github.com/Wing924/ltsv from 0.3.1 to 0.4.0 in /src/go [\#18636](https://github.com/netdata/netdata/pull/18636) ([dependabot[bot]](https://github.com/apps/dependabot))
+
+## [v2.0.1](https://github.com/netdata/netdata/tree/v2.0.1) (2024-11-14)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.0.0...v2.0.1)
 
 ## [v2.0.0](https://github.com/netdata/netdata/tree/v2.0.0) (2024-11-07)
 
@@ -415,20 +436,6 @@
 - Regenerate integrations.js [\#18475](https://github.com/netdata/netdata/pull/18475) ([netdatabot](https://github.com/netdatabot))
 - added version to systemd-journal info response [\#18474](https://github.com/netdata/netdata/pull/18474) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18473](https://github.com/netdata/netdata/pull/18473) ([netdatabot](https://github.com/netdatabot))
-- Remove w1sensor in favor of Go implementation [\#18471](https://github.com/netdata/netdata/pull/18471) ([Ancairon](https://github.com/Ancairon))
-- Improve processing of pending alerts [\#18470](https://github.com/netdata/netdata/pull/18470) ([stelfrag](https://github.com/stelfrag))
-- Fix node index in alerts [\#18469](https://github.com/netdata/netdata/pull/18469) ([stelfrag](https://github.com/stelfrag))
-- go.d storcli: fix unmarshal driveInfo [\#18466](https://github.com/netdata/netdata/pull/18466) ([ilyam8](https://github.com/ilyam8))
-- w1sensor collector Go implementation [\#18464](https://github.com/netdata/netdata/pull/18464) ([Ancairon](https://github.com/Ancairon))
-- Check correct number of bits for LZC of XOR value. [\#18463](https://github.com/netdata/netdata/pull/18463) ([vkalintiris](https://github.com/vkalintiris))
-- netdata-claim.sh: fix parsing url arg [\#18460](https://github.com/netdata/netdata/pull/18460) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/likexian/whois from 1.15.4 to 1.15.5 in /src/go [\#18457](https://github.com/netdata/netdata/pull/18457) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/likexian/whois-parser from 1.24.19 to 1.24.20 in /src/go [\#18456](https://github.com/netdata/netdata/pull/18456) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Cleanup, rename and packaging fix \(Windows Codes\) [\#18455](https://github.com/netdata/netdata/pull/18455) ([thiagoftsm](https://github.com/thiagoftsm))
-- Regenerate integrations.js [\#18454](https://github.com/netdata/netdata/pull/18454) ([netdatabot](https://github.com/netdatabot))
-- Bump github.com/Masterminds/sprig/v3 from 3.2.3 to 3.3.0 in /src/go [\#18453](https://github.com/netdata/netdata/pull/18453) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/prometheus/common from 0.55.0 to 0.57.0 in /src/go [\#18452](https://github.com/netdata/netdata/pull/18452) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/docker/docker from 27.1.2+incompatible to 27.2.0+incompatible in /src/go [\#18451](https://github.com/netdata/netdata/pull/18451) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
