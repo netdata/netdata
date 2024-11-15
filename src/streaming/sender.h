@@ -61,6 +61,7 @@ struct sender_state {
     ND_SOCK sock;
 
     struct {
+        int id;
         bool interactive;                       // used internally by the dispatcher to optimize sending in batches
         bool interactive_sent;
         size_t bytes_compressed;

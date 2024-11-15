@@ -2,7 +2,7 @@
 
 #include "sender-internals.h"
 
-void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host) {
+static void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host) {
     se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):strdupz("");
     se->os_id = (host->system_info->host_os_id)?url_encode(host->system_info->host_os_id):strdupz("");
     se->os_version = (host->system_info->host_os_version)?url_encode(host->system_info->host_os_version):strdupz("");
@@ -10,7 +10,7 @@ void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host) {
     se->kernel_version = (host->system_info->kernel_version)?url_encode(host->system_info->kernel_version):strdupz("");
 }
 
-void rrdpush_clean_encoded(stream_encoded_t *se) {
+static void rrdpush_clean_encoded(stream_encoded_t *se) {
     if (se->os_name) {
         freez(se->os_name);
         se->os_name = NULL;
@@ -522,4 +522,163 @@ bool stream_sender_connect(struct sender_state *s, uint16_t default_port, time_t
            rrdhost_hostname(host), s->connected_to);
 
     return true;
+}
+
+static struct {
+    struct {
+        ND_THREAD *thread;
+        struct completion completion;
+
+        struct {
+            // the incoming queue of the connector thread
+            // all other threads leave new senders here, to be connected to their parents
+            SPINLOCK spinlock;
+            struct sender_state *ll;
+        } queue;
+    } connector;
+} connector_globals = {
+    .connector = {
+        .queue = {
+            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+            .ll = NULL,
+        },
+    },
+};
+
+void stream_sender_connector_add_to_queue(struct sender_state *s) {
+    spinlock_lock(&connector_globals.connector.queue.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(connector_globals.connector.queue.ll, s, prev, next);
+    spinlock_unlock(&connector_globals.connector.queue.spinlock);
+
+    // signal the connector to catch the job
+    completion_mark_complete_a_job(&connector_globals.connector.completion);
+}
+
+void stream_sender_connector_remove_unlinked(struct sender_state *s) {
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    sender_lock(s);
+
+    __atomic_store_n(&s->exit.shutdown, false, __ATOMIC_RELAXED);
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+
+    s->last_state_since_t = now_realtime_sec();
+    stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, s->exit.reason, s->last_state_since_t);
+
+    sender_unlock(s);
+
+    rrdhost_stream_parents_reset(s->host, STREAM_HANDSHAKE_EXITING);
+
+#ifdef NETDATA_LOG_STREAM_SENDER
+    if (s->stream_log_fp) {
+        fclose(s->stream_log_fp);
+        s->stream_log_fp = NULL;
+    }
+#endif
+}
+
+static void *stream_sender_connector_thread(void *ptr __maybe_unused) {
+    worker_register("STREAMCNT");
+    worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_CONNECTING, "connect");
+    worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_CONNECTED, "connected");
+    worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE, "bad handshake");
+    worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT, "timeout");
+    worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION, "cant upgrade");
+
+    worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_QUEUED_NODES, "queued nodes", "nodes", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_CONNECTED_NODES, "connected nodes", "nodes", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_FAILED_NODES, "failed nodes", "nodes", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_CANCELLED_NODES, "cancelled nodes", "nodes", WORKER_METRIC_ABSOLUTE);
+
+    unsigned job_id = 0;
+
+    while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
+        worker_is_idle();
+        job_id = completion_wait_for_a_job_with_timeout(&connector_globals.connector.completion, job_id, 1);
+        size_t nodes = 0, connected_nodes = 0, failed_nodes = 0, cancelled_nodes = 0;
+
+        spinlock_lock(&connector_globals.connector.queue.spinlock);
+        struct sender_state *next;
+        for(struct sender_state *s = connector_globals.connector.queue.ll; s ; s = next) {
+            next = s->next;
+            nodes++;
+
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
+            if(stream_sender_is_signaled_to_stop(s)) {
+                cancelled_nodes++;
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(connector_globals.connector.queue.ll, s, prev, next);
+                stream_sender_connector_remove_unlinked(s);
+                continue;
+            }
+
+            spinlock_unlock(&connector_globals.connector.queue.spinlock);
+            worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
+            bool move_to_dispatcher = stream_sender_connect(s, stream_send.parents.default_port, stream_send.parents.timeout_s);
+            spinlock_lock(&connector_globals.connector.queue.spinlock);
+
+            if(move_to_dispatcher) {
+                connected_nodes++;
+                stream_sender_on_connect(s);
+
+                worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTED);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(connector_globals.connector.queue.ll, s, prev, next);
+                spinlock_unlock(&connector_globals.connector.queue.spinlock);
+
+                // do not have the connector lock when calling this
+                stream_sender_dispatcher_add_to_queue(s);
+
+                spinlock_lock(&connector_globals.connector.queue.spinlock);
+            }
+            else
+                failed_nodes++;
+
+            worker_is_idle();
+        }
+        spinlock_unlock(&connector_globals.connector.queue.spinlock);
+
+        worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_QUEUED_NODES, (NETDATA_DOUBLE)nodes);
+        worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_CONNECTED_NODES, (NETDATA_DOUBLE)connected_nodes);
+        worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_FAILED_NODES, (NETDATA_DOUBLE)failed_nodes);
+        worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_CANCELLED_NODES, (NETDATA_DOUBLE)cancelled_nodes);
+    }
+
+    return NULL;
+}
+
+bool stream_sender_connector_init(void) {
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static bool initialized = false;
+
+    spinlock_lock(&spinlock);
+
+    if(!initialized) {
+        completion_init(&connector_globals.connector.completion);
+
+        int id = 0;
+        char tag[NETDATA_THREAD_TAG_MAX + 1];
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "-CN" "[%d]", id);
+
+        connector_globals.connector.thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_sender_connector_thread, &id);
+        if (!connector_globals.connector.thread)
+            nd_log_daemon(NDLP_ERR, "STREAM connector: failed to create new thread for client.");
+        else
+            initialized = true;
+    }
+
+    spinlock_unlock(&spinlock);
+
+    return initialized;
+}
+
+void stream_sender_connector_cancel_threads(void) {
+    nd_thread_signal_cancel(connector_globals.connector.thread);
 }

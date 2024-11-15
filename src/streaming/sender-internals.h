@@ -60,12 +60,20 @@ void rrdpush_sender_execute_commands(struct sender_state *s);
 
 bool stream_sender_connect(struct sender_state *s, uint16_t default_port, time_t timeout);
 
-void stream_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force);
-
 bool stream_sender_is_host_stopped(struct sender_state *s);
 
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_msg msg);
 
 void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
+
+void stream_sender_dispatcher_add_to_queue(struct sender_state *s);
+
+bool stream_sender_connector_init(void);
+void stream_sender_connector_cancel_threads(void);
+void stream_sender_connector_remove_unlinked(struct sender_state *s);
+void stream_sender_connector_add_to_queue(struct sender_state *s);
+
+bool stream_sender_is_signaled_to_stop(struct sender_state *s);
+void stream_sender_on_connect(struct sender_state *s);
 
 #endif //NETDATA_SENDER_INTERNALS_H
