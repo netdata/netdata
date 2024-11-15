@@ -74,6 +74,7 @@ Metrics:
 |:------|:----------|:----|
 | iis.website_traffic | received, sent | bytes/s |
 | iis.website_requests_rate | requests | requests/s |
+| iis.website_requests_by_type_rate | options, get, post, head, put, delete, trace, move, copy, mkcol, propfind, proppatch, search, lock, unlock, other | requests/s |
 | iis.website_active_connections_count | active | connections |
 | iis.website_users_count | anonymous, non_anonymous | users |
 | iis.website_connection_attempts_rate | connection | attempts/s |
