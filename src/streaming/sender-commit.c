@@ -54,8 +54,8 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     if(unlikely(!src || !src_len))
         return;
 
-    size_t uncompressed_len = src_len;
-    size_t compressed_len = 0;
+    size_t total_uncompressed_len = src_len;
+    size_t total_compressed_len = 0;
 
     sender_lock(s);
 #ifdef NETDATA_LOG_STREAM_SENDER
@@ -126,7 +126,6 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                 }
             }
 
-            compressed_len += dst_len;
             rrdpush_signature_t signature = rrdpush_compress_encode_signature(dst_len);
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -144,16 +143,14 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                 sender_unlock(s);
                 return;
             }
-            else {
-                if(cbuffer_add_unsafe(s->buffer, dst, dst_len)) {
-                    s->flags |= SENDER_FLAG_OVERFLOW;
-                    stream_sender_reconnect(s);
-                    sender_unlock(s);
-                    return;
-                }
-                else
-                    s->sent_bytes_on_this_connection_per_type[type] += dst_len + sizeof(signature);
+            else if(cbuffer_add_unsafe(s->buffer, dst, dst_len)) {
+                s->flags |= SENDER_FLAG_OVERFLOW;
+                stream_sender_reconnect(s);
+                sender_unlock(s);
+                return;
             }
+            s->sent_bytes_on_this_connection_per_type[type] += dst_len + sizeof(signature);
+            total_compressed_len += dst_len + sizeof(signature);
 
             src = src + size_to_compress;
             src_len -= size_to_compress;
@@ -167,10 +164,10 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     }
     else {
         s->sent_bytes_on_this_connection_per_type[type] += src_len;
-        compressed_len = uncompressed_len;
+        total_compressed_len = total_uncompressed_len;
     }
 
-    stream_sender_update_dispatcher_added_data_unsafe(s, uncompressed_len, compressed_len);
+    stream_sender_update_dispatcher_added_data_unsafe(s, total_compressed_len, total_uncompressed_len);
 
     // decide if this has interactive data
     bool interactive = !s->dispatcher.interactive_sent &&
