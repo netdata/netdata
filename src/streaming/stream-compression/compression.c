@@ -2,7 +2,7 @@
 
 #include "compression.h"
 #include "../stream-conf.h"
-#include "../sender.h"
+#include "../sender-internals.h"
 #include "../receiver.h"
 
 #include "gzip.h"

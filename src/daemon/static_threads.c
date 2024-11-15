@@ -121,7 +121,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .enabled = 0,
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = stream_sender_start_localhost},
+        .start_routine = localhost_sender_start},
     {
         .name = "WEB[1]",
         .config_section = NULL,

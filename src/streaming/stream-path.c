@@ -2,6 +2,7 @@
 
 #include "stream-path.h"
 #include "rrdpush.h"
+#include "sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
 
 typedef enum __attribute__((packed)) {

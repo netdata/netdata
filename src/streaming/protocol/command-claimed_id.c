@@ -54,7 +54,7 @@ PARSER_RC rrdpush_receiver_pluginsd_claimed_id(char **words, size_t num_words, P
 }
 
 void rrdpush_sender_send_claimed_id(RRDHOST *host) {
-    if(!stream_has_capability(host->sender, STREAM_CAP_CLAIM))
+    if(!rrdhost_sender_has_capabilities(host, STREAM_CAP_CLAIM))
         return;
 
     if(unlikely(!rrdhost_can_send_metadata_to_parent(host)))

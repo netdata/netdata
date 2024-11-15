@@ -248,6 +248,11 @@ void stream_sender_reconnect(struct sender_state *s) {
     stream_sender_send_msg_to_dispatcher(s, msg);
 }
 
+static int sender_write_pipe_fd(struct sender_state *s) {
+    struct dispatcher *dp = stream_sender_dispatcher(s);
+    return dp->pipe_fds[PIPE_WRITE];
+}
+
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_msg msg) {
     if(!msg.slot || !msg.magic) return;
 
@@ -255,11 +260,6 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_ms
     if (pipe_fd != -1 && write(pipe_fd, &msg, sizeof(msg)) != sizeof(msg))
         netdata_log_error("STREAM %s [send]: cannot write to internal pipe.",
                           rrdhost_hostname(s->host));
-}
-
-int sender_write_pipe_fd(struct sender_state *s) {
-    struct dispatcher *dp = stream_sender_dispatcher(s);
-    return dp->pipe_fds[PIPE_WRITE];
 }
 
 static void stream_sender_connector_add_unlinked(struct sender_state *s) {

@@ -486,7 +486,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
                 // run all these without having the receiver lock
 
                 stream_path_child_disconnected(host);
-                stream_sender_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
+                rrdhost_sender_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
                 rrdpush_receiver_replication_reset(host);
                 rrdcontext_host_child_disconnected(host);
 

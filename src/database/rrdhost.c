@@ -7,8 +7,6 @@
 #error RRD_STORAGE_TIERS is not 5 - you need to update the grouping iterations per tier
 #endif
 
-static void rrdhost_streaming_sender_structures_init(RRDHOST *host);
-
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
 size_t storage_tiers = 3;
 bool use_direct_io = true;
@@ -242,7 +240,7 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
     if(stream && parents && api_key) {
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
 
-        rrdhost_streaming_sender_structures_init(host);
+        rrdhost_sender_structures_init(host);
 
         host->stream.snd.destination = string_dup(parents);
         rrdhost_stream_parents_update_from_destination(host);
@@ -1168,50 +1166,6 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
     }
 }
 
-static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
-{
-    if (host->sender)
-        return;
-
-    host->sender = callocz(1, sizeof(*host->sender));
-    __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
-
-    host->sender->host = host;
-    host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024, &netdata_buffers_statistics.cbuffers_streaming);
-    host->sender->capabilities = stream_our_capabilities(host, true);
-
-    nd_sock_init(&host->sender->sock, netdata_ssl_streaming_sender_ctx, netdata_ssl_validate_certificate_sender);
-    host->sender->disabled_capabilities = STREAM_CAP_NONE;
-
-    if(!stream_send.compression.enabled)
-        host->sender->disabled_capabilities |= STREAM_CAP_COMPRESSIONS_AVAILABLE;
-
-    spinlock_init(&host->sender->spinlock);
-    replication_init_sender(host->sender);
-}
-
-static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
-{
-    rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
-
-    if (unlikely(!host->sender))
-        return;
-
-    stream_sender_signal_to_stop_and_wait(
-        host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true); // stop a possibly running thread
-    cbuffer_free(host->sender->buffer);
-
-    rrdpush_compressor_destroy(&host->sender->compressor);
-
-    replication_cleanup_sender(host->sender);
-
-    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
-
-    freez(host->sender);
-    host->sender = NULL;
-    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
-}
-
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     if(!host) return;
 
@@ -1243,7 +1197,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     // ------------------------------------------------------------------------
     // clean up streaming
 
-    rrdhost_streaming_sender_structures_free(host);
+    rrdhost_sender_structures_free(host);
 
     if (netdata_exit || force)
         stop_streaming_receiver(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP);

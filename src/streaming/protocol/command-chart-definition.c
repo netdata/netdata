@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "commands.h"
+#include "../sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
 
 // chart labels
