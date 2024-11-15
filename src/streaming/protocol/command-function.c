@@ -15,7 +15,9 @@ void rrdpush_send_global_functions(RRDHOST *host) {
 
     rrd_global_functions_expose_rrdpush(host, wb, stream_has_capability(host->sender, STREAM_CAP_DYNCFG));
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
+    // send it as STREAM_TRAFFIC_TYPE_METADATA, not STREAM_TRAFFIC_TYPE_FUNCTIONS
+    // this is just metadata not an interactive function call
+    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 
     sender_thread_buffer_free();
 }

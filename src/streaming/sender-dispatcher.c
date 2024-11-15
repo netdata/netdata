@@ -170,8 +170,13 @@ static bool stream_sender_log_dst_port(BUFFER *wb, void *ptr) {
 
 struct dispatcher {
     int id;
-    int pipe_fds[2];
+    pid_t tid;
     ND_THREAD *thread;
+
+    struct {
+        SPINLOCK spinlock; // ensure a single writer at a time
+        int fds[2];
+    } pipe;
 
     struct {
         // the incoming queue of the dispatcher thread
@@ -241,18 +246,60 @@ void stream_sender_reconnect(struct sender_state *s) {
     stream_sender_send_msg_to_dispatcher(s, msg);
 }
 
-static int sender_write_pipe_fd(struct sender_state *s) {
-    struct dispatcher *dp = stream_sender_dispatcher(s);
-    return dp->pipe_fds[PIPE_WRITE];
-}
-
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_msg msg) {
-    if(!msg.slot || !msg.magic) return;
+    if (!msg.slot || !msg.magic) return;
 
-    int pipe_fd = sender_write_pipe_fd(s);
-    if (pipe_fd != -1 && write(pipe_fd, &msg, sizeof(msg)) != sizeof(msg))
-        netdata_log_error("STREAM %s [send]: cannot write to internal pipe.",
-                          rrdhost_hostname(s->host));
+    struct dispatcher *dp = stream_sender_dispatcher(s);
+
+    // don't send a message to ourselves
+    if (dp->tid == gettid_cached()) return;
+
+    // ensure one writer at a time
+    spinlock_lock(&dp->pipe.spinlock);
+
+    int pipe_fd = dp->pipe.fds[PIPE_WRITE];
+    if (pipe_fd != -1) {
+        ssize_t total_written = 0;
+        ssize_t bytes_to_write = sizeof(msg);
+        const char *msg_ptr = (const char *)&msg;
+
+        while (total_written < bytes_to_write) {
+            ssize_t written = write(pipe_fd, msg_ptr + total_written, bytes_to_write - total_written);
+
+            if (written > 0)
+                total_written += written;
+
+            else if (written == -1) {
+                if (errno == EINTR)
+                    continue; // Interrupted by a signal, retry
+
+                else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // pipe is full
+                    nd_log_limit_static_global_var(erl, 1, 1 * USEC_PER_MS);
+                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                                 "STREAM %s [send]: pipe full, cannot write to internal pipe. Retrying.",
+                                 rrdhost_hostname(s->host));
+                    continue;
+                }
+                else {
+                    // Other errors
+                    nd_log_limit_static_global_var(erl, 1, 1 * USEC_PER_MS);
+                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                                 "STREAM %s [send]: cannot write to internal pipe. Error: %s",
+                                 rrdhost_hostname(s->host), strerror(errno));
+                    break;
+                }
+            }
+        }
+
+        if (total_written < bytes_to_write) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM %s [send]: partial write, could not write a complete message to internal pipe.",
+                   rrdhost_hostname(s->host));
+        }
+    }
+
+    spinlock_unlock(&dp->pipe.spinlock);
 }
 
 static void stream_sender_connector_add_unlinked(struct sender_state *s) {
@@ -379,6 +426,33 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct 
         stream_sender_connector_add_unlinked(s);
 }
 
+static int set_pipe_size(int pipe_fd, int new_size) {
+    int default_size = new_size;
+    int result = new_size;
+
+#ifdef F_GETPIPE_SZ
+    // get the current size of the pipe
+    result = fcntl(pipe_fd, F_GETPIPE_SZ);
+    if(result > 0)
+        default_size = result;
+#endif
+
+#ifdef F_SETPIPE_SZ
+    // set the new size to the pipe
+    if(result <= new_size) {
+        result = fcntl(pipe_fd, F_SETPIPE_SZ, new_size);
+        if (result <= 0)
+            return default_size;
+    }
+#endif
+
+    // we return either:
+    // 1. the new_size (after setting it)
+    // 2. the current size (if we can't set it, but we can read it)
+    // 3. the new_size (without setting it, when we can't read the current size)
+    return result;  // Returns the new pipe size
+}
+
 void *stream_sender_dispacther_thread(void *ptr) {
     struct dispatcher *dp = ptr;
 
@@ -412,15 +486,17 @@ void *stream_sender_dispacther_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, "pipe messages received", "messages", WORKER_METRIC_INCREMENT);
 
-    if(pipe(dp->pipe_fds) != 0) {
+    if(pipe(dp->pipe.fds) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM [dispatch%d]: cannot create required pipe.", dp->id);
-        dp->pipe_fds[PIPE_READ] = -1;
-        dp->pipe_fds[PIPE_WRITE] = -1;
+        dp->pipe.fds[PIPE_READ] = -1;
+        dp->pipe.fds[PIPE_WRITE] = -1;
         return NULL;
     }
 
-    size_t pipe_messages_size = 4096;
-    struct pipe_msg *pipe_messages_buf = mallocz(pipe_messages_size * sizeof(*pipe_messages_buf));
+    dp->tid = gettid_cached();
+
+    const size_t pipe_messages_size = set_pipe_size(dp->pipe.fds[PIPE_READ], 16384 * sizeof(struct pipe_msg)) / sizeof(struct pipe_msg);
+    const struct pipe_msg *pipe_messages_buf = mallocz(pipe_messages_size * sizeof(struct pipe_msg));
 
     usec_t now_ut = now_monotonic_usec();
     usec_t next_all_ut = now_ut;
@@ -451,8 +527,8 @@ void *stream_sender_dispacther_thread(void *ptr) {
 
             nodes++;
 
+            // the default for all nodes
             dp->pollfd.array[slot].events = POLLIN;
-            dp->pollfd.array[slot].fd = s->sock.fd;
             dp->pollfd.array[slot].revents = 0;
 
             if(!do_all && !s->dispatcher.interactive)
@@ -512,7 +588,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
         }
 
         dp->pollfd.array[0] = (struct pollfd) {
-            .fd = dp->pipe_fds[PIPE_READ],
+            .fd = dp->pipe.fds[PIPE_READ],
             .events = POLLIN,
             .revents = 0,
         };
@@ -542,10 +618,9 @@ void *stream_sender_dispacther_thread(void *ptr) {
 
             if (likely(revents & (POLLIN | POLLPRI))) {
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_PIPE_READ);
-                ssize_t bytes = read(
-                    dp->pollfd.array[0].fd, pipe_messages_buf, sizeof(*pipe_messages_buf) * pipe_messages_size);
+                ssize_t bytes = read(dp->pipe.fds[PIPE_READ], pipe_messages_buf, sizeof(struct pipe_msg) * pipe_messages_size);
                 if(bytes > 0) {
-                    size_t count = bytes / sizeof(*pipe_messages_buf);
+                    size_t count = bytes / sizeof(struct pipe_msg);
                     if(bytes % count) {
                         nd_log(NDLS_DAEMON, NDLP_ERR,
                                "STREAM [dispatch%d]: received partial number of messages from pipe by %zu bytes",
@@ -586,17 +661,8 @@ void *stream_sender_dispacther_thread(void *ptr) {
             }
             else if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
                 // we have errors on this pipe
-
-                close(dp->pipe_fds[PIPE_READ]);
-                dp->pipe_fds[PIPE_READ] = -1;
-                close(dp->pipe_fds[PIPE_WRITE]);
-                dp->pipe_fds[PIPE_WRITE] = -1;
-                if(pipe(dp->pipe_fds) != 0) {
-                    nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM [dispatch%d]: cannot create required pipe.", dp->id);
-                    break; // exit the dispatcher thread
-                }
-                else
-                    nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM [dispatch%d]: restarted internal pipe.", dp->id);
+                nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM [dispatch%d]: got errors on pipe - exiting to be restarted.", dp->id);
+                break; // exit the dispatcher thread
             }
         }
 
@@ -673,9 +739,17 @@ void *stream_sender_dispacther_thread(void *ptr) {
                         bytes_sent += bytes;
 
                         if(!s->dispatcher.bytes_outstanding) {
+                            // we sent them all, remove the interactive flag
                             s->dispatcher.interactive = false;
                             s->dispatcher.interactive_sent = false;
+
+                            // recreate the circular buffer if we have to
                             stream_sender_cbuffer_recreate_timed_unsafe(s, now_s, false);
+                        }
+                        else if(s->dispatcher.bytes_outstanding > s->dispatcher.bytes_available) {
+                            // at 50% turn on the interactive flag
+                            s->dispatcher.interactive = true;
+                            s->dispatcher.interactive_sent = true;
                         }
                     }
                     else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
@@ -752,12 +826,13 @@ void *stream_sender_dispacther_thread(void *ptr) {
     memset(&dp->pollfd, 0, sizeof(dp->pollfd));
 
     freez(pipe_messages_buf);
-    close(dp->pipe_fds[PIPE_READ]);
-    dp->pipe_fds[PIPE_READ] = -1;
-    close(dp->pipe_fds[PIPE_WRITE]);
-    dp->pipe_fds[PIPE_WRITE] = -1;
+    close(dp->pipe.fds[PIPE_READ]);
+    dp->pipe.fds[PIPE_READ] = -1;
+    close(dp->pipe.fds[PIPE_WRITE]);
+    dp->pipe.fds[PIPE_WRITE] = -1;
 
     dp->thread = NULL;
+    dp->tid = 0;
 
     return NULL;
 }
@@ -771,8 +846,10 @@ static bool stream_sender_dispatcher_init(struct sender_state *s) {
     spinlock_lock(&spinlock);
 
     if(dp->thread == NULL) {
-        dp->pipe_fds[PIPE_READ] = -1;
-        dp->pipe_fds[PIPE_WRITE] = -1;
+        dp->pipe.fds[PIPE_READ] = -1;
+        dp->pipe.fds[PIPE_WRITE] = -1;
+        spinlock_init(&dp->pipe.spinlock);
+        spinlock_init(&dp->queue.spinlock);
 
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "-DP" "[%d]", dp->id);
@@ -789,8 +866,11 @@ static bool stream_sender_dispatcher_init(struct sender_state *s) {
 
 void stream_sender_start_host_routing(RRDHOST *host) {
     host->sender->dispatcher.id = (int)os_random(MAX_DISPATCHERS);
-    bool connector_running =  stream_sender_connector_init();
+
+    // initialize first the dispatcher, to have its spinlocks and pipes initialized
+    // before the connector attempts to use them
     bool dispatcher_running = stream_sender_dispatcher_init(host->sender);
+    bool connector_running =  stream_sender_connector_init();
 
     if(dispatcher_running && connector_running) {
         rrdhost_stream_parent_ssl_init(host->sender);
