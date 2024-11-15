@@ -119,7 +119,8 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     }
 
     // we change the URL, to allow the agent dashboard to work with Netdata Cloud on-prem, if any.
-    cloud_config_url_set(url);
+    if(node_id_updated)
+        cloud_config_url_set(url);
 
     // send it down the line (to children)
     rrdpush_receiver_send_node_and_claim_id_to_child(s->host);
