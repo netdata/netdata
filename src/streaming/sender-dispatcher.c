@@ -342,6 +342,14 @@ static void stream_sender_dispatcher_realloc_arrays_unsafe(struct dispatcher *dp
         dp->pollfd.running = reallocz(dp->pollfd.running, new_size * sizeof(*dp->pollfd.running));
         dp->pollfd.size = new_size;
         dp->pollfd.used = slot + 1;
+
+        // slot zero is always our pipe
+        dp->pollfd.array[0] = (struct pollfd) {
+            .fd = dp->pipe.fds[PIPE_READ],
+            .events = POLLIN,
+            .revents = 0,
+        };
+        dp->pollfd.running[0] = NULL;
     }
     else if(slot >= dp->pollfd.used)
         dp->pollfd.used = slot + 1;
@@ -587,13 +595,8 @@ void *stream_sender_dispacther_thread(void *ptr) {
             worker_set_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, (NETDATA_DOUBLE)messages);
         }
 
-        dp->pollfd.array[0] = (struct pollfd) {
-            .fd = dp->pipe.fds[PIPE_READ],
-            .events = POLLIN,
-            .revents = 0,
-        };
-
         worker_is_idle();
+        dp->pollfd.array[0].revents = 0;
         int poll_rc = poll(
             dp->pollfd.array,
             dp->pollfd.used, 50); // timeout in milliseconds
@@ -850,6 +853,7 @@ static bool stream_sender_dispatcher_init(struct sender_state *s) {
         dp->pipe.fds[PIPE_WRITE] = -1;
         spinlock_init(&dp->pipe.spinlock);
         spinlock_init(&dp->queue.spinlock);
+        dp->pollfd.used = 0;
 
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "-DP" "[%d]", dp->id);

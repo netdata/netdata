@@ -93,15 +93,18 @@ void stream_parent_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reas
     d->reason = reason;
 }
 
-static inline usec_t randomize_wait_ut(time_t secs) {
-    usec_t delay_ut = (secs < SENDER_MIN_RECONNECT_DELAY ? SENDER_MIN_RECONNECT_DELAY : secs) * USEC_PER_SEC;
-    usec_t wait_ut = (SENDER_MIN_RECONNECT_DELAY * USEC_PER_SEC) +
-                     os_random(delay_ut - (SENDER_MIN_RECONNECT_DELAY * USEC_PER_SEC));
+static inline usec_t randomize_wait_ut(time_t min, time_t max) {
+    min = (min < SENDER_MIN_RECONNECT_DELAY ? SENDER_MIN_RECONNECT_DELAY : min);
+    if(max < min) max = min;
+
+    usec_t min_ut = min * USEC_PER_SEC;
+    usec_t max_ut = max * USEC_PER_SEC;
+    usec_t wait_ut = min_ut + os_random(max_ut - min_ut);
     return now_realtime_usec() + wait_ut;
 }
 
 void rrdhost_stream_parents_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
-    usec_t until_ut = randomize_wait_ut(stream_send.parents.reconnect_delay_s);
+    usec_t until_ut = randomize_wait_ut(5, stream_send.parents.reconnect_delay_s);
     rw_spinlock_write_lock(&host->stream.snd.parents.spinlock);
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d; d = d->next) {
         d->postpone_until_ut = until_ut;
@@ -114,7 +117,7 @@ void rrdhost_stream_parents_reset(RRDHOST *host, STREAM_HANDSHAKE reason) {
 void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t secs) {
     if(!d) return;
     d->reason = reason;
-    d->postpone_until_ut = randomize_wait_ut(secs);
+    d->postpone_until_ut = randomize_wait_ut(5, secs);
 }
 
 usec_t stream_parent_get_reconnection_ut(STREAM_PARENT *d) {
@@ -230,40 +233,40 @@ static void stream_parent_nd_sock_error_to_reason(STREAM_PARENT *d, ND_SOCK *soc
     switch (sock->error) {
         case ND_SOCK_ERR_CONNECTION_REFUSED:
             d->reason = STREAM_HANDSHAKE_CONNECTION_REFUSED;
-            d->postpone_until_ut = randomize_wait_ut(30);
-            block_parent_for_all_nodes(d, 60);
+            d->postpone_until_ut = randomize_wait_ut(30, 60);
+            block_parent_for_all_nodes(d, 30);
             break;
 
         case ND_SOCK_ERR_CANNOT_RESOLVE_HOSTNAME:
             d->reason = STREAM_HANDSHAKE_CANT_RESOLVE_HOSTNAME;
-            d->postpone_until_ut = randomize_wait_ut(10);
+            d->postpone_until_ut = randomize_wait_ut(30, 60);
             block_parent_for_all_nodes(d, 30);
             break;
 
         case ND_SOCK_ERR_NO_HOST_IN_DEFINITION:
             d->reason = STREAM_HANDSHAKE_NO_HOST_IN_DESTINATION;
             d->banned_for_this_session = true;
-            d->postpone_until_ut = randomize_wait_ut(600);
+            d->postpone_until_ut = randomize_wait_ut(30, 60);
             block_parent_for_all_nodes(d, 30);
             break;
 
         case ND_SOCK_ERR_TIMEOUT:
             d->reason = STREAM_HANDSHAKE_CONNECT_TIMEOUT;
-            d->postpone_until_ut = randomize_wait_ut(d->remote.nodes < 10 ? 30 : 300);
-            block_parent_for_all_nodes(d, 600);
+            d->postpone_until_ut = randomize_wait_ut(300, d->remote.nodes < 10 ? 600 : 900);
+            block_parent_for_all_nodes(d, 300);
             break;
 
         case ND_SOCK_ERR_SSL_INVALID_CERTIFICATE:
             d->reason = STREAM_HANDSHAKE_ERROR_INVALID_CERTIFICATE;
-            d->postpone_until_ut = randomize_wait_ut(600);
-            block_parent_for_all_nodes(d, 600);
+            d->postpone_until_ut = randomize_wait_ut(300, 600);
+            block_parent_for_all_nodes(d, 300);
             break;
 
         case ND_SOCK_ERR_SSL_CANT_ESTABLISH_SSL_CONNECTION:
         case ND_SOCK_ERR_SSL_FAILED_TO_OPEN:
             d->reason = STREAM_HANDSHAKE_ERROR_SSL_ERROR;
-            d->postpone_until_ut = randomize_wait_ut(600);
-            block_parent_for_all_nodes(d, 600);
+            d->postpone_until_ut = randomize_wait_ut(60, 180);
+            block_parent_for_all_nodes(d, 60);
             break;
 
         default:
@@ -271,13 +274,13 @@ static void stream_parent_nd_sock_error_to_reason(STREAM_PARENT *d, ND_SOCK *soc
         case ND_SOCK_ERR_FAILED_TO_CREATE_SOCKET:
         case ND_SOCK_ERR_UNKNOWN_ERROR:
             d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
-            d->postpone_until_ut = randomize_wait_ut(30);
+            d->postpone_until_ut = randomize_wait_ut(30, 60);
             break;
 
         case ND_SOCK_ERR_THREAD_CANCELLED:
         case ND_SOCK_ERR_NO_DESTINATION_AVAILABLE:
             d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
-            d->postpone_until_ut = randomize_wait_ut(60);
+            d->postpone_until_ut = randomize_wait_ut(30, 60);
             break;
     }
 }
