@@ -69,15 +69,17 @@ typedef void (*rrdpush_defer_action_t)(struct sender_state *s, void *data);
 typedef void (*rrdpush_defer_cleanup_t)(struct sender_state *s, void *data);
 
 typedef enum __attribute__((packed)) {
-    SENDER_MSG_INTERACTIVE = 0,
+    SENDER_MSG_NONE = 0,
+    SENDER_MSG_INTERACTIVE,
     SENDER_MSG_RECONNECT,
     SENDER_MSG_STOP,
 } SENDER_MSG;
 
 struct pipe_msg {
-    uint32_t magic;
-    uint32_t slot;
-    SENDER_MSG msg;
+    uint32_t slot;      // the run slot of the dispatcher this message refers to
+    uint32_t magic;     // random number used to verify that the message the dispatcher receives is for this sender
+    uint8_t id;         // the dispatcher id this message refers to
+    SENDER_MSG msg;     // the actual message to be delivered
 };
 
 struct sender_state {

@@ -81,6 +81,7 @@ static void stream_sender_on_ready_to_dispatch(struct sender_state *s) {
            "STREAM [dispatchX] [%s]: running ready-to-dispatch hooks...",
            rrdhost_hostname(s->host));
 
+    // set this flag before sending any data, or the data will not be sent
     rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
 
     rrdpush_sender_execute_commands_cleanup(s);
@@ -96,9 +97,6 @@ static void stream_sender_on_disconnect(struct sender_state *s) {
            "STREAM [dispatchX] [%s]: running on-disconnect hooks...",
            rrdhost_hostname(s->host));
 
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-
-    nd_sock_close(&s->sock);
     rrdpush_sender_execute_commands_cleanup(s);
     rrdpush_sender_charts_and_replication_reset(s);
     rrdpush_sender_clear_parent_claim_id(s->host);
@@ -188,6 +186,12 @@ struct dispatcher {
     struct {
         SPINLOCK spinlock; // ensure a single writer at a time
         int fds[2];
+
+        // ----
+
+        size_t residual_bytes;      // partial pipe reads are tracked here
+        size_t size;
+        struct pipe_msg *messages;
     } pipe;
 
     struct {
@@ -201,10 +205,17 @@ struct dispatcher {
         // private fields for the dispatcher thread only - DO NOT USE ON OTHER THREADS
         size_t used;
         size_t size;
-        struct pollfd *array;
-        struct sender_state **running;
-    } pollfd;
+        struct pollfd *pollfds;         // the array to pass to poll()
+        struct sender_state **senders;  // the array of senders (may have nulls in it)
+    } run;
+
+    struct {
+        usec_t next_full_ut;
+        size_t messages;
+    } ops;
 };
+
+static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct dispatcher *dp, size_t slot, STREAM_HANDSHAKE reason, bool reconnect);
 
 static struct {
     struct dispatcher dispatcher[MAX_DISPATCHERS];
@@ -257,6 +268,9 @@ void stream_sender_reconnect(struct sender_state *s) {
     msg.msg = SENDER_MSG_RECONNECT;
     stream_sender_send_msg_to_dispatcher(s, msg);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// pipe messages
 
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_msg msg) {
     if (!msg.slot || !msg.magic) return;
@@ -314,24 +328,92 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_ms
     spinlock_unlock(&dp->pipe.spinlock);
 }
 
+static void stream_sender_dispatcher_read_pipe_messages(struct dispatcher *dp) {
+    char *buffer_start = (char *)dp->pipe.messages;
+    size_t message_size = sizeof(struct pipe_msg);
+    size_t max_read_size = message_size * dp->pipe.size;
+
+    char *read_position = buffer_start + dp->pipe.residual_bytes;
+    size_t bytes_available = max_read_size - dp->pipe.residual_bytes;
+
+    ssize_t bytes_read = read(dp->pipe.fds[PIPE_READ], read_position, bytes_available);
+    if(bytes_read <= 0) {
+        if (bytes_read < 0 && errno != EAGAIN && errno != EINTR)
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM [dispatch%d]: pipe read error", dp->id);
+        return;
+    }
+
+    size_t total_bytes = dp->pipe.residual_bytes + bytes_read;
+    size_t full_messages = total_bytes / message_size;
+    dp->pipe.residual_bytes = total_bytes % message_size;
+
+    dp->ops.messages += full_messages;
+
+    for (size_t i = 0; i < full_messages; i++) {
+        struct pipe_msg *msg = &dp->pipe.messages[i];
+
+        if (msg->slot > 0 &&
+            msg->slot < dp->run.used &&
+            msg->id == dp->id &&
+            dp->run.senders[msg->slot] &&
+            dp->run.senders[msg->slot]->dispatcher.pollfd.magic == msg->magic) {
+
+            // Process the message
+            switch (msg->msg) {
+                case SENDER_MSG_INTERACTIVE:
+                    dp->run.senders[msg->slot]->dispatcher.interactive = true;
+                    break;
+
+                case SENDER_MSG_RECONNECT:
+                    stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, 0, true);
+                    break;
+
+                case SENDER_MSG_STOP:
+                    stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, 0, false);
+                    break;
+
+                case SENDER_MSG_NONE:
+                    break;
+
+                default:
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "STREAM [dispatch%d]: invalid msg id %u", dp->id, (unsigned)msg->msg);
+                    break;
+            }
+        }
+        else {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM [dispatch%d]: invalid slot %" PRIu32 " read from pipe", dp->id, msg->slot);
+        }
+    }
+
+    if (dp->pipe.residual_bytes > 0) {
+        // move the last partial message to the beginning for next call
+        memmove(buffer_start, buffer_start + (full_messages * message_size), dp->pipe.residual_bytes);
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 static void stream_sender_dispatcher_realloc_arrays_unsafe(struct dispatcher *dp, size_t slot) {
-    if(slot >= dp->pollfd.size) {
-        size_t new_size = dp->pollfd.size > 0 ? dp->pollfd.size * 2 : 8;
-        dp->pollfd.array = reallocz(dp->pollfd.array, new_size * sizeof(*dp->pollfd.array));
-        dp->pollfd.running = reallocz(dp->pollfd.running, new_size * sizeof(*dp->pollfd.running));
-        dp->pollfd.size = new_size;
-        dp->pollfd.used = slot + 1;
+    if(slot >= dp->run.size) {
+        size_t new_size = dp->run.size > 0 ? dp->run.size * 2 : 8;
+        dp->run.pollfds = reallocz(dp->run.pollfds, new_size * sizeof(*dp->run.pollfds));
+        dp->run.senders = reallocz(dp->run.senders, new_size * sizeof(*dp->run.senders));
+        dp->run.size = new_size;
+        dp->run.used = slot + 1;
 
         // slot zero is always our pipe
-        dp->pollfd.array[0] = (struct pollfd) {
+        dp->run.pollfds[0] = (struct pollfd) {
             .fd = dp->pipe.fds[PIPE_READ],
             .events = POLLIN,
             .revents = 0,
         };
-        dp->pollfd.running[0] = NULL;
+        dp->run.senders[0] = NULL;
     }
-    else if(slot >= dp->pollfd.used)
-        dp->pollfd.used = slot + 1;
+    else if(slot >= dp->run.used)
+        dp->run.used = slot + 1;
 }
 
 void stream_sender_dispatcher_add_to_queue(struct sender_state *s) {
@@ -359,11 +441,11 @@ static void stream_sender_dispatcher_move_queue_to_running(struct dispatcher *dp
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dp->queue.ll, s, prev, next);
 
         // slot 0 is our pipe
-        size_t slot = dp->pollfd.used > 0 ? dp->pollfd.used : 1;
+        size_t slot = dp->run.used > 0 ? dp->run.used : 1;
 
         // find an empty slot
-        for(size_t i = first_slot; i < slot && i < dp->pollfd.used ;i++) {
-            if(!dp->pollfd.running[i]) {
+        for(size_t i = first_slot; i < slot && i < dp->run.used ;i++) {
+            if(!dp->run.senders[i]) {
                 slot = i;
                 break;
             }
@@ -375,22 +457,24 @@ static void stream_sender_dispatcher_move_queue_to_running(struct dispatcher *dp
                "STREAM [dispatch%d] [%s]: moving host from dispatcher queue to dispatcher running slot %zu...",
                dp->id, rrdhost_hostname(s->host), slot);
 
-        dp->pollfd.running[slot] = s;
-        dp->pollfd.array[slot] = (struct pollfd){
+        dp->run.senders[slot] = s;
+        dp->run.pollfds[slot] = (struct pollfd){
             .fd = s->sock.fd,
             .events = POLLIN,
             .revents = 0,
         };
 
         sender_lock(s);
+        s->dispatcher.pollfd.id = dp->id;
         s->dispatcher.pollfd.slot = slot;
         s->dispatcher.pollfd.magic = os_random32();
         s->host->stream.snd.status.connections++;
         s->last_state_since_t = now_realtime_sec();
-        stream_sender_update_dispatcher_reset_unsafe(s);
 
         // reset the bytes we have sent for this session
         memset(s->sent_bytes_on_this_connection_per_type, 0, sizeof(s->sent_bytes_on_this_connection_per_type));
+
+        stream_sender_update_dispatcher_reset_unsafe(s);
         sender_unlock(s);
 
         stream_sender_on_ready_to_dispatch(s);
@@ -401,13 +485,16 @@ static void stream_sender_dispatcher_move_queue_to_running(struct dispatcher *dp
 }
 
 static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct dispatcher *dp, size_t slot, STREAM_HANDSHAKE reason, bool reconnect) {
-    dp->pollfd.array[slot] = (struct pollfd) {
+    dp->run.pollfds[slot] = (struct pollfd) {
         .fd = -1,
         .events = 0,
         .revents = 0,
     };
 
-    struct sender_state *s = dp->pollfd.running[slot];
+    if(slot == dp->run.used - 1)
+        dp->run.used--;
+
+    struct sender_state *s = dp->run.senders[slot];
     if(!s) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM [dispatch%d] [unknown]: tried to remove host from slot %zu (reconnect = %s), but it is empty!",
@@ -415,12 +502,20 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct 
         return;
     }
 
-    stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, reason, now_realtime_sec());
+    // clear this flag asap, to stop other threads from pushing metrics for this node
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
 
-    stream_sender_on_disconnect(s);
-
-    dp->pollfd.running[slot] = NULL;
+    // clear these asap, to make sender_commit() stop processing data for this host
+    sender_lock(s);
     s->dispatcher.pollfd.slot = 0;
+    s->dispatcher.pollfd.magic = 0;
+    sender_unlock(s);
+
+    nd_sock_close(&s->sock);
+    dp->run.senders[slot] = NULL;
+
+    stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, reason, now_realtime_sec());
+    stream_sender_on_disconnect(s);
 
     if (!reconnect || stream_sender_is_signaled_to_stop(s))
         stream_sender_connector_remove_unlinked(s);
@@ -453,6 +548,92 @@ static int set_pipe_size(int pipe_fd, int new_size) {
     // 2. the current size (if we can't set it, but we can read it)
     // 3. the new_size (without setting it, when we can't read the current size)
     return result;  // Returns the new pipe size
+}
+
+void stream_sender_dispatcher_prepare(struct dispatcher *dp) {
+    usec_t now_ut = now_monotonic_usec();
+    time_t now_s = (time_t)(now_ut / USEC_PER_SEC);
+
+    bool do_all = false;
+    if(now_ut >= dp->ops.next_full_ut) {
+        dp->ops.next_full_ut = now_ut + 50 * USEC_PER_MS;
+        do_all = true;
+    }
+
+    size_t bytes_uncompressed = 0;
+    size_t bytes_compressed = 0;
+    NETDATA_DOUBLE buffer_ratio = 0.0;
+    size_t nodes = 0;
+    size_t slots_empty = 0;
+
+    for(size_t slot = 1; slot < dp->run.used ; slot++) {
+        struct sender_state *s = dp->run.senders[slot];
+        if(!s) {
+            slots_empty++;
+            continue;
+        }
+
+        nodes++;
+
+        // the default for all nodes
+        dp->run.pollfds[slot].events = POLLIN;
+        dp->run.pollfds[slot].revents = 0;
+
+        if(!do_all && !s->dispatcher.interactive)
+            continue;
+
+        // If the TCP window never opened then something is wrong, restart connection
+        if(unlikely(do_all &&
+                     now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
+                     !rrdpush_sender_pending_replication_requests(s) &&
+                     !rrdpush_sender_replicating_charts(s)
+                         )) {
+
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+                ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+                ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+                ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
+            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_TIMEOUT);
+
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM [dispatch%d] %s [send to %s]: could not send metrics for %ld seconds - closing connection - "
+                   "we have sent %zu bytes on this connection via %zu send attempts.",
+                   dp->id, rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
+                   s->sent_bytes_on_this_connection, s->send_attempts);
+
+            stream_sender_dispatcher_move_running_to_connector_or_remove(dp, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT, true);
+            continue;
+        }
+
+        sender_lock(s);
+        bytes_compressed += s->dispatcher.bytes_compressed;
+        bytes_uncompressed += s->dispatcher.bytes_uncompressed;
+        uint64_t outstanding = s->dispatcher.bytes_outstanding;
+        if (s->dispatcher.buffer_ratio > buffer_ratio) buffer_ratio = s->dispatcher.buffer_ratio;
+        sender_unlock(s);
+
+        if(outstanding)
+            dp->run.pollfds[slot].events |= POLLOUT;
+    }
+
+    if(do_all) {
+        if (bytes_compressed && bytes_uncompressed) {
+            NETDATA_DOUBLE compression_ratio = 100.0 - ((NETDATA_DOUBLE)bytes_compressed * 100.0 / (NETDATA_DOUBLE)bytes_uncompressed);
+            worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO, compression_ratio);
+        }
+
+        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_NODES, (NETDATA_DOUBLE)nodes);
+        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
+        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
+        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO, buffer_ratio);
+        worker_set_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, (NETDATA_DOUBLE)dp->ops.messages);
+    }
 }
 
 void *stream_sender_dispacther_thread(void *ptr) {
@@ -497,164 +678,48 @@ void *stream_sender_dispacther_thread(void *ptr) {
 
     dp->tid = gettid_cached();
 
-    const size_t pipe_messages_size = set_pipe_size(dp->pipe.fds[PIPE_READ], 16384 * sizeof(struct pipe_msg)) / sizeof(struct pipe_msg);
-    struct pipe_msg *pipe_messages_buf = mallocz(pipe_messages_size * sizeof(struct pipe_msg));
+    dp->pipe.size = set_pipe_size(dp->pipe.fds[PIPE_READ], 16384 * sizeof(struct pipe_msg)) / sizeof(struct pipe_msg);
+    dp->pipe.messages = mallocz(dp->pipe.size * sizeof(struct pipe_msg));
 
     usec_t now_ut = now_monotonic_usec();
-    usec_t next_all_ut = now_ut;
-    uint64_t messages = 0;
+    dp->ops.next_full_ut = now_ut;
 
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
         worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_LIST);
 
+        // move any pending hosts in the inbound queue, to the running list
         stream_sender_dispatcher_move_queue_to_running(dp);
 
-        now_ut = now_monotonic_usec();
-        time_t now_s = (time_t)(now_ut / USEC_PER_SEC);
-
-        bool do_all = false;
-        if(now_ut >= next_all_ut) {
-            next_all_ut = now_ut + 50 * USEC_PER_MS;
-            do_all = true;
-        }
-
-        size_t bytes_uncompressed = 0;
-        size_t bytes_compressed = 0;
-        NETDATA_DOUBLE buffer_ratio = 0.0;
-
-        size_t nodes = 0;
-        for(size_t slot = 1; slot < dp->pollfd.used ; slot++) {
-            struct sender_state *s = dp->pollfd.running[slot];
-            if(!s) continue;
-
-            nodes++;
-
-            // the default for all nodes
-            dp->pollfd.array[slot].events = POLLIN;
-            dp->pollfd.array[slot].revents = 0;
-
-            if(!do_all && !s->dispatcher.interactive)
-                continue;
-
-            // If the TCP window never opened then something is wrong, restart connection
-            if(unlikely(do_all &&
-                         now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
-                         !rrdpush_sender_pending_replication_requests(s) &&
-                         !rrdpush_sender_replicating_charts(s)
-                             )) {
-
-                ND_LOG_STACK lgs[] = {
-                    ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
-                    ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
-                    ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
-                    ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
-                    ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
-                    ND_LOG_FIELD_END(),
-                };
-                ND_LOG_STACK_PUSH(lgs);
-
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_TIMEOUT);
-
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM [dispatch%d] %s [send to %s]: could not send metrics for %ld seconds - closing connection - "
-                       "we have sent %zu bytes on this connection via %zu send attempts.",
-                       dp->id, rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
-                       s->sent_bytes_on_this_connection, s->send_attempts);
-
-                stream_sender_dispatcher_move_running_to_connector_or_remove(dp, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT, true);
-                continue;
-            }
-
-            sender_lock(s);
-            bytes_compressed += s->dispatcher.bytes_compressed;
-            bytes_uncompressed += s->dispatcher.bytes_uncompressed;
-            uint64_t outstanding = s->dispatcher.bytes_outstanding;
-            if (s->dispatcher.buffer_ratio > buffer_ratio) buffer_ratio = s->dispatcher.buffer_ratio;
-            sender_unlock(s);
-
-            if(outstanding)
-                dp->pollfd.array[slot].events |= POLLOUT;
-        }
-
-        if(do_all) {
-            if (bytes_compressed && bytes_uncompressed) {
-                NETDATA_DOUBLE compression_ratio = 100.0 - ((NETDATA_DOUBLE)bytes_compressed * 100.0 / (NETDATA_DOUBLE)bytes_uncompressed);
-                worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO, compression_ratio);
-            }
-
-            worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_NODES, (NETDATA_DOUBLE)nodes);
-            worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
-            worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
-            worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO, buffer_ratio);
-            worker_set_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, (NETDATA_DOUBLE)messages);
-        }
+        // prepare dp->pollfd.array
+        stream_sender_dispatcher_prepare(dp);
 
         worker_is_idle();
-        dp->pollfd.array[0].revents = 0;
-        int poll_rc = poll(
-            dp->pollfd.array,
-            dp->pollfd.used, 50); // timeout in milliseconds
+        dp->run.pollfds[0].revents = 0;
+
+        // wait for data - timeout is in milliseconds
+        int poll_rc = poll(dp->run.pollfds, dp->run.used, 50);
 
         if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR)))
-            // timeout
+            // timed out - just loop again
             continue;
 
         if(unlikely(poll_rc == -1)) {
-            // poll() error
+            // poll() returned an error
             worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_POLL_ERROR);
             nd_log_limit_static_thread_var(erl, 1, 1 * USEC_PER_MS);
             nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "STREAM [dispatch%d] poll() returned error", dp->id);
             continue;
         }
 
-        now_s = now_monotonic_sec();
+        time_t now_s = now_monotonic_sec();
 
         // If the collector woke us up then empty the pipe to remove the signal
-        if(dp->pollfd.array[0].revents) {
-            short revents = dp->pollfd.array[0].revents;
+        if(dp->run.pollfds[0].revents) {
+            short revents = dp->run.pollfds[0].revents;
 
             if (likely(revents & (POLLIN | POLLPRI))) {
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_PIPE_READ);
-                ssize_t bytes = read(dp->pipe.fds[PIPE_READ], pipe_messages_buf, sizeof(struct pipe_msg) * pipe_messages_size);
-                if(bytes > 0) {
-                    size_t count = bytes / sizeof(struct pipe_msg);
-                    if(bytes % count) {
-                        nd_log(NDLS_DAEMON, NDLP_ERR,
-                               "STREAM [dispatch%d]: received partial number of messages from pipe by %zu bytes",
-                               dp->id, bytes % count);
-                    }
-
-                    messages += count;
-
-                    for(size_t i = 0; i < count ; i++) {
-                        struct pipe_msg *msg = &pipe_messages_buf[i];
-                        if (msg->slot > 0 && msg->slot < dp->pollfd.used &&
-                            dp->pollfd.running[msg->slot]->dispatcher.pollfd.magic == msg->magic) {
-                            switch (msg->msg) {
-                                case SENDER_MSG_INTERACTIVE:
-                                    dp->pollfd.running[msg->slot]->dispatcher.interactive = true;
-                                    break;
-
-                                case SENDER_MSG_RECONNECT:
-                                    stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, 0, true);
-                                    break;
-
-                                case SENDER_MSG_STOP:
-                                    stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, 0, false);
-                                    break;
-
-                                default:
-                                    nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM [dispatch%d]: invalid msg id %u",
-                                           dp->id, (unsigned)msg->msg);
-                                    break;
-                            }
-                        }
-                        else {
-                            nd_log(NDLS_DAEMON, NDLP_ERR,
-                                   "STREAM [dispatch%d]: invalid slot %" PRIu32 " read from pipe", dp->id, msg->slot);
-                        }
-                    }
-                }
+                stream_sender_dispatcher_read_pipe_messages(dp);
             }
             else if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
                 // we have errors on this pipe
@@ -667,9 +732,9 @@ void *stream_sender_dispacther_thread(void *ptr) {
         size_t bytes_received = 0;
         size_t bytes_sent = 0;
 
-        for(size_t slot = 1; slot < dp->pollfd.used ; slot++) {
-            struct sender_state *s = dp->pollfd.running[slot];
-            if(!s || !dp->pollfd.array[slot].revents)
+        for(size_t slot = 1; slot < dp->run.used ; slot++) {
+            struct sender_state *s = dp->run.senders[slot];
+            if(!s || !dp->run.pollfds[slot].revents)
                 continue;
 
             ND_LOG_STACK lgs[] = {
@@ -693,7 +758,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
                 continue;
             }
 
-            short revents = dp->pollfd.array[slot].revents;
+            short revents = dp->run.pollfds[slot].revents;
 
             if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
                 // we have errors on this socket
@@ -810,22 +875,25 @@ void *stream_sender_dispacther_thread(void *ptr) {
         stream_sender_dispatcher_move_queue_to_running(dp);
 
     // stop all hosts
-    for(size_t slot = 1; slot < dp->pollfd.used ;slot++) {
-        struct sender_state *s = dp->pollfd.running[slot];
+    for(size_t slot = 1; slot < dp->run.used ;slot++) {
+        struct sender_state *s = dp->run.senders[slot];
         if(!s) continue;
 
         stream_sender_dispatcher_move_running_to_connector_or_remove(dp, slot, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
     }
 
     // cleanup
-    freez(dp->pollfd.array);
-    freez(dp->pollfd.running);
-    memset(&dp->pollfd, 0, sizeof(dp->pollfd));
+    freez(dp->run.pollfds);
+    freez(dp->run.senders);
+    memset(&dp->run, 0, sizeof(dp->run));
 
-    freez(pipe_messages_buf);
+    freez(dp->pipe.messages);
+    dp->pipe.messages = NULL;
+    dp->pipe.size = 0;
+
     close(dp->pipe.fds[PIPE_READ]);
-    dp->pipe.fds[PIPE_READ] = -1;
     close(dp->pipe.fds[PIPE_WRITE]);
+    dp->pipe.fds[PIPE_READ] = -1;
     dp->pipe.fds[PIPE_WRITE] = -1;
 
     dp->thread = NULL;
@@ -847,7 +915,7 @@ static bool stream_sender_dispatcher_init(struct sender_state *s) {
         dp->pipe.fds[PIPE_WRITE] = -1;
         spinlock_init(&dp->pipe.spinlock);
         spinlock_init(&dp->queue.spinlock);
-        dp->pollfd.used = 0;
+        dp->run.used = 0;
 
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "-DP" "[%d]", dp->id);

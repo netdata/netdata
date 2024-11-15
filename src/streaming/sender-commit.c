@@ -60,6 +60,27 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     size_t total_compressed_len = 0;
 
     sender_lock(s);
+
+    if(s->dispatcher.pollfd.slot == 0 || s->dispatcher.pollfd.magic == 0) {
+        // the dispatcher is not there anymore - ignore these data
+        sender_unlock(s);
+        sender_thread_buffer_free(); // free the thread data
+        return;
+    }
+
+    if(unlikely(s->sbuf.cb->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
+        // adaptive sizing of the circular buffer is needed to get this.
+
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "STREAM %s [send to %s]: max buffer size of %zu is too small "
+               "for a data message of size %zu. Increasing the max buffer size "
+               "to %d times the max data message size.",
+               rrdhost_hostname(s->host), s->connected_to, s->sbuf.cb->max_size,
+               buffer_strlen(wb) + 1, SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE);
+
+        s->sbuf.cb->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
+    }
+
 #ifdef NETDATA_LOG_STREAM_SENDER
     if(type == STREAM_TRAFFIC_TYPE_METADATA) {
         if(!s->stream_log_fp) {
@@ -76,13 +97,6 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
         );
     }
 #endif
-
-    if(unlikely(s->sbuf.cb->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
-        netdata_log_info("STREAM %s [send to %s]: max buffer size of %zu is too small for a data message of size %zu. Increasing the max buffer size to %d times the max data message size.",
-                         rrdhost_hostname(s->host), s->connected_to, s->sbuf.cb->max_size, buffer_strlen(wb) + 1, SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE);
-
-        s->sbuf.cb->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
-    }
 
     if (s->compressor.initialized) {
         while(src_len) {
