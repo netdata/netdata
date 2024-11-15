@@ -4,30 +4,32 @@
 
 static __thread BUFFER *sender_thread_buffer = NULL;
 static __thread bool sender_thread_buffer_used = false;
-static __thread time_t sender_thread_buffer_last_reset_s = 0;
+static __thread size_t sender_thread_buffer_our_recreates = 0;    // the sender sequence, when we created this buffer
+static __thread size_t sender_thread_buffer_sender_recreates = 0; // sender_commit() copies this, while having the sender lock
 
 void sender_thread_buffer_free(void) {
     buffer_free(sender_thread_buffer);
     sender_thread_buffer = NULL;
     sender_thread_buffer_used = false;
-    sender_thread_buffer_last_reset_s = 0;
+    sender_thread_buffer_our_recreates = 0;
+    sender_thread_buffer_sender_recreates = 0;
 }
 
 // Collector thread starting a transmission
-BUFFER *sender_start(struct sender_state *s) {
+BUFFER *sender_start(struct sender_state *s __maybe_unused) {
     if(unlikely(sender_thread_buffer_used))
         fatal("STREAMING: thread buffer is used multiple times concurrently.");
 
-    if(unlikely(rrdpush_sender_last_buffer_recreate_get(s) > sender_thread_buffer_last_reset_s)) {
-        if(unlikely(sender_thread_buffer && sender_thread_buffer->size > THREAD_BUFFER_INITIAL_SIZE)) {
-            buffer_free(sender_thread_buffer);
-            sender_thread_buffer = NULL;
-        }
+    if(unlikely(sender_thread_buffer &&
+                 sender_thread_buffer->size > THREAD_BUFFER_INITIAL_SIZE &&
+                 sender_thread_buffer_our_recreates != sender_thread_buffer_sender_recreates)) {
+        buffer_free(sender_thread_buffer);
+        sender_thread_buffer = NULL;
     }
 
     if(unlikely(!sender_thread_buffer)) {
         sender_thread_buffer = buffer_create(THREAD_BUFFER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_streaming);
-        sender_thread_buffer_last_reset_s = rrdpush_sender_last_buffer_recreate_get(s);
+        sender_thread_buffer_our_recreates = sender_thread_buffer_sender_recreates;
     }
 
     sender_thread_buffer_used = true;
@@ -75,11 +77,11 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     }
 #endif
 
-    if(unlikely(s->buffer->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
+    if(unlikely(s->sbuf.cb->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
         netdata_log_info("STREAM %s [send to %s]: max buffer size of %zu is too small for a data message of size %zu. Increasing the max buffer size to %d times the max data message size.",
-                         rrdhost_hostname(s->host), s->connected_to, s->buffer->max_size, buffer_strlen(wb) + 1, SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE);
+                         rrdhost_hostname(s->host), s->connected_to, s->sbuf.cb->max_size, buffer_strlen(wb) + 1, SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE);
 
-        s->buffer->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
+        s->sbuf.cb->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
     }
 
     if (s->compressor.initialized) {
@@ -137,13 +139,13 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                       size_to_compress, dst_len, decoded_dst_len);
 #endif
 
-            if(cbuffer_add_unsafe(s->buffer, (const char *)&signature, sizeof(signature))) {
+            if(cbuffer_add_unsafe(s->sbuf.cb, (const char *)&signature, sizeof(signature))) {
                 s->flags |= SENDER_FLAG_OVERFLOW;
                 stream_sender_reconnect(s);
                 sender_unlock(s);
                 return;
             }
-            else if(cbuffer_add_unsafe(s->buffer, dst, dst_len)) {
+            else if(cbuffer_add_unsafe(s->sbuf.cb, dst, dst_len)) {
                 s->flags |= SENDER_FLAG_OVERFLOW;
                 stream_sender_reconnect(s);
                 sender_unlock(s);
@@ -156,7 +158,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
             src_len -= size_to_compress;
         }
     }
-    else if(cbuffer_add_unsafe(s->buffer, src, src_len)) {
+    else if(cbuffer_add_unsafe(s->sbuf.cb, src, src_len)) {
         s->flags |= SENDER_FLAG_OVERFLOW;
         stream_sender_reconnect(s);
         sender_unlock(s);
@@ -168,6 +170,9 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     }
 
     stream_sender_update_dispatcher_added_data_unsafe(s, total_compressed_len, total_uncompressed_len);
+
+    // copy the sequence number of sender buffer recreates, while having our lock
+    sender_thread_buffer_sender_recreates = s->sbuf.recreates;
 
     // decide if this has interactive data
     bool interactive = !s->dispatcher.interactive_sent &&

@@ -21,7 +21,7 @@ void rrdhost_sender_structures_init(struct rrdhost *host) {
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
 
     host->sender->host = host;
-    host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024, &netdata_buffers_statistics.cbuffers_streaming);
+    host->sender->sbuf.cb = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024, &netdata_buffers_statistics.cbuffers_streaming);
     host->sender->capabilities = stream_our_capabilities(host, true);
 
     nd_sock_init(&host->sender->sock, netdata_ssl_streaming_sender_ctx, netdata_ssl_validate_certificate_sender);
@@ -41,7 +41,7 @@ void rrdhost_sender_structures_free(struct rrdhost *host) {
 
     rrdhost_sender_signal_to_stop_and_wait(
         host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true); // stop a possibly running thread
-    cbuffer_free(host->sender->buffer);
+    cbuffer_free(host->sender->sbuf.cb);
 
     rrdpush_compressor_destroy(&host->sender->compressor);
 

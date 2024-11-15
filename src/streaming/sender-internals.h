@@ -81,8 +81,13 @@ struct pipe_msg {
 };
 
 struct sender_state {
+    SPINLOCK spinlock;
+
     RRDHOST *host;
     SENDER_FLAGS flags;
+    STREAM_CAPABILITIES capabilities;
+    STREAM_CAPABILITIES disabled_capabilities;
+    int16_t hops;
 
     ND_SOCK sock;
 
@@ -101,25 +106,25 @@ struct sender_state {
 
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
     size_t send_attempts;
-
     size_t sent_bytes_on_this_connection;
     time_t last_traffic_seen_t;
     time_t last_state_since_t;              // the timestamp of the last state (online/offline) change
 
+    struct {
+        struct circular_buffer *cb;
+        size_t recreates;
+    } sbuf;
+
+    struct {
+        char b[PLUGINSD_LINE_MAX + 1];
+        ssize_t read_len;
+        struct line_splitter line;
+    } rbuf;
+
     // Metrics are collected asynchronously by collector threads calling rrdset_done_push(). This can also trigger
     // the lazy creation of the sender thread - both cases (buffer access and thread creation) are guarded here.
-    SPINLOCK spinlock;
-    struct circular_buffer *buffer;
-    char read_buffer[PLUGINSD_LINE_MAX + 1];
-    ssize_t read_len;
-    STREAM_CAPABILITIES capabilities;
-    STREAM_CAPABILITIES disabled_capabilities;
-
     size_t sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX];
 
-    int16_t hops;
-
-    struct line_splitter line;
     struct compressor_state compressor;
 
 #ifdef NETDATA_LOG_STREAM_SENDER
@@ -147,7 +152,6 @@ struct sender_state {
     struct {
         size_t buffer_used_percentage;          // the current utilization of the sending buffer
         usec_t last_flush_time_ut;              // the last time the sender flushed the sending buffer in USEC
-        time_t last_buffer_recreate_s;          // true when the sender buffer should be re-created
     } atomic;
 
     struct {
@@ -166,9 +170,6 @@ struct sender_state {
 
 #define sender_lock(sender) spinlock_lock(&(sender)->spinlock)
 #define sender_unlock(sender) spinlock_unlock(&(sender)->spinlock)
-
-#define rrdpush_sender_last_buffer_recreate_get(sender) __atomic_load_n(&(sender)->atomic.last_buffer_recreate_s, __ATOMIC_RELAXED)
-#define rrdpush_sender_last_buffer_recreate_set(sender, value) __atomic_store_n(&(sender)->atomic.last_buffer_recreate_s, value, __ATOMIC_RELAXED)
 
 #define rrdpush_sender_replication_buffer_full_set(sender, value) __atomic_store_n(&((sender)->replication.atomic.reached_max), value, __ATOMIC_SEQ_CST)
 #define rrdpush_sender_replication_buffer_full_get(sender) __atomic_load_n(&((sender)->replication.atomic.reached_max), __ATOMIC_SEQ_CST)

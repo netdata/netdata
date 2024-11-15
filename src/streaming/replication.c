@@ -1460,7 +1460,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     // send the replication data
     rq->q->rq = rq;
     replication_response_execute_and_finalize(
-            rq->q, (size_t)((unsigned long long)rq->sender->host->sender->buffer->max_size * MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER / 100ULL), workers);
+            rq->q, (size_t)((unsigned long long)rq->sender->host->sender->sbuf.cb->max_size * MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER / 100ULL), workers);
 
     rq->q = NULL;
 
@@ -1528,8 +1528,8 @@ void replication_cleanup_sender(struct sender_state *sender) {
 }
 
 void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
-    size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
-    size_t percentage = (s->buffer->max_size - available) * 100 / s->buffer->max_size;
+    size_t available = cbuffer_available_size_unsafe(s->host->sender->sbuf.cb);
+    size_t percentage = (s->sbuf.cb->max_size - available) * 100 / s->sbuf.cb->max_size;
 
     if(unlikely(percentage > MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED && !rrdpush_sender_replication_buffer_full_get(s))) {
         rrdpush_sender_replication_buffer_full_set(s, true);

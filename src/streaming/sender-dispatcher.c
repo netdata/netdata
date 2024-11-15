@@ -2,28 +2,21 @@
 
 #include "sender-internals.h"
 
-static void stream_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force) {
+static void stream_sender_cbuffer_recreate_timed_unsafe(struct sender_state *s, time_t now_s, bool force) {
     static __thread time_t last_reset_time_s = 0;
 
     if(!force && now_s - last_reset_time_s < 300)
         return;
 
-    if(!have_mutex)
-        sender_lock(s);
-
-    rrdpush_sender_last_buffer_recreate_set(s, now_s);
     last_reset_time_s = now_s;
 
-    if(s->buffer && s->buffer->size > CBUFFER_INITIAL_SIZE) {
-        size_t max = s->buffer->max_size;
-        cbuffer_free(s->buffer);
-        s->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.cbuffers_streaming);
+    s->sbuf.recreates++; // we increase even if we don't do it, to have sender_start() recreate its buffers
+
+    if(s->sbuf.cb && s->sbuf.cb->size > CBUFFER_INITIAL_SIZE) {
+        size_t max = s->sbuf.cb->max_size;
+        cbuffer_free(s->sbuf.cb);
+        s->sbuf.cb = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.cbuffers_streaming);
     }
-
-    sender_thread_buffer_free();
-
-    if(!have_mutex)
-        sender_unlock(s);
 }
 
 static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
@@ -32,8 +25,8 @@ static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
     sender_lock(host->sender);
 
     // flush the output buffer from any data it may have
-    cbuffer_flush(host->sender->buffer);
-    stream_sender_cbuffer_recreate_timed(host->sender, now_monotonic_sec(), true, true);
+    cbuffer_flush(host->sender->sbuf.cb);
+    stream_sender_cbuffer_recreate_timed_unsafe(host->sender, now_monotonic_sec(), true);
 
     sender_unlock(host->sender);
 }
@@ -73,9 +66,9 @@ void stream_sender_on_connect(struct sender_state *s) {
 
     s->last_traffic_seen_t = now_monotonic_sec();
     s->flags &= ~SENDER_FLAG_OVERFLOW;
-    s->read_len = 0;
-    s->buffer->read = 0;
-    s->buffer->write = 0;
+    s->rbuf.read_len = 0;
+    s->sbuf.cb->read = 0;
+    s->sbuf.cb->write = 0;
     s->send_attempts = 0;
 }
 
@@ -226,9 +219,9 @@ static void stream_sender_update_dispatcher_reset_unsafe(struct sender_state *s)
 
 static void stream_sender_update_dispatcher_sent_data_unsafe(struct sender_state *s, uint64_t bytes_sent) {
     s->sent_bytes_on_this_connection += bytes_sent;
-    s->dispatcher.bytes_outstanding = cbuffer_next_unsafe(s->buffer, NULL);
-    s->dispatcher.bytes_available = cbuffer_available_size_unsafe(s->buffer);
-    s->dispatcher.buffer_ratio = (NETDATA_DOUBLE)(s->buffer->max_size -  s->dispatcher.bytes_available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size;
+    s->dispatcher.bytes_outstanding = cbuffer_next_unsafe(s->sbuf.cb, NULL);
+    s->dispatcher.bytes_available = cbuffer_available_size_unsafe(s->sbuf.cb);
+    s->dispatcher.buffer_ratio = (NETDATA_DOUBLE)(s->sbuf.cb->max_size -  s->dispatcher.bytes_available) * 100.0 / (NETDATA_DOUBLE)s->sbuf.cb->max_size;
     replication_recalculate_buffer_used_ratio_unsafe(s);
 }
 
@@ -236,9 +229,9 @@ void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, u
     // calculate the statistics for our dispatcher
     s->dispatcher.bytes_uncompressed += bytes_uncompressed;
     s->dispatcher.bytes_compressed += bytes_compressed;
-    s->dispatcher.bytes_outstanding = cbuffer_next_unsafe(s->buffer, NULL);
-    s->dispatcher.bytes_available = cbuffer_available_size_unsafe(s->buffer);
-    s->dispatcher.buffer_ratio = (NETDATA_DOUBLE)(s->buffer->max_size -  s->dispatcher.bytes_available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size;
+    s->dispatcher.bytes_outstanding = cbuffer_next_unsafe(s->sbuf.cb, NULL);
+    s->dispatcher.bytes_available = cbuffer_available_size_unsafe(s->sbuf.cb);
+    s->dispatcher.buffer_ratio = (NETDATA_DOUBLE)(s->sbuf.cb->max_size -  s->dispatcher.bytes_available) * 100.0 / (NETDATA_DOUBLE)s->sbuf.cb->max_size;
     replication_recalculate_buffer_used_ratio_unsafe(s);
 }
 
@@ -288,7 +281,7 @@ static void stream_sender_connector_add_unlinked(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM connector [%s]: adding host", rrdhost_hostname(s->host));
 
     nd_sock_close(&s->sock);
-    s->buffer->max_size = stream_send.buffer_max_size;
+    s->sbuf.cb->max_size = stream_send.buffer_max_size;
     s->parent_using_h2o = stream_send.parents.h2o;
 
     // do not have the dispatcher lock when calling this
@@ -632,7 +625,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "STREAM [dispatch%d] %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. "
                        "Restarting connection.",
-                       dp->id, rrdhost_hostname(s->host), s->connected_to, s->buffer->size, s->sent_bytes_on_this_connection);
+                       dp->id, rrdhost_hostname(s->host), s->connected_to, s->sbuf.cb->size, s->sent_bytes_on_this_connection);
                 stream_sender_dispatcher_move_running_to_connector_or_remove(dp, slot, true);
                 continue;
             }
@@ -671,10 +664,10 @@ void *stream_sender_dispacther_thread(void *ptr) {
                 sender_lock(s);
                 {
                     char *chunk;
-                    size_t outstanding = cbuffer_next_unsafe(s->buffer, &chunk);
+                    size_t outstanding = cbuffer_next_unsafe(s->sbuf.cb, &chunk);
                     ssize_t bytes = nd_sock_send_nowait(&s->sock, chunk, outstanding);
                     if (likely(bytes > 0)) {
-                        cbuffer_remove_unsafe(s->buffer, bytes);
+                        cbuffer_remove_unsafe(s->sbuf.cb, bytes);
                         stream_sender_update_dispatcher_sent_data_unsafe(s, bytes);
                         s->last_traffic_seen_t = now_s;
                         bytes_sent += bytes;
@@ -682,6 +675,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
                         if(!s->dispatcher.bytes_outstanding) {
                             s->dispatcher.interactive = false;
                             s->dispatcher.interactive_sent = false;
+                            stream_sender_cbuffer_recreate_timed_unsafe(s, now_s, false);
                         }
                     }
                     else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
@@ -703,9 +697,9 @@ void *stream_sender_dispacther_thread(void *ptr) {
                 // we can receive data from this socket
 
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_SOCKET_RECEIVE);
-                ssize_t bytes = nd_sock_revc_nowait(&s->sock, s->read_buffer + s->read_len, sizeof(s->read_buffer) - s->read_len - 1);
+                ssize_t bytes = nd_sock_revc_nowait(&s->sock, s->rbuf.b + s->rbuf.read_len, sizeof(s->rbuf.b) - s->rbuf.read_len - 1);
                 if (bytes > 0) {
-                    s->read_len += bytes;
+                    s->rbuf.read_len += bytes;
                     s->last_traffic_seen_t = now_s;
                     bytes_received += bytes;
                 }
@@ -727,7 +721,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
                 }
             }
 
-            if(unlikely(s->read_len)) {
+            if(unlikely(s->rbuf.read_len)) {
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_EXECUTE);
                 rrdpush_sender_execute_commands(s);
             }

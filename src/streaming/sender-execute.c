@@ -146,12 +146,12 @@ void rrdpush_sender_execute_commands_cleanup(struct sender_state *s) {
 // This is just a placeholder until the gap filling state machine is inserted
 void rrdpush_sender_execute_commands(struct sender_state *s) {
     ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &s->line),
+        ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &s->rbuf.line),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    char *start = s->read_buffer, *end = &s->read_buffer[s->read_len], *newline;
+    char *start = s->rbuf.b, *end = &s->rbuf.b[s->rbuf.read_len], *newline;
     *end = '\0';
     for( ; start < end ; start = newline + 1) {
         newline = strchr(start, '\n');
@@ -165,7 +165,7 @@ void rrdpush_sender_execute_commands(struct sender_state *s) {
         }
 
         *newline = '\0';
-        s->line.count++;
+        s->rbuf.line.count++;
 
         if(s->defer.end_keyword) {
             if(strcmp(start, s->defer.end_keyword) == 0) {
@@ -180,25 +180,25 @@ void rrdpush_sender_execute_commands(struct sender_state *s) {
             continue;
         }
 
-        s->line.num_words = quoted_strings_splitter_whitespace(start, s->line.words, PLUGINSD_MAX_WORDS);
-        const char *command = get_word(s->line.words, s->line.num_words, 0);
+        s->rbuf.line.num_words = quoted_strings_splitter_whitespace(start, s->rbuf.line.words, PLUGINSD_MAX_WORDS);
+        const char *command = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 0);
 
         if(command && strcmp(command, PLUGINSD_CALL_FUNCTION) == 0) {
-            char *transaction  = get_word(s->line.words, s->line.num_words, 1);
-            char *timeout_s    = get_word(s->line.words, s->line.num_words, 2);
-            char *function     = get_word(s->line.words, s->line.num_words, 3);
-            char *access       = get_word(s->line.words, s->line.num_words, 4);
-            char *source       = get_word(s->line.words, s->line.num_words, 5);
+            char *transaction  = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
+            char *timeout_s    = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 2);
+            char *function     = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 3);
+            char *access       = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 4);
+            char *source       = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 5);
 
             execute_commands_function(s, command, transaction, timeout_s, function, NULL, access, source);
         }
         else if(command && strcmp(command, PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN) == 0) {
-            char *transaction  = get_word(s->line.words, s->line.num_words, 1);
-            char *timeout_s    = get_word(s->line.words, s->line.num_words, 2);
-            char *function     = get_word(s->line.words, s->line.num_words, 3);
-            char *access       = get_word(s->line.words, s->line.num_words, 4);
-            char *source       = get_word(s->line.words, s->line.num_words, 5);
-            char *content_type = get_word(s->line.words, s->line.num_words, 6);
+            char *transaction  = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
+            char *timeout_s    = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 2);
+            char *function     = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 3);
+            char *access       = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 4);
+            char *source       = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 5);
+            char *content_type = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 6);
 
             s->defer.end_keyword = PLUGINSD_CALL_FUNCTION_PAYLOAD_END;
             s->defer.payload = buffer_create(0, NULL);
@@ -219,7 +219,7 @@ void rrdpush_sender_execute_commands(struct sender_state *s) {
             worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST);
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
-            char *transaction = get_word(s->line.words, s->line.num_words, 1);
+            char *transaction = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
             if(transaction && *transaction)
                 rrd_function_cancel(transaction);
         }
@@ -227,7 +227,7 @@ void rrdpush_sender_execute_commands(struct sender_state *s) {
             worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST);
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
-            char *transaction = get_word(s->line.words, s->line.num_words, 1);
+            char *transaction = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
             if(transaction && *transaction)
                 rrd_function_progress(transaction);
         }
@@ -237,10 +237,10 @@ void rrdpush_sender_execute_commands(struct sender_state *s) {
             // do not log replication commands received - way too many!
             // nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
-            const char *chart_id = get_word(s->line.words, s->line.num_words, 1);
-            const char *start_streaming = get_word(s->line.words, s->line.num_words, 2);
-            const char *after = get_word(s->line.words, s->line.num_words, 3);
-            const char *before = get_word(s->line.words, s->line.num_words, 4);
+            const char *chart_id = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
+            const char *start_streaming = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 2);
+            const char *after = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 3);
+            const char *before = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 4);
 
             if (!chart_id || !start_streaming || !after || !before) {
                 netdata_log_error("STREAM %s [send to %s] %s command is incomplete"
@@ -264,7 +264,7 @@ void rrdpush_sender_execute_commands(struct sender_state *s) {
             rrdpush_sender_get_node_and_claim_id_from_parent(s);
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_JSON) == 0) {
-            char *keyword = get_word(s->line.words, s->line.num_words, 1);
+            char *keyword = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
 
             s->defer.end_keyword = PLUGINSD_KEYWORD_JSON_END;
             s->defer.payload = buffer_create(0, NULL);
@@ -274,18 +274,18 @@ void rrdpush_sender_execute_commands(struct sender_state *s) {
         }
         else {
             netdata_log_error("STREAM %s [send to %s] received unknown command over connection: %s",
-                              rrdhost_hostname(s->host), s->connected_to, s->line.words[0]?s->line.words[0]:"(unset)");
+                              rrdhost_hostname(s->host), s->connected_to, s->rbuf.line.words[0]?s->rbuf.line.words[0]:"(unset)");
         }
 
-        line_splitter_reset(&s->line);
+        line_splitter_reset(&s->rbuf.line);
     }
 
     if (start < end) {
-        memmove(s->read_buffer, start, end-start);
-        s->read_len = end - start;
+        memmove(s->rbuf.b, start, end-start);
+        s->rbuf.read_len = end - start;
     }
     else {
-        s->read_buffer[0] = '\0';
-        s->read_len = 0;
+        s->rbuf.b[0] = '\0';
+        s->rbuf.read_len = 0;
     }
 }
