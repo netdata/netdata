@@ -4331,6 +4331,56 @@ void *global_statistics_extended_main(void *ptr)
 
         worker_is_busy(WORKER_JOB_WORKERS);
         worker_utilization_charts();
+    }
+
+    return NULL;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// global statistics extended thread
+
+static void global_statistics_sqlite3_cleanup(void *pptr)
+{
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if (!static_thread)
+        return;
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    netdata_log_info("cleaning up...");
+
+    worker_unregister();
+    worker_utilization_finish();
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
+void *global_statistics_sqlite3_main(void *ptr)
+{
+    CLEANUP_FUNCTION_REGISTER(global_statistics_sqlite3_cleanup) cleanup_ptr = ptr;
+
+    global_statistics_register_workers();
+
+    int update_every =
+        (int)config_get_duration_seconds(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+    if (update_every < localhost->rrd_update_every) {
+        update_every = localhost->rrd_update_every;
+        config_set_duration_seconds(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", update_every);
+    }
+
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb, USEC_PER_SEC);
+    usec_t real_step = USEC_PER_SEC;
+
+    while (service_running(SERVICE_COLLECTORS)) {
+        worker_is_idle();
+        heartbeat_next(&hb);
+        if (real_step < step) {
+            real_step += USEC_PER_SEC;
+            continue;
+        }
+        real_step = USEC_PER_SEC;
 
         worker_is_busy(WORKER_JOB_SQLITE3);
         sqlite3_statistics_charts();
