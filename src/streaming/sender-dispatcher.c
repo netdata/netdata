@@ -564,12 +564,12 @@ void stream_sender_dispatcher_prepare(struct dispatcher *dp) {
     size_t bytes_compressed = 0;
     NETDATA_DOUBLE buffer_ratio = 0.0;
     size_t nodes = 0;
-    size_t slots_empty = 0;
+//    size_t slots_empty = 0;
 
     for(size_t slot = 1; slot < dp->run.used ; slot++) {
         struct sender_state *s = dp->run.senders[slot];
         if(!s) {
-            slots_empty++;
+//            slots_empty++;
             continue;
         }
 
@@ -612,15 +612,26 @@ void stream_sender_dispatcher_prepare(struct dispatcher *dp) {
         }
 
         sender_lock(s);
-        bytes_compressed += s->dispatcher.bytes_compressed;
-        bytes_uncompressed += s->dispatcher.bytes_uncompressed;
-        uint64_t outstanding = s->dispatcher.bytes_outstanding;
-        if (s->dispatcher.buffer_ratio > buffer_ratio) buffer_ratio = s->dispatcher.buffer_ratio;
-        sender_unlock(s);
+        {
+            bytes_compressed += s->dispatcher.bytes_compressed;
+            bytes_uncompressed += s->dispatcher.bytes_uncompressed;
+            uint64_t outstanding = s->dispatcher.bytes_outstanding;
+            if (s->dispatcher.buffer_ratio > buffer_ratio)
+                buffer_ratio = s->dispatcher.buffer_ratio;
 
-        if(outstanding)
-            dp->run.pollfds[slot].events |= POLLOUT;
+            if (outstanding)
+                dp->run.pollfds[slot].events |= POLLOUT;
+
+//            if (unlikely(slots_empty)) {
+//                size_t target_slot = slot - slots_empty;
+//                SWAP(dp->run.pollfds[slot], dp->run.pollfds[target_slot]);
+//                SWAP(dp->run.senders[slot], dp->run.senders[target_slot]);
+//                s->dispatcher.pollfd_slot = target_slot;
+//            }
+        }
+        sender_unlock(s);
     }
+//    dp->run.used -= slots_empty;
 
     if(do_all) {
         if (bytes_compressed && bytes_uncompressed) {
