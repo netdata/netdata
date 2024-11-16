@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/vmware/govmomi from 0.46.0 to 0.46.1 in /src/go [\#19030](https://github.com/netdata/netdata/pull/19030) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Regenerate integrations.js [\#19029](https://github.com/netdata/netdata/pull/19029) ([netdatabot](https://github.com/netdatabot))
+- improvement\(windows/iis\): add requests by type chart [\#19028](https://github.com/netdata/netdata/pull/19028) ([ilyam8](https://github.com/ilyam8))
+- fix\(windows/iis\): dont sanitize site name for labels [\#19027](https://github.com/netdata/netdata/pull/19027) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d.plugin\): set nooplogger for automaxprocs [\#19026](https://github.com/netdata/netdata/pull/19026) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#19025](https://github.com/netdata/netdata/pull/19025) ([netdatabot](https://github.com/netdatabot))
 - docs\(go.d/windows\): remove references to old MSI [\#19024](https://github.com/netdata/netdata/pull/19024) ([ilyam8](https://github.com/ilyam8))
@@ -431,11 +435,6 @@
 - Update LIbbpf [\#18480](https://github.com/netdata/netdata/pull/18480) ([thiagoftsm](https://github.com/thiagoftsm))
 - added missing comma in Access-Control-Allow-Headers [\#18479](https://github.com/netdata/netdata/pull/18479) ([ktsaou](https://github.com/ktsaou))
 - add Access-Control-Allow-Headers: x-transaction-id [\#18478](https://github.com/netdata/netdata/pull/18478) ([ktsaou](https://github.com/ktsaou))
-- add Access-Control-Allow-Headers: x-netdata-auth [\#18477](https://github.com/netdata/netdata/pull/18477) ([ktsaou](https://github.com/ktsaou))
-- prevent sigsegv in config-parsers [\#18476](https://github.com/netdata/netdata/pull/18476) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#18475](https://github.com/netdata/netdata/pull/18475) ([netdatabot](https://github.com/netdatabot))
-- added version to systemd-journal info response [\#18474](https://github.com/netdata/netdata/pull/18474) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#18473](https://github.com/netdata/netdata/pull/18473) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
