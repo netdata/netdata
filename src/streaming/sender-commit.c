@@ -2,6 +2,8 @@
 
 #include "sender-internals.h"
 
+#define SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
+
 static __thread BUFFER *sender_thread_buffer = NULL;
 static __thread bool sender_thread_buffer_used = false;
 static __thread size_t sender_thread_buffer_our_recreates = 0;    // the sender sequence, when we created this buffer
@@ -37,15 +39,14 @@ BUFFER *sender_start(struct sender_state *s __maybe_unused) {
     return sender_thread_buffer;
 }
 
-#define SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
-
 // Collector thread finishing a transmission
 void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type) {
+    struct pipe_msg msg;
 
-    if(unlikely(wb != sender_thread_buffer))
+    if (unlikely(wb != sender_thread_buffer))
         fatal("STREAMING: sender is trying to commit a buffer that is not this thread's buffer.");
 
-    if(unlikely(!sender_thread_buffer_used))
+    if (unlikely(!sender_thread_buffer_used))
         fatal("STREAMING: sender is committing a buffer twice.");
 
     sender_thread_buffer_used = false;
@@ -53,7 +54,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     char *src = (char *)buffer_tostring(wb);
     size_t src_len = buffer_strlen(wb);
 
-    if(unlikely(!src || !src_len))
+    if (unlikely(!src || !src_len))
         return;
 
     size_t total_uncompressed_len = src_len;
@@ -61,48 +62,61 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
     sender_lock(s);
 
-    if(s->dispatcher.pollfd.slot == 0 || s->dispatcher.pollfd.magic == 0) {
+    // copy the sequence number of sender buffer recreates, while having our lock
+    sender_thread_buffer_sender_recreates = s->sbuf.recreates;
+
+    if (s->dispatcher.msg.slot == 0 || s->dispatcher.msg.magic == 0) {
         // the dispatcher is not there anymore - ignore these data
         sender_unlock(s);
         sender_thread_buffer_free(); // free the thread data
         return;
     }
 
-    if(unlikely(s->sbuf.cb->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
+    if (unlikely(s->sbuf.cb->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
         // adaptive sizing of the circular buffer is needed to get this.
 
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "STREAM %s [send to %s]: max buffer size of %zu is too small "
-               "for a data message of size %zu. Increasing the max buffer size "
-               "to %d times the max data message size.",
-               rrdhost_hostname(s->host), s->connected_to, s->sbuf.cb->max_size,
-               buffer_strlen(wb) + 1, SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE);
+        nd_log(
+            NDLS_DAEMON,
+            NDLP_NOTICE,
+            "STREAM %s [send to %s]: max buffer size of %zu is too small "
+            "for a data message of size %zu. Increasing the max buffer size "
+            "to %d times the max data message size.",
+            rrdhost_hostname(s->host),
+            s->connected_to,
+            s->sbuf.cb->max_size,
+            buffer_strlen(wb) + 1,
+            SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE);
 
         s->sbuf.cb->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
     }
 
 #ifdef NETDATA_LOG_STREAM_SENDER
-    if(type == STREAM_TRAFFIC_TYPE_METADATA) {
-        if(!s->stream_log_fp) {
+    if (type == STREAM_TRAFFIC_TYPE_METADATA) {
+        if (!s->stream_log_fp) {
             char filename[FILENAME_MAX + 1];
-            snprintfz(filename, FILENAME_MAX, "/tmp/stream-sender-%s.txt", s->host ? rrdhost_hostname(s->host) : "unknown");
+            snprintfz(
+                filename, FILENAME_MAX, "/tmp/stream-sender-%s.txt", s->host ? rrdhost_hostname(s->host) : "unknown");
 
             s->stream_log_fp = fopen(filename, "w");
         }
 
-        fprintf(s->stream_log_fp, "\n--- SEND MESSAGE START: %s ----\n"
-                                  "%s"
-                                  "--- SEND MESSAGE END ----------------------------------------\n"
-                , rrdhost_hostname(s->host), src
-        );
+        fprintf(
+            s->stream_log_fp,
+            "\n--- SEND MESSAGE START: %s ----\n"
+            "%s"
+            "--- SEND MESSAGE END ----------------------------------------\n",
+            rrdhost_hostname(s->host),
+            src);
     }
 #endif
 
     if (s->compressor.initialized) {
-        while(src_len) {
+        // compressed traffic
+
+        while (src_len) {
             size_t size_to_compress = src_len;
 
-            if(unlikely(size_to_compress > COMPRESSION_MAX_MSG_SIZE)) {
+            if (unlikely(size_to_compress > COMPRESSION_MAX_MSG_SIZE)) {
                 if (stream_has_capability(s, STREAM_CAP_BINARY))
                     size_to_compress = COMPRESSION_MAX_MSG_SIZE;
                 else {
@@ -115,9 +129,9 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                             if (unlikely(*t == '\n'))
                                 break;
 
-                        if (t <= src) {
+                        if (t <= src)
                             size_to_compress = COMPRESSION_MAX_MSG_SIZE;
-                        } else
+                        else
                             size_to_compress = t - src + 1;
                     }
                 }
@@ -126,19 +140,19 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
             const char *dst;
             size_t dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
             if (!dst_len) {
-                netdata_log_error("STREAM %s [send to %s]: COMPRESSION failed. Resetting compressor and re-trying",
-                                  rrdhost_hostname(s->host), s->connected_to);
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                    "STREAM %s [send to %s]: COMPRESSION failed. Resetting compressor and re-trying",
+                    rrdhost_hostname(s->host), s->connected_to);
 
                 rrdpush_compression_initialize(s);
                 dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
-                if(!dst_len) {
-                    netdata_log_error("STREAM %s [send to %s]: COMPRESSION failed again. Deactivating compression",
-                                      rrdhost_hostname(s->host), s->connected_to);
+                if (!dst_len) {
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                        "STREAM %s [send to %s]: COMPRESSION failed again. Deactivating compression",
+                        rrdhost_hostname(s->host), s->connected_to);
 
                     rrdpush_compression_deactivate(s);
-                    stream_sender_reconnect(s);
-                    sender_unlock(s);
-                    return;
+                    goto compression_failed_with_lock;
                 }
             }
 
@@ -147,65 +161,67 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 #ifdef NETDATA_INTERNAL_CHECKS
             // check if reversing the signature provides the same length
             size_t decoded_dst_len = rrdpush_decompress_decode_signature((const char *)&signature, sizeof(signature));
-            if(decoded_dst_len != dst_len)
-                fatal("RRDPUSH COMPRESSION: invalid signature, original payload %zu bytes, "
-                      "compressed payload length %zu bytes, but signature says payload is %zu bytes",
-                      size_to_compress, dst_len, decoded_dst_len);
+            if (decoded_dst_len != dst_len)
+                fatal(
+                    "RRDPUSH COMPRESSION: invalid signature, original payload %zu bytes, "
+                    "compressed payload length %zu bytes, but signature says payload is %zu bytes",
+                    size_to_compress,
+                    dst_len,
+                    decoded_dst_len);
 #endif
 
-            if(cbuffer_add_unsafe(s->sbuf.cb, (const char *)&signature, sizeof(signature))) {
-                s->flags |= SENDER_FLAG_OVERFLOW;
-                stream_sender_reconnect(s);
-                sender_unlock(s);
-                return;
-            }
-            else if(cbuffer_add_unsafe(s->sbuf.cb, dst, dst_len)) {
-                s->flags |= SENDER_FLAG_OVERFLOW;
-                stream_sender_reconnect(s);
-                sender_unlock(s);
-                return;
-            }
-            s->sent_bytes_on_this_connection_per_type[type] += dst_len + sizeof(signature);
+            if (cbuffer_add_unsafe(s->sbuf.cb, (const char *)&signature, sizeof(signature)) ||
+                cbuffer_add_unsafe(s->sbuf.cb, dst, dst_len))
+                goto overflow_with_lock;
+
             total_compressed_len += dst_len + sizeof(signature);
 
             src = src + size_to_compress;
             src_len -= size_to_compress;
         }
     }
-    else if(cbuffer_add_unsafe(s->sbuf.cb, src, src_len)) {
-        s->flags |= SENDER_FLAG_OVERFLOW;
-        stream_sender_reconnect(s);
-        sender_unlock(s);
-        return;
-    }
     else {
-        s->sent_bytes_on_this_connection_per_type[type] += src_len;
+        // uncompressed traffic
+
+        if (cbuffer_add_unsafe(s->sbuf.cb, src, src_len))
+            goto overflow_with_lock;
+
         total_compressed_len = total_uncompressed_len;
     }
 
-    stream_sender_update_dispatcher_added_data_unsafe(s, total_compressed_len, total_uncompressed_len);
-
-    // copy the sequence number of sender buffer recreates, while having our lock
-    sender_thread_buffer_sender_recreates = s->sbuf.recreates;
+    // update s->dispatcher entries
+    stream_sender_update_dispatcher_added_data_unsafe(s, type, total_compressed_len, total_uncompressed_len);
 
     // decide if this has interactive data
     bool interactive = !s->dispatcher.interactive_sent &&
-                       (
-                           s->dispatcher.bytes_outstanding >= s->dispatcher.bytes_available ||
-                           !stream_has_capability(s, STREAM_CAP_INTERPOLATED) ||
-                           (type != STREAM_TRAFFIC_TYPE_DATA &&
-                            type != STREAM_TRAFFIC_TYPE_REPLICATION &&
-                            type != STREAM_TRAFFIC_TYPE_METADATA)
-                       );
+                       (s->dispatcher.bytes_outstanding >= s->dispatcher.bytes_available ||
+                        !stream_has_capability(s, STREAM_CAP_INTERPOLATED) || type == STREAM_TRAFFIC_TYPE_FUNCTIONS);
 
-    if(interactive)
+    if (interactive) {
+        msg = s->dispatcher.msg;
         s->dispatcher.interactive_sent = true;
+    }
 
-    struct pipe_msg msg = s->dispatcher.pollfd;
     sender_unlock(s);
 
-    if(interactive) {
+    if (interactive) {
         msg.msg = SENDER_MSG_INTERACTIVE;
         stream_sender_send_msg_to_dispatcher(s, msg);
     }
+
+    return;
+
+overflow_with_lock:
+    msg = s->dispatcher.msg;
+    sender_unlock(s);
+    msg.msg = SENDER_MSG_RECONNECT_OVERFLOW;
+    stream_sender_send_msg_to_dispatcher(s, msg);
+    return;
+
+compression_failed_with_lock:
+    msg = s->dispatcher.msg;
+    sender_unlock(s);
+    msg.msg = SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION;
+    stream_sender_send_msg_to_dispatcher(s, msg);
+    return;
 }

@@ -201,9 +201,9 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
         s->stream.ssl = nd_sock_is_ssl(&host->sender->sock);
 
         memcpy(s->stream.sent_bytes_on_this_connection_per_type,
-               host->sender->sent_bytes_on_this_connection_per_type,
+               host->sender->dispatcher.bytes_sent_by_type,
                MIN(sizeof(s->stream.sent_bytes_on_this_connection_per_type),
-                   sizeof(host->sender->sent_bytes_on_this_connection_per_type)));
+                   sizeof(host->sender->dispatcher.bytes_sent_by_type)));
 
         if (rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
             s->stream.hops = host->sender->hops;

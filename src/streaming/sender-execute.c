@@ -139,12 +139,12 @@ static void cleanup_deferred_data(struct sender_state *s) {
     s->defer.action_data = NULL;
 }
 
-void rrdpush_sender_execute_commands_cleanup(struct sender_state *s) {
+void stream_sender_execute_commands_cleanup(struct sender_state *s) {
     cleanup_deferred_data(s);
 }
 
 // This is just a placeholder until the gap filling state machine is inserted
-void rrdpush_sender_execute_commands(struct sender_state *s) {
+void stream_sender_execute_commands(struct sender_state *s) {
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &s->rbuf.line),
         ND_LOG_FIELD_END(),

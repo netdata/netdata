@@ -69,11 +69,9 @@ void stream_sender_on_connect(struct sender_state *s) {
     rrdpush_sender_cbuffer_flush(s->host);
 
     s->last_traffic_seen_t = now_monotonic_sec();
-    s->flags &= ~SENDER_FLAG_OVERFLOW;
     s->rbuf.read_len = 0;
     s->sbuf.cb->read = 0;
     s->sbuf.cb->write = 0;
-    s->send_attempts = 0;
 }
 
 static void stream_sender_on_ready_to_dispatch(struct sender_state *s) {
@@ -84,7 +82,7 @@ static void stream_sender_on_ready_to_dispatch(struct sender_state *s) {
     // set this flag before sending any data, or the data will not be sent
     rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
 
-    rrdpush_sender_execute_commands_cleanup(s);
+    stream_sender_execute_commands_cleanup(s);
     rrdpush_sender_thread_send_custom_host_variables(s->host);
     stream_path_send_to_parent(s->host);
     rrdpush_sender_send_claimed_id(s->host);
@@ -97,7 +95,7 @@ static void stream_sender_on_disconnect(struct sender_state *s) {
            "STREAM [dispatchX] [%s]: running on-disconnect hooks...",
            rrdhost_hostname(s->host));
 
-    rrdpush_sender_execute_commands_cleanup(s);
+    stream_sender_execute_commands_cleanup(s);
     rrdpush_sender_charts_and_replication_reset(s);
     rrdpush_sender_clear_parent_claim_id(s->host);
     rrdpush_receiver_send_node_and_claim_id_to_child(s->host);
@@ -236,25 +234,40 @@ static struct dispatcher *stream_sender_dispatcher(struct sender_state *s) {
 }
 
 static void stream_sender_update_dispatcher_reset_unsafe(struct sender_state *s) {
-    s->sent_bytes_on_this_connection = 0;
+    memset(s->dispatcher.bytes_sent_by_type, 0, sizeof(s->dispatcher.bytes_sent_by_type));
+
     s->dispatcher.bytes_uncompressed = 0;
     s->dispatcher.bytes_compressed = 0;
     s->dispatcher.bytes_outstanding = 0;
     s->dispatcher.bytes_available = 0;
     s->dispatcher.buffer_ratio = 0.0;
+    s->dispatcher.sends_interactive = 0;
+    s->dispatcher.sends_non_interactive = 0;
+    s->dispatcher.bytes_interactive = 0;
+    s->dispatcher.bytes_non_interactive = 0;
     replication_recalculate_buffer_used_ratio_unsafe(s);
 }
 
 static void stream_sender_update_dispatcher_sent_data_unsafe(struct sender_state *s, uint64_t bytes_sent) {
-    s->sent_bytes_on_this_connection += bytes_sent;
+    if(unlikely(s->dispatcher.interactive)) {
+        s->dispatcher.sends_interactive++;
+        s->dispatcher.bytes_interactive += bytes_sent;
+    }
+    else {
+        s->dispatcher.sends_non_interactive++;
+        s->dispatcher.bytes_non_interactive += bytes_sent;
+    }
+
     s->dispatcher.bytes_outstanding = cbuffer_next_unsafe(s->sbuf.cb, NULL);
     s->dispatcher.bytes_available = cbuffer_available_size_unsafe(s->sbuf.cb);
     s->dispatcher.buffer_ratio = (NETDATA_DOUBLE)(s->sbuf.cb->max_size -  s->dispatcher.bytes_available) * 100.0 / (NETDATA_DOUBLE)s->sbuf.cb->max_size;
     replication_recalculate_buffer_used_ratio_unsafe(s);
 }
 
-void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, uint64_t bytes_compressed, uint64_t bytes_uncompressed) {
+void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, STREAM_TRAFFIC_TYPE type, uint64_t bytes_compressed, uint64_t bytes_uncompressed) {
     // calculate the statistics for our dispatcher
+    s->dispatcher.bytes_sent_by_type[type] += bytes_compressed;
+
     s->dispatcher.bytes_uncompressed += bytes_uncompressed;
     s->dispatcher.bytes_compressed += bytes_compressed;
     s->dispatcher.bytes_outstanding = cbuffer_next_unsafe(s->sbuf.cb, NULL);
@@ -263,14 +276,66 @@ void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, u
     replication_recalculate_buffer_used_ratio_unsafe(s);
 }
 
-void stream_sender_reconnect(struct sender_state *s) {
-    struct pipe_msg msg = s->dispatcher.pollfd;
-    msg.msg = SENDER_MSG_RECONNECT;
-    stream_sender_send_msg_to_dispatcher(s, msg);
-}
-
 // --------------------------------------------------------------------------------------------------------------------
 // pipe messages
+
+static void stream_sender_dispatcher_handle_msg(struct dispatcher *dp, struct pipe_msg *msg) {
+    if (msg->slot > 0 &&
+        msg->slot < dp->run.used &&
+        msg->id == dp->id &&
+        dp->run.senders[msg->slot] &&
+        dp->run.senders[msg->slot]->dispatcher.msg.magic == msg->magic) {
+
+        struct sender_state *s = dp->run.senders[msg->slot];
+
+        switch (msg->msg) {
+            case SENDER_MSG_INTERACTIVE:
+                s->dispatcher.interactive = true;
+                break;
+
+            case SENDER_MSG_RECONNECT_OVERFLOW:
+                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_OVERFLOW);
+                errno_clear();
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "STREAM [dispatch%d] %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. "
+                       "Restarting connection.",
+                       dp->id, rrdhost_hostname(s->host), s->connected_to, s->sbuf.cb->size,
+                       s->dispatcher.bytes_interactive + s->dispatcher.bytes_non_interactive);
+
+                stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER, true);
+                break;
+
+            case SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION:
+                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_COMPRESSION_ERROR);
+                errno_clear();
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "STREAM [dispatch%d] %s [send to %s]: restarting connection without compression.",
+                       dp->id, rrdhost_hostname(s->host), s->connected_to);
+
+                stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER, true);
+                break;
+
+            case SENDER_MSG_STOP_RECEIVER_LEFT:
+                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVER_LEFT);
+                stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
+                break;
+
+            case SENDER_MSG_STOP_HOST_CLEANUP:
+                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_HOST_CLEANUP);
+                stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, false);
+                break;
+
+            default:
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "STREAM [dispatch%d]: invalid msg id %u", dp->id, (unsigned)msg->msg);
+                break;
+        }
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM [dispatch%d]: invalid slot %" PRIu32 " read from pipe", dp->id, msg->slot);
+    }
+}
 
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_msg msg) {
     if (!msg.slot || !msg.magic) return;
@@ -278,7 +343,10 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_ms
     struct dispatcher *dp = stream_sender_dispatcher(s);
 
     // don't send a message to ourselves
-    if (dp->tid == gettid_cached()) return;
+    if (dp->tid == gettid_cached()) {
+        stream_sender_dispatcher_handle_msg(dp, &msg);
+        return;
+    }
 
     // ensure one writer at a time
     spinlock_lock(&dp->pipe.spinlock);
@@ -351,41 +419,9 @@ static void stream_sender_dispatcher_read_pipe_messages(struct dispatcher *dp) {
     dp->ops.messages += full_messages;
 
     for (size_t i = 0; i < full_messages; i++) {
+        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_PIPE_READ);
         struct pipe_msg *msg = &dp->pipe.messages[i];
-
-        if (msg->slot > 0 &&
-            msg->slot < dp->run.used &&
-            msg->id == dp->id &&
-            dp->run.senders[msg->slot] &&
-            dp->run.senders[msg->slot]->dispatcher.pollfd.magic == msg->magic) {
-
-            // Process the message
-            switch (msg->msg) {
-                case SENDER_MSG_INTERACTIVE:
-                    dp->run.senders[msg->slot]->dispatcher.interactive = true;
-                    break;
-
-                case SENDER_MSG_RECONNECT:
-                    stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, 0, true);
-                    break;
-
-                case SENDER_MSG_STOP:
-                    stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, 0, false);
-                    break;
-
-                case SENDER_MSG_NONE:
-                    break;
-
-                default:
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "STREAM [dispatch%d]: invalid msg id %u", dp->id, (unsigned)msg->msg);
-                    break;
-            }
-        }
-        else {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM [dispatch%d]: invalid slot %" PRIu32 " read from pipe", dp->id, msg->slot);
-        }
+        stream_sender_dispatcher_handle_msg(dp, msg);
     }
 
     if (dp->pipe.residual_bytes > 0) {
@@ -465,14 +501,11 @@ static void stream_sender_dispatcher_move_queue_to_running(struct dispatcher *dp
         };
 
         sender_lock(s);
-        s->dispatcher.pollfd.id = dp->id;
-        s->dispatcher.pollfd.slot = slot;
-        s->dispatcher.pollfd.magic = os_random32();
+        s->dispatcher.msg.id = dp->id;
+        s->dispatcher.msg.slot = slot;
+        s->dispatcher.msg.magic = os_random32();
         s->host->stream.snd.status.connections++;
         s->last_state_since_t = now_realtime_sec();
-
-        // reset the bytes we have sent for this session
-        memset(s->sent_bytes_on_this_connection_per_type, 0, sizeof(s->sent_bytes_on_this_connection_per_type));
 
         stream_sender_update_dispatcher_reset_unsafe(s);
         sender_unlock(s);
@@ -507,8 +540,8 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct 
 
     // clear these asap, to make sender_commit() stop processing data for this host
     sender_lock(s);
-    s->dispatcher.pollfd.slot = 0;
-    s->dispatcher.pollfd.magic = 0;
+    s->dispatcher.msg.slot = 0;
+    s->dispatcher.msg.magic = 0;
     sender_unlock(s);
 
     nd_sock_close(&s->sock);
@@ -605,7 +638,8 @@ void stream_sender_dispatcher_prepare(struct dispatcher *dp) {
                    "STREAM [dispatch%d] %s [send to %s]: could not send metrics for %ld seconds - closing connection - "
                    "we have sent %zu bytes on this connection via %zu send attempts.",
                    dp->id, rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
-                   s->sent_bytes_on_this_connection, s->send_attempts);
+                   s->dispatcher.bytes_interactive + s->dispatcher.bytes_non_interactive,
+                   s->dispatcher.sends_non_interactive + s->dispatcher.sends_interactive);
 
             stream_sender_dispatcher_move_running_to_connector_or_remove(dp, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT, true);
             continue;
@@ -666,6 +700,9 @@ void *stream_sender_dispacther_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED, "disconnect parent closed");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
+    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_COMPRESSION_ERROR, "disconnect compression error");
+    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_COMPRESSION_ERROR, "disconnect receiver left");
+    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_HOST_CLEANUP, "disconnect host cleanup");
 
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_REPLAY_REQUEST, "replay request");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST, "function");
@@ -758,17 +795,6 @@ void *stream_sender_dispacther_thread(void *ptr) {
             };
             ND_LOG_STACK_PUSH(lgs);
 
-            if(unlikely(s->flags & SENDER_FLAG_OVERFLOW)) {
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_OVERFLOW);
-                errno_clear();
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM [dispatch%d] %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. "
-                       "Restarting connection.",
-                       dp->id, rrdhost_hostname(s->host), s->connected_to, s->sbuf.cb->size, s->sent_bytes_on_this_connection);
-                stream_sender_dispatcher_move_running_to_connector_or_remove(dp, slot, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER, true);
-                continue;
-            }
-
             short revents = dp->run.pollfds[slot].revents;
 
             if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
@@ -787,7 +813,8 @@ void *stream_sender_dispacther_thread(void *ptr) {
 
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "STREAM [dispatch%d] %s [send to %s]: %s restarting connection - %zu bytes transmitted.",
-                       dp->id, rrdhost_hostname(s->host), s->connected_to, error, s->sent_bytes_on_this_connection);
+                       dp->id, rrdhost_hostname(s->host), s->connected_to, error,
+                       s->dispatcher.bytes_interactive + s->dispatcher.bytes_non_interactive);
 
                 stream_sender_dispatcher_move_running_to_connector_or_remove(dp, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR, true);
                 continue;
@@ -797,9 +824,8 @@ void *stream_sender_dispacther_thread(void *ptr) {
                 // we can send data on this socket
 
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_SOCKET_SEND);
-                s->send_attempts++;
-                bool disconnect = false;
 
+                bool disconnect = false;
                 sender_lock(s);
                 {
                     char *chunk;
@@ -812,9 +838,13 @@ void *stream_sender_dispacther_thread(void *ptr) {
                         bytes_sent += bytes;
 
                         if(!s->dispatcher.bytes_outstanding) {
-                            // we sent them all, remove the interactive flag
-                            s->dispatcher.interactive = false;
-                            s->dispatcher.interactive_sent = false;
+                            // we sent them all
+
+                            if(s->dispatcher.interactive)
+                                s->dispatcher.interactive = false;
+
+                            if(s->dispatcher.interactive_sent)
+                                s->dispatcher.interactive_sent = false;
 
                             // recreate the circular buffer if we have to
                             stream_sender_cbuffer_recreate_timed_unsafe(s, now_s, false);
@@ -833,8 +863,10 @@ void *stream_sender_dispacther_thread(void *ptr) {
                 if(disconnect) {
                     worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR);
                     nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "STREAM [dispatch%d] %s [send to %s]: failed to send metrics - restarting connection - we have sent %zu bytes on this connection.",
-                           dp->id, rrdhost_hostname(s->host), s->connected_to, s->sent_bytes_on_this_connection);
+                           "STREAM [dispatch%d] %s [send to %s]: failed to send metrics - restarting connection - "
+                           "we have sent %zu bytes on this connection.",
+                           dp->id, rrdhost_hostname(s->host), s->connected_to,
+                           s->dispatcher.bytes_interactive + s->dispatcher.bytes_non_interactive);
                     stream_sender_dispatcher_move_running_to_connector_or_remove(dp, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED, true);
                     continue;
                 }
@@ -870,7 +902,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
 
             if(unlikely(s->rbuf.read_len)) {
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_EXECUTE);
-                rrdpush_sender_execute_commands(s);
+                stream_sender_execute_commands(s);
             }
 
             replay_entries += dictionary_entries(s->replication.requests);

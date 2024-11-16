@@ -295,7 +295,6 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
                 buffer_json_member_add_uint64(wb, "metadata", s->stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_METADATA]);
                 buffer_json_member_add_uint64(wb, "functions", s->stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
                 buffer_json_member_add_uint64(wb, "replication", s->stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION]);
-                buffer_json_member_add_uint64(wb, "dyncfg", s->stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_DYNCFG]);
             }
             buffer_json_object_close(wb); // traffic
 

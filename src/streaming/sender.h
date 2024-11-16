@@ -10,7 +10,6 @@ typedef enum __attribute__((packed)) {
     STREAM_TRAFFIC_TYPE_FUNCTIONS,
     STREAM_TRAFFIC_TYPE_METADATA,
     STREAM_TRAFFIC_TYPE_DATA,
-    STREAM_TRAFFIC_TYPE_DYNCFG,
 
     // terminator
     STREAM_TRAFFIC_TYPE_MAX,

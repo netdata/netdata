@@ -33,23 +33,26 @@
 #define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED           10
 #define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR           11
 #define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR              12
+#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_COMPRESSION_ERROR       13
+#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVER_LEFT           14
+#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_HOST_CLEANUP            15
 
 // dispatcher execute requests
-#define WORKER_SENDER_DISPATCHER_JOB_REPLAY_REQUEST                     13
-#define WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST                   14
+#define WORKER_SENDER_DISPATCHER_JOB_REPLAY_REQUEST                     15
+#define WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST                   16
 
 // dispatcher metrics
-#define WORKER_SENDER_DISPATCHER_JOB_NODES                              15
-#define WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO                       16
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED                     17
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT                         18
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED                   19
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED                 20
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO            21
-#define WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE                   22
-#define WORKER_SENDER_DISPATHCER_JOB_MESSAGES                           23
+#define WORKER_SENDER_DISPATCHER_JOB_NODES                              17
+#define WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO                       18
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED                     19
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT                         20
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED                   21
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED                 22
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO            23
+#define WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE                   24
+#define WORKER_SENDER_DISPATHCER_JOB_MESSAGES                           25
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 24
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 26
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 25
 #endif
 
@@ -57,10 +60,6 @@
 
 #define CBUFFER_INITIAL_SIZE (16 * 1024)
 #define THREAD_BUFFER_INITIAL_SIZE (CBUFFER_INITIAL_SIZE / 2)
-
-typedef enum __attribute__((packed)) {
-    SENDER_FLAG_OVERFLOW     = (1 << 0), // The buffer has been overflown
-} SENDER_FLAGS;
 
 #include "stream-compression/compression.h"
 #include "stream-conf.h"
@@ -70,9 +69,11 @@ typedef void (*rrdpush_defer_cleanup_t)(struct sender_state *s, void *data);
 
 typedef enum __attribute__((packed)) {
     SENDER_MSG_NONE = 0,
-    SENDER_MSG_INTERACTIVE,
-    SENDER_MSG_RECONNECT,
-    SENDER_MSG_STOP,
+    SENDER_MSG_INTERACTIVE,                         // move traffic around as soon as possible
+    SENDER_MSG_RECONNECT_OVERFLOW,                  // reconnect the node, it has buffer overflow
+    SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION,       // reconnect the node, but disable compression
+    SENDER_MSG_STOP_RECEIVER_LEFT,                  // disconnect the node, the receiver left
+    SENDER_MSG_STOP_HOST_CLEANUP,                   // disconnect the node, it is being de-allocated
 } SENDER_MSG;
 
 struct pipe_msg {
@@ -86,7 +87,6 @@ struct sender_state {
     SPINLOCK spinlock;
 
     RRDHOST *host;
-    SENDER_FLAGS flags;
     STREAM_CAPABILITIES capabilities;
     STREAM_CAPABILITIES disabled_capabilities;
     int16_t hops;
@@ -94,21 +94,32 @@ struct sender_state {
     ND_SOCK sock;
 
     struct {
-        int id;
+        int id;                                 // this is the routing id for the dispatcher - it is set once
         bool interactive;                       // used internally by the dispatcher to optimize sending in batches
-        bool interactive_sent;
+        bool interactive_sent;                  // used by the collector threads to know if they have already asked for it
+
+        struct pipe_msg msg;                    // copy this while having the lock and then send the message without having the lock
+        uint32_t pollfd_slot;
+
+        // statistics about our compression efficiency
         size_t bytes_compressed;
         size_t bytes_uncompressed;
+
+        // the current buffer statistics
+        // these SHOULD ALWAYS BE CALCULATED ON EVERY sender_unlock() IF THE BUFFER WAS MODIFIED
         size_t bytes_outstanding;
         size_t bytes_available;
         NETDATA_DOUBLE buffer_ratio;
-        struct pipe_msg pollfd;
-        uint32_t pollfd_slot;
+
+        // statistics about successful sends
+        size_t sends_interactive;
+        size_t sends_non_interactive;
+        size_t bytes_interactive;
+        size_t bytes_non_interactive;
+        size_t bytes_sent_by_type[STREAM_TRAFFIC_TYPE_MAX];
     } dispatcher;
 
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
-    size_t send_attempts;
-    size_t sent_bytes_on_this_connection;
     time_t last_traffic_seen_t;
     time_t last_state_since_t;              // the timestamp of the last state (online/offline) change
 
@@ -122,10 +133,6 @@ struct sender_state {
         ssize_t read_len;
         struct line_splitter line;
     } rbuf;
-
-    // Metrics are collected asynchronously by collector threads calling rrdset_done_push(). This can also trigger
-    // the lazy creation of the sender thread - both cases (buffer access and thread creation) are guarded here.
-    size_t sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX];
 
     struct compressor_state compressor;
 
@@ -194,10 +201,8 @@ struct sender_state {
 
 void stream_sender_start_host_routing(RRDHOST *host);
 
-void stream_sender_reconnect(struct sender_state *s);
-
-void rrdpush_sender_execute_commands_cleanup(struct sender_state *s);
-void rrdpush_sender_execute_commands(struct sender_state *s);
+void stream_sender_execute_commands_cleanup(struct sender_state *s);
+void stream_sender_execute_commands(struct sender_state *s);
 
 bool stream_sender_connect(struct sender_state *s, uint16_t default_port, time_t timeout);
 
@@ -205,7 +210,7 @@ bool stream_sender_is_host_stopped(struct sender_state *s);
 
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_msg msg);
 
-void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
+void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, STREAM_TRAFFIC_TYPE type, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
 
 void stream_sender_dispatcher_add_to_queue(struct sender_state *s);
 
