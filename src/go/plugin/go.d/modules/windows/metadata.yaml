@@ -36,10 +36,7 @@ modules:
           It collect metrics by periodically sending HTTP requests to [Prometheus exporter for Windows machines](https://github.com/prometheus-community/windows_exporter), a native Windows agent running on each host.
       default_behavior:
         auto_detection:
-          description: |
-            It detects Windows exporter instances running on localhost (requires using [Netdata MSI installer](https://github.com/netdata/msi-installer#instructions)).
-            
-            Using the Netdata MSI installer is recommended for testing purposes only. For production use, you need to install Netdata on a Linux host and configure it to collect metrics remotely.
+          description: ""
         limits:
           description: ""
         performance_impact:
