@@ -112,6 +112,13 @@ struct mssql_instance {
     COUNTER_DATA MSSQLRecompilations;
 };
 
+enum lock_instance_idx {
+    NETDATA_MSSQL_ENUM_MLI_IDX_WAIT,
+    NETDATA_MSSQL_ENUM_MLI_IDX_DEAD_LOCKS,
+
+    NETDATA_MSSQL_ENUM_MLI_IDX_END
+};
+
 struct mssql_lock_instance {
     struct mssql_instance *parent;
 
@@ -120,6 +127,20 @@ struct mssql_lock_instance {
 
     RRDDIM *rd_lockWait;
     RRDDIM *rd_deadLocks;
+
+    uint32_t updated;
+};
+
+enum db_instance_idx {
+    NETDATA_MSSQL_ENUM_MDI_IDX_FILE_SIZE,
+    NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS,
+    NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP,
+    NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED,
+    NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHES,
+    NETDATA_MSSQL_ENUM_MDI_IDX_TRANSACTIONS,
+    NETDATA_MSSQL_ENUM_MDI_IDX_WRITE_TRANSACTIONS,
+
+    NETDATA_MSSQL_ENUM_MDI_IDX_END
 };
 
 struct mssql_db_instance {
@@ -140,6 +161,8 @@ struct mssql_db_instance {
     RRDDIM *rd_db_log_flushes;
     RRDDIM *rd_db_transactions;
     RRDDIM *rd_db_write_transactions;
+
+    uint32_t updated;
 };
 
 static DICTIONARY *mssql_instances = NULL;
@@ -882,10 +905,8 @@ static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, c
             rrddim_add(mli->parent->st_db_backup_restore_operations, id, db, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(
-        mli->parent->st_db_backup_restore_operations,
-        mli->rd_db_backup_restore_operations,
-        (collected_number)mli->MSSQLDatabaseBackupRestoreOperations.current.Data);
+    collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP)) ? mli->MSSQLDatabaseBackupRestoreOperations.current.Data : 0;
+    rrddim_set_by_pointer(mli->parent->st_db_backup_restore_operations, mli->rd_db_backup_restore_operations, data);
 }
 
 static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
@@ -918,10 +939,8 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, cons
         mli->rd_db_log_flushes = rrddim_add(mli->parent->st_db_log_flushes, id, db, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(
-        mli->parent->st_db_log_flushes,
-        mli->rd_db_log_flushes,
-        (collected_number)mli->MSSQLDatabaseLogFlushes.current.Data);
+    collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHES)) ? mli->MSSQLDatabaseLogFlushes.current.Data : 0;
+    rrddim_set_by_pointer(mli->parent->st_db_log_flushes, mli->rd_db_log_flushes, data);
 }
 
 static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
@@ -954,10 +973,8 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, cons
         mli->rd_db_log_flushed = rrddim_add(mli->parent->st_db_log_flushed, id, db, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(
-        mli->parent->st_db_log_flushed,
-        mli->rd_db_log_flushed,
-        (collected_number)mli->MSSQLDatabaseLogFlushed.current.Data);
+    collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED)) ? mli->MSSQLDatabaseLogFlushed.current.Data : 0;
+    rrddim_set_by_pointer(mli->parent->st_db_log_flushed, mli->rd_db_log_flushed, data);
 }
 
 static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
@@ -990,10 +1007,8 @@ static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *
         mli->rd_db_transactions = rrddim_add(mli->parent->st_db_transactions, id, db, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(
-        mli->parent->st_db_transactions,
-        mli->rd_db_transactions,
-        (collected_number)mli->MSSQLDatabaseTransactions.current.Data);
+    collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_TRANSACTIONS)) ? mli->MSSQLDatabaseTransactions.current.Data : 0;
+    rrddim_set_by_pointer(mli->parent->st_db_transactions, mli->rd_db_transactions, data);
 }
 
 static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
@@ -1030,10 +1045,8 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const 
             rrddim_add(mli->parent->st_db_write_transactions, id, db, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(
-        mli->parent->st_db_write_transactions,
-        mli->rd_db_write_transactions,
-        (collected_number)mli->MSSQLDatabaseWriteTransactions.current.Data);
+    collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_WRITE_TRANSACTIONS)) ? mli->MSSQLDatabaseWriteTransactions.current.Data : 0;
+    rrddim_set_by_pointer(mli->parent->st_db_write_transactions, mli->rd_db_write_transactions, data);
 }
 
 static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
@@ -1070,10 +1083,11 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
             rrddim_add(mli->parent->st_db_active_transactions, id, db, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
+    collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS)) ? mli->MSSQLDatabaseActiveTransactions.current.Data : 0;
     rrddim_set_by_pointer(
         mli->parent->st_db_active_transactions,
         mli->rd_db_active_transactions,
-        (collected_number)mli->MSSQLDatabaseActiveTransactions.current.Data);
+        data);
 }
 
 static void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
@@ -1106,10 +1120,8 @@ static void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char
         mli->rd_db_data_file_size = rrddim_add(mli->parent->st_db_data_file_size, id, db, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set_by_pointer(
-        mli->parent->st_db_data_file_size,
-        mli->rd_db_data_file_size,
-        (collected_number)mli->MSSQLDatabaseDataFileSize.current.Data * 1024);
+    collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_FILE_SIZE)) ? mli->MSSQLDatabaseDataFileSize.current.Data * 1024 : 0;
+    rrddim_set_by_pointer(mli->parent->st_db_data_file_size, mli->rd_db_data_file_size, data);
 }
 
 int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -1160,17 +1172,31 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
         if (!mdi)
             continue;
 
+        mdi->updated = 0;
         if (!mdi->parent) {
             mdi->parent = p;
         }
 
-        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseDataFileSize);
-        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseActiveTransactions);
-        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseBackupRestoreOperations);
-        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseLogFlushed);
-        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseLogFlushes);
-        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseTransactions);
-        perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseWriteTransactions);
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseDataFileSize))
+            mdi->updated |= (1<<NETDATA_MSSQL_ENUM_MDI_IDX_FILE_SIZE);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseActiveTransactions))
+            mdi->updated |= (1<<NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS);
+
+        if ( perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseBackupRestoreOperations))
+            mdi->updated |= (1<<NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseLogFlushed))
+            mdi->updated |= (1<<NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseLogFlushes))
+            mdi->updated |= (1<<NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHES);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseTransactions))
+            mdi->updated |= (1<<NETDATA_MSSQL_ENUM_MDI_IDX_TRANSACTIONS);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseWriteTransactions))
+            mdi->updated |= (1<<NETDATA_MSSQL_ENUM_MDI_IDX_WRITE_TRANSACTIONS);
     }
 
     dictionary_sorted_walkthrough_read(p->databases, dict_mssql_databases_charts_cb, &update_every);
