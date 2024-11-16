@@ -38,21 +38,21 @@
 #define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_HOST_CLEANUP            15
 
 // dispatcher execute requests
-#define WORKER_SENDER_DISPATCHER_JOB_REPLAY_REQUEST                     15
-#define WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST                   16
+#define WORKER_SENDER_DISPATCHER_JOB_REPLAY_REQUEST                     16
+#define WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST                   17
 
 // dispatcher metrics
-#define WORKER_SENDER_DISPATCHER_JOB_NODES                              17
-#define WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO                       18
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED                     19
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT                         20
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED                   21
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED                 22
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO            23
-#define WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE                   24
-#define WORKER_SENDER_DISPATHCER_JOB_MESSAGES                           25
+#define WORKER_SENDER_DISPATCHER_JOB_NODES                              18
+#define WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO                       19
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED                     20
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT                         21
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED                   22
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED                 23
+#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO            24
+#define WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE                   25
+#define WORKER_SENDER_DISPATHCER_JOB_MESSAGES                           26
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 26
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 27
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 25
 #endif
 
@@ -68,19 +68,20 @@ typedef void (*rrdpush_defer_action_t)(struct sender_state *s, void *data);
 typedef void (*rrdpush_defer_cleanup_t)(struct sender_state *s, void *data);
 
 typedef enum __attribute__((packed)) {
-    SENDER_MSG_NONE = 0,
-    SENDER_MSG_INTERACTIVE,                         // move traffic around as soon as possible
-    SENDER_MSG_RECONNECT_OVERFLOW,                  // reconnect the node, it has buffer overflow
-    SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION,       // reconnect the node, but disable compression
-    SENDER_MSG_STOP_RECEIVER_LEFT,                  // disconnect the node, the receiver left
-    SENDER_MSG_STOP_HOST_CLEANUP,                   // disconnect the node, it is being de-allocated
-} SENDER_MSG;
+    SENDER_MSG_NONE                             = 0,
+    SENDER_MSG_ENABLE_SENDING                   = (1 << 0), // move traffic around as soon as possible
+    SENDER_MSG_RECONNECT_OVERFLOW               = (1 << 1), // reconnect the node, it has buffer overflow
+    SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION    = (1 << 2), // reconnect the node, but disable compression
+    SENDER_MSG_STOP_RECEIVER_LEFT               = (1 << 3), // disconnect the node, the receiver left
+    SENDER_MSG_STOP_HOST_CLEANUP                = (1 << 4), // disconnect the node, it is being de-allocated
+} SENDER_OP;
 
-struct pipe_msg {
+struct sender_op {
     uint32_t slot;      // the run slot of the dispatcher this message refers to
     uint32_t magic;     // random number used to verify that the message the dispatcher receives is for this sender
     uint8_t id;         // the dispatcher id this message refers to
-    SENDER_MSG msg;     // the actual message to be delivered
+    SENDER_OP op;       // the actual message to be delivered
+    struct sender_state *sender;
 };
 
 struct sender_state {
@@ -95,11 +96,14 @@ struct sender_state {
 
     struct {
         int id;                                 // this is the routing id for the dispatcher - it is set once
-        bool interactive;                       // used internally by the dispatcher to optimize sending in batches
-        bool interactive_sent;                  // used by the collector threads to know if they have already asked for it
 
-        struct pipe_msg msg;                    // copy this while having the lock and then send the message without having the lock
+        struct sender_op msg;                    // copy this while having the lock and then send the message without having the lock
         uint32_t pollfd_slot;
+
+        // this is a property of stream_sender_send_msg_to_dispatcher()
+        // protected by dispatcher->messages.spinlock
+        // DO NOT READ OR WRITE ANYWHERE ELSE
+        uint32_t msg_slot;                      // the ephemeral slot id in the message queue
 
         // statistics about our compression efficiency
         size_t bytes_compressed;
@@ -112,10 +116,8 @@ struct sender_state {
         NETDATA_DOUBLE buffer_ratio;
 
         // statistics about successful sends
-        size_t sends_interactive;
-        size_t sends_non_interactive;
-        size_t bytes_interactive;
-        size_t bytes_non_interactive;
+        size_t sends;
+        size_t bytes_sent;
         size_t bytes_sent_by_type[STREAM_TRAFFIC_TYPE_MAX];
     } dispatcher;
 
@@ -208,7 +210,7 @@ bool stream_sender_connect(struct sender_state *s, uint16_t default_port, time_t
 
 bool stream_sender_is_host_stopped(struct sender_state *s);
 
-void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_msg msg);
+void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_op msg);
 
 void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, STREAM_TRAFFIC_TYPE type, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
 

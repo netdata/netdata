@@ -184,12 +184,8 @@ struct dispatcher {
     struct {
         SPINLOCK spinlock; // ensure a single writer at a time
         int fds[2];
-
-        // ----
-
-        size_t residual_bytes;      // partial pipe reads are tracked here
         size_t size;
-        struct pipe_msg *messages;
+        char *buffer;
     } pipe;
 
     struct {
@@ -200,17 +196,23 @@ struct dispatcher {
     } queue;
 
     struct {
+        SPINLOCK spinlock;
+        size_t added;
+        size_t processed;
+        size_t bypassed;
+        size_t size;
+        size_t used;
+        struct sender_op *array;         // the array of messages from the senders
+        struct sender_op *copy;          // a copy of the array of messages from the senders, to work on
+    } messages;
+
+    struct {
         // private fields for the dispatcher thread only - DO NOT USE ON OTHER THREADS
         size_t used;
         size_t size;
         struct pollfd *pollfds;         // the array to pass to poll()
         struct sender_state **senders;  // the array of senders (may have nulls in it)
     } run;
-
-    struct {
-        usec_t next_full_ut;
-        size_t messages;
-    } ops;
 };
 
 static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct dispatcher *dp, size_t slot, STREAM_HANDSHAKE reason, bool reconnect);
@@ -241,23 +243,14 @@ static void stream_sender_update_dispatcher_reset_unsafe(struct sender_state *s)
     s->dispatcher.bytes_outstanding = 0;
     s->dispatcher.bytes_available = 0;
     s->dispatcher.buffer_ratio = 0.0;
-    s->dispatcher.sends_interactive = 0;
-    s->dispatcher.sends_non_interactive = 0;
-    s->dispatcher.bytes_interactive = 0;
-    s->dispatcher.bytes_non_interactive = 0;
+    s->dispatcher.sends = 0;
+    s->dispatcher.bytes_sent = 0;
     replication_recalculate_buffer_used_ratio_unsafe(s);
 }
 
 static void stream_sender_update_dispatcher_sent_data_unsafe(struct sender_state *s, uint64_t bytes_sent) {
-    if(unlikely(s->dispatcher.interactive)) {
-        s->dispatcher.sends_interactive++;
-        s->dispatcher.bytes_interactive += bytes_sent;
-    }
-    else {
-        s->dispatcher.sends_non_interactive++;
-        s->dispatcher.bytes_non_interactive += bytes_sent;
-    }
-
+    s->dispatcher.sends++;
+    s->dispatcher.bytes_sent += bytes_sent;
     s->dispatcher.bytes_outstanding = cbuffer_next_unsafe(s->sbuf.cb, NULL);
     s->dispatcher.bytes_available = cbuffer_available_size_unsafe(s->sbuf.cb);
     s->dispatcher.buffer_ratio = (NETDATA_DOUBLE)(s->sbuf.cb->max_size -  s->dispatcher.bytes_available) * 100.0 / (NETDATA_DOUBLE)s->sbuf.cb->max_size;
@@ -279,7 +272,9 @@ void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, S
 // --------------------------------------------------------------------------------------------------------------------
 // pipe messages
 
-static void stream_sender_dispatcher_handle_msg(struct dispatcher *dp, struct pipe_msg *msg) {
+static void stream_sender_dispatcher_handle_op(struct dispatcher *dp, struct sender_op *msg) {
+    dp->messages.processed++;
+
     if (msg->slot > 0 &&
         msg->slot < dp->run.used &&
         msg->id == dp->id &&
@@ -288,145 +283,132 @@ static void stream_sender_dispatcher_handle_msg(struct dispatcher *dp, struct pi
 
         struct sender_state *s = dp->run.senders[msg->slot];
 
-        switch (msg->msg) {
-            case SENDER_MSG_INTERACTIVE:
-                s->dispatcher.interactive = true;
-                break;
+        if(msg->op & SENDER_MSG_ENABLE_SENDING) {
+            if (msg->slot < dp->run.used &&                // it is a valid slot
+                dp->run.senders[msg->slot] &&              // it is not empty
+                dp->run.senders[msg->slot] == msg->sender) // it our sender
+                dp->run.pollfds[msg->slot].events |= POLLOUT;
 
-            case SENDER_MSG_RECONNECT_OVERFLOW:
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_OVERFLOW);
-                errno_clear();
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM [dispatch%d] %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. "
-                       "Restarting connection.",
-                       dp->id, rrdhost_hostname(s->host), s->connected_to, s->sbuf.cb->size,
-                       s->dispatcher.bytes_interactive + s->dispatcher.bytes_non_interactive);
-
-                stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER, true);
-                break;
-
-            case SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION:
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_COMPRESSION_ERROR);
-                errno_clear();
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM [dispatch%d] %s [send to %s]: restarting connection without compression.",
-                       dp->id, rrdhost_hostname(s->host), s->connected_to);
-
-                stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER, true);
-                break;
-
-            case SENDER_MSG_STOP_RECEIVER_LEFT:
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVER_LEFT);
-                stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
-                break;
-
-            case SENDER_MSG_STOP_HOST_CLEANUP:
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_HOST_CLEANUP);
-                stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, false);
-                break;
-
-            default:
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM [dispatch%d]: invalid msg id %u", dp->id, (unsigned)msg->msg);
-                break;
+            if(msg->op == SENDER_MSG_ENABLE_SENDING)
+                return;
         }
+
+        if(msg->op & SENDER_MSG_RECONNECT_OVERFLOW) {
+            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_OVERFLOW);
+            errno_clear();
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM [dispatch%d] %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. "
+                   "Restarting connection.",
+                   dp->id, rrdhost_hostname(s->host), s->connected_to, s->sbuf.cb->size, s->dispatcher.bytes_sent);
+
+            stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER, true);
+        }
+        else if(msg->op & SENDER_MSG_STOP_RECEIVER_LEFT) {
+            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVER_LEFT);
+            stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
+            return;
+        }
+        else if(msg->op & SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION) {
+            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_COMPRESSION_ERROR);
+            errno_clear();
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM [dispatch%d] %s [send to %s]: restarting connection without compression.",
+                   dp->id, rrdhost_hostname(s->host), s->connected_to);
+
+            stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER, true);
+        }
+        else if(msg->op & SENDER_MSG_STOP_HOST_CLEANUP) {
+            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_HOST_CLEANUP);
+            stream_sender_dispatcher_move_running_to_connector_or_remove(dp, msg->slot, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, false);
+            return;
+        }
+        else
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM [dispatch%d]: invalid msg id %u", dp->id, (unsigned)msg->op);
     }
-    else {
+    else
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM [dispatch%d]: invalid slot %" PRIu32 " read from pipe", dp->id, msg->slot);
-    }
 }
 
-void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct pipe_msg msg) {
-    if (!msg.slot || !msg.magic) return;
+void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_op msg) {
+    if (!msg.slot || !msg.magic || msg.sender != s) return;
 
+    bool send_pipe_msg = false;
     struct dispatcher *dp = stream_sender_dispatcher(s);
 
-    // don't send a message to ourselves
-    if (dp->tid == gettid_cached()) {
-        stream_sender_dispatcher_handle_msg(dp, &msg);
+    if(dp->tid == gettid_cached()) {
+        // we are running at the dispatcher thread
+        // no need for locks or queuing
+        dp->messages.bypassed++;
+        stream_sender_dispatcher_handle_op(dp, &msg);
         return;
     }
 
-    // ensure one writer at a time
-    spinlock_lock(&dp->pipe.spinlock);
+    spinlock_lock(&dp->messages.spinlock);
+    {
+        dp->messages.added++;
+        if (s->dispatcher.msg_slot >= dp->messages.used || dp->messages.array[s->dispatcher.msg_slot].sender != s) {
+            if (unlikely(dp->messages.used >= dp->messages.size)) {
+                // this should never happen, but let's find the root cause
 
-    int pipe_fd = dp->pipe.fds[PIPE_WRITE];
-    if (pipe_fd != -1) {
-        ssize_t total_written = 0;
-        ssize_t bytes_to_write = sizeof(msg);
-        const char *msg_ptr = (const char *)&msg;
-
-        while (total_written < bytes_to_write) {
-            ssize_t written = write(pipe_fd, msg_ptr + total_written, bytes_to_write - total_written);
-
-            if (written > 0)
-                total_written += written;
-
-            else if (written == -1) {
-                if (errno == EINTR)
-                    continue; // Interrupted by a signal, retry
-
-                else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    // pipe is full
-                    nd_log_limit_static_global_var(erl, 1, 1 * USEC_PER_MS);
-                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                                 "STREAM %s [send]: pipe full, cannot write to internal pipe. Retrying.",
-                                 rrdhost_hostname(s->host));
-                    continue;
+                if (!dp->messages.size) {
+                    // we are exiting
+                    spinlock_unlock(&dp->messages.spinlock);
+                    return;
                 }
-                else {
-                    // Other errors
-                    nd_log_limit_static_global_var(erl, 1, 1 * USEC_PER_MS);
-                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                                 "STREAM %s [send]: cannot write to internal pipe. Error: %s",
-                                 rrdhost_hostname(s->host), strerror(errno));
-                    break;
+
+                // try to find us in the list
+                for (size_t i = 0; i < dp->messages.size; i++) {
+                    if (dp->messages.array[i].sender == s) {
+                        s->dispatcher.msg_slot = i;
+                        dp->messages.array[s->dispatcher.msg_slot].op |= msg.op;
+                        spinlock_unlock(&dp->messages.spinlock);
+                        internal_fatal(true, "the dispatcher message queue is full, but this sender is already on slot %zu", i);
+                        return;
+                    }
                 }
+
+                fatal("the dispatcher message queue is full, but this should never happen");
             }
-        }
 
-        if (total_written < bytes_to_write) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM %s [send]: partial write, could not write a complete message to internal pipe.",
-                   rrdhost_hostname(s->host));
+            // let's use a new slot
+            send_pipe_msg = !dp->messages.used; // write to the pipe, only when the queue was empty before this msg
+            s->dispatcher.msg_slot = dp->messages.used++;
+            dp->messages.array[s->dispatcher.msg_slot] = msg;
         }
+        else
+            // the existing slot is good
+            dp->messages.array[s->dispatcher.msg_slot].op |= msg.op;
     }
+    spinlock_unlock(&dp->messages.spinlock);
 
-    spinlock_unlock(&dp->pipe.spinlock);
+    if(send_pipe_msg &&
+        dp->pipe.fds[PIPE_WRITE] != -1 &&
+        write(dp->pipe.fds[PIPE_WRITE], " ", 1) != 1) {
+        nd_log_limit_static_global_var(erl, 1, 1 * USEC_PER_MS);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                     "STREAM %s [send]: cannot write to dispatcher pipe",
+                     rrdhost_hostname(s->host));
+    }
 }
 
 static void stream_sender_dispatcher_read_pipe_messages(struct dispatcher *dp) {
-    char *buffer_start = (char *)dp->pipe.messages;
-    size_t message_size = sizeof(struct pipe_msg);
-    size_t max_read_size = message_size * dp->pipe.size;
+    if(read(dp->pipe.fds[PIPE_READ], dp->pipe.buffer, dp->pipe.size * sizeof(*dp->pipe.buffer)) <= 0)
+        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM [dispatch%d]: pipe read error", dp->id);
 
-    char *read_position = buffer_start + dp->pipe.residual_bytes;
-    size_t bytes_available = max_read_size - dp->pipe.residual_bytes;
-
-    ssize_t bytes_read = read(dp->pipe.fds[PIPE_READ], read_position, bytes_available);
-    if(bytes_read <= 0) {
-        if (bytes_read < 0 && errno != EAGAIN && errno != EINTR)
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM [dispatch%d]: pipe read error", dp->id);
-        return;
+    size_t used = 0;
+    spinlock_lock(&dp->messages.spinlock);
+    if(dp->messages.used) {
+        used = dp->messages.used;
+        memcpy(dp->messages.copy, dp->messages.array, used * sizeof(*dp->messages.copy));
+        dp->messages.used = 0;
     }
+    spinlock_unlock(&dp->messages.spinlock);
 
-    size_t total_bytes = dp->pipe.residual_bytes + bytes_read;
-    size_t full_messages = total_bytes / message_size;
-    dp->pipe.residual_bytes = total_bytes % message_size;
-
-    dp->ops.messages += full_messages;
-
-    for (size_t i = 0; i < full_messages; i++) {
-        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_PIPE_READ);
-        struct pipe_msg *msg = &dp->pipe.messages[i];
-        stream_sender_dispatcher_handle_msg(dp, msg);
-    }
-
-    if (dp->pipe.residual_bytes > 0) {
-        // move the last partial message to the beginning for next call
-        memmove(buffer_start, buffer_start + (full_messages * message_size), dp->pipe.residual_bytes);
+    for(size_t i = 0; i < used ;i++) {
+        struct sender_op *msg = &dp->messages.copy[i];
+        stream_sender_dispatcher_handle_op(dp, msg);
     }
 }
 
@@ -439,6 +421,12 @@ static void stream_sender_dispatcher_realloc_arrays_unsafe(struct dispatcher *dp
         dp->run.senders = reallocz(dp->run.senders, new_size * sizeof(*dp->run.senders));
         dp->run.size = new_size;
         dp->run.used = slot + 1;
+
+        spinlock_lock(&dp->messages.spinlock);
+        dp->messages.array = reallocz(dp->messages.array, new_size * sizeof(*dp->messages.array));
+        dp->messages.copy = reallocz(dp->messages.copy, new_size * sizeof(*dp->messages.copy));
+        dp->messages.size = new_size;
+        spinlock_unlock(&dp->messages.spinlock);
 
         // slot zero is always our pipe
         dp->run.pollfds[0] = (struct pollfd) {
@@ -469,7 +457,6 @@ static void stream_sender_dispatcher_move_queue_to_running(struct dispatcher *dp
 
     // process the queue
     spinlock_lock(&dp->queue.spinlock);
-    stream_sender_dispatcher_realloc_arrays_unsafe(dp, 0); // our pipe
     while(dp->queue.ll) {
         worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DEQUEUE);
 
@@ -504,6 +491,7 @@ static void stream_sender_dispatcher_move_queue_to_running(struct dispatcher *dp
         s->dispatcher.msg.id = dp->id;
         s->dispatcher.msg.slot = slot;
         s->dispatcher.msg.magic = os_random32();
+        s->dispatcher.msg.sender = s;
         s->host->stream.snd.status.connections++;
         s->last_state_since_t = now_realtime_sec();
 
@@ -542,6 +530,7 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct 
     sender_lock(s);
     s->dispatcher.msg.slot = 0;
     s->dispatcher.msg.magic = 0;
+    s->dispatcher.msg.sender = NULL;
     sender_unlock(s);
 
     nd_sock_close(&s->sock);
@@ -583,15 +572,9 @@ static int set_pipe_size(int pipe_fd, int new_size) {
     return result;  // Returns the new pipe size
 }
 
-void stream_sender_dispatcher_prepare(struct dispatcher *dp) {
+void stream_sender_dispatcher_check_all_nodes(struct dispatcher *dp) {
     usec_t now_ut = now_monotonic_usec();
     time_t now_s = (time_t)(now_ut / USEC_PER_SEC);
-
-    bool do_all = false;
-    if(now_ut >= dp->ops.next_full_ut) {
-        dp->ops.next_full_ut = now_ut + 50 * USEC_PER_MS;
-        do_all = true;
-    }
 
     size_t bytes_uncompressed = 0;
     size_t bytes_compressed = 0;
@@ -612,12 +595,8 @@ void stream_sender_dispatcher_prepare(struct dispatcher *dp) {
         dp->run.pollfds[slot].events = POLLIN;
         dp->run.pollfds[slot].revents = 0;
 
-        if(!do_all && !s->dispatcher.interactive)
-            continue;
-
         // If the TCP window never opened then something is wrong, restart connection
-        if(unlikely(do_all &&
-                     now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
+        if(unlikely(now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
                      !rrdpush_sender_pending_replication_requests(s) &&
                      !rrdpush_sender_replicating_charts(s)
                          )) {
@@ -638,8 +617,7 @@ void stream_sender_dispatcher_prepare(struct dispatcher *dp) {
                    "STREAM [dispatch%d] %s [send to %s]: could not send metrics for %ld seconds - closing connection - "
                    "we have sent %zu bytes on this connection via %zu send attempts.",
                    dp->id, rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
-                   s->dispatcher.bytes_interactive + s->dispatcher.bytes_non_interactive,
-                   s->dispatcher.sends_non_interactive + s->dispatcher.sends_interactive);
+                   s->dispatcher.bytes_sent, s->dispatcher.sends);
 
             stream_sender_dispatcher_move_running_to_connector_or_remove(dp, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT, true);
             continue;
@@ -667,18 +645,16 @@ void stream_sender_dispatcher_prepare(struct dispatcher *dp) {
     }
 //    dp->run.used -= slots_empty;
 
-    if(do_all) {
-        if (bytes_compressed && bytes_uncompressed) {
-            NETDATA_DOUBLE compression_ratio = 100.0 - ((NETDATA_DOUBLE)bytes_compressed * 100.0 / (NETDATA_DOUBLE)bytes_uncompressed);
-            worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO, compression_ratio);
-        }
-
-        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_NODES, (NETDATA_DOUBLE)nodes);
-        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
-        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
-        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO, buffer_ratio);
-        worker_set_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, (NETDATA_DOUBLE)dp->ops.messages);
+    if (bytes_compressed && bytes_uncompressed) {
+        NETDATA_DOUBLE compression_ratio = 100.0 - ((NETDATA_DOUBLE)bytes_compressed * 100.0 / (NETDATA_DOUBLE)bytes_uncompressed);
+        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO, compression_ratio);
     }
+
+    worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_NODES, (NETDATA_DOUBLE)nodes);
+    worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
+    worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
+    worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO, buffer_ratio);
+    worker_set_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, (NETDATA_DOUBLE)(dp->messages.processed));
 }
 
 void *stream_sender_dispacther_thread(void *ptr) {
@@ -715,7 +691,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED, "bytes uncompressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
     worker_register_job_custom_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO, "cumulative compression savings ratio", "%", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
-    worker_register_job_custom_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, "pipe messages received", "messages", WORKER_METRIC_INCREMENT);
+    worker_register_job_custom_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, "ops processed", "messages", WORKER_METRIC_INCREMENTAL_TOTAL);
 
     if(pipe(dp->pipe.fds) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM [dispatch%d]: cannot create required pipe.", dp->id);
@@ -726,26 +702,39 @@ void *stream_sender_dispacther_thread(void *ptr) {
 
     dp->tid = gettid_cached();
 
-    dp->pipe.size = set_pipe_size(dp->pipe.fds[PIPE_READ], 16384 * sizeof(struct pipe_msg)) / sizeof(struct pipe_msg);
-    dp->pipe.messages = mallocz(dp->pipe.size * sizeof(struct pipe_msg));
+    dp->pipe.size = set_pipe_size(dp->pipe.fds[PIPE_READ], 65536 * sizeof(*dp->pipe.buffer)) / sizeof(*dp->pipe.buffer);
+    dp->pipe.buffer = mallocz(dp->pipe.size * sizeof(*dp->pipe.buffer));
 
-    usec_t now_ut = now_monotonic_usec();
-    dp->ops.next_full_ut = now_ut;
+    usec_t last_check_all_nodes_ut = 0;
+    usec_t last_dequeue_ut = 0;
+
+    // allocate our pipe
+    stream_sender_dispatcher_realloc_arrays_unsafe(dp, 0);
 
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
-        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_LIST);
+        usec_t now_ut = now_monotonic_usec();
 
-        // move any pending hosts in the inbound queue, to the running list
-        stream_sender_dispatcher_move_queue_to_running(dp);
+        if(now_ut - last_dequeue_ut >= 100 * USEC_PER_MS) {
+            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DEQUEUE);
 
-        // prepare dp->pollfd.array
-        stream_sender_dispatcher_prepare(dp);
+            // move any pending hosts in the inbound queue, to the running list
+            stream_sender_dispatcher_move_queue_to_running(dp);
+            last_dequeue_ut = now_ut;
+        }
+
+        if(now_ut - last_check_all_nodes_ut >= USEC_PER_SEC) {
+            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_LIST);
+
+            // periodically check the entire list of nodes
+            // this detects unresponsive parents too (timeout)
+            stream_sender_dispatcher_check_all_nodes(dp);
+            last_check_all_nodes_ut = now_ut;
+        }
 
         worker_is_idle();
-        dp->run.pollfds[0].revents = 0;
 
         // wait for data - timeout is in milliseconds
-        int poll_rc = poll(dp->run.pollfds, dp->run.used, 50);
+        int poll_rc = poll(dp->run.pollfds, dp->run.used, 100);
 
         if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR)))
             // timed out - just loop again
@@ -764,6 +753,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
         // If the collector woke us up then empty the pipe to remove the signal
         if(dp->run.pollfds[0].revents) {
             short revents = dp->run.pollfds[0].revents;
+            dp->run.pollfds[0].revents = 0;
 
             if (likely(revents & (POLLIN | POLLPRI))) {
                 worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_PIPE_READ);
@@ -785,6 +775,9 @@ void *stream_sender_dispacther_thread(void *ptr) {
             if(!s || !dp->run.pollfds[slot].revents)
                 continue;
 
+            short revents = dp->run.pollfds[slot].revents;
+            dp->run.pollfds[slot].revents = 0; // reset revents for the next iteration
+
             ND_LOG_STACK lgs[] = {
                 ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
                 ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
@@ -794,8 +787,6 @@ void *stream_sender_dispacther_thread(void *ptr) {
                 ND_LOG_FIELD_END(),
             };
             ND_LOG_STACK_PUSH(lgs);
-
-            short revents = dp->run.pollfds[slot].revents;
 
             if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
                 // we have errors on this socket
@@ -813,8 +804,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
 
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "STREAM [dispatch%d] %s [send to %s]: %s restarting connection - %zu bytes transmitted.",
-                       dp->id, rrdhost_hostname(s->host), s->connected_to, error,
-                       s->dispatcher.bytes_interactive + s->dispatcher.bytes_non_interactive);
+                       dp->id, rrdhost_hostname(s->host), s->connected_to, error, s->dispatcher.bytes_sent);
 
                 stream_sender_dispatcher_move_running_to_connector_or_remove(dp, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR, true);
                 continue;
@@ -839,20 +829,10 @@ void *stream_sender_dispacther_thread(void *ptr) {
 
                         if(!s->dispatcher.bytes_outstanding) {
                             // we sent them all
-
-                            if(s->dispatcher.interactive)
-                                s->dispatcher.interactive = false;
-
-                            if(s->dispatcher.interactive_sent)
-                                s->dispatcher.interactive_sent = false;
+                            dp->run.pollfds[slot].events &= ~(POLLOUT);
 
                             // recreate the circular buffer if we have to
                             stream_sender_cbuffer_recreate_timed_unsafe(s, now_s, false);
-                        }
-                        else if(s->dispatcher.bytes_outstanding > s->dispatcher.bytes_available) {
-                            // at 50% turn on the interactive flag
-                            s->dispatcher.interactive = true;
-                            s->dispatcher.interactive_sent = true;
                         }
                     }
                     else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
@@ -865,8 +845,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
                     nd_log(NDLS_DAEMON, NDLP_ERR,
                            "STREAM [dispatch%d] %s [send to %s]: failed to send metrics - restarting connection - "
                            "we have sent %zu bytes on this connection.",
-                           dp->id, rrdhost_hostname(s->host), s->connected_to,
-                           s->dispatcher.bytes_interactive + s->dispatcher.bytes_non_interactive);
+                           dp->id, rrdhost_hostname(s->host), s->connected_to, s->dispatcher.bytes_sent);
                     stream_sender_dispatcher_move_running_to_connector_or_remove(dp, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED, true);
                     continue;
                 }
@@ -930,8 +909,15 @@ void *stream_sender_dispacther_thread(void *ptr) {
     freez(dp->run.senders);
     memset(&dp->run, 0, sizeof(dp->run));
 
-    freez(dp->pipe.messages);
-    dp->pipe.messages = NULL;
+    spinlock_lock(&dp->messages.spinlock);
+    freez(dp->messages.array);
+    dp->messages.array = NULL;
+    dp->messages.size = 0;
+    dp->messages.used = 0;
+    spinlock_unlock(&dp->messages.spinlock);
+
+    freez(dp->pipe.buffer);
+    dp->pipe.buffer = NULL;
     dp->pipe.size = 0;
 
     close(dp->pipe.fds[PIPE_READ]);
@@ -958,7 +944,9 @@ static bool stream_sender_dispatcher_init(struct sender_state *s) {
         dp->pipe.fds[PIPE_WRITE] = -1;
         spinlock_init(&dp->pipe.spinlock);
         spinlock_init(&dp->queue.spinlock);
+        spinlock_init(&dp->messages.spinlock);
         dp->run.used = 0;
+        dp->messages.used = 0;
 
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "-DP" "[%d]", dp->id);

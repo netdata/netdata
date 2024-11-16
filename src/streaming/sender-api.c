@@ -81,13 +81,13 @@ void rrdhost_sender_signal_to_stop_and_wait(struct rrdhost *host, STREAM_HANDSHA
         host->sender->exit.reason = reason;
     }
 
-    struct pipe_msg msg = host->sender->dispatcher.msg;
+    struct sender_op msg = host->sender->dispatcher.msg;
     sender_unlock(host->sender);
 
     if(reason == STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT)
-        msg.msg = SENDER_MSG_STOP_RECEIVER_LEFT;
+        msg.op = SENDER_MSG_STOP_RECEIVER_LEFT;
     else
-        msg.msg = SENDER_MSG_STOP_HOST_CLEANUP;
+        msg.op = SENDER_MSG_STOP_HOST_CLEANUP;
     stream_sender_send_msg_to_dispatcher(host->sender, msg);
 
     while(wait && rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED))

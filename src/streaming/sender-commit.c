@@ -41,7 +41,7 @@ BUFFER *sender_start(struct sender_state *s __maybe_unused) {
 
 // Collector thread finishing a transmission
 void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type) {
-    struct pipe_msg msg;
+    struct sender_op msg;
 
     if (unlikely(wb != sender_thread_buffer))
         fatal("STREAMING: sender is trying to commit a buffer that is not this thread's buffer.");
@@ -190,22 +190,16 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     }
 
     // update s->dispatcher entries
+    bool enable_sending = s->dispatcher.bytes_outstanding == 0;
     stream_sender_update_dispatcher_added_data_unsafe(s, type, total_compressed_len, total_uncompressed_len);
 
-    // decide if this has interactive data
-    bool interactive = !s->dispatcher.interactive_sent &&
-                       (s->dispatcher.bytes_outstanding >= s->dispatcher.bytes_available ||
-                        !stream_has_capability(s, STREAM_CAP_INTERPOLATED) || type == STREAM_TRAFFIC_TYPE_FUNCTIONS);
-
-    if (interactive) {
+    if (enable_sending)
         msg = s->dispatcher.msg;
-        s->dispatcher.interactive_sent = true;
-    }
 
     sender_unlock(s);
 
-    if (interactive) {
-        msg.msg = SENDER_MSG_INTERACTIVE;
+    if (enable_sending) {
+        msg.op = SENDER_MSG_ENABLE_SENDING;
         stream_sender_send_msg_to_dispatcher(s, msg);
     }
 
@@ -214,14 +208,14 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 overflow_with_lock:
     msg = s->dispatcher.msg;
     sender_unlock(s);
-    msg.msg = SENDER_MSG_RECONNECT_OVERFLOW;
+    msg.op = SENDER_MSG_RECONNECT_OVERFLOW;
     stream_sender_send_msg_to_dispatcher(s, msg);
     return;
 
 compression_failed_with_lock:
     msg = s->dispatcher.msg;
     sender_unlock(s);
-    msg.msg = SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION;
+    msg.op = SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION;
     stream_sender_send_msg_to_dispatcher(s, msg);
     return;
 }
