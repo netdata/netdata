@@ -95,15 +95,13 @@ struct sender_state {
     ND_SOCK sock;
 
     struct {
-        int id;                                 // this is the routing id for the dispatcher - it is set once
-
-        struct sender_op msg;                    // copy this while having the lock and then send the message without having the lock
-        uint32_t pollfd_slot;
+        int8_t id;              // the dispatcher id - protected by sender_lock()
+        struct sender_op msg;   // the template for sending a message to the dispatcher - protected by sender_lock()
 
         // this is a property of stream_sender_send_msg_to_dispatcher()
         // protected by dispatcher->messages.spinlock
-        // DO NOT READ OR WRITE ANYWHERE ELSE
-        uint32_t msg_slot;                      // the ephemeral slot id in the message queue
+        // DO NOT READ OR WRITE ANYWHERE
+        uint32_t msg_slot;      // ensures a dispatcher queue that can never get full
 
         // statistics about our compression efficiency
         size_t bytes_compressed;
@@ -122,12 +120,12 @@ struct sender_state {
     } dispatcher;
 
     struct {
-        int id;
+        int8_t id;          // the connector id - protected by sender_lock()
     } connector;
 
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
     time_t last_traffic_seen_t;
-    time_t last_state_since_t;              // the timestamp of the last state (online/offline) change
+    time_t last_state_since_t;                  // the timestamp of the last state (online/offline) change
 
     struct {
         struct circular_buffer *cb;
