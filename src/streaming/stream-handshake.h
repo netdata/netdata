@@ -86,6 +86,6 @@ typedef enum {
 
 } STREAM_HANDSHAKE;
 
-const char *stream_handshake_error_to_string(STREAM_HANDSHAKE handshake_error);
+const char *stream_handshake_error_to_string(STREAM_HANDSHAKE reason);
 
 #endif //NETDATA_STREAM_HANDSHAKE_H

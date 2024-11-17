@@ -52,13 +52,13 @@ static struct {
     { 0, NULL },
 };
 
-const char *stream_handshake_error_to_string(STREAM_HANDSHAKE handshake_error) {
-    if(handshake_error >= STREAM_HANDSHAKE_OK_V1)
+const char *stream_handshake_error_to_string(STREAM_HANDSHAKE reason) {
+    if(reason >= STREAM_HANDSHAKE_OK_V1)
         // handshake_error is the whole version / capabilities number
         return "CONNECTED";
 
     for(size_t i = 0; handshake_errors[i].str ; i++) {
-        if(handshake_error == handshake_errors[i].err)
+        if(reason == handshake_errors[i].err)
             return handshake_errors[i].str;
     }
 

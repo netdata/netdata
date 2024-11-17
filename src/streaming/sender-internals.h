@@ -77,10 +77,10 @@ typedef enum __attribute__((packed)) {
 } SENDER_OP;
 
 struct sender_op {
-    uint32_t slot;      // the run slot of the dispatcher this message refers to
-    uint32_t magic;     // random number used to verify that the message the dispatcher receives is for this sender
-    uint8_t id;         // the dispatcher id this message refers to
-    SENDER_OP op;       // the actual message to be delivered
+    uint32_t dispatcher_run_slot;       // the run slot of the dispatcher this message refers to
+    uint32_t session;                   // random number used to verify that the message the dispatcher receives is for this sender
+    int8_t dispatcher_id;               // the dispatcher id this message refers to
+    SENDER_OP op;                       // the actual message to be delivered
     struct sender_state *sender;
 };
 
@@ -120,6 +120,10 @@ struct sender_state {
         size_t bytes_sent;
         size_t bytes_sent_by_type[STREAM_TRAFFIC_TYPE_MAX];
     } dispatcher;
+
+    struct {
+        int id;
+    } connector;
 
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
     time_t last_traffic_seen_t;
@@ -216,7 +220,7 @@ void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, S
 
 void stream_sender_dispatcher_add_to_queue(struct sender_state *s);
 
-bool stream_sender_connector_init(void);
+bool stream_sender_connector_init(struct sender_state *s);
 void stream_sender_connector_cancel_threads(void);
 void stream_sender_connector_remove_unlinked(struct sender_state *s);
 void stream_sender_connector_add_unlinked(struct sender_state *s);

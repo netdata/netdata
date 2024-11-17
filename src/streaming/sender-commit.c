@@ -65,7 +65,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     // copy the sequence number of sender buffer recreates, while having our lock
     sender_thread_buffer_sender_recreates = s->sbuf.recreates;
 
-    if (s->dispatcher.msg.slot == 0 || s->dispatcher.msg.magic == 0) {
+    if (s->dispatcher.msg.dispatcher_run_slot == 0 || s->dispatcher.msg.session == 0) {
         // the dispatcher is not there anymore - ignore these data
         sender_unlock(s);
         sender_thread_buffer_free(); // free the thread data

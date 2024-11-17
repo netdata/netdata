@@ -20,6 +20,8 @@ void rrdhost_sender_structures_init(struct rrdhost *host) {
     host->sender = callocz(1, sizeof(*host->sender));
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
 
+    host->sender->connector.id = -1;
+    host->sender->dispatcher.id = -1;
     host->sender->host = host;
     host->sender->sbuf.cb = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024, &netdata_buffers_statistics.cbuffers_streaming);
     host->sender->capabilities = stream_our_capabilities(host, true);
