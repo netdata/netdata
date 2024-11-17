@@ -2900,9 +2900,6 @@ struct dictionary_stats dictionary_stats_category_replication = { .name = "repli
 #ifdef DICT_WITH_STATS
 struct dictionary_categories {
     struct dictionary_stats *stats;
-    const char *family;
-    const char *context_prefix;
-    int priority;
 
     RRDSET *st_dicts;
     RRDDIM *rd_dicts_active;
@@ -2943,15 +2940,15 @@ struct dictionary_categories {
     RRDDIM *rd_spins_delete;
 
 } dictionary_categories[] = {
-    { .stats = &dictionary_stats_category_collectors, "dictionaries collectors", "dictionaries", 900000 },
-    { .stats = &dictionary_stats_category_rrdhost, "dictionaries hosts", "dictionaries", 900000 },
-    { .stats = &dictionary_stats_category_rrdset_rrddim, "dictionaries rrd", "dictionaries", 900000 },
-    { .stats = &dictionary_stats_category_rrdcontext, "dictionaries contexts", "dictionaries", 900000 },
-    { .stats = &dictionary_stats_category_rrdlabels, "dictionaries labels", "dictionaries", 900000 },
-    { .stats = &dictionary_stats_category_rrdhealth, "dictionaries health", "dictionaries", 900000 },
-    { .stats = &dictionary_stats_category_functions, "dictionaries functions", "dictionaries", 900000 },
-    { .stats = &dictionary_stats_category_replication, "dictionaries replication", "dictionaries", 900000 },
-    { .stats = &dictionary_stats_category_other, "dictionaries other", "dictionaries", 900000 },
+    { .stats = &dictionary_stats_category_collectors, },
+    { .stats = &dictionary_stats_category_rrdhost, },
+    { .stats = &dictionary_stats_category_rrdset_rrddim, },
+    { .stats = &dictionary_stats_category_rrdcontext, },
+    { .stats = &dictionary_stats_category_rrdlabels, },
+    { .stats = &dictionary_stats_category_rrdhealth, },
+    { .stats = &dictionary_stats_category_functions, },
+    { .stats = &dictionary_stats_category_replication, },
+    { .stats = &dictionary_stats_category_other, },
 
     // terminator
     { .stats = NULL, NULL, NULL, 0 },
@@ -2962,6 +2959,9 @@ struct dictionary_categories {
 static void update_dictionary_category_charts(struct dictionary_categories *c) {
     struct dictionary_stats stats;
     stats.name = c->stats->name;
+    int priority = 900000;
+    const char *family = "dictionaries";
+    const char *context_prefix = "dictionaries";
 
     // ------------------------------------------------------------------------
 
@@ -2972,22 +2972,22 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     if(c->st_dicts || total != 0) {
         if (unlikely(!c->st_dicts)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.dictionaries", c->context_prefix, stats.name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.dictionaries", context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.dictionaries", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.dictionaries", context_prefix);
 
             c->st_dicts = rrdset_create_localhost(
                 "netdata"
                 , id
                 , NULL
-                , c->family
+                , family
                 , context
                 , "Dictionaries"
                 , "dictionaries"
                 , "netdata"
                 , "stats"
-                , c->priority + 0
+                , priority + 0
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
@@ -3013,22 +3013,22 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     if(c->st_items || total != 0) {
         if (unlikely(!c->st_items)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.items", c->context_prefix, stats.name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.items", context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.items", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.items", context_prefix);
 
             c->st_items = rrdset_create_localhost(
                 "netdata"
                 , id
                 , NULL
-                , c->family
+                , family
                 , context
                 , "Dictionary Items"
                 , "items"
                 , "netdata"
                 , "stats"
-                , c->priority + 1
+                , priority + 1
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
@@ -3063,22 +3063,22 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     if(c->st_ops || total != 0) {
         if (unlikely(!c->st_ops)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.ops", c->context_prefix, stats.name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.ops", context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.ops", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.ops", context_prefix);
 
             c->st_ops = rrdset_create_localhost(
                 "netdata"
                 , id
                 , NULL
-                , c->family
+                , family
                 , context
                 , "Dictionary Operations"
                 , "ops/s"
                 , "netdata"
                 , "stats"
-                , c->priority + 2
+                , priority + 2
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
@@ -3122,22 +3122,22 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     if(c->st_callbacks || total != 0) {
         if (unlikely(!c->st_callbacks)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.callbacks", c->context_prefix, stats.name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.callbacks", context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.callbacks", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.callbacks", context_prefix);
 
             c->st_callbacks = rrdset_create_localhost(
                 "netdata"
                 , id
                 , NULL
-                , c->family
+                , family
                 , context
                 , "Dictionary Callbacks"
                 , "callbacks/s"
                 , "netdata"
                 , "stats"
-                , c->priority + 3
+                , priority + 3
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
@@ -3168,22 +3168,22 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     if(c->st_memory || total != 0) {
         if (unlikely(!c->st_memory)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.memory", c->context_prefix, stats.name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.memory", context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.memory", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.memory", context_prefix);
 
             c->st_memory = rrdset_create_localhost(
                 "netdata"
                 , id
                 , NULL
-                , c->family
+                , family
                 , context
                 , "Dictionary Memory"
                 , "bytes"
                 , "netdata"
                 , "stats"
-                , c->priority + 4
+                , priority + 4
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_STACKED
             );
@@ -3213,22 +3213,22 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     if(c->st_spins || total != 0) {
         if (unlikely(!c->st_spins)) {
             char id[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.spins", c->context_prefix, stats.name);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "%s.%s.spins", context_prefix, stats.name);
 
             char context[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.spins", c->context_prefix);
+            snprintfz(context, RRD_ID_LENGTH_MAX, "netdata.%s.category.spins", context_prefix);
 
             c->st_spins = rrdset_create_localhost(
                 "netdata"
                 , id
                 , NULL
-                , c->family
+                , family
                 , context
                 , "Dictionary Spins"
                 , "count"
                 , "netdata"
                 , "stats"
-                , c->priority + 5
+                , priority + 5
                 , localhost->rrd_update_every
                 , RRDSET_TYPE_LINE
             );
