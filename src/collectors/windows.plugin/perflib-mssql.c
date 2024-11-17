@@ -803,7 +803,8 @@ int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
         mli->rd_lockWait = rrddim_add(mli->parent->st_lockWait, id, instance, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(mli->parent->st_lockWait, mli->rd_lockWait, (collected_number)mli->lockWait.current.Data);
+    collected_number dataValue = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MLI_IDX_WAIT)) ? mli->lockWait.current.Data : 0;
+    rrddim_set_by_pointer(mli->parent->st_lockWait, mli->rd_lockWait, dataValue);
 
     if (!mli->parent->st_deadLocks) {
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_locks_deadlocks", mli->parent->instanceID);
@@ -830,7 +831,8 @@ int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
         mli->rd_deadLocks = rrddim_add(mli->parent->st_deadLocks, id, instance, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(mli->parent->st_deadLocks, mli->rd_deadLocks, (collected_number)mli->deadLocks.current.Data);
+    dataValue = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MLI_IDX_DEAD_LOCKS)) ? mli->deadLocks.current.Data : 0;
+    rrddim_set_by_pointer(mli->parent->st_deadLocks, mli->rd_deadLocks, dataValue);
 
     return 1;
 }
@@ -861,8 +863,11 @@ static void do_mssql_locks(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *p
             mli->parent = p;
         }
 
-        perflibGetObjectCounter(pDataBlock, pObjectType, &mli->lockWait);
-        perflibGetObjectCounter(pDataBlock, pObjectType, &mli->deadLocks);
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mli->lockWait))
+            mli->updated |= (1<<NETDATA_MSSQL_ENUM_MLI_IDX_WAIT);
+
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mli->deadLocks))
+            mli->updated |= (1<<NETDATA_MSSQL_ENUM_MLI_IDX_DEAD_LOCKS);
     }
 
     dictionary_sorted_walkthrough_read(p->locks_instances, dict_mssql_locks_charts_cb, &update_every);
