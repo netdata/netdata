@@ -1864,8 +1864,10 @@ static void replication_main_cleanup(void *pptr) {
     replication_globals.main_thread.threads_ptrs = NULL;
     __atomic_sub_fetch(&replication_buffers_allocated, threads * sizeof(ND_THREAD *), __ATOMIC_RELAXED);
 
-    aral_destroy(replication_globals.aral_rse);
-    replication_globals.aral_rse = NULL;
+    // we should not destroy aral on exit
+    // the sender threads may still be working on flushing senders replication requests
+    //aral_destroy(replication_globals.aral_rse);
+    //replication_globals.aral_rse = NULL;
 
     // custom code
     worker_unregister();
