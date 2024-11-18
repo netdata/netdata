@@ -728,7 +728,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_COMPRESSION_ERROR, "disconnect compression error");
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_COMPRESSION_ERROR, "disconnect receiver left");
+    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVER_LEFT, "disconnect receiver left");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_HOST_CLEANUP, "disconnect host cleanup");
 
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_REPLAY_REQUEST, "replay request");
