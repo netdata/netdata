@@ -4,6 +4,7 @@
 # PROVIDE: netdata
 # REQUIRE: DAEMON NETWORKING
 # BEFORE: LOGIN
+# KEYWORD: shutdown
 
 . /etc/rc.subr
 
