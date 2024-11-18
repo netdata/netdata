@@ -473,16 +473,21 @@ ml_dimension_deserialize_kmeans(const char *json_str)
     // Check the version
     {
         struct json_object *tmp_obj;
-        if (!json_object_object_get_ex(root, "version", &tmp_obj) ||
-            !json_object_is_type(tmp_obj, json_type_string)) {
-            netdata_log_error("Failed to deserialize kmeans: missing version field");
+        if (!json_object_object_get_ex(root, "version", &tmp_obj)) {
+            netdata_log_error("Failed to deserialize kmeans: missing key 'version'");
             json_object_put(root);
             return false;
         }
-
+        if (!json_object_is_type(tmp_obj, json_type_string)) {
+            netdata_log_error("Failed to deserialize kmeans: failed to parse string for 'version'");
+            json_object_put(root);
+            return false;
+        }
         const char *version = json_object_get_string(tmp_obj);
+
         if (strcmp(version, "1")) {
             netdata_log_error("Failed to deserialize kmeans: expected version 1");
+            json_object_put(root);
             return false;
         }
     }
@@ -498,25 +503,33 @@ ml_dimension_deserialize_kmeans(const char *json_str)
 
         struct json_object *tmp_obj;
         for (size_t i = 0; i != keys.size(); i++) {
-            if (!json_object_object_get_ex(root, keys[i], &tmp_obj) ||
-                !json_object_is_type(tmp_obj, json_type_string)) {
+            if (!json_object_object_get_ex(root, keys[i], &tmp_obj)) {
+                netdata_log_error("Failed to deserialize kmeans: missing key '%s'", keys[i]);
+                json_object_put(root);
+                return false;
+            }
+            if (!json_object_is_type(tmp_obj, json_type_string)) {
                 netdata_log_error("Failed to deserialize kmeans: missing string value for key '%s'", keys[i]);
                 json_object_put(root);
                 return false;
             }
-
             values[i] = json_object_get_string(tmp_obj);
         }
     }
+
     DimensionLookupInfo DLI(values[0], values[1], values[2]);
 
     // Parse the kmeans model
     ml_kmeans_inlined_t inlined_km;
     {
         struct json_object *kmeans_obj;
-        if (!json_object_object_get_ex(root, "model", &kmeans_obj) ||
-            !json_object_is_type(kmeans_obj, json_type_object)) {
-            netdata_log_error("Failed to deserialize kmeans: missing object for key 'model'");
+        if (!json_object_object_get_ex(root, "model", &kmeans_obj)) {
+            netdata_log_error("Failed to deserialize kmeans: missing key 'model'");
+            json_object_put(root);
+            return false;
+        }
+        if (!json_object_is_type(kmeans_obj, json_type_object)) {
+            netdata_log_error("Failed to deserialize kmeans: failed to parse object for 'model'");
             json_object_put(root);
             return false;
         }
@@ -536,7 +549,7 @@ ml_dimension_deserialize_kmeans(const char *json_str)
     }
 
     ml_queue_item_t item;
-    item.type = ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL;
+    item.type = ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL;
     item.add_existing_model = {
         DLI, inlined_km
     };
@@ -1132,7 +1145,7 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
     AcquiredDimension AcqDim(req.DLI);
 
     if (!AcqDim.acquired()) {
-        netdata_log_error("Failed to create new model: could not acquire dimension (machine-guid: %s, dimension: '%s.%s')",
+        netdata_log_error("Failed to add existing model: could not acquire dimension (machine-guid: %s, dimension: '%s.%s')",
                           req.DLI.machineGuid(), req.DLI.chartId(), req.DLI.dimensionId());
         return ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION;
     }
