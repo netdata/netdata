@@ -557,7 +557,7 @@ static void ml_dimension_stream_kmeans(const ml_dimension_t *dim)
 
     BUFFER *wb = sender_start(s);
     buffer_sprintf(
-        wb, PLUGINSD_KEYWORD_JSON " " PLUGINSD_KEYWORD_JSON_CMD_STREAM_PATH "\n%s\n" PLUGINSD_KEYWORD_JSON_END "\n",
+        wb, PLUGINSD_KEYWORD_JSON " " PLUGINSD_KEYWORD_JSON_CMD_ML_MODEL "\n%s\n" PLUGINSD_KEYWORD_JSON_END "\n",
         buffer_tostring(payload));
     sender_commit(s, wb, STREAM_TRAFFIC_TYPE_METADATA);
     global_statistics_ml_models_sent();
