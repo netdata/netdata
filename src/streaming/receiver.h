@@ -38,6 +38,12 @@ struct receiver_state {
         size_t id;
         bool stop;
         struct plugind cd;
+
+        struct {
+            size_t used;
+            char buf[PLUGINSD_LINE_MAX + 1];
+            char *header;
+        } compressed;
     } receiver;
 
     BUFFER *buffer;

@@ -83,25 +83,6 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
 
     do {
         errno_clear();
-
-        switch(wait_on_socket_or_cancel_with_timeout(&r->sock.ssl, r->sock.fd, 0, POLLIN, NULL)) {
-            case 0: // data are waiting
-                break;
-
-            case 1: // timeout reached
-                netdata_log_error("STREAM: %s(): timeout while waiting for data on socket!", __FUNCTION__);
-                return -3;
-
-            case -1: // thread cancelled
-                netdata_log_error("STREAM: %s(): thread has been cancelled timeout while waiting for data on socket!", __FUNCTION__);
-                return -4;
-
-            default:
-            case 2: // error on socket
-                netdata_log_error("STREAM: %s() socket error!", __FUNCTION__);
-                return -2;
-        }
-
         bytes_read = nd_sock_read(&r->sock, buffer, size);
 
     } while(bytes_read < 0 && errno == EINTR && tries--);
@@ -154,10 +135,8 @@ static inline STREAM_HANDSHAKE read_stream_error_to_reason(int code) {
 }
 
 static inline bool receiver_read_uncompressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(r->reader.read_buffer[r->reader.read_len] != '\0')
-        fatal("%s(): read_buffer does not start with zero", __FUNCTION__ );
-#endif
+    internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
+                   "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
     int bytes_read = read_stream(r, r->reader.read_buffer + r->reader.read_len, sizeof(r->reader.read_buffer) - r->reader.read_len - 1);
     if(unlikely(bytes_read <= 0)) {
@@ -174,110 +153,104 @@ static inline bool receiver_read_uncompressed(struct receiver_state *r, STREAM_H
     return true;
 }
 
+typedef enum {
+    DECOMPRESS_NEED_MORE_DATA,
+    DECOMPRESS_FAILED,
+    DECOMPRESS_OK,
+} decompressor_status_t;
+
+static inline void receiver_move_compressed(struct receiver_state *r) {
+    size_t remaining = r->receiver.compressed.used - (r->receiver.compressed.header - r->receiver.compressed.buf);
+    if(remaining > 0) {
+        memmove(r->receiver.compressed.buf, r->receiver.compressed.header, remaining);
+        r->receiver.compressed.header = r->receiver.compressed.buf;
+        r->receiver.compressed.used = remaining;
+    }
+    else {
+        r->receiver.compressed.header = NULL;
+        r->receiver.compressed.used = 0;
+    }
+}
+
+static inline decompressor_status_t receiver_feed_decompressor(struct receiver_state *r) {
+    if(!r->receiver.compressed.header)
+        r->receiver.compressed.header = r->receiver.compressed.buf;
+
+    if(r->receiver.compressed.header + r->decompressor.signature_size > r->receiver.compressed.buf + r->receiver.compressed.used) {
+        // incomplete header, we need to wait for more data
+        receiver_move_compressed(r);
+        return DECOMPRESS_NEED_MORE_DATA;
+    }
+
+    size_t compressed_message_size = rrdpush_decompressor_start(&r->decompressor, r->receiver.compressed.header, r->decompressor.signature_size);
+    if (unlikely(!compressed_message_size)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "multiplexed uncompressed data in compressed stream!");
+        return DECOMPRESS_FAILED;
+    }
+
+    if(unlikely(compressed_message_size > COMPRESSION_MAX_MSG_SIZE)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "received a compressed message of %zu bytes, which is bigger than the max compressed message "
+               "size supported of %zu. Ignoring message.",
+               compressed_message_size, (size_t)COMPRESSION_MAX_MSG_SIZE);
+        return DECOMPRESS_FAILED;
+    }
+
+    if(r->receiver.compressed.header + r->decompressor.signature_size + compressed_message_size > r->receiver.compressed.buf + r->receiver.compressed.used) {
+        // incomplete compressed message, we need to wait for more data
+        receiver_move_compressed(r);
+        return DECOMPRESS_NEED_MORE_DATA;
+    }
+
+    size_t bytes_to_parse = rrdpush_decompress(&r->decompressor, r->receiver.compressed.header + r->decompressor.signature_size, compressed_message_size);
+    if (unlikely(!bytes_to_parse)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "no bytes to parse.");
+        return DECOMPRESS_FAILED;
+    }
+
+    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_to_parse);
+
+    // move the header to the next message
+    r->receiver.compressed.header += r->decompressor.signature_size + compressed_message_size;
+
+    return DECOMPRESS_OK;
+}
+
+static inline decompressor_status_t receiver_get_decompressed(struct receiver_state *r) {
+    if (unlikely(!rrdpush_decompressed_bytes_in_buffer(&r->decompressor)))
+        return DECOMPRESS_NEED_MORE_DATA;
+
+    size_t available = sizeof(r->reader.read_buffer) - r->reader.read_len - 1;
+    if (likely(available)) {
+        size_t len = rrdpush_decompressor_get(&r->decompressor, r->reader.read_buffer + r->reader.read_len, available);
+        if (unlikely(!len)) {
+            internal_error(true, "decompressor returned zero length #1");
+            return DECOMPRESS_FAILED;
+        }
+
+        r->reader.read_len += (int)len;
+        r->reader.read_buffer[r->reader.read_len] = '\0';
+    }
+    else {
+        internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", r->reader.read_len);
+        return DECOMPRESS_FAILED;
+    }
+
+    return DECOMPRESS_OK;
+}
+
 static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
 
     internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
-    // first use any available uncompressed data
-    if (likely(rrdpush_decompressed_bytes_in_buffer(&r->decompressor))) {
-        size_t available = sizeof(r->reader.read_buffer) - r->reader.read_len - 1;
-        if (likely(available)) {
-            size_t len = rrdpush_decompressor_get(&r->decompressor, r->reader.read_buffer + r->reader.read_len, available);
-            if (unlikely(!len)) {
-                internal_error(true, "decompressor returned zero length #1");
-                return false;
-            }
-
-            r->reader.read_len += (int)len;
-            r->reader.read_buffer[r->reader.read_len] = '\0';
-        }
-        else
-            internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", r->reader.read_len);
-
-        return true;
-    }
-
-    // no decompressed data available
-    // read the compression signature of the next block
-
-    if(unlikely(r->reader.read_len + r->decompressor.signature_size > sizeof(r->reader.read_buffer) - 1)) {
-        internal_error(true, "The last incomplete line does not leave enough room for the next compression header! "
-                             "Already have %zd bytes in read_buffer.", r->reader.read_len);
+    int bytes_read = read_stream(r, r->receiver.compressed.buf + r->receiver.compressed.used, sizeof(r->receiver.compressed.buf) - r->receiver.compressed.used);
+    if (unlikely(bytes_read <= 0)) {
+        *reason = read_stream_error_to_reason(bytes_read);
         return false;
     }
-
-    // read the compression signature from the stream
-    // we have to do a loop here, because read_stream() may return less than the data we need
-    int bytes_read = 0;
-    do {
-        int ret = read_stream(r, r->reader.read_buffer + r->reader.read_len + bytes_read, r->decompressor.signature_size - bytes_read);
-        if (unlikely(ret <= 0)) {
-            *reason = read_stream_error_to_reason(ret);
-            return false;
-        }
-
-        bytes_read += ret;
-    } while(unlikely(bytes_read < (int)r->decompressor.signature_size));
-
+    r->receiver.compressed.used += bytes_read;
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
-
-    if(unlikely(bytes_read != (int)r->decompressor.signature_size))
-        fatal("read %d bytes, but expected compression signature of size %zu", bytes_read, r->decompressor.signature_size);
-
-    size_t compressed_message_size = rrdpush_decompressor_start(&r->decompressor, r->reader.read_buffer + r->reader.read_len, bytes_read);
-    if (unlikely(!compressed_message_size)) {
-        internal_error(true, "multiplexed uncompressed data in compressed stream!");
-        r->reader.read_len += bytes_read;
-        r->reader.read_buffer[r->reader.read_len] = '\0';
-        return true;
-    }
-
-    if(unlikely(compressed_message_size > COMPRESSION_MAX_MSG_SIZE)) {
-        netdata_log_error("received a compressed message of %zu bytes, which is bigger than the max compressed message size supported of %zu. Ignoring message.",
-              compressed_message_size, (size_t)COMPRESSION_MAX_MSG_SIZE);
-        return false;
-    }
-
-    // delete compression header from our read buffer
-    r->reader.read_buffer[r->reader.read_len] = '\0';
-
-    // Read the entire compressed block of compressed data
-    char compressed[compressed_message_size];
-    size_t compressed_bytes_read = 0;
-    do {
-        size_t start = compressed_bytes_read;
-        size_t remaining = compressed_message_size - start;
-
-        int last_read_bytes = read_stream(r, &compressed[start], remaining);
-        if (unlikely(last_read_bytes <= 0)) {
-            *reason = read_stream_error_to_reason(last_read_bytes);
-            return false;
-        }
-
-        compressed_bytes_read += last_read_bytes;
-
-    } while(unlikely(compressed_message_size > compressed_bytes_read));
-
-    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)compressed_bytes_read);
-
-    // decompress the compressed block
-    size_t bytes_to_parse = rrdpush_decompress(&r->decompressor, compressed, compressed_bytes_read);
-    if (unlikely(!bytes_to_parse)) {
-        internal_error(true, "no bytes to parse.");
-        return false;
-    }
-
-    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_to_parse);
-
-    // fill read buffer with decompressed data
-    size_t len = (int) rrdpush_decompressor_get(&r->decompressor, r->reader.read_buffer + r->reader.read_len, sizeof(r->reader.read_buffer) - r->reader.read_len - 1);
-    if (unlikely(!len)) {
-        internal_error(true, "decompressor returned zero length #2");
-        return false;
-    }
-    r->reader.read_len += (int)len;
-    r->reader.read_buffer[r->reader.read_len] = '\0';
 
     return true;
 }
@@ -541,6 +514,8 @@ static void stream_receiver_move_queue_to_running(struct receiver *rr) {
         }
 
         stream_receiver_realloc_arrays_unsafe(rr, slot);
+        rpt->receiver.compressed.header = NULL;
+        rpt->receiver.compressed.used = 0;
 
         streaming_parser_init(rpt);
 
@@ -632,27 +607,77 @@ static void *stream_receive_thread(void *ptr) {
             };
             ND_LOG_STACK_PUSH(lgs);
 
-            STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
-            bool have_new_data = rpt->compressed_connection ? receiver_read_compressed(rpt, &reason)
-                                                              : receiver_read_uncompressed(rpt, &reason);
-
-            if(unlikely(!have_new_data)) {
-                receiver_set_exit_reason(rpt, reason, false);
+            if(receiver_should_stop(rpt)) {
+                receiver_set_exit_reason(rpt, rpt->exit.reason, false);
                 stream_receiver_remove(rr, slot);
                 continue;
             }
 
-            while(!receiver_should_stop(rpt) &&
-                   buffered_reader_next_line(&rpt->reader, rpt->buffer)) {
-
-                if(unlikely(parser_action(parser, rpt->buffer->buffer))) {
-                    receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
+            if(rpt->compressed_connection) {
+                STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
+                if(unlikely(!receiver_read_compressed(rpt, &reason))) {
+                    receiver_set_exit_reason(rpt, reason, false);
                     stream_receiver_remove(rr, slot);
-                    break;
+                    continue;
                 }
 
-                rpt->buffer->len = 0;
-                rpt->buffer->buffer[0] = '\0';
+                bool node_broken = false;
+                while(!node_broken) {
+                    decompressor_status_t feed = receiver_feed_decompressor(rpt);
+                    if(likely(feed == DECOMPRESS_OK)) {
+                        while (1) {
+                            decompressor_status_t rc = receiver_get_decompressed(rpt);
+                            if (likely(rc == DECOMPRESS_OK)) {
+                                while (buffered_reader_next_line(&rpt->reader, rpt->buffer)) {
+                                    if (unlikely(parser_action(parser, rpt->buffer->buffer))) {
+                                        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
+                                        stream_receiver_remove(rr, slot);
+                                        break;
+                                    }
+
+                                    rpt->buffer->len = 0;
+                                    rpt->buffer->buffer[0] = '\0';
+                                }
+                            }
+                            else if (rc == DECOMPRESS_NEED_MORE_DATA)
+                                break;
+
+                            else {
+                                node_broken = true;
+                                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
+                                stream_receiver_remove(rr, slot);
+                                break;
+                            }
+                        }
+                    }
+                    else if (feed == DECOMPRESS_NEED_MORE_DATA)
+                        break;
+                    else {
+                        node_broken = true;
+                        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
+                        stream_receiver_remove(rr, slot);
+                        break;
+                    }
+                }
+            }
+            else {
+                STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
+                if(unlikely(!receiver_read_uncompressed(rpt, &reason))) {
+                    receiver_set_exit_reason(rpt, reason, false);
+                    stream_receiver_remove(rr, slot);
+                    continue;
+                }
+
+                while(buffered_reader_next_line(&rpt->reader, rpt->buffer)) {
+                    if(unlikely(parser_action(parser, rpt->buffer->buffer))) {
+                        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
+                        stream_receiver_remove(rr, slot);
+                        break;
+                    }
+
+                    rpt->buffer->len = 0;
+                    rpt->buffer->buffer[0] = '\0';
+                }
             }
 
             rr->run.pollfds[slot].revents = 0;
@@ -678,6 +703,8 @@ static void stream_receiver_add(struct receiver_state *rpt) {
             receiver_globals.cores = 4;
         else if(receiver_globals.cores > MAX_RECEIVERS)
             receiver_globals.cores = MAX_RECEIVERS;
+
+        receiver_globals.cores = 1;
     }
 
     size_t min_slot = 0;
