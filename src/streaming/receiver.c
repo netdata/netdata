@@ -470,6 +470,11 @@ struct {
     struct receiver receivers[MAX_RECEIVERS];
 } receiver_globals = { 0 };
 
+void stream_receiver_cancel_threads(void) {
+    for(size_t i = 0; i < MAX_RECEIVERS ;i++)
+        nd_thread_signal_cancel(receiver_globals.receivers[i].thread);
+}
+
 static void stream_receiver_realloc_arrays_unsafe(struct receiver *rr, size_t slot) {
     internal_fatal(rr->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
