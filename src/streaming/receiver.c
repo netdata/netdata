@@ -283,6 +283,34 @@ static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HAN
 }
 
 bool plugin_is_enabled(struct plugind *cd);
+static void rrdhost_clear_receiver(struct receiver_state *rpt);
+
+static void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status, ND_LOG_FIELD_PRIORITY priority) {
+    // this function may be called BEFORE we spawn the receiver thread
+    // so, we need to add the fields again (it does not harm)
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
+        ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
+        ND_LOG_FIELD_TXT(NDF_NIDL_NODE, (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""),
+        ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_from_child_msgid),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    nd_log(NDLS_ACCESS, priority, "api_key:'%s' machine_guid:'%s' msg:'%s'"
+           , (rpt->key && *rpt->key)? rpt->key : ""
+           , (rpt->machine_guid && *rpt->machine_guid) ? rpt->machine_guid : ""
+           , msg);
+
+    nd_log(NDLS_DAEMON, priority, "STREAM_RECEIVER for '%s': %s %s%s%s"
+           , (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""
+           , msg
+           , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?" (":""
+           , stream_handshake_error_to_string(rpt->exit.reason)
+               , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?")":""
+    );
+}
 
 static void receiver_set_exit_reason(struct receiver_state *rpt, STREAM_HANDSHAKE reason, bool force) {
     if(force || !rpt->exit.reason)
@@ -292,7 +320,7 @@ static void receiver_set_exit_reason(struct receiver_state *rpt, STREAM_HANDSHAK
 static inline bool receiver_should_stop(struct receiver_state *rpt) {
     static __thread size_t counter = 0;
 
-    if(nd_thread_signaled_to_cancel()) {
+    if(__atomic_load_n(&rpt->receiver.stop, __ATOMIC_RELAXED)) {
         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
         return true;
     }
@@ -313,18 +341,32 @@ static inline bool receiver_should_stop(struct receiver_state *rpt) {
     return false;
 }
 
-static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd) {
-    size_t result = 0;
+static void streaming_parser_init(struct receiver_state *rpt) {
+    rpt->receiver.cd = (struct plugind){
+        .update_every = default_rrd_update_every,
+        .unsafe = {
+            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+            .running = true,
+            .enabled = true,
+        },
+        .started_t = now_realtime_sec(),
+    };
+
+    // put the client IP and port into the buffers used by plugins.d
+    snprintfz(rpt->receiver.cd.id,           CONFIG_MAX_NAME,  "%s:%s", rpt->client_ip, rpt->client_port);
+    snprintfz(rpt->receiver.cd.filename,     FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
+    snprintfz(rpt->receiver.cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
+    snprintfz(rpt->receiver.cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
     PARSER *parser = NULL;
     {
         PARSER_USER_OBJECT user = {
-                .enabled = plugin_is_enabled(cd),
-                .host = rpt->host,
-                .opaque = rpt,
-                .cd = cd,
-                .trust_durations = 1,
-                .capabilities = rpt->capabilities,
+            .enabled = plugin_is_enabled(&rpt->receiver.cd),
+            .host = rpt->host,
+            .opaque = rpt,
+            .cd = &rpt->receiver.cd,
+            .trust_durations = 1,
+            .capabilities = rpt->capabilities,
         };
 
         parser = parser_init(&user, rpt->sock.fd, rpt->sock.fd, PARSER_INPUT_SPLIT,
@@ -339,71 +381,338 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd) {
 
     rrd_collector_started();
 
-    bool compressed_connection = rrdpush_decompression_initialize(rpt);
+    rpt->compressed_connection = rrdpush_decompression_initialize(rpt);
     buffered_reader_init(&rpt->reader);
 
 #ifdef NETDATA_LOG_STREAM_RECEIVE
     {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "/tmp/stream-receiver-%s.txt", rpt->host ? rrdhost_hostname(
-                        rpt->host) : "unknown"
-                 );
+                                                                                         rpt->host) : "unknown"
+        );
         parser->user.stream_log_fp = fopen(filename, "w");
         parser->user.stream_log_repertoire = PARSER_REP_METADATA;
     }
 #endif
 
-    CLEAN_BUFFER *buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
-
-    ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
-            ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
-            ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
-            ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
-            ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
-
     __atomic_store_n(&rpt->parser, parser, __ATOMIC_RELAXED);
     rrdpush_receiver_send_node_and_claim_id_to_child(rpt->host);
 
-    while(!receiver_should_stop(rpt)) {
+    rpt->buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
+}
 
-        if(!buffered_reader_next_line(&rpt->reader, buffer)) {
-            STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
+static void stream_receiver_on_disconnect(struct receiver_state *rpt) {
+    if(!rpt) return;
 
-            bool have_new_data = compressed_connection ? receiver_read_compressed(rpt, &reason)
-                                                       : receiver_read_uncompressed(rpt, &reason);
+    __atomic_store_n(&rpt->receiver.stop, false, __ATOMIC_RELAXED);
 
-            if(unlikely(!have_new_data)) {
-                receiver_set_exit_reason(rpt, reason, false);
-                break;
-            }
+    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
+                     "receive thread ended (task id %d)"
+                     , rpt->hostname ? rpt->hostname : "-"
+                     , rpt->client_ip ? rpt->client_ip : "-", rpt->client_port ? rpt->client_port : "-", gettid_cached());
 
-            continue;
-        }
-
-        if(unlikely(parser_action(parser, buffer->buffer))) {
-            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-            break;
-        }
-
-        buffer->len = 0;
-        buffer->buffer[0] = '\0';
-    }
+    buffer_free(rpt->buffer);
+    rpt->buffer = NULL;
 
     // cleanup the sender buffer, because we may end-up reusing an incomplete buffer
     sender_thread_buffer_free();
-    parser->user.v2.stream_buffer.wb = NULL;
 
-    // make sure send_to_plugin() will not write any data to the socket
-    spinlock_lock(&parser->writer.spinlock);
-    parser->fd_output = -1;
-    parser->ssl_output = NULL;
-    spinlock_unlock(&parser->writer.spinlock);
+    size_t count = 0;
+    PARSER *parser = __atomic_load_n(&rpt->parser, __ATOMIC_RELAXED);
+    if(parser) {
+        parser->user.v2.stream_buffer.wb = NULL;
 
-    result = parser->user.data_collections_count;
-    return result;
+        // make sure send_to_plugin() will not write any data to the socket
+        spinlock_lock(&parser->writer.spinlock);
+        parser->fd_output = -1;
+        parser->ssl_output = NULL;
+        spinlock_unlock(&parser->writer.spinlock);
+
+        count = parser->user.data_collections_count;
+    }
+
+    // the parser stopped
+    receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
+
+    {
+        char msg[100 + 1];
+        snprintfz(msg, sizeof(msg) - 1, "disconnected (completed %zu updates)", count);
+        rrdpush_receive_log_status(rpt, msg, RRDPUSH_STATUS_DISCONNECTED, NDLP_WARNING);
+    }
+
+    // in case we have cloud connection we inform cloud
+    // a child disconnected
+    uint64_t total_reboot = rrdhost_stream_path_total_reboot_time_ms(rpt->host);
+    schedule_node_state_update(rpt->host, MIN((total_reboot * MAX_CHILD_DISC_TOLERANCE), MAX_CHILD_DISC_DELAY));
+
+    rrdhost_clear_receiver(rpt);
+    rrdhost_set_is_parent_label();
+    receiver_state_free(rpt);
+}
+
+static bool stream_receiver_log_capabilities(BUFFER *wb, void *ptr) {
+    struct receiver_state *rpt = ptr;
+    if(!rpt)
+        return false;
+
+    stream_capabilities_to_string(wb, rpt->capabilities);
+    return true;
+}
+
+static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
+    struct receiver_state *rpt = ptr;
+    if(!rpt)
+        return false;
+
+    buffer_strcat(wb, nd_sock_is_ssl(&rpt->sock) ? "https" : "http");
+    return true;
+}
+
+#define MAX_RECEIVERS 2048
+
+struct receiver {
+    size_t id;
+    pid_t tid;
+
+    ND_THREAD *thread;
+    size_t nodes;
+
+    struct {
+        SPINLOCK spinlock;
+        struct receiver_state *ll;
+    } queue;
+
+    struct {
+        size_t size;
+        size_t used;
+        struct pollfd *pollfds;
+        struct receiver_state **nodes;
+    } run;
+};
+
+struct {
+    size_t cores;
+    struct receiver receivers[MAX_RECEIVERS];
+} receiver_globals = { 0 };
+
+static void stream_receiver_realloc_arrays_unsafe(struct receiver *rr, size_t slot) {
+    internal_fatal(rr->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
+    if(slot >= rr->run.size) {
+        size_t new_size = rr->run.size > 0 ? rr->run.size * 2 : 8;
+        rr->run.pollfds = reallocz(rr->run.pollfds, new_size * sizeof(*rr->run.pollfds));
+        rr->run.nodes = reallocz(rr->run.nodes, new_size * sizeof(*rr->run.nodes));
+        rr->run.size = new_size;
+        rr->run.used = slot + 1;
+    }
+    else if(slot >= rr->run.used)
+        rr->run.used = slot + 1;
+}
+
+static void stream_receiver_move_queue_to_running(struct receiver *rr) {
+    internal_fatal(rr->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
+    size_t first_slot = 1;
+
+    // process the queue
+    spinlock_lock(&rr->queue.spinlock);
+    while(rr->queue.ll) {
+        // worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DEQUEUE);
+
+        struct receiver_state *rpt = rr->queue.ll;
+        ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
+            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
+            ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rr->queue.ll, rpt, prev, next);
+
+        // slot 0 is our pipe
+        size_t slot = rr->run.used > 0 ? rr->run.used : 1;
+
+        // find an empty slot
+        for(size_t i = first_slot; i < slot && i < rr->run.used ;i++) {
+            if(!rr->run.nodes[i]) {
+                slot = i;
+                break;
+            }
+        }
+
+        stream_receiver_realloc_arrays_unsafe(rr, slot);
+
+        streaming_parser_init(rpt);
+
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "STREAM [receive%zu] [%s]: moving host from receiver queue to receiver running slot %zu...",
+               rr->id, rrdhost_hostname(rpt->host), slot);
+
+        rr->run.nodes[slot] = rpt;
+        rr->run.pollfds[slot] = (struct pollfd){
+            .fd = rpt->sock.fd,
+            .events = POLLIN,
+            .revents = 0,
+        };
+
+        first_slot = slot + 1;
+    }
+    spinlock_unlock(&rr->queue.spinlock);
+}
+
+static void stream_receiver_remove(struct receiver *rr, size_t slot) {
+    internal_fatal(rr->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
+    struct receiver_state *rpt = rr->run.nodes[slot];
+    stream_receiver_on_disconnect(rpt);
+    rr->run.nodes[slot] = NULL;
+    rr->run.pollfds[slot] = (struct pollfd){
+        .fd = -1,
+        .events = 0,
+        .revents = 0,
+    };
+}
+
+static void *stream_receive_thread(void *ptr) {
+    struct receiver *rr = ptr;
+    rr->tid = gettid_cached();
+
+    worker_register("STREAMRCV");
+
+    worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_READ,
+                                      "received bytes", "bytes/s",
+                                      WORKER_METRIC_INCREMENT);
+
+    worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED,
+                                      "uncompressed bytes", "bytes/s",
+                                      WORKER_METRIC_INCREMENT);
+
+    worker_register_job_custom_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
+                                      "replication completion", "%",
+                                      WORKER_METRIC_ABSOLUTE);
+
+    while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
+        stream_receiver_move_queue_to_running(rr);
+
+        if(!rr->run.used) {
+            sleep_usec(50 * USEC_PER_MS);
+            continue;
+        }
+
+        int poll_rc = poll(rr->run.pollfds, rr->run.used, 100);
+
+        if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR)))
+            // timed out - just loop again
+            continue;
+
+        if(unlikely(poll_rc == -1)) {
+            // poll() returned an error
+            nd_log_limit_static_thread_var(erl, 1, 1 * USEC_PER_MS);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "STREAM [receiver%zu] poll() returned error", rr->id);
+            continue;
+        }
+
+        for(size_t slot = 0; slot < rr->run.used ;slot++) {
+            if(!rr->run.pollfds[slot].revents || !rr->run.nodes[slot]) continue;
+
+            struct receiver_state *rpt = rr->run.nodes[slot];
+
+            PARSER *parser = __atomic_load_n(&rpt->parser, __ATOMIC_RELAXED);
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
+                ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
+                ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rpt->hostname),
+                ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
+                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
+                ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
+                ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
+                ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
+                ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
+            STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
+            bool have_new_data = rpt->compressed_connection ? receiver_read_compressed(rpt, &reason)
+                                                              : receiver_read_uncompressed(rpt, &reason);
+
+            if(unlikely(!have_new_data)) {
+                receiver_set_exit_reason(rpt, reason, false);
+                stream_receiver_remove(rr, slot);
+                continue;
+            }
+
+            while(!receiver_should_stop(rpt) &&
+                   buffered_reader_next_line(&rpt->reader, rpt->buffer)) {
+
+                if(unlikely(parser_action(parser, rpt->buffer->buffer))) {
+                    receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
+                    stream_receiver_remove(rr, slot);
+                    break;
+                }
+
+                rpt->buffer->len = 0;
+                rpt->buffer->buffer[0] = '\0';
+            }
+
+            rr->run.pollfds[slot].revents = 0;
+        }
+    }
+
+    for(size_t i = 0; i < rr->run.used ;i++)
+        stream_receiver_remove(rr, i);
+
+    worker_unregister();
+
+    rr->thread = NULL;
+    return NULL;
+}
+
+static void stream_receiver_add(struct receiver_state *rpt) {
+    SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+
+    spinlock_lock(&spinlock);
+    if(!receiver_globals.cores) {
+        receiver_globals.cores = os_get_system_cpus() - 2;
+        if(receiver_globals.cores < 4)
+            receiver_globals.cores = 4;
+        else if(receiver_globals.cores > MAX_RECEIVERS)
+            receiver_globals.cores = MAX_RECEIVERS;
+    }
+
+    size_t min_slot = 0;
+    size_t min_nodes = receiver_globals.receivers[0].nodes;
+    for(size_t i = 1; i < receiver_globals.cores ; i++) {
+        if(receiver_globals.receivers[i].nodes < min_nodes) {
+            min_slot = i;
+            min_nodes = receiver_globals.receivers[i].nodes;
+        }
+    }
+    rpt->receiver.id = min_slot;
+
+    struct receiver *rr = &receiver_globals.receivers[rpt->receiver.id];
+
+    spinlock_lock(&rr->queue.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rr->queue.ll, rpt, prev, next);
+    rr->nodes++;
+    spinlock_unlock(&rr->queue.spinlock);
+
+    if(!rr->thread) {
+        rr->id = rr - receiver_globals.receivers;
+
+        char tag[NETDATA_THREAD_TAG_MAX + 1];
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_RECEIVER "[%zu]", rr->id);
+        tag[NETDATA_THREAD_TAG_MAX] = '\0';
+
+        rr->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_receive_thread, rr);
+        if(!rr->thread) {
+            rrdpush_receive_log_status(
+                rpt, "can't create receiver thread",
+                RRDPUSH_STATUS_INTERNAL_SERVER_ERROR, NDLP_ERR);
+        }
+    }
+
+    spinlock_unlock(&spinlock);
 }
 
 static void rrdpush_receiver_replication_reset(RRDHOST *host) {
@@ -531,7 +840,7 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
             shutdown(host->receiver->sock.fd, SHUT_RDWR);
         }
 
-        nd_thread_signal_cancel(host->receiver->thread);
+        __atomic_store_n(&host->receiver->receiver.stop, true, __ATOMIC_RELAXED);
     }
 
     int count = 2000;
@@ -546,10 +855,10 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
 
     if(host->receiver)
         netdata_log_error("STREAM '%s' [receive from [%s]:%s]: "
-              "thread %d takes too long to stop, giving up..."
+              "thread %zu takes too long to stop, giving up..."
         , rrdhost_hostname(host)
         , host->receiver->client_ip, host->receiver->client_port
-        , host->receiver->tid);
+        , host->receiver->receiver.id);
     else
         ret = true;
 
@@ -562,34 +871,7 @@ static void rrdpush_send_error_on_taken_over_connection(struct receiver_state *r
     nd_sock_send_timeout(&rpt->sock, (char *)msg, strlen(msg), 0, 5);
 }
 
-static void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status, ND_LOG_FIELD_PRIORITY priority) {
-    // this function may be called BEFORE we spawn the receiver thread
-    // so, we need to add the fields again (it does not harm)
-    ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
-            ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
-            ND_LOG_FIELD_TXT(NDF_NIDL_NODE, (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""),
-            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, status),
-            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_from_child_msgid),
-            ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
-
-    nd_log(NDLS_ACCESS, priority, "api_key:'%s' machine_guid:'%s' msg:'%s'"
-                       , (rpt->key && *rpt->key)? rpt->key : ""
-                       , (rpt->machine_guid && *rpt->machine_guid) ? rpt->machine_guid : ""
-                       , msg);
-
-    nd_log(NDLS_DAEMON, priority, "STREAM_RECEIVER for '%s': %s %s%s%s"
-                     , (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""
-                     , msg
-                     , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?" (":""
-                     , stream_handshake_error_to_string(rpt->exit.reason)
-                     , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?")":""
-                     );
-}
-
-static void rrdpush_receive(struct receiver_state *rpt) {
+static bool rrdpush_receive(struct receiver_state *rpt) {
     stream_conf_receiver_config(rpt, &rpt->config, rpt->key, rpt->machine_guid);
 
     // find the host for this receiver
@@ -667,22 +949,6 @@ static void rrdpush_receive(struct receiver_state *rpt) {
     );
 #endif // NETDATA_INTERNAL_CHECKS
 
-
-    struct plugind cd = {
-            .update_every = default_rrd_update_every,
-            .unsafe = {
-                    .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                    .running = true,
-                    .enabled = true,
-            },
-            .started_t = now_realtime_sec(),
-    };
-
-    // put the client IP and port into the buffers used by plugins.d
-    snprintfz(cd.id,           CONFIG_MAX_NAME,  "%s:%s", rpt->client_ip, rpt->client_port);
-    snprintfz(cd.filename,     FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
-    snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
-    snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
     rrdpush_select_receiver_compression_algorithm(rpt);
 
@@ -765,87 +1031,13 @@ static void rrdpush_receive(struct receiver_state *rpt) {
     rrdhost_stream_parents_reset(rpt->host, STREAM_HANDSHAKE_PREPARING);
 
     // receive data
-    size_t count = streaming_parser(rpt, &cd);
-
-    // the parser stopped
-    receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
-
-    {
-        char msg[100 + 1];
-        snprintfz(msg, sizeof(msg) - 1, "disconnected (completed %zu updates)", count);
-        rrdpush_receive_log_status(rpt, msg, RRDPUSH_STATUS_DISCONNECTED, NDLP_WARNING);
-    }
-
-    // in case we have cloud connection we inform cloud
-    // a child disconnected
-    uint64_t total_reboot = rrdhost_stream_path_total_reboot_time_ms(rpt->host);
-    schedule_node_state_update(rpt->host, MIN((total_reboot * MAX_CHILD_DISC_TOLERANCE), MAX_CHILD_DISC_DELAY));
+    stream_receiver_add(rpt);
+    // streaming_parser(rpt);
+    // stream_receiver_on_disconnect(rpt);
+    return true;
 
 cleanup:
-    ;
-}
-
-static bool stream_receiver_log_capabilities(BUFFER *wb, void *ptr) {
-    struct receiver_state *rpt = ptr;
-    if(!rpt)
-        return false;
-
-    stream_capabilities_to_string(wb, rpt->capabilities);
-    return true;
-}
-
-static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
-    struct receiver_state *rpt = ptr;
-    if(!rpt)
-        return false;
-
-    buffer_strcat(wb, nd_sock_is_ssl(&rpt->sock) ? "https" : "http");
-    return true;
-}
-
-void *rrdpush_receiver_thread(void *ptr) {
-    worker_register("STREAMRCV");
-
-    worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_READ,
-                                      "received bytes", "bytes/s",
-                                      WORKER_METRIC_INCREMENT);
-
-    worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED,
-                                      "uncompressed bytes", "bytes/s",
-                                      WORKER_METRIC_INCREMENT);
-
-    worker_register_job_custom_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
-                                      "replication completion", "%",
-                                      WORKER_METRIC_ABSOLUTE);
-
-    struct receiver_state *rpt = (struct receiver_state *) ptr;
-    rpt->tid = gettid_cached();
-
-    ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
-            ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
-            ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rpt->hostname),
-            ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
-            ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
-            ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
-
-    netdata_log_info("STREAM %s [%s]:%s: receive thread started", rpt->hostname, rpt->client_ip
-                     , rpt->client_port);
-
-    rrdpush_receive(rpt);
-
-    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
-                     "receive thread ended (task id %d)"
-                     , rpt->hostname ? rpt->hostname : "-"
-                     , rpt->client_ip ? rpt->client_ip : "-", rpt->client_port ? rpt->client_port : "-", gettid_cached());
-
-    worker_unregister();
-    rrdhost_clear_receiver(rpt);
-    rrdhost_set_is_parent_label();
-    receiver_state_free(rpt);
-    return NULL;
+    return false;
 }
 
 int rrdpush_receiver_permission_denied(struct web_client *w) {
@@ -1253,18 +1445,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_RECEIVER "[%s]", rpt->hostname);
     tag[NETDATA_THREAD_TAG_MAX] = '\0';
 
-    rpt->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt);
-    if(!rpt->thread) {
-        rrdpush_receive_log_status(
-            rpt, "can't create receiver thread",
-            RRDPUSH_STATUS_INTERNAL_SERVER_ERROR, NDLP_ERR);
-
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "Can't handle this request");
-        receiver_state_free(rpt);
-        return HTTP_RESP_INTERNAL_SERVER_ERROR;
-    }
+    rrdpush_receive(rpt);
 
     // prevent the caller from closing the streaming socket
     return HTTP_RESP_OK;
 }
+
+

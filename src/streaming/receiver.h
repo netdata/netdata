@@ -6,6 +6,7 @@
 #include "libnetdata/libnetdata.h"
 #include "stream-conf.h"
 #include "database/rrd.h"
+#include "plugins.d/plugins_d.h"
 
 struct parser;
 
@@ -13,8 +14,6 @@ uint32_t stream_currently_connected_receivers(void);
 
 struct receiver_state {
     RRDHOST *host;
-    pid_t tid;
-    ND_THREAD *thread;
     ND_SOCK sock;
     char *key;
     char *hostname;
@@ -35,6 +34,14 @@ struct receiver_state {
 
     struct buffered_reader reader;
 
+    struct {
+        size_t id;
+        bool stop;
+        struct plugind cd;
+    } receiver;
+
+    BUFFER *buffer;
+    bool compressed_connection;
     int16_t hops;
 
     struct {
@@ -63,6 +70,8 @@ struct receiver_state {
 #ifdef ENABLE_H2O
     void *h2o_ctx;
 #endif
+
+    struct receiver_state *prev, *next;
 };
 
 #ifdef ENABLE_H2O

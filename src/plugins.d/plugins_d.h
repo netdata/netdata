@@ -3,7 +3,9 @@
 #ifndef NETDATA_PLUGINS_D_H
 #define NETDATA_PLUGINS_D_H 1
 
-#include "daemon/common.h"
+#include "libnetdata/libnetdata.h"
+
+struct rrdhost;
 
  #define PLUGINSD_CMD_MAX (FILENAME_MAX*2)
 #define PLUGINSD_STOCK_PLUGINS_DIRECTORY_PATH 0
@@ -24,7 +26,7 @@ struct plugind {
     size_t serial_failures;             // the number of times the plugin started
                                         // without collecting values
 
-    RRDHOST *host;                      // the host the plugin collects data for
+    struct rrdhost *host;                      // the host the plugin collects data for
     int update_every;                   // the plugin default data collection frequency
 
     struct {
@@ -44,7 +46,7 @@ struct plugind {
 
 extern struct plugind *pluginsd_root;
 
-size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations);
+size_t pluginsd_process(struct rrdhost *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations);
 
 struct parser;
 void pluginsd_process_cleanup(struct parser *parser);
