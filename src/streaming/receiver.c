@@ -485,7 +485,7 @@ static void stream_receiver_realloc_arrays_unsafe(struct receiver *rr, size_t sl
 static void stream_receiver_move_queue_to_running(struct receiver *rr) {
     internal_fatal(rr->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
-    size_t first_slot = 1;
+    size_t first_slot = 0;
 
     // process the queue
     spinlock_lock(&rr->queue.spinlock);
