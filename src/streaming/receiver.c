@@ -703,8 +703,6 @@ static void stream_receiver_add(struct receiver_state *rpt) {
             receiver_globals.cores = 4;
         else if(receiver_globals.cores > MAX_RECEIVERS)
             receiver_globals.cores = MAX_RECEIVERS;
-
-        receiver_globals.cores = 1;
     }
 
     size_t min_slot = 0;
