@@ -160,29 +160,35 @@ typedef enum {
 } decompressor_status_t;
 
 static inline void receiver_move_compressed(struct receiver_state *r) {
-    size_t remaining = r->receiver.compressed.used - (r->receiver.compressed.header - r->receiver.compressed.buf);
+    size_t remaining = r->receiver.compressed.used - r->receiver.compressed.start;
     if(remaining > 0) {
-        memmove(r->receiver.compressed.buf, r->receiver.compressed.header, remaining);
-        r->receiver.compressed.header = r->receiver.compressed.buf;
+        memmove(r->receiver.compressed.buf, r->receiver.compressed.buf + r->receiver.compressed.start, remaining);
+        r->receiver.compressed.start = 0;
         r->receiver.compressed.used = remaining;
+        r->receiver.compressed.tracks[1] = r->receiver.compressed.tracks[0];
+        r->receiver.compressed.tracks[0].start = 1;
+        r->receiver.compressed.tracks[0].end = 1;
     }
     else {
-        r->receiver.compressed.header = NULL;
+        r->receiver.compressed.start = 0;
         r->receiver.compressed.used = 0;
     }
 }
 
 static inline decompressor_status_t receiver_feed_decompressor(struct receiver_state *r) {
-    if(!r->receiver.compressed.header)
-        r->receiver.compressed.header = r->receiver.compressed.buf;
+    char *buf = r->receiver.compressed.buf;
+    size_t start = r->receiver.compressed.start;
+    size_t signature_size = r->decompressor.signature_size;
+    size_t used = r->receiver.compressed.used;
 
-    if(r->receiver.compressed.header + r->decompressor.signature_size > r->receiver.compressed.buf + r->receiver.compressed.used) {
+    if(start + signature_size > used) {
         // incomplete header, we need to wait for more data
         receiver_move_compressed(r);
         return DECOMPRESS_NEED_MORE_DATA;
     }
 
-    size_t compressed_message_size = rrdpush_decompressor_start(&r->decompressor, r->receiver.compressed.header, r->decompressor.signature_size);
+    size_t compressed_message_size = rrdpush_decompressor_start(&r->decompressor, buf + start, signature_size);
+
     if (unlikely(!compressed_message_size)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "multiplexed uncompressed data in compressed stream!");
         return DECOMPRESS_FAILED;
@@ -196,13 +202,15 @@ static inline decompressor_status_t receiver_feed_decompressor(struct receiver_s
         return DECOMPRESS_FAILED;
     }
 
-    if(r->receiver.compressed.header + r->decompressor.signature_size + compressed_message_size > r->receiver.compressed.buf + r->receiver.compressed.used) {
+    if(start + signature_size + compressed_message_size > used) {
         // incomplete compressed message, we need to wait for more data
         receiver_move_compressed(r);
         return DECOMPRESS_NEED_MORE_DATA;
     }
 
-    size_t bytes_to_parse = rrdpush_decompress(&r->decompressor, r->receiver.compressed.header + r->decompressor.signature_size, compressed_message_size);
+    size_t bytes_to_parse = rrdpush_decompress(
+        &r->decompressor, buf + start + signature_size, compressed_message_size);
+
     if (unlikely(!bytes_to_parse)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "no bytes to parse.");
         return DECOMPRESS_FAILED;
@@ -211,7 +219,7 @@ static inline decompressor_status_t receiver_feed_decompressor(struct receiver_s
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_to_parse);
 
     // move the header to the next message
-    r->receiver.compressed.header += r->decompressor.signature_size + compressed_message_size;
+    r->receiver.compressed.start += signature_size + compressed_message_size;
 
     return DECOMPRESS_OK;
 }
@@ -251,6 +259,11 @@ static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HAN
         *reason = read_stream_error_to_reason(bytes_read);
         return false;
     }
+
+    r->receiver.compressed.tracks[1] = r->receiver.compressed.tracks[0];
+    r->receiver.compressed.tracks[0].start = r->receiver.compressed.used;
+    r->receiver.compressed.tracks[0].end = bytes_read;
+
     r->receiver.compressed.used += bytes_read;
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
 
@@ -376,55 +389,6 @@ static void streaming_parser_init(struct receiver_state *rpt) {
     rpt->buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
 }
 
-static void stream_receiver_on_disconnect(struct receiver_state *rpt) {
-    if(!rpt) return;
-
-    __atomic_store_n(&rpt->receiver.stop, false, __ATOMIC_RELAXED);
-
-    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
-                     "receive thread ended (task id %d)"
-                     , rpt->hostname ? rpt->hostname : "-"
-                     , rpt->client_ip ? rpt->client_ip : "-", rpt->client_port ? rpt->client_port : "-", gettid_cached());
-
-    buffer_free(rpt->buffer);
-    rpt->buffer = NULL;
-
-    // cleanup the sender buffer, because we may end-up reusing an incomplete buffer
-    sender_thread_buffer_free();
-
-    size_t count = 0;
-    PARSER *parser = __atomic_load_n(&rpt->parser, __ATOMIC_RELAXED);
-    if(parser) {
-        parser->user.v2.stream_buffer.wb = NULL;
-
-        // make sure send_to_plugin() will not write any data to the socket
-        spinlock_lock(&parser->writer.spinlock);
-        parser->fd_output = -1;
-        parser->ssl_output = NULL;
-        spinlock_unlock(&parser->writer.spinlock);
-
-        count = parser->user.data_collections_count;
-    }
-
-    // the parser stopped
-    receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
-
-    {
-        char msg[100 + 1];
-        snprintfz(msg, sizeof(msg) - 1, "disconnected (completed %zu updates)", count);
-        rrdpush_receive_log_status(rpt, msg, RRDPUSH_STATUS_DISCONNECTED, NDLP_WARNING);
-    }
-
-    // in case we have cloud connection we inform cloud
-    // a child disconnected
-    uint64_t total_reboot = rrdhost_stream_path_total_reboot_time_ms(rpt->host);
-    schedule_node_state_update(rpt->host, MIN((total_reboot * MAX_CHILD_DISC_TOLERANCE), MAX_CHILD_DISC_DELAY));
-
-    rrdhost_clear_receiver(rpt);
-    rrdhost_set_is_parent_label();
-    receiver_state_free(rpt);
-}
-
 static bool stream_receiver_log_capabilities(BUFFER *wb, void *ptr) {
     struct receiver_state *rpt = ptr;
     if(!rpt)
@@ -521,7 +485,7 @@ static void stream_receiver_move_queue_to_running(struct receiver *rr) {
         }
 
         stream_receiver_realloc_arrays_unsafe(rr, slot);
-        rpt->receiver.compressed.header = NULL;
+        rpt->receiver.compressed.start = 0;
         rpt->receiver.compressed.used = 0;
 
         streaming_parser_init(rpt);
@@ -542,11 +506,61 @@ static void stream_receiver_move_queue_to_running(struct receiver *rr) {
     spinlock_unlock(&rr->queue.spinlock);
 }
 
+static void stream_receiver_on_disconnect(struct receiver *rr, struct receiver_state *rpt) {
+    internal_fatal(rr->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+    if(!rpt) return;
+
+    __atomic_store_n(&rpt->receiver.stop, false, __ATOMIC_RELAXED);
+
+    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
+                     "receive thread ended (task id %d)"
+                     , rpt->hostname ? rpt->hostname : "-"
+                     , rpt->client_ip ? rpt->client_ip : "-", rpt->client_port ? rpt->client_port : "-", gettid_cached());
+
+    buffer_free(rpt->buffer);
+    rpt->buffer = NULL;
+
+    // cleanup the sender buffer, because we may end-up reusing an incomplete buffer
+    sender_thread_buffer_free();
+
+    size_t count = 0;
+    PARSER *parser = __atomic_load_n(&rpt->parser, __ATOMIC_RELAXED);
+    if(parser) {
+        parser->user.v2.stream_buffer.wb = NULL;
+
+        // make sure send_to_plugin() will not write any data to the socket
+        spinlock_lock(&parser->writer.spinlock);
+        parser->fd_output = -1;
+        parser->ssl_output = NULL;
+        spinlock_unlock(&parser->writer.spinlock);
+
+        count = parser->user.data_collections_count;
+    }
+
+    // the parser stopped
+    receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
+
+    {
+        char msg[100 + 1];
+        snprintfz(msg, sizeof(msg) - 1, "disconnected (completed %zu updates)", count);
+        rrdpush_receive_log_status(rpt, msg, RRDPUSH_STATUS_DISCONNECTED, NDLP_WARNING);
+    }
+
+    // in case we have cloud connection we inform cloud
+    // a child disconnected
+    uint64_t total_reboot = rrdhost_stream_path_total_reboot_time_ms(rpt->host);
+    schedule_node_state_update(rpt->host, MIN((total_reboot * MAX_CHILD_DISC_TOLERANCE), MAX_CHILD_DISC_DELAY));
+
+    rrdhost_clear_receiver(rpt);
+    rrdhost_set_is_parent_label();
+    receiver_state_free(rpt);
+}
+
 static void stream_receiver_remove(struct receiver *rr, size_t slot) {
     internal_fatal(rr->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     struct receiver_state *rpt = rr->run.nodes[slot];
-    stream_receiver_on_disconnect(rpt);
+    stream_receiver_on_disconnect(rr, rpt);
     rr->run.nodes[slot] = NULL;
     rr->run.pollfds[slot] = (struct pollfd){
         .fd = -1,

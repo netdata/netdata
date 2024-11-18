@@ -12,6 +12,11 @@ struct parser;
 
 uint32_t stream_currently_connected_receivers(void);
 
+struct track_reads {
+    size_t start;
+    size_t end;
+};
+
 struct receiver_state {
     RRDHOST *host;
     ND_SOCK sock;
@@ -40,9 +45,10 @@ struct receiver_state {
         struct plugind cd;
 
         struct {
+            size_t start;
             size_t used;
-            char buf[PLUGINSD_LINE_MAX + 1];
-            char *header;
+            char buf[COMPRESSION_MAX_CHUNK * 2];
+            struct track_reads tracks[2];
         } compressed;
     } receiver;
 
