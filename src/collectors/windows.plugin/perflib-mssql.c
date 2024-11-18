@@ -1182,8 +1182,11 @@ static void do_mssql_databases(PERF_DATA_BLOCK *pDataBlock, struct mssql_instanc
             mdi->parent = p;
         }
 
-        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseDataFileSize))
-            mdi->updated |= (1<<NETDATA_MSSQL_ENUM_MDI_IDX_FILE_SIZE);
+        if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseDataFileSize)) {
+            LONGLONG value = (LONGLONG)mdi->MSSQLDatabaseDataFileSize.current.Data;
+            if (value > 0)
+                mdi->updated |= (1<<NETDATA_MSSQL_ENUM_MDI_IDX_FILE_SIZE);
+        }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &mdi->MSSQLDatabaseActiveTransactions))
             mdi->updated |= (1<<NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS);
