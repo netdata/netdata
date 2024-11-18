@@ -113,24 +113,24 @@ bool rrdpush_compression_initialize(struct sender_state *s) {
 }
 
 bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
-    rrdpush_decompressor_destroy(&rpt->decompressor);
+    rrdpush_decompressor_destroy(&rpt->receiver.compressed.decompressor);
 
     // IMPORTANT
     // KEEP THE SAME ORDER IN COMPRESSION
 
     if(stream_has_capability(rpt, STREAM_CAP_ZSTD))
-        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
+        rpt->receiver.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
     else if(stream_has_capability(rpt, STREAM_CAP_LZ4))
-        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
+        rpt->receiver.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
     else if(stream_has_capability(rpt, STREAM_CAP_BROTLI))
-        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_BROTLI;
+        rpt->receiver.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_BROTLI;
     else if(stream_has_capability(rpt, STREAM_CAP_GZIP))
-        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
+        rpt->receiver.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
     else
-        rpt->decompressor.algorithm = COMPRESSION_ALGORITHM_NONE;
+        rpt->receiver.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_NONE;
 
-    if(rpt->decompressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
-        rrdpush_decompressor_init(&rpt->decompressor);
+    if(rpt->receiver.compressed.decompressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
+        rrdpush_decompressor_init(&rpt->receiver.compressed.decompressor);
         return true;
     }
 

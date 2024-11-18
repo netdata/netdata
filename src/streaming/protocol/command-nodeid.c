@@ -33,7 +33,7 @@ void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
                   PLUGINSD_KEYWORD_NODE_ID " '%s' '%s' '%s'\n",
                   claim_id.str, node_id_str, cloud_config_url_get());
 
-        send_to_plugin(buf, __atomic_load_n(&host->receiver->parser, __ATOMIC_RELAXED));
+        send_to_plugin(buf, __atomic_load_n(&host->receiver->receiver.parser, __ATOMIC_RELAXED));
     }
     spinlock_unlock(&host->receiver_lock);
 }
