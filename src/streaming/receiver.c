@@ -244,7 +244,9 @@ static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HAN
     internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
-    int bytes_read = read_stream(r, r->receiver.compressed.buf + r->receiver.compressed.used, sizeof(r->receiver.compressed.buf) - r->receiver.compressed.used);
+    int bytes_read = read_stream(r, r->receiver.compressed.buf + r->receiver.compressed.used,
+                                 sizeof(r->receiver.compressed.buf) - r->receiver.compressed.used);
+
     if (unlikely(bytes_read <= 0)) {
         *reason = read_stream_error_to_reason(bytes_read);
         return false;
@@ -698,7 +700,7 @@ static void stream_receiver_add(struct receiver_state *rpt) {
 
     spinlock_lock(&spinlock);
     if(!receiver_globals.cores) {
-        receiver_globals.cores = os_get_system_cpus() - 2;
+        receiver_globals.cores = os_get_system_cpus() / 2;
         if(receiver_globals.cores < 4)
             receiver_globals.cores = 4;
         else if(receiver_globals.cores > MAX_RECEIVERS)
