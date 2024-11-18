@@ -434,7 +434,6 @@
 - remove charts.d/apcupsd [\#18481](https://github.com/netdata/netdata/pull/18481) ([ilyam8](https://github.com/ilyam8))
 - Update LIbbpf [\#18480](https://github.com/netdata/netdata/pull/18480) ([thiagoftsm](https://github.com/thiagoftsm))
 - added missing comma in Access-Control-Allow-Headers [\#18479](https://github.com/netdata/netdata/pull/18479) ([ktsaou](https://github.com/ktsaou))
-- add Access-Control-Allow-Headers: x-transaction-id [\#18478](https://github.com/netdata/netdata/pull/18478) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
