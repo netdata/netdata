@@ -73,6 +73,13 @@ static inline ssize_t nd_sock_read(ND_SOCK *s, void *buf, size_t num) {
         return read(s->fd, buf, num);
 }
 
+static inline ssize_t nd_sock_write(ND_SOCK *s, const void *buf, size_t num) {
+    if (nd_sock_is_ssl(s))
+        return netdata_ssl_write(&s->ssl, buf, num);
+    else
+        return write(s->fd, buf, num);
+}
+
 static inline ssize_t nd_sock_revc_nowait(ND_SOCK *s, void *buf, size_t num) {
     if (nd_sock_is_ssl(s))
         return netdata_ssl_read(&s->ssl, buf, num);

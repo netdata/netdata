@@ -15,28 +15,20 @@ ssize_t send_to_plugin(const char *txt, PARSER *parser) {
     spinlock_lock(&parser->writer.spinlock);
     ssize_t bytes = -1;
 
-    NETDATA_SSL *ssl = parser->ssl_output;
-    if(ssl) {
+    ND_SOCK tmp = { .fd = parser->fd_output, };
+    ND_SOCK *s = parser->sock;  // try the socket
+    if(!s) s = &tmp;            // socket is not there, use the pipe
 
-        if(SSL_connection(ssl))
-            bytes = netdata_ssl_write(ssl, (void *) txt, strlen(txt));
-
-        else
-            netdata_log_error("PLUGINSD: cannot send command (SSL)");
-
-        spinlock_unlock(&parser->writer.spinlock);
-        return bytes;
-    }
-
-    if(parser->fd_output != -1) {
+    if(s->fd != -1) {
+        // plugins pipe or socket (with or without SSL)
         bytes = 0;
         ssize_t total = (ssize_t)strlen(txt);
         ssize_t sent;
 
         do {
-            sent = write(parser->fd_output, &txt[bytes], total - bytes);
+            sent = nd_sock_write(s, &txt[bytes], total - bytes);
             if(sent <= 0) {
-                netdata_log_error("PLUGINSD: cannot send command (fd = %d)", parser->fd_output);
+                netdata_log_error("PLUGINSD: cannot send command (fd = %d)", s->fd);
                 spinlock_unlock(&parser->writer.spinlock);
                 return -3;
             }
@@ -83,15 +75,24 @@ void parser_destroy(PARSER *parser) {
 
 
 PARSER *parser_init(struct parser_user_object *user, int fd_input, int fd_output,
-                    PARSER_INPUT_TYPE flags, void *ssl __maybe_unused) {
+                    PARSER_INPUT_TYPE flags, ND_SOCK *sock) {
     PARSER *parser;
 
     parser = callocz(1, sizeof(*parser));
+
     if(user)
         parser->user = *user;
-    parser->fd_input = fd_input;
-    parser->fd_output = fd_output;
-    parser->ssl_output = ssl;
+
+    if(sock) {
+        parser->fd_input = sock->fd;
+        parser->fd_output = sock->fd;
+        parser->sock = sock;
+    }
+    else {
+        parser->fd_input = fd_input;
+        parser->fd_output = fd_output;
+    }
+
     parser->flags = flags;
 
     spinlock_init(&parser->writer.spinlock);

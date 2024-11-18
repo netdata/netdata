@@ -350,8 +350,7 @@ static void streaming_parser_init(struct receiver_state *rpt) {
             .capabilities = rpt->capabilities,
         };
 
-        parser = parser_init(&user, rpt->sock.fd, rpt->sock.fd, PARSER_INPUT_SPLIT,
-                             (rpt->sock.ssl.conn) ? &rpt->sock.ssl : NULL);
+        parser = parser_init(&user, -1, -1, PARSER_INPUT_SPLIT, &rpt->sock);
     }
 
 #ifdef ENABLE_H2O
@@ -523,8 +522,9 @@ static void stream_receiver_on_disconnect(struct receiver *rr, struct receiver_s
 
         // make sure send_to_plugin() will not write any data to the socket
         spinlock_lock(&parser->writer.spinlock);
+        parser->fd_input = -1;
         parser->fd_output = -1;
-        parser->ssl_output = NULL;
+        parser->sock = NULL;
         spinlock_unlock(&parser->writer.spinlock);
 
         count = parser->user.data_collections_count;
