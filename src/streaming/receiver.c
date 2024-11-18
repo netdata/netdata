@@ -504,11 +504,6 @@ static void stream_receiver_on_disconnect(struct receiver *rr, struct receiver_s
 
     __atomic_store_n(&rpt->receiver.stop, false, __ATOMIC_RELAXED);
 
-    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
-                     "receive thread ended (task id %d)"
-                     , rpt->hostname ? rpt->hostname : "-"
-                     , rpt->client_ip ? rpt->client_ip : "-", rpt->client_port ? rpt->client_port : "-", gettid_cached());
-
     buffer_free(rpt->receiver.buffer);
     rpt->receiver.buffer = NULL;
 
@@ -549,10 +544,17 @@ static void stream_receiver_on_disconnect(struct receiver *rr, struct receiver_s
     receiver_state_free(rpt);
 }
 
-static void stream_receiver_remove(struct receiver *rr, size_t slot) {
+static void stream_receiver_remove(struct receiver *rr, struct receiver_state *rpt, size_t slot, const char *why) {
     internal_fatal(rr->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
-    struct receiver_state *rpt = rr->run.nodes[slot];
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "STREAM '%s' [receive from [%s]:%s]: "
+           "receiver disconnected: %s"
+           , rpt->hostname ? rpt->hostname : "-"
+           , rpt->client_ip ? rpt->client_ip : "-"
+           , rpt->client_port ? rpt->client_port : "-"
+           , why ? why : "");
+
     stream_receiver_on_disconnect(rr, rpt);
     rr->run.nodes[slot] = NULL;
     rr->run.pollfds[slot] = (struct pollfd){
@@ -623,7 +625,7 @@ static void *stream_receive_thread(void *ptr) {
 
             if(receiver_should_stop(rpt)) {
                 receiver_set_exit_reason(rpt, rpt->exit.reason, false);
-                stream_receiver_remove(rr, slot);
+                stream_receiver_remove(rr, rpt, slot, "received stop signal");
                 continue;
             }
 
@@ -631,7 +633,7 @@ static void *stream_receive_thread(void *ptr) {
                 STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
                 if(unlikely(!receiver_read_compressed(rpt, &reason))) {
                     receiver_set_exit_reason(rpt, reason, false);
-                    stream_receiver_remove(rr, slot);
+                    stream_receiver_remove(rr, rpt, slot, "socket read error");
                     continue;
                 }
 
@@ -645,7 +647,7 @@ static void *stream_receive_thread(void *ptr) {
                                 while (buffered_reader_next_line(&rpt->reader, rpt->receiver.buffer)) {
                                     if (unlikely(parser_action(parser, rpt->receiver.buffer->buffer))) {
                                         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                                        stream_receiver_remove(rr, slot);
+                                        stream_receiver_remove(rr, rpt, slot, "parser failed");
                                         node_broken = true;
                                         break;
                                     }
@@ -659,7 +661,7 @@ static void *stream_receive_thread(void *ptr) {
 
                             else {
                                 receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                                stream_receiver_remove(rr, slot);
+                                stream_receiver_remove(rr, rpt, slot, "decompressor failed");
                                 node_broken = true;
                                 break;
                             }
@@ -669,7 +671,7 @@ static void *stream_receive_thread(void *ptr) {
                         break;
                     else {
                         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                        stream_receiver_remove(rr, slot);
+                        stream_receiver_remove(rr, rpt, slot, "compressed data invalid");
                         node_broken = true;
                         break;
                     }
@@ -679,14 +681,14 @@ static void *stream_receive_thread(void *ptr) {
                 STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
                 if(unlikely(!receiver_read_uncompressed(rpt, &reason))) {
                     receiver_set_exit_reason(rpt, reason, false);
-                    stream_receiver_remove(rr, slot);
+                    stream_receiver_remove(rr, rpt, slot, "socker read error");
                     continue;
                 }
 
                 while(buffered_reader_next_line(&rpt->reader, rpt->receiver.buffer)) {
                     if(unlikely(parser_action(parser, rpt->receiver.buffer->buffer))) {
                         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                        stream_receiver_remove(rr, slot);
+                        stream_receiver_remove(rr, rpt, slot, "parser failed");
                         break;
                     }
 
@@ -700,7 +702,7 @@ static void *stream_receive_thread(void *ptr) {
     }
 
     for(size_t i = 0; i < rr->run.used ;i++)
-        stream_receiver_remove(rr, i);
+        stream_receiver_remove(rr, rr->run.nodes[i], i, "shutdown");
 
     worker_unregister();
 
