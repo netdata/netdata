@@ -1,6 +1,11 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# PROVIDE: netdata
+# REQUIRE: DAEMON NETWORKING
+# BEFORE: LOGIN
+# KEYWORD: shutdown
+
 . /etc/rc.subr
 
 name=netdata
