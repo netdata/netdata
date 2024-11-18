@@ -503,7 +503,7 @@ static void stream_receiver_move_queue_to_running(struct receiver *rr) {
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rr->queue.ll, rpt, prev, next);
 
         // slot 0 is our pipe
-        size_t slot = rr->run.used > 0 ? rr->run.used : 1;
+        size_t slot = rr->run.used;
 
         // find an empty slot
         for(size_t i = first_slot; i < slot && i < rr->run.used ;i++) {
