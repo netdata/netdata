@@ -237,6 +237,7 @@ USAGE: ${PROGRAM} [options]
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
   --disable-telemetry        Opt-out from our anonymous telemetry program. (DISABLE_TELEMETRY=1)
   --skip-available-ram-check Skip checking the amount of RAM the system has and pretend it has enough to build safely.
+  --dev                      Do not remove the build directory - speeds up rebuilds
 HEREDOC
 }
 
@@ -258,6 +259,7 @@ ENABLE_CHARTS=1
 ENABLE_H2O=1
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
+REMOVE_BUILD=1
 
 RELEASE_CHANNEL="nightly" # valid values are 'nightly' and 'stable'
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
@@ -346,6 +348,9 @@ while [ -n "${1}" ]; do
       NETDATA_DISABLE_TELEMETRY=1
       NETDATA_PREPARE_ONLY=1
       DONOTWAIT=1
+      ;;
+    "--dev")
+      REMOVE_BUILD=0
       ;;
     "--help" | "-h")
       usage
@@ -573,7 +578,7 @@ echo >&2
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Configuring Netdata."
 NETDATA_BUILD_DIR="${NETDATA_BUILD_DIR:-./build/}"
-rm -rf "${NETDATA_BUILD_DIR}"
+[ ${REMOVE_BUILD} -eq 1 ] && rm -rf "${NETDATA_BUILD_DIR}"
 
 # function to extract values from the config file
 config_option() {
