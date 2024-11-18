@@ -299,25 +299,10 @@ static void receiver_set_exit_reason(struct receiver_state *rpt, STREAM_HANDSHAK
 }
 
 static inline bool receiver_should_stop(struct receiver_state *rpt) {
-    static __thread size_t counter = 0;
-
-    if(__atomic_load_n(&rpt->receiver.stop, __ATOMIC_RELAXED)) {
+    if(unlikely(__atomic_load_n(&rpt->exit.shutdown, __ATOMIC_RELAXED))) {
         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
         return true;
     }
-
-    if(unlikely(rpt->exit.shutdown)) {
-        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
-        return true;
-    }
-
-    if(unlikely(!service_running(SERVICE_STREAMING))) {
-        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_NETDATA_EXIT, false);
-        return true;
-    }
-
-    if(unlikely((counter++ % 1000) == 0))
-        rpt->last_msg_t = now_monotonic_sec();
 
     return false;
 }
@@ -502,8 +487,6 @@ static void stream_receiver_on_disconnect(struct receiver *rr, struct receiver_s
     internal_fatal(rr->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
     if(!rpt) return;
 
-    __atomic_store_n(&rpt->receiver.stop, false, __ATOMIC_RELAXED);
-
     buffer_free(rpt->receiver.buffer);
     rpt->receiver.buffer = NULL;
 
@@ -603,6 +586,8 @@ static void *stream_receive_thread(void *ptr) {
             continue;
         }
 
+        time_t now_s = now_monotonic_sec();
+
         for(size_t slot = 0; slot < rr->run.used ;slot++) {
             if(!rr->run.pollfds[slot].revents || !rr->run.nodes[slot]) continue;
 
@@ -628,6 +613,8 @@ static void *stream_receive_thread(void *ptr) {
                 stream_receiver_remove(rr, rpt, slot, "received stop signal");
                 continue;
             }
+
+            rpt->last_msg_t = now_s;
 
             if(rpt->receiver.compressed.enabled) {
                 STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
@@ -782,6 +769,7 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         host->receiver = rpt;
         rpt->host = host;
 
+        __atomic_store_n(&rpt->exit.shutdown, false, __ATOMIC_RELAXED);
         host->stream.rcv.status.last_connected = now_realtime_sec();
         host->stream.rcv.status.last_disconnected = 0;
         host->stream.rcv.status.last_chart = 0;
@@ -852,6 +840,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
             streaming_receiver_disconnected();
 
+            __atomic_store_n(&host->receiver->exit.shutdown, false, __ATOMIC_RELAXED);
             host->stream.rcv.status.check_obsolete = false;
             host->stream.rcv.status.last_connected = 0;
             host->stream.rcv.status.last_disconnected = now_realtime_sec();
@@ -876,13 +865,11 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
     spinlock_lock(&host->receiver_lock);
 
     if(host->receiver) {
-        if(!host->receiver->exit.shutdown) {
-            host->receiver->exit.shutdown = true;
+        if(!__atomic_load_n(&host->receiver->exit.shutdown, __ATOMIC_RELAXED)) {
+            __atomic_store_n(&host->receiver->exit.shutdown, true, __ATOMIC_RELAXED);
             receiver_set_exit_reason(host->receiver, reason, true);
             shutdown(host->receiver->sock.fd, SHUT_RDWR);
         }
-
-        __atomic_store_n(&host->receiver->receiver.stop, true, __ATOMIC_RELAXED);
     }
 
     int count = 2000;
