@@ -104,6 +104,11 @@
                 </File>
             </ComponentGroup>
 
+            <CustomAction Id="DllPermission" Directory="System64Folder" ExeCommand='[System64Folder]icacls.exe &quot;[System64Folder]wevt_netdata.dll&quot; /grant &quot;NT SERVICE\EventLog&quot;:R' Execute="deferred" Return="ignore" Impersonate="no"/>
+            <InstallExecuteSequence>
+                <Custom Action="DllPermission" After="InstallFiles" />
+            </InstallExecuteSequence>
+
             <Component Id="NetdataService" Directory="USRBINDIR">
                 <File Id="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
 
