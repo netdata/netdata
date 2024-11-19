@@ -791,7 +791,7 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *wc, uint64
         nd_log(
             NDLS_ACCESS,
             NDLP_NOTICE,
-            "Cloud requested not to verify alert version for host \"%s\", node \"%s\"",
+            "Cloud requested to skip alert version verification for host \"%s\", node \"%s\"",
             rrdhost_hostname(wc->host),
             wc->node_id);
         return;
