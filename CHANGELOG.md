@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- --dev option to installer [\#19034](https://github.com/netdata/netdata/pull/19034) ([ktsaou](https://github.com/ktsaou))
+- add `shutdown` keyword to ensure graceful service termination on FreeBSD [\#19033](https://github.com/netdata/netdata/pull/19033) ([ilyam8](https://github.com/ilyam8))
+- fix: ensure correct startup order for Netdata service on FreeBSD [\#19032](https://github.com/netdata/netdata/pull/19032) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/gorcon/rcon from 1.3.5 to 1.4.0 in /src/go [\#19031](https://github.com/netdata/netdata/pull/19031) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/vmware/govmomi from 0.46.0 to 0.46.1 in /src/go [\#19030](https://github.com/netdata/netdata/pull/19030) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations.js [\#19029](https://github.com/netdata/netdata/pull/19029) ([netdatabot](https://github.com/netdatabot))
 - improvement\(windows/iis\): add requests by type chart [\#19028](https://github.com/netdata/netdata/pull/19028) ([ilyam8](https://github.com/ilyam8))
@@ -430,10 +434,6 @@
 - Bump golang.org/x/text from 0.17.0 to 0.18.0 in /src/go [\#18486](https://github.com/netdata/netdata/pull/18486) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Remove Warnings \(ebpf\) [\#18484](https://github.com/netdata/netdata/pull/18484) ([thiagoftsm](https://github.com/thiagoftsm))
 - \[WIP\] Windows-Events Logs Explorer [\#18483](https://github.com/netdata/netdata/pull/18483) ([ktsaou](https://github.com/ktsaou))
-- fix win sysinfo installed ram calculation [\#18482](https://github.com/netdata/netdata/pull/18482) ([ilyam8](https://github.com/ilyam8))
-- remove charts.d/apcupsd [\#18481](https://github.com/netdata/netdata/pull/18481) ([ilyam8](https://github.com/ilyam8))
-- Update LIbbpf [\#18480](https://github.com/netdata/netdata/pull/18480) ([thiagoftsm](https://github.com/thiagoftsm))
-- added missing comma in Access-Control-Allow-Headers [\#18479](https://github.com/netdata/netdata/pull/18479) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
