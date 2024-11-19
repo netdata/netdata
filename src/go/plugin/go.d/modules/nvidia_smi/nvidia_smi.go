@@ -68,6 +68,9 @@ func (nv *NvidiaSmi) Configuration() any {
 
 func (nv *NvidiaSmi) Init() error {
 	if nv.exec == nil {
+		if runtime.GOOS == "windows" && nv.LoopMode {
+			nv.LoopMode = false
+		}
 		smi, err := nv.initNvidiaSmiExec()
 		if err != nil {
 			return err
