@@ -103,31 +103,27 @@ POPEN_INSTANCE *spawn_popen_run_variadic(const char *cmd, ...) {
 POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
     if(!cmd || !*cmd) return NULL;
 
-//#if defined(OS_WINDOWS)
-//    if(strncmp(cmd, "exec ", 5) == 0) {
-//        size_t len = strlen(cmd);
-//        char cmd_copy[strlen(cmd) + 1];
-//        memcpy(cmd_copy, cmd, len + 1);
-//        char *words[100];
-//        size_t num_words = quoted_strings_splitter(cmd_copy, words, 100, isspace_map_pluginsd);
-//        char *exec = get_word(words, num_words, 0);
-//        char *prog = get_word(words, num_words, 1);
-//        if (strcmp(exec, "exec") == 0 &&
-//            prog &&
-//            strendswith(prog, ".plugin") &&
-//            !strendswith(prog, "charts.d.plugin") &&
-//            !strendswith(prog, "ioping.plugin")) {
-//            const char *argv[num_words - 1 + 1]; // remove exec, add terminator
-//
-//            size_t dst = 0;
-//            for (size_t i = 1; i < num_words; i++)
-//                argv[dst++] = get_word(words, num_words, i);
-//
-//            argv[dst] = NULL;
-//            return spawn_popen_run_argv(argv);
-//        }
-//    }
-//#endif
+#if defined(OS_WINDOWS)
+   if(strncmp(cmd, "exec ", 5) == 0) {
+       size_t len = strlen(cmd);
+       char cmd_copy[strlen(cmd) + 1];
+       memcpy(cmd_copy, cmd, len + 1);
+       char *words[100];
+       size_t num_words = quoted_strings_splitter(cmd_copy, words, 100, isspace_map_pluginsd);
+       char *exec = get_word(words, num_words, 0);
+       char *prog = get_word(words, num_words, 1);
+       if (strcmp(exec, "exec") == 0 && prog && strendswith(prog, ".exe")) {
+           const char *argv[num_words - 1 + 1]; // remove exec, add terminator
+
+           size_t dst = 0;
+           for (size_t i = 1; i < num_words; i++)
+               argv[dst++] = get_word(words, num_words, i);
+
+           argv[dst] = NULL;
+           return spawn_popen_run_argv(argv);
+       }
+   }
+#endif
 
     const char *argv[] = {
         "/bin/sh",
