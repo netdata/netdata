@@ -232,13 +232,6 @@ jobs:
         id: qemu
         if: matrix.platform != 'linux/amd64' && matrix.platform != 'linux/i386' && needs.file-check.outputs.run == 'true'
         uses: docker/setup-qemu-action@v3
-      - name: Prepare Docker Environment
-        id: docker-config
-        if: needs.file-check.outputs.run == 'true'
-        shell: bash
-        run: |
-          echo '{"cgroup-parent": "actions-job.slice", "experimental": true}' | sudo tee /etc/docker/daemon.json 2>/dev/null
-          sudo service docker restart
       - name: Fetch images
         id: fetch-images
         if: needs.file-check.outputs.run == 'true'
@@ -278,20 +271,6 @@ jobs:
                      -e VERSION=${{ needs.version-check.outputs.version }} -e DISTRO_VERSION=${{ matrix.version }} \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata ${{ matrix.base_image }} \
                      /netdata/.github/scripts/pkg-test.sh
-      - name: Upload to PackageCloud
-        id: upload
-        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
-        continue-on-error: true
-        shell: bash
-        env:
-          PKG_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_API_KEY }}
-        run: |
-          printf "Packages to upload:\n%s" "$(ls artifacts/*.${{ matrix.format }})"
-          for pkgfile in artifacts/*.${{ matrix.format }} ; do
-            .github/scripts/package_cloud_wrapper.sh yank ${{ needs.version-check.outputs.repo }}/${{ matrix.repo_distro }} \
-            "$(basename "${pkgfile}")" || true
-            .github/scripts/package_cloud_wrapper.sh push ${{ needs.version-check.outputs.repo }}/${{ matrix.repo_distro }} "${pkgfile}"
-          done
       - name: SSH setup
         id: ssh-setup
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'

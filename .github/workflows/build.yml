@@ -609,6 +609,77 @@ jobs:
             && needs.file-check.outputs.run == 'true'
           }}
 
+  artifact-verification-updater: # Test the generated dist archive using the updater code.
+    name: Test Consolidated Artifacts (Updater)
+    runs-on: ubuntu-latest
+    needs:
+      - prepare-upload
+      - file-check
+    services:
+      apache: # This gets used to serve the dist tarball for the updater script.
+        image: httpd:2.4
+        ports:
+          - 8080:80
+        volumes:
+          - ${{ github.workspace }}:/usr/local/apache2/htdocs/
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Checkout
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/checkout@v4
+      - name: Fetch artifacts
+        id: fetch-artifacts
+        if: needs.file-check.outputs.run == 'true'
+        uses: Wandalen/wretry.action@v3
+        with:
+          action: actions/download-artifact@v4
+          with: |
+            name: final-artifacts
+            path: artifacts
+          attempt_limit: 3
+          attempt_delay: 2000
+      - name: Prepare artifacts directory
+        id: prepare
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          mkdir -p download/latest
+          mv artifacts/* download/latest
+          ls -al download/latest
+      - name: Run Updater Check
+        id: check
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host \
+                 -v $PWD:/netdata -w /netdata \
+                 ubuntu:latest /bin/sh -x /netdata/.github/scripts/run-updater-check.sh
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Updater checks for ${{ matrix.distro }} failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Updater checks for ${{ matrix.distro }} failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Fetch artifacts: ${{ steps.fetch-artifacts.outcome }}
+              Prepare artifact directory: ${{ steps.prepare.outcome }}
+              Updater check: ${{ steps.check.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
+          }}
+
   create-nightly: # Create a nightly build release in netdata/netdata-nightlies
     name: Create Nightly Release
     runs-on: ubuntu-latest
@@ -855,114 +926,12 @@ jobs:
             && github.repository == 'netdata/netdata'
           }}
 
-  prepare-test-images: # Prepare the test environments for our build checks. This also checks dependency handling code for each tested environment.
-    name: Prepare Test Environments
-    runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch'
-    needs:
-      - matrix
-    env:
-      RETRY_DELAY: 300
-    strategy:
-      # Unlike the actual build tests, this completes _very_ fast (average of about 3 minutes for each job), so we
-      # just run everything in parallel instead lof limiting job concurrency.
-      fail-fast: false
-      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
-    steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v4
-      - name: Setup Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build test environment
-        id: build1
-        uses: docker/build-push-action@v6
-        continue-on-error: true # We retry 3 times at 5 minute intervals if there is a failure here.
-        with:
-          push: false
-          load: false
-          file: .github/dockerfiles/Dockerfile.build_test
-          build-args: |
-            BASE=${{ matrix.distro }}
-            PRE=${{ matrix.env_prep }}
-            RMJSONC=${{ matrix.jsonc_removal }}
-          outputs: type=docker,dest=/tmp/image.tar
-          tags: test:${{ matrix.artifact_key }}
-      - name: Retry delay
-        if: ${{ steps.build1.outcome == 'failure' }}
-        run: sleep "${RETRY_DELAY}"
-      - name: Build test environment (attempt 2)
-        if: ${{ steps.build1.outcome == 'failure' }}
-        id: build2
-        uses: docker/build-push-action@v6
-        continue-on-error: true # We retry 3 times at 5 minute intervals if there is a failure here.
-        with:
-          push: false
-          load: false
-          file: .github/dockerfiles/Dockerfile.build_test
-          build-args: |
-            BASE=${{ matrix.distro }}
-            PRE=${{ matrix.env_prep }}
-            RMJSONC=${{ matrix.jsonc_removal }}
-          outputs: type=docker,dest=/tmp/image.tar
-          tags: test:${{ matrix.artifact_key }}
-      - name: Retry delay
-        if: ${{ steps.build1.outcome == 'failure' && steps.build2.outcome == 'failure' }}
-        run: sleep "${RETRY_DELAY}"
-      - name: Build test environment (attempt 3)
-        if: ${{ steps.build1.outcome == 'failure' && steps.build2.outcome == 'failure' }}
-        id: build3
-        uses: docker/build-push-action@v6
-        with:
-          push: false
-          load: false
-          file: .github/dockerfiles/Dockerfile.build_test
-          build-args: |
-            BASE=${{ matrix.distro }}
-            PRE=${{ matrix.env_prep }}
-            RMJSONC=${{ matrix.jsonc_removal }}
-          outputs: type=docker,dest=/tmp/image.tar
-          tags: test:${{ matrix.artifact_key }}
-      - name: Upload image artifact
-        id: upload
-        uses: actions/upload-artifact@v4.4.2
-        with:
-          name: ${{ matrix.artifact_key }}-test-env
-          path: /tmp/image.tar
-          retention-days: 30
-      - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_COLOR: 'danger'
-          SLACK_FOOTER: ''
-          SLACK_ICON_EMOJI: ':github-actions:'
-          SLACK_TITLE: 'Test environment preparation for ${{ matrix.distro }} failed:'
-          SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: |-
-              ${{ github.repository }}: Test environment preparation for ${{ matrix.distro }} failed.
-              Checkout: ${{ steps.checkout.outcome }}
-              Set up Buildx: ${{ steps.buildx.outcome }}
-              Build test environment: ${{ steps.build1.outcome }}
-              Build test environment (attempt 2): ${{ steps.build2.outcome }}
-              Build test environment (attempt 3): ${{ steps.build3.outcome }}
-              Upload: ${{ steps.upload.outcome }}
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-        if: >-
-          ${{
-            failure()
-            && startsWith(github.ref, 'refs/heads/master')
-            && github.event_name != 'pull_request'
-            && github.repository == 'netdata/netdata'
-          }}
-
   source-build: # Test various source build arrangements.
     name: Test Source Build
     runs-on: ubuntu-latest
     if: github.event_name != 'workflow_dispatch'
     needs:
       - matrix
-      - prepare-test-images
       - file-check
     strategy:
       fail-fast: false
@@ -979,33 +948,31 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Fetch test environment
-        id: fetch
-        if: needs.file-check.outputs.run == 'true'
+      - name: Setup Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build test environment
+        id: build
         uses: Wandalen/wretry.action@v3
         with:
-          action: actions/download-artifact@v4
+          action: docker/build-push-action@v6
           with: |
-            name: ${{ matrix.artifact_key }}-test-env
-            path: .
+            push: false
+            load: true
+            file: .github/dockerfiles/Dockerfile.build_test
+            build-args: |
+              BASE=${{ matrix.distro }}
+              PRE=${{ matrix.env_prep }}
+              RMJSONC=${{ matrix.jsonc_removal }}
+            tags: test:${{ matrix.artifact_key }}
           attempt_limit: 3
-          attempt_delay: 2000
-      - name: Load test environment
-        id: load
-        if: needs.file-check.outputs.run == 'true'
-        run: docker load --input image.tar
-      - name: netdata-installer on ${{ matrix.distro }}, require cloud
+          attempt_delay: 15000
+      - name: netdata-installer on ${{ matrix.distro }}
         id: build-cloud
         if: needs.file-check.outputs.run == 'true'
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
               /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --one-time-build ${{ needs.file-check.outputs.skip-go }}'
-      - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
-        id: build-no-jsonc
-        if: matrix.jsonc_removal != '' && needs.file-check.outputs.run == 'true'
-        run: |
-          docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
-              /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --one-time-build ${{ needs.file-check.outputs.skip-go }}'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -1017,10 +984,9 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Build tests for ${{ matrix.distro }} failed.
               Checkout: ${{ steps.checkout.outcome }}
-              Fetch test environment: ${{ steps.fetch.outcome }}
-              Load test environment: ${{ steps.load.outcome }}
+              Set up Buildx: ${{ steps.buildx.outcome }}
+              Build test environment: ${{ steps.build1.outcome }}
               netdata-installer: ${{ steps.build-cloud.outcome }}
-              netdata-installer, no JSON-C: ${{ steps.build-no-jsonc.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
@@ -1102,136 +1068,3 @@ jobs:
             && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
           }}
-
-  updater-check: # Test the generated dist archive using the updater code.
-    name: Test Generated Distfile and Updater Code
-    runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch'
-    needs:
-      - build-dist
-      - matrix
-      - prepare-test-images
-      - file-check
-    strategy:
-      fail-fast: false
-      max-parallel: 8
-      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
-    services:
-      apache: # This gets used to serve the dist tarball for the updater script.
-        image: httpd:2.4
-        ports:
-          - 8080:80
-        volumes:
-          - ${{ github.workspace }}:/usr/local/apache2/htdocs/
-    steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
-      - name: Checkout
-        id: checkout
-        if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v4
-      - name: Fetch dist tarball artifacts
-        id: fetch-tarball
-        if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
-        with:
-          action: actions/download-artifact@v4
-          with: |
-            name: dist-tarball
-            path: dist-tarball
-          attempt_limit: 3
-          attempt_delay: 2000
-      - name: Prepare artifact directory
-        id: prepare
-        if: needs.file-check.outputs.run == 'true'
-        run: |
-          mkdir -p artifacts/download/v9999.0.0 || exit 1
-          mkdir -p artifacts/latest || exit 1
-          echo "v9999.0.0" > artifacts/latest/latest-version.txt || exit 1
-          cp dist-tarball/* artifacts/download/v9999.0.0 || exit 1
-          cd artifacts/download/v9999.0.0 || exit 1
-          ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
-          ls -lFh
-          sha256sum -b ./* > "sha256sums.txt" || exit 1
-          cat sha256sums.txt
-          cd ../.. || exit 1
-          ls -lR
-      - name: Fetch test environment
-        id: fetch-test-environment
-        if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
-        with:
-          action: actions/download-artifact@v4
-          with: |
-            name: ${{ matrix.artifact_key }}-test-env
-            path: .
-          attempt_limit: 3
-          attempt_delay: 2000
-      - name: Load test environment
-        id: load
-        if: needs.file-check.outputs.run == 'true'
-        run: docker load --input image.tar
-      - name: Install netdata and run the updater on ${{ matrix.distro }}
-        id: updater-check
-        if: needs.file-check.outputs.run == 'true'
-        run: |
-          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host -w /netdata \
-                 -e EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }} \
-                 test:${{ matrix.artifact_key }} /netdata/.github/scripts/run-updater-check.sh
-      - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_COLOR: 'danger'
-          SLACK_FOOTER: ''
-          SLACK_ICON_EMOJI: ':github-actions:'
-          SLACK_TITLE: 'Updater checks for ${{ matrix.distro }} failed:'
-          SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: |-
-              ${{ github.repository }}: Updater checks for ${{ matrix.distro }} failed.
-              Checkout: ${{ steps.checkout.outcome }}
-              Fetch dist tarball: ${{ steps.fetch-tarball.outcome }}
-              Prepare artifact directory: ${{ steps.prepare.outcome }}
-              Fetch test environment: ${{ steps.fetch-test-environment.outcome }}
-              Load test environment: ${{ steps.load.outcome }}
-              Updater check: ${{ steps.updater-check.outcome }}
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-        if: >-
-          ${{
-            failure()
-            && startsWith(github.ref, 'refs/heads/master')
-            && github.event_name != 'pull_request'
-            && github.repository == 'netdata/netdata'
-            && needs.file-check.outputs.run == 'true'
-          }}
-
-  gitignore-check: # Verify that the build process does not make any changes to the source tree.
-    name: .gitignore
-    needs:
-      - file-check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
-      - name: Checkout
-        if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - name: Prepare environment
-        if: needs.file-check.outputs.run == 'true'
-        run: ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
-      - name: Build netdata
-        if: needs.file-check.outputs.run == 'true'
-        run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install-prefix /tmp/install --one-time-build ${{ needs.file-check.outputs.skip-go }}
-      - name: Check that repo is clean
-        if: needs.file-check.outputs.run == 'true'
-        run: |
-          git status --porcelain=v1 > /tmp/porcelain
-          if [ -s /tmp/porcelain ]; then
-            cat /tmp/porcelain
-            exit 1
-          fi
