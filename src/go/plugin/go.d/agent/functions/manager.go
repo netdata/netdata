@@ -40,21 +40,21 @@ type Manager struct {
 	FunctionRegistry map[string]func(Function)
 }
 
-func (m *Manager) Run(ctx context.Context) {
+func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
 	m.Info("instance is started")
 	defer func() { m.Info("instance is stopped") }()
 
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	go func() { defer wg.Done(); m.run(ctx) }()
+	go func() { defer wg.Done(); m.run(ctx, quitCh) }()
 
 	wg.Wait()
 
 	<-ctx.Done()
 }
 
-func (m *Manager) run(ctx context.Context) {
+func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -76,6 +76,11 @@ func (m *Manager) run(ctx context.Context) {
 				fn, err = parseFunctionWithPayload(ctx, line, m.input)
 			case line == "":
 				continue
+			case line == "QUIT":
+				if quitCh != nil {
+					quitCh <- struct{}{}
+					return
+				}
 			default:
 				m.Warningf("unexpected line: '%s'", line)
 				continue

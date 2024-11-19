@@ -21,9 +21,9 @@ import (
 var obsoleteLock = &sync.Mutex{}
 var obsoleteCharts = true
 
-func DontObsoleteCharts() {
+func ObsoleteCharts(b bool) {
 	obsoleteLock.Lock()
-	obsoleteCharts = false
+	obsoleteCharts = b
 	obsoleteLock.Unlock()
 }
 

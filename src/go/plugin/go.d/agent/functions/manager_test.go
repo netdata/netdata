@@ -275,7 +275,7 @@ FUNCTION_PAYLOAD_END
 
 			done := make(chan struct{})
 
-			go func() { defer close(done); mgr.Run(ctx) }()
+			go func() { defer close(done); mgr.Run(ctx, nil) }()
 
 			timeout := testTime + time.Second*2
 			tk := time.NewTimer(timeout)
