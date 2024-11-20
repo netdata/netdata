@@ -37,9 +37,9 @@ area](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netda
 - `--claim-token`: Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node
   after the install.
 - `--claim-rooms`: Specify a comma-separated list of tokens for each Room this node should appear in.
-- `--claim-proxy`: Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy.
+- `--claim-proxy`: Specify a proxy to use when connecting to the Cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy.
   See [connecting through a proxy](/src/claim/README.md#automatically-via-a-provisioning-system-or-the-command-line) for details.
-- `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`.
+- `--claim-url`: Specify a URL to use when connecting to the Cloud. Defaults to `https://app.netdata.cloud`.
 
 For example:
 

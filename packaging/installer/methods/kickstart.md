@@ -114,11 +114,11 @@ By default, the kickstart script will provide a Netdata agent installation that 
 - `--claim-token`
   Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node after the installation. This will connect and claim the Netdata Agent to Netdata Cloud.
 - `--claim-url`
-  Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`. Use this option to change the Netdata Cloud URL to point to your Netdata Cloud installation.
+  Specify a URL to use when connecting to the Cloud. Defaults to `https://app.netdata.cloud`. Use this option to change the Netdata Cloud URL to point to your Netdata Cloud installation.
 - `--claim-rooms`
   Specify a comma-separated list of tokens for each Room this node should appear in.
 - `--claim-proxy`
-  Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [connecting through a proxy](/src/claim/README.md#automatically-via-a-provisioning-system-or-the-command-line) for details.
+  Specify a proxy to use when connecting to the Cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [connecting through a proxy](/src/claim/README.md#automatically-via-a-provisioning-system-or-the-command-line) for details.
 - `--claim-only`
   If there is an existing installation, only try to claim it without attempting to update it. If there is no existing installation, install and claim Netdata normally.
 
