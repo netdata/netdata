@@ -125,7 +125,7 @@ func (t *http2Transport) RoundTrip(req *http.Request) (resp *http.Response, err 
 	return t.t2c.RoundTrip(req)
 }
 
-func (t *http2Transport) CloseIdleConnection() {
+func (t *http2Transport) CloseIdleConnections() {
 	t.t2.CloseIdleConnections()
 	t.t2c.CloseIdleConnections()
 }
