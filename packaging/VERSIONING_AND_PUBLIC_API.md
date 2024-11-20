@@ -59,7 +59,7 @@ Netdata Agent git repository.
 
 ## Public API
 
-The remainder of the document outlines the public API of the Netdata agent.
+The remainder of the document outlines the public API of the Netdata Agent.
 
 We define two categories of components within the public API:
 
@@ -89,7 +89,7 @@ notes at least one minor release prior to being merged:
 - The protocol used for communicating with external data collection plugins.
 - The APIs provided by the `python.d.plugin` and `charts.d.plugin` data collection frameworks.
 - The set of optional features supported by the Agent which are provided by default in our pre-built packages. If
-  support for an optional feature is being completely removed from the agent, that is instead covered by what
+  support for an optional feature is being completely removed from the Agent, that is instead covered by what
   component that feature is part of.
 
 ### Loosely Defined Public API Components

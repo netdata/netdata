@@ -1,7 +1,7 @@
 # Connect Agent to Cloud
 
 This section guides you through installing and securely connecting a new Netdata Agent to Netdata Cloud via the
-encrypted Agent-Cloud Link ([ACLK](/src/aclk/README.md)). Connecting your agent to Netdata Cloud unlocks additional
+encrypted Agent-Cloud Link ([ACLK](/src/aclk/README.md)). Connecting your Agent to Netdata Cloud unlocks additional
 features like centralized monitoring and easier collaboration.
 
 ## Connect
@@ -70,8 +70,8 @@ example:
    insecure = no
 ```
 
-If the agent is already running, you can either run `netdatacli reload-claiming-state` or restart the agent.
-Otherwise, the agent will be claimed when it starts.
+If the Agent is already running, you can either run `netdatacli reload-claiming-state` or restart the Agent.
+Otherwise, the Agent will be claimed when it starts.
 
 If the claiming process fails, the reason will be logged in daemon.log (search for "CLAIM") and the `cloud` section of `http://ip:19999/api/v2/info`.
 
@@ -102,7 +102,7 @@ sudo rm -rf cloud.d/
 
 > **IMPORTANT**
 >
-> Keep in mind that the Agent will be **re-claimed automatically** if the environment variables or `claim.conf` exist when the agent is restarted.
+> Keep in mind that the Agent will be **re-claimed automatically** if the environment variables or `claim.conf` exist when the Agent is restarted.
 
 This node no longer has access to the credentials it was used when connecting to Netdata Cloud via the ACLK. You will
 still be able to see this node in your Rooms in an **unreachable** state.

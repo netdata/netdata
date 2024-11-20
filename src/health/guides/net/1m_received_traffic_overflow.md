@@ -1,6 +1,6 @@
 ﻿### Understand the alert
 
-Network interfaces are categorized primarily on the bandwidth they can operate (1 Gbps, 10 Gbps, etc). High network utilization occurs when the volume of data on a network link approaches the capacity of the link. Netdata agent
+Network interfaces are categorized primarily on the bandwidth they can operate (1 Gbps, 10 Gbps, etc). High network utilization occurs when the volume of data on a network link approaches the capacity of the link. Netdata Agent
 calculates the average outbound utilization for a specific network interface over the last minute. High outbound utilization increases latency and packet loss because packet bursts are buffered
 
 This alarm may indicate either network congestion or malicious activity.

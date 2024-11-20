@@ -10,7 +10,7 @@ An increase in workload means that your web server is handling more traffic than
 
 1. Analyze web traffic logs
 
-   To understand the reason behind the increased workload, the first step is to analyze the web server traffic logs. Look for any patterns, specific time intervals, or specific user agents that are contributing to the high number of requests.
+   To understand the reason behind the increased workload, the first step is to analyze the web server traffic logs. Look for any patterns, specific time intervals, or specific user Agents that are contributing to the high number of requests.
 
 2. Check the web server performance
 

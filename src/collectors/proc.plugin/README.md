@@ -581,7 +581,7 @@ Default configuration will monitor only enabled infiniband ports, and refresh ne
 
 ## AMD GPUs
 
-This module monitors every AMD GPU card discovered at agent startup.
+This module monitors every AMD GPU card discovered at Agent startup.
 
 ### Monitored GPU metrics
 

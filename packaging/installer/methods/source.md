@@ -93,7 +93,7 @@ On Linux systems, Netdata has support for using the kernel's eBPF
 interface to monitor performance-related VFS, network, and process events,
 allowing for insights into process lifetimes and file access
 patterns. Using this functionality requires additional code managed in
-a separate repository from the core Netdata agent. You can either install
+a separate repository from the core Netdata Agent. You can either install
 a pre-built copy of the required code, or build it locally.
 
 #### Installing the pre-built eBPF code

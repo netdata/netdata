@@ -30,9 +30,9 @@ An HTTP endpoint is like a door where clients make requests to access web servic
    curl -I http://example.com/some/endpoint
    ```
 
-4. Check for network issues between the monitoring agent and the HTTP endpoint.
+4. Check for network issues between the monitoring Agent and the HTTP endpoint.
 
-   Use tools like `ping`, `traceroute`, or `mtr` to check for network latency or packet loss between the monitoring agent and the HTTP endpoint.
+   Use tools like `ping`, `traceroute`, or `mtr` to check for network latency or packet loss between the monitoring Agent and the HTTP endpoint.
 
 5. Review the web server or application configuration.
 

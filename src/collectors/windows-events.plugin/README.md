@@ -216,12 +216,12 @@ account.
 
 ### Is any of my data exposed to Netdata Cloud from this plugin?
 
-No. When you access the agent directly, none of your data passes through Netdata Cloud. You need a free Netdata
+No. When you access the Agent directly, none of your data passes through Netdata Cloud. You need a free Netdata
 Cloud account only to verify your identity and enable the use of Netdata Functions. Once this is done, all the
-data flow directly from your Netdata agent to your web browser.
+data flow directly from your Netdata Agent to your web browser.
 
 When you access Netdata via https://app.netdata.cloud, your data travel via Netdata Cloud, but they are not stored
-in Netdata Cloud. This is to allow you access your Netdata agents from anywhere. All communication from/to
+in Netdata Cloud. This is to allow you access your Netdata Agents from anywhere. All communication from/to
 Netdata Cloud is encrypted.
 
 ### What are the different types of event logs supported by this plugin?

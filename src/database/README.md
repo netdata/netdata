@@ -45,7 +45,7 @@ You can select the database mode by editing `netdata.conf` and setting:
 ## Netdata Longer Metrics Retention
 
 Metrics retention is controlled only by the disk space allocated to storing metrics. But it also affects the memory and
-CPU required by the agent to query longer timeframes.
+CPU required by the Agent to query longer timeframes.
 
 Since Netdata Agents usually run on the edge, on production systems, Netdata Agent **parents** should be considered.
 When having a [**parent - child**](/docs/observability-centralization-points/README.md) setup, the child (the

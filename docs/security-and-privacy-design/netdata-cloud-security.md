@@ -4,7 +4,7 @@ Netdata Cloud is designed with a security-first approach to ensure the highest l
 using Netdata Cloud in environments that require compliance with standards like PCI DSS, SOC 2, or HIPAA, users can be
 confident that all collected data is stored within their infrastructure. Data viewed on dashboards and alert
 notifications travel over Netdata Cloud, but are not stored—instead, they're transformed in transit, aggregated from
-multiple agents and parents (centralization points), to appear as one data source in the user's browser.
+multiple Agents and parents (centralization points), to appear as one data source in the user's browser.
 
 ## User Identification and Authorization
 

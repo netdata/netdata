@@ -8,19 +8,19 @@ The following are questions that are usually asked by Netdata Cloud On-Prem oper
 
 ## Loading charts takes a long time or ends with an error
 
-The charts service is trying to collect data from the agents involved in the query. In most of the cases, this microservice queries many agents (depending on the Room), and all of them have to reply for the query to be satisfied.
+The charts service is trying to collect data from the Agents involved in the query. In most of the cases, this microservice queries many Agents (depending on the Room), and all of them have to reply for the query to be satisfied.
 
 One or more of the following may be the cause:
 
 1. **Slow Netdata Agent or Netdata Agents with unreliable connections**
 
-   If any of the Netdata agents queried is slow or has an unreliable network connection, the query will stall and Netdata Cloud will have timeout before responding.
+   If any of the Netdata Agents queried is slow or has an unreliable network connection, the query will stall and Netdata Cloud will have timeout before responding.
 
-   When agents are overloaded or have unreliable connections, we suggest to install more Netdata Parents for providing reliable backends to Netdata Cloud. They will automatically be preferred for all queries, when available.
+   When Agents are overloaded or have unreliable connections, we suggest to install more Netdata Parents for providing reliable backends to Netdata Cloud. They will automatically be preferred for all queries, when available.
 
 2. **Poor Kubernetes cluster management**
 
-   Another common issue is poor management of the Kubernetes cluster. When a node of a Kubernetes cluster is saturated, or the limits set to its containers are small, Netdata Cloud microservices get throttled by Kubernetes and does not get the resources required to process the responses of Netdata agents and aggregate the results for the dashboard.
+   Another common issue is poor management of the Kubernetes cluster. When a node of a Kubernetes cluster is saturated, or the limits set to its containers are small, Netdata Cloud microservices get throttled by Kubernetes and does not get the resources required to process the responses of Netdata Agents and aggregate the results for the dashboard.
 
    We recommend to review the throttling of the containers and increase the limits if required.
 

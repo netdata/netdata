@@ -6,7 +6,7 @@ For example, with the default of `warn: $this > 1`, this means that 1% or more o
 
 ### Troubleshoot the alert
 
-This alert is a signal that some significant percentage of metrics within your infrastructure have been flagged as anomalous accoring to the ML based anomaly detection models the Netdata agent continually trains and re-trains for each metric. This tells us something somewhere might look strange in some way. THe next step is to try drill in and see what metrics are actually driving this.
+This alert is a signal that some significant percentage of metrics within your infrastructure have been flagged as anomalous accoring to the ML based anomaly detection models the Netdata Agent continually trains and re-trains for each metric. This tells us something somewhere might look strange in some way. THe next step is to try drill in and see what metrics are actually driving this.
 
 1. **Filter for the node or nodes relevant**: First we need to reduce as much noise as possible by filtering for just those nodes that have the elevated node anomaly rate. Look at the `anomaly_detection.anomaly_rate` chart and group by `node` to see which nodes have an elevated anomaly rate. Filter for just those nodes since this will reduce any noise as much as possible.
 

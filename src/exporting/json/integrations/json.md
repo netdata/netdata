@@ -13,7 +13,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/json.svg" width="150"/>
 
 
-Use the JSON connector for the exporting engine to archive your agent's metrics to JSON document databases for long-term storage,
+Use the JSON connector for the exporting engine to archive your Agent's metrics to JSON document databases for long-term storage,
 further analysis, or correlation with data from other sources
 
 

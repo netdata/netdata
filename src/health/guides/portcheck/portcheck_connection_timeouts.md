@@ -32,7 +32,7 @@ This alert triggers a warning state when the ratio of timeouts is between 10-40%
 
 5. Check the Netdata configuration
    - Review the Netdata configuration file `/etc/netdata/netdata.conf` to ensure the `portcheck` plugin settings are correctly configured for monitoring the TCP endpoint.
-   - If necessary, update and restart the Netdata agent.
+   - If necessary, update and restart the Netdata Agent.
 
 ### Useful resources
 

@@ -7,7 +7,7 @@ import TabItem from '@theme/TabItem';
 
 We do not officially support running our Docker images with the Docker CLI `--user` option or the Docker Compose
 `user:` parameter. Such usage will usually still work, but some features will not be available when run this
-way. Note that the agent will drop privileges appropriately inside the container during startup, meaning that even
+way. Note that the Agent will drop privileges appropriately inside the container during startup, meaning that even
 when run without these options almost nothing in the container will actually run with an effective UID of 0.
 
 Our POWER8+ Docker images do not support our FreeIPMI collector. This is a technical limitation in FreeIPMI itself,
@@ -620,12 +620,12 @@ Our Docker image provides integrated support for health checks through the stand
 
 You can control how the health checks run by using the environment variable `NETDATA_HEALTHCHECK_TARGET` as follows:
 
-- If left unset, the health check will attempt to access the `/api/v1/info` endpoint of the agent.
-- If set to the exact value 'cli', the health check script will use `netdatacli ping` to determine if the agent is
+- If left unset, the health check will attempt to access the `/api/v1/info` endpoint of the Agent.
+- If set to the exact value 'cli', the health check script will use `netdatacli ping` to determine if the Agent is
   running correctly or not. This is sufficient to ensure that Netdata did not hang during startup, but does not provide
   a rigorous verification that the daemon is collecting data or is otherwise usable.
 - If set to anything else, the health check will treat the value as a URL to check for a 200 status code on. In most
-  cases, this should start with `http://localhost:19999/` to check the agent running in the container.
+  cases, this should start with `http://localhost:19999/` to check the Agent running in the container.
 
 In most cases, the default behavior of checking the `/api/v1/info` endpoint will be sufficient. If you are using a
 configuration which disables the web server or restricts access to certain APIs, you will need to use a non-default

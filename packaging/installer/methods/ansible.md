@@ -11,7 +11,7 @@ code?
 
 Enter [Ansible](https://ansible.com), a popular system provisioning, configuration management, and infrastructure as
 code (IaC) tool. Ansible uses **playbooks** to glue many standardized operations together with a simple syntax, then run
-those operations over standard and secure SSH connections. There's no agent to install on the remote system, so all you
+those operations over standard and secure SSH connections. There's no Agent to install on the remote system, so all you
 have to worry about is your application and your monitoring software.
 
 Ansible has some competition from the likes of [Puppet](https://puppet.com/) or [Chef](https://www.chef.io/), but the

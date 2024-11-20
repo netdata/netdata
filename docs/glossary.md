@@ -128,7 +128,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 ## S
 
-- [**Single Node Dashboard**](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata agent, with thousand of metrics and hundreds of interactive charts that requires no set up.
+- [**Single Node Dashboard**](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata Agent, with thousand of metrics and hundreds of interactive charts that requires no set up.
 
 - [**Space**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
 

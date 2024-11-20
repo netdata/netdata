@@ -90,7 +90,7 @@ Using the above, Netdata will bind to:
 - IPv4 127.0.0.1 at port 19999 (port was used from `default port`). Only the UI (dashboard) and the read API will be accessible on this port. Both HTTP and HTTPS requests will be accepted.
 - IPv4 10.1.1.1 at port 19998. The management API and `netdata.conf` will be accessible on this port.
 - All the IPs `hostname` resolves to (both IPv4 and IPv6 depending on the resolved IPs) at port 19997. Only badges will be accessible on this port.
-- All IPv6 IPs at port 19996. Only metric streaming requests from other Netdata agents will be accepted on this port. Only encrypted streams will be allowed (i.e. child nodes also need to be [configured for TLS](/src/streaming/README.md).
+- All IPv6 IPs at port 19996. Only metric streaming requests from other Netdata Agents will be accepted on this port. Only encrypted streams will be allowed (i.e. child nodes also need to be [configured for TLS](/src/streaming/README.md).
 - All the IPs `localhost` resolves to (both IPv4 and IPv6 depending the resolved IPs) at port 19996. This port will only accept registry API requests.
 - All IPv4 and IPv6 IPs at port `http` as set in `/etc/services`. Only the UI (dashboard) and the read API will be accessible on this port.
 - Unix domain socket `/run/netdata/netdata.sock`. All requests are serviceable on this socket. Note that in some OSs like Fedora, every service sees a different `/tmp`, so don't create a Unix socket under `/tmp`. `/run` or `/var/run` is suggested.
@@ -179,7 +179,7 @@ Example:
 
 For information how to configure the child to use TLS, check [securing the communication](/src/streaming/README.md#securing-streaming-with-tlsssl) in the streaming documentation. There you will find additional details on the expected behavior for client and server nodes, when their respective TLS options are enabled.
 
-When we define the use of SSL in a Netdata agent for different ports,  Netdata will apply the behavior specified on each port. For example, using the configuration line below:
+When we define the use of SSL in a Netdata Agent for different ports,  Netdata will apply the behavior specified on each port. For example, using the configuration line below:
 
 ```text
 [web]
@@ -235,7 +235,7 @@ Netdata supports access lists in `netdata.conf`:
 
 - `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](/src/web/api/health/README.md#health-management-api)
 
-In order to check the FQDN of the connection without opening the Netdata agent to DNS-spoofing, a reverse-dns record
+In order to check the FQDN of the connection without opening the Netdata Agent to DNS-spoofing, a reverse-dns record
 must be setup for the connecting host. At connection time the reverse-dns of the peer IP address is resolved, and
 a forward DNS resolution is made to validate the IP address against the name-pattern.
 

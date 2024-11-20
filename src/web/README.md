@@ -6,7 +6,7 @@ we put a lot of emphasis on real-time, meaningful, and context-aware charts.
 We bundle Netdata with a dashboard and hundreds of charts, designed by both our
 team and the community, but you can also customize them yourself.
 
-There are two primary ways to view Netdata's dashboards on the agent:
+There are two primary ways to view Netdata's dashboards on the Agent:
 
 1.  The [local Agent dashboard](/src/web/gui/README.md) that comes pre-configured with every Netdata installation. You can
     see it at `http://NODE:19999`, replacing `NODE` with `localhost`, the hostname of your node, or its IP address. You

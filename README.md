@@ -233,7 +233,7 @@ By default, Netdata will send e-mail notifications if there is a configured MTA 
 
 ### 4. **Configure Netdata Parents** :family:
 
-Optionally, configure one or more Netdata Parents. A Netdata Parent is a Netdata Agent that has been configured to accept [streaming connections](https://learn.netdata.cloud/docs/streaming/streaming-configuration-reference) from other Netdata agents.
+Optionally, configure one or more Netdata Parents. A Netdata Parent is a Netdata Agent that has been configured to accept [streaming connections](https://learn.netdata.cloud/docs/streaming/streaming-configuration-reference) from other Netdata Agents.
 
 Netdata Parents provide:
 
@@ -264,8 +264,8 @@ If you connect your Netdata Parents, there is no need to connect your Netdata Ag
 
 When your Netdata nodes are connected to Netdata Cloud, you can (on top of the above):
 
-- Access your Netdata agents from anywhere
-- Access sensitive Netdata agent features (like "Netdata Functions": processes, systemd-journal)
+- Access your Netdata Agents from anywhere
+- Access sensitive Netdata Agent features (like "Netdata Functions": processes, systemd-journal)
 - Organize your infra in spaces and Rooms
 - Create, manage, and share **custom dashboards**
 - Invite your team and assign roles to them (Role-Based Access Control)
@@ -573,7 +573,7 @@ Here are some suggestions on how to manage and navigate this wealth of informati
    If you're looking for specific information, you can use the search feature to find the relevant metrics or charts. This can help you avoid scrolling through all the data.
 
 3. **Customize your Dashboards**<br/>
-   Netdata allows you to create custom dashboards, which can help you focus on the metrics that are most important to you. Sign-in to Netdata and there you can have your custom dashboards. (coming soon to the agent dashboard too)
+   Netdata allows you to create custom dashboards, which can help you focus on the metrics that are most important to you. Sign-in to Netdata and there you can have your custom dashboards. (coming soon to the Agent dashboard too)
 
 4. **Leverage Netdata's Anomaly Detection**<br/>
    Netdata uses machine learning to detect anomalies in your metrics. This can help you identify potential issues before they become major problems. We have added an `AR` button above the dashboard table of contents to reveal the anomaly rate per section so that you can spot what could need your attention.
@@ -633,7 +633,7 @@ We are aware that for privacy or regulatory reasons, not all environments can al
 
 These steps will disable the anonymous telemetry for your Netdata installation.
 
-Please note, even with telemetry disabled, Netdata still requires a [Netdata Registry](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry) for alert notifications' Call To Action (CTA) functionality. When you click an alert notification, it redirects you to the Netdata Registry, which then directs your web browser to the specific Netdata Agent that issued the alert for further troubleshooting. The Netdata Registry learns the URLs of your agents when you visit their dashboards.
+Please note, even with telemetry disabled, Netdata still requires a [Netdata Registry](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry) for alert notifications' Call To Action (CTA) functionality. When you click an alert notification, it redirects you to the Netdata Registry, which then directs your web browser to the specific Netdata Agent that issued the alert for further troubleshooting. The Netdata Registry learns the URLs of your Agents when you visit their dashboards.
 
 Any Netdata Agent can act as a Netdata Registry. Designate one Netdata Agent as your registry, and our global Netdata Registry will no longer be in use. For further information on this, please refer to [this guide](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry).
 

@@ -957,7 +957,7 @@ Then compile your `netdata_ebpf.te` file with the following commands to create a
 # semodule_package -o netdata_ebpf.pp -m netdata_ebpf.mod
 ```
 
-Finally, you can load the new policy and start the Netdata agent again:
+Finally, you can load the new policy and start the Netdata Agent again:
 
 ```bash
 # semodule -i netdata_ebpf.pp

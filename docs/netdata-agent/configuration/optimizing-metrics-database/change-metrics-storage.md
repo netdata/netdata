@@ -17,8 +17,7 @@ With these defaults, Netdata requires approximately 4 GiB of storage space (incl
 
 ## Retention Settings
 
-> **In a parent-child setup**, these settings manage the shared storage space used by the Netdata parent agent for
-> storing metrics collected by both the parent and its child nodes.
+> **In a parent-child setup**, these settings manage the shared storage space used by the Netdata parent Agent for storing metrics collected by both the parent and its child nodes.
 
 You can fine-tune retention for each tier by setting a time limit or size limit. Setting a limit to 0 disables it,
 allowing for no time-based deletion for that tier or using all available space, respectively. This enables various

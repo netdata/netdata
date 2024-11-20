@@ -266,7 +266,7 @@ CREATE USER netdata;
 GRANT pg_monitor TO netdata;
 ```
 
-After creating the new user, restart the Netdata agent with `sudo systemctl restart netdata`, or
+After creating the new user, restart the Netdata Agent with `sudo systemctl restart netdata`, or
 the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/start-stop-restart.md) for your
 system.
 

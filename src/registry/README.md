@@ -135,7 +135,7 @@ Keep in mind that connections to Netdata API ports are filtered by `[web].allow 
 `[registry].allow from` should also be allowed by `[web].allow connection from`.
 
 The patterns can be matches over IP addresses or FQDN of the host. In order to check the FQDN of the connection without
-opening the Netdata agent to DNS-spoofing, a reverse-dns record must be setup for the connecting host. At connection
+opening the Netdata Agent to DNS-spoofing, a reverse-dns record must be setup for the connecting host. At connection
 time the reverse-dns of the peer IP address is resolved, and a forward DNS resolution is made to validate the IP address
 against the name-pattern.
 

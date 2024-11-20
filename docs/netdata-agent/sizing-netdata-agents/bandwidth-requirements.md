@@ -44,4 +44,4 @@ The information transferred to Netdata Cloud is:
 
 This is not a constant stream of information. Netdata Agents update Netdata Cloud only about status changes on all the above (e.g., an alert being triggered, or a metric stopped being collected). So, there is an initial handshake and exchange of information when Netdata starts, and then there only updates when required.
 
-Of course, when you view Netdata Cloud dashboards that need to query the database a Netdata agent maintains, this query is forwarded to an agent that can satisfy it. This means that Netdata Cloud receives metric samples only when a user is accessing a dashboard and the samples transferred are usually aggregations to allow rendering the dashboards.  
+Of course, when you view Netdata Cloud dashboards that need to query the database a Netdata Agent maintains, this query is forwarded to an Agent that can satisfy it. This means that Netdata Cloud receives metric samples only when a user is accessing a dashboard and the samples transferred are usually aggregations to allow rendering the dashboards.  

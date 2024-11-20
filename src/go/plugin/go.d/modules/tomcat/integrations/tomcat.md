@@ -38,7 +38,7 @@ By default, this Tomcat collector cannot access the server's status page. To ena
 
 #### Auto-Detection
 
-If the Netdata agent and Tomcat are on the same host, the collector will attempt to connect to the Tomcat server's status page at `http://localhost:8080/manager/status?XML=true`.
+If the Netdata Agent and Tomcat are on the same host, the collector will attempt to connect to the Tomcat server's status page at `http://localhost:8080/manager/status?XML=true`.
 
 
 #### Limits
@@ -120,7 +120,7 @@ There are no alerts configured by default for this integration.
 
 #### Access to Tomcat Status Endpoint
 
-The Netdata agent needs read-only access to its status endpoint to collect data from the Tomcat server.
+The Netdata Agent needs read-only access to its status endpoint to collect data from the Tomcat server.
 
 You can achieve this by creating a dedicated user named `netdata` with read-only permissions specifically for accessing the [Server Status](https://tomcat.apache.org/tomcat-10.0-doc/manager-howto.html#Server_Status) endpoint.
 

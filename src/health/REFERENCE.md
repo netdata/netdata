@@ -89,7 +89,7 @@ available options are described below.
 
 ### Disable all alerts
 
-In the `netdata.conf` `[health]` section, set `enabled` to `no`, and restart the agent.
+In the `netdata.conf` `[health]` section, set `enabled` to `no`, and restart the Agent.
 
 ### Disable some alerts
 
@@ -116,7 +116,7 @@ When you need to frequently disable all or some alerts from triggering during ce
 when running backups) you can use the
 [health management API](/src/web/api/health/README.md).
 The API allows you to issue commands to control the health engine's behavior without changing configuration,
-or restarting the agent.
+or restarting the Agent.
 
 ### Temporarily silence notifications at runtime
 
@@ -124,7 +124,7 @@ If you want health checks to keep running and alerts to keep getting triggered, 
 suppressed temporarily, you can use the
 [health management API](/src/web/api/health/README.md).
 The API allows you to issue commands to control the health engine's behavior without changing configuration,
-or restarting the agent.
+or restarting the Agent.
 
 ## Write a new health entity
 
