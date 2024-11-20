@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Add a special version number to bypass alert snapshots [\#19042](https://github.com/netdata/netdata/pull/19042) ([stelfrag](https://github.com/stelfrag))
+- Add Custom Actions \(Installer\) [\#19041](https://github.com/netdata/netdata/pull/19041) ([thiagoftsm](https://github.com/thiagoftsm))
+- fix\(go.d/nvidia\_smi\): disable loop mode on Win [\#19040](https://github.com/netdata/netdata/pull/19040) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d/nvidia\_smi\): disable loop mode by default on Win [\#19039](https://github.com/netdata/netdata/pull/19039) ([ilyam8](https://github.com/ilyam8))
+- improvement\(go.d.plugin\): terminate on QUIT command [\#19038](https://github.com/netdata/netdata/pull/19038) ([ilyam8](https://github.com/ilyam8))
+- fix\(windows/netframework\): dont sanitize proc name for labels [\#19036](https://github.com/netdata/netdata/pull/19036) ([ilyam8](https://github.com/ilyam8))
 - --dev option to installer [\#19034](https://github.com/netdata/netdata/pull/19034) ([ktsaou](https://github.com/ktsaou))
 - add `shutdown` keyword to ensure graceful service termination on FreeBSD [\#19033](https://github.com/netdata/netdata/pull/19033) ([ilyam8](https://github.com/ilyam8))
 - fix: ensure correct startup order for Netdata service on FreeBSD [\#19032](https://github.com/netdata/netdata/pull/19032) ([ilyam8](https://github.com/ilyam8))
@@ -59,6 +65,7 @@
 - go mod tidy [\#18967](https://github.com/netdata/netdata/pull/18967) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18966](https://github.com/netdata/netdata/pull/18966) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/rabbitmq\): add cluster support [\#18965](https://github.com/netdata/netdata/pull/18965) ([ilyam8](https://github.com/ilyam8))
+- Tidy up CI to improve overall run times. [\#18957](https://github.com/netdata/netdata/pull/18957) ([Ferroin](https://github.com/Ferroin))
 - added /api/v3/stream\_path [\#18943](https://github.com/netdata/netdata/pull/18943) ([ktsaou](https://github.com/ktsaou))
 - Update Windows Documentation [\#18928](https://github.com/netdata/netdata/pull/18928) ([thiagoftsm](https://github.com/thiagoftsm))
 - IIS Metadata [\#18765](https://github.com/netdata/netdata/pull/18765) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -427,13 +434,6 @@
 - Bump golang.org/x/net from 0.28.0 to 0.29.0 in /src/go [\#18496](https://github.com/netdata/netdata/pull/18496) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Windows Plugin Metrics \(Thermal and Memory\) [\#18494](https://github.com/netdata/netdata/pull/18494) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations.js [\#18493](https://github.com/netdata/netdata/pull/18493) ([netdatabot](https://github.com/netdatabot))
-- varnish collector Go implementation [\#18491](https://github.com/netdata/netdata/pull/18491) ([Ancairon](https://github.com/Ancairon))
-- add go.d/apcupsd [\#18489](https://github.com/netdata/netdata/pull/18489) ([ilyam8](https://github.com/ilyam8))
-- Improve processing on removed alerts after agent restart [\#18488](https://github.com/netdata/netdata/pull/18488) ([stelfrag](https://github.com/stelfrag))
-- Bump github.com/prometheus/common from 0.57.0 to 0.58.0 in /src/go [\#18487](https://github.com/netdata/netdata/pull/18487) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump golang.org/x/text from 0.17.0 to 0.18.0 in /src/go [\#18486](https://github.com/netdata/netdata/pull/18486) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Remove Warnings \(ebpf\) [\#18484](https://github.com/netdata/netdata/pull/18484) ([thiagoftsm](https://github.com/thiagoftsm))
-- \[WIP\] Windows-Events Logs Explorer [\#18483](https://github.com/netdata/netdata/pull/18483) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
