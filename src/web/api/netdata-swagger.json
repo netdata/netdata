@@ -98,7 +98,7 @@
                     "api": {
                       "$ref": "#/components/schemas/api"
                     },
-                    "Agents": {
+                    "agents": {
                       "$ref": "#/components/schemas/agents"
                     },
                     "versions": {
@@ -2901,7 +2901,7 @@
           "api": {
             "$ref": "#/components/schemas/api"
           },
-          "Agents": {
+          "agents": {
             "$ref": "#/components/schemas/agents"
           },
           "versions": {
@@ -3489,7 +3489,7 @@
         "description": "The version of the API used.",
         "type": "integer"
       },
-      "Agents": {
+      "agents": {
         "description": "An array of Agent definitions consulted to compose this response.\n",
         "type": "array",
         "items": {
@@ -3684,7 +3684,7 @@
           "api": {
             "$ref": "#/components/schemas/api"
           },
-          "Agents": {
+          "agents": {
             "$ref": "#/components/schemas/agents"
           },
           "versions": {
