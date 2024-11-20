@@ -12,7 +12,7 @@ The software is known for its low impact on memory resources, high scalability, 
 
 - Nginx is used and useful in cases when you want to access different instances of Netdata from a single server.
 
-- Password-protect access to Netdata, until distributed authentication is implemented via the Netdata cloud Sign In mechanism.
+- Password-protect access to Netdata, until distributed authentication is implemented via the Netdata Cloud Sign In mechanism.
 
 - A proxy was necessary to encrypt the communication to Netdata, until v1.16.0, which provided TLS (HTTPS) support.
 

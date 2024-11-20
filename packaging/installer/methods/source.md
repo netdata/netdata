@@ -45,7 +45,7 @@ are using a source tarball published by the Netdata project, then these are incl
 of the Git repository, you may need to explicitly fetch and update the submodules using `git submodule update
 --init --recursive`.
 
-### Netdata cloud
+### Netdata Cloud
 
 ## Building Netdata
 

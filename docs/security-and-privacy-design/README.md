@@ -100,7 +100,7 @@ laws, including GDPR and CCPA.
 
 Netdata ensures user privacy rights as mandated by the GDPR and CCPA. This includes the right to access, correct, and
 delete personal data. These functions are all available online via the Netdata Cloud User Interface (UI). In case a user
-wants to remove all personal information (email and activities), they can delete their cloud account by logging
+wants to remove all personal information (email and activities), they can delete their Netdata Cloud account by logging
 into <https://app.netdata.cloud> and accessing their profile, at the bottom left of the screen.
 
 ### Regular Review and Updates

@@ -451,7 +451,7 @@ The `source` is an integer field that can have the following values:
 - `1`: The value was set automatically.
 - `2`: The value was set manually.
 - `4`: This is a K8 label.
-- `8`: This is a label defined using `netdata` Agent cloud link.
+- `8`: This is a label defined using `netdata` Agent-Cloud link.
 
 #### CLABEL_COMMIT
 
