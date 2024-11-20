@@ -1158,7 +1158,9 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     int *update_every = data;
 
     void (*transaction_chart[])(struct mssql_db_instance *, const char *, int) = {
-        mssql_data_file_size_chart,
+        // FIXME: allegedly Netdata collects negative values (MSSQLDatabaseDataFileSize).
+        // something is wrong, perflibdump shows correct values.
+        // mssql_data_file_size_chart,
         mssql_transactions_chart,
         mssql_database_backup_restore_chart,
         mssql_database_log_flushed_chart,
