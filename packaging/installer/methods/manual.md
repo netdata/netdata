@@ -210,7 +210,7 @@ cd netdata
 Unlike the [`kickstart.sh`](/packaging/installer/methods/kickstart.md), the `netdata-installer.sh` script does
 not allow you to automatically [connect](/src/claim/README.md) your node to Netdata Cloud immediately after installation.
 
-See the [connect to cloud](/src/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
+See the [connect to Netdata Cloud](/src/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
 
 ### 'nonrepresentable section on output' errors
 

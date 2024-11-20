@@ -6,7 +6,7 @@ The complete documentation of the Netdata agent's REST API is documented in the 
 
 You can explore it using the **[Swagger UI](https://learn.netdata.cloud/api)**, or the **[Swagger Editor](https://editor.swagger.io/?url=https://raw.githubusercontent.com/netdata/netdata/master/src/web/api/netdata-swagger.yaml)**.
 
-## Netdata cloud API
+## Netdata Cloud API
 
-A very basic Netdata cloud REST API supports the [Grafana data source plugin](https://github.com/netdata/netdata-grafana-datasource-plugin/blob/master/README.md), 
+A very basic Netdata Cloud REST API supports the [Grafana data source plugin](https://github.com/netdata/netdata-grafana-datasource-plugin/blob/master/README.md), 
 but has not yet been expanded for wider use. We intend to provide a properly documented API in the future.
