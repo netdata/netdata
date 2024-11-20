@@ -41,7 +41,7 @@ Netdata Cloud does not store user credentials.
 
 ## Security Features and Response
 
-Netdata Cloud offers a variety of security features, including infrastructure-level dashboards, centralized alerts notifications, auditing logs, and role-based access to different segments of the infrastructure. It employs several protection mechanisms against DDoS attacks, such as rate-limiting and automated blacklisting. It also uses static code analyzers to prevent other types of attacks.
+Netdata Cloud offers a variety of security features, including infrastructure-level dashboards, centralized alert notifications, auditing logs, and role-based access to different segments of the infrastructure. It employs several protection mechanisms against DDoS attacks, such as rate-limiting and automated blacklisting. It also uses static code analyzers to prevent other types of attacks.
 
 In the event of potential security vulnerabilities or incidents, Netdata Cloud follows the same process as the Netdata
 agent. Every report is acknowledged and analyzed by the Netdata team within three working days, and the team keeps the

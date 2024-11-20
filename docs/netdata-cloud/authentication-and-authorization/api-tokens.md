@@ -2,7 +2,7 @@
 
 ## Overview
 
-Every single user can get access to the Netdata resource programmatically. It is done through the API Token which can be also called as Bearer Token. This token is used for authentication and authorization, it can be issued in the Netdata UI under the user Settings:
+Every single user can get access to the Netdata resource programmatically. It is done through the API Token, also called Bearer Token. This token is used for authentication and authorization, it can be issued in the Netdata UI under the user Settings:
 
 <img width="316" alt="image" src="https://github.com/netdata/netdata/assets/14999928/b0846076-afae-47ab-92df-c24967305ab9"/>
 

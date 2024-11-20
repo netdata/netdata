@@ -21,7 +21,7 @@ Please respond in the affirmative for any relevant prompts during the installati
 
 The simplest method is to use the single line [kickstart script](/packaging/installer/methods/kickstart.md)
 
-If you have a Netdata Cloud account then clicking on the **Connect Nodes** button will generate the kickstart command you should use. Use the command from the "Linux" tab, it should look something like this:
+If you have a Netdata Cloud account, clicking on the **Connect Nodes** button will generate the kickstart command you should use. Use the command from the "Linux" tab, it should look something like this:
 
 ```sh
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token <CLAIM_TOKEN> --claim-url https://app.netdata.cloud
