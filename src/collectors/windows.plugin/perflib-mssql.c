@@ -907,7 +907,7 @@ static void mssql_database_backup_restore_chart(struct mssql_db_instance *mli, c
             id, RRD_ID_LENGTH_MAX, "mssql_db_%s_instance_%s_backup_restore_operations", db, mli->parent->instanceID);
 
         mli->rd_db_backup_restore_operations =
-            rrddim_add(mli->parent->st_db_backup_restore_operations, id, db, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(mli->parent->st_db_backup_restore_operations, id, "backup", 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_BACKUP_RESTORE_OP)) ? mli->MSSQLDatabaseBackupRestoreOperations.current.Data : 0;
@@ -941,7 +941,7 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mli, cons
     if (!mli->rd_db_log_flushes) {
         snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_db_%s_instance_%s_log_flushes_bytes", db, mli->parent->instanceID);
 
-        mli->rd_db_log_flushes = rrddim_add(mli->parent->st_db_log_flushes, id, db, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mli->rd_db_log_flushes = rrddim_add(mli->parent->st_db_log_flushes, id, "flushes", 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHES)) ? mli->MSSQLDatabaseLogFlushes.current.Data : 0;
@@ -975,7 +975,7 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mli, cons
     if (!mli->rd_db_log_flushed) {
         snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_db_%s_instance_%s_log_flushed_bytes", db, mli->parent->instanceID);
 
-        mli->rd_db_log_flushed = rrddim_add(mli->parent->st_db_log_flushed, id, db, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mli->rd_db_log_flushed = rrddim_add(mli->parent->st_db_log_flushed, id, "flushed", 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_LOG_FLUSHED)) ? mli->MSSQLDatabaseLogFlushed.current.Data : 0;
@@ -1009,7 +1009,7 @@ static void mssql_transactions_chart(struct mssql_db_instance *mli, const char *
     if (!mli->rd_db_transactions) {
         snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_db_%s_instance_%s_transactions", db, mli->parent->instanceID);
 
-        mli->rd_db_transactions = rrddim_add(mli->parent->st_db_transactions, id, db, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        mli->rd_db_transactions = rrddim_add(mli->parent->st_db_transactions, id, "transactions", 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_TRANSACTIONS)) ? mli->MSSQLDatabaseTransactions.current.Data : 0;
@@ -1047,7 +1047,7 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mli, const 
         snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_db_%s_instance_%s_write_transactions", db, mli->parent->instanceID);
 
         mli->rd_db_write_transactions =
-            rrddim_add(mli->parent->st_db_write_transactions, id, db, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(mli->parent->st_db_write_transactions, id, "write", 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_WRITE_TRANSACTIONS)) ? mli->MSSQLDatabaseWriteTransactions.current.Data : 0;
@@ -1085,7 +1085,7 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
         snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_db_%s_instance_%s_active_transactions", db, mli->parent->instanceID);
 
         mli->rd_db_active_transactions =
-            rrddim_add(mli->parent->st_db_active_transactions, id, db, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(mli->parent->st_db_active_transactions, id, "active", 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_ACTIVE_TRANSACTIONS)) ? mli->MSSQLDatabaseActiveTransactions.current.Data : 0;
@@ -1122,7 +1122,7 @@ static void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char
     if (!mli->rd_db_data_file_size) {
         snprintfz(id, RRD_ID_LENGTH_MAX, "mssql_db_%s_instance_%s_data_files_size_bytes", db, mli->parent->instanceID);
 
-        mli->rd_db_data_file_size = rrddim_add(mli->parent->st_db_data_file_size, id, db, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mli->rd_db_data_file_size = rrddim_add(mli->parent->st_db_data_file_size, id, "size", 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     collected_number data = (mli->updated & (1<<NETDATA_MSSQL_ENUM_MDI_IDX_FILE_SIZE)) ? mli->MSSQLDatabaseDataFileSize.current.Data * 1024 : 0;
