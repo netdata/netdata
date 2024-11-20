@@ -60,7 +60,7 @@
     },
     {
       "name": "management",
-      "description": "Everything related to managing netdata agents"
+      "description": "Everything related to managing netdata Agents"
     }
   ],
   "paths": {
@@ -71,7 +71,7 @@
           "nodes"
         ],
         "summary": "Nodes Info v2",
-        "description": "Get a list of all nodes hosted by this Netdata agent.\n",
+        "description": "Get a list of all nodes hosted by this Netdata Agent.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/scopeNodes"
@@ -92,13 +92,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "`/api/v2/nodes` response for all nodes hosted by a Netdata agent.\n",
+                  "description": "`/api/v2/nodes` response for all nodes hosted by a Netdata Agent.\n",
                   "type": "object",
                   "properties": {
                     "api": {
                       "$ref": "#/components/schemas/api"
                     },
-                    "agents": {
+                    "Agents": {
                       "$ref": "#/components/schemas/agents"
                     },
                     "versions": {
@@ -125,7 +125,7 @@
           "contexts"
         ],
         "summary": "Contexts Info v2",
-        "description": "Get a list of all contexts, across all nodes, hosted by this Netdata agent.\n",
+        "description": "Get a list of all contexts, across all nodes, hosted by this Netdata Agent.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/scopeNodes"
@@ -161,7 +161,7 @@
           "contexts"
         ],
         "summary": "Full Text Search v2",
-        "description": "Get a list of contexts, across all nodes, hosted by this Netdata agent, matching a string expression\n",
+        "description": "Get a list of contexts, across all nodes, hosted by this Netdata Agent, matching a string expression\n",
         "parameters": [
           {
             "name": "q",
@@ -1853,7 +1853,7 @@
       "scopeNodes": {
         "name": "scope_nodes",
         "in": "query",
-        "description": "A simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked against the nodes' machine guid, node id and hostname. The default nodes scope is all nodes for which this agent has data for. Usually the nodes scope is used to slice the entire dashboard (e.g. the Global Nodes Selector at the Netdata Cloud overview dashboard). Both positive and negative simple pattern expressions are supported.\n",
+        "description": "A simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked against the nodes' machine guid, node id and hostname. The default nodes scope is all nodes for which this Agent has data for. Usually the nodes scope is used to slice the entire dashboard (e.g. the Global Nodes Selector at the Netdata Cloud overview dashboard). Both positive and negative simple pattern expressions are supported.\n",
         "required": false,
         "schema": {
           "type": "string",
@@ -1864,7 +1864,7 @@
       "scopeContexts": {
         "name": "scope_contexts",
         "in": "query",
-        "description": "A simple pattern limiting the contexts scope of the query. The scope controls both data and metadata response. The default contexts scope is all contexts for which this agent has data for. Usually the contexts scope is used to slice data on the dashboard (e.g. each context based chart has its own contexts scope, limiting the chart to all the instances of the selected context). Both positive and negative simple pattern expressions are supported.\n",
+        "description": "A simple pattern limiting the contexts scope of the query. The scope controls both data and metadata response. The default contexts scope is all contexts for which this Agent has data for. Usually the contexts scope is used to slice data on the dashboard (e.g. each context based chart has its own contexts scope, limiting the chart to all the instances of the selected context). Both positive and negative simple pattern expressions are supported.\n",
         "required": false,
         "schema": {
           "type": "string",
@@ -1992,7 +1992,7 @@
       "dataQueryOptions": {
         "name": "options",
         "in": "query",
-        "description": "Options that affect data generation.\n* `jsonwrap` - Wrap the output in a JSON object with metadata about the query.\n* `raw` - change the output so that it is aggregatable across multiple such queries. Supported by `/api/v2` data queries and `json2` format.\n* `minify` - Remove unnecessary spaces and newlines from the output.\n* `debug` - Provide additional information in `jsonwrap` output to help tracing issues.\n* `nonzero` - Do not return dimensions that all their values are zero, to improve the visual appearance of charts. They will still be returned if all the dimensions are entirely zero.\n* `null2zero` - Replace `null` values with `0`.\n* `absolute` or `abs` - Traditionally Netdata returns select dimensions negative to improve visual appearance. This option turns this feature off.\n* `display-absolute` - Only used by badges, to do color calculation using the signed value, but render the value without a sign.\n* `flip` or `reversed` - Order the timestamps array in reverse order (newest to oldest).\n* `min2max` - When flattening multi-dimensional data into a single metric format, use `max - min` instead of `sum`. This is EOL - use `/api/v2` to control aggregation across dimensions.\n* `percentage` - Convert all values into a percentage vs the row total. When enabled, Netdata will query all dimensions, even the ones that have not been selected or are hidden, to find the row total, in order to calculate the percentage of each dimension selected.\n* `seconds` - Output timestamps in seconds instead of dates.\n* `milliseconds` or `ms` - Output timestamps in milliseconds instead of dates.\n* `unaligned` - by default queries are aligned to the the view, so that as time passes past data returned do not change. When a data query will not be used for visualization, `unaligned` can be given to avoid aligning the query time-frame for visual precision.\n* `match-ids`, `match-names`. By default filters match both IDs and names when they are available. Setting either of the two options will disable the other.\n* `anomaly-bit` - query the anomaly information instead of metric values. This is EOL, use `/api/v2` and `json2` format which always returns this information and many more.\n* `jw-anomaly-rates` - return anomaly rates as a separate result set in the same `json` format response. This is EOL, use `/api/v2` and `json2` format which always returns information and many more. \n* `details` - `/api/v2/data` returns in `jsonwrap` the full tree of dimensions that have been matched by the query.\n* `group-by-labels` - `/api/v2/data` returns in `jsonwrap` flattened labels per output dimension. These are used to identify the instances that have been aggregated into each dimension, making it possible to provide a map, like Netdata does for Kubernetes.\n* `natural-points` - return timestamps as found in the database. The result is again fixed-step, but the query engine attempts to align them with the timestamps found in the database.\n* `virtual-points` - return timestamps independent of the database alignment. This is needed aggregating data across multiple Netdata agents, to ensure that their outputs do not need to be interpolated to be merged.\n* `selected-tier` - use data exclusively from the selected tier given with the `tier` parameter. This option is set automatically when the `tier` parameter is set.\n* `all-dimensions` - In `/api/v1` `jsonwrap` include metadata for all candidate metrics examined. In `/api/v2` this is standard behavior and no option is needed.\n* `label-quotes` - In `csv` output format, enclose each header label in quotes.\n* `objectrows` - Each row of value should be an object, not an array (only for `json` format).\n* `google_json` - Comply with google JSON/JSONP specs (only for `json` format).\n",
+        "description": "Options that affect data generation.\n* `jsonwrap` - Wrap the output in a JSON object with metadata about the query.\n* `raw` - change the output so that it is aggregatable across multiple such queries. Supported by `/api/v2` data queries and `json2` format.\n* `minify` - Remove unnecessary spaces and newlines from the output.\n* `debug` - Provide additional information in `jsonwrap` output to help tracing issues.\n* `nonzero` - Do not return dimensions that all their values are zero, to improve the visual appearance of charts. They will still be returned if all the dimensions are entirely zero.\n* `null2zero` - Replace `null` values with `0`.\n* `absolute` or `abs` - Traditionally Netdata returns select dimensions negative to improve visual appearance. This option turns this feature off.\n* `display-absolute` - Only used by badges, to do color calculation using the signed value, but render the value without a sign.\n* `flip` or `reversed` - Order the timestamps array in reverse order (newest to oldest).\n* `min2max` - When flattening multi-dimensional data into a single metric format, use `max - min` instead of `sum`. This is EOL - use `/api/v2` to control aggregation across dimensions.\n* `percentage` - Convert all values into a percentage vs the row total. When enabled, Netdata will query all dimensions, even the ones that have not been selected or are hidden, to find the row total, in order to calculate the percentage of each dimension selected.\n* `seconds` - Output timestamps in seconds instead of dates.\n* `milliseconds` or `ms` - Output timestamps in milliseconds instead of dates.\n* `unaligned` - by default queries are aligned to the the view, so that as time passes past data returned do not change. When a data query will not be used for visualization, `unaligned` can be given to avoid aligning the query time-frame for visual precision.\n* `match-ids`, `match-names`. By default filters match both IDs and names when they are available. Setting either of the two options will disable the other.\n* `anomaly-bit` - query the anomaly information instead of metric values. This is EOL, use `/api/v2` and `json2` format which always returns this information and many more.\n* `jw-anomaly-rates` - return anomaly rates as a separate result set in the same `json` format response. This is EOL, use `/api/v2` and `json2` format which always returns information and many more. \n* `details` - `/api/v2/data` returns in `jsonwrap` the full tree of dimensions that have been matched by the query.\n* `group-by-labels` - `/api/v2/data` returns in `jsonwrap` flattened labels per output dimension. These are used to identify the instances that have been aggregated into each dimension, making it possible to provide a map, like Netdata does for Kubernetes.\n* `natural-points` - return timestamps as found in the database. The result is again fixed-step, but the query engine attempts to align them with the timestamps found in the database.\n* `virtual-points` - return timestamps independent of the database alignment. This is needed aggregating data across multiple Netdata Agents, to ensure that their outputs do not need to be interpolated to be merged.\n* `selected-tier` - use data exclusively from the selected tier given with the `tier` parameter. This option is set automatically when the `tier` parameter is set.\n* `all-dimensions` - In `/api/v1` `jsonwrap` include metadata for all candidate metrics examined. In `/api/v2` this is standard behavior and no option is needed.\n* `label-quotes` - In `csv` output format, enclose each header label in quotes.\n* `objectrows` - Each row of value should be an object, not an array (only for `json` format).\n* `google_json` - Comply with google JSON/JSONP specs (only for `json` format).\n",
         "required": false,
         "allowEmptyValue": false,
         "schema": {
@@ -2186,7 +2186,7 @@
       "timeoutMS": {
         "name": "timeout",
         "in": "query",
-        "description": "Specify a timeout value in milliseconds after which the agent will abort the query and return a 503 error. A value of 0 indicates no timeout.\n",
+        "description": "Specify a timeout value in milliseconds after which the Agent will abort the query and return a 503 error. A value of 0 indicates no timeout.\n",
         "required": false,
         "schema": {
           "type": "number",
@@ -2197,7 +2197,7 @@
       "timeoutSecs": {
         "name": "timeout",
         "in": "query",
-        "description": "Specify a timeout value in seconds after which the agent will abort the query and return a 504 error. A value of 0 indicates no timeout, but some endpoints, like `weights`, do not accept infinite timeouts (they have a predefined default), so to disable the timeout it must be set to a really high value.\n",
+        "description": "Specify a timeout value in seconds after which the Agent will abort the query and return a 504 error. A value of 0 indicates no timeout, but some endpoints, like `weights`, do not accept infinite timeouts (they have a predefined default), so to disable the timeout it must be set to a really high value.\n",
         "required": false,
         "schema": {
           "type": "number",
@@ -2901,7 +2901,7 @@
           "api": {
             "$ref": "#/components/schemas/api"
           },
-          "agents": {
+          "Agents": {
             "$ref": "#/components/schemas/agents"
           },
           "versions": {
@@ -3489,39 +3489,39 @@
         "description": "The version of the API used.",
         "type": "integer"
       },
-      "agents": {
-        "description": "An array of agent definitions consulted to compose this response.\n",
+      "Agents": {
+        "description": "An array of Agent definitions consulted to compose this response.\n",
         "type": "array",
         "items": {
           "type": "object",
           "properties": {
             "mg": {
-              "description": "The agent machine GUID.",
+              "description": "The Agent machine GUID.",
               "type": "string",
               "format": "uuid"
             },
             "nd": {
-              "description": "The agent cloud node ID.",
+              "description": "The Agent cloud node ID.",
               "type": "string",
               "format": "uuid"
             },
             "nm": {
-              "description": "The agent hostname.",
+              "description": "The Agent hostname.",
               "type": "string"
             },
             "ai": {
-              "description": "The agent index ID for this agent, in this response.",
+              "description": "The Agent index ID for this Agent, in this response.",
               "type": "integer"
             },
             "now": {
-              "description": "The current unix epoch timestamp of this agent.",
+              "description": "The current unix epoch timestamp of this Agent.",
               "type": "integer"
             }
           }
         }
       },
       "versions": {
-        "description": "Hashes that allow the caller to detect important database changes of Netdata agents.\n",
+        "description": "Hashes that allow the caller to detect important database changes of Netdata Agents.\n",
         "type": "object",
         "properties": {
           "nodes_hard_hash": {
@@ -3577,11 +3577,11 @@
             "type": "object",
             "properties": {
               "ai": {
-                "description": "The agent index id that has been contacted for this node.",
+                "description": "The Agent index id that has been contacted for this node.",
                 "type": "integer"
               },
               "code": {
-                "description": "The HTTP response code of the response for this node. When working directly with an agent, this is always 200. If the `code` is missing, it should be assumed to be 200.",
+                "description": "The HTTP response code of the response for this node. When working directly with an Agent, this is always 200. If the `code` is missing, it should be assumed to be 200.",
                 "type": "integer"
               },
               "msg": {
@@ -3589,7 +3589,7 @@
                 "type": "string"
               },
               "ms": {
-                "description": "The time in milliseconds this node took to respond, or if the local agent responded for this node, the time it needed to execute the query. If `ms` is missing, the time that was required to query this node is unknown.",
+                "description": "The time in milliseconds this node took to respond, or if the local Agent responded for this node, the time it needed to execute the query. If `ms` is missing, the time that was required to query this node is unknown.",
                 "type": "number"
               }
             }
@@ -3641,11 +3641,11 @@
                 "type": "string"
               },
               "hops": {
-                "description": "How many hops away from the origin node, the queried one is. 0 means the agent itself is the origin node.",
+                "description": "How many hops away from the origin node, the queried one is. 0 means the Agent itself is the origin node.",
                 "type": "integer"
               },
               "state": {
-                "description": "The current state of the node on this agent.",
+                "description": "The current state of the node on this Agent.",
                 "type": "string",
                 "enum": [
                   "reachable",
@@ -3678,13 +3678,13 @@
         }
       },
       "contexts2": {
-        "description": "`/api/v2/contexts` and `/api/v2/q` response about multi-node contexts hosted by a Netdata agent.\n",
+        "description": "`/api/v2/contexts` and `/api/v2/q` response about multi-node contexts hosted by a Netdata Agent.\n",
         "type": "object",
         "properties": {
           "api": {
             "$ref": "#/components/schemas/api"
           },
-          "agents": {
+          "Agents": {
             "$ref": "#/components/schemas/agents"
           },
           "versions": {
@@ -4310,7 +4310,7 @@
         "properties": {
           "aclk-available": {
             "type": "string",
-            "description": "Describes whether this agent is capable of connection to the Cloud. False means agent has been built without ACLK component either on purpose (user choice) or due to missing dependency.\n"
+            "description": "Describes whether this Agent is capable of connection to the Cloud. False means Agent has been built without ACLK component either on purpose (user choice) or due to missing dependency.\n"
           },
           "aclk-version": {
             "type": "integer",
@@ -4323,18 +4323,18 @@
               "type": "string"
             }
           },
-          "agent-claimed": {
+          "Agent-claimed": {
             "type": "boolean",
-            "description": "Informs whether this agent has been added to a space in the cloud (User has to perform claiming). If false (user didn't perform claiming) agent will never attempt any cloud connection."
+            "description": "Informs whether this Agent has been added to a space in the cloud (User has to perform claiming). If false (user didn't perform claiming) Agent will never attempt any cloud connection."
           },
           "claimed_id": {
             "type": "string",
             "format": "uuid",
-            "description": "Unique ID this agent uses to identify when connecting to cloud"
+            "description": "Unique ID this Agent uses to identify when connecting to cloud"
           },
           "online": {
             "type": "boolean",
-            "description": "Informs if this agent was connected to the cloud at the time this request has been processed."
+            "description": "Informs if this Agent was connected to the cloud at the time this request has been processed."
           },
           "used-cloud-protocol": {
             "type": "string",
@@ -4605,7 +4605,7 @@
         "properties": {
           "version": {
             "type": "integer",
-            "description": "The version of dynamic configuration supported by the Netdata agent."
+            "description": "The version of dynamic configuration supported by the Netdata Agent."
           },
           "tree": {
             "type": "object",
