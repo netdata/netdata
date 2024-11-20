@@ -59,7 +59,7 @@ paths:
                 properties:
                   api:
                     $ref: '#/components/schemas/api'
-                  Agents:
+                  agents:
                     $ref: '#/components/schemas/agents'
                   versions:
                     $ref: '#/components/schemas/versions'
@@ -2111,7 +2111,7 @@ components:
       properties:
         api:
           $ref: '#/components/schemas/api'
-        Agents:
+        agents:
           $ref: '#/components/schemas/agents'
         versions:
           $ref: '#/components/schemas/versions'
@@ -2561,7 +2561,7 @@ components:
     api:
       description: The version of the API used.
       type: integer
-    Agents:
+    agents:
       description: |
         An array of Agent definitions consulted to compose this response.
       type: array
@@ -2702,7 +2702,7 @@ components:
       properties:
         api:
           $ref: '#/components/schemas/api'
-        Agents:
+        agents:
           $ref: '#/components/schemas/agents'
         versions:
           $ref: '#/components/schemas/versions'
