@@ -344,7 +344,7 @@ static void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_ins
 
     if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->MSSQLUserConnections)) {
         if (!p->st_user_connections) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_user_connection", p->instanceID);
+            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_user_connections", p->instanceID);
             netdata_fix_chart_name(id);
             p->st_user_connections = rrdset_create_localhost(
                 "mssql",
