@@ -137,6 +137,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | body | HTTP request body. |  | no |
 | headers | HTTP request headers. |  | no |
 | not_follow_redirects | Redirect handling policy. Controls whether the client follows redirects. | no | no |
+| force_http2 | Forces the use of HTTP/2 protocol for all requests, even over plain TCP (h2c). | no | no |
 | tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | no | no |
 | tls_ca | Certification authority that the client uses when verifying the server's certificates. |  | no |
 | tls_cert | Client TLS certificate. |  | no |
