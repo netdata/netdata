@@ -28,7 +28,7 @@ For production environments, Parent nodes outside the production infrastructure 
 
 ## Disable Plugins or Collectors
 
-If you know that you don't need an [entire Plugin or a specific Collector](/src/collectors/README.md#collector-architecture-and-terminology), you can disable them.
+If you know that you don't need an [entire Plugin or a specific Collector](/src/collectors/README.md), you can disable them.
 
 > **Note**
 >

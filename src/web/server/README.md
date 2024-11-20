@@ -256,7 +256,11 @@ Example:
 
 For information how to configure the child to use TLS, check [securing the communication](/src/streaming/README.md#securing-streaming-with-tlsssl) in the streaming documentation. There you will find additional details on the expected behavior for client and server nodes, when their respective TLS options are enabled.
 
+<<<<<<< HEAD
 When we define the use of SSL in a Netdata Agent for different ports, Netdata will apply the behavior specified on each port. For example, using the configuration line below:
+=======
+When we define the use of SSL in a Netdata Agent for different ports,  Netdata will apply the behavior specified on each port. For example, using the configuration line below:
+>>>>>>> 1fdf66e6b (Capitalize the word "Agent" (#19044))
 
 ```text
 [web]
@@ -276,4 +280,72 @@ When you start using Netdata with TLS, you may find errors in the Netdata log, w
 
 Most of the time, these errors are due to incompatibilities between your browser's options related to TLS/SSL protocols and Netdata's internal configuration. The most common error is `error:00000006:lib(0):func(0):EVP lib`.
 
+<<<<<<< HEAD
 </details>
+=======
+In the near future, Netdata will allow our users to change the internal configuration to avoid similar errors. Until then, we're recommending only the most common and safe encryption protocols listed above.
+
+### Access lists
+
+Netdata supports access lists in `netdata.conf`:
+
+```text
+[web]
+    allow connections from = localhost *
+    allow dashboard from = localhost *
+    allow badges from = *
+    allow streaming from = *
+    allow netdata.conf from = localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.* 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.* 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.* 172.31.*
+    allow management from = localhost
+```
+
+`*` does string matches on the IPs or FQDNs of the clients.
+
+- `allow connections from` matches anyone that connects on the Netdata port(s).
+     So, if someone is not allowed, it will be connected and disconnected immediately, without reading even
+     a single byte from its connection. This is a global setting with higher priority to any of the ones below.
+
+- `allow dashboard from` receives the request and examines if it is a static dashboard file or an API call the
+     dashboards do.
+
+- `allow badges from` checks if the API request is for a badge. Badges are not matched by `allow dashboard from`.
+
+- `allow streaming from` checks if the child willing to stream metrics to this Netdata is allowed.
+     This can be controlled per API KEY and MACHINE GUID in `stream.conf`.
+     The setting in `netdata.conf` is checked before the ones in `stream.conf`.
+
+- `allow netdata.conf from` checks the IP to allow `http://netdata.host:19999/netdata.conf`.
+     The IPs listed are all the private IPv4 addresses, including link local IPv6 addresses. Keep in mind that connections to Netdata API ports are filtered by `allow connections from`. So, IPs allowed by `allow netdata.conf from` should also be allowed by `allow connections from`.
+
+- `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](/src/web/api/health/README.md#health-management-api)
+
+In order to check the FQDN of the connection without opening the Netdata Agent to DNS-spoofing, a reverse-dns record
+must be setup for the connecting host. At connection time the reverse-dns of the peer IP address is resolved, and
+a forward DNS resolution is made to validate the IP address against the name-pattern.
+
+Please note that this process can be expensive on a machine that is serving many connections. Each access list has an
+associated configuration option to turn off DNS-based patterns completely to avoid incurring this cost at run-time:
+
+```text
+    allow connections by dns = heuristic
+    allow dashboard by dns = heuristic
+    allow badges by dns = heuristic
+    allow streaming by dns = heuristic
+    allow netdata.conf by dns = no
+    allow management by dns = heuristic
+```
+
+The three possible values for each of these options are `yes`, `no` and `heuristic`. The `heuristic` option disables
+the check when the pattern only contains IPv4/IPv6 addresses or `localhost`, and enables it when wildcards are
+present that may match DNS FQDNs.
+
+## DDoS protection
+
+If you publish your Netdata web server to the internet, you may want to apply some protection against DDoS:
+
+1. Use the `static-threaded` web server (it is the default)
+2. Use reasonable `[web].web server max sockets` (the default is)
+3. Don't use all your CPU cores for Netdata (lower `[web].web server threads`)
+4. Run the `netdata` process with a low process scheduling priority (the default is the lowest)
+5. If possible, proxy Netdata via a full featured web server (Nginx, Apache, etc)
+>>>>>>> 1fdf66e6b (Capitalize the word "Agent" (#19044))
