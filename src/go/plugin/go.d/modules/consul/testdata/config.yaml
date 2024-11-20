@@ -16,3 +16,4 @@ tls_cert: "ok"
 tls_key: "ok"
 tls_skip_verify: yes
 acl_token: "ok"
+force_http2: yes
