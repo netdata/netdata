@@ -816,7 +816,7 @@ int dict_mssql_locks_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
             "locks",
             "mssql.instance_locks_deadlocks",
             "Lock requests that resulted in deadlock.",
-            "locks/s",
+            "deadlocks/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibMSSQL",
             PRIO_MSSQL_LOCKS_DEADLOCK,
