@@ -1262,7 +1262,9 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
         }
 
         rrddim_set_by_pointer(
-            p->st_conn_memory, p->rd_conn_memory, (collected_number)(p->MSSQLConnectionMemoryBytes.current.Data));
+            p->st_conn_memory,
+            p->rd_conn_memory,
+            (collected_number)(p->MSSQLConnectionMemoryBytes.current.Data * 1024));
         rrdset_done(p->st_conn_memory);
     }
 
@@ -1352,7 +1354,9 @@ static void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
         }
 
         rrddim_set_by_pointer(
-            p->st_mem_tot_server, p->rd_mem_tot_server, (collected_number)p->MSSQLTotalServerMemory.current.Data);
+            p->st_mem_tot_server,
+            p->rd_mem_tot_server,
+            (collected_number)(p->MSSQLTotalServerMemory.current.Data * 1024));
 
         rrdset_done(p->st_mem_tot_server);
     }
