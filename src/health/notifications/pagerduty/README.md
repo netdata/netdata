@@ -26,7 +26,7 @@ You can send notifications to PagerDuty using Netdata's Agent alert notification
 
 #### 
 
-- An installation of the [PagerDuty](https://www.pagerduty.com/docs/guides/agent-install-guide/) agent on the node running the Netdata Agent
+- An installation of the [PagerDuty](https://www.pagerduty.com/docs/guides/agent-install-guide/) Agent on the node running the Netdata Agent
 - A PagerDuty Generic API service using either the `Events API v2` or `Events API v1`
 - [Add a new service](https://support.pagerduty.com/docs/services-and-integrations#section-configuring-services-and-integrations) to PagerDuty. Click Use our API directly and select either `Events API v2` or `Events API v1`. Once you finish creating the service, click on the Integrations tab to find your Integration Key.
 - Access to the terminal where Netdata Agent is running
