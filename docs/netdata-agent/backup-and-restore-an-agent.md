@@ -34,18 +34,18 @@ In this standard scenario, you’re backing up your Netdata Agent in case of a n
    sudo tar -cvpzf netdata_backup.tar.gz /etc/netdata/ /var/cache/netdata /var/lib/netdata
    ```
 
-   Stopping the Netdata agent is typically necessary to back up the database files of the Netdata Agent.
+   Stopping the Netdata Agent is typically necessary to back up the database files of the Netdata Agent.
 
 If you want to minimize the gap in metrics caused by stopping the Netdata Agent, consider implementing a backup job or script that follows this sequence:
 
 - Backup the Agent configuration Identity directories
 - Stop the Netdata service
 - Backup up the database files
-- Restart the netdata agent.
+- Restart the Netdata Agent.
 
 ### Restoring Netdata
 
-1. Ensure that the Netdata agent is installed and is [stopped](/docs/netdata-agent/start-stop-restart.md)
+1. Ensure that the Netdata Agent is installed and is [stopped](/docs/netdata-agent/start-stop-restart.md)
 
    If you plan to deploy the Agent and restore a backup on top of it, then you might find it helpful to use the [`--dont-start-it`](/packaging/installer/methods/kickstart.md#other-options) option upon installation.
 
@@ -66,4 +66,4 @@ If you want to minimize the gap in metrics caused by stopping the Netdata Agent,
     sudo tar -xvpzf /path/to/netdata_backup.tar.gz -C /
     ```
 
-3. [Start the Netdata agent](/docs/netdata-agent/start-stop-restart.md)
+3. [Start the Netdata Agent](/docs/netdata-agent/start-stop-restart.md)

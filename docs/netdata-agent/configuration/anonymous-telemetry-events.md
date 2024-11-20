@@ -1,7 +1,6 @@
 # Anonymous telemetry events
 
-By default, Netdata collects anonymous usage information from the open-source monitoring agent. For agent events like start, stop, crash, etc. we use our own cloud function in GCP. For frontend telemetry (page views etc.) on the agent dashboard itself, we use the open-source
-product analytics platform [PostHog](https://github.com/PostHog/posthog).
+By default, Netdata collects anonymous usage information from the open-source monitoring Agent. For events like start, stop, crash, etc. we use our own cloud function in GCP. For frontend telemetry (page views etc.) on the dashboard itself, we use the open-source product analytics platform [PostHog](https://github.com/PostHog/posthog).
 
 We are strongly committed to your [data privacy](https://netdata.cloud/privacy/).
 
@@ -10,7 +9,7 @@ We use the statistics gathered from this information for two purposes:
 1. **Quality assurance**, to help us understand if Netdata behaves as expected, and to help us classify repeated
    issues with certain distributions or environments.
 
-2. **Usage statistics**, to help us interpret how people use the Netdata agent in real-world environments, and to help
+2. **Usage statistics**, to help us interpret how people use the Netdata Agent in real-world environments, and to help
    us identify how our development/design decisions influence the community.
 
 Netdata collects usage information via two different channels:
@@ -59,7 +58,7 @@ filename and source code line number of the fatal error.
 Starting with v1.21, we additionally collect information about:
 
 - Failures to build the dependencies required to use Cloud features.
-- Unavailability of Cloud features in an agent.
+- Unavailability of Cloud features in an Agent.
 - Failures to connect to the Cloud in case the [connection process](/src/claim/README.md) has been completed. This includes error codes
   to inform the Netdata team about the reason why the connection failed.
 

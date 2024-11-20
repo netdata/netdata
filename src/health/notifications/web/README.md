@@ -1,4 +1,4 @@
-# Browser pop up agent alert notifications
+# Browser pop up Agent alert notifications
 
 The Netdata dashboard shows HTML notifications, when it is open.
 

@@ -49,9 +49,9 @@ Check [Restoring a Netdata Parent after maintenance](/docs/observability-central
 
 When there are multiple data sources for the same node, Netdata Cloud follows this strategy:
 
-1. Netdata Cloud prefers Netdata agents having `live` data.
-2. For time-series queries, when multiple Netdata agents have the retention required to answer the query, Netdata Cloud prefers the one that is further away from production systems.
-3. For Functions, Netdata Cloud prefers Netdata agents that are closer to the production systems.
+1. Netdata Cloud prefers Netdata Agents having `live` data.
+2. For time-series queries, when multiple Netdata Agents have the retention required to answer the query, Netdata Cloud prefers the one that is further away from production systems.
+3. For Functions, Netdata Cloud prefers Netdata Agents that are closer to the production systems.
 
 ## Is there a way to balance child nodes to the parent nodes of a cluster?
 
@@ -69,7 +69,7 @@ To set the ephemeral flag on a node, edit its netdata.conf and in the `[global]`
 
 A parent node tracks connections and disconnections. When a node is marked as ephemeral and stops connecting for more than 24 hours, the parent will delete it from its memory and local administration, and tell Cloud that it is no longer live nor stale. Data for the node can no longer be accessed, but if the node connects again later, the node will be "revived", and previous data becomes available again.
 
-A node can be forced into this "forgotten" state with the Netdata CLI tool on the parent the node is connected to (if still connected) or one of the parent agents it was previously connected to. The state will be propagated _upwards_ and _sideways_ in case of an HA setup.
+A node can be forced into this "forgotten" state with the Netdata CLI tool on the parent the node is connected to (if still connected) or one of the parent Agents it was previously connected to. The state will be propagated _upwards_ and _sideways_ in case of an HA setup.
 
 ```
 netdatacli remove-stale-node <node_id | machine_guid | hostname | ALL_NODES>

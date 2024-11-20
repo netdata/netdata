@@ -396,15 +396,15 @@ free Netdata Cloud account.
 
 ### Is any of my data exposed to Netdata Cloud from this plugin?
 
-No. When you access the agent directly, none of your data passes through Netdata Cloud.
+No. When you access the Agent directly, none of your data passes through Netdata Cloud.
 You need a free Netdata Cloud account only to verify your identity and enable the use of
-Netdata Functions. Once this is done, all the data flow directly from your Netdata agent
+Netdata Functions. Once this is done, all the data flow directly from your Netdata Agent
 to your web browser.
 
 Also check [this discussion](https://github.com/netdata/netdata/discussions/16136).
 
 When you access Netdata via `https://app.netdata.cloud`, your data travel via Netdata Cloud,
-but they are not stored in Netdata Cloud. This is to allow you access your Netdata agents from
+but they are not stored in Netdata Cloud. This is to allow you access your Netdata Agents from
 anywhere. All communication from/to Netdata Cloud is encrypted.
 
 ### What are `volatile` and `persistent` journals?

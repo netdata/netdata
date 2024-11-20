@@ -12,7 +12,7 @@ For more information check our [Pricing](https://www.netdata.cloud/pricing/) pag
 
 ## SaaS Version
 
-[Sign-up to Netdata Cloud](https://app.netdata.cloud) and start connecting your Netdata agents. The commands provided once you have signed up, include all the information to install and automatically connect (claim) Netdata agents to your Netdata Cloud space.
+[Sign-up to Netdata Cloud](https://app.netdata.cloud) and start connecting your Netdata Agents. The commands provided once you have signed up, include all the information to install and automatically connect (claim) Netdata Agents to your Netdata Cloud space.
 
 ## On-Prem Version
 

@@ -274,7 +274,7 @@ Finally, you can reset everything to its defaults by clicking the green "Reset" 
 
 ## Anomaly Rate ribbon
 
-Netdata's unsupervised machine learning algorithm creates a unique model for each metric collected by your agents, using exclusively the metric's past data.
+Netdata's unsupervised machine learning algorithm creates a unique model for each metric collected by your Agents, using exclusively the metric's past data.
 It then uses these unique models during data collection to predict the value that should be collected and check if the collected value is within the range of acceptable values based on past patterns and behavior.
 
 If the value collected is an outlier, it is marked as anomalous.

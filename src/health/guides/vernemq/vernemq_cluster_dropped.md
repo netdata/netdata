@@ -1,6 +1,6 @@
 ### Understand the alert
 
-This alert indicates that VerneMQ, an MQTT broker, is experiencing issues with inter-node message delivery within a clustered environment. The Netdata agent calculates the amount of traffic dropped during communication with cluster nodes in the last minute. If you receive this alert, it means that the outgoing cluster buffer is full and some messages cannot be delivered.
+This alert indicates that VerneMQ, an MQTT broker, is experiencing issues with inter-node message delivery within a clustered environment. The Netdata Agent calculates the amount of traffic dropped during communication with cluster nodes in the last minute. If you receive this alert, it means that the outgoing cluster buffer is full and some messages cannot be delivered.
 
 ### What does dropped messages mean?
 

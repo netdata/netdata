@@ -59,7 +59,7 @@ stateDiagram-v2
 6. **Check**: a health engine, triggering alerts and sending notifications. Netdata comes with hundreds of alert configurations that are automatically attached to metrics when they get collected, detecting errors, common configuration errors and performance issues.
 7. **Query**: a query engine for querying time-series data.
 8. **Score**: a scoring engine for comparing and correlating metrics.
-9. **Stream**: a mechanism to connect Netdata agents and build Metrics Centralization Points (Netdata Parents).
+9. **Stream**: a mechanism to connect Netdata Agents and build Metrics Centralization Points (Netdata Parents).
 10. **Visualize**: Netdata's fully automated dashboards for all metrics.
 11. **Export**: export metric samples to 3rd party time-series databases, enabling the use of 3rd party tools for visualization, like Grafana.
 
@@ -77,8 +77,8 @@ stateDiagram-v2
 
 ## Dashboard Versions
 
-The Netdata agents (Standalone, Children and Parents) **share the dashboard** of Netdata Cloud. However, when the user is logged in and the Netdata agent is connected to Netdata Cloud, the following are enabled (which are otherwise disabled):
+The Netdata Agents (Standalone, Children and Parents) **share the dashboard** of Netdata Cloud. However, when the user is logged in and the Agent is connected to the Cloud, the following are enabled (which are otherwise disabled):
 
-1. **Access to Sensitive Data**: Some data, like systemd-journal logs and several [Top Monitoring](/docs/top-monitoring-netdata-functions.md) features expose sensitive data, like IPs, ports, process command lines and more. To access all these when the dashboard is served directly from a Netdata agent, Netdata Cloud is required to verify that the user accessing the dashboard has the required permissions.
+1. **Access to Sensitive Data**: Some data, like systemd-journal logs and several [Top Monitoring](/docs/top-monitoring-netdata-functions.md) features expose sensitive data, like IPs, ports, process command lines and more. To access all these when the dashboard is served directly from an Agent, Netdata Cloud is required to verify that the user accessing the dashboard has the required permissions.
 
-2. **Dynamic Configuration**: Netdata agents are configured via configuration files, manually or through some provisioning system. The latest Netdata includes a feature to allow users to change some configurations (collectors, alerts) via the dashboard. This feature is only available to users of paid Netdata Cloud plan.
+2. **Dynamic Configuration**: Netdata Agents are configured via configuration files, manually or through some provisioning system. The latest Netdata includes a feature to allow users to change some configurations (collectors, alerts) via the dashboard. This feature is only available to users of paid Netdata Cloud plan.

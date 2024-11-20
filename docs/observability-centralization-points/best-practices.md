@@ -32,8 +32,8 @@ Compared to other observability solutions, the design of Netdata offers:
 
 - **Optimized Cost and Performance**: By distributing the load across multiple centralization points, Netdata can optimize both performance and cost. This distribution allows for the efficient use of resources and help mitigate the bottlenecks associated with a single centralization point.
 
-- **Simplicity**: Netdata agents (Children and Parents) require minimal configuration and maintenance, usually less than the configuration and maintenance required for the agents and exporters of other monitoring solutions. This provides an observability pipeline that has less moving parts and is easier to manage and maintain.
+- **Simplicity**: Netdata Agents (Children and Parents) require minimal configuration and maintenance, usually less than the configuration and maintenance required for the Agents and exporters of other monitoring solutions. This provides an observability pipeline that has less moving parts and is easier to manage and maintain.
 
-- **Always On-Prem**: Netdata centralization points are always on-prem. Even when Netdata Cloud is used, Netdata agents and parents are queried to provide the data required for the dashboards.
+- **Always On-Prem**: Netdata centralization points are always on-prem. Even when Netdata Cloud is used, Netdata Agents and parents are queried to provide the data required for the dashboards.
 
 - **Bottom-Up Observability**: Netdata is designed to monitor systems, containers and applications bottom-up, aiming to provide the maximum resolution, visibility, depth and insights possible. Its ability to segment the infrastructure into multiple independent observability centralization points with customized retention, machine learning and alerts on each of them, while providing unified infrastructure level dashboards at Netdata Cloud, provides a flexible environment that can be tailored per service or team, while still being one unified infrastructure.

@@ -12,7 +12,7 @@ keywords:
   - MongoDB
 overview:
   exporter_description: |
-    Use the MongoDB connector for the exporting engine to archive your agent's metrics to a MongoDB database
+    Use the MongoDB connector for the exporting engine to archive your Agent's metrics to a MongoDB database
     for long-term storage, further analysis, or correlation with data from other sources.
   exporter_limitations: ''
 setup:

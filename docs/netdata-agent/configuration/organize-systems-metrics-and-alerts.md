@@ -104,8 +104,7 @@ can reload labels using the helpful `netdatacli` tool:
 netdatacli reload-labels
 ```
 
-Your host labels will now be enabled. You can double-check these by using `curl http://HOST-IP:19999/api/v1/info` to
-read the status of your agent. For example, from a VPS system running Debian 10:
+Your host labels will now be enabled. You can double-check these by using `curl http://HOST-IP:19999/api/v1/info` to read the status of your Agent. For example, from a VPS system running Debian 10:
 
 ```json
 {
@@ -232,7 +231,7 @@ All go.d plugin collectors support the specification of labels at the "collectio
 labels (e.g. generic Prometheus collector, Kubernetes, Docker and more). But you can also add your own custom labels by configuring
 the data collection jobs.
 
-For example, suppose we have a single Netdata agent, collecting data from two remote Apache web servers, located in different data centers.
+For example, suppose we have a single Netdata Agent, collecting data from two remote Apache web servers, located in different data centers.
 The web servers are load balanced and provide access to the service "Payments".
 
 You can define the following in `go.d.conf`, to be able to group the web requests by service or location:

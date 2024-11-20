@@ -14,7 +14,7 @@ The API Tokens are not going to expire and can be limited to a few scopes:
 
 * `scope:agent-ui`
 
-  this token is mainly used by the local Netdata agent accessing the Cloud UI
+  this token is mainly used by the local Netdata Agent accessing the Cloud UI
 
 * `scope:grafana-plugin`
 
