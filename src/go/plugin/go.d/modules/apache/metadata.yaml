@@ -119,6 +119,10 @@ modules:
               description: Redirect handling policy. Controls whether the client follows redirects.
               default_value: no
               required: false
+            - name: force_http2
+              description: Forces the use of HTTP/2 protocol for all requests, even over plain TCP (h2c).
+              default_value: no
+              required: false
             - name: tls_skip_verify
               description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
               default_value: no
