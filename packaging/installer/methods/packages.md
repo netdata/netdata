@@ -14,7 +14,7 @@ and fail if it cannot do so.
 >
 > In July 2022, we switched hosting of our native packages from Package Cloud to self-hosted repositories.
 > Until late 2024 we continued to provide packages via Package Cloud, but we have since then switched to only
-> providing packages via our own repositories.
+> providing packages via our repositories.
 
 ## Manual setup of RPM packages
 
@@ -75,7 +75,7 @@ Within each top level group of repositories, there are directories for each supp
 Under each of these directories is a directory for each supported release, corresponding to the release codename.
 
 These repositories are set up as what Debian calls ‘flat repositories’, and are available via both HTTP and HTTPS.
-Additionally our repositories support acquiring repository metadata by-hash, which leads to use of URLs similar to
+Additionally, our repositories support acquiring repository metadata by-hash, which leads to use of URLs similar to
 `http://repository.netdata.cloud/repos/edge/ubuntu/focal/by-hash/SHA256/91ccff6523a3c4483ebb539ff2b4adcd3b6b5d0c0c2c9573c5a6947a127819bc`,
 and this is the preferred method for updating metadata as it is more reliable.
 
