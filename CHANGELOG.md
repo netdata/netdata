@@ -6,12 +6,19 @@
 
 **Merged pull requests:**
 
+- fix\(go.d/pkg/web\): correct close idle connections [\#19052](https://github.com/netdata/netdata/pull/19052) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#19048](https://github.com/netdata/netdata/pull/19048) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d/pkg/web\): add "force\_http2" option [\#19047](https://github.com/netdata/netdata/pull/19047) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#19045](https://github.com/netdata/netdata/pull/19045) ([netdatabot](https://github.com/netdatabot))
+- Capitalize the word "Agent" [\#19044](https://github.com/netdata/netdata/pull/19044) ([Ancairon](https://github.com/Ancairon))
+- Capitalize the word "cloud" [\#19043](https://github.com/netdata/netdata/pull/19043) ([Ancairon](https://github.com/Ancairon))
 - Add a special version number to bypass alert snapshots [\#19042](https://github.com/netdata/netdata/pull/19042) ([stelfrag](https://github.com/stelfrag))
 - Add Custom Actions \(Installer\) [\#19041](https://github.com/netdata/netdata/pull/19041) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix\(go.d/nvidia\_smi\): disable loop mode on Win [\#19040](https://github.com/netdata/netdata/pull/19040) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/nvidia\_smi\): disable loop mode by default on Win [\#19039](https://github.com/netdata/netdata/pull/19039) ([ilyam8](https://github.com/ilyam8))
 - improvement\(go.d.plugin\): terminate on QUIT command [\#19038](https://github.com/netdata/netdata/pull/19038) ([ilyam8](https://github.com/ilyam8))
 - fix\(windows/netframework\): dont sanitize proc name for labels [\#19036](https://github.com/netdata/netdata/pull/19036) ([ilyam8](https://github.com/ilyam8))
+- Fix MSSQL algorithm \(Windows.plugin\) [\#19035](https://github.com/netdata/netdata/pull/19035) ([thiagoftsm](https://github.com/thiagoftsm))
 - --dev option to installer [\#19034](https://github.com/netdata/netdata/pull/19034) ([ktsaou](https://github.com/ktsaou))
 - add `shutdown` keyword to ensure graceful service termination on FreeBSD [\#19033](https://github.com/netdata/netdata/pull/19033) ([ilyam8](https://github.com/ilyam8))
 - fix: ensure correct startup order for Netdata service on FreeBSD [\#19032](https://github.com/netdata/netdata/pull/19032) ([ilyam8](https://github.com/ilyam8))
@@ -429,11 +436,6 @@
 - Bump github.com/docker/docker from 27.2.0+incompatible to 27.2.1+incompatible in /src/go [\#18502](https://github.com/netdata/netdata/pull/18502) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Assorted build cleanup for external data collection plugins. [\#18501](https://github.com/netdata/netdata/pull/18501) ([Ferroin](https://github.com/Ferroin))
 - remove python.d/varnish [\#18499](https://github.com/netdata/netdata/pull/18499) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/jackc/pgx/v5 from 5.6.0 to 5.7.0 in /src/go [\#18498](https://github.com/netdata/netdata/pull/18498) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/prometheus/common from 0.58.0 to 0.59.1 in /src/go [\#18497](https://github.com/netdata/netdata/pull/18497) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump golang.org/x/net from 0.28.0 to 0.29.0 in /src/go [\#18496](https://github.com/netdata/netdata/pull/18496) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Windows Plugin Metrics \(Thermal and Memory\) [\#18494](https://github.com/netdata/netdata/pull/18494) ([thiagoftsm](https://github.com/thiagoftsm))
-- Regenerate integrations.js [\#18493](https://github.com/netdata/netdata/pull/18493) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
