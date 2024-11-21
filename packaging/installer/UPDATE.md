@@ -59,10 +59,6 @@ wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /
 
 To update Netdata, [download](/packaging/windows/WINDOWS_INSTALLER.md#download-the-msi-installer) the latest installer and reinstall the Agent.
 
-> **Note**
->
-> The Windows Agent is currently under beta and only available for Nightly releases, and the installer can be found in our [nightlies repo](https://github.com/netdata/netdata-nightlies). A stable version will be released soon.
-
 ## macOS
 
 If you installed Netdata on your macOS system using Homebrew, you can explicitly request an update:
