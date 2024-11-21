@@ -74,18 +74,18 @@ Netdata supports access lists in `netdata.conf`:
 - `allow dashboard from` receives the request and examines if it is a static dashboard file or an API call the
   dashboards do.
 
-- `allow badges from` checks if the API request is for a badge. Badges are not matched by `allow dashboard from`.
+- `allow badges from` checks if the API request is for a badge. Badges aren’t matched by `allow dashboard from`.
 
 - `allow streaming from` checks if the child willing to stream metrics to this Netdata is allowed.
   This can be controlled per API KEY and MACHINE GUID in `stream.conf`.
   The setting in `netdata.conf` is checked before the ones in `stream.conf`.
 
 - `allow netdata.conf from` checks the IP to allow `http://netdata.host:19999/netdata.conf`.
-  The IPs listed are all the private IPv4 addresses, including link local IPv6 addresses. Keep in mind that connections to Netdata API ports are filtered by `allow connections from`. So, IPs allowed by `allow netdata.conf from` should also be allowed by `allow connections from`.
+  The IPs listed are all the private IPv4 addresses, including link-local IPv6 addresses. Keep in mind that connections to Netdata API ports are filtered by `allow connections from`. So, IPs allowed by `allow netdata.conf from` should also be allowed by `allow connections from`.
 
 - `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](/src/web/api/health/README.md#health-management-api)
 
-In order to check the FQDN of the connection without opening the Netdata Agent to DNS-spoofing, a reverse-dns record must be setup for the connecting host. At connection time the reverse-dns of the peer IP address is resolved, and a forward DNS resolution is made to validate the IP address against the name-pattern.
+To check the FQDN of the connection without opening the Netdata Agent to DNS-spoofing, a reverse-dns record must be setup for the connecting host. At connection time, the reverse-dns of the peer IP address is resolved, and a forward DNS resolution is made to validate the IP address against the name-pattern.
 
 Please note that this process can be expensive on a machine that is serving many connections. Each access list has an associated configuration option to turn off DNS-based patterns completely to avoid incurring this cost at run-time:
 
@@ -108,7 +108,7 @@ If you publish your Netdata web server to the internet, you may want to apply so
 2. Use reasonable `[web].web server max sockets` (e.g default)
 3. Don't use all your CPU cores for Netdata (lower `[web].web server threads`)
 4. Run the `netdata` process with a low process scheduling priority (the default is the lowest)
-5. If possible, proxy Netdata via a full featured web server (Nginx, Apache, etc)
+5. If possible, proxy Netdata via a full-featured web server (Nginx, Apache, etc.)
 
 ## Examples
 
@@ -158,8 +158,8 @@ Using the above, Netdata will bind to:
 - IPv4 127.0.0.1 at port 19999 (port was used from `default port`). Only the UI (dashboard) and the read API will be accessible on this port. Both HTTP and HTTPS requests will be accepted.
 - IPv4 10.1.1.1 at port 19998. The management API and `netdata.conf` will be accessible on this port.
 - All the IPs `hostname` resolves to (both IPv4 and IPv6 depending on the resolved IPs) at port 19997. Only badges will be accessible on this port.
-- All IPv6 IPs at port 19996. Only metric streaming requests from other Netdata Agents will be accepted on this port. Only encrypted streams will be allowed (i.e. Children also need to be [configured for TLS](/src/streaming/README.md)).
-- All the IPs `localhost` resolves to (both IPv4 and IPv6 depending the resolved IPs) at port 19996. This port will only accept registry API requests.
+- All IPv6 IPs at port 19996. Only metric streaming requests from other Netdata Agents will be accepted on this port. Only encrypted streams will be allowed (i.e., Children also need to be [configured for TLS](/src/streaming/README.md)).
+- All the IPs `localhost` resolves to (both IPv4 and IPv6 depending on the resolved IPs) at port 19996. This port will only accept registry API requests.
 - All IPv4 and IPv6 IPs at port `http` as set in `/etc/services`. Only the UI (dashboard) and the read API will be accessible on this port.
 - Unix domain socket `/run/netdata/netdata.sock`. All requests are serviceable on this socket. Note that in some OSs like Fedora, every service sees a different `/tmp`, so don't create a Unix socket under `/tmp`. `/run` or `/var/run` is suggested.
 
@@ -173,7 +173,7 @@ The access lists themselves and the general setting `allow connections from` in 
 The API requests are serviced as follows:
 
 - `dashboard` gives access to the UI, the read API and badges API calls.
-- `badges` gives access only to the badges API calls.
+- `badges` gives access only to the badge API calls.
 - `management` gives access only to the management API calls.
 
 </details>
@@ -200,7 +200,7 @@ To enable TLS, provide the path to your certificate and private key in the `[web
     ssl certificate = /etc/netdata/ssl/cert.pem
 ```
 
-Both files must be readable by the `netdata` user. If either of these files do not exist or are unreadable, Netdata will fall back to HTTP. For a parent-child connection, only the parent needs these settings.
+Both files must be readable by the `netdata` user. If any of these files are missing or can’t be read, Netdata will fall back to using HTTP. For a parent-child connection, only the parent needs these settings.
 
 For test purposes, generate self-signed certificates with the following command:
 
@@ -209,7 +209,7 @@ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out
 ```
 
 > If you use 4096 bits for your key and the certificate, Netdata will need more CPU to process the communication.
-> `rsa4096` can be up to 4 times slower than `rsa2048`, so we recommend using 2048 bits. Verify the difference
+> `rsa4096` can be up to four times slower than `rsa2048`, so we recommend using 2048 bits. Verify the difference
 > by running:
 >
 > ```sh
@@ -230,7 +230,7 @@ Beginning with version `v1.21.0`, specify the TLS version and the ciphers that y
     tls ciphers = TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256
 ```
 
-If you do not specify these options, Netdata will use the highest available protocol version on your system and the default cipher list for that protocol provided by your TLS implementation.
+If you don’t specify these options, Netdata will use the highest available protocol version on your system and the default cipher list for that protocol provided by your TLS implementation.
 
 #### TLS/SSL enforcement
 
@@ -239,7 +239,7 @@ When the certificates are defined and unless any other options are provided, a N
 - Redirect all incoming HTTP web server requests to HTTPS. Applies to the dashboard, the API, `netdata.conf` and badges.
 - Allow incoming child connections to use both unencrypted and encrypted communications for streaming.
 
-To change this behavior, you need to modify the `bind to` setting in the `[web]` section of `netdata.conf`. At the end of each port definition, append `^SSL=force` or `^SSL=optional`. What happens with these settings differs, depending on whether the port is used for HTTP/S requests, or for streaming.
+To change this behavior, you need to modify the `bind to` setting in the `[web]` section of `netdata.conf`. At the end of each port definition, append `^SSL=force` or `^SSL=optional`. What happens with these settings differs, depending on whether the port is used for HTTP/S requests or for streaming.
 
 | SSL setting |    HTTP requests    | HTTPS requests | Unencrypted Streams | Encrypted Streams |
 |:-----------:|:-------------------:|:--------------:|:-------------------:|:------------------|
@@ -276,6 +276,6 @@ When you start using Netdata with TLS, you may find errors in the Netdata log, w
 
 Most of the time, these errors are due to incompatibilities between your browser's options related to TLS/SSL protocols and Netdata's internal configuration. The most common error is `error:00000006:lib(0):func(0):EVP lib`.
 
-In the near future, Netdata will allow our users to change the internal configuration to avoid similar errors. Until then, we're recommending only the most common and safe encryption protocols listed above.
+Netdata will soon allow our users to change the internal configuration to avoid such errors. Until then, we're recommending only the most common and safe encryption protocols listed above.
 
 </details>
