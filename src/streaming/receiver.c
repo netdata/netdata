@@ -483,7 +483,7 @@ static void stream_receiver_move_queue_to_running(struct receiver *rr) {
     spinlock_unlock(&rr->queue.spinlock);
 }
 
-static void stream_receiver_on_disconnect(struct receiver *rr, struct receiver_state *rpt) {
+static void stream_receiver_on_disconnect(struct receiver *rr __maybe_unused, struct receiver_state *rpt) {
     internal_fatal(rr->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
     if(!rpt) return;
 
