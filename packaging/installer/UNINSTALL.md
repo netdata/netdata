@@ -81,7 +81,7 @@ chmod +x ./netdata-uninstaller.sh
 
 To uninstall Netdata on Windows, use the standard application uninstaller in your **Settings** app or **Control Panel**.
 
-You can also use Powershell to uninstall Netdata, by running:
+You can also use PowerShell:
 
 ```powershell
 msiexec /qn /x netdata-x64.msi
