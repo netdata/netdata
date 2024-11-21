@@ -276,6 +276,4 @@ When you start using Netdata with TLS, you may find errors in the Netdata log, w
 
 Most of the time, these errors are due to incompatibilities between your browser's options related to TLS/SSL protocols and Netdata's internal configuration. The most common error is `error:00000006:lib(0):func(0):EVP lib`.
 
-Netdata will soon allow our users to change the internal configuration to avoid such errors. Until then, we're recommending only the most common and safe encryption protocols listed above.
-
 </details>
