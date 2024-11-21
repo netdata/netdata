@@ -68,20 +68,20 @@ Netdata supports access lists in `netdata.conf`:
 `*` does string matches on the IPs or FQDNs of the clients.
 
 - `allow connections from` matches anyone that connects on the Netdata port(s).
-     So, if someone is not allowed, it will be connected and disconnected immediately, without reading even
-     a single byte from its connection. This is a global setting with higher priority to any of the ones below.
+  So, if someone is not allowed, it will be connected and disconnected immediately, without reading even
+  a single byte from its connection. This is a global setting with higher priority to any of the ones below.
 
 - `allow dashboard from` receives the request and examines if it is a static dashboard file or an API call the
-     dashboards do.
+  dashboards do.
 
 - `allow badges from` checks if the API request is for a badge. Badges are not matched by `allow dashboard from`.
 
 - `allow streaming from` checks if the child willing to stream metrics to this Netdata is allowed.
-     This can be controlled per API KEY and MACHINE GUID in `stream.conf`.
-     The setting in `netdata.conf` is checked before the ones in `stream.conf`.
+  This can be controlled per API KEY and MACHINE GUID in `stream.conf`.
+  The setting in `netdata.conf` is checked before the ones in `stream.conf`.
 
 - `allow netdata.conf from` checks the IP to allow `http://netdata.host:19999/netdata.conf`.
-     The IPs listed are all the private IPv4 addresses, including link local IPv6 addresses. Keep in mind that connections to Netdata API ports are filtered by `allow connections from`. So, IPs allowed by `allow netdata.conf from` should also be allowed by `allow connections from`.
+  The IPs listed are all the private IPv4 addresses, including link local IPv6 addresses. Keep in mind that connections to Netdata API ports are filtered by `allow connections from`. So, IPs allowed by `allow netdata.conf from` should also be allowed by `allow connections from`.
 
 - `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](/src/web/api/health/README.md#health-management-api)
 
@@ -256,7 +256,7 @@ Example:
 
 For information how to configure the child to use TLS, check [securing the communication](/src/streaming/README.md#securing-streaming-with-tlsssl) in the streaming documentation. There you will find additional details on the expected behavior for client and server nodes, when their respective TLS options are enabled.
 
-When we define the use of SSL in a Netdata Agent for different ports,  Netdata will apply the behavior specified on each port. For example, using the configuration line below:
+When we define the use of SSL in a Netdata Agent for different ports, Netdata will apply the behavior specified on each port. For example, using the configuration line below:
 
 ```text
 [web]

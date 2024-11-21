@@ -6,21 +6,21 @@ Below are some best practices that can further secure your Agents.
 
 - [Disable the local dashboard](#disable-the-local-dashboard)
 
-    **Simplest and recommended method** for those who have added nodes to Netdata Cloud and view dashboards and metrics there.
+  **Simplest and recommended method** for those who have added nodes to Netdata Cloud and view dashboards and metrics there.
 
 - [Use Netdata Parents as Web Application Firewalls](#use-netdata-parents-as-web-application-firewalls)
 
 - [Expose the local dashboard only in a private LAN](#expose-the-local-dashboard-only-in-a-private-lan)
 
-    To retain access to your node's local dashboard, via a LAN connection.
+  To retain access to your node's local dashboard, via a LAN connection.
 
 - [Fine-grained access control](#fine-grained-access-control)
 
-    Allow local dashboard access only from specific IP addresses, such as a trusted static IP or connections from behind a management LAN.
+  Allow local dashboard access only from specific IP addresses, such as a trusted static IP or connections from behind a management LAN.
 
 - [Use a reverse proxy (authenticating web server in proxy mode)](#use-an-authenticating-web-server-in-proxy-mode)
 
-    Password-protect a local dashboard and enable TLS to secure it.
+  Password-protect a local dashboard and enable TLS to secure it.
 
 ## Disable the local dashboard
 
