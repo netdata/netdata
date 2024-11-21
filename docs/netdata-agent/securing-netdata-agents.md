@@ -1,112 +1,80 @@
 # Securing Netdata Agents
 
-Netdata is a monitoring system. It should be protected, the same way you protect all your admin apps. We assume Netdata
-will be installed privately, for your eyes only.
+Upon installation, the Agent serves the **local dashboard** at port `19999`. If the node's IP is publicly accessible, anyone can load the dashboard and metrics at `http://NODE:19999`.
 
-Upon installation, the Netdata Agent serves the **local dashboard** at port `19999`. If the node is accessible to the
-internet at large, anyone can access the dashboard and your node's metrics at `http://NODE:19999`. We made this decision
-so that the local dashboard was immediately accessible to users, and so that we don't dictate how professionals set up
-and secure their infrastructures.
+Below are some best practices that can further secure your Agents.
 
-Viewers will be able to get some information about the system Netdata is running. This information is everything the dashboard
-provides. The dashboard includes a list of the services each system runs (the legends of the charts under the `Systemd Services`
-section), the applications running (the legends of the charts under the `Applications` section), the disks of the system and
-their names, the user accounts of the system that are running processes (the `Users` and `User Groups` section of the dashboard),
-the network interfaces and their names (not the IPs) and detailed information about the performance of the system and its applications.
+- [Disable the local dashboard](#disable-the-local-dashboard)
 
-This information is not sensitive (meaning that it is not your business data), but **it is important for possible attackers**.
-It will give them clues on what to check, what to try and in the case of DDoS against your applications, they will know if they’re doing it right or not.
+    **Simplest and recommended method** for those who have added nodes to Netdata Cloud and view dashboards and metrics there.
 
-Also, viewers could use Netdata itself to stress your servers. Although the Netdata daemon runs unprivileged, with the minimum
-process priority (scheduling priority `idle` - lower than nice 19) and adjusts its OutOfMemory (OOM) score to 1000 (so that it
-will be first to be killed by the kernel if the system starves for memory), some pressure can be applied on your systems if
-someone attempts a DDoS against Netdata.
+- [Use Netdata Parents as Web Application Firewalls](#use-netdata-parents-as-web-application-firewalls)
 
-Instead of dictating how to secure your infrastructure, we give you many options to establish security best practices
-that align with your goals and your organization's standards.
+- [Expose the local dashboard only in a private LAN](#expose-the-local-dashboard-only-in-a-private-lan)
 
-- [Disable the local dashboard](#disable-the-local-dashboard): **Simplest and recommended method** for those who have
-  added nodes to Netdata Cloud and view dashboards and metrics there.
+    To retain access to your node's local dashboard, via a LAN connection.
 
-- [Expose Netdata only in a private LAN](#expose-netdata-only-in-a-private-lan). Simplest and recommended method for those who don’t use Netdata Cloud.
+- [Fine-grained access control](#fine-grained-access-control)
 
-- [Fine-grained access control](#fine-grained-access-control): Allow local dashboard access from
-  only certain IP addresses, such as a trusted static IP or connections from behind a management LAN. Full support for Netdata Cloud.
+    Allow local dashboard access only from specific IP addresses, such as a trusted static IP or connections from behind a management LAN.
 
-- [Use a reverse proxy (authenticating web server in proxy mode)](#use-an-authenticating-web-server-in-proxy-mode): Password-protect
-  a local dashboard and enable TLS to secure it. Full support for Netdata Cloud.
+- [Use a reverse proxy (authenticating web server in proxy mode)](#use-an-authenticating-web-server-in-proxy-mode)
 
-- [Use Netdata parents as Web Application Firewalls](#use-netdata-parents-as-web-application-firewalls)
-
-- [Other methods](#other-methods) list some less common methods of protecting Netdata.
+    Password-protect a local dashboard and enable TLS to secure it.
 
 ## Disable the local dashboard
 
-This is the _recommended method for those who have connected their nodes to Netdata Cloud_ and prefer viewing real-time
-metrics using the Room Overview, Nodes tab, and Cloud dashboards.
+This is the recommended method for those who have connected their nodes to Netdata Cloud.
 
-You can disable the local dashboard (and API) but retain the encrypted Agent-Cloud link
-([ACLK](/src/aclk/README.md)) that
-allows you to stream metrics on demand from your nodes via the Netdata Cloud interface. This change mitigates all
-concerns about revealing metrics and system design to the internet at large, while keeping all the functionality you
-need to view metrics and troubleshoot issues with Netdata Cloud.
+You can disable the local dashboard (and API) but retain the encrypted Agent-Cloud link ([ACLK](/src/aclk/README.md)). That allows you to view metrics on demand from your nodes via the Cloud UI. This change mitigates all concerns about revealing metrics and system design to the internet at large, while keeping all the functionality you need to view metrics and troubleshoot issues using Netdata Cloud.
 
-Open `netdata.conf` with `./edit-config netdata.conf`. Scroll down to the `[web]` section, and find the `mode =
-static-threaded` setting, and change it to `none`.
+Open `netdata.conf` using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script. Scroll down to the `[web]` section, and find the `mode = static-threaded` setting, and change it to `none`.
 
 ```text
 [web]
     mode = none
 ```
 
-Save and close the editor, then [restart your Agent](/docs/netdata-agent/start-stop-restart.md). If you try to visit the local dashboard to `http://NODE:19999` again, the connection will fail because
-that node no longer serves its local dashboard.
+Save and close the editor, then [restart your Agent](/docs/netdata-agent/start-stop-restart.md). If you try to visit the local dashboard to `http://NODE:19999` again, the connection will fail as that node no longer serves it.
 
-> See the [configuration basics doc](/docs/netdata-agent/configuration/README.md) for details on how to find
-`netdata.conf` and use
-> `edit-config`.
+> **Note**
+>
+> If you’re using Netdata with Docker, make sure to set the `NETDATA_HEALTHCHECK_TARGET` environment variable to `cli`.
 
-If you’re using Netdata with Docker, make sure to set the `NETDATA_HEALTHCHECK_TARGET` environment variable to `cli`.
+## Use Netdata Parents as Web Application Firewalls
 
-## Expose Netdata only in a private LAN
+The Agents you install on your production systems don’t need direct access to the Internet. Even when you use Netdata Cloud, you can appoint one or more Parents to act as border gateways or application firewalls, isolating your production systems from the rest of the world. They receive metric data from their Children or other Parents on one side, and serve most queries using their own copy of the data to satisfy dashboard requests on the other side.
 
-If your organization has a private administration and management LAN, you can bind Netdata on this network interface on all your servers.
-This is done in `Netdata.conf` with these settings:
+For more information, see our documentation about [Observability Centralization Points](/docs/observability-centralization-points/README.md).
+
+## Expose the local dashboard only in a private LAN
+
+If your organization has a private administration and management LAN, you can bind the Agent on this network interface on all your servers.
+
+Open `netdata.conf` using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script. Scroll down to the `[web]` section, and set:
 
 ```text
 [web]
     bind to = 10.1.1.1:19999 localhost:19999
 ```
 
-You can bind Netdata to multiple IPs and ports. If you use hostnames, Netdata will resolve them and use all the IPs
-(in the above example `localhost` usually resolves to both `127.0.0.1` and `::1`).
+You can bind the Agent to multiple IPs and ports. If you use hostnames, it will resolve them and use all the IPs (in the above example `localhost` usually resolves to both `127.0.0.1` and `::1`).
 
-**This is the best and the suggested way to protect Netdata**. Your systems **should** have a private administration and management
-LAN, so that all management tasks are performed without any possibility of them being exposed on the internet.
+<details><summary>More info for cloud-based installations</summary>
 
-For Cloud-based installations, if your cloud provider doesn’t provide such a private LAN (or if you use multiple providers),
-you can create a virtual management and administration LAN with tools like `tincd` or `gvpe`. These tools create a mesh VPN
-allowing all servers to communicate securely and privately. Your administration stations join this mesh VPN to get access to
-management and administration tasks on all your cloud servers.
+For cloud-based installations, if your cloud provider doesn’t provide such a private LAN (or if you use multiple providers), you can create a virtual management and administration LAN with tools like `tincd` or `gvpe`. These tools create a mesh VPN allowing all servers to communicate securely and privately. Your administration stations join this mesh VPN to get access to management and administration tasks on all your cloud servers.
 
-For `gvpe` we have developed a [simple provisioning tool](https://github.com/netdata/netdata-demo-site/tree/master/gvpe) you
-may find handy (it includes statically compiled `gvpe` binaries for Linux and FreeBSD, and also a script to compile `gvpe`
-on your macOS system). We use this to create a management and administration LAN for all Netdata demo sites (spread all over
-the internet using multiple hosting providers).
+For `gvpe` we have developed a [simple provisioning tool](https://github.com/netdata/netdata-demo-site/tree/master/gvpe) you may find handy (it includes statically compiled `gvpe` binaries for Linux and FreeBSD, and also a script to compile `gvpe` on your macOS system). We use this to create a management and administration LAN for all Netdata demo sites (spread all over the internet using multiple hosting providers).
+
+</details>
 
 ## Fine-grained access control
 
-If you want to keep using the local dashboard, but don't want it exposed to the internet, you can restrict access with
-[access lists](/src/web/server/README.md#access-lists). This method also fully
-retains the ability to stream metrics
-on-demand through Netdata Cloud.
+If you want to keep using the local dashboard, but don't want it exposed to the internet, you can restrict access with [access lists](/src/web/server/README.md#access-lists). This method also fully retains the ability to view metrics on-demand through Netdata Cloud.
 
-The `allow connections from` setting helps you allow only certain IP addresses or FQDN/hostnames, such as a trusted
-static IP, only `localhost`, or connections from behind a management LAN.
+The `allow connections from` setting helps you allow only certain IP addresses or FQDN/hostnames, such as a trusted static IP, only `localhost`, or connections from behind a management LAN.
 
-By default, this setting is `localhost *`. This setting allows connections from `localhost` in addition to _all_
-connections, using the `*` wildcard. You can change this setting using Netdata's [simple
-patterns](/src/libnetdata/simple_pattern/README.md).
+By default, this setting is `localhost *`. This setting allows connections from `localhost` in addition to _all_ connections, using the `*` wildcard. You can change this setting using Netdata's [simple patterns](/src/libnetdata/simple_pattern/README.md).
 
 ```text
 [web]
@@ -120,8 +88,7 @@ patterns](/src/libnetdata/simple_pattern/README.md).
     allow connections from = example*
 ```
 
-The `allow connections from` setting is global and restricts access to the dashboard, badges, streaming, API, and
-`netdata.conf`, but you can also set each of those access lists in more detail if you want:
+The `allow connections from` setting is global and restricts access to the dashboard, badges, streaming, API, and `netdata.conf`, but you can also set each of those access lists in more detail if you want:
 
 ```text
 [web]
@@ -133,42 +100,11 @@ The `allow connections from` setting is global and restricts access to the dashb
     allow management from = localhost
 ```
 
-See the [web server](/src/web/server/README.md#access-lists) docs for additional details about access lists. You can take access lists one step further by [enabling SSL](/src/web/server/README.md#enable-httpstls-support) to encrypt data from local
-dashboard in transit. The connection to Netdata Cloud is always secured with TLS.
+Check the [Web Server](/src/web/server/README.md#access-lists) reference for additional details about access lists.
+
+You can take access lists one step further by [enabling SSL](/src/web/server/README.md#enable-httpstls-support) to encrypt data from the local dashboard in transit. The connection to Netdata Cloud is always secured with TLS.
 
 ## Use an authenticating web server in proxy mode
 
-Use one web server to provide authentication in front of **all your Netdata servers**. So, you will be accessing all your Netdata with
-URLs like `http://{HOST}/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign in once for all your servers).
-Instructions are provided on how to set the proxy configuration to have Netdata run behind
-[nginx](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md),
-[HAproxy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md),
-[Apache](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-apache.md),
-[lighthttpd](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-lighttpd.md),
-[caddy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-caddy.md), and
-[H2O](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md).
-
-## Use Netdata parents as Web Application Firewalls
-
-The Netdata Agents you install on your production systems don’t need direct access to the Internet. Even when you use
-Netdata Cloud, you can appoint one or more Netdata Parents to act as border gateways or application firewalls, isolating
-your production systems from the rest of the world. Netdata
-Parents receive metric data from Netdata Agents or other Netdata Parents on one side, and serve most queries using their own
-copy of the data to satisfy dashboard requests on the other side.
-
-For more information, see [Streaming and replication](/docs/observability-centralization-points/README.md).
-
-## Other methods
-
-Of course, there are many more methods you could use to protect Netdata:
-
-- Bind Netdata to localhost and use `ssh -L 19998:127.0.0.1:19999 remote.netdata.ip` to forward connections of local port 19998 to remote port 19999.
-  This way you can ssh to a Netdata server and then use `http://127.0.0.1:19998/` on your computer to access the remote Netdata dashboard.
-
-- If you’re always under a static IP, you can use the script given above to allow direct access to your Netdata servers without authentication,
-  from all your static IPs.
-
-- Install all your Netdata in **headless data collector** mode, forwarding all metrics in real-time to a parent
-  Netdata server, which will be protected with authentication using a nginx server running locally at the parent
-  Netdata server. This requires more resources (you will need a bigger parent Netdata server), but doesn’t require
-  any firewall changes, since all the child Netdata servers will not be listening for incoming connections.
+You can use one web server to provide authentication in front of **all your Agents**. You will be accessing them with URLs like `http://{HOST}/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign in once for all your servers).
+Instructions are provided on how to set the proxy configuration to have Netdata run behind [nginx](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md), [HAproxy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md), [Apache](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-apache.md), [lighthttpd](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-lighttpd.md), [caddy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-caddy.md), and [H2O](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md).
