@@ -42,7 +42,6 @@ static bool do_thermal_zones(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
             strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
 
-        netdata_fix_chart_name(windows_shared_buffer);
         struct thermal_zone *p = dictionary_set(thermal_zones, windows_shared_buffer, NULL, sizeof(*p));
 
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->thermalZoneTemperature);
@@ -51,6 +50,7 @@ static bool do_thermal_zones(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if (!p->st) {
             char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "thermalzone_%s_temperature", windows_shared_buffer);
+            netdata_fix_chart_name(id);
             p->st = rrdset_create_localhost(
                 "system",
                 id,

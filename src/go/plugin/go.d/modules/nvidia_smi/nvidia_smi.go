@@ -5,6 +5,7 @@ package nvidia_smi
 import (
 	_ "embed"
 	"errors"
+	"runtime"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -28,8 +29,10 @@ func init() {
 func New() *NvidiaSmi {
 	return &NvidiaSmi{
 		Config: Config{
-			Timeout:  confopt.Duration(time.Second * 10),
-			LoopMode: true,
+			Timeout: confopt.Duration(time.Second * 10),
+			// Disable loop mode on Windows due to go.d.plugin's non-graceful exit
+			// which can leave `nvidia_smi` processes running indefinitely.
+			LoopMode: !(runtime.GOOS == "windows"),
 		},
 		binName: "nvidia-smi",
 		charts:  &module.Charts{},
@@ -65,6 +68,9 @@ func (nv *NvidiaSmi) Configuration() any {
 
 func (nv *NvidiaSmi) Init() error {
 	if nv.exec == nil {
+		if runtime.GOOS == "windows" && nv.LoopMode {
+			nv.LoopMode = false
+		}
 		smi, err := nv.initNvidiaSmiExec()
 		if err != nil {
 			return err

@@ -1,6 +1,6 @@
 ### Understand the alert
 
-The Netdata Agent monitors your HTTP endpoints. You can specify endpoints that the agent will monitor in Agent's Go module under `go.d/httpcheck.conf`. You can also specify the expected response pattern. This HTTP endpoint will send in the `response_match` option. If the endpoint's response does not match the `response_match` pattern, then the Agent marks the response as unexpected.
+The Netdata Agent monitors your HTTP endpoints. You can specify endpoints that the Agent will monitor in Agent's Go module under `go.d/httpcheck.conf`. You can also specify the expected response pattern. This HTTP endpoint will send in the `response_match` option. If the endpoint's response does not match the `response_match` pattern, then the Agent marks the response as unexpected.
 
 The Netdata Agent calculates the average ratio of HTTP responses with unexpected content over the last 5 minutes.
 

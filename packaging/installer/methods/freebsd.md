@@ -21,7 +21,7 @@ Please respond in the affirmative for any relevant prompts during the installati
 
 The simplest method is to use the single line [kickstart script](/packaging/installer/methods/kickstart.md)
 
-If you have a Netdata cloud account then clicking on the **Connect Nodes** button will generate the kickstart command you should use. Use the command from the "Linux" tab, it should look something like this:
+If you have a Netdata Cloud account, clicking on the **Connect Nodes** button will generate the kickstart command you should use. Use the command from the "Linux" tab, it should look something like this:
 
 ```sh
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token <CLAIM_TOKEN> --claim-url https://app.netdata.cloud
@@ -120,7 +120,7 @@ The following options are mutually exclusive and specify special operations othe
 - `--uninstall`: Uninstall an existing installation of Netdata. Fails if there is no existing install.
 - `--claim-only`: If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
 - `--repositories-only`: Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
-- `--prepare-offline-install-source`: Instead of installing the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](/packaging/installer/methods/offline.md) for more info.
+- `--prepare-offline-install-source`: Instead of installing the Agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](/packaging/installer/methods/offline.md) for more info.
 
 Additionally, the following environment variables may be used to further customize how the script runs (most users
 should not need to use special values for any of these):

@@ -15,6 +15,7 @@ tls_ca: "ok"
 tls_cert: "ok"
 tls_key: "ok"
 tls_skip_verify: yes
+force_http2: yes
 status_accepted:
   - 123
 response_match: "ok"

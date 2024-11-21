@@ -22,7 +22,7 @@ A successful HTTP request is one that receives a response with an HTTP status co
 
 4. Verify client connections
 
-   Investigate the IP addresses and user agents that are making a significant number of requests during the alert period. If there's a spike in requests from a single or a few IPs, it could be a sign of a coordinated attack, excessive crawling, or other unexpected behavior.
+   Investigate the IP addresses and user Agents that are making a significant number of requests during the alert period. If there's a spike in requests from a single or a few IPs, it could be a sign of a coordinated attack, excessive crawling, or other unexpected behavior.
 
 5. Check your web application
 

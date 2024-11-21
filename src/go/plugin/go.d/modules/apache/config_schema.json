@@ -30,6 +30,11 @@
         "description": "If set, the client will not follow HTTP redirects automatically.",
         "type": "boolean"
       },
+      "force_http2": {
+        "title": "Force HTTP2",
+        "description": "If set, forces the use of HTTP/2 protocol for all requests, even over plain TCP (h2c).",
+        "type": "boolean"
+      },
       "username": {
         "title": "Username",
         "description": "The username for basic authentication.",
@@ -143,7 +148,8 @@
             "update_every",
             "url",
             "timeout",
-            "not_follow_redirects"
+            "not_follow_redirects",
+            "force_http2"
           ]
         },
         {

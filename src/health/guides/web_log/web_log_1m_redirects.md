@@ -2,7 +2,7 @@
 
 HTTP response status codes indicate whether a specific HTTP request has been successfully completed or not.
 
-The 3XX class of status code indicates that further action needs to be taken by the user agent in order to fulfill the request. The action required may be carried out by the user agent without interaction with the user if and only if the method used in the second request is GET or HEAD. A client SHOULD detect infinite redirection loops, since such loops generate network traffic for each redirection.
+The 3XX class of status code indicates that further action needs to be taken by the user Agent in order to fulfill the request. The action required may be carried out by the user Agent without interaction with the user if and only if the method used in the second request is GET or HEAD. A client SHOULD detect infinite redirection loops, since such loops generate network traffic for each redirection.
 
 The Netdata Agent calculates the ratio of redirection HTTP requests over the last minute. This metric does not include the "304 Not modified" message.
 

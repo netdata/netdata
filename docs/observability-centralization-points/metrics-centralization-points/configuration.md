@@ -2,7 +2,7 @@
 
 Metrics streaming configuration for both Netdata Children and Parents is done via `stream.conf`.
 
-`netdata.conf` and `stream.conf` have the same `ini` format, but `netdata.conf` is considered a non-sensitive file, while `stream.conf` contains API keys, IPs and other sensitive information that enable communication between Netdata agents.
+`netdata.conf` and `stream.conf` have the same `ini` format, but `netdata.conf` is considered a non-sensitive file, while `stream.conf` contains API keys, IPs and other sensitive information that enable communication between Netdata Agents.
 
 `stream.conf` has 2 main sections:
 

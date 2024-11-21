@@ -15,5 +15,6 @@ tls_ca: "ok"
 tls_cert: "ok"
 tls_key: "ok"
 tls_skip_verify: yes
+force_http2: yes
 node: "ok"
 databases: "ok"

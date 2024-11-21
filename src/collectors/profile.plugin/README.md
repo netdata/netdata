@@ -1,6 +1,6 @@
 # profile.plugin
 
-This plugin allows someone to backfill an agent with random data.
+This plugin allows someone to backfill an Agent with random data.
 
 A user can specify:
 

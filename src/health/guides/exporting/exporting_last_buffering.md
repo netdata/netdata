@@ -16,7 +16,7 @@ This alert is related to the Netdata Exporting engine, which calculates the numb
    ```
    Replace `new_value` with the desired number that matches your system requirements.
 
-4. Restart the Netdata Agent: After modifying the `exporting.conf` file, don't forget to restart the Netdata Agent for changes to take effect. Use the following command to restart the agent: 
+4. Restart the Netdata Agent: After modifying the `exporting.conf` file, don't forget to restart the Netdata Agent for changes to take effect. Use the following command to restart the Agent: 
    
    ```
    sudo systemctl restart netdata

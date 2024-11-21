@@ -2,7 +2,7 @@
 
 Your system communicates with the devices attached to it through interrupt requests. In a nutshell, when an interrupt occurs, the operating system stops what it was doing and starts addressing that interrupt.
 
-Network interfaces can receive thousands of packets per second. To avoid burying the system with thousands of interrupts, the Linux kernel uses the NAPI polling framework. In this way, we can replace hundreds of hardware interrupts with one poll by managing them with a few Soft Interrupt ReQuests (Soft IRQs). Ksoftirqd is a per-CPU kernel thread responsible for handling those unserved Soft Interrupt ReQuests (Soft IRQs). The Netdata agent inspects the average number of times Ksoftirqd ran out of netdev_budget or CPU time when there was still work to be done. This abnormality may cause packet overflow on the intermediate buffers and, as a result, drop packet on your network interfaces.
+Network interfaces can receive thousands of packets per second. To avoid burying the system with thousands of interrupts, the Linux kernel uses the NAPI polling framework. In this way, we can replace hundreds of hardware interrupts with one poll by managing them with a few Soft Interrupt ReQuests (Soft IRQs). Ksoftirqd is a per-CPU kernel thread responsible for handling those unserved Soft Interrupt ReQuests (Soft IRQs). The Netdata Agent inspects the average number of times Ksoftirqd ran out of netdev_budget or CPU time when there was still work to be done. This abnormality may cause packet overflow on the intermediate buffers and, as a result, drop packet on your network interfaces.
 
 The default value of the netdev_budget is 300.  However, this may not be enough in some cases, such as:
 

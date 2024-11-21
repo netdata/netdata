@@ -4,7 +4,7 @@ Netdata Cloud is designed with a security-first approach to ensure the highest l
 using Netdata Cloud in environments that require compliance with standards like PCI DSS, SOC 2, or HIPAA, users can be
 confident that all collected data is stored within their infrastructure. Data viewed on dashboards and alert
 notifications travel over Netdata Cloud, but are not stored—instead, they're transformed in transit, aggregated from
-multiple agents and parents (centralization points), to appear as one data source in the user's browser.
+multiple Agents and parents (centralization points), to appear as one data source in the user's browser.
 
 ## User Identification and Authorization
 
@@ -41,10 +41,7 @@ Netdata Cloud does not store user credentials.
 
 ## Security Features and Response
 
-Netdata Cloud offers a variety of security features, including infrastructure-level dashboards, centralized alerts
-notifications, auditing logs, and role-based access to different segments of the infrastructure. The cloud service
-employs several protection mechanisms against DDoS attacks, such as rate-limiting and automated blacklisting. It also
-uses static code analyzers to prevent other types of attacks.
+Netdata Cloud offers a variety of security features, including infrastructure-level dashboards, centralized alert notifications, auditing logs, and role-based access to different segments of the infrastructure. It employs several protection mechanisms against DDoS attacks, such as rate-limiting and automated blacklisting. It also uses static code analyzers to prevent other types of attacks.
 
 In the event of potential security vulnerabilities or incidents, Netdata Cloud follows the same process as the Netdata
 agent. Every report is acknowledged and analyzed by the Netdata team within three working days, and the team keeps the
@@ -59,8 +56,7 @@ security tools, etc.) on a per contract basis.
 
 ## Deleting Personal Data
 
-Users who wish to remove all personal data (including email and activities) can delete their cloud account by logging
-into Netdata Cloud and accessing their profile.
+Users who wish to remove all personal data (including email and activities) can delete their account by logging into Netdata Cloud and accessing their profile.
 
 ## User Privacy and Data Protection
 

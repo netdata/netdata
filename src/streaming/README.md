@@ -50,7 +50,7 @@ This section is used by the sending Netdata.
 
 ### `[API_KEY]` sections
 
-This section defines an API key for other agents to connect to this Netdata.
+This section defines an API key for other Agents to connect to this Netdata.
 
 | Setting                      | Default    | Description                                                                                                                                                                                              |
 |------------------------------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -75,12 +75,12 @@ This section defines an API key for other agents to connect to this Netdata.
 
 ### `[MACHINE_GUID]` sections
 
-This section is about customizing configuration for specific agents. It allows many agents to share the same API key, while providing customizability per remote agent.
+This section is about customizing configuration for specific Agents. It allows many Agents to share the same API key, while providing customizability per remote Agent.
 
 | Setting                      | Default    | Description                                                                                                                                                                                              |
 |------------------------------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `enabled`                    | `no`       | Whether this MACHINE_GUID enabled or disabled.                                                                                                                                                           |
-| `type`                       | `machine`  | This section defines the configuration for a specific agent.                                                                                                                                             |
+| `type`                       | `machine`  | This section defines the configuration for a specific Agent.                                                                                                                                             |
 | [`allow from`](#allow-from)  | `*`        | A space-separated list of [Netdata simple patterns](/src/libnetdata/simple_pattern/README.md) matching the IPs of nodes that will stream metrics using this API key. [Read more &rarr;](#allow-from)     |
 | `retention`                  | `3600`     | The default amount of child metrics history to retain when using the `ram` db.                                                                                                                           |
 | [`db`](#default-memory-mode) | `dbengine` | The [database](/src/database/README.md) to use for all nodes using this `API_KEY`. Valid settings are `dbengine`, `ram`, or `none`. [Read more &rarr;](#default-memory-mode)                             |
@@ -221,7 +221,7 @@ default `dbengine` as specified by the `API_KEY`, and alerts are disabled.
 [![Supported version Netdata Agent release](https://img.shields.io/badge/Supported%20Netdata%20stream%20version-v5%2B-blue)](https://github.com/netdata/netdata/releases/latest)
 
 #### OS dependencies
-* Streaming compression is based on [lz4 v1.9.0+](https://github.com/lz4/lz4). The [lz4 v1.9.0+](https://github.com/lz4/lz4) library must be installed in your OS in order to enable streaming compression. Any lower version will disable Netdata streaming compression for compatibility purposes between the older versions of Netdata agents.
+* Streaming compression is based on [lz4 v1.9.0+](https://github.com/lz4/lz4). The [lz4 v1.9.0+](https://github.com/lz4/lz4) library must be installed in your OS in order to enable streaming compression. Any lower version will disable Netdata streaming compression for compatibility purposes between the older versions of Netdata Agents.
 
 To check if your Netdata Agent supports stream compression run the following GET request in your browser or terminal:
 
@@ -251,7 +251,7 @@ A compressed data packet is determined and decompressed on the fly.
 #### Limitations
 This limitation will be withdrawn asap and is work-in-progress.
 
-The current implementation of streaming data compression can support only a few number of dimensions in a chart with names that cannot exceed the size of 16384 bytes. In case your instance hit this limitation, the agent will deactivate compression during runtime to avoid stream corruption. This limitation can be seen in the error.log file with the sequence of the following messages: 
+The current implementation of streaming data compression can support only a few number of dimensions in a chart with names that cannot exceed the size of 16384 bytes. In case your instance hit this limitation, the Agent will deactivate compression during runtime to avoid stream corruption. This limitation can be seen in the error.log file with the sequence of the following messages: 
 ```
 netdata INFO  : STREAM_SENDER[child01] : STREAM child01 [send to my.parent.IP]: connecting...
 netdata INFO  : STREAM_SENDER[child01] : STREAM child01 [send to my.parent.IP]: initializing communication...
@@ -266,7 +266,7 @@ netdata ERROR : PLUGINSD[go.d] : STREAM_COMPRESSION child01 [send to my.parent.I
 netdata INFO  : STREAM_SENDER[child01] : STREAM child01 [send to my.parent.IP]: connecting...
 netdata INFO  : STREAM_SENDER[child01] : STREAM child01 [send to my.parent.IP]: initializing communication...
 netdata INFO  : STREAM_SENDER[child01] : STREAM child01 [send to my.parent.IP]: waiting response from remote netdata...
-netdata INFO  : STREAM_SENDER[child01] : Stream is uncompressed! One of the agents (my.parent.IP <-> child01) does not support compression OR compression is disabled.
+netdata INFO  : STREAM_SENDER[child01] : Stream is uncompressed! One of the Agents (my.parent.IP <-> child01) does not support compression OR compression is disabled.
 netdata INFO  : STREAM_SENDER[child01] : STREAM child01 [send to my.parent.IP]: established communication with a parent using protocol version 4 - ready to send metrics...
 netdata INFO  : WEB_SERVER[static4] : STREAM child01 [send]: sending metrics...
 ```
@@ -283,7 +283,7 @@ To enable stream compression:
 
 2. In the `[stream]` section, set `enable compression` to `yes`.
 ```
-# This is the default stream compression flag for an agent.
+# This is the default stream compression flag for an Agent.
 
 [stream]
     enable compression = yes | no

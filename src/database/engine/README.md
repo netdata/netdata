@@ -122,7 +122,7 @@ Until **hot pages** and **dirty pages** are **flushed** to disk they are at risk
 power failure), as they are stored only in memory.
 
 The supported way of ensuring high data availability is the use of Netdata Parents to stream the data in real-time to
-multiple other Netdata agents.
+multiple other Netdata Agents.
 
 ## Memory requirements and retention
 

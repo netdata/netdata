@@ -62,6 +62,8 @@ type Agent struct {
 	Out               io.Writer
 
 	api *netdataapi.API
+
+	quitCh chan struct{}
 }
 
 // New creates a new Agent.
@@ -83,6 +85,7 @@ func New(cfg Config) *Agent {
 		ModuleRegistry:    module.DefaultRegistry,
 		Out:               safewriter.Stdout,
 		api:               netdataapi.New(safewriter.Stdout),
+		quitCh:            make(chan struct{}),
 	}
 }
 
@@ -100,17 +103,25 @@ func serve(a *Agent) {
 	var exit bool
 
 	for {
+		module.ObsoleteCharts(false)
+
 		ctx, cancel := context.WithCancel(context.Background())
 
 		wg.Add(1)
 		go func() { defer wg.Done(); a.run(ctx) }()
 
-		switch sig := <-ch; sig {
-		case syscall.SIGHUP:
-			a.Infof("received %s signal (%d). Restarting running instance", sig, sig)
-		default:
-			a.Infof("received %s signal (%d). Terminating...", sig, sig)
-			module.DontObsoleteCharts()
+		select {
+		case sig := <-ch:
+			switch sig {
+			case syscall.SIGHUP:
+				a.Infof("received %s signal (%d). Restarting running instance", sig, sig)
+				module.ObsoleteCharts(true)
+			default:
+				a.Infof("received %s signal (%d). Terminating...", sig, sig)
+				exit = true
+			}
+		case <-a.quitCh:
+			a.Infof("received QUIT command. Terminating...")
 			exit = true
 		}
 
@@ -209,7 +220,7 @@ func (a *Agent) run(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	go func() { defer wg.Done(); fnMgr.Run(ctx) }()
+	go func() { defer wg.Done(); fnMgr.Run(ctx, a.quitCh) }()
 
 	wg.Add(1)
 	go func() { defer wg.Done(); jobMgr.Run(ctx, in) }()

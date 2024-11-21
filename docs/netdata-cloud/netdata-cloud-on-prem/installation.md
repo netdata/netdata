@@ -123,59 +123,59 @@ Responsible for user registration & authentication. Manages user account informa
 
 ### cloud-agent-data-ctrl-service
 
-Forwards request from the cloud to the relevant agents.
+Forwards request from the Cloud to the relevant Agents.
 The requests include:
 
-- Fetching chart metadata from the agent
-- Fetching chart data from the agent
-- Fetching function data from the agent
+- Fetching chart metadata from the Agent
+- Fetching chart data from the Agent
+- Fetching function data from the Agent
 
 ### cloud-agent-mqtt-input-service
 
-Forwards MQTT messages emitted by the agent related to the agent entities to the internal Pulsar broker. These include agent connection state updates.
+Forwards MQTT messages emitted by the Agent related to the Agent entities to the internal Pulsar broker. These include Agent connection state updates.
 
 ### cloud-agent-mqtt-output-service
 
-Forwards Pulsar messages emitted in the cloud related to the agent entities to the MQTT broker. From there, the messages reach the relevant agent.
+Forwards Pulsar messages emitted in the Cloud related to the Agent entities to the MQTT broker. From there, the messages reach the relevant Agent.
 
 ### cloud-alarm-config-mqtt-input-service
 
-Forwards MQTT messages emitted by the agent related to the alarm-config entities to the internal Pulsar broker.  These include the data for the alarm configuration as seen by the agent.
+Forwards MQTT messages emitted by the Agent related to the alarm-config entities to the internal Pulsar broker.  These include the data for the alarm configuration as seen by the Agent.
 
 ### cloud-alarm-log-mqtt-input-service
 
-Forwards MQTT messages emitted by the agent related to the alarm-log entities to the internal Pulsar broker. These contain data about the alarm transitions that occurred in an agent.
+Forwards MQTT messages emitted by the Agent related to the alarm-log entities to the internal Pulsar broker. These contain data about the alarm transitions that occurred in an Agent.
 
 ### cloud-alarm-mqtt-output-service
 
-Forwards Pulsar messages emitted in the cloud related to the alarm entities to the MQTT broker. From there, the messages reach the relevant agent.
+Forwards Pulsar messages emitted in the Cloud related to the alarm entities to the MQTT broker. From there, the messages reach the relevant Agent.
 
 ### cloud-alarm-processor-service
 
-Persists latest alert statuses received from the agent in the cloud.
+Persists latest alert statuses received from the Agent in the Cloud.
 Aggregates alert statuses from relevant node instances.
-Exposes API endpoints to fetch alert data for visualization on the cloud.
+Exposes API endpoints to fetch alert data for visualization on the Cloud.
 Determines if notifications need to be sent when alert statuses change and emits relevant messages to Pulsar.
 Exposes API endpoints to store and return notification-silencing data.
 
 ### cloud-alarm-streaming-service
 
-Responsible for starting the alert stream between the agent and the cloud.
-Ensures that messages are processed in the correct order, and starts a reconciliation process between the cloud and the agent if out-of-order processing occurs.
+Responsible for starting the alert stream between the Agent and the Cloud.
+Ensures that messages are processed in the correct order, and starts a reconciliation process between the Cloud and the Agent if out-of-order processing occurs.
 
 ### cloud-charts-mqtt-input-service
 
-Forwards MQTT messages emitted by the agent related to the chart entities to the internal Pulsar broker. These include the chart metadata that is used to display relevant charts on the cloud.
+Forwards MQTT messages emitted by the Agent related to the chart entities to the internal Pulsar broker. These include the chart metadata that is used to display relevant charts on the Cloud.
 
 ### cloud-charts-mqtt-output-service
 
-Forwards Pulsar messages emitted in the cloud related to the charts entities to the MQTT broker. From there, the messages reach the relevant agent.
+Forwards Pulsar messages emitted in the Cloud related to the charts entities to the MQTT broker. From there, the messages reach the relevant Agent.
 
 ### cloud-charts-service
 
 Exposes API endpoints to fetch the chart metadata.
-Forwards data requests via the `cloud-agent-data-ctrl-service` to the relevant agents to fetch chart data points.
-Exposes API endpoints to call various other endpoints on the agent, for instance, functions.
+Forwards data requests via the `cloud-agent-data-ctrl-service` to the relevant Agents to fetch chart data points.
+Exposes API endpoints to call various other endpoints on the Agent, for instance, functions.
 
 ### cloud-custom-dashboard-service
 
@@ -183,8 +183,8 @@ Exposes API endpoints to fetch and store custom dashboard data.
 
 ### cloud-environment-service
 
-Serves as the first contact point between the agent and the cloud.
-Returns authentication and MQTT endpoints to connecting agents.
+Serves as the first contact point between the Agent and the Cloud.
+Returns authentication and MQTT endpoints to connecting Agents.
 
 ### cloud-feed-service
 
@@ -193,7 +193,7 @@ Exposes API endpoints to fetch feed events from Elasticsearch.
 
 ### cloud-frontend
 
-Contains the on-prem cloud website. Serves static content.
+Contains the on-prem Cloud website. Serves static content.
 
 ### cloud-iam-user-service
 
@@ -209,11 +209,11 @@ Exposes API endpoints to fetch a human-friendly explanation of various netdata c
 
 ### cloud-node-mqtt-input-service
 
-Forwards MQTT messages emitted by the agent related to the node entities to the internal Pulsar broker. These include the node metadata as well as their connectivity state, either direct or via parents.
+Forwards MQTT messages emitted by the Agent related to the node entities to the internal Pulsar broker. These include the node metadata as well as their connectivity state, either direct or via parents.
 
 ### cloud-node-mqtt-output-service
 
-Forwards Pulsar messages emitted in the cloud related to the charts entities to the MQTT broker. From there, the messages reach the relevant agent.
+Forwards Pulsar messages emitted in the Cloud related to the charts entities to the MQTT broker. From there, the messages reach the relevant Agent.
 
 ### cloud-notifications-dispatcher-service
 
@@ -222,6 +222,6 @@ Handles incoming notification messages and uses the relevant channels(email, sla
 
 ### cloud-spaceroom-service
 
-Exposes API endpoints to fetch and store relations between agents, nodes, spaces, users, and rooms.
-Acts as a provider of authorization for other cloud endpoints.
-Exposes API endpoints to authenticate agents connecting to the cloud.
+Exposes API endpoints to fetch and store relations between Agents, nodes, spaces, users, and rooms.
+Acts as a provider of authorization for other Cloud endpoints.
+Exposes API endpoints to authenticate Agents connecting to the Cloud.

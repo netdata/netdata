@@ -26,7 +26,7 @@ The following table summarizes the effect of each optimization on the CPU, RAM a
 | [Use a different metric storage database](/src/database/README.md)                                                                |                    | :heavy_check_mark: | :heavy_check_mark: |
 | [Disable machine learning](#disable-machine-learning)                                                                             | :heavy_check_mark: |                    |                    |
 | [Use a reverse proxy](#run-netdata-behind-a-proxy)                                                                                | :heavy_check_mark: |                    |                    |
-| [Disable/lower gzip compression for the agent dashboard](#disablelower-gzip-compression-for-the-dashboard)                        | :heavy_check_mark: |                    |                    |
+| [Disable/lower gzip compression for the Agent dashboard](#disablelower-gzip-compression-for-the-dashboard)                        | :heavy_check_mark: |                    |                    |
 
 ## Resources required by a default Netdata installation
 
@@ -62,7 +62,7 @@ To reduce CPU usage, you can (either one or a combination of the following actio
 3. [Reduce the data collection frequency](#reduce-collection-frequency)
 4. [Disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors)
 5. [Use a reverse proxy](#run-netdata-behind-a-proxy),
-6. [Disable/lower gzip compression for the agent dashboard](#disablelower-gzip-compression-for-the-dashboard).
+6. [Disable/lower gzip compression for the Agent dashboard](#disablelower-gzip-compression-for-the-dashboard).
 
 ### Memory consumption
 
@@ -111,7 +111,7 @@ using [streaming and replication](/docs/observability-centralization-points/READ
 ### Disable health checks on the child nodes
 
 When you set up streaming, we recommend you run your health checks on the parent. This saves resources on the children
-and makes it easier to configure or disable alerts and agent notifications.
+and makes it easier to configure or disable alerts and Agent notifications.
 
 The parents by default run health checks for each child, as long as the child is connected (the details are
 in `stream.conf`). On the child nodes you should add to `netdata.conf` the following:

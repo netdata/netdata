@@ -44,21 +44,6 @@ include:
     support_type: Core
     notes: ''
     eol_check: true
-  - <<: *alpine
-    version: "3.19"
-    support_type: Core
-    notes: ''
-    eol_check: true
-  - <<: *alpine
-    version: "3.18"
-    support_type: Intermediate
-    notes: ''
-    eol_check: true
-  - <<: *alpine
-    version: "3.17"
-    support_type: Intermediate
-    notes: ''
-    eol_check: true
 
   - distro: archlinux
     version: latest

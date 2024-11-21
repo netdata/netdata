@@ -33,7 +33,7 @@ modules:
 
           This collector monitors the performance of Windows machines, collects both host metrics and metrics from various Windows applications (e.g. Active Directory, MSSQL).
         method_description: |
-          It collect metrics by periodically sending HTTP requests to [Prometheus exporter for Windows machines](https://github.com/prometheus-community/windows_exporter), a native Windows agent running on each host.
+          It collect metrics by periodically sending HTTP requests to [Prometheus exporter for Windows machines](https://github.com/prometheus-community/windows_exporter), a native Windows Agent running on each host.
       default_behavior:
         auto_detection:
           description: ""

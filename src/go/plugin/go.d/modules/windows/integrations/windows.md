@@ -32,7 +32,7 @@ To get started with Netdata on Windows, see the [Netdata Windows Installer](http
 This collector monitors the performance of Windows machines, collects both host metrics and metrics from various Windows applications (e.g. Active Directory, MSSQL).
 
 
-It collect metrics by periodically sending HTTP requests to [Prometheus exporter for Windows machines](https://github.com/prometheus-community/windows_exporter), a native Windows agent running on each host.
+It collect metrics by periodically sending HTTP requests to [Prometheus exporter for Windows machines](https://github.com/prometheus-community/windows_exporter), a native Windows Agent running on each host.
 
 
 This collector is supported on all platforms.

@@ -28,7 +28,7 @@ Netdata is committed to adhering to the best practices laid out by the Open Sour
 Currently, the Netdata Agent follows the OSSF best practices at the passing level. Feel free to audit our approach to
 the [OSSF guidelines](https://bestpractices.coreinfrastructure.org/en/projects/2231)
 
-Netdata Cloud boasts of comprehensive end-to-end automated testing, encompassing the UI, back-end, and agents, where
+Netdata Cloud boasts of comprehensive end-to-end automated testing, encompassing the UI, back-end, and Agents, where
 involved. In addition, the Netdata Agent uses an array of third-party services for static code analysis,
 security analysis, and CI/CD integrations to ensure code quality on a per pull request basis. Tools like Github's
 CodeQL, Github's Dependabot, our own unit tests, various types of linters,
@@ -100,7 +100,7 @@ laws, including GDPR and CCPA.
 
 Netdata ensures user privacy rights as mandated by the GDPR and CCPA. This includes the right to access, correct, and
 delete personal data. These functions are all available online via the Netdata Cloud User Interface (UI). In case a user
-wants to remove all personal information (email and activities), they can delete their cloud account by logging
+wants to remove all personal information (email and activities), they can delete their Netdata Cloud account by logging
 into <https://app.netdata.cloud> and accessing their profile, at the bottom left of the screen.
 
 ### Regular Review and Updates
@@ -124,10 +124,10 @@ Netdata also collects anonymous telemetry events, which provide information on t
 and performance metrics. This data is used to understand how the software is being used and to identify areas for
 improvement.
 
-The purpose of collecting these statistics and telemetry data is to guide the development of the open-source agent,
+The purpose of collecting these statistics and telemetry data is to guide the development of the open-source Agent,
 focusing on areas that are most beneficial to users.
 
-Users have the option to opt out of this data collection during the installation of the agent, or at any time by
+Users have the option to opt out of this data collection during the installation of the Agent, or at any time by
 removing a specific file from their system.
 
 Netdata retains this data indefinitely in order to track changes and trends within the community over time.

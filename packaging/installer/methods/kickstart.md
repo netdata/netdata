@@ -65,7 +65,7 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 The script automatically detects if it is running interactively, on a user's terminal, or headless in a CI/CD environment. These are options related to overriding this behavior.
 
 - `--non-interactive` or `--dont-wait`
-  Don’t prompt for anything and assume yes whenever possible, overriding any automatic detection of an interactive run. Use this option when installing Netdata agent with a provisioning tool or in CI/CD.
+  Don’t prompt for anything and assume yes whenever possible, overriding any automatic detection of an interactive run. Use this option when installing Netdata Agent with a provisioning tool or in CI/CD.
 - `--interactive`
    Act as if running interactively, even if automatic detection indicates a run is non-interactive.
 
@@ -109,22 +109,22 @@ By default, the script installs a cron job to automatically update Netdata to th
 
 ### Netdata Cloud related options
 
-By default, the kickstart script will provide a Netdata agent installation that can potentially communicate with Netdata Cloud if the Netdata agent is further configured to do so.
+By default, the kickstart script will provide a Netdata Agent installation that can potentially communicate with Netdata Cloud if the Netdata Agent is further configured to do so.
 
 - `--claim-token`
   Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node after the installation. This will connect and claim the Netdata Agent to Netdata Cloud.
 - `--claim-url`
-  Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`. Use this option to change the Netdata Cloud URL to point to your Netdata Cloud installation.
+  Specify a URL to use when connecting to the Cloud. Defaults to `https://app.netdata.cloud`. Use this option to change the Netdata Cloud URL to point to your Netdata Cloud installation.
 - `--claim-rooms`
   Specify a comma-separated list of tokens for each Room this node should appear in.
 - `--claim-proxy`
-  Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [connecting through a proxy](/src/claim/README.md#automatically-via-a-provisioning-system-or-the-command-line) for details.
+  Specify a proxy to use when connecting to the Cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [connecting through a proxy](/src/claim/README.md#automatically-via-a-provisioning-system-or-the-command-line) for details.
 - `--claim-only`
   If there is an existing installation, only try to claim it without attempting to update it. If there is no existing installation, install and claim Netdata normally.
 
 ### anonymous telemetry
 
-By default, the agent is sending anonymous telemetry data to help us take identify the most common operating systems and the configurations Netdata agents run. We use this information to prioritize our efforts towards what is most commonly used by our community.
+By default, the Agent is sending anonymous telemetry data to help us take identify the most common operating systems and the configurations Netdata Agents run. We use this information to prioritize our efforts towards what is most commonly used by our community.
 
 - `--disable-telemetry`
   Disable anonymous statistics.
@@ -157,7 +157,7 @@ The following options are mutually exclusive and specify special operations othe
 - `--repositories-only`
   Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
 - `--prepare-offline-install-source`
-  Instead of installing the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](/packaging/installer/methods/offline.md) for more info.
+  Instead of installing the Agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](/packaging/installer/methods/offline.md) for more info.
 
 ### environment variables
 
