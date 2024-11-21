@@ -26,7 +26,6 @@ curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /t
 
 </details>
 
-
 **What to Expect**:
 
 In most cases, these commands will guide you through the uninstallation process and remove configuration and data files automatically.
@@ -81,3 +80,9 @@ chmod +x ./netdata-uninstaller.sh
 ## Windows
 
 To uninstall Netdata on Windows, use the standard application uninstaller in your **Settings** app or **Control Panel**.
+
+You can also use Powershell to uninstall Netdata, by running:
+
+```powershell
+msiexec /qn /x netdata-x64.msi
+```
