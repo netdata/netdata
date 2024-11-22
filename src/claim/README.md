@@ -1,8 +1,6 @@
 # Connect Agent to Cloud
 
-This section guides you through installing and securely connecting a new Netdata Agent to Netdata Cloud via the
-encrypted Agent-Cloud Link ([ACLK](/src/aclk/README.md)). Connecting your Agent to Netdata Cloud unlocks additional
-features like centralized monitoring and easier collaboration.
+This section guides you through installing and securely connecting a new Agent to Netdata Cloud via the encrypted Agent-Cloud Link ([ACLK](/src/aclk/README.md)). Connecting your Agent to Netdata Cloud unlocks additional features like centralized monitoring and easier collaboration.
 
 ## Connect
 
@@ -14,8 +12,7 @@ There are two places in the UI where you can add/connect your Node:
   select "Nodes." Click the "+" button to add a new node.
 - [**Nodes tab**](/docs/dashboards-and-charts/nodes-tab.md): Click on the "Add nodes" button.
 
-Netdata Cloud will generate a command that you can execute on your Node to install and claim the Agent. The command is
-available for different installation methods:
+Netdata Cloud will generate a command that you can execute on your Node to install and connect the Agent to your Space. The command is available for different installation methods:
 
 | Method              | Description                                                                                                                                                                                                      |
 |---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -70,10 +67,9 @@ example:
    insecure = no
 ```
 
-If the Agent is already running, you can either run `netdatacli reload-claiming-state` or restart the Agent.
-Otherwise, the Agent will be claimed when it starts.
+If the Agent is already running, you can either run `netdatacli reload-claiming-state` or restart the Agent. Otherwise, the Agent will be connected when it starts.
 
-If the claiming process fails, the reason will be logged in daemon.log (search for "CLAIM") and the `cloud` section of `http://ip:19999/api/v2/info`.
+If the connection process fails, the reason will be logged in daemon.log (search for "CLAIM") and the `cloud` section of `http://ip:19999/api/v2/info`.
 
 #### Automatically, via environment variables
 
@@ -85,9 +81,9 @@ Netdata will use the following environment variables:
 - `NETDATA_CLAIM_PROXY`: The URL of a proxy server to use for the connection (optional)
 - `NETDATA_EXTRA_CLAIM_OPTS`, may contain a space separated list of options. The option `-insecure` is the only currently used.
 
-The `NETDATA_CLAIM_TOKEN` alone is enough for triggering the claiming process.
+The `NETDATA_CLAIM_TOKEN` alone is enough for triggering the connection process.
 
-If the claiming process fails, the reason will be logged in daemon.log (search for "CLAIM") and the `cloud` section of `http://ip:19999/api/v2/info`.
+If the connection process fails, the reason will be logged in daemon.log (search for "CLAIM") and the `cloud` section of `http://ip:19999/api/v2/info`.
 
 ## Reconnect
 
