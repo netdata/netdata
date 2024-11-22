@@ -209,7 +209,7 @@ static void initialize_mssql_objects(struct mssql_instance *p, const char *insta
 }
 
 static inline void initialize_mssql_keys(struct mssql_instance *p) {
-    // General Statistics (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-transactions-object)
+    // General Statistics (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-general-statistics-object)
     p->MSSQLUserConnections.key = "User Connections";
     p->MSSQLBlockedProcesses.key = "Processes blocked";
 
