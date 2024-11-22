@@ -13,7 +13,7 @@ For more details please check out documentation on how we use our internal colle
 
 The following is required to be able to run Functions from Netdata Cloud.
 
-- At least one of the nodes claimed to your Space should be on a Netdata Agent version higher than `v1.37.1`
+- At least one of the nodes connected to your Space should be on a Netdata Agent version higher than `v1.37.1`
 - Ensure that the node has the collector that exposes the function you want enabled
 
 ## What functions are currently available?

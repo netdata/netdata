@@ -149,4 +149,4 @@ even thousands of nodes. There are no actual bottlenecks especially if you retai
 
 ## Z
 
-- **Zero Configuration**: Netdata is pre-configured and capable to autodetect and monitor any well known application that runs on your system. You just deploy and claim Netdata Agents in your Netdata space, and monitor them in seconds.
+- **Zero Configuration**: Netdata is pre-configured and capable to autodetect and monitor any well known application that runs on your system. You just deploy and connect Netdata Agents in your Netdata space, and monitor them in seconds.
