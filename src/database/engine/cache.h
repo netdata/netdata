@@ -33,133 +33,93 @@ typedef struct pgc_entry {
     uint8_t *custom_data;
 } PGC_ENTRY;
 
-#define PGC_CACHE_LINE_PADDING(x) uint8_t padding##x[64]
-
 struct pgc_queue_statistics {
-    size_t entries;
-    size_t size;
+    alignas(64) size_t entries;
+    alignas(64) size_t size;
 
-    PGC_CACHE_LINE_PADDING(1);
+    alignas(64) size_t max_entries;
+    alignas(64) size_t max_size;
 
-    size_t max_entries;
-    size_t max_size;
+    alignas(64) size_t added_entries;
+    alignas(64) size_t added_size;
 
-    PGC_CACHE_LINE_PADDING(2);
-
-    size_t added_entries;
-    size_t added_size;
-
-    PGC_CACHE_LINE_PADDING(3);
-
-    size_t removed_entries;
-    size_t removed_size;
-
-    PGC_CACHE_LINE_PADDING(4);
+    alignas(64) size_t removed_entries;
+    alignas(64) size_t removed_size;
 };
 
 struct pgc_statistics {
-    size_t wanted_cache_size;
-    size_t current_cache_size;
+    alignas(64) size_t wanted_cache_size;
+    alignas(64) size_t current_cache_size;
 
-    PGC_CACHE_LINE_PADDING(1);
+    alignas(64) size_t added_entries;
+    alignas(64) size_t added_size;
 
-    size_t added_entries;
-    size_t added_size;
+    alignas(64) size_t removed_entries;
+    alignas(64) size_t removed_size;
 
-    PGC_CACHE_LINE_PADDING(2);
+    alignas(64) size_t entries;                 // all the entries (includes clean, dirty, hot)
+    alignas(64) size_t size;                    // all the entries (includes clean, dirty, hot)
 
-    size_t removed_entries;
-    size_t removed_size;
+    alignas(64) size_t evicting_entries;
+    alignas(64) size_t evicting_size;
 
-    PGC_CACHE_LINE_PADDING(3);
+    alignas(64) size_t flushing_entries;
+    alignas(64) size_t flushing_size;
 
-    size_t entries;                 // all the entries (includes clean, dirty, hot)
-    size_t size;                    // all the entries (includes clean, dirty, hot)
+    alignas(64) size_t hot2dirty_entries;
+    alignas(64) size_t hot2dirty_size;
 
-    size_t evicting_entries;
-    size_t evicting_size;
+    alignas(64) size_t acquires;
+    alignas(64) size_t releases;
 
-    size_t flushing_entries;
-    size_t flushing_size;
+    alignas(64) size_t acquires_for_deletion;
+    alignas(64) size_t referenced_entries;      // all the entries currently referenced
+    alignas(64) size_t referenced_size;         // all the entries currently referenced
 
-    size_t hot2dirty_entries;
-    size_t hot2dirty_size;
+    alignas(64) size_t searches_exact;
+    alignas(64) size_t searches_exact_hits;
+    alignas(64) size_t searches_exact_misses;
 
-    PGC_CACHE_LINE_PADDING(4);
+    alignas(64) size_t searches_closest;
+    alignas(64) size_t searches_closest_hits;
+    alignas(64) size_t searches_closest_misses;
 
-    size_t acquires;
-    PGC_CACHE_LINE_PADDING(4a);
-    size_t releases;
-    PGC_CACHE_LINE_PADDING(4b);
-    size_t acquires_for_deletion;
-    PGC_CACHE_LINE_PADDING(4c);
-
-    size_t referenced_entries;      // all the entries currently referenced
-    size_t referenced_size;         // all the entries currently referenced
-
-    PGC_CACHE_LINE_PADDING(5);
-
-    size_t searches_exact;
-    size_t searches_exact_hits;
-    size_t searches_exact_misses;
-
-    PGC_CACHE_LINE_PADDING(6);
-
-    size_t searches_closest;
-    size_t searches_closest_hits;
-    size_t searches_closest_misses;
-
-    PGC_CACHE_LINE_PADDING(7);
-
-    size_t flushes_completed;
-    size_t flushes_completed_size;
-    size_t flushes_cancelled;
-    size_t flushes_cancelled_size;
+    alignas(64) size_t flushes_completed;
+    alignas(64) size_t flushes_completed_size;
+    alignas(64) size_t flushes_cancelled;
+    alignas(64) size_t flushes_cancelled_size;
 
 #ifdef PGC_COUNT_POINTS_COLLECTED
-    PGC_CACHE_LINE_PADDING(8);
-    size_t points_collected;
+    alignas(64) size_t points_collected;
 #endif
 
-    PGC_CACHE_LINE_PADDING(9);
+    alignas(64) size_t insert_spins;
+    alignas(64) size_t evict_spins;
+    alignas(64) size_t release_spins;
+    alignas(64) size_t acquire_spins;
+    alignas(64) size_t delete_spins;
+    alignas(64) size_t flush_spins;
 
-    size_t insert_spins;
-    size_t evict_spins;
-    size_t release_spins;
-    size_t acquire_spins;
-    size_t delete_spins;
-    size_t flush_spins;
+    alignas(64) size_t workers_search;
+    alignas(64) size_t workers_add;
+    alignas(64) size_t workers_evict;
+    alignas(64) size_t workers_flush;
+    alignas(64) size_t workers_jv2_flush;
+    alignas(64) size_t workers_hot2dirty;
 
-    PGC_CACHE_LINE_PADDING(10);
-
-    size_t workers_search;
-    size_t workers_add;
-    size_t workers_evict;
-    size_t workers_flush;
-    size_t workers_jv2_flush;
-    size_t workers_hot2dirty;
-
-    size_t evict_skipped;
-    size_t hot_empty_pages_evicted_immediately;
-    size_t hot_empty_pages_evicted_later;
-
-    PGC_CACHE_LINE_PADDING(11);
+    alignas(64) size_t evict_skipped;
+    alignas(64) size_t hot_empty_pages_evicted_immediately;
+    alignas(64) size_t hot_empty_pages_evicted_later;
 
     // events
-    size_t events_cache_under_severe_pressure;
-    size_t events_cache_needs_space_aggressively;
-    size_t events_flush_critical;
-
-    PGC_CACHE_LINE_PADDING(12);
+    alignas(64) size_t events_cache_under_severe_pressure;
+    alignas(64) size_t events_cache_needs_space_aggressively;
+    alignas(64) size_t events_flush_critical;
 
     struct {
-        PGC_CACHE_LINE_PADDING(0);
         struct pgc_queue_statistics hot;
-        PGC_CACHE_LINE_PADDING(1);
         struct pgc_queue_statistics dirty;
-        PGC_CACHE_LINE_PADDING(2);
         struct pgc_queue_statistics clean;
-        PGC_CACHE_LINE_PADDING(3);
     } queues;
 };
 
@@ -250,13 +210,8 @@ size_t pgc_aral_overhead(void);
 
 static inline size_t indexing_partition(Word_t ptr, Word_t modulo) __attribute__((const));
 static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
-#ifdef ENV64BIT
-    uint64_t hash = murmur64(ptr);
+    XXH64_hash_t hash = XXH3_64bits(&ptr, sizeof(ptr));
     return hash % modulo;
-#else
-    uint32_t hash = murmur32(ptr);
-    return hash % modulo;
-#endif
 }
 
 #endif // DBENGINE_CACHE_H
