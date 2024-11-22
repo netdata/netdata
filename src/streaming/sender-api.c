@@ -23,7 +23,7 @@ void rrdhost_sender_structures_init(struct rrdhost *host) {
     host->sender->connector.id = -1;
     host->sender->dispatcher.id = -1;
     host->sender->host = host;
-    host->sender->sbuf.cb = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024, &netdata_buffers_statistics.cbuffers_streaming);
+    host->sender->sbuf.cb = cbuffer_new(CBUFFER_INITIAL_SIZE, CBUFFER_INITIAL_MAX_SIZE, &netdata_buffers_statistics.cbuffers_streaming);
     host->sender->capabilities = stream_our_capabilities(host, true);
 
     nd_sock_init(&host->sender->sock, netdata_ssl_streaming_sender_ctx, netdata_ssl_validate_certificate_sender);

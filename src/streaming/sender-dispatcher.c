@@ -13,9 +13,8 @@ static void stream_sender_cbuffer_recreate_timed_unsafe(struct sender_state *s, 
     s->sbuf.recreates++; // we increase even if we don't do it, to have sender_start() recreate its buffers
 
     if(s->sbuf.cb && s->sbuf.cb->size > CBUFFER_INITIAL_SIZE) {
-        size_t max = s->sbuf.cb->max_size;
         cbuffer_free(s->sbuf.cb);
-        s->sbuf.cb = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.cbuffers_streaming);
+        s->sbuf.cb = cbuffer_new(CBUFFER_INITIAL_SIZE, CBUFFER_INITIAL_MAX_SIZE, &netdata_buffers_statistics.cbuffers_streaming);
     }
 }
 
