@@ -1499,11 +1499,11 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
     if(!sender->replication.oldest_request_after_t || rq.after < sender->replication.oldest_request_after_t)
         sender->replication.oldest_request_after_t = rq.after;
 
-    if(start_streaming && rrdpush_sender_get_buffer_used_percent(sender) <= STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)
-        replication_execute_request(&rq, false);
-
-    else
-        dictionary_set(sender->replication.requests, chart_id, &rq, sizeof(struct replication_request));
+//    if(start_streaming && rrdpush_sender_get_buffer_used_percent(sender) <= STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)
+//        replication_execute_request(&rq, false);
+//
+//    else
+    dictionary_set(sender->replication.requests, chart_id, &rq, sizeof(struct replication_request));
 }
 
 void replication_sender_delete_pending_requests(struct sender_state *sender) {
