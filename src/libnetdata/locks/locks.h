@@ -46,6 +46,7 @@ bool spinlock_trylock_cancelable(SPINLOCK *spinlock);
 
 typedef struct netdata_rw_spinlock {
     int32_t readers;
+    int32_t writers_waiting;
     SPINLOCK spinlock;
 } RW_SPINLOCK;
 
