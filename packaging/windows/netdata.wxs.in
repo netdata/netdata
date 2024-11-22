@@ -131,6 +131,12 @@
                                 Remove="uninstall"
                                 Name="Netdata"
                                 Wait="yes" />
+
+                 <RegistryValue Root="HKLM"
+                               Key="System\CurrentControlSet\Services\Netdata"
+                               Name="DelayedAutoStart"
+                               Value="1"
+                               Type="integer" />
             </Component>
     </Fragment>
 
