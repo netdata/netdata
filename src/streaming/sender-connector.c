@@ -532,7 +532,7 @@ bool stream_sender_connect(struct sender_state *s, uint16_t default_port, time_t
     return true;
 }
 
-#define MAX_CONNECTORS 2
+#define MAX_CONNECTORS 1
 
 struct connector {
     int8_t id;
