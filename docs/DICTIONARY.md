@@ -1,16 +1,34 @@
-# Dictionary
+# Terminology Dictionary
 
-This is a file to provide help on how to refer to common terms that are used in Netdata.
+This guide standardizes terminology for Netdata's documentation and communications. When referring to Netdata mechanisms or concepts, use these terms and definitions to ensure clarity and consistency.
 
-The goal is to make it more clear when talking about a Netdata mechanism or concept, and not confuse the user.
+When the context is clear, we can omit the "Netdata" prefix for brevity.
 
-In some terms that we use the prefix "Netdata" it is preferable to then remove it in the rest of the file, as the context has been set.
+## Core Components
 
-- Agent(s), Netdata Agent(s): The Netdata Agent
-- Anomaly Detection
-- Anomaly Advisor
-- Machine Learning
-- Child(ren): Formerly "Netdata Children"
-- Cloud, Netdata Cloud: The Netdata Cloud
-- Parent(s): Formerly "Netdata Parents".
-- Tier(s): The Database Tiers
+| Term                   | Definition                                                               |
+|------------------------|--------------------------------------------------------------------------|
+| **Agent** (**Agents**) | The core monitoring software that collects, processes and stores metrics |
+| **Cloud**              | The centralized platform for managing and visualizing Netdata metrics    |
+
+## Database
+
+| Term                 | Definition                                         |
+|----------------------|----------------------------------------------------|
+| **Tier** (**Tiers**) | Database storage layers with different granularity |
+
+## Streaming
+
+| Term                     | Definition                                                  |
+|--------------------------|-------------------------------------------------------------|
+| **Parent** (**Parents**) | An Agent that receives metrics from other Agents (Children) |
+| **Child** (**Children**) | An Agent that streams metrics to another Agent (Parent)     |
+
+## Machine Learning
+
+| Term                    | Abbreviation | Definition                                                                                      |
+|-------------------------|:------------:|-------------------------------------------------------------------------------------------------|
+| **Machine Learning**    |      ML      | An umbrella term for Netdata's ML-powered features                                              |
+| **Anomaly Detection**   |              | The capability to identify unusual patterns in metrics                                          |
+| **Metric Correlations** |              | Filters dashboard to show metrics with the most significant changes in the selected time window |
+| **Anomaly Advisor**     |              | The interface and tooling for analyzing detected anomalies                                      |
