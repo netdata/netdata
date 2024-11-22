@@ -689,8 +689,10 @@ static void *stream_receive_thread(void *ptr) {
         }
     }
 
-    for(size_t i = 0; i < rr->run.used ;i++)
-        stream_receiver_remove(rr, rr->run.nodes[i], i, "shutdown");
+    for(size_t i = 0; i < rr->run.used ;i++) {
+        if (rr->run.nodes[i])
+            stream_receiver_remove(rr, rr->run.nodes[i], i, "shutdown");
+    }
 
     worker_unregister();
 
