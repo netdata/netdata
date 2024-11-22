@@ -2,11 +2,16 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.0.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.0.2...HEAD)
 
 **Merged pull requests:**
 
+- build\(deps\): bump k8s.io/client-go from 0.31.2 to 0.31.3 in /src/go [\#19059](https://github.com/netdata/netdata/pull/19059) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/vmware/govmomi from 0.46.1 to 0.46.2 in /src/go [\#19058](https://github.com/netdata/netdata/pull/19058) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Windows doc updates [\#19054](https://github.com/netdata/netdata/pull/19054) ([Ancairon](https://github.com/Ancairon))
+- Securing Agents section docs cleanup [\#19053](https://github.com/netdata/netdata/pull/19053) ([Ancairon](https://github.com/Ancairon))
 - fix\(go.d/pkg/web\): correct close idle connections [\#19052](https://github.com/netdata/netdata/pull/19052) ([ilyam8](https://github.com/ilyam8))
+- Update documentation about our native package repos. [\#19049](https://github.com/netdata/netdata/pull/19049) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#19048](https://github.com/netdata/netdata/pull/19048) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/pkg/web\): add "force\_http2" option [\#19047](https://github.com/netdata/netdata/pull/19047) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#19045](https://github.com/netdata/netdata/pull/19045) ([netdatabot](https://github.com/netdatabot))
@@ -77,6 +82,10 @@
 - Update Windows Documentation [\#18928](https://github.com/netdata/netdata/pull/18928) ([thiagoftsm](https://github.com/thiagoftsm))
 - IIS Metadata [\#18765](https://github.com/netdata/netdata/pull/18765) ([thiagoftsm](https://github.com/thiagoftsm))
 - Bump github.com/Wing924/ltsv from 0.3.1 to 0.4.0 in /src/go [\#18636](https://github.com/netdata/netdata/pull/18636) ([dependabot[bot]](https://github.com/apps/dependabot))
+
+## [v2.0.2](https://github.com/netdata/netdata/tree/v2.0.2) (2024-11-21)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.0.1...v2.0.2)
 
 ## [v2.0.1](https://github.com/netdata/netdata/tree/v2.0.1) (2024-11-14)
 
@@ -432,10 +441,6 @@
 - go.d add function to execute a command inside a Docker container [\#18509](https://github.com/netdata/netdata/pull/18509) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18508](https://github.com/netdata/netdata/pull/18508) ([netdatabot](https://github.com/netdatabot))
 - server dashboard v3 static files, when available [\#18507](https://github.com/netdata/netdata/pull/18507) ([ktsaou](https://github.com/ktsaou))
-- add varnishstat and varnishadm to ndsudo [\#18503](https://github.com/netdata/netdata/pull/18503) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/docker/docker from 27.2.0+incompatible to 27.2.1+incompatible in /src/go [\#18502](https://github.com/netdata/netdata/pull/18502) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Assorted build cleanup for external data collection plugins. [\#18501](https://github.com/netdata/netdata/pull/18501) ([Ferroin](https://github.com/Ferroin))
-- remove python.d/varnish [\#18499](https://github.com/netdata/netdata/pull/18499) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
