@@ -233,17 +233,25 @@ from all hosts sending logs to the central logs server via `systemd-remote`.
 
 ## Full-text search
 
-The plugin supports searching for any text on all fields of the log entries.
+The plugin supports searching through all fields of log entries using text patterns.
 
-Full text search is combined with the selected filters.
+**Pattern Matching**:
 
-The text box accepts asterisks `*` as wildcards. So, `a*b*c` means match anything that contains `a`, then `b` and
-then `c` with anything between them.
+- All patterns use "contains" matching (not exact match).
+- Patterns support wildcards (`*`) to match any characters.
+- Example: `error` matches "error", "errors", "error_count", etc.
+- Example with wildcard: `a*b` matches anything containing `a` followed by `b`, like `acb`, `a_long_b`.
 
-Spaces are treated as OR expressions. So that `a*b c*d` means `a*b OR c*d`.
+**Multiple Patterns**:
 
-Negative expressions are supported, by prefixing any string with `!`. Example: `!systemd *` means match anything that
-does not contain `systemd` on any of its fields.
+- Separate patterns with ` | ` (pipe character with spaces on both sides).
+- Multiple patterns are combined with OR logic.
+- Example: `error | warning` matches entries containing either `error` OR `warning`.
+
+**Negative Patterns**:
+
+- Prefix pattern with `!` to exclude matching entries.
+- Example: `!systemd | *` matches any entry that does NOT contain `systemd`.
 
 ## Query performance
 
