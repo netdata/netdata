@@ -209,30 +209,31 @@ static void initialize_mssql_objects(struct mssql_instance *p, const char *insta
 }
 
 static inline void initialize_mssql_keys(struct mssql_instance *p) {
-    // General Statistics
+    // General Statistics (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-transactions-object)
     p->MSSQLUserConnections.key = "User Connections";
     p->MSSQLBlockedProcesses.key = "Processes blocked";
 
-    // SQL Statistics
+    // SQL Statistics (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-sql-statistics-object)
     p->MSSQLStatsAutoParameterization.key = "Auto-Param Attempts/sec";
     p->MSSQLStatsBatchRequests.key = "Batch Requests/sec";
     p->MSSQLStatSafeAutoParameterization.key = "Safe Auto-Params/sec";
     p->MSSQLCompilations.key = "SQL Compilations/sec";
     p->MSSQLRecompilations.key = "SQL Re-Compilations/sec";
 
-    // Buffer Management
+    // Buffer Management (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-buffer-manager-object)
     p->MSSQLBufferCacheHits.key = "Buffer cache hit ratio";
     p->MSSQLBufferPageLifeExpectancy.key = "Page life expectancy";
     p->MSSQLBufferCheckpointPages.key = "Checkpoint pages/sec";
     p->MSSQLBufferPageReads.key = "Page reads/sec";
     p->MSSQLBufferPageWrites.key = "Page writes/sec";
 
-    // Access Methods
+    // Access Methods (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-access-methods-object)
     p->MSSQLAccessMethodPageSplits.key = "Page Splits/sec";
 
-    // Errors
+    // Errors (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-sql-errors-object)
     p->MSSQLSQLErrorsTotal.key = "Errors/sec";
 
+    // Memory Management (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-memory-manager-object)
     p->MSSQLConnectionMemoryBytes.key = "Connection Memory (KB)";
     p->MSSQLExternalBenefitOfMemory.key = "External benefit of memory";
     p->MSSQLPendingMemoryGrants.key = "Memory Grants Pending";
@@ -240,6 +241,7 @@ static inline void initialize_mssql_keys(struct mssql_instance *p) {
 }
 
 void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    // https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object
     struct mssql_lock_instance *ptr = value;
     ptr->deadLocks.key = "Number of Deadlocks/sec";
     ptr->lockWait.key = "Lock Waits/sec";
@@ -248,6 +250,7 @@ void dict_mssql_insert_locks_cb(const DICTIONARY_ITEM *item __maybe_unused, void
 void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_db_instance *ptr = value;
 
+    // https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-databases-object
     ptr->MSSQLDatabaseDataFileSize.key = "Data File(s) Size (KB)";
     ptr->MSSQLDatabaseActiveTransactions.key = "Active Transactions";
     ptr->MSSQLDatabaseBackupRestoreOperations.key = "Backup/Restore Throughput/sec";
