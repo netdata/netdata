@@ -25,7 +25,7 @@ The Netdata dashboard consists of the following main sections:
 
 > **Note**
 >
-> Some sections of the dashboard, when accessed through the Agent, may require the user to be signed in to Netdata Cloud or have the Agent connected to Netdata Cloud for their full functionality. Examples include saving visualization settings on charts or custom dashboards, connecting a node to Netdata Cloud, or executing functions on an Agent.
+> Some dashboard sections may require the user to be signed in and have the Agent connected to Netdata Cloud for their full functionality when accessed through the Agent. Examples include saving visualization settings on charts or custom dashboards, connecting a node to Netdata Cloud, or executing functions on an Agent.
 
 ## How to access the dashboards?
 
