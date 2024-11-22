@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdhost-status.h"
+#include "receiver-internals.h"
 #include "sender-internals.h"
 
 ENUM_STR_MAP_DEFINE(RRDHOST_DB_STATUS) = {
@@ -128,7 +129,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     s->ingest.since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
     s->ingest.reason = (online) ? STREAM_HANDSHAKE_NEVER : host->stream.rcv.status.exit_reason;
 
-    spinlock_lock(&host->receiver_lock);
+    rrdhost_receiver_lock(host);
     s->ingest.hops = (int16_t)(host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
     bool has_receiver = false;
     if (host->receiver && !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED)) {
@@ -141,7 +142,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
         s->ingest.peers = nd_sock_socket_peers(&host->receiver->sock);
         s->ingest.ssl = nd_sock_is_ssl(&host->receiver->sock);
     }
-    spinlock_unlock(&host->receiver_lock);
+    rrdhost_receiver_unlock(host);
 
     if (online) {
         if(s->db.status == RRDHOST_DB_STATUS_INITIALIZING)

@@ -38,7 +38,7 @@ const struct capability *aclk_get_agent_capas()
 
 struct capability *aclk_get_node_instance_capas(RRDHOST *host)
 {
-    bool functions = (host == localhost || (host->receiver && stream_has_capability(host->receiver, STREAM_CAP_FUNCTIONS)));
+    bool functions = (host == localhost || receiver_has_capability(host, STREAM_CAP_FUNCTIONS));
     bool dyncfg = (host == localhost || dyncfg_available_for_rrdhost(host));
 
     struct capability ni_caps[] = {

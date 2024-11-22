@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
+#include "receiver-internals.h"
 #include "sender-internals.h"
 
 static STREAM_CAPABILITIES globally_disabled_capabilities = STREAM_CAP_ALWAYS_DISABLED;
@@ -102,12 +103,12 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
         // we have DATA_WITH_ML capability
         // we should remove the DATA_WITH_ML capability if our database does not have anomaly info
         // this can happen under these conditions: 1. we don't run ML, and 2. we don't receive ML
-        spinlock_lock(&host->receiver_lock);
+        rrdhost_receiver_lock(host);
 
         if (!ml_host_running(host) && !stream_has_capability(host->receiver, STREAM_CAP_ML_MODELS))
             disabled_capabilities |= STREAM_CAP_ML_MODELS;
 
-        spinlock_unlock(&host->receiver_lock);
+        rrdhost_receiver_unlock(host);
 
         if(host->sender)
             disabled_capabilities |= host->sender->disabled_capabilities;

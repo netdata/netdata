@@ -203,7 +203,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
         if (host == localhost)
             continue;
 
-        spinlock_lock(&host->receiver_lock);
+        rrdhost_receiver_lock(host);
 
         time_t now = now_realtime_sec();
 
@@ -215,7 +215,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
             host->stream.rcv.status.check_obsolete = false;
         }
 
-        spinlock_unlock(&host->receiver_lock);
+        rrdhost_receiver_unlock(host);
     }
 
     rrd_rdunlock();

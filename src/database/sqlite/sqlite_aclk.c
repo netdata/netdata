@@ -353,9 +353,9 @@ static void node_update_timer_cb(uv_timer_t *handle)
     struct aclk_sync_cfg_t *ahc = handle->data;
     RRDHOST *host = ahc->host;
 
-    spinlock_lock(&host->receiver_lock);
+    rrdhost_receiver_lock(host);
     int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
-    spinlock_unlock(&host->receiver_lock);
+    rrdhost_receiver_unlock(host);
     nd_log(NDLS_ACLK, NDLP_DEBUG,"Timer: Sending node update info for %s, LIVE = %d", rrdhost_hostname(host), live);
     aclk_host_state_update(host, live, 1);
 }
@@ -453,9 +453,9 @@ static void aclk_synchronization(void *arg)
                     }
 
                     // This is fallback if timer fails
-                    spinlock_lock(&host->receiver_lock);
+                    rrdhost_receiver_lock(host);
                     int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
-                    spinlock_unlock(&host->receiver_lock);
+                    rrdhost_receiver_unlock(host);
                     aclk_host_state_update(host, live, 1);
                     nd_log(NDLS_ACLK, NDLP_DEBUG,"Sending node update info for %s, LIVE = %d", rrdhost_hostname(host), live);
                     break;

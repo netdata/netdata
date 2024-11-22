@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
+#include "receiver-internals.h"
 #include "web/server/h2o/http_server.h"
 
 // When a child disconnects this is the maximum we will wait
@@ -758,7 +759,7 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     bool signal_rrdcontext = false;
     bool set_this = false;
 
-    spinlock_lock(&host->receiver_lock);
+    rrdhost_receiver_lock(host);
 
     if (!host->receiver) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
@@ -802,7 +803,7 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         set_this = true;
     }
 
-    spinlock_unlock(&host->receiver_lock);
+    rrdhost_receiver_unlock(host);
 
     if(signal_rrdcontext)
         rrdcontext_host_child_connected(host);
@@ -814,13 +815,13 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
     RRDHOST *host = rpt->host;
     if(!host) return;
 
-    spinlock_lock(&host->receiver_lock);
+    rrdhost_receiver_lock(host);
     {
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
 
         if (host->receiver == rpt) {
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
-            spinlock_unlock(&host->receiver_lock);
+            rrdhost_receiver_unlock(host);
             {
                 // run all these without having the receiver lock
 
@@ -834,7 +835,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
                 rrdhost_stream_parents_reset(host, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT);
             }
-            spinlock_lock(&host->receiver_lock);
+            rrdhost_receiver_lock(host);
 
             // now we have the lock again
 
@@ -856,13 +857,13 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
     pluginsd_process_cleanup(rpt->receiver.parser);
     __atomic_store_n(&rpt->receiver.parser, NULL, __ATOMIC_RELAXED);
 
-    spinlock_unlock(&host->receiver_lock);
+    rrdhost_receiver_unlock(host);
 }
 
 bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
     bool ret = false;
 
-    spinlock_lock(&host->receiver_lock);
+    rrdhost_receiver_lock(host);
 
     if(host->receiver) {
         if(!__atomic_load_n(&host->receiver->exit.shutdown, __ATOMIC_RELAXED)) {
@@ -874,12 +875,12 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
 
     int count = 2000;
     while (host->receiver && count-- > 0) {
-        spinlock_unlock(&host->receiver_lock);
+        rrdhost_receiver_unlock(host);
 
         // let the lock for the receiver thread to exit
         sleep_usec(1 * USEC_PER_MS);
 
-        spinlock_lock(&host->receiver_lock);
+        rrdhost_receiver_lock(host);
     }
 
     if(host->receiver)
@@ -891,7 +892,7 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
     else
         ret = true;
 
-    spinlock_unlock(&host->receiver_lock);
+    rrdhost_receiver_unlock(host);
 
     return ret;
 }
@@ -1421,7 +1422,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             host = NULL;
 
         if (host) {
-            spinlock_lock(&host->receiver_lock);
+            rrdhost_receiver_lock(host);
             if (host->receiver) {
                 age = now_monotonic_sec() - host->receiver->last_msg_t;
 
@@ -1430,7 +1431,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
                 else
                     receiver_stale = true;
             }
-            spinlock_unlock(&host->receiver_lock);
+            rrdhost_receiver_unlock(host);
         }
         rrd_rdunlock();
 

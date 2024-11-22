@@ -2,8 +2,8 @@
 
 #include "compression.h"
 #include "../stream-conf.h"
+#include "../receiver-internals.h"
 #include "../sender-internals.h"
-#include "../receiver.h"
 
 #include "gzip.h"
 

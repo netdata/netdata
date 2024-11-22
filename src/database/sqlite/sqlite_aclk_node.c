@@ -65,13 +65,8 @@ static void build_node_info(RRDHOST *host)
     now_realtime_timeval(&node_info.updated_at);
 
     char *host_version = NULL;
-    if (host != localhost) {
-        spinlock_lock(&host->receiver_lock);
-        host_version = strdupz(
-            host->receiver && host->receiver->program_version ? host->receiver->program_version :
-                                                                rrdhost_program_version(host));
-        spinlock_unlock(&host->receiver_lock);
-    }
+    if (host != localhost)
+        host_version = receiver_program_version_strdupz(host);
 
     node_info.data.name = rrdhost_hostname(host);
     node_info.data.os = rrdhost_os(host);

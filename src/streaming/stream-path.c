@@ -2,6 +2,7 @@
 
 #include "stream-path.h"
 #include "rrdpush.h"
+#include "receiver-internals.h"
 #include "sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
 
@@ -122,7 +123,7 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
     if(ml_enabled(host))
         p.flags |= STREAM_PATH_FLAG_ML;
 
-    spinlock_lock(&host->receiver_lock);
+    rrdhost_receiver_lock(host);
     if(host->receiver) {
         p.hops = (int16_t)host->receiver->hops;
         p.since = host->receiver->connected_since_s;
@@ -131,7 +132,7 @@ static STREAM_PATH rrdhost_stream_path_self(RRDHOST *host) {
         p.hops = (is_localhost) ? 0 : -1; // -1 for stale nodes
         p.since = netdata_start_time;
     }
-    spinlock_unlock(&host->receiver_lock);
+    rrdhost_receiver_unlock(host);
 
     // the following may get the receiver lock again!
     p.capabilities = stream_our_capabilities(host, true);
@@ -235,7 +236,7 @@ void stream_path_send_to_child(RRDHOST *host) {
 
     CLEAN_BUFFER *payload = stream_path_payload(host);
 
-    spinlock_lock(&host->receiver_lock);
+    rrdhost_receiver_lock(host);
     if(stream_has_capability(host->receiver, STREAM_CAP_PATHS) &&
         !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED)) {
 
@@ -243,7 +244,7 @@ void stream_path_send_to_child(RRDHOST *host) {
         buffer_sprintf(wb, PLUGINSD_KEYWORD_JSON " " PLUGINSD_KEYWORD_JSON_CMD_STREAM_PATH "\n%s\n" PLUGINSD_KEYWORD_JSON_END "\n", buffer_tostring(payload));
         send_to_plugin(buffer_tostring(wb), __atomic_load_n(&host->receiver->receiver.parser, __ATOMIC_RELAXED));
     }
-    spinlock_unlock(&host->receiver_lock);
+    rrdhost_receiver_unlock(host);
 }
 
 void stream_path_child_disconnected(RRDHOST *host) {

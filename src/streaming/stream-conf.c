@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon/common.h"
+#include "receiver-internals.h"
+#include "sender-internals.h"
 
 static struct config stream_config = APPCONFIG_INITIALIZER;
 

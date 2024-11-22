@@ -1334,6 +1334,9 @@ struct rrdhost {
 };
 extern RRDHOST *localhost;
 
+#define rrdhost_receiver_lock(host) spinlock_lock(&(host)->receiver_lock)
+#define rrdhost_receiver_unlock(host) spinlock_unlock(&(host)->receiver_lock)
+
 #define rrdhost_hostname(host) string2str((host)->hostname)
 #define rrdhost_registry_hostname(host) string2str((host)->registry_hostname)
 #define rrdhost_os(host) string2str((host)->os)

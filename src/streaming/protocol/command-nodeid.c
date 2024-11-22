@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "commands.h"
+#include "../receiver-internals.h"
 #include "../sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
 
@@ -13,8 +14,8 @@ void rrdpush_sender_clear_parent_claim_id(RRDHOST *host) {
 void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
     if(host == localhost || UUIDiszero(host->node_id)) return;
 
-    spinlock_lock(&host->receiver_lock);
-    if(host->receiver && stream_has_capability(host->receiver, STREAM_CAP_NODE_ID)) {
+    rrdhost_receiver_lock(host);
+    if(stream_has_capability(host->receiver, STREAM_CAP_NODE_ID)) {
         char node_id_str[UUID_STR_LEN] = "";
         uuid_unparse_lower(host->node_id.uuid, node_id_str);
 
@@ -35,7 +36,7 @@ void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
 
         send_to_plugin(buf, __atomic_load_n(&host->receiver->receiver.parser, __ATOMIC_RELAXED));
     }
-    spinlock_unlock(&host->receiver_lock);
+    rrdhost_receiver_unlock(host);
 }
 
 // the sender of the child receives node id, claim id and cloud url from the receiver of the parent
