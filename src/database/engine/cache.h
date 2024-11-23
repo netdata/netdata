@@ -220,7 +220,7 @@ static inline size_t pgc_max_evictors(void) {
     static size_t rc = 0;
     if (likely(rc)) return rc;
 
-    rc = get_netdata_cpus() / 4;
+    rc = get_netdata_cpus();
     if (rc < 4) rc = 4;
     return rc;
 }
@@ -229,7 +229,7 @@ static inline size_t pgc_max_flushers(void) {
     static size_t rc = 0;
     if (likely(rc)) return rc;
 
-    rc = get_netdata_cpus() / 4;
+    rc = get_netdata_cpus();
     if (rc < 4) rc = 4;
     return rc;
 }

@@ -106,6 +106,9 @@ struct pgc {
         dynamic_target_cache_size_callback dynamic_target_size_cb;
     } config;
 
+    ND_THREAD *evict_thread;
+    struct completion evict_thread_completion;
+
     struct pgc_index {
         alignas(64) RW_SPINLOCK rw_spinlock;
         Pvoid_t sections_judy;
@@ -329,22 +332,26 @@ typedef bool (*evict_filter)(PGC_PAGE *page, void *data);
 static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them, evict_filter filter, void *data);
 #define evict_pages(cache, max_skip, max_evict, wait, all_of_them) evict_pages_with_filter(cache, max_skip, max_evict, wait, all_of_them, NULL, NULL)
 
-static inline void evict_on_clean_page_added(PGC *cache __maybe_unused) {
-    if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache)) {
+static inline void signal_evict_thread_or_evict_inline(PGC *cache) {
+    const size_t per1000 = cache_usage_per1000(cache, NULL);
+
+    if (per1000 > cache->config.healthy_size_per1000)
+        completion_mark_complete_a_job(&cache->evict_thread_completion);
+
+    if (per1000 >= cache->config.severe_pressure_per1000 ||
+        ((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) && cache->config.aggressive_evict_per1000))
         evict_pages(cache,
                     cache->config.max_skip_pages_per_inline_eviction,
                     cache->config.max_pages_per_inline_eviction,
                     false, false);
-    }
 }
 
-static inline void evict_on_page_release_when_permitted(PGC *cache __maybe_unused) {
-    if ((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_under_severe_pressure(cache)) {
-        evict_pages(cache,
-                    cache->config.max_skip_pages_per_inline_eviction,
-                    cache->config.max_pages_per_inline_eviction,
-                    false, false);
-    }
+static inline void evict_on_clean_page_added(PGC *cache) {
+    signal_evict_thread_or_evict_inline(cache);
+}
+
+static inline void evict_on_page_release_when_permitted(PGC *cache) {
+    signal_evict_thread_or_evict_inline(cache);
 }
 
 // ----------------------------------------------------------------------------
@@ -957,8 +964,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         // don't bother - not enough to do anything
         return false;
 
+    bool under_sever_pressure = per1000 >= cache->config.severe_pressure_per1000;
     size_t workers_running = __atomic_add_fetch(&cache->stats.workers_evict, 1, __ATOMIC_RELAXED);
-    if(!wait && !all_of_them && workers_running > cache->config.max_workers_evict_inline && per1000 < cache->config.severe_pressure_per1000) {
+    if(!wait && !all_of_them && workers_running > cache->config.max_workers_evict_inline && !under_sever_pressure) {
         __atomic_sub_fetch(&cache->stats.workers_evict, 1, __ATOMIC_RELAXED);
         return false;
     }
@@ -982,20 +990,22 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     size_t spins = 0;
 
     do {
-        if(++spins > 1)
-            __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
-
         bool batch;
         size_t max_size_to_evict = 0;
         if (unlikely(all_of_them)) {
+            // evict them all
             max_size_to_evict = SIZE_MAX;
+            under_sever_pressure = true;
             batch = true;
         }
         else if(unlikely(wait)) {
+            // evict as many as necessary for the cache to go at the predefined threshold
             per1000 = cache_usage_per1000(cache, &max_size_to_evict);
-            batch = (wait && per1000 > cache->config.severe_pressure_per1000) ? true : false;
+            under_sever_pressure = per1000 >= cache->config.severe_pressure_per1000;
+            batch = under_sever_pressure;
         }
         else {
+            // this is an adder, so evict just 1 page
             batch = false;
             max_size_to_evict = (cache_above_healthy_limit(cache)) ? 1 : 0;
         }
@@ -1007,6 +1017,13 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         if(total_pages_evicted >= max_evict && !all_of_them) {
             stopped_before_finishing = true;
             break;
+        }
+
+        if(++spins > 1) {
+            __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
+            if (wait && !under_sever_pressure)
+                // give it time to avoid spinning forever
+                tinysleep();
         }
 
         if(!all_of_them && !wait) {
@@ -1691,6 +1708,21 @@ void free_all_unreferenced_clean_pages(PGC *cache) {
     evict_pages(cache, 0, 0, true, true);
 }
 
+static void *evict_thread(void *ptr) {
+    PGC *cache = (PGC *)ptr;
+
+    unsigned job_id = 0;
+
+    while (true) {
+        job_id = completion_wait_for_a_job(&cache->evict_thread_completion, job_id);
+        if (nd_thread_signaled_to_cancel()) break;
+
+        evict_pages(cache, 0, 0, true, false);
+    }
+
+    return NULL;
+}
+
 // ----------------------------------------------------------------------------
 // public API
 
@@ -1732,6 +1764,11 @@ PGC *pgc_create(const char *name,
     cache->config.aggressive_evict_per1000    = 1010; // turn adders into evictors above this threshold
     cache->config.healthy_size_per1000        =  980; // don't evict if current size is below this threshold
     cache->config.evict_low_threshold_per1000 =  950; // when evicting, bring the size down to this threshold
+
+    {
+        completion_init(&cache->evict_thread_completion);
+        cache->evict_thread = nd_thread_create(name, NETDATA_THREAD_OPTION_JOINABLE, evict_thread, cache);
+    }
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
 
@@ -1804,6 +1841,11 @@ void pgc_destroy(PGC *cache) {
 
     // free all unreferenced clean pages
     free_all_unreferenced_clean_pages(cache);
+
+    // stop the eviction thread
+    nd_thread_signal_cancel(cache->evict_thread);
+    completion_mark_complete_a_job(&cache->evict_thread_completion);
+    nd_thread_join(cache->evict_thread);
 
     if(PGC_REFERENCED_PAGES(cache))
         netdata_log_error("DBENGINE CACHE: there are %zu referenced cache pages - leaving the cache allocated", PGC_REFERENCED_PAGES(cache));
