@@ -263,6 +263,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     const size_t hot = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
     const size_t clean = __atomic_load_n(&cache->clean.stats->size, __ATOMIC_RELAXED);
     const size_t current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED); // + pgc_aral_overhead();
+    const size_t referenced_size = __atomic_load_n(&cache->stats.referenced_size, __ATOMIC_RELAXED);
 
     if(cache->config.options & PGC_OPTIONS_AUTOSCALE) {
         const size_t dirty_max = __atomic_load_n(&cache->dirty.stats->max_size, __ATOMIC_RELAXED);
@@ -292,12 +293,12 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     // protection against huge queries
     // if huge queries are running, or huge amounts need to be saved
     // allow the cache to grow more (hot pages in main cache are also referenced)
-    const size_t referenced_size = __atomic_load_n(&cache->stats.referenced_size, __ATOMIC_RELAXED);
     if(unlikely(wanted_cache_size < referenced_size * 2 / 3))
         wanted_cache_size = referenced_size * 2 / 3;
 
-    if(!clean)
-        wanted_cache_size = (size_t)((uint64_t)current_cache_size * 1000ULL / (uint64_t)cache->config.aggressive_evict_per1000) + 1;
+    // if we don't have enough clean pages, there is not reason to be aggressive or critical
+    if(current_cache_size > wanted_cache_size && wanted_cache_size < current_cache_size - clean)
+        wanted_cache_size = current_cache_size - clean;
 
     const size_t per1000 = (size_t)((unsigned long long)current_cache_size * 1000ULL / (unsigned long long)wanted_cache_size);
 
