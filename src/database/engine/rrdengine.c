@@ -87,6 +87,8 @@ struct rrdeng_main {
         .loop = {},
         .async = {},
         .timer = {},
+        .timer100ms = {},
+        .retention_timer = {},
         .flushes_running = 0,
         .evictions_running = 0,
         .cleanup_running = 0,
@@ -1730,6 +1732,14 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         }
         rrdeng_main.async.data = &rrdeng_main;
 
+        ret = uv_timer_init(&rrdeng_main.loop, &rrdeng_main.timer100ms);
+        if (ret) {
+            netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
+            uv_close((uv_handle_t *)&rrdeng_main.async, NULL);
+            fatal_assert(0 == uv_loop_close(&rrdeng_main.loop));
+            return false;
+        }
+
         ret = uv_timer_init(&rrdeng_main.loop, &rrdeng_main.timer);
         if (ret) {
             netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
@@ -2062,6 +2072,9 @@ void dbengine_event_loop(void* arg) {
 
                 case RRDENG_OPCODE_SHUTDOWN_EVLOOP: {
                     uv_close((uv_handle_t *)&main->async, NULL);
+                    (void) uv_timer_stop(&main->timer100ms);
+                    uv_close((uv_handle_t *)&main->timer100ms, NULL);
+
                     (void) uv_timer_stop(&main->timer);
                     uv_close((uv_handle_t *)&main->timer, NULL);
 
