@@ -1023,27 +1023,37 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     size_t spins = 0;
 
     do {
-        bool batch;
         size_t max_size_to_evict = 0;
+        size_t max_pages_to_evict = 0;
         if (unlikely(all_of_them)) {
             // evict them all
             max_size_to_evict = SIZE_MAX;
+            max_pages_to_evict = SIZE_MAX;
             under_sever_pressure = true;
-            batch = true;
         }
         else if(unlikely(wait)) {
             // evict as many as necessary for the cache to go at the predefined threshold
             per1000 = cache_usage_per1000(cache, &max_size_to_evict);
-            under_sever_pressure = per1000 >= cache->config.severe_pressure_per1000;
-            batch = under_sever_pressure;
+            if(per1000 >= cache->config.severe_pressure_per1000) {
+                under_sever_pressure = true;
+                max_pages_to_evict = 10;
+            }
+            else if(per1000 >= cache->config.aggressive_evict_per1000) {
+                under_sever_pressure = false;
+                max_pages_to_evict = 2;
+            }
+            else {
+                under_sever_pressure = false;
+                max_pages_to_evict = 1;
+            }
         }
         else {
             // this is an adder, so evict just 1 page
-            batch = false;
             max_size_to_evict = (cache_above_healthy_limit(cache)) ? 1 : 0;
+            max_pages_to_evict = 1;
         }
 
-        if (!max_size_to_evict)
+        if (!max_size_to_evict || !max_pages_to_evict)
             break;
 
         // check if we have to stop
@@ -1052,12 +1062,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             break;
         }
 
-        if(++spins > 1) {
+        if(++spins > 1)
             __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
-            if (wait && !under_sever_pressure)
-                // give it time to avoid spinning forever
-                tinysleep();
-        }
 
         if(!all_of_them && !wait) {
             if(!pgc_ll_trylock(cache, &cache->clean)) {
@@ -1073,6 +1079,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         // find a page to evict
         PGC_PAGE *pages_to_evict = NULL;
         size_t pages_to_evict_size = 0;
+        size_t pages_to_evict_count = 0;
         for(PGC_PAGE *page = cache->clean.base, *next = NULL, *first_page_we_relocated = NULL; page ; page = next) {
             next = page->link.next;
 
@@ -1102,8 +1109,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pages_to_evict, page, link.prev, link.next);
 
                 pages_to_evict_size += page->assumed_size;
+                pages_to_evict_count++;
 
-                if(unlikely(all_of_them || (batch && pages_to_evict_size < max_size_to_evict)))
+                if(unlikely(all_of_them || (pages_to_evict_count < max_pages_to_evict)))
                     // get more pages
                     ;
                 else
