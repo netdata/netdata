@@ -1846,6 +1846,7 @@ void pgc_destroy(PGC *cache) {
     nd_thread_signal_cancel(cache->evict_thread);
     completion_mark_complete_a_job(&cache->evict_thread_completion);
     nd_thread_join(cache->evict_thread);
+    completion_destroy(&cache->evict_thread_completion);
 
     if(PGC_REFERENCED_PAGES(cache))
         netdata_log_error("DBENGINE CACHE: there are %zu referenced cache pages - leaving the cache allocated", PGC_REFERENCED_PAGES(cache));
