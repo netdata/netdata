@@ -1303,14 +1303,14 @@ struct dbengine2_cache_pointers {
     RRDDIM *rd_pgc_memory_evictions_critical;
     RRDDIM *rd_pgc_memory_evictions_aggressive;
     RRDDIM *rd_pgc_memory_flushes_critical;
-    RRDDIM *rd_pgc_evict_thread_signals;
-    RRDDIM *rd_pgc_eviction_inline_on_add;
-    RRDDIM *rd_pgc_eviction_inline_on_release;
-    RRDDIM *rd_pgc_flush_inline_on_add;
-    RRDDIM *rd_pgc_flush_inline_on_release;
+    RRDDIM *rd_pgc_waste_evict_thread_signals;
+    RRDDIM *rd_pgc_waste_evict_inline_on_add;
+    RRDDIM *rd_pgc_waste_evict_inline_on_release;
+    RRDDIM *rd_pgc_waste_flush_inline_on_add;
+    RRDDIM *rd_pgc_waste_flush_inline_on_release;
 
     RRDSET *st_pgc_waste;
-    RRDDIM *rd_pgc_waste_evictions_skipped;
+    RRDDIM *rd_pgc_waste_evict_relocated;
     RRDDIM *rd_pgc_waste_flushes_cancelled;
     RRDDIM *rd_pgc_waste_insert_spins;
     RRDDIM *rd_pgc_waste_evict_spins;
@@ -1683,11 +1683,6 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             ptrs->rd_pgc_memory_evictions_aggressive = rrddim_add(ptrs->st_pgc_memory_events, "evictions aggressive", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_memory_evictions_critical   = rrddim_add(ptrs->st_pgc_memory_events, "evictions critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_memory_flushes_critical     = rrddim_add(ptrs->st_pgc_memory_events, "flushes critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_evict_thread_signals        = rrddim_add(ptrs->st_pgc_memory_events, "evict thread signals", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_eviction_inline_on_add      = rrddim_add(ptrs->st_pgc_memory_events, "evictions inline add", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_eviction_inline_on_release  = rrddim_add(ptrs->st_pgc_memory_events, "evictions inline rel", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_flush_inline_on_add         = rrddim_add(ptrs->st_pgc_memory_events, "flushes inline add", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_flush_inline_on_release     = rrddim_add(ptrs->st_pgc_memory_events, "flushes inline rel", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             buffer_free(id);
             buffer_free(family);
@@ -1698,11 +1693,6 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
         rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_memory_evictions_aggressive, (collected_number)pgc_stats->events_cache_needs_space_aggressively);
         rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_memory_evictions_critical, (collected_number)pgc_stats->events_cache_under_severe_pressure);
         rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_memory_flushes_critical, (collected_number)pgc_stats->events_flush_critical);
-        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_evict_thread_signals, (collected_number)pgc_stats->events_evict_thread_signals);
-        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_eviction_inline_on_add, (collected_number)pgc_stats->events_evictions_inline_on_add);
-        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_eviction_inline_on_release, (collected_number)pgc_stats->events_evictions_inline_on_release);
-        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_flush_inline_on_add, (collected_number)pgc_stats->events_flush_on_add);
-        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_flush_inline_on_release, (collected_number)pgc_stats->events_flush_on_release);
 
         rrdset_done(ptrs->st_pgc_memory_events);
     }
@@ -1732,14 +1722,19 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
-            ptrs->rd_pgc_waste_evictions_skipped = rrddim_add(ptrs->st_pgc_waste, "evictions skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_waste_flushes_cancelled = rrddim_add(ptrs->st_pgc_waste, "flushes cancelled", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_waste_acquire_spins     = rrddim_add(ptrs->st_pgc_waste, "acquire spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_waste_release_spins     = rrddim_add(ptrs->st_pgc_waste, "release spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_waste_insert_spins      = rrddim_add(ptrs->st_pgc_waste, "insert spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_waste_delete_spins      = rrddim_add(ptrs->st_pgc_waste, "delete spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_waste_evict_spins       = rrddim_add(ptrs->st_pgc_waste, "evict spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_waste_flush_spins       = rrddim_add(ptrs->st_pgc_waste, "flush spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_evict_relocated          = rrddim_add(ptrs->st_pgc_waste, "evict relocated", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_flushes_cancelled        = rrddim_add(ptrs->st_pgc_waste, "flushes cancelled", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_acquire_spins            = rrddim_add(ptrs->st_pgc_waste, "acquire spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_release_spins            = rrddim_add(ptrs->st_pgc_waste, "release spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_insert_spins             = rrddim_add(ptrs->st_pgc_waste, "insert spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_delete_spins             = rrddim_add(ptrs->st_pgc_waste, "delete spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_evict_spins              = rrddim_add(ptrs->st_pgc_waste, "evict spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_flush_spins              = rrddim_add(ptrs->st_pgc_waste, "flush spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_evict_thread_signals     = rrddim_add(ptrs->st_pgc_waste, "evict thread signals", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_evict_inline_on_add      = rrddim_add(ptrs->st_pgc_waste, "evict inline add", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_evict_inline_on_release  = rrddim_add(ptrs->st_pgc_waste, "evict inline rel", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_flush_inline_on_add      = rrddim_add(ptrs->st_pgc_waste, "flush inline add", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_flush_inline_on_release  = rrddim_add(ptrs->st_pgc_waste, "flush inline rel", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             buffer_free(id);
             buffer_free(family);
@@ -1747,7 +1742,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             priority++;
         }
 
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evictions_skipped, (collected_number)pgc_stats->evict_skipped);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_relocated, (collected_number)pgc_stats->evict_relocated);
         rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flushes_cancelled, (collected_number)pgc_stats->flushes_cancelled);
         rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_acquire_spins, (collected_number)pgc_stats->acquire_spins);
         rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_release_spins, (collected_number)pgc_stats->release_spins);
@@ -1755,6 +1750,11 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
         rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_delete_spins, (collected_number)pgc_stats->delete_spins);
         rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_spins, (collected_number)pgc_stats->evict_spins);
         rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flush_spins, (collected_number)pgc_stats->flush_spins);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_thread_signals, (collected_number)pgc_stats->events_evict_thread_signals);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_inline_on_add, (collected_number)pgc_stats->events_evictions_inline_on_add);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_inline_on_release, (collected_number)pgc_stats->events_evictions_inline_on_release);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flush_inline_on_add, (collected_number)pgc_stats->events_flush_on_add);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flush_inline_on_release, (collected_number)pgc_stats->events_flush_on_release);
 
         rrdset_done(ptrs->st_pgc_waste);
     }

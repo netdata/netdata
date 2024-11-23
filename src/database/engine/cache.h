@@ -107,7 +107,7 @@ struct pgc_statistics {
     alignas(64) size_t workers_jv2_flush;
     alignas(64) size_t workers_hot2dirty;
 
-    alignas(64) size_t evict_skipped;
+    alignas(64) size_t evict_relocated;
     alignas(64) size_t hot_empty_pages_evicted_immediately;
     alignas(64) size_t hot_empty_pages_evicted_later;
 

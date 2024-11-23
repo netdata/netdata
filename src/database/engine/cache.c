@@ -1033,7 +1033,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         max_evict = 2;
 
     size_t total_pages_evicted = 0;
-    size_t total_pages_skipped = 0;
+    size_t total_pages_relocated = 0;
     bool stopped_before_finishing = false;
     size_t spins = 0;
     size_t max_pages_to_evict = 0;
@@ -1142,8 +1142,10 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
                 DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
 
+                total_pages_relocated++;
+
                 // check if we have to stop
-                if(unlikely(++total_pages_skipped >= max_skip && !all_of_them)) {
+                if(unlikely(total_pages_relocated >= max_skip && !all_of_them)) {
                     stopped_before_finishing = true;
                     break;
                 }
@@ -1235,7 +1237,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         else
             break;
 
-    } while(all_of_them || (total_pages_evicted < max_evict && total_pages_skipped < max_skip));
+    } while(all_of_them || (total_pages_evicted < max_evict && total_pages_relocated < max_skip));
 
     if(all_of_them && !filter) {
         pgc_ll_lock(cache, &cache->clean);
@@ -1249,8 +1251,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     }
 
 premature_exit:
-    if(unlikely(total_pages_skipped))
-        __atomic_add_fetch(&cache->stats.evict_skipped, total_pages_skipped, __ATOMIC_RELAXED);
+    if(unlikely(total_pages_relocated))
+        __atomic_add_fetch(&cache->stats.evict_relocated, total_pages_relocated, __ATOMIC_RELAXED);
 
     __atomic_sub_fetch(&cache->stats.workers_evict, 1, __ATOMIC_RELAXED);
 
