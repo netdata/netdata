@@ -1724,16 +1724,21 @@ static void *evict_thread(void *ptr) {
 
     while (true) {
         job_id = completion_wait_for_a_job_with_timeout(&cache->evict_thread_completion, job_id, 100);
+        if (nd_thread_signaled_to_cancel())
+            return NULL;
 
-        size_t per1000 = SIZE_MAX;
-        while (per1000 > cache->config.healthy_size_per1000) {
+        size_t size_to_evict = 0;
+        cache_usage_per1000(cache, &size_to_evict);
+
+        while (size_to_evict) {
             if (nd_thread_signaled_to_cancel())
                 return NULL;
 
             evict_pages(cache, 0, 0, true, false);
             tinysleep();
 
-            per1000 = cache_usage_per1000(cache, NULL);
+            size_to_evict = 0;
+            cache_usage_per1000(cache, &size_to_evict);
         }
     }
 
