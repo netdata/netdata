@@ -261,6 +261,8 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
 
     const size_t dirty = __atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED);
     const size_t hot = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
+    const size_t clean = __atomic_load_n(&cache->clean.stats->size, __ATOMIC_RELAXED);
+    const size_t current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED); // + pgc_aral_overhead();
 
     if(cache->config.options & PGC_OPTIONS_AUTOSCALE) {
         const size_t dirty_max = __atomic_load_n(&cache->dirty.stats->max_size, __ATOMIC_RELAXED);
@@ -294,7 +296,8 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     if(unlikely(wanted_cache_size < referenced_size * 2 / 3))
         wanted_cache_size = referenced_size * 2 / 3;
 
-    const size_t current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED); // + pgc_aral_overhead();
+    if(!clean)
+        wanted_cache_size = (size_t)((uint64_t)current_cache_size * 1000ULL / (uint64_t)cache->config.aggressive_evict_per1000) + 1;
 
     const size_t per1000 = (size_t)((unsigned long long)current_cache_size * 1000ULL / (unsigned long long)wanted_cache_size);
 
@@ -305,7 +308,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     spinlock_unlock(&cache->usage.spinlock);
 
     if(size_to_evict) {
-        const size_t target = (size_t)((unsigned long long)wanted_cache_size * (unsigned long long)cache->config.evict_low_threshold_per1000 / 1000ULL);
+        const size_t target = (size_t)((uint64_t)wanted_cache_size * (uint64_t)cache->config.evict_low_threshold_per1000 / 1000ULL);
         if(current_cache_size > target)
             *size_to_evict = current_cache_size - target;
         else
@@ -1036,11 +1039,11 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             per1000 = cache_usage_per1000(cache, &max_size_to_evict);
             if(per1000 >= cache->config.severe_pressure_per1000) {
                 under_sever_pressure = true;
-                max_pages_to_evict = 10;
+                max_pages_to_evict = 100;
             }
             else if(per1000 >= cache->config.aggressive_evict_per1000) {
                 under_sever_pressure = false;
-                max_pages_to_evict = 2;
+                max_pages_to_evict = 10;
             }
             else {
                 under_sever_pressure = false;
