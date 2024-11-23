@@ -106,8 +106,11 @@ struct pgc {
         dynamic_target_cache_size_callback dynamic_target_size_cb;
     } config;
 
-    ND_THREAD *evict_thread;
-    struct completion evict_thread_completion;
+    struct {
+        SPINLOCK spinlock;              // when locked, the evict_thread is currently evicting pages
+        ND_THREAD *thread;              // the thread
+        struct completion completion;   // signal the thread to wake up
+    } evictor;
 
     struct pgc_index {
         alignas(64) RW_SPINLOCK rw_spinlock;
@@ -334,19 +337,12 @@ static inline bool flushing_critical(PGC *cache);
 static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wait, bool all_of_them);
 
 static void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
-    static __thread bool signaled = false;
-
     const size_t per1000 = cache_usage_per1000(cache, NULL);
 
-    if (per1000 <= cache->config.healthy_size_per1000) {
-        signaled = false;
-        return;
-    }
-
-    if (!signaled) {
+    if (per1000 > cache->config.aggressive_evict_per1000 && spinlock_trylock(&cache->evictor.spinlock)) {
         __atomic_add_fetch(&cache->stats.events_evict_thread_signals, 1, __ATOMIC_RELAXED);
-        completion_mark_complete_a_job(&cache->evict_thread_completion);
-        signaled = true;
+        completion_mark_complete_a_job(&cache->evictor.completion);
+        spinlock_unlock(&cache->evictor.spinlock);
     }
 
     if (per1000 >= cache->config.severe_pressure_per1000 ||
@@ -1748,16 +1744,20 @@ static void *evict_thread(void *ptr) {
     unsigned job_id = 0;
 
     while (true) {
-        job_id = completion_wait_for_a_job_with_timeout(&cache->evict_thread_completion, job_id, 100);
+        job_id = completion_wait_for_a_job_with_timeout(&cache->evictor.completion, job_id, 100);
         if (nd_thread_signaled_to_cancel())
             return NULL;
+
+        spinlock_lock(&cache->evictor.spinlock);
 
         size_t size_to_evict = 0;
         cache_usage_per1000(cache, &size_to_evict);
 
         while (size_to_evict) {
-            if (nd_thread_signaled_to_cancel())
+            if (nd_thread_signaled_to_cancel()) {
+                spinlock_unlock(&cache->evictor.spinlock);
                 return NULL;
+            }
 
             evict_pages(cache, 0, 0, true, false);
             tinysleep();
@@ -1765,6 +1765,8 @@ static void *evict_thread(void *ptr) {
             size_to_evict = 0;
             cache_usage_per1000(cache, &size_to_evict);
         }
+
+        spinlock_unlock(&cache->evictor.spinlock);
     }
 
     return NULL;
@@ -1813,8 +1815,9 @@ PGC *pgc_create(const char *name,
     cache->config.evict_low_threshold_per1000 =  950; // when evicting, bring the size down to this threshold
 
     {
-        completion_init(&cache->evict_thread_completion);
-        cache->evict_thread = nd_thread_create(name, NETDATA_THREAD_OPTION_JOINABLE, evict_thread, cache);
+        spinlock_init(&cache->evictor.spinlock);
+        completion_init(&cache->evictor.completion);
+        cache->evictor.thread = nd_thread_create(name, NETDATA_THREAD_OPTION_JOINABLE, evict_thread, cache);
     }
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
@@ -1890,10 +1893,10 @@ void pgc_destroy(PGC *cache) {
     free_all_unreferenced_clean_pages(cache);
 
     // stop the eviction thread
-    nd_thread_signal_cancel(cache->evict_thread);
-    completion_mark_complete_a_job(&cache->evict_thread_completion);
-    nd_thread_join(cache->evict_thread);
-    completion_destroy(&cache->evict_thread_completion);
+    nd_thread_signal_cancel(cache->evictor.thread);
+    completion_mark_complete_a_job(&cache->evictor.completion);
+    nd_thread_join(cache->evictor.thread);
+    completion_destroy(&cache->evictor.completion);
 
     if(PGC_REFERENCED_PAGES(cache))
         netdata_log_error("DBENGINE CACHE: there are %zu referenced cache pages - leaving the cache allocated", PGC_REFERENCED_PAGES(cache));
