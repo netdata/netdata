@@ -221,6 +221,13 @@ static inline void pgc_index_write_lock(PGC *cache, size_t partition) {
 static inline void pgc_index_write_unlock(PGC *cache, size_t partition) {
     rw_spinlock_write_unlock(&cache->index[partition].rw_spinlock);
 }
+static inline bool pgc_index_trywrite_lock(PGC *cache, size_t partition, bool force) {
+    if(force) {
+        rw_spinlock_write_lock(&cache->index[partition].rw_spinlock);
+        return true;
+    }
+    return rw_spinlock_trywrite_lock(&cache->index[partition].rw_spinlock);
+}
 
 static inline bool pgc_ll_trylock(PGC *cache __maybe_unused, struct pgc_linked_list *ll) {
     return spinlock_trylock(&ll->spinlock);
@@ -1029,10 +1036,10 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     size_t total_pages_skipped = 0;
     bool stopped_before_finishing = false;
     size_t spins = 0;
+    size_t max_pages_to_evict = 0;
 
     do {
         size_t max_size_to_evict = 0;
-        size_t max_pages_to_evict = 0;
         if (unlikely(all_of_them)) {
             // evict them all
             max_size_to_evict = SIZE_MAX;
@@ -1044,11 +1051,11 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             per1000 = cache_usage_per1000(cache, &max_size_to_evict);
             if(per1000 >= cache->config.severe_pressure_per1000) {
                 under_sever_pressure = true;
-                max_pages_to_evict = 100;
+                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 1024;
             }
             else if(per1000 >= cache->config.aggressive_evict_per1000) {
                 under_sever_pressure = false;
-                max_pages_to_evict = 10;
+                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 128;
             }
             else {
                 under_sever_pressure = false;
@@ -1119,7 +1126,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 pages_to_evict_size += page->assumed_size;
                 pages_to_evict_count++;
 
-                if(unlikely(all_of_them || (pages_to_evict_count < max_pages_to_evict)))
+                if((pages_to_evict_count < max_pages_to_evict && pages_to_evict_size < max_size_to_evict) || all_of_them)
                     // get more pages
                     ;
                 else
@@ -1153,6 +1160,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 PGC_PAGE *pages_per_partition[cache->config.partitions];
                 memset(pages_per_partition, 0, sizeof(PGC_PAGE *) * cache->config.partitions);
 
+                bool partitions_done[cache->config.partitions];
+                memset(partitions_done, 0, sizeof(bool) * cache->config.partitions);
+
                 // sort them by partition
                 for (PGC_PAGE *page = pages_to_evict, *next = NULL; page; page = next) {
                     next = page->link.next;
@@ -1163,15 +1173,28 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 }
 
                 // remove them from the index
-                for (size_t partition = 0; partition < cache->config.partitions; partition++) {
-                    if (!pages_per_partition[partition]) continue;
+                size_t remaining_partitions = cache->config.partitions;
+                size_t last_remaining_partitions = remaining_partitions + 1;
+                while(remaining_partitions) {
+                    bool force = remaining_partitions == last_remaining_partitions;
+                    last_remaining_partitions = remaining_partitions;
+                    remaining_partitions = 0;
 
-                    pgc_index_write_lock(cache, partition);
+                    for (size_t partition = 0; partition < cache->config.partitions; partition++) {
+                        if (!pages_per_partition[partition] || partitions_done[partition])
+                            continue;
 
-                    for (PGC_PAGE *page = pages_per_partition[partition]; page; page = page->link.next)
-                        remove_this_page_from_index_unsafe(cache, page, partition);
+                        if(pgc_index_trywrite_lock(cache, partition, force)) {
+                            partitions_done[partition] = true;
 
-                    pgc_index_write_unlock(cache, partition);
+                            for (PGC_PAGE *page = pages_per_partition[partition]; page; page = page->link.next)
+                                remove_this_page_from_index_unsafe(cache, page, partition);
+
+                            pgc_index_write_unlock(cache, partition);
+                        }
+                        else
+                            remaining_partitions++;
+                    }
                 }
 
                 // free them
