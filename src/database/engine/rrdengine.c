@@ -1746,6 +1746,7 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
             return false;
         }
 
+        rrdeng_main.timer100ms.data = &rrdeng_main;
         rrdeng_main.timer.data = &rrdeng_main;
         rrdeng_main.retention_timer.data = &rrdeng_main;
 
