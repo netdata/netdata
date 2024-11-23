@@ -1303,6 +1303,11 @@ struct dbengine2_cache_pointers {
     RRDDIM *rd_pgc_memory_evictions_critical;
     RRDDIM *rd_pgc_memory_evictions_aggressive;
     RRDDIM *rd_pgc_memory_flushes_critical;
+    RRDDIM *rd_pgc_evict_thread_signals;
+    RRDDIM *rd_pgc_eviction_inline_on_add;
+    RRDDIM *rd_pgc_eviction_inline_on_release;
+    RRDDIM *rd_pgc_flush_inline_on_add;
+    RRDDIM *rd_pgc_flush_inline_on_release;
 
     RRDSET *st_pgc_waste;
     RRDDIM *rd_pgc_waste_evictions_skipped;
@@ -1678,6 +1683,11 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             ptrs->rd_pgc_memory_evictions_aggressive = rrddim_add(ptrs->st_pgc_memory_events, "evictions aggressive", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_memory_evictions_critical   = rrddim_add(ptrs->st_pgc_memory_events, "evictions critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_memory_flushes_critical     = rrddim_add(ptrs->st_pgc_memory_events, "flushes critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_evict_thread_signals        = rrddim_add(ptrs->st_pgc_memory_events, "evict thread signals", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_eviction_inline_on_add      = rrddim_add(ptrs->st_pgc_memory_events, "evictions inline add", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_eviction_inline_on_release  = rrddim_add(ptrs->st_pgc_memory_events, "evictions inline rel", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_flush_inline_on_add         = rrddim_add(ptrs->st_pgc_memory_events, "flushes inline add", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_flush_inline_on_release     = rrddim_add(ptrs->st_pgc_memory_events, "flushes inline rel", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             buffer_free(id);
             buffer_free(family);
@@ -1688,6 +1698,11 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
         rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_memory_evictions_aggressive, (collected_number)pgc_stats->events_cache_needs_space_aggressively);
         rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_memory_evictions_critical, (collected_number)pgc_stats->events_cache_under_severe_pressure);
         rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_memory_flushes_critical, (collected_number)pgc_stats->events_flush_critical);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_evict_thread_signals, (collected_number)pgc_stats->events_evict_thread_signals);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_eviction_inline_on_add, (collected_number)pgc_stats->events_evictions_inline_on_add);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_eviction_inline_on_release, (collected_number)pgc_stats->events_evictions_inline_on_release);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_flush_inline_on_add, (collected_number)pgc_stats->events_flush_on_add);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_flush_inline_on_release, (collected_number)pgc_stats->events_flush_on_release);
 
         rrdset_done(ptrs->st_pgc_memory_events);
     }

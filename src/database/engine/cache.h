@@ -112,9 +112,15 @@ struct pgc_statistics {
     alignas(64) size_t hot_empty_pages_evicted_later;
 
     // events
+    alignas(64) size_t events_evict_thread_signals;
+    alignas(64) size_t events_evictions_inline_on_add;
+    alignas(64) size_t events_evictions_inline_on_release;
     alignas(64) size_t events_cache_under_severe_pressure;
     alignas(64) size_t events_cache_needs_space_aggressively;
     alignas(64) size_t events_flush_critical;
+    alignas(64) size_t events_flush_on_add;
+    alignas(64) size_t events_flush_on_release;
+
 
     struct {
         struct pgc_queue_statistics hot;
