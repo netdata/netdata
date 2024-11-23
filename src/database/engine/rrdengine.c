@@ -40,6 +40,7 @@ struct rrdeng_main {
     uv_loop_t loop;
     uv_async_t async;
     uv_timer_t timer;
+    uv_timer_t timer100ms;
     uv_timer_t retention_timer;
     pid_t tid;
     bool shutdown;
@@ -1376,7 +1377,8 @@ static void *cache_flush_tp_worker(struct rrdengine_instance *ctx __maybe_unused
         return data;
 
     worker_is_busy(UV_EVENT_DBENGINE_FLUSH_MAIN_CACHE);
-    pgc_flush_pages(main_cache, 0);
+    while (pgc_flush_pages(main_cache, 0))
+        tinysleep();
 
     return data;
 }
@@ -1386,7 +1388,8 @@ static void *cache_evict_tp_worker(struct rrdengine_instance *ctx __maybe_unused
         return data;
 
     worker_is_busy(UV_EVENT_DBENGINE_EVICT_MAIN_CACHE);
-    pgc_evict_pages(main_cache, 0, 0);
+    while (pgc_evict_pages(main_cache, 0, 0))
+        tinysleep();
 
     return data;
 }
@@ -1642,8 +1645,7 @@ bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx)
     return false;
 }
 
-void retention_timer_cb(uv_timer_t *handle)
-{
+static void retention_timer_cb(uv_timer_t *handle) {
     if (!localhost)
         return;
 
@@ -1663,7 +1665,7 @@ void retention_timer_cb(uv_timer_t *handle)
     worker_is_idle();
 }
 
-void timer_cb(uv_timer_t* handle) {
+static void timer_per_sec_cb(uv_timer_t* handle) {
     worker_is_busy(RRDENG_TIMER_CB);
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
@@ -1672,9 +1674,18 @@ void timer_cb(uv_timer_t* handle) {
     worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED));
     worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.executing, __ATOMIC_RELAXED));
 
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_CLEANUP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+
+    worker_is_idle();
+}
+
+static void timer_per100ms_cb(uv_timer_t* handle) {
+    worker_is_busy(RRDENG_TIMER_CB);
+    uv_stop(handle->loop);
+    uv_update_time(handle->loop);
+
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_CLEANUP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     worker_is_idle();
 }
@@ -1932,7 +1943,8 @@ void dbengine_event_loop(void* arg) {
     struct rrdeng_cmd cmd;
     main->tid = gettid_cached();
 
-    fatal_assert(0 == uv_timer_start(&main->timer, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
+    fatal_assert(0 == uv_timer_start(&main->timer100ms, timer_per100ms_cb, 100, 100));
+    fatal_assert(0 == uv_timer_start(&main->timer, timer_per_sec_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     fatal_assert(0 == uv_timer_start(&main->retention_timer, retention_timer_cb, TIMER_PERIOD_MS * 60, TIMER_PERIOD_MS * 60));
 
     bool shutdown = false;
@@ -1975,7 +1987,7 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case RRDENG_OPCODE_FLUSH_INIT: {
-                    if(rrdeng_main.flushes_running < (size_t)(libuv_worker_threads / 4)) {
+                    if(rrdeng_main.flushes_running < 2 + (size_t)(libuv_worker_threads / 8)) {
                         rrdeng_main.flushes_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush);
                     }
@@ -1983,7 +1995,7 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case RRDENG_OPCODE_EVICT_INIT: {
-                    if(!rrdeng_main.evictions_running) {
+                    if(rrdeng_main.evictions_running < 2 + (size_t)(libuv_worker_threads / 8)) {
                         rrdeng_main.evictions_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cache_evict_tp_worker, after_do_cache_evict);
                     }

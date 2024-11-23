@@ -1477,7 +1477,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
 
         if(!pgc_ll_trylock(cache, &cache->dirty)) {
             // we would block, so give up...
-            return true;
+            return false;
         }
 
         // we got the lock at this point
@@ -1730,8 +1730,8 @@ PGC *pgc_create(const char *name,
     cache->config.max_workers_evict_inline    = max_inline_evictors;
     cache->config.severe_pressure_per1000     = 1020; // turn releasers into evictors above this threshold
     cache->config.aggressive_evict_per1000    = 1010; // turn adders into evictors above this threshold
-    cache->config.healthy_size_per1000        =  990; // don't evict if current size is below this threshold
-    cache->config.evict_low_threshold_per1000 =  970; // when evicting, bring the size down to this threshold
+    cache->config.healthy_size_per1000        =  980; // don't evict if current size is below this threshold
+    cache->config.evict_low_threshold_per1000 =  950; // when evicting, bring the size down to this threshold
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
 
