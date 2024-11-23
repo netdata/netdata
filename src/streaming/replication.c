@@ -33,6 +33,9 @@
 #define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 30
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
 
+#define MAX_REPLICATION_THREADS 32
+#define REQUESTS_AHEAD_PER_THREAD 10
+
 static struct replication_query_statistics replication_queries = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
         .queries_started = 0,
@@ -1002,8 +1005,6 @@ struct replication_sort_entry {
     size_t unique_id;              // used as a key to identify the sort entry - we never access its contents
 };
 
-#define MAX_REPLICATION_THREADS 20 // + 1 for the main thread
-
 // the global variables for the replication thread
 static struct replication_thread {
     ARAL *aral_rse;
@@ -1718,14 +1719,7 @@ static int replication_pipeline_execute_next(void) {
     struct replication_request *rq;
 
     if(unlikely(!rtp.rqs)) {
-        rtp.max_requests_ahead = (int)get_netdata_cpus() / 2;
-
-        if(rtp.max_requests_ahead > libuv_worker_threads * 2)
-            rtp.max_requests_ahead = libuv_worker_threads * 2;
-
-        if(rtp.max_requests_ahead < 2)
-            rtp.max_requests_ahead = 2;
-
+        rtp.max_requests_ahead = REQUESTS_AHEAD_PER_THREAD;
         rtp.rqs = callocz(rtp.max_requests_ahead, sizeof(struct replication_request));
         __atomic_add_fetch(&replication_buffers_allocated, rtp.max_requests_ahead * sizeof(struct replication_request), __ATOMIC_RELAXED);
     }
@@ -1885,10 +1879,20 @@ void replication_initialize(void) {
 void *replication_thread_main(void *ptr __maybe_unused) {
     replication_initialize_workers(true);
 
-    int threads = config_get_number(CONFIG_SECTION_DB, "replication threads", 1);
-    if(threads < 1 || threads > MAX_REPLICATION_THREADS) {
+    int nodes = (int)dictionary_entries(rrdhost_root_index);
+    int cpus = (int)get_netdata_cpus();
+    int threads = MIN(cpus / 2, nodes * 2);
+    if (threads < 1) threads = 1;
+    else if (threads > MAX_REPLICATION_THREADS) threads = MAX_REPLICATION_THREADS;
+
+    threads = config_get_number(CONFIG_SECTION_DB, "replication threads", threads);
+    if(threads < 1) {
         netdata_log_error("replication threads given %d is invalid, resetting to 1", threads);
         threads = 1;
+    }
+    else if(threads > MAX_REPLICATION_THREADS) {
+        netdata_log_error("replication threads given %d is invalid, resetting to %d", threads, (int)MAX_REPLICATION_THREADS);
+        threads = MAX_REPLICATION_THREADS;
     }
 
     if(--threads) {

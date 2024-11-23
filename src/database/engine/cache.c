@@ -1724,7 +1724,7 @@ PGC *pgc_create(const char *name,
     cache->config.max_pages_per_inline_eviction = max_pages_per_inline_eviction;
     cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 2) ? 2 : max_skip_pages_per_inline_eviction;
     cache->config.max_flushes_inline = (max_flushes_inline < 1) ? 1 : max_flushes_inline;
-    cache->config.partitions = partitions < 1 ? (size_t)get_netdata_cpus() : partitions;
+    cache->config.partitions = partitions < 1 ? (size_t)get_netdata_cpus() * 4 : partitions;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
 
     cache->config.max_workers_evict_inline    = max_inline_evictors;
