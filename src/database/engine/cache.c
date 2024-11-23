@@ -333,7 +333,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 static inline bool flushing_critical(PGC *cache);
 static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wait, bool all_of_them);
 
-static inline void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
+static void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
     static __thread bool signaled = false;
 
     const size_t per1000 = cache_usage_per1000(cache, NULL);
