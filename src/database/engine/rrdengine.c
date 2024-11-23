@@ -46,7 +46,9 @@ struct rrdeng_main {
     bool shutdown;
 
     size_t flushes_running;
-    size_t evictions_running;
+    size_t evict_main_running;
+    size_t evict_open_running;
+    size_t evict_extent_running;
     size_t cleanup_running;
 
     struct {
@@ -90,7 +92,7 @@ struct rrdeng_main {
         .timer100ms = {},
         .retention_timer = {},
         .flushes_running = 0,
-        .evictions_running = 0,
+        .evict_main_running = 0,
         .cleanup_running = 0,
 
         .cmd_queue = {
@@ -1385,12 +1387,34 @@ static void *cache_flush_tp_worker(struct rrdengine_instance *ctx __maybe_unused
     return data;
 }
 
-static void *cache_evict_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
+static void *cache_evict_main_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
     if (!main_cache)
         return data;
 
     worker_is_busy(UV_EVENT_DBENGINE_EVICT_MAIN_CACHE);
     while (pgc_evict_pages(main_cache, 0, 0))
+        tinysleep();
+
+    return data;
+}
+
+static void *cache_evict_open_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
+    if (!open_cache)
+        return data;
+
+    worker_is_busy(UV_EVENT_DBENGINE_EVICT_OPEN_CACHE);
+    while (pgc_evict_pages(open_cache, 0, 0))
+        tinysleep();
+
+    return data;
+}
+
+static void *cache_evict_extent_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
+    if (!extent_cache)
+        return data;
+
+    worker_is_busy(UV_EVENT_DBENGINE_EVICT_EXTENT_CACHE);
+    while (pgc_evict_pages(extent_cache, 0, 0))
         tinysleep();
 
     return data;
@@ -1537,8 +1561,16 @@ static void after_do_cache_flush(struct rrdengine_instance *ctx __maybe_unused, 
     rrdeng_main.flushes_running--;
 }
 
-static void after_do_cache_evict(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    rrdeng_main.evictions_running--;
+static void after_do_main_cache_evict(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    rrdeng_main.evict_main_running--;
+}
+
+static void after_do_open_cache_evict(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    rrdeng_main.evict_open_running--;
+}
+
+static void after_do_extent_cache_evict(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    rrdeng_main.evict_extent_running--;
 }
 
 static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
@@ -1686,8 +1718,10 @@ static void timer_per100ms_cb(uv_timer_t* handle) {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_OPEN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_EXTENT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     worker_is_idle();
 }
@@ -1922,8 +1956,8 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_FLUSHED_TO_OPEN,                          "flushed to open");
     worker_register_job_name(RRDENG_OPCODE_DATABASE_ROTATE,                          "db rotate");
     worker_register_job_name(RRDENG_OPCODE_JOURNAL_INDEX,                            "journal index");
-    worker_register_job_name(RRDENG_OPCODE_FLUSH_INIT,                               "flush init");
-    worker_register_job_name(RRDENG_OPCODE_EVICT_INIT,                               "evict init");
+    worker_register_job_name(RRDENG_OPCODE_FLUSH_MAIN,                               "flush init");
+    worker_register_job_name(RRDENG_OPCODE_EVICT_MAIN,                               "evict init");
     worker_register_job_name(RRDENG_OPCODE_CTX_SHUTDOWN,                             "ctx shutdown");
     worker_register_job_name(RRDENG_OPCODE_CTX_QUIESCE,                              "ctx quiesce");
     worker_register_job_name(RRDENG_OPCODE_SHUTDOWN_EVLOOP,                          "dbengine shutdown");
@@ -1936,8 +1970,8 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSHED_TO_OPEN,      "flushed to open cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_DATABASE_ROTATE,      "db rotate cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_JOURNAL_INDEX,        "journal index cb");
-    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_INIT,           "flush init cb");
-    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EVICT_INIT,           "evict init cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_MAIN,           "flush init cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EVICT_MAIN,           "evict init cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_SHUTDOWN,         "ctx shutdown cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_QUIESCE,          "ctx quiesce cb");
 
@@ -1997,18 +2031,34 @@ void dbengine_event_loop(void* arg) {
                     break;
                 }
 
-                case RRDENG_OPCODE_FLUSH_INIT: {
-                    if(rrdeng_main.flushes_running < 2 + (size_t)(libuv_worker_threads / 8)) {
+                case RRDENG_OPCODE_FLUSH_MAIN: {
+                    if(rrdeng_main.flushes_running < pgc_max_flushers()) {
                         rrdeng_main.flushes_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush);
                     }
                     break;
                 }
 
-                case RRDENG_OPCODE_EVICT_INIT: {
-                    if(rrdeng_main.evictions_running < 2 + (size_t)(libuv_worker_threads / 8)) {
-                        rrdeng_main.evictions_running++;
-                        work_dispatch(NULL, NULL, NULL, opcode, cache_evict_tp_worker, after_do_cache_evict);
+                case RRDENG_OPCODE_EVICT_MAIN: {
+                    if(rrdeng_main.evict_main_running < pgc_max_evictors()) {
+                        rrdeng_main.evict_main_running++;
+                        work_dispatch(NULL, NULL, NULL, opcode, cache_evict_main_tp_worker, after_do_main_cache_evict);
+                    }
+                    break;
+                }
+
+                case RRDENG_OPCODE_EVICT_OPEN: {
+                    if(rrdeng_main.evict_open_running < pgc_max_evictors()) {
+                        rrdeng_main.evict_open_running++;
+                        work_dispatch(NULL, NULL, NULL, opcode, cache_evict_open_tp_worker, after_do_open_cache_evict);
+                    }
+                    break;
+                }
+
+                case RRDENG_OPCODE_EVICT_EXTENT: {
+                    if(rrdeng_main.evict_extent_running < pgc_max_evictors()) {
+                        rrdeng_main.evict_extent_running++;
+                        work_dispatch(NULL, NULL, NULL, opcode, cache_evict_extent_tp_worker, after_do_extent_cache_evict);
                     }
                     break;
                 }

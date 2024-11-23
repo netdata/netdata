@@ -214,4 +214,24 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
     return hash % modulo;
 }
 
+long get_netdata_cpus(void);
+
+static inline size_t pgc_max_evictors(void) {
+    static size_t rc = 0;
+    if (likely(rc)) return rc;
+
+    rc = get_netdata_cpus() / 4;
+    if (rc < 4) rc = 4;
+    return rc;
+}
+
+static inline size_t pgc_max_flushers(void) {
+    static size_t rc = 0;
+    if (likely(rc)) return rc;
+
+    rc = get_netdata_cpus() / 4;
+    if (rc < 4) rc = 4;
+    return rc;
+}
+
 #endif // DBENGINE_CACHE_H
