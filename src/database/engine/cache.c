@@ -333,10 +333,19 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 #define evict_pages(cache, max_skip, max_evict, wait, all_of_them) evict_pages_with_filter(cache, max_skip, max_evict, wait, all_of_them, NULL, NULL)
 
 static inline void signal_evict_thread_or_evict_inline(PGC *cache) {
+    static __thread bool signaled = false;
+
     const size_t per1000 = cache_usage_per1000(cache, NULL);
 
-    if (per1000 > cache->config.healthy_size_per1000)
+    if (per1000 <= cache->config.healthy_size_per1000) {
+        signaled = false;
+        return;
+    }
+
+    if (!signaled) {
         completion_mark_complete_a_job(&cache->evict_thread_completion);
+        signaled = true;
+    }
 
     if (per1000 >= cache->config.severe_pressure_per1000 ||
         ((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) && cache->config.aggressive_evict_per1000))
@@ -1709,15 +1718,23 @@ void free_all_unreferenced_clean_pages(PGC *cache) {
 }
 
 static void *evict_thread(void *ptr) {
-    PGC *cache = (PGC *)ptr;
+    PGC *cache = ptr;
 
     unsigned job_id = 0;
 
     while (true) {
-        job_id = completion_wait_for_a_job(&cache->evict_thread_completion, job_id);
-        if (nd_thread_signaled_to_cancel()) break;
+        job_id = completion_wait_for_a_job_with_timeout(&cache->evict_thread_completion, job_id, 100);
 
-        evict_pages(cache, 0, 0, true, false);
+        size_t per1000 = SIZE_MAX;
+        while (per1000 > cache->config.healthy_size_per1000) {
+            if (nd_thread_signaled_to_cancel())
+                return NULL;
+
+            evict_pages(cache, 0, 0, true, false);
+            tinysleep();
+
+            per1000 = cache_usage_per1000(cache, NULL);
+        }
     }
 
     return NULL;

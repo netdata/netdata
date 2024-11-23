@@ -25,7 +25,7 @@ bool completion_timedwait_for(struct completion *p, uint64_t timeout_s);
 void completion_mark_complete(struct completion *p);
 
 unsigned completion_wait_for_a_job(struct completion *p, unsigned completed_jobs);
-unsigned completion_wait_for_a_job_with_timeout(struct completion *p, unsigned completed_jobs, uint64_t timeout_s);
+unsigned completion_wait_for_a_job_with_timeout(struct completion *p, unsigned completed_jobs, uint64_t timeout_ms);
 void completion_mark_complete_a_job(struct completion *p);
 bool completion_is_done(struct completion *p);
 

@@ -81,9 +81,9 @@ unsigned completion_wait_for_a_job(struct completion *p, unsigned completed_jobs
     return completed_jobs;
 }
 
-unsigned completion_wait_for_a_job_with_timeout(struct completion *p, unsigned completed_jobs, uint64_t timeout_s)
+unsigned completion_wait_for_a_job_with_timeout(struct completion *p, unsigned completed_jobs, uint64_t timeout_ms)
 {
-    uint64_t timeout_ns = timeout_s * NSEC_PER_SEC;
+    uint64_t timeout_ns = timeout_ms * NSEC_PER_MSEC;
     if(!timeout_ns) timeout_ns = 1;
 
     uint64_t start_time_ns = uv_hrtime();

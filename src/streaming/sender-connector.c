@@ -674,7 +674,7 @@ static void *stream_sender_connector_thread(void *ptr) {
 
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
         worker_is_idle();
-        job_id = completion_wait_for_a_job_with_timeout(&cr->completion, job_id, 1);
+        job_id = completion_wait_for_a_job_with_timeout(&cr->completion, job_id, 1000);
         size_t nodes = 0, connected_nodes = 0, failed_nodes = 0, cancelled_nodes = 0;
 
         spinlock_lock(&cr->queue.spinlock);
