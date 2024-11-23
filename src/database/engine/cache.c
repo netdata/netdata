@@ -1724,14 +1724,14 @@ PGC *pgc_create(const char *name,
     cache->config.max_pages_per_inline_eviction = max_pages_per_inline_eviction;
     cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 2) ? 2 : max_skip_pages_per_inline_eviction;
     cache->config.max_flushes_inline = (max_flushes_inline < 1) ? 1 : max_flushes_inline;
-    cache->config.partitions = partitions < 1 ? (size_t)get_netdata_cpus() * 4 : partitions;
+    cache->config.partitions = partitions < 1 ? 4 + (size_t)get_netdata_cpus() : partitions;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
 
     cache->config.max_workers_evict_inline    = max_inline_evictors;
-    cache->config.severe_pressure_per1000     = 1010;
-    cache->config.aggressive_evict_per1000    =  990;
-    cache->config.healthy_size_per1000        =  980;
-    cache->config.evict_low_threshold_per1000 =  970;
+    cache->config.severe_pressure_per1000     = 1020; // turn releasers into evictors above this threshold
+    cache->config.aggressive_evict_per1000    = 1010; // turn adders into evictors above this threshold
+    cache->config.healthy_size_per1000        =  990; // don't evict if current size is below this threshold
+    cache->config.evict_low_threshold_per1000 =  970; // when evicting, bring the size down to this threshold
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
 

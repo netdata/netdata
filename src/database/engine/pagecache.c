@@ -1073,11 +1073,11 @@ void pgc_and_mrg_initialize(void)
             main_cache_flush_dirty_page_init_callback,
             main_cache_flush_dirty_page_callback,
             10,
-            10240,                                      // if there are that many threads, evict so many at once!
-            1000,                           //
-            5,                                          // don't delay too much other threads
-            PGC_OPTIONS_AUTOSCALE,                               // AUTOSCALE = 2x max hot pages
-            0,                                                 // 0 = as many as the system cpus
+            1 + get_netdata_cpus() / 4,
+            1000,
+            1 + get_netdata_cpus() / 8,
+            PGC_OPTIONS_AUTOSCALE,
+            0,
             0
     );
 
@@ -1089,11 +1089,11 @@ void pgc_and_mrg_initialize(void)
             NULL,
             open_cache_flush_dirty_page_callback,
             10,
-            10240,                                      // if there are that many threads, evict that many at once!
-            1000,                           //
-            3,                                          // don't delay too much other threads
+            1 + get_netdata_cpus() / 4,
+            1000,
+            1 + get_netdata_cpus() / 8,
             PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
-            0,                                                 // 0 = as many as the system cpus
+            0,
             sizeof(struct extent_io_data)
     );
     pgc_set_dynamic_target_cache_size_callback(open_cache, dynamic_open_cache_size);
@@ -1106,11 +1106,11 @@ void pgc_and_mrg_initialize(void)
             NULL,
             extent_cache_flush_dirty_page_callback,
             5,
-            10,                                         // it will lose up to that extents at once!
-            100,                            //
-            2,                                          // don't delay too much other threads
+            1 + get_netdata_cpus() / 4,
+            100,
+            1 + get_netdata_cpus() / 8,
             PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
-            0,                                                 // 0 = as many as the system cpus
+            0,
             0
     );
     pgc_set_dynamic_target_cache_size_callback(extent_cache, dynamic_extent_cache_size);

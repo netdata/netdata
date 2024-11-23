@@ -1876,7 +1876,9 @@ void replication_initialize(void) {
                                                NULL, NULL, false, false);
 }
 
-void *replication_thread_main(void *ptr __maybe_unused) {
+void *replication_thread_main(void *ptr) {
+    CLEANUP_FUNCTION_REGISTER(replication_main_cleanup) cleanup_ptr = ptr;
+
     replication_initialize_workers(true);
 
     int nodes = (int)dictionary_entries(rrdhost_root_index);
@@ -1889,11 +1891,15 @@ void *replication_thread_main(void *ptr __maybe_unused) {
     if(threads < 1) {
         netdata_log_error("replication threads given %d is invalid, resetting to 1", threads);
         threads = 1;
+        config_set_number(CONFIG_SECTION_DB, "replication threads", threads);
     }
     else if(threads > MAX_REPLICATION_THREADS) {
         netdata_log_error("replication threads given %d is invalid, resetting to %d", threads, (int)MAX_REPLICATION_THREADS);
         threads = MAX_REPLICATION_THREADS;
+        config_set_number(CONFIG_SECTION_DB, "replication threads", threads);
     }
+
+    netdata_log_info("replication threads set to %d (cpu cores = %d, nodes = %d)", threads, cpus, nodes);
 
     if(--threads) {
         replication_globals.main_thread.threads = threads;
@@ -1909,8 +1915,6 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                                                                                replication_worker_thread, NULL);
         }
     }
-
-    CLEANUP_FUNCTION_REGISTER(replication_main_cleanup) cleanup_ptr = ptr;
 
     // start from 100% completed
     worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, 100.0);
