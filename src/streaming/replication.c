@@ -1881,7 +1881,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
 
     int nodes = (int)dictionary_entries(rrdhost_root_index);
     int cpus = (int)get_netdata_cpus();
-    int threads = MIN(cpus / 2, nodes * 2);
+    int threads = MIN(cpus, nodes);
     if (threads < 1) threads = 1;
     else if (threads > MAX_REPLICATION_THREADS) threads = MAX_REPLICATION_THREADS;
 
