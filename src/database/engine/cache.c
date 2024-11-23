@@ -1032,6 +1032,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     else if(unlikely(max_evict < 2))
         max_evict = 2;
 
+    size_t traversed = 0;
     size_t total_pages_evicted = 0;
     size_t total_pages_relocated = 0;
     bool stopped_before_finishing = false;
@@ -1097,6 +1098,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         size_t pages_to_evict_count = 0;
         for(PGC_PAGE *page = cache->clean.base, *next = NULL, *first_page_we_relocated = NULL; page ; page = next) {
             next = page->link.next;
+            traversed++;
 
             if(unlikely(page == first_page_we_relocated))
                 // we did a complete loop on all pages
@@ -1252,7 +1254,10 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
 premature_exit:
     if(unlikely(total_pages_relocated))
-        __atomic_add_fetch(&cache->stats.evict_relocated, total_pages_relocated, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&cache->stats.events_evict_relocated, total_pages_relocated, __ATOMIC_RELAXED);
+
+    if(traversed)
+        __atomic_add_fetch(&cache->stats.events_evict_traversed, traversed, __ATOMIC_RELAXED);
 
     __atomic_sub_fetch(&cache->stats.workers_evict, 1, __ATOMIC_RELAXED);
 
