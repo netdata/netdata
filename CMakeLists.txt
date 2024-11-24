@@ -224,6 +224,15 @@ else()
     set(NEED_NDSUDO FALSE)
 endif()
 
+
+include(FetchContent)
+FetchContent_Declare(
+        mimalloc
+        GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+        GIT_TAG v2.1.7
+)
+FetchContent_MakeAvailable(mimalloc)
+
 if(ENABLE_WEBRTC)
         include(FetchContent)
         include(NetdataFetchContentExtra)
@@ -1853,7 +1862,9 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 # add_executable(test test.cpp)
 # target_link_libraries(test Threads::Threads)
 
+
 target_link_libraries(libnetdata PUBLIC
+        mimalloc
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
         "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid>"
