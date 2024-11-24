@@ -408,7 +408,7 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
     size_t content_length = 0;
     char *payload_start = NULL;
 
-    while (!payload_received || content_length <= payload_received) {
+    while (!payload_received || content_length < payload_received) {
         size_t remaining = sizeof(buf) - total_received;
 
         if (remaining <= 1) {
