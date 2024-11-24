@@ -373,7 +373,7 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
              rrdhost_program_version(localhost));
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM %s: fetching stream info from '%s'...",
+           "STREAM PARENTS of %s: fetching stream info from '%s'...",
            hostname, string2str(d->destination));
 
     // Establish connection
@@ -381,8 +381,8 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
     if (!nd_sock_connect_to_this(&sock, string2str(d->destination), default_port, 5, ssl)) {
         d->selection.info = false;
         stream_parent_nd_sock_error_to_reason(d, &sock);
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM %s: failed to connect for stream info to '%s': %s",
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM PARENTS of %s: failed to connect for stream info to '%s': %s",
                hostname, string2str(d->destination),
                ND_SOCK_ERROR_2str(sock.error));
         return false;
@@ -393,8 +393,8 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
     if (sent <= 0) {
         d->selection.info = false;
         stream_parent_nd_sock_error_to_reason(d, &sock);
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM %s: failed to send stream info request to '%s': %s",
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM PARENTS of %s: failed to send stream info request to '%s': %s",
                hostname, string2str(d->destination),
                ND_SOCK_ERROR_2str(sock.error));
         return false;
@@ -405,8 +405,8 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
     if (received <= 0) {
         d->selection.info = false;
         stream_parent_nd_sock_error_to_reason(d, &sock);
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM %s: failed to receive stream info response from '%s': %s",
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM PARENTS of %s: failed to receive stream info response from '%s': %s",
                hostname, string2str(d->destination),
                ND_SOCK_ERROR_2str(sock.error));
         return false;
@@ -422,8 +422,8 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
     if (!jobj) {
         d->selection.info = false;
         d->reason = STREAM_HANDSHAKE_NO_STREAM_INFO;
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM %s: failed to parse JSON stream info response from '%s'",
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM PARENTS of %s: failed to parse JSON stream info response from '%s'",
                hostname, string2str(d->destination));
         return false;
     }
@@ -433,15 +433,15 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
     if(!stream_info_json_parse_v1(jobj, "", d, error)) {
         d->selection.info = false;
         d->reason = STREAM_HANDSHAKE_NO_STREAM_INFO;
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM %s: failed to extract fields from JSON stream info response from '%s': %s",
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM PARENTS of %s: failed to extract fields from JSON stream info response from '%s': %s",
                hostname, string2str(d->destination),
                buffer_tostring(error));
         return false;
     }
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM %s: received stream_info data from '%s': "
+           "STREAM PARENTS of %s: received stream_info data from '%s': "
            "status: %d, nodes: %zu, receivers: %zu, first_time_s: %ld, last_time_s: %ld, "
            "db status: %s, db liveness: %s, ingest type: %s, ingest status: %s",
            hostname, string2str(d->destination),
@@ -498,7 +498,7 @@ bool stream_parent_connect_to_one_unsafe(
 
     // do we have any parents?
     if(!size) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM %s: no parents configured", rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM PARENTS of %s: no parents configured", rrdhost_hostname(host));
         return false;
     }
 
@@ -525,7 +525,7 @@ bool stream_parent_connect_to_one_unsafe(
         if (d->postpone_until_ut > now_ut) {
             skipped_but_useful++;
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "STREAM %s: skipping useful parent '%s': POSTPONED FOR %ld SECS MORE: %s",
+                   "STREAM PARENTS of %s: skipping useful parent '%s': POSTPONED FOR %ld SECS MORE: %s",
                    rrdhost_hostname(host),
                    string2str(d->destination),
                    (time_t)((d->postpone_until_ut - now_ut) / USEC_PER_SEC),
@@ -547,7 +547,7 @@ bool stream_parent_connect_to_one_unsafe(
                         d->banned_permanently = true;
                         skipped_not_useful++;
                         nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                               "STREAM %s: destination '%s' is banned permanently because it is the origin server",
+                               "STREAM PARENTS of %s: destination '%s' is banned permanently because it is the origin server",
                                rrdhost_hostname(host), string2str(d->destination));
                         continue;
                     }
@@ -575,7 +575,7 @@ bool stream_parent_connect_to_one_unsafe(
                         d->banned_for_this_session = true;
                         skipped_not_useful++;
                         nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                               "STREAM %s: destination '%s' is banned for this session, because it is in our path before us.",
+                               "STREAM PARENTS of %s: destination '%s' is banned for this session, because it is in our path before us.",
                                rrdhost_hostname(host), string2str(d->destination));
                         continue;
                     }
@@ -592,7 +592,7 @@ bool stream_parent_connect_to_one_unsafe(
         if(skip) {
             skipped_but_useful++;
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "STREAM %s: skipping useful parent '%s': %s",
+                   "STREAM PARENTS of %s: skipping useful parent '%s': %s",
                    rrdhost_hostname(host),
                    string2str(d->destination),
                    stream_handshake_error_to_string(d->reason));
@@ -608,7 +608,7 @@ bool stream_parent_connect_to_one_unsafe(
     // can we use any parent?
     if(!count) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM %s: no parents available (%zu skipped but useful, %zu skipped not useful)",
+               "STREAM PARENTS of %s: no parents available (%zu skipped but useful, %zu skipped not useful)",
                rrdhost_hostname(host),
             skipped_but_useful, skipped_not_useful);
         return false;
@@ -636,7 +636,7 @@ bool stream_parent_connect_to_one_unsafe(
             // if we have only 1 similar, move on
             if (similar == 1) {
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                       "STREAM %s: reordering keeps parent No %zu, '%s'",
+                       "STREAM PARENTS of %s: reordering keeps parent No %zu, '%s'",
                        rrdhost_hostname(host), base, string2str(array[base]->destination));
                 array[base]->selection.order = base + 1;
                 array[base]->selection.batch = batch + 1;
@@ -660,7 +660,7 @@ bool stream_parent_connect_to_one_unsafe(
                         SWAP(array[base], array[chosen]);
 
                     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                           "STREAM %s: random reordering of %zu similar parents (slots %zu to %zu), No %zu is '%s'",
+                           "STREAM PARENTS of %s: random reordering of %zu similar parents (slots %zu to %zu), No %zu is '%s'",
                            rrdhost_hostname(host),
                            similar, base, base + similar,
                            base, string2str(array[base]->destination));
@@ -687,7 +687,7 @@ bool stream_parent_connect_to_one_unsafe(
         array[0]->selection.random = false;
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM %s: only 1 parent is available: '%s'",
+               "STREAM PARENTS of %s: only 1 parent is available: '%s'",
                rrdhost_hostname(host), string2str(array[0]->destination));
     }
 
@@ -704,7 +704,7 @@ bool stream_parent_connect_to_one_unsafe(
         }
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM %s: connecting to '%s' (default port: %d, parent %zu of %zu)...",
+               "STREAM PARENTS of %s: connecting to '%s' (default port: %d, parent %zu of %zu)...",
                rrdhost_hostname(host), string2str(d->destination), default_port,
                i + 1, count);
 
@@ -732,7 +732,7 @@ bool stream_parent_connect_to_one_unsafe(
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(host->stream.snd.parents.all, d, prev, next);
 
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "STREAM %s: connected to '%s' (default port: %d, fd %d)...",
+                   "STREAM PARENTS of %s: connected to '%s' (default port: %d, fd %d)...",
                    rrdhost_hostname(host), string2str(d->destination), default_port,
                    sender_sock->fd);
 
@@ -742,7 +742,7 @@ bool stream_parent_connect_to_one_unsafe(
         else {
             stream_parent_nd_sock_error_to_reason(d, sender_sock);
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "STREAM %s: stream connection to '%s' failed (default port: %d): %s",
+                   "STREAM PARENTS of %s: stream connection to '%s' failed (default port: %d): %s",
                    rrdhost_hostname(host),
                    string2str(d->destination), default_port,
                    ND_SOCK_ERROR_2str(sender_sock->error));
@@ -797,8 +797,9 @@ static bool stream_parent_add_one_unsafe(char *entry, void *data) {
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(t->list, d, prev, next);
 
     t->count++;
-    nd_log_daemon(NDLP_INFO, "STREAM %s: added streaming destination No %d: '%s'",
-                  rrdhost_hostname(t->host), t->count, string2str(d->destination));
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "STREAM PARENTS of %s: added streaming destination No %d: '%s'",
+           rrdhost_hostname(t->host), t->count, string2str(d->destination));
 
     return false; // we return false, so that we will get all defined destinations
 }
