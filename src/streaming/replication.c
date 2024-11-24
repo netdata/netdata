@@ -33,7 +33,7 @@
 #define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 30
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
 
-#define MAX_REPLICATION_THREADS 10
+#define MAX_REPLICATION_THREADS 32
 #define REQUESTS_AHEAD_PER_THREAD 1 // 1 = enable synchronous queries
 
 static struct replication_query_statistics replication_queries = {
@@ -1889,7 +1889,7 @@ void *replication_thread_main(void *ptr) {
 
     int nodes = (int)dictionary_entries(rrdhost_root_index);
     int cpus = (int)get_netdata_cpus();
-    int threads = MIN(cpus / 4, nodes / 10);
+    int threads = MIN(cpus / 2, nodes / 5);
     if (threads < 1) threads = 1;
     else if (threads > MAX_REPLICATION_THREADS) threads = MAX_REPLICATION_THREADS;
 
