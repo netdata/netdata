@@ -859,8 +859,16 @@ struct timing_steps {
         [TIMING_STEP_DBENGINE_EVICT_FREE_CB] = {.name = "EVICT_FREE_CB", .time = 0, },
         [TIMING_STEP_DBENGINE_EVICT_FREE_ATOMICS2] = {.name = "EVICT_FREE_ATOMICS2", .time = 0, },
         [TIMING_STEP_DBENGINE_EVICT_FREE_ARAL] = {.name = "EVICT_FREE_ARAL", .time = 0, },
-        [TIMING_STEP_DBENGINE_EVICT_FREE_PGD_DATA] = {.name = "EVICT_FREE_PGD_DATA", .time = 0, },
-        [TIMING_STEP_DBENGINE_EVICT_FREE_PGD_ARAL] = {.name = "EVICT_FREE_PGD_ARAL", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_DATA] = {.name = "EVICT_FREE_PGD_DATA", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_ARAL] = {.name = "EVICT_FREE_PGD_ARAL", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_TIER1] = { .name = "EVICT_FREE_MAIN_TIER1", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_G512] = { .name = "EVICT_FREE_MAIN_G512", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GBIG] = { .name = "EVICT_FREE_MAIN_GBIG", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GMALLOC] = { .name = "EVICT_FREE_MAIN_GMALLOC", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GLIVE] = { .name = "EVICT_FREE_MAIN_GLIVE", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GWORKER] = { .name = "EVICT_FREE_MAIN_GWORKER", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_OPEN] = { .name = "EVICT_FREE_OPEN", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_EXTENT] = { .name = "EVICT_FREE_EXTENT", .time = 0, },
 
         // terminator
         [TIMING_STEP_MAX] = { .name = NULL, .time = 0, },

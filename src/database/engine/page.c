@@ -306,6 +306,7 @@ void pgd_free(PGD *pg)
         case RRDENG_PAGE_TYPE_ARRAY_32BIT:
         case RRDENG_PAGE_TYPE_ARRAY_TIER1:
             pgd_data_aral_free(pg->raw.data, pg->raw.size);
+            timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_TIER1);
             break;
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
@@ -322,13 +323,17 @@ void pgd_free(PGD *pg)
                         "Tried to free gorilla PGD loaded from disk with invalid aral_index");
 
                     aral_freez(pgd_alloc_globals.aral_gorilla_buffer[pg->raw.aral_index], pg->raw.data);
+                    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_G512);
                 }
                 else if(big_index <= GORILLA_ARAL_MULTIPLES + 1) {
                     big_index -= 2;
                     aral_freez(pgd_alloc_globals.aral_gorilla_big_buffers[big_index], pg->raw.data);
+                    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GBIG);
                 }
-                else
+                else {
                     freez(pg->raw.data);
+                    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GMALLOC);
+                }
 
                 pg->raw.data = NULL;
                 pg->raw.size = 0;
@@ -351,11 +356,15 @@ void pgd_free(PGD *pg)
                     pg->gorilla.num_buffers -= 1;
                 }
 
+                timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GLIVE);
+
                 internal_fatal(pg->gorilla.num_buffers != 0,
                                "Could not free all gorilla writer buffers");
 
                 aral_freez(pgd_alloc_globals.aral_gorilla_writer[pg->gorilla.aral_index], pg->gorilla.writer);
                 pg->gorilla.writer = NULL;
+
+                timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GWORKER);
             } else {
                 fatal("pgd_free() called on gorilla page with unsupported state");
                 // TODO: should we support any other states?
@@ -370,11 +379,11 @@ void pgd_free(PGD *pg)
             break;
     }
 
-    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_PGD_DATA);
+    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_DATA);
 
     aral_freez(pgd_alloc_globals.aral_pgd, pg);
 
-    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_PGD_ARAL);
+    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_ARAL);
 }
 
 // ----------------------------------------------------------------------------

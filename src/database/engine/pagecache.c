@@ -63,6 +63,7 @@ static void open_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_E
 {
     struct rrdengine_datafile *datafile = entry.data;
     datafile_release(datafile, DATAFILE_ACQUIRE_OPEN_CACHE);
+    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_OPEN);
 }
 
 static void open_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
@@ -73,6 +74,7 @@ static void open_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 static void extent_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     dbengine_extent_free(entry.data, entry.size);
+    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_EXTENT);
 }
 
 static void extent_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
