@@ -423,8 +423,11 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
         ssize_t received = nd_sock_recv_timeout(&sock, buf + total_received, remaining - 1, 0, 5);
         if (received <= 0) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM PARENTS of %s: socket receive error while querying stream info on '%s': %s",
-                   hostname, string2str(d->destination), ND_SOCK_ERROR_2str(sock.error));
+                   "STREAM PARENTS of %s: socket receive error while querying stream info on '%s' "
+                   "(total received %zu, payload received %zu, content length %zu): %s",
+                   hostname, string2str(d->destination),
+                   total_received, payload_received, content_length,
+                   ND_SOCK_ERROR_2str(sock.error));
 
             d->selection.info = false;
             stream_parent_nd_sock_error_to_reason(d, &sock);
