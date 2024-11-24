@@ -34,7 +34,7 @@
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
 
 #define MAX_REPLICATION_THREADS 10
-#define REQUESTS_AHEAD_PER_THREAD 5
+#define REQUESTS_AHEAD_PER_THREAD 1 // 1 = enable synchronous queries
 
 static struct replication_query_statistics replication_queries = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
@@ -119,7 +119,8 @@ static struct replication_query *replication_query_prepare(
         time_t query_before,
         bool query_enable_streaming,
         time_t wall_clock_time,
-        STREAM_CAPABILITIES capabilities
+        STREAM_CAPABILITIES capabilities,
+        bool synchronous
 ) {
     size_t dimensions = rrdset_number_of_dimensions(st);
     struct replication_query *q = callocz(1, sizeof(struct replication_query) + dimensions * sizeof(struct replication_dimension));
@@ -189,8 +190,11 @@ static struct replication_query *replication_query_prepare(
         d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
         d->rd = rd;
 
-        storage_engine_query_init(q->backend, rd->tiers[0].smh, &d->handle, q->query.after, q->query.before,
-                     q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW);
+        STORAGE_PRIORITY priority = q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW;
+        if(synchronous) priority = STORAGE_PRIORITY_SYNCHRONOUS;
+
+        storage_engine_query_init(q->backend, rd->tiers[0].smh, &d->handle,
+                                  q->query.after, q->query.before, priority);
         d->enabled = true;
         d->skip = false;
         count++;
@@ -551,7 +555,8 @@ static struct replication_query *replication_response_prepare(
         bool requested_enable_streaming,
         time_t requested_after,
         time_t requested_before,
-        STREAM_CAPABILITIES capabilities
+        STREAM_CAPABILITIES capabilities,
+        bool synchronous
         ) {
     time_t wall_clock_time = now_realtime_sec();
 
@@ -613,7 +618,7 @@ static struct replication_query *replication_response_prepare(
             db_first_entry, db_last_entry,
             requested_after, requested_before, requested_enable_streaming,
             query_after, query_before, query_enable_streaming,
-            wall_clock_time, capabilities);
+            wall_clock_time, capabilities, synchronous);
 }
 
 void replication_response_cancel_and_finalize(struct replication_query *q) {
@@ -1454,7 +1459,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
                 rq->start_streaming,
                 rq->after,
                 rq->before,
-                rq->sender->capabilities);
+                rq->sender->capabilities, true);
     }
 
     if(likely(workers)) worker_is_busy(WORKER_JOB_QUERYING);
@@ -1747,11 +1752,12 @@ static int replication_pipeline_execute_next(void) {
             if (rq->st && !rq->q) {
                 worker_is_busy(WORKER_JOB_PREPARE_QUERY);
                 rq->q = replication_response_prepare(
-                        rq->st,
-                        rq->start_streaming,
-                        rq->after,
-                        rq->before,
-                        rq->sender->capabilities);
+                    rq->st,
+                    rq->start_streaming,
+                    rq->after,
+                    rq->before,
+                    rq->sender->capabilities,
+                    rtp.max_requests_ahead == 1);
             }
 
             rq->executed = false;
