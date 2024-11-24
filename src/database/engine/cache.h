@@ -223,7 +223,7 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
 long get_netdata_cpus(void);
 
 static inline size_t pgc_max_evictors(void) {
-    return get_netdata_cpus();
+    return 1 + get_netdata_cpus() / 2;
 }
 
 static inline size_t pgc_max_flushers(void) {

@@ -1899,9 +1899,9 @@ PGC *pgc_create(const char *name,
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
 
     cache->config.max_workers_evict_inline    = max_inline_evictors;
-    cache->config.severe_pressure_per1000     = 1100; // turn releasers into evictors above this threshold
-    cache->config.aggressive_evict_per1000    = 1000; // turn adders into evictors above this threshold
-    cache->config.healthy_size_per1000        =  975; // don't evict if the current size is below this threshold
+    cache->config.severe_pressure_per1000     = 1000; // turn releasers into evictors above this threshold
+    cache->config.aggressive_evict_per1000    =  990; // turn adders into evictors above this threshold
+    cache->config.healthy_size_per1000        =  950; // don't evict if the current size is below this threshold
     cache->config.evict_low_threshold_per1000 =  900; // when evicting, bring the size down to this threshold
 
     {
