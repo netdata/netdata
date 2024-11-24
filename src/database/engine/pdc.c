@@ -1255,11 +1255,6 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
 
         void *extent_data = datafile_extent_read(ctx, epdl->file, epdl->extent_offset, epdl->extent_size);
         if(extent_data != NULL) {
-
-            void *copied_extent_compressed_data = dbengine_extent_alloc(epdl->extent_size);
-            memcpy(copied_extent_compressed_data, extent_data, epdl->extent_size);
-            datafile_extent_read_free(extent_data);
-
             if(worker)
                 worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);
 
@@ -1272,11 +1267,11 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
                     .size = epdl->extent_size,
                     .end_time_s = 0,
                     .update_every_s = 0,
-                    .data = copied_extent_compressed_data,
+                    .data = extent_data,
             }, &added);
 
             if (!added) {
-                dbengine_extent_free(copied_extent_compressed_data, epdl->extent_size);
+                dbengine_extent_free(extent_data, epdl->extent_size);
                 internal_fatal(epdl->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
                                "DBENGINE: cache size does not match the expected size");
             }
