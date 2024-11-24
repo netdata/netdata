@@ -423,8 +423,8 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
         d->selection.info = false;
         d->reason = STREAM_HANDSHAKE_NO_STREAM_INFO;
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM PARENTS of %s: failed to parse JSON stream info response from '%s'",
-               hostname, string2str(d->destination));
+               "STREAM PARENTS of %s: failed to parse stream info response from '%s', JSON data: %s",
+               hostname, string2str(d->destination), json_start);
         return false;
     }
 
