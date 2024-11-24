@@ -360,16 +360,24 @@ static void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
         spinlock_unlock(&cache->evictor.spinlock);
     }
 
-    if (!(cache->config.options & PGC_OPTIONS_EVICT_PAGES_NO_INLINE) && per1000 >= cache->config.severe_pressure_per1000) {
-        if (on_release)
-            __atomic_add_fetch(&cache->stats.events_evictions_inline_on_release, 1, __ATOMIC_RELAXED);
-        else
+    if(!(cache->config.options & PGC_OPTIONS_EVICT_PAGES_NO_INLINE)) {
+        if (per1000 >= cache->config.severe_pressure_per1000 && !on_release) {
+            // the threads that add pages, turn into evictors when the cache needs evictions aggressively
             __atomic_add_fetch(&cache->stats.events_evictions_inline_on_add, 1, __ATOMIC_RELAXED);
+            evict_pages(cache,
+                        cache->config.max_skip_pages_per_inline_eviction,
+                        cache->config.max_pages_per_inline_eviction,
+                        false, false);
+        }
+        else if (per1000 >= cache->config.severe_pressure_per1000 && on_release) {
+            // the threads that releasing pages, turn into evictors hen the cache is critical
+            __atomic_add_fetch(&cache->stats.events_evictions_inline_on_release, 1, __ATOMIC_RELAXED);
 
-        evict_pages(cache,
-                    cache->config.max_skip_pages_per_inline_eviction,
-                    cache->config.max_pages_per_inline_eviction,
-                    false, false);
+            evict_pages(cache,
+                        cache->config.max_skip_pages_per_inline_eviction * 2,
+                        cache->config.max_pages_per_inline_eviction * 2,
+                        false, false);
+        }
     }
 }
 
@@ -1862,8 +1870,8 @@ PGC *pgc_create(const char *name,
                 size_t max_flushes_inline,
                 PGC_OPTIONS options, size_t partitions, size_t additional_bytes_per_page) {
 
-    if(max_pages_per_inline_eviction < 2)
-        max_pages_per_inline_eviction = 2;
+    if(max_pages_per_inline_eviction < 1)
+        max_pages_per_inline_eviction = 1;
 
     if(max_dirty_pages_per_flush < 1)
         max_dirty_pages_per_flush = 1;
