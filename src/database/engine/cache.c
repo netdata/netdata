@@ -1839,10 +1839,11 @@ static void *evict_thread(void *ptr) {
 
         spinlock_lock(&cache->evictor.spinlock);
 
+        size_t at_once = 10;
         size_t size_to_evict = 0;
-        cache_usage_per1000(cache, &size_to_evict);
+        size_t per1000 = cache_usage_per1000(cache, &size_to_evict);
 
-        while (size_to_evict) {
+        while (size_to_evict && ((--at_once && size_to_evict && per1000 > cache->config.healthy_size_per1000) || (per1000 > cache->config.aggressive_evict_per1000))) {
             if (nd_thread_signaled_to_cancel()) {
                 spinlock_unlock(&cache->evictor.spinlock);
                 return NULL;
@@ -1852,7 +1853,7 @@ static void *evict_thread(void *ptr) {
             tinysleep();
 
             size_to_evict = 0;
-            cache_usage_per1000(cache, &size_to_evict);
+            per1000 = cache_usage_per1000(cache, &size_to_evict);
         }
 
         spinlock_unlock(&cache->evictor.spinlock);
