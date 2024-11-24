@@ -1226,22 +1226,38 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 }
 
                 usec_t finished_ut = now_monotonic_usec();
+                usec_t total_ut = finished_ut - started_pages_selection_ut;
 
-                char selection[64];
-                duration_snprintf_usec_t(selection, sizeof(selection), started_pages_sorting_ut - started_pages_selection_ut);
+                char size_txt[64];
+                size_snprintf_bytes(size_txt, sizeof(size_txt), pages_to_evict_size);
 
-                char sorting[64];
-                duration_snprintf_usec_t(sorting, sizeof(sorting), started_pages_eviction_ut - started_pages_sorting_ut);
+                usec_t selection_ut = started_pages_sorting_ut - started_pages_selection_ut;
+                char selection_txt[64];
+                duration_snprintf_usec_t(selection_txt, sizeof(selection_txt), selection_ut);
 
-                char eviction[64];
-                duration_snprintf_usec_t(eviction, sizeof(eviction), started_pages_destruction_ut - started_pages_eviction_ut);
+                usec_t sorting_ut = started_pages_eviction_ut - started_pages_sorting_ut;
+                char sorting_txt[64];
+                duration_snprintf_usec_t(sorting_txt, sizeof(sorting_txt), sorting_ut);
 
-                char destruction[64];
-                duration_snprintf_usec_t(destruction, sizeof(destruction), finished_ut - started_pages_destruction_ut);
+                usec_t eviction_ut = started_pages_destruction_ut - started_pages_eviction_ut;
+                char eviction_txt[64];
+                duration_snprintf_usec_t(eviction_txt, sizeof(eviction_txt), eviction_ut);
+
+                usec_t destruction_ut = finished_ut - started_pages_destruction_ut;
+                char destruction_txt[64];
+                duration_snprintf_usec_t(destruction_txt, sizeof(destruction_txt), destruction_ut);
+
+                char total_txt[64];
+                duration_snprintf_usec_t(total_txt, sizeof(total_txt), total_ut);
 
                 nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                       "EVICTION TIMINGS: %zu pages (%zu bytes), selection: %s, sorting: %s, eviction: %s, destruction: %s",
-                       pages_to_evict_count, pages_to_evict_size, selection, sorting, eviction, destruction);
+                       "EVICTION TIMINGS on cache %s: %zu pages (%s), selection: %s (%.1f%%), sorting: %s (%.1f%%), eviction: %s (%.1f%%), destruction: %s (%.1f%%), total: %s",
+                       cache->config.name, pages_to_evict_count, size_txt,
+                       selection_txt, (double)selection_ut * 100.0 / (double)total_ut,
+                       sorting_txt, (double)sorting_ut * 100.0 / (double)total_ut,
+                       eviction_txt, (double)eviction_ut * 100.0 / (double)total_ut,
+                       destruction_txt, (double)destruction_ut * 100.0 / (double)total_ut,
+                       total_txt);
             }
             else {
                 // just one page to be evicted
