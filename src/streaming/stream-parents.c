@@ -422,14 +422,9 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
 
         ssize_t received = nd_sock_recv_timeout(&sock, buf + total_received, remaining - 1, 0, 5);
         if (received <= 0) {
-            if (sock.error == ND_SOCK_ERR_TIMEOUT)
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "STREAM PARENTS of %s: timeout while receiving stream info response from '%s'",
-                       hostname, string2str(d->destination));
-            else
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "STREAM PARENTS of %s: socket receive error while receiving stream info response from '%s'",
-                       hostname, string2str(d->destination));
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM PARENTS of %s: socket receive error while querying stream info on '%s': %s",
+                   hostname, string2str(d->destination), ND_SOCK_ERROR_2str(sock.error));
 
             d->selection.info = false;
             stream_parent_nd_sock_error_to_reason(d, &sock);
