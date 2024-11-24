@@ -1379,7 +1379,7 @@ static void *cache_flush_tp_worker(struct rrdengine_instance *ctx __maybe_unused
         return data;
 
     worker_is_busy(UV_EVENT_DBENGINE_FLUSH_MAIN_CACHE);
-    while (pgc_flush_pages(main_cache, 0))
+    while (pgc_flush_pages(main_cache))
         tinysleep();
 
     return data;

@@ -14,12 +14,12 @@ typedef struct pgc_page PGC_PAGE;
 
 typedef enum __attribute__ ((__packed__)) {
     PGC_OPTIONS_NONE       = 0,
-    PGC_OPTIONS_EVICT_PAGES_INLINE = (1 << 0),
-    PGC_OPTIONS_FLUSH_PAGES_INLINE = (1 << 1),
-    PGC_OPTIONS_AUTOSCALE          = (1 << 2),
+    PGC_OPTIONS_EVICT_PAGES_NO_INLINE   = (1 << 0),
+    PGC_OPTIONS_FLUSH_PAGES_NO_INLINE   = (1 << 1),
+    PGC_OPTIONS_AUTOSCALE               = (1 << 2),
 } PGC_OPTIONS;
 
-#define PGC_OPTIONS_DEFAULT (PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE | PGC_OPTIONS_AUTOSCALE)
+#define PGC_OPTIONS_DEFAULT (PGC_OPTIONS_EVICT_PAGES_NO_INLINE | PGC_OPTIONS_AUTOSCALE)
 
 typedef struct pgc_entry {
     Word_t section;             // the section this belongs to
@@ -206,7 +206,7 @@ void pgc_set_dynamic_target_cache_size_callback(PGC *cache, dynamic_target_cache
 
 // return true when there is more work to do
 bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict);
-bool pgc_flush_pages(PGC *cache, size_t max_flushes);
+bool pgc_flush_pages(PGC *cache);
 
 struct pgc_statistics pgc_get_statistics(PGC *cache);
 size_t pgc_hot_and_dirty_entries(PGC *cache);
@@ -224,7 +224,7 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
 long get_netdata_cpus(void);
 
 static inline size_t pgc_max_evictors(void) {
-    return 1;
+    return 2 + get_netdata_cpus() / 2;
 }
 
 static inline size_t pgc_max_flushers(void) {

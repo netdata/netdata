@@ -1076,7 +1076,7 @@ void pgc_and_mrg_initialize(void)
             pgc_max_evictors(),
             1000,
             1,
-            PGC_OPTIONS_AUTOSCALE,
+            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
             0,
             0
     );
@@ -1092,7 +1092,7 @@ void pgc_and_mrg_initialize(void)
             pgc_max_evictors(),
             1000,
             1,
-            PGC_OPTIONS_AUTOSCALE,
+            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
             0,
             sizeof(struct extent_io_data)
     );
@@ -1109,7 +1109,7 @@ void pgc_and_mrg_initialize(void)
             pgc_max_evictors(),
             100,
             1,
-            PGC_OPTIONS_AUTOSCALE,
+            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
             0,
             0
     );
