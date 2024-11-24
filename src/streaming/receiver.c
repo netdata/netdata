@@ -592,6 +592,9 @@ static void *stream_receive_thread(void *ptr) {
         for(size_t slot = 0; slot < rr->run.used ;slot++) {
             if(!rr->run.pollfds[slot].revents || !rr->run.nodes[slot]) continue;
 
+            if(nd_thread_signaled_to_cancel() || !service_running(SERVICE_STREAMING))
+                break;
+
             struct receiver_state *rpt = rr->run.nodes[slot];
 
             PARSER *parser = __atomic_load_n(&rpt->receiver.parser, __ATOMIC_RELAXED);
@@ -626,7 +629,7 @@ static void *stream_receive_thread(void *ptr) {
                 }
 
                 bool node_broken = false;
-                while(!node_broken) {
+                while(!node_broken && !nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING) && !receiver_should_stop(rpt)) {
                     decompressor_status_t feed = receiver_feed_decompressor(rpt);
                     if(likely(feed == DECOMPRESS_OK)) {
                         while (!node_broken) {
@@ -634,6 +637,7 @@ static void *stream_receive_thread(void *ptr) {
                             if (likely(rc == DECOMPRESS_OK)) {
                                 while (buffered_reader_next_line(&rpt->reader, rpt->receiver.buffer)) {
                                     if (unlikely(parser_action(parser, rpt->receiver.buffer->buffer))) {
+
                                         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
                                         stream_receiver_remove(rr, rpt, slot, "parser failed");
                                         node_broken = true;
@@ -663,6 +667,12 @@ static void *stream_receive_thread(void *ptr) {
                         node_broken = true;
                         break;
                     }
+                }
+
+                if(receiver_should_stop(rpt)) {
+                    receiver_set_exit_reason(rpt, rpt->exit.reason, false);
+                    stream_receiver_remove(rr, rpt, slot, "received stop signal");
+                    continue;
                 }
             }
             else {
