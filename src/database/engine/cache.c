@@ -355,7 +355,7 @@ static void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
     const size_t per1000 = cache_usage_per1000(cache, NULL);
 
     if (per1000 > cache->config.aggressive_evict_per1000 && spinlock_trylock(&cache->evictor.spinlock)) {
-        __atomic_add_fetch(&cache->stats.events_evict_thread_signals, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&cache->stats.waste_evict_thread_signals, 1, __ATOMIC_RELAXED);
         completion_mark_complete_a_job(&cache->evictor.completion);
         spinlock_unlock(&cache->evictor.spinlock);
     }
@@ -363,7 +363,7 @@ static void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
     if(!(cache->config.options & PGC_OPTIONS_EVICT_PAGES_NO_INLINE)) {
         if (per1000 >= cache->config.severe_pressure_per1000 && !on_release) {
             // the threads that add pages, turn into evictors when the cache needs evictions aggressively
-            __atomic_add_fetch(&cache->stats.events_evictions_inline_on_add, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&cache->stats.waste_evictions_inline_on_add, 1, __ATOMIC_RELAXED);
             evict_pages(cache,
                         cache->config.max_skip_pages_per_inline_eviction,
                         cache->config.max_pages_per_inline_eviction,
@@ -371,7 +371,7 @@ static void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
         }
         else if (per1000 >= cache->config.severe_pressure_per1000 && on_release) {
             // the threads that releasing pages, turn into evictors hen the cache is critical
-            __atomic_add_fetch(&cache->stats.events_evictions_inline_on_release, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&cache->stats.waste_evictions_inline_on_release, 1, __ATOMIC_RELAXED);
 
             evict_pages(cache,
                         cache->config.max_skip_pages_per_inline_eviction * 2,
@@ -392,9 +392,9 @@ static inline void evict_on_page_release_when_permitted(PGC *cache) {
 static inline void flush_inline(PGC *cache, bool on_release) {
     if(!(cache->config.options & PGC_OPTIONS_FLUSH_PAGES_NO_INLINE) && flushing_critical(cache)) {
         if (on_release)
-            __atomic_add_fetch(&cache->stats.events_flush_on_release, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&cache->stats.waste_flush_on_release, 1, __ATOMIC_RELAXED);
         else
-            __atomic_add_fetch(&cache->stats.events_flush_on_add, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&cache->stats.waste_flush_on_add, 1, __ATOMIC_RELAXED);
 
         flush_pages(cache, cache->config.max_flushes_inline, PGC_SECTION_ALL, false, false);
     }
@@ -1017,7 +1017,7 @@ static inline bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache
     return true;
 }
 
-// returns true, when there is more work to do
+// returns true, when there is potentially more work to do
 static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them, evict_filter filter, void *data) {
     size_t per1000 = cache_usage_per1000(cache, NULL);
 
@@ -1045,7 +1045,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     else if(unlikely(max_evict < 2))
         max_evict = 2;
 
-    size_t traversed = 0;
+    size_t this_loop_evicted = 0;
     size_t total_pages_evicted = 0;
     size_t total_pages_relocated = 0;
     bool stopped_before_finishing = false;
@@ -1093,8 +1093,10 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             break;
         }
 
-        if(++spins > 1)
-            __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
+        if(++spins > 1 && !this_loop_evicted)
+            __atomic_add_fetch(&cache->stats.waster_evict_useless_spins, 1, __ATOMIC_RELAXED);
+
+        this_loop_evicted = 0;
 
         timing_dbengine_evict_init();
 
@@ -1117,7 +1119,6 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         size_t pages_to_evict_count = 0;
         for(PGC_PAGE *page = cache->clean.base, *next = NULL, *first_page_we_relocated = NULL; page ; page = next) {
             next = page->link.next;
-            traversed++;
 
             if(unlikely(page == first_page_we_relocated))
                 // we did a complete loop on all pages
@@ -1250,6 +1251,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                         __atomic_sub_fetch(&cache->stats.evicting_size, page_size, __ATOMIC_RELAXED);
 
                         total_pages_evicted++;
+                        this_loop_evicted++;
 
                         timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_ATOMICS);
                     }
@@ -1273,6 +1275,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 __atomic_sub_fetch(&cache->stats.evicting_size, page_size, __ATOMIC_RELAXED);
 
                 total_pages_evicted++;
+                this_loop_evicted++;
             }
         }
         else
@@ -1294,9 +1297,6 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 premature_exit:
     if(unlikely(total_pages_relocated))
         __atomic_add_fetch(&cache->stats.events_evict_relocated, total_pages_relocated, __ATOMIC_RELAXED);
-
-    if(traversed)
-        __atomic_add_fetch(&cache->stats.events_evict_traversed, traversed, __ATOMIC_RELAXED);
 
     __atomic_sub_fetch(&cache->stats.workers_evict, 1, __ATOMIC_RELAXED);
 

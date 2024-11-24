@@ -94,7 +94,7 @@ struct pgc_statistics {
 #endif
 
     alignas(64) size_t insert_spins;
-    alignas(64) size_t evict_spins;
+    alignas(64) size_t waster_evict_useless_spins;
     alignas(64) size_t release_spins;
     alignas(64) size_t acquire_spins;
     alignas(64) size_t delete_spins;
@@ -112,15 +112,14 @@ struct pgc_statistics {
 
     // events
     alignas(64) size_t events_evict_relocated;
-    alignas(64) size_t events_evict_traversed;
-    alignas(64) size_t events_evict_thread_signals;
-    alignas(64) size_t events_evictions_inline_on_add;
-    alignas(64) size_t events_evictions_inline_on_release;
+    alignas(64) size_t waste_evict_thread_signals;
+    alignas(64) size_t waste_evictions_inline_on_add;
+    alignas(64) size_t waste_evictions_inline_on_release;
     alignas(64) size_t events_cache_under_severe_pressure;
     alignas(64) size_t events_cache_needs_space_aggressively;
     alignas(64) size_t events_flush_critical;
-    alignas(64) size_t events_flush_on_add;
-    alignas(64) size_t events_flush_on_release;
+    alignas(64) size_t waste_flush_on_add;
+    alignas(64) size_t waste_flush_on_release;
 
 
     struct {
