@@ -1051,11 +1051,13 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             per1000 = cache_usage_per1000(cache, &max_size_to_evict);
             if(per1000 >= cache->config.severe_pressure_per1000) {
                 under_sever_pressure = true;
-                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 4096;
+                // max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 4096;
+                max_pages_to_evict = 1;
             }
             else if(per1000 >= cache->config.aggressive_evict_per1000) {
                 under_sever_pressure = false;
-                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 128;
+                // max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 128;
+                max_pages_to_evict = 1;
             }
             else {
                 under_sever_pressure = false;
@@ -1080,7 +1082,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         if(++spins > 1)
             __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
 
-        usec_t started_pages_selection_ut = now_monotonic_usec();
+        usec_t started_pages_selection_ut;
+        if(max_pages_to_evict > 1)
+            started_pages_selection_ut = now_monotonic_usec();
 
         if(!all_of_them && !wait) {
             if(!pgc_ll_trylock(cache, &cache->clean)) {
@@ -1229,7 +1233,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 usec_t total_ut = finished_ut - started_pages_selection_ut;
 
                 char size_txt[64];
-                size_snprintf_bytes(size_txt, sizeof(size_txt), pages_to_evict_size);
+                size_snprintf(size_txt, sizeof(size_txt), pages_to_evict_size, "B", false);
 
                 usec_t selection_ut = started_pages_sorting_ut - started_pages_selection_ut;
                 char selection_txt[64];
