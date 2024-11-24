@@ -166,10 +166,14 @@ static void *pgd_data_aral_alloc(size_t size)
 static void pgd_data_aral_free(void *page, size_t size)
 {
     ARAL *ar = pgd_aral_data_lookup(size);
-    if (!ar)
+    if (!ar) {
         freez(page);
-    else
+        timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_TIER1_MALLOC);
+    }
+    else {
         aral_freez(ar, page);
+        timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_TIER1_ARAL);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -306,7 +310,6 @@ void pgd_free(PGD *pg)
         case RRDENG_PAGE_TYPE_ARRAY_32BIT:
         case RRDENG_PAGE_TYPE_ARRAY_TIER1:
             pgd_data_aral_free(pg->raw.data, pg->raw.size);
-            timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_TIER1);
             break;
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)

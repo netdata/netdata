@@ -1143,6 +1143,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 pages_to_evict_size += page->assumed_size;
                 pages_to_evict_count++;
 
+                timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_SELECT_PAGE);
+
                 if((pages_to_evict_count < max_pages_to_evict && pages_to_evict_size < max_size_to_evict) || all_of_them)
                     // get more pages
                     ;
@@ -1160,6 +1162,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
 
                 total_pages_relocated++;
+
+                timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_RELOCATE_PAGE);
 
                 // check if we have to stop
                 if(unlikely(total_pages_relocated >= max_skip && !all_of_them)) {
@@ -1195,7 +1199,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pages_per_partition[partition], page, link.prev, link.next);
                 }
 
-                timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_UNLINK);
+                timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_SORT);
                 usec_t started_pages_eviction_ut = now_monotonic_usec();
 
                 // remove them from the index
@@ -1217,6 +1221,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                                 remove_this_page_from_index_unsafe(cache, page, partition);
 
                             pgc_index_write_unlock(cache, partition);
+
+                            timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_DEINDEX_PAGE);
                         }
                         else
                             remaining_partitions++;
