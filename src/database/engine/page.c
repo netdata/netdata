@@ -240,8 +240,6 @@ PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size)
             pg->raw.data = mallocz(size);
             pg->raw.size = size;
 
-            // TODO: rm this
-            memset(pg->raw.data, 0, size);
             memcpy(pg->raw.data, base, size);
 
             uint32_t total_entries = gorilla_buffer_patch((void *) pg->raw.data);
