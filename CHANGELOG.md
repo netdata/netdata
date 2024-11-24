@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- update gorilla comp internal charts family [\#19068](https://github.com/netdata/netdata/pull/19068) ([ilyam8](https://github.com/ilyam8))
 - docs\(systemd-journal.plugin\): correct "Full-text search" [\#19066](https://github.com/netdata/netdata/pull/19066) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#19065](https://github.com/netdata/netdata/pull/19065) ([netdatabot](https://github.com/netdatabot))
 - Register service to delay start [\#19063](https://github.com/netdata/netdata/pull/19063) ([stelfrag](https://github.com/stelfrag))
@@ -443,8 +444,6 @@
 - remove save-database from netdatacli usage [\#18519](https://github.com/netdata/netdata/pull/18519) ([ilyam8](https://github.com/ilyam8))
 - improve netdatacli docs [\#18518](https://github.com/netdata/netdata/pull/18518) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18517](https://github.com/netdata/netdata/pull/18517) ([netdatabot](https://github.com/netdatabot))
-- go.d/varnish update meta [\#18516](https://github.com/netdata/netdata/pull/18516) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/jackc/pgx/v5 from 5.7.0 to 5.7.1 in /src/go [\#18515](https://github.com/netdata/netdata/pull/18515) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
