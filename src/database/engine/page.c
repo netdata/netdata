@@ -28,7 +28,7 @@ typedef struct {
 } page_gorilla_t;
 
 struct pgd {
-    // the uses number of slots in the page
+    // the used number of slots in the page
     uint16_t used;
 
     // the total number of slots available in the page
