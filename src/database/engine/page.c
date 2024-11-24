@@ -17,31 +17,30 @@ typedef enum __attribute__((packed)) {
 
 typedef struct {
     uint8_t *data;
-    uint32_t size;
-    int aral_index;
+    uint16_t size;
+    uint8_t aral_index;
 } page_raw_t;
 
-
 typedef struct {
-    size_t num_buffers;
     gorilla_writer_t *writer;
-    int aral_index;
+    uint16_t num_buffers;
+    uint8_t aral_index;
 } page_gorilla_t;
 
 struct pgd {
+    // the uses number of slots in the page
+    uint16_t used;
+
+    // the total number of slots available in the page
+    uint16_t slots;
+
     // the page type
     uint8_t type;
 
-   // options related to the page
+    // options related to the page
     PAGE_OPTIONS options;
 
     PGD_STATES states;
-
-    // the uses number of slots in the page
-    uint32_t used;
-
-    // the total number of slots available in the page
-    uint32_t slots;
 
     union {
         page_raw_t raw;
@@ -53,12 +52,14 @@ struct pgd {
 // memory management
 
 #define GORILLA_ARAL_PARTITIONS 4
+#define GORILLA_ARAL_MULTIPLES 8
 
 struct {
     ARAL *aral_pgd;
     ARAL *aral_data[RRD_STORAGE_TIERS];
     ARAL *aral_gorilla_buffer[GORILLA_ARAL_PARTITIONS];
     ARAL *aral_gorilla_writer[GORILLA_ARAL_PARTITIONS];
+    ARAL *aral_gorilla_big_buffers[GORILLA_ARAL_MULTIPLES]; // 1024, 1536, 2048, 2560, 3072, 3584, 4096, 4608
 } pgd_alloc_globals = {};
 
 static ARAL *pgd_aral_data_lookup(size_t size)
@@ -134,6 +135,22 @@ void pgd_init_arals(void)
                 512 * sizeof(gorilla_writer_t),
                 pgc_aral_statistics(),
                 NULL, NULL, false, false);
+    }
+
+    // gorilla big buffers aral
+    for(size_t i = 0; i < GORILLA_ARAL_MULTIPLES ;i++) {
+        size_t bytes = (i + 2) * RRDENG_GORILLA_32BIT_BUFFER_SIZE;
+        char buf[20 + 1];
+        snprintfz(buf, sizeof(buf) - 1, "gbigbuf-%zu", bytes);
+
+        // FIXME: add stats
+        pgd_alloc_globals.aral_gorilla_big_buffers[i] = aral_create(
+            buf,
+            bytes,
+            64,
+            512 * bytes,
+            pgc_aral_statistics(),
+            NULL, NULL, false, false);
     }
 }
 
@@ -240,12 +257,20 @@ PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size)
             internal_fatal(size % RRDENG_GORILLA_32BIT_BUFFER_SIZE, "Expected size to be a multiple of %zu-bytes",
                 RRDENG_GORILLA_32BIT_BUFFER_SIZE);
 
-            if(size == RRDENG_GORILLA_32BIT_BUFFER_SIZE) {
+            size_t big_index = size / RRDENG_GORILLA_32BIT_BUFFER_SIZE;
+
+            if(big_index == 1) {
+                // use the standard aral for gorilla, to reuse free space in these aral allocations
                 pg->raw.aral_index = gettid_cached() % GORILLA_ARAL_PARTITIONS;
                 pg->raw.data = aral_mallocz(pgd_alloc_globals.aral_gorilla_buffer[pg->raw.aral_index]);
             }
+            else if(big_index <= GORILLA_ARAL_MULTIPLES + 1) {
+                big_index -= 2;
+                pg->raw.aral_index = UINT8_MAX;
+                pg->raw.data = aral_mallocz(pgd_alloc_globals.aral_gorilla_big_buffers[big_index]);
+            }
             else {
-                pg->raw.aral_index = -1;
+                pg->raw.aral_index = UINT8_MAX;
                 pg->raw.data = mallocz(size);
             }
 
@@ -286,11 +311,22 @@ void pgd_free(PGD *pg)
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
             {
                 internal_fatal(pg->raw.data == NULL, "Tried to free gorilla PGD loaded from disk with NULL data");
-                internal_fatal(pg->raw.size == RRDENG_GORILLA_32BIT_BUFFER_SIZE && (pg->raw.aral_index < 0 || pg->raw.aral_index >= GORILLA_ARAL_PARTITIONS),
-                               "Tried to free gorilla PGD loaded from disk with invalid aral_index");
+                internal_fatal(pg->raw.size % RRDENG_GORILLA_32BIT_BUFFER_SIZE, "Expected size to be a multiple of %zu-bytes",
+                               RRDENG_GORILLA_32BIT_BUFFER_SIZE);
 
-                if(pg->raw.size == RRDENG_GORILLA_32BIT_BUFFER_SIZE && pg->raw.aral_index >= 0 && pg->raw.aral_index < GORILLA_ARAL_PARTITIONS)
+                size_t big_index = pg->raw.size / RRDENG_GORILLA_32BIT_BUFFER_SIZE;
+
+                if(big_index == 1) {
+                    internal_fatal(
+                        pg->raw.size == RRDENG_GORILLA_32BIT_BUFFER_SIZE && pg->raw.aral_index >= GORILLA_ARAL_PARTITIONS,
+                        "Tried to free gorilla PGD loaded from disk with invalid aral_index");
+
                     aral_freez(pgd_alloc_globals.aral_gorilla_buffer[pg->raw.aral_index], pg->raw.data);
+                }
+                else if(big_index <= GORILLA_ARAL_MULTIPLES + 1) {
+                    big_index -= 2;
+                    aral_freez(pgd_alloc_globals.aral_gorilla_big_buffers[big_index], pg->raw.data);
+                }
                 else
                     freez(pg->raw.data);
 
