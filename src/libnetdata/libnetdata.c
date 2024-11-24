@@ -848,6 +848,20 @@ struct timing_steps {
         [TIMING_STEP_END2_PROPAGATE] = { .name = "END2 propagate", .time = 0, },
         [TIMING_STEP_END2_STORE] = { .name = "END2 store", .time = 0, },
 
+        [TIMING_STEP_DBENGINE_EVICT_LOCK] = {.name = "EVICT_LOCK", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_SELECT] = {.name = "EVICT_SELECT", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_UNLINK] = {.name = "EVICT_UNLINK", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_DEINDEX] = {.name = "EVICT_DEINDEX", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FINISHED] = {.name = "EVICT_FINISHED", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_LOOP] = {.name = "EVICT_FREE_LOOP", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_PAGE] = {.name = "EVICT_FREE_PAGE", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_ATOMICS] = {.name = "EVICT_FREE_ATOMICS", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_CB] = {.name = "EVICT_FREE_CB", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_ATOMICS2] = {.name = "EVICT_FREE_ATOMICS2", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_ARAL] = {.name = "EVICT_FREE_ARAL", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_PGD_DATA] = {.name = "EVICT_FREE_PGD_DATA", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_PGD_ARAL] = {.name = "EVICT_FREE_PGD_ARAL", .time = 0, },
+
         // terminator
         [TIMING_STEP_MAX] = { .name = NULL, .time = 0, },
 };
