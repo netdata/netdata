@@ -713,6 +713,7 @@ void *stream_sender_dispacther_thread(void *ptr) {
     worker_register("STREAMSND");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_LIST, "list");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DEQUEUE, "dequeue");
+    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_PREP, "prep");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_POLL_ERROR, "disconnect poll error");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_PIPE_READ, "pipe read");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_SOCKET_RECEIVE, "receive");
@@ -786,6 +787,8 @@ void *stream_sender_dispacther_thread(void *ptr) {
         // wait for data - timeout is in milliseconds
         int poll_rc = poll(dp->run.pollfds, dp->run.used, 100);
 
+        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_PREP);
+
         if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR)))
             // timed out - just loop again
             continue;
@@ -841,6 +844,8 @@ void *stream_sender_dispacther_thread(void *ptr) {
 
             if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
                 // we have errors on this socket
+
+                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_SOCKET_ERROR);
 
                 char *error = "unknown error";
 
