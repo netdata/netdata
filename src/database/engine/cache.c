@@ -898,6 +898,8 @@ static inline void free_this_page(PGC *cache, PGC_PAGE *page, size_t partition _
             .custom_data = (cache->config.additional_bytes_per_page) ? page->custom_data : NULL,
     });
 
+    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_CB);
+
     // update statistics
     __atomic_add_fetch(&cache->stats.removed_entries, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&cache->stats.removed_size, page->assumed_size, __ATOMIC_RELAXED);
@@ -905,12 +907,16 @@ static inline void free_this_page(PGC *cache, PGC_PAGE *page, size_t partition _
     __atomic_sub_fetch(&cache->stats.entries, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&cache->stats.size, page->assumed_size, __ATOMIC_RELAXED);
 
+    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_ATOMICS2);
+
     // free our memory
 #ifdef PGC_WITH_ARAL
     aral_freez(cache->index[partition].aral, page);
 #else
     freez(page);
 #endif
+
+    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_ARAL);
 }
 
 static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_t partition) {
@@ -1082,6 +1088,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         if(++spins > 1)
             __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
 
+        timing_dbengine_evict_init();
+
         usec_t started_pages_selection_ut;
         if(max_pages_to_evict > 1)
             started_pages_selection_ut = now_monotonic_usec();
@@ -1096,6 +1104,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         }
         else
             pgc_ll_lock(cache, &cache->clean);
+
+        timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_LOCK);
 
         // find a page to evict
         PGC_PAGE *pages_to_evict = NULL;
@@ -1160,6 +1170,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         }
         pgc_ll_unlock(cache, &cache->clean);
 
+        timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_SELECT);
+
         if(likely(pages_to_evict)) {
             // remove them from the index
 
@@ -1183,6 +1195,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pages_per_partition[partition], page, link.prev, link.next);
                 }
 
+                timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_UNLINK);
                 usec_t started_pages_eviction_ut = now_monotonic_usec();
 
                 // remove them from the index
@@ -1210,6 +1223,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     }
                 }
 
+                timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_DEINDEX);
                 usec_t started_pages_destruction_ut = now_monotonic_usec();
 
                 // free them
@@ -1219,15 +1233,23 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     for (PGC_PAGE *page = pages_per_partition[partition], *next = NULL; page; page = next) {
                         next = page->link.next;
 
+                        timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_LOOP);
+
                         size_t page_size = page->assumed_size;
                         free_this_page(cache, page, partition);
+
+                        timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_PAGE);
 
                         __atomic_sub_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
                         __atomic_sub_fetch(&cache->stats.evicting_size, page_size, __ATOMIC_RELAXED);
 
                         total_pages_evicted++;
+
+                        timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_ATOMICS);
                     }
                 }
+
+                timing_dbengine_evict_report();
 
                 usec_t finished_ut = now_monotonic_usec();
                 usec_t total_ut = finished_ut - started_pages_selection_ut;

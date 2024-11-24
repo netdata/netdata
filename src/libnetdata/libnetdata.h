@@ -296,6 +296,20 @@ typedef enum {
     TIMING_STEP_FREEIPMI_READ_event_offset_string,
     TIMING_STEP_FREEIPMI_READ_manufacturer_id,
 
+    TIMING_STEP_DBENGINE_EVICT_LOCK,
+    TIMING_STEP_DBENGINE_EVICT_SELECT,
+    TIMING_STEP_DBENGINE_EVICT_UNLINK,
+    TIMING_STEP_DBENGINE_EVICT_DEINDEX,
+    TIMING_STEP_DBENGINE_EVICT_FINISHED,
+    TIMING_STEP_DBENGINE_EVICT_FREE_LOOP,
+    TIMING_STEP_DBENGINE_EVICT_FREE_PAGE,
+    TIMING_STEP_DBENGINE_EVICT_FREE_ATOMICS,
+    TIMING_STEP_DBENGINE_EVICT_FREE_CB,
+    TIMING_STEP_DBENGINE_EVICT_FREE_ATOMICS2,
+    TIMING_STEP_DBENGINE_EVICT_FREE_ARAL,
+    TIMING_STEP_DBENGINE_EVICT_FREE_PGD_DATA,
+    TIMING_STEP_DBENGINE_EVICT_FREE_PGD_ARAL,
+
     // terminator
     TIMING_STEP_MAX,
 } TIMING_STEP;
@@ -315,6 +329,11 @@ typedef enum {
 #define timing_step(step) debug_dummy()
 #define timing_report() debug_dummy()
 #endif
+
+#define timing_dbengine_evict_init() timing_action(TIMING_ACTION_INIT, TIMING_STEP_INTERNAL)
+#define timing_dbengine_evict_step(step) timing_action(TIMING_ACTION_STEP, step)
+#define timing_dbengine_evict_report() timing_action(TIMING_ACTION_FINISH, TIMING_STEP_INTERNAL)
+
 void timing_action(TIMING_ACTION action, TIMING_STEP step);
 
 int hash256_string(const unsigned char *string, size_t size, char *hash);

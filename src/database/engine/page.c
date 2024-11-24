@@ -370,7 +370,11 @@ void pgd_free(PGD *pg)
             break;
     }
 
+    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_PGD_DATA);
+
     aral_freez(pgd_alloc_globals.aral_pgd, pg);
+
+    timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_PGD_ARAL);
 }
 
 // ----------------------------------------------------------------------------
