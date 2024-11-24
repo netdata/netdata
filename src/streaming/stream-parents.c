@@ -364,6 +364,8 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
              "Host: %s" HTTP_ENDL
              "User-Agent: %s/%s" HTTP_ENDL
              "Accept: */*" HTTP_ENDL
+             "Accept-Encoding: identity" HTTP_ENDL  // disable chunked encoding
+             "TE: identity" HTTP_ENDL               // disable chunked encoding
              "Pragma: no-cache" HTTP_ENDL
              "Cache-Control: no-cache" HTTP_ENDL
              "Connection: close" HTTP_HDR_END,
@@ -401,30 +403,86 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
     }
 
     // Receive HTTP response
-    ssize_t received = nd_sock_recv_timeout(&sock, buf, sizeof(buf) - 1, 0, 5);
-    if (received <= 0) {
-        d->selection.info = false;
-        stream_parent_nd_sock_error_to_reason(d, &sock);
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM PARENTS of %s: failed to receive stream info response from '%s': %s",
-               hostname, string2str(d->destination),
-               ND_SOCK_ERROR_2str(sock.error));
-        return false;
+    size_t total_received = 0;
+    size_t payload_received = 0;
+    size_t content_length = 0;
+    char *payload_start = NULL;
+
+    while (!payload_received || content_length <= payload_received) {
+        size_t remaining = sizeof(buf) - total_received;
+
+        if (remaining <= 1) {
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM PARENTS of %s: stream info receive buffer is full while receiving response from '%s'",
+                   hostname, string2str(d->destination));
+            d->selection.info = false;
+            d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
+            return false;
+        }
+
+        ssize_t received = nd_sock_recv_timeout(&sock, buf + total_received, remaining - 1, 0, 5);
+        if (received <= 0) {
+            if (sock.error == ND_SOCK_ERR_TIMEOUT)
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "STREAM PARENTS of %s: timeout while receiving stream info response from '%s'",
+                       hostname, string2str(d->destination));
+            else
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "STREAM PARENTS of %s: socket receive error while receiving stream info response from '%s'",
+                       hostname, string2str(d->destination));
+
+            d->selection.info = false;
+            stream_parent_nd_sock_error_to_reason(d, &sock);
+            return false;
+        }
+
+        total_received += received;
+        buf[total_received] = '\0';
+
+        if(!payload_start) {
+            char *headers_end = strstr(buf, HTTP_HDR_END);
+            if (!headers_end)
+                // we have not received the whole header yet
+                continue;
+
+            payload_start = headers_end + sizeof(HTTP_HDR_END) - 1;
+        }
+
+        // the payload size so far
+        payload_received = total_received - (payload_start - buf);
+
+        if(!content_length) {
+            char *content_length_ptr = strstr(buf, "Content-Length: ");
+            if (!content_length_ptr) {
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "STREAM PARENTS of %s: stream info response from '%s' does not have a Content-Length",
+                       hostname, string2str(d->destination));
+
+                d->selection.info = false;
+                d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
+                return false;
+            }
+            content_length = strtoul(content_length_ptr + strlen("Content-Length: "), NULL, 10);
+            if (!content_length) {
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "STREAM PARENTS of %s: stream info response from '%s' has invalid Content-Length",
+                       hostname, string2str(d->destination));
+
+                d->selection.info = false;
+                d->reason = STREAM_HANDSHAKE_INTERNAL_ERROR;
+                return false;
+            }
+        }
     }
-    buf[received] = '\0';
 
     // Parse HTTP response and extract JSON
-    char *json_start = strstr(buf, HTTP_HDR_END);
-    if (!json_start) return false;
-    json_start += sizeof(HTTP_HDR_END) - 1; // skip the entire header
-
-    CLEAN_JSON_OBJECT *jobj = json_tokener_parse(json_start);
+    CLEAN_JSON_OBJECT *jobj = json_tokener_parse(payload_start);
     if (!jobj) {
         d->selection.info = false;
         d->reason = STREAM_HANDSHAKE_NO_STREAM_INFO;
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM PARENTS of %s: failed to parse stream info response from '%s', JSON data: %s",
-               hostname, string2str(d->destination), json_start);
+               hostname, string2str(d->destination), payload_start);
         return false;
     }
 
