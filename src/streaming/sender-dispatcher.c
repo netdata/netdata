@@ -145,7 +145,7 @@ static bool stream_sender_log_dst_port(BUFFER *wb, void *ptr) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-#define MAX_DISPATCHERS 1
+#define MAX_DISPATCHERS 2
 
 struct dispatcher {
     int8_t id;
