@@ -336,15 +336,20 @@ typedef enum {
 #define timing_init() timing_action(TIMING_ACTION_INIT, TIMING_STEP_INTERNAL)
 #define timing_step(step) timing_action(TIMING_ACTION_STEP, step)
 #define timing_report() timing_action(TIMING_ACTION_FINISH, TIMING_STEP_INTERNAL)
-#else
-#define timing_init() debug_dummy()
-#define timing_step(step) debug_dummy()
-#define timing_report() debug_dummy()
-#endif
 
 #define timing_dbengine_evict_init() timing_action(TIMING_ACTION_INIT, TIMING_STEP_INTERNAL)
 #define timing_dbengine_evict_step(step) timing_action(TIMING_ACTION_STEP, step)
 #define timing_dbengine_evict_report() timing_action(TIMING_ACTION_FINISH, TIMING_STEP_INTERNAL)
+#else
+#define timing_init() debug_dummy()
+#define timing_step(step) debug_dummy()
+#define timing_report() debug_dummy()
+
+#define timing_dbengine_evict_init() debug_dummy()
+#define timing_dbengine_evict_step(step) debug_dummy()
+#define timing_dbengine_evict_report() debug_dummy()
+#endif
+
 
 void timing_action(TIMING_ACTION action, TIMING_STEP step);
 

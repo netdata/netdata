@@ -228,7 +228,7 @@ static inline size_t pgc_max_evictors(void) {
 }
 
 static inline size_t pgc_max_flushers(void) {
-    return 2;
+    return 2 + get_netdata_cpus() / 2;
 }
 
 #endif // DBENGINE_CACHE_H

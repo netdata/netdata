@@ -299,11 +299,11 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
 
     // protection against huge queries
     // if huge queries are running, or huge amounts need to be saved
-    // allow the cache to grow more (hot pages in main cache are also referenced)
+    // allow the cache to grow more (hot pages in the main cache are also referenced)
     if(unlikely(wanted_cache_size < referenced_size * 2 / 3))
         wanted_cache_size = referenced_size * 2 / 3;
 
-    // if we don't have enough clean pages, there is not reason to be aggressive or critical
+    // if we don't have enough clean pages, there is no reason to be aggressive or critical
     if(current_cache_size > wanted_cache_size && wanted_cache_size < current_cache_size - clean)
         wanted_cache_size = current_cache_size - clean;
 
@@ -318,7 +318,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     if(size_to_evict) {
         size_t target = (size_t)((uint64_t)wanted_cache_size * (uint64_t)cache->config.evict_low_threshold_per1000 / 1000ULL);
 
-        if(clean < wanted_cache_size - target)
+        if(target < wanted_cache_size - clean)
             target = wanted_cache_size - clean;
 
         if(current_cache_size > target)
@@ -1057,13 +1057,13 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             per1000 = cache_usage_per1000(cache, &max_size_to_evict);
             if(per1000 >= cache->config.severe_pressure_per1000) {
                 under_sever_pressure = true;
-                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 4096;
-                // max_pages_to_evict = 1;
+                // max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 4096;
+                max_pages_to_evict = 1;
             }
             else if(per1000 >= cache->config.aggressive_evict_per1000) {
                 under_sever_pressure = false;
-                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 128;
-                // max_pages_to_evict = 1;
+                // max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 128;
+                max_pages_to_evict = 1;
             }
             else {
                 under_sever_pressure = false;
@@ -1089,10 +1089,6 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
 
         timing_dbengine_evict_init();
-
-        usec_t started_pages_selection_ut;
-        if(max_pages_to_evict > 1)
-            started_pages_selection_ut = now_monotonic_usec();
 
         if(!all_of_them && !wait) {
             if(!pgc_ll_trylock(cache, &cache->clean)) {
@@ -1182,8 +1178,6 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             if(unlikely(pages_to_evict->link.next)) {
                 // we have many pages, let's minimize the index locks we are going to get
 
-                usec_t started_pages_sorting_ut = now_monotonic_usec();
-
                 PGC_PAGE *pages_per_partition[cache->config.partitions];
                 memset(pages_per_partition, 0, sizeof(PGC_PAGE *) * cache->config.partitions);
 
@@ -1200,7 +1194,6 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 }
 
                 timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_SORT);
-                usec_t started_pages_eviction_ut = now_monotonic_usec();
 
                 // remove them from the index
                 size_t remaining_partitions = cache->config.partitions;
@@ -1230,7 +1223,6 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 }
 
                 timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_DEINDEX);
-                usec_t started_pages_destruction_ut = now_monotonic_usec();
 
                 // free them
                 for (size_t partition = 0; partition < cache->config.partitions; partition++) {
@@ -1256,40 +1248,6 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 }
 
                 timing_dbengine_evict_report();
-
-                usec_t finished_ut = now_monotonic_usec();
-                usec_t total_ut = finished_ut - started_pages_selection_ut;
-
-                char size_txt[64];
-                size_snprintf(size_txt, sizeof(size_txt), pages_to_evict_size, "B", false);
-
-                usec_t selection_ut = started_pages_sorting_ut - started_pages_selection_ut;
-                char selection_txt[64];
-                duration_snprintf_usec_t(selection_txt, sizeof(selection_txt), selection_ut);
-
-                usec_t sorting_ut = started_pages_eviction_ut - started_pages_sorting_ut;
-                char sorting_txt[64];
-                duration_snprintf_usec_t(sorting_txt, sizeof(sorting_txt), sorting_ut);
-
-                usec_t eviction_ut = started_pages_destruction_ut - started_pages_eviction_ut;
-                char eviction_txt[64];
-                duration_snprintf_usec_t(eviction_txt, sizeof(eviction_txt), eviction_ut);
-
-                usec_t destruction_ut = finished_ut - started_pages_destruction_ut;
-                char destruction_txt[64];
-                duration_snprintf_usec_t(destruction_txt, sizeof(destruction_txt), destruction_ut);
-
-                char total_txt[64];
-                duration_snprintf_usec_t(total_txt, sizeof(total_txt), total_ut);
-
-                nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                       "EVICTION TIMINGS on cache %s: %zu pages (%s), selection: %s (%.1f%%), sorting: %s (%.1f%%), eviction: %s (%.1f%%), destruction: %s (%.1f%%), total: %s",
-                       cache->config.name, pages_to_evict_count, size_txt,
-                       selection_txt, (double)selection_ut * 100.0 / (double)total_ut,
-                       sorting_txt, (double)sorting_ut * 100.0 / (double)total_ut,
-                       eviction_txt, (double)eviction_ut * 100.0 / (double)total_ut,
-                       destruction_txt, (double)destruction_ut * 100.0 / (double)total_ut,
-                       total_txt);
             }
             else {
                 // just one page to be evicted
