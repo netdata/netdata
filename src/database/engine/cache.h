@@ -223,11 +223,11 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
 long get_netdata_cpus(void);
 
 static inline size_t pgc_max_evictors(void) {
-    return 2 + get_netdata_cpus() / 2;
+    return get_netdata_cpus();
 }
 
 static inline size_t pgc_max_flushers(void) {
-    return 2 + get_netdata_cpus() / 2;
+    return get_netdata_cpus();
 }
 
 #endif // DBENGINE_CACHE_H

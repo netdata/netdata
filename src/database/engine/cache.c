@@ -269,7 +269,11 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     const size_t dirty = __atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED);
     const size_t hot = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
     const size_t clean = __atomic_load_n(&cache->clean.stats->size, __ATOMIC_RELAXED);
-    const size_t current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED); // + pgc_aral_overhead();
+    const size_t evicting = __atomic_load_n(&cache->stats.evicting_size, __ATOMIC_RELAXED);
+    const size_t flushing = __atomic_load_n(&cache->stats.flushing_size, __ATOMIC_RELAXED);
+    const size_t current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED);
+    const size_t all_pages_size = hot + dirty + clean + evicting + flushing;
+    const size_t index = current_cache_size > all_pages_size ? current_cache_size - all_pages_size : 0;
     const size_t referenced_size = __atomic_load_n(&cache->stats.referenced_size, __ATOMIC_RELAXED);
 
     if(cache->config.options & PGC_OPTIONS_AUTOSCALE) {
@@ -280,7 +284,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
         const size_t max_size1 = MAX(hot_max, hot) * 2;
 
         // protection against slow flushing
-        const size_t max_size2 = hot_max + ((dirty_max < hot_max / 2) ? hot_max / 2 : dirty_max * 2);
+        const size_t max_size2 = hot_max + ((dirty_max * 2 < hot_max * 2 / 3) ? hot_max * 2 / 3 : dirty_max * 2) + index;
 
         // the final wanted cache size
         wanted_cache_size = MIN(max_size1, max_size2);
@@ -291,17 +295,17 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
                 wanted_cache_size = wanted_cache_size_cb;
         }
 
-        if (wanted_cache_size < hot + dirty + cache->config.clean_size)
-            wanted_cache_size = hot + dirty + cache->config.clean_size;
+        if (wanted_cache_size < hot + dirty + index + cache->config.clean_size)
+            wanted_cache_size = hot + dirty + index + cache->config.clean_size;
     }
     else
-        wanted_cache_size = hot + dirty + cache->config.clean_size;
+        wanted_cache_size = hot + dirty + index + cache->config.clean_size;
 
     // protection against huge queries
     // if huge queries are running, or huge amounts need to be saved
     // allow the cache to grow more (hot pages in the main cache are also referenced)
-    if(unlikely(wanted_cache_size < referenced_size * 2 / 3))
-        wanted_cache_size = referenced_size * 2 / 3;
+    if(unlikely(wanted_cache_size < referenced_size + dirty))
+        wanted_cache_size = referenced_size + dirty;
 
     // if we don't have enough clean pages, there is no reason to be aggressive or critical
     if(current_cache_size > wanted_cache_size && wanted_cache_size < current_cache_size - clean)
@@ -354,7 +358,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
 static void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
     const size_t per1000 = cache_usage_per1000(cache, NULL);
 
-    if (per1000 > cache->config.aggressive_evict_per1000 && spinlock_trylock(&cache->evictor.spinlock)) {
+    if (per1000 > cache->config.healthy_size_per1000 && spinlock_trylock(&cache->evictor.spinlock)) {
         __atomic_add_fetch(&cache->stats.waste_evict_thread_signals, 1, __ATOMIC_RELAXED);
         completion_mark_complete_a_job(&cache->evictor.completion);
         spinlock_unlock(&cache->evictor.spinlock);
@@ -1895,8 +1899,8 @@ PGC *pgc_create(const char *name,
 
     cache->config.max_workers_evict_inline    = max_inline_evictors;
     cache->config.severe_pressure_per1000     = 1100; // turn releasers into evictors above this threshold
-    cache->config.aggressive_evict_per1000    = 1050; // turn adders into evictors above this threshold
-    cache->config.healthy_size_per1000        =  980; // don't evict if current size is below this threshold
+    cache->config.aggressive_evict_per1000    = 1000; // turn adders into evictors above this threshold
+    cache->config.healthy_size_per1000        =  975; // don't evict if the current size is below this threshold
     cache->config.evict_low_threshold_per1000 =  900; // when evicting, bring the size down to this threshold
 
     {
