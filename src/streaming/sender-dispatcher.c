@@ -716,8 +716,9 @@ void *stream_sender_dispacther_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_PREP, "prep");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_POLL_ERROR, "disconnect poll error");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_PIPE_READ, "pipe read");
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_SOCKET_RECEIVE, "receive");
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_SOCKET_SEND, "send");
+    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_SOCKET_RECEIVE, "sock receive");
+    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_SOCKET_SEND, "sock send");
+    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_SOCKET_ERROR, "sock error");
     worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_EXECUTE, "execute");
 
     // disconnection reasons
