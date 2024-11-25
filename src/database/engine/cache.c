@@ -294,21 +294,23 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
             if(wanted_cache_size_cb > wanted_cache_size)
                 wanted_cache_size = wanted_cache_size_cb;
         }
+        else {
+            // ballooning to use all RAM and out of memory protection
+            const size_t mem_available = os_mem_available();
+            const size_t min_available = 3ULL * 1024 * 1024 * 1024;
+            if(mem_available < min_available)
+                // we must shrink
+                wanted_cache_size = current_cache_size - (min_available - mem_available);
+            else
+                // we can grow
+                wanted_cache_size = current_cache_size + (mem_available - min_available);
+        }
 
         if (wanted_cache_size < hot + dirty + index + cache->config.clean_size)
             wanted_cache_size = hot + dirty + index + cache->config.clean_size;
     }
     else
         wanted_cache_size = hot + dirty + index + cache->config.clean_size;
-
-    const size_t mem_available = os_mem_available();
-    const size_t min_available = 3ULL * 1024 * 1024 * 1024;
-    if(mem_available < min_available)
-        // we must shrink
-        wanted_cache_size = current_cache_size - (min_available - mem_available);
-    else
-        // we can grow
-        wanted_cache_size = current_cache_size + (mem_available - min_available);
 
     // protection against huge queries
     // if huge queries are running, or huge amounts need to be saved
