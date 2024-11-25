@@ -9,5 +9,5 @@ faster disks. This alert is triggered in critical state when the number deleted 
 
 ### Useful resources
 
-[Read more about Netdata DB engine](/src/database/README.md/engine)
+[Read more about Netdata DB engine](/src/database/engine/README.md)
 
