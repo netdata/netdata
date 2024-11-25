@@ -1,6 +1,6 @@
 # Database Configuration Reference
 
-This document will provide information on the available configuration options for the Agent's Database. For an explanation of the Database's elements, check the [Database overview page](/src/database/README.md)
+This document provides details on configuring the Agent's Database. For a deeper understanding of the Database components, see the [Database overview](/src/database/README.md).
 
 ## Modes
 
