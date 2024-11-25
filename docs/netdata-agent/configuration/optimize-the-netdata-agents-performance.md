@@ -22,8 +22,8 @@ The following table summarizes the effect of each optimization on the CPU, RAM a
 | [Use streaming and replication](#use-streaming-and-replication)                                            | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | [Disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors)                          | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | [Reduce data collection frequency](#reduce-collection-frequency)                                           | :heavy_check_mark: |                    | :heavy_check_mark: |
-| [Change how long Netdata stores metrics](/src/database/README.md#tiers)                                    |                    | :heavy_check_mark: | :heavy_check_mark: |
-| [Use a different metric storage database](/src/database/README.md)                                         |                    | :heavy_check_mark: | :heavy_check_mark: |
+| [Change how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers)                                    |                    | :heavy_check_mark: | :heavy_check_mark: |
+| [Use a different metric storage database](/src/database/CONFIGURATION.md)                                         |                    | :heavy_check_mark: | :heavy_check_mark: |
 | [Disable machine learning](#disable-machine-learning)                                                      | :heavy_check_mark: |                    |                    |
 | [Use a reverse proxy](#run-netdata-behind-a-proxy)                                                         | :heavy_check_mark: |                    |                    |
 | [Disable/lower gzip compression for the Agent dashboard](#disablelower-gzip-compression-for-the-dashboard) | :heavy_check_mark: |                    |                    |
@@ -72,8 +72,8 @@ The memory footprint of Netdata is mainly influenced by the number of metrics co
 To estimate and control memory consumption, you can (either one or a combination of the following actions):
 
 1. [Disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors)
-2. [Change how long Netdata stores metrics](/src/database/README.md#tiers)
-3. [Use a different metric storage database](/src/database/README.md).
+2. [Change how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers)
+3. [Use a different metric storage database](/src/database/CONFIGURATION.md#modes).
 
 ### Disk footprint and I/O
 
@@ -90,11 +90,11 @@ To optimize your disk footprint in any aspect described below, you can:
 
 To configure retention, you can:
 
-1. [Change how long Netdata stores metrics](/src/database/README.md#tiers).
+1. [Change how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
 To control disk I/O:
 
-1. [Use a different metric storage database](/src/database/README.md),
+1. [Use a different metric storage database](/src/database/CONFIGURATION.md),
 
 Minimize deployment impact on the production system by optimizing disk footprint:
 
@@ -123,7 +123,7 @@ in `stream.conf`). On the child nodes you should add to `netdata.conf` the follo
 
 ### Use memory mode ram for the child nodes
 
-See [using a different metric storage database](/src/database/README.md).
+See [using a different metric storage database](/src/database/README.md#modes).
 
 ## Disable unneeded plugins or collectors
 
@@ -211,11 +211,11 @@ update_every: 10
 ## Lower memory usage for metrics retention
 
 See how
-to [change how long Netdata stores metrics](/src/database/README.md#tiers).
+to [change how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
 ## Use a different metric storage database
 
-Consider [using a different metric storage database](/src/database/README.md)
+Consider [using a different metric storage database](/src/database/README.md#modes)
 when running Netdata on IoT devices, and for children in a parent-child set up based
 on [streaming and replication](/docs/observability-centralization-points/README.md).
 

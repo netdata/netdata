@@ -193,7 +193,7 @@ We also suggest that you:
 
    For increased security, user management and access to our latest features, tools and troubleshooting solutions.
 
-2. [Change how long Netdata stores metrics](/src/database/README.md#modes)
+2. [Change how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers)
 
    To control Netdata's memory use, when you have a lot of ephemeral metrics.
 

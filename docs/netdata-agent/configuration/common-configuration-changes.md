@@ -19,7 +19,7 @@ changes reflected in those visualizations due to the way Netdata Cloud proxies m
 
 ### Increase the long-term metrics retention period
 
-Read our doc on [increasing long-term metrics storage](/src/database/README.md#tiers) for details.
+Read our doc on [increasing long-term metrics storage](/src/database/CONFIGURATION.md#tiers) for details.
 
 ## Modify alerts and notifications
 
