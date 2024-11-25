@@ -139,7 +139,7 @@ Install `smartmontools` version 7.0 or later using your distribution's package m
 
     > **Multiple Devices**: These examples only show mapping of one device (/dev/sda). You'll need to add additional `--device` options (in docker run) or entries in the `devices` list (in docker-compose.yml) for each storage device you want Netdata's smartctl collector to monitor.
 
-    > **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nvme#readme) to monitor NVMe devices.
+    > **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nvme#readme) to monitor NVMe devices.
 
 
 

@@ -13,7 +13,7 @@ Learn more about [how collectors work](/src/collectors/README.md), and then lear
 
 If you don't see the app/service you'd like to monitor in this list:
 
-- If your application has a Prometheus endpoint, Netdata can monitor it! Look at our [generic Prometheus collector](/src/go/plugin/go.d/modules/prometheus/README.md).
+- If your application has a Prometheus endpoint, Netdata can monitor it! Look at our [generic Prometheus collector](/src/go/plugin/go.d/collector/prometheus/README.md).
 
 - If your application is instrumented to expose [StatsD](https://blog.netdata.cloud/introduction-to-statsd/) metrics, see our [generic StatsD collector](/src/collectors/statsd.plugin/README.md).
 

@@ -41,7 +41,7 @@ We recommend a few strategies for organizing your Rooms.
   If you have a user-facing SaaS product, or an internal service that this said product relies on, you may want to monitor that entire stack in a single Room. This might include Kubernetes clusters, Docker containers, proxies, databases, web servers, brokers, and more. End-to-end Rooms are valuable tools for ensuring the health and performance of your organization's essential services.
 
 - **Incident response**  
-  You can also create new Rooms as one of the first steps in your incident response process. For example, you have a user-facing web app that relies on Apache Pulsar for a message queue, and one of your nodes using the [Pulsar collector](/src/go/plugin/go.d/modules/pulsar/README.md) begins reporting a suspiciously low messages rate. You can create a Room called `$year-$month-$day-pulsar-rate`, add all your Pulsar nodes in addition to nodes they connect to, and begin diagnosing the root cause in a Room optimized for getting to resolution as fast as possible.
+  You can also create new Rooms as one of the first steps in your incident response process. For example, you have a user-facing web app that relies on Apache Pulsar for a message queue, and one of your nodes using the [Pulsar collector](/src/go/plugin/go.d/collector/pulsar/README.md) begins reporting a suspiciously low messages rate. You can create a Room called `$year-$month-$day-pulsar-rate`, add all your Pulsar nodes in addition to nodes they connect to, and begin diagnosing the root cause in a Room optimized for getting to resolution as fast as possible.
 
 ### Add Rooms
 
