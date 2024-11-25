@@ -22,6 +22,7 @@ func (h *Hpssa) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
 	h.collectControllers(mx, controllers)
+
 	h.updateCharts(controllers)
 
 	return mx, nil

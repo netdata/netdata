@@ -19,6 +19,7 @@ var (
 
 	dataP212andP410i, _    = os.ReadFile("testdata/ssacli-P212_P410i.txt")
 	dataP400ar, _          = os.ReadFile("testdata/ssacli-P400ar.txt")
+	dataP408ia, _          = os.ReadFile("testdata/ssacli-P408i-a.txt")
 	dataP400iUnassigned, _ = os.ReadFile("testdata/ssacli-P400i-unassigned.txt")
 )
 
@@ -29,6 +30,7 @@ func Test_testDataIsValid(t *testing.T) {
 
 		"dataP212andP410i":    dataP212andP410i,
 		"dataP400ar":          dataP400ar,
+		"dataP408ia":          dataP408ia,
 		"dataP400iUnassigned": dataP400iUnassigned,
 	} {
 		require.NotNil(t, data, name)
@@ -293,6 +295,40 @@ func TestHpssa_Collect(t *testing.T) {
 				"pd_2I:1:8_ld_2_array_B_cntrl_P440ar_slot_0_temperature": 29,
 			},
 		},
+		"success P408i-a": {
+			prepareMock: prepareMockOkP408ia,
+			wantCharts: len(controllerChartsTmpl)*1 - 1 +
+				len(arrayChartsTmpl)*1 +
+				len(logicalDriveChartsTmpl)*1 +
+				len(physicalDriveChartsTmpl)*4,
+			wantMetrics: map[string]int64{
+				"array_A_cntrl_HPE_slot_P408i-a_status_nok":                 0,
+				"array_A_cntrl_HPE_slot_P408i-a_status_ok":                  1,
+				"cntrl_HPE_slot_P408i-a_cache_battery_status_nok":           0,
+				"cntrl_HPE_slot_P408i-a_cache_battery_status_ok":            1,
+				"cntrl_HPE_slot_P408i-a_cache_presence_status_not_present":  0,
+				"cntrl_HPE_slot_P408i-a_cache_presence_status_present":      1,
+				"cntrl_HPE_slot_P408i-a_cache_status_nok":                   0,
+				"cntrl_HPE_slot_P408i-a_cache_status_ok":                    1,
+				"cntrl_HPE_slot_P408i-a_status_nok":                         0,
+				"cntrl_HPE_slot_P408i-a_status_ok":                          1,
+				"cntrl_HPE_slot_P408i-a_temperature":                        52,
+				"ld_1_array_A_cntrl_HPE_slot_P408i-a_status_nok":            0,
+				"ld_1_array_A_cntrl_HPE_slot_P408i-a_status_ok":             1,
+				"pd_2I:1:1_ld_1_array_A_cntrl_HPE_slot_P408i-a_status_nok":  0,
+				"pd_2I:1:1_ld_1_array_A_cntrl_HPE_slot_P408i-a_status_ok":   1,
+				"pd_2I:1:1_ld_1_array_A_cntrl_HPE_slot_P408i-a_temperature": 34,
+				"pd_2I:1:2_ld_1_array_A_cntrl_HPE_slot_P408i-a_status_nok":  0,
+				"pd_2I:1:2_ld_1_array_A_cntrl_HPE_slot_P408i-a_status_ok":   1,
+				"pd_2I:1:2_ld_1_array_A_cntrl_HPE_slot_P408i-a_temperature": 34,
+				"pd_2I:1:3_ld_1_array_A_cntrl_HPE_slot_P408i-a_status_nok":  0,
+				"pd_2I:1:3_ld_1_array_A_cntrl_HPE_slot_P408i-a_status_ok":   1,
+				"pd_2I:1:3_ld_1_array_A_cntrl_HPE_slot_P408i-a_temperature": 28,
+				"pd_2I:1:4_ld_1_array_A_cntrl_HPE_slot_P408i-a_status_nok":  0,
+				"pd_2I:1:4_ld_1_array_A_cntrl_HPE_slot_P408i-a_status_ok":   1,
+				"pd_2I:1:4_ld_1_array_A_cntrl_HPE_slot_P408i-a_temperature": 30,
+			},
+		},
 		"success P400i with Unassigned": {
 			prepareMock: prepareMockOkP400iUnassigned,
 			wantCharts: (len(controllerChartsTmpl)*1 - 2) +
@@ -373,6 +409,11 @@ func prepareMockOkP212andP410i() *mockSsacliExec {
 func prepareMockOkP400ar() *mockSsacliExec {
 	return &mockSsacliExec{
 		infoData: dataP400ar,
+	}
+}
+func prepareMockOkP408ia() *mockSsacliExec {
+	return &mockSsacliExec{
+		infoData: dataP408ia,
 	}
 }
 
