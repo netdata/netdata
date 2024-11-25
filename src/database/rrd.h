@@ -1060,6 +1060,7 @@ struct alarm_entry {
     RRDCALC_STATUS new_status;
 
     uint32_t flags;
+    bool pending_save;
 
     int delay;
     time_t delay_up_to_timestamp;
