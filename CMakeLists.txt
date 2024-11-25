@@ -208,34 +208,6 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
-cmake_dependent_option(ENABLE_MIMALLOC "Enable mimalloc allocator" ON
-        "CMAKE_SIZEOF_VOID_P EQUAL 8; NOT APPLE; NOT ANDROID; NOT OPENBSD" OFF)
-
-if(ENABLE_MIMALLOC)
-        function(netdata_add_mimalloc)
-                set(MI_BUILD_STATIC ON CACHE INTERNAL "")
-                set(MI_BUILD_SHARED OFF CACHE INTERNAL "")
-                set(MI_BUILD_OBJECT OFF CACHE INTERNAL "")
-                set(MI_BUILD_TESTS OFF CACHE INTERNAL "")
-
-                if(ENABLE_ADDRESS_SANITIZER)
-                        set(MI_TRACK_ASAN On CACHE INTERNAL "")
-                endif()
-
-                include(FetchContent)
-                include(NetdataFetchContentExtra)
-
-                FetchContent_Declare(
-                        mimalloc
-                        GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
-                        GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f # v2.1.7
-                )
-                FetchContent_MakeAvailable_NoInstall(mimalloc)
-        endfunction()
-
-        netdata_add_mimalloc()
-endif()
-
 if(ENABLE_PLUGIN_GO)
     include(NetdataGoTools)
 
@@ -1872,7 +1844,6 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 # target_link_libraries(test Threads::Threads)
 
 target_link_libraries(libnetdata PUBLIC
-        mimalloc-static
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
         "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid>"
