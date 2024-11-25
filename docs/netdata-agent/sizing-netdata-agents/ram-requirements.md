@@ -6,7 +6,7 @@ Using the default [Database Tier configuration](/docs/netdata-agent/configuratio
 
 Netdata by default should need 100MB to 200MB of RAM, depending on the number of metrics being collected.
 
-This number can be lowered by limiting the number of Database Tiers or switching Database modes. For more information, check [Disk Requirements and Retention](/src/database/README.md).
+This number can be lowered by limiting the number of Database Tiers or switching Database modes. For more information, check [the Database section of our documentation](/src/database/README.md).
 
 ## Parents
 
