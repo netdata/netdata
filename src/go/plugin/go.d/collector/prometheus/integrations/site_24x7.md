@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/prometheus/integrations/site_24x7.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/prometheus/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/integrations/site_24x7.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/metadata.yaml"
 sidebar_label: "Site 24x7"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Synthetic Checks"

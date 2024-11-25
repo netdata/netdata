@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/prometheus/integrations/sql_database_agnostic.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/prometheus/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/integrations/sql_database_agnostic.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/metadata.yaml"
 sidebar_label: "SQL Database agnostic"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Databases"
