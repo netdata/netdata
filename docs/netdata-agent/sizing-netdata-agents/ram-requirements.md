@@ -12,22 +12,22 @@ This number can be lowered by limiting the number of Database Tiers or switching
 
 | Description                          |         Scope         | RAM Required |                      Notes                       |
 |:-------------------------------------|:---------------------:|:------------:|:------------------------------------------------:|
-| metrics with retention               | time-series in the db |    1 KiB     |              Metadata and indexes                |
+| metrics with retention               | time-series in the db |    1 KiB     |               Metadata and indexes               |
 | metrics currently collected          | time-series collected |    20 KiB    | 16 KiB for db + 4 KiB for collection structures  |
-| metrics with Machine Learning Models | time-series collected |    5 KiB     |        The trained models per dimension          |
-| nodes with retention                 |    nodes in the db    |    10 KiB    |              Metadata and indexes                |
-| nodes currently received             |    nodes collected    |   512 KiB    |        Structures and reception buffers          |
+| metrics with Machine Learning Models | time-series collected |    5 KiB     |         The trained models per dimension         |
+| nodes with retention                 |    nodes in the db    |    10 KiB    |               Metadata and indexes               |
+| nodes currently received             |    nodes collected    |   512 KiB    |         Structures and reception buffers         |
 | nodes currently sent                 |    nodes collected    |   512 KiB    |         Structures and dispatch buffers          |
 
 These numbers vary depending on name length, the number of dimensions per instance and per context, the number and length of the labels added, the number of Machine Learning models maintained and similar parameters. For most use cases, they represent the worst case scenario, so you may find out Netdata actually needs less than that.
 
-Each metric currently being collected needs (1 index + 20 collection + 5 ml) = 26 KiB.  When it stops being collected it needs 1 KiB (index).
+Each metric currently being collected needs (1 index + 20 collection + 5 ml) = 26 KiB.  When it stops being collected, it needs 1 KiB (index).
 
-Each node currently being collected needs (10 index + 512 reception + 512 dispatch) = 1034 KiB. When it stops being collected it needs 10 KiB (index).
+Each node currently being collected needs (10 index + 512 reception + 512 dispatch) = 1034 KiB. When it stops being collected, it needs 10 KiB (index).
 
 ### Example
 
-A Netdata Parents cluster (2 nodes) has 1 million currently collected metrics from 500 nodes, and 10 million archived metrics from 5000 nodes:
+A Netdata cluster (two Parents) has one million currently collected metrics from 500 nodes, and 10 million archived metrics from 5000 nodes:
 
 | Description                          |  Entries   | RAM per Entry |    Total RAM |
 |:-------------------------------------|:----------:|:-------------:|-------------:|
@@ -39,7 +39,7 @@ A Netdata Parents cluster (2 nodes) has 1 million currently collected metrics fr
 | nodes currently sent                 |    500     |    512 KiB    |      256 MiB |
 | **Memory required per node**         |            |               | **35.7 GiB** |
 
-On highly volatile environments (like Kubernetes clusters), the Database retention can significantly affect memory usage. Usually reducing retention on higher Database Tiers helps reducing memory usage.
+In highly volatile environments (like Kubernetes clusters), Database retention can significantly affect memory usage. Usually, reducing retention on higher Database Tiers helps to reduce memory usage.
 
 ## Database Size
 
@@ -69,7 +69,7 @@ about 16 GiB
 
 Logs usually require significantly more disk space and I/O bandwidth than metrics. For optimal performance, we recommend to store metrics and logs on separate, independent disks.
 
-Netdata uses direct-I/O for its Database, in order to not pollute the system caches with its own data.
+Netdata uses direct-I/O for its Database to not pollute the system caches with its own data.
 
 To optimize disk I/O, Netdata maintains its own private caches. The default settings of these caches are automatically adjusted to the minimum required size for acceptable metrics query performance.
 
