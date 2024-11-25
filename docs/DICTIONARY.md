@@ -29,6 +29,7 @@ When the context is clear, we can omit the "Netdata" prefix for brevity.
 | Term                    | Abbreviation | Definition                                                                                      |
 |-------------------------|:------------:|-------------------------------------------------------------------------------------------------|
 | **Machine Learning**    |      ML      | An umbrella term for Netdata's ML-powered features                                              |
+| **Model(s)**            |              | Uppercase when referring to the ML Models Netdata uses                                          |
 | **Anomaly Detection**   |              | The capability to identify unusual patterns in metrics                                          |
 | **Metric Correlations** |              | Filters dashboard to show metrics with the most significant changes in the selected time window |
 | **Anomaly Advisor**     |              | The interface and tooling for analyzing detected anomalies                                      |
