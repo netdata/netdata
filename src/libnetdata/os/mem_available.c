@@ -42,22 +42,11 @@ uint64_t os_mem_available(void) {
 
 // Linux
 #if defined(OS_LINUX)
-#if defined(HAVE_SYSINFO)
-#include <linux/sysinfo.h>
-#include <sys/sysinfo.h>
-uint64_t os_mem_available(void) {
-    struct sysinfo info;
-    if (sysinfo(&info) == 0)
-        return (uint64_t)info.freeram * info.mem_unit;
-
-    return 0;
-}
-#else
 uint64_t os_mem_available(void) {
     static uint64_t last_mem_available = 0;
     static usec_t last_ut = 0;
     usec_t now_ut = now_monotonic_usec();
-    if(last_ut + 1 * USEC_PER_MS > now_ut)
+    if(last_ut + USEC_PER_MS / 2 > now_ut)
         return last_mem_available;
 
     last_ut = now_ut;
@@ -80,7 +69,7 @@ uint64_t os_mem_available(void) {
     size_t lines = procfile_lines(ff);
     for(size_t line = 0; line < lines ;line++) {
         if(strcmp(procfile_lineword(ff, line, 0), "MemAvailable") == 0) {
-            last_mem_available = str2ull(procfile_lineword(ff, line, 1), NULL);
+            last_mem_available = str2ull(procfile_lineword(ff, line, 1), NULL) * 1024;
             return last_mem_available;
         }
     }
@@ -88,7 +77,6 @@ uint64_t os_mem_available(void) {
     last_mem_available = 0;
     return 0;
 }
-#endif
 #endif
 
 // FreeBSD

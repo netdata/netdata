@@ -389,7 +389,7 @@ void pgd_free(PGD *pg)
                     timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GMALLOC);
                 }
                 else
-                    fatal("Invalid raw page type %d, of size %zu", pg->raw.type, pg->raw.size);
+                    fatal("Invalid raw page type %d, of size %u", pg->raw.type, (unsigned)pg->raw.size);
 
                 pg->raw.data = NULL;
                 pg->raw.size = 0;

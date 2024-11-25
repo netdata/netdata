@@ -301,6 +301,15 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     else
         wanted_cache_size = hot + dirty + index + cache->config.clean_size;
 
+    const size_t mem_available = os_mem_available();
+    const size_t min_available = 3ULL * 1024 * 1024 * 1024;
+    if(mem_available < min_available)
+        // we must shrink
+        wanted_cache_size = current_cache_size - (min_available - mem_available);
+    else
+        // we can grow
+        wanted_cache_size = current_cache_size + (mem_available - min_available);
+
     // protection against huge queries
     // if huge queries are running, or huge amounts need to be saved
     // allow the cache to grow more (hot pages in the main cache are also referenced)
@@ -1833,7 +1842,7 @@ static void *evict_thread(void *ptr) {
     unsigned job_id = 0;
 
     while (true) {
-        job_id = completion_wait_for_a_job_with_timeout(&cache->evictor.completion, job_id, 100);
+        job_id = completion_wait_for_a_job_with_timeout(&cache->evictor.completion, job_id, 50);
         if (nd_thread_signaled_to_cancel())
             return NULL;
 
@@ -1900,9 +1909,9 @@ PGC *pgc_create(const char *name,
 
     cache->config.max_workers_evict_inline    = max_inline_evictors;
     cache->config.severe_pressure_per1000     = 1000; // turn releasers into evictors above this threshold
-    cache->config.aggressive_evict_per1000    =  990; // turn adders into evictors above this threshold
-    cache->config.healthy_size_per1000        =  950; // don't evict if the current size is below this threshold
-    cache->config.evict_low_threshold_per1000 =  900; // when evicting, bring the size down to this threshold
+    cache->config.aggressive_evict_per1000    =  995; // turn adders into evictors above this threshold
+    cache->config.healthy_size_per1000        =  980; // don't evict if the current size is below this threshold
+    cache->config.evict_low_threshold_per1000 =  970; // when evicting, bring the size down to this threshold
 
     {
         spinlock_init(&cache->evictor.spinlock);
