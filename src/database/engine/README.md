@@ -12,7 +12,7 @@ DBENGINE is the time-series database of Netdata.
 
 A **data point** has:
 
-1. A **value**, the data collected for a metric.  There is a special **value** to indicate that the collector failed to collect a valid value, and thus the data point is a **gap**.
+1. A **value**, the data collected for a metric. There is a special **value** to indicate that the collector failed to collect a valid value, and thus the data point is a **gap**.
 2. A **timestamp**, the time it has been collected.
 3. A **duration**, the time between this and the previous data collection.
 4. A flag which is set when machine-learning categorized the collected value as **anomalous** (an outlier based on the trained models).
@@ -34,6 +34,7 @@ When data points are stored in higher tiers (time aggregations - see [Tiers](#Ti
 This design allows Netdata to accurately know the **average**, **minimum**, **maximum** and **anomaly rate** values even when using higher tiers to satisfy a query.
 
 ### Pages
+
 Data points are organized into **pages**, i.e., segments of contiguous data collections of the same metric.
 
 Each page:
@@ -110,10 +111,10 @@ Tiers are supported in Netdata Agents with version `netdata-1.35.0.138.nightly` 
 
 Updating the higher **tiers** is automated, and it happens in real-time while data are being collected for **tier 0**.
 
-When the Netdata Agent starts, during the first data collection of each metric, higher tier are automatically **backfilled** with 
+When the Netdata Agent starts, during the first data collection of each metric, higher tier are automatically **backfilled** with
 data from lower tiers, so that the aggregation they provide will be accurate.
 
-Configuring how the number of tiers and the disk space allocated to each tier is how you can 
+Configuring how the number of tiers and the disk space allocated to each tier is how you can
 [change how long netdata stores metrics](/src/database/README.md#tiers).
 
 ### Data loss
@@ -175,7 +176,6 @@ On bigger setups open cache will get a bigger LRU by automatically sizing it (th
 #### Extent Cache
 
 Caches compressed **extent** data, to avoid reading too repeatedly the same data from disks.
-
 
 ### Shared Memory
 
