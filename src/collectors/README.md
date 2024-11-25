@@ -11,11 +11,10 @@ If you don't see charts for your application, check our collectors' [configurati
 
 Netdata's collectors are specialized data collection plugins that gather metrics from various sources. They are divided into two main categories:
 
-| Type     | Description                                                           | Key Features                                                                                                                                                                                                           |
-|----------|-----------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Internal | Native collectors that gather system-level metrics                    | • Written in `C` for optimal performance<br/>• Run as threads within Netdata daemon<br/>• Zero external dependencies<br/>• Minimal system overhead                                                                        |
+| Type     | Description                                                           | Key Features                                                                                                                                                                                                               |
+|----------|-----------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Internal | Native collectors that gather system-level metrics                    | • Written in `C` for optimal performance<br/>• Run as threads within Netdata daemon<br/>• Zero external dependencies<br/>• Minimal system overhead                                                                         |
 | External | Modular collectors that gather metrics from applications and services | • Support multiple programming languages<br/>• Run as independent processes<br/>• Communicate via pipes with Netdata<br/>• Managed by [plugins.d](/src/plugins.d/README.md)<br/>• Examples: MySQL, Nginx, Redis collectors |
-
 
 ## Collector Privileges
 

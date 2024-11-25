@@ -3,7 +3,7 @@
 The list of supported collectors can be found in the [Collecting Metrics](/src/collectors/README.md) section,
 and on [our website](https://www.netdata.cloud/integrations).
 
-The documentation of each Collector provides all the necessary configuration options and prerequisites for that collector. In most cases, either the charts are automatically generated without any configuration, or you just fulfil those prerequisites and configure the collector.
+The documentation of each Collector provides all the necessary configuration options and prerequisites for that collector. In most cases, either the charts are automatically generated without any configuration, or you fulfil those prerequisites and configure the collector.
 
 > **Info**
 >
@@ -38,7 +38,7 @@ After you make your changes, restart the Agent with the [appropriate method](/do
 
 ## Adjust data collection frequency
 
-In some scenarios you might want to increase or decrease the data collection frequency of the Collectors as it directly affects CPU utilization.
+In some scenarios, you might want to increase or decrease the data collection frequency of the Collectors as it directly affects CPU utilization.
 
 ### Global
 
@@ -49,7 +49,7 @@ The default is `1`, meaning that the Agent collects metrics every second.
 > **Note**
 >
 > If the `update every` for an individual collector is less than the global, the Netdata Agent uses the global setting.
-If you change this to `2`, Netdata enforces a minimum `update every` setting of 2 seconds, and collects metrics every other second, which will effectively halve CPU utilization.
+> If you change this to `2`, Netdata enforces a minimum `update every` setting of 2 seconds, and collects metrics every other second, which will effectively halve CPU utilization.
 
 ```text
 [global]
@@ -64,7 +64,7 @@ After you make your changes, restart the Agent with the [appropriate method](/do
 
 Every Collector and Plugin have their own `update every` settings, which you can also change in their respective configuration files.
 
-To reduce the collection frequency of a [Plugin](/src/collectors/README.md#collector-architecture-and-terminology), open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) and find the appropriate section.
+To reduce the collection frequency of a plugin, open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) and find the appropriate section.
 
 For example, to reduce the frequency of the `apps` plugin:
 
