@@ -247,6 +247,38 @@ uint32_t gorilla_buffer_patch(gorilla_buffer_t *gbuf) {
     return n;
 }
 
+size_t gorilla_buffer_unpatched_nbuffers(const gorilla_buffer_t *gbuf) {
+    size_t nbuffers = 0;
+    while(gbuf) {
+        nbuffers++;
+
+        if(gbuf->header.next) {
+            const auto *buf = reinterpret_cast<const uint32_t *>(gbuf);
+            gbuf = reinterpret_cast<const gorilla_buffer_t *>(&buf[RRDENG_GORILLA_32BIT_BUFFER_SLOTS]);
+        }
+        else
+            break;
+    }
+
+    return nbuffers;
+}
+
+size_t gorilla_buffer_unpatched_nbytes(const gorilla_buffer_t *gbuf) {
+    size_t nbytes = 0;
+    while(gbuf) {
+        nbytes += sizeof(gorilla_buffer_t) + (gbuf->header.nbits + (CHAR_BIT - 1)) / CHAR_BIT;
+
+        if(gbuf->header.next) {
+            const auto *buf = reinterpret_cast<const uint32_t *>(gbuf);
+            gbuf = reinterpret_cast<const gorilla_buffer_t *>(&buf[RRDENG_GORILLA_32BIT_BUFFER_SLOTS]);
+        }
+        else
+            break;
+    }
+
+    return nbytes;
+}
+
 gorilla_reader_t gorilla_writer_get_reader(const gorilla_writer_t *gw)
 {
     const gorilla_buffer_t *buffer = __atomic_load_n(&gw->head_buffer, __ATOMIC_SEQ_CST);
