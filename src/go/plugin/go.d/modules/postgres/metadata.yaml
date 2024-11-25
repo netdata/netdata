@@ -67,6 +67,12 @@ modules:
               CREATE USER netdata;
               GRANT pg_monitor TO netdata;
               ```
+
+              If you are using postgres with docker, you should set password for netdata user:
+
+              ```postgresql
+              ALTER USER netdata WITH PASSWORD 'postgres';
+              ```
               
               After creating the new user, restart the Netdata Agent with `sudo systemctl restart netdata`, or
               the [appropriate method](/docs/netdata-agent/start-stop-restart.md) for your
