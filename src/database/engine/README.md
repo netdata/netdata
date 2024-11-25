@@ -19,22 +19,22 @@ A **data point** has:
 
 Using the **timestamp** and **duration**, Netdata calculates for each point its **start time**, **end time** and **update every**.
 
-For incremental metrics (counters), Netdata interpolates the collected values to align them to the expected **end time** at the microsecond level,  absorbing data collection micro-latencies.
+For incremental metrics (counters), Netdata interpolates the collected values to align them to the expected **end time** at the microsecond level, absorbing data collection micro-latencies.
 
 When data points are stored in higher tiers (time aggregations - see [Tiers](#Tiers) below), each data point has:
 
-1. The **sum** of the original values that have been aggregated,
-2. The **count**  of all the original values aggregated,
+1. The **sum** of the original values that have been aggregated
+2. The **count** of all the original values aggregated,
 3. The **minimum** value among them,
 4. The **maximum** value among them,
-5. Their **anomaly rate**, i.e. the count of values that were detected as outliers based on the currently trained models for the metric,
+5. Their **anomaly rate**, i.e., the count of values that were detected as outliers based on the currently trained models for the metric
 6. A **timestamp**, which is the equal to the **end time** of the last point aggregated,
 7. A **duration**, which is the duration between the **first time** of the first point aggregated to the **end time** of the last point aggregated.
 
 This design allows Netdata to accurately know the **average**, **minimum**, **maximum** and **anomaly rate** values even when using higher tiers to satisfy a query.
 
 ### Pages
-Data points are organized into **pages**, i.e. segments of contiguous data collections of the same metric.
+Data points are organized into **pages**, i.e., segments of contiguous data collections of the same metric.
 
 Each page:
 
@@ -46,7 +46,7 @@ Each page:
 
 A **page** is a simple array of values. Each slot in the array has a **timestamp** implied by its position in the array, and each value stored represents the **data point** for that time, for the metric the page belongs to.
 
-This simple fixed step page design allows Netdata to collect several millions of points per second and pack all the values in a compact form with minimal metadata overhead.
+This fixed step page design allows Netdata to collect several millions of points per second and pack all the values in a compact form with minimal metadata overhead.
 
 #### Hot Pages
 
@@ -58,7 +58,7 @@ Once a **hot page** is full, it becomes a **dirty page**, and it is scheduled fo
 
 #### Clean Pages
 
-Flushed (saved) pages are **clean pages**, i.e. read-only pages that reside primarily on disk, and are loaded on demand to satisfy data queries.
+Flushed (saved) pages are **clean pages**, i.e., read-only pages that reside primarily on disk, and are loaded on demand to satisfy data queries.
 
 #### Pages Configuration
 
@@ -96,7 +96,7 @@ Each **datafile** has two **journal files** with metadata related to the stored 
 
 Database rotation is achieved by deleting the oldest **datafile** (and its journals) and creating a new one (with its journals).
 
-Data on disk are append-only. There is no way to delete, add, or update data in the middle of the database. If data are not useful for whatever reason, Netdata can be instructed to ignore these data. They will eventually be deleted from disk when the database is rotated. New data are always appended.
+Data on disk are append-only. There is no way to delete, add, or update data in the middle of the database. If data are not useful for whatever reason, Netdata can be instructed to ignore these data. They will eventually be deleted from the disk when the database is rotated. New data are always appended.
 
 #### Tiers
 
@@ -110,7 +110,7 @@ Tiers are supported in Netdata Agents with version `netdata-1.35.0.138.nightly` 
 
 Updating the higher **tiers** is automated, and it happens in real-time while data are being collected for **tier 0**.
 
-When the Netdata Agent starts, during the first data collection of each metric, higher tiers are automatically **backfilled** with 
+When the Netdata Agent starts, during the first data collection of each metric, higher tier are automatically **backfilled** with 
 data from lower tiers, so that the aggregation they provide will be accurate.
 
 Configuring how the number of tiers and the disk space allocated to each tier is how you can 
@@ -118,7 +118,7 @@ Configuring how the number of tiers and the disk space allocated to each tier is
 
 ### Data loss
 
-Until **hot pages** and **dirty pages** are **flushed** to disk they are at risk (e.g. due to a crash, or
+Until **hot pages** and **dirty pages** are **flushed** to disk, they are at risk (e.g., due to a crash, or
 power failure), as they are stored only in memory.
 
 The supported way of ensuring high data availability is the use of Netdata Parents to stream the data in real-time to
@@ -132,7 +132,7 @@ See [change how long netdata stores metrics](/src/database/README.md#tiers)
 
 Netdata has several protection mechanisms to prevent the use of more memory (than the above), by incrementally fetching data from disk and aggressively evicting old data to make Room for new data, but still memory may grow beyond the above limit under the following conditions:
 
-1. The number of pages concurrently used in queries do not fit the in the above size. This can happen when multiple queries of unreasonably long time-frames run on lower, higher resolution, tiers. The Netdata query planner attempts to avoid such situations by gradually loading pages, but still under extreme conditions the system may use more memory to satisfy these queries.
+1. The number of pages concurrently used in queries does not fit in the above size. This can happen when multiple queries of unreasonably long time-frames run on lower, higher resolution tiers. The Netdata query planner attempts to avoid such situations by gradually loading pages, but still under extreme conditions, the system may use more memory to satisfy these queries.
 
 2. The disks that host Netdata files are extremely slow for the workload required by the database so that data cannot be flushed to disk quickly to free memory. Netdata will automatically spawn more flushing workers in an attempt to parallelize and speed up flushing, but still if the disks cannot write the data quickly enough, they will remain in memory until they are written to disk.
 
@@ -154,11 +154,11 @@ memory in KiB = METRICS x (TIERS - 1) x 4KiB x 2 + 32768 KiB
 
 the part `METRICS x (TIERS - 1) x 4KiB` is an estimate for the max hot size of the main cache. Tier 0 pages are 4KiB, but tier 1 pages are 2 KiB and tier 2 pages are 384 bytes. So a single metric in 3 tiers uses 4096 + 2048 + 384 = 6528 bytes. The equation estimates 8192 per metric, which includes cache internal structures and leaves some spare.
 
-Then `x 2` is the worst case estimate for the dirty queue. If all collected metrics (hot) become available for saving at once, to avoid stopping data collection all their pages will become dirty and new hot pages will be created instantly. To save memory, when Netdata starts, DBENGINE allocates randomly smaller pages for metrics, to spread their completion evenly across time.
+Then `x 2` is the worst case estimate for the dirty queue. If all collected metrics (hot) become available for saving at once, to avoid stopping data collection, all their pages will become dirty and new hot pages will be created instantly. To save memory, when Netdata starts, DBENGINE allocates randomly smaller pages for metrics, to spread their completion evenly across time.
 
 The memory we saved with the above is used to improve the LRU cache. So, although we reserved 32MiB for the LRU, in bigger setups (Netdata Parents) the LRU grows a lot more, within the limits of the equation.
 
-In practice, the main cache sizes itself with `hot x 1.5` instead of `host x 2`. The reason is that 5% of main cache is reserved for expanding open cache, 5% for expanding extent cache and we need Room for the extensive buffers that are allocated in these setups. When the main cache exceeds `hot x 1.5` it enters a mode of critical evictions, and aggresively frees pages from the LRU to maintain a healthy memory footprint within its design limits.
+In practice, the main cache sizes itself with `hot x 1.5` instead of `host x 2`. The reason is that 5% of the main cache is reserved for expanding open cache, 5% for expanding extent cache, and we need Room for the extensive buffers that are allocated in these setups. When the main cache exceeds `hot x 1.5` it enters a mode of critical evictions, and aggressively frees pages from the LRU to maintain a healthy memory footprint within its design limits.
 
 #### Open Cache
 
@@ -166,9 +166,9 @@ Stores metadata about on disk pages. Not the data itself. Only metadata about th
 
 Its primary use is to index information about the open datafile, the one that still accepts new pages. Once that datafile becomes full, all the hot pages of the open cache are indexed in journal v2 files.
 
-The clean queue is an LRU for reducing the journal v2 scans during quering.
+The clean queue is an LRU for reducing the journal v2 scans during querying.
 
-Open cache uses memory ballooning too, like the main cache, based on its own hot pages. Open cache hot size is mainly controlled by the size of the open datafile. This is why on netdata versions with journal files v2, we decreased the maximum datafile size from 1GB to 512MB and we increased the target number of datafiles from 20 to 50.
+Open cache uses memory ballooning too, like the main cache, based on its own hot pages. Open cache hot size is mainly controlled by the size of the open datafile. This is why on netdata versions with journal files v2, we decreased the maximum datafile size from 1GB to 512MB, and we increased the target number of datafiles from 20 to 50.
 
 On bigger setups open cache will get a bigger LRU by automatically sizing it (the whole open cache) to 5% to the size of (the whole) main cache.
 
