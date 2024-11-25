@@ -1,0 +1,317 @@
+HPE Smart Array P408i-a SR Gen10 in Slot 0 (Embedded)
+   Bus Interface: PCI
+   Slot: 0
+   Serial Number: REDACTED
+   RAID 6 Status: Enabled
+   Controller Status: OK
+   Hardware Revision: B
+   Firmware Version: 6.52
+   Firmware Supports Online Firmware Activation: False
+   Rebuild Priority: Medium
+   Expand Priority: Medium
+   Surface Scan Delay: 3 secs
+   Surface Scan Mode: Idle
+   Parallel Surface Scan Supported: Yes
+   Current Parallel Surface Scan Count: 1
+   Max Parallel Surface Scan Count: 16
+   Queue Depth: Automatic
+   Monitor and Performance Delay: 60  min
+   Elevator Sort: Enabled
+   Degraded Performance Optimization: Disabled
+   Inconsistency Repair Policy: Disabled
+   Write Cache Bypass Threshold Size: 1040 KiB
+   Wait for Cache Room: Disabled
+   Surface Analysis Inconsistency Notification: Disabled
+   Post Prompt Timeout: 15 secs
+   Cache Board Present: True
+   Cache Status: OK
+   Cache Ratio: 20% Read / 80% Write
+   Configured Drive Write Cache Policy: Enable
+   Unconfigured Drive Write Cache Policy: Default
+   Total Cache Size: 2.0
+   Total Cache Memory Available: 1.8
+   Battery Backed Cache Size: 1.8
+   No-Battery Write Cache: Enabled
+   SSD Caching RAID5 WriteBack Enabled: True
+   SSD Caching Version: 2
+   Cache Backup Power Source: Batteries
+   Battery/Capacitor Count: 1
+   Battery/Capacitor Status: OK
+   SATA NCQ Supported: True
+   Spare Activation Mode: Activate on physical drive failure (default)
+   Controller Temperature (C): 52
+   Number of Ports: 2 Internal only
+   Encryption: Not Set
+   Express Local Encryption: False
+   SED Encryption: Off
+   Driver Name: smartpqi
+   Driver Version: Linux 2.1.18-045
+   WWN Port: 51402EC01526FD80
+   PCI Address (Domain:Bus:Device.Function): 0000:5C:00.0
+   Negotiated PCIe Data Rate: PCIe 3.0 x8 (7880 MB/s)
+   Controller Mode: Mixed
+   Port Max Phy Rate Limiting Supported: False
+   Latency Scheduler Setting: Disabled
+   Current Power Mode: MaxPerformance
+   Survival Mode: Enabled
+   Host Serial Number: REDACTED
+   Sanitize Erase Supported: True
+   Sanitize Lock: None
+   Sensor ID: 0
+      Location: Inlet Ambient
+      Current Value (C): 45
+      Max Value Since Power On: 45
+   Sensor ID: 1
+      Location: ASIC
+      Current Value (C): 52
+      Max Value Since Power On: 53
+   Sensor ID: 2
+      Location: Top
+      Current Value (C): 48
+      Max Value Since Power On: 48
+   Primary Boot Volume: None
+   Secondary Boot Volume: None
+   SPDM Supports Get Slot Certificate Chain: no
+   SPDM Supports Get Controller Info       : no
+   SPDM Supports Get Slot Info             : no
+   SPDM Supports Set Import Certificate    : no
+   SPDM Supports Set Invalidate Slot       : no
+   Surface Scan Completion Supported: True
+   Persistent Event Log Policy Change Supported: False
+
+
+
+
+   Internal Drive Cage at Port 1I, Box 0, OK
+
+      Drive Bays: 4
+      Port: 1I
+      Box: 0
+      Location: Internal
+
+   Physical Drives
+      None attached
+
+
+
+   Internal Drive Cage at Port 2I, Box 1, OK
+
+      Drive Bays: 4
+      Port: 2I
+      Box: 1
+      Location: Internal
+
+   Physical Drives
+      physicaldrive 2I:1:1 (port 2I:box 1:bay 1, SATA SSD, 960 GB, OK)
+      physicaldrive 2I:1:2 (port 2I:box 1:bay 2, SATA SSD, 960 GB, OK)
+      physicaldrive 2I:1:3 (port 2I:box 1:bay 3, SATA SSD, 960 GB, OK)
+      physicaldrive 2I:1:4 (port 2I:box 1:bay 4, SATA SSD, 960 GB, OK)
+
+
+   Port Name: 1I
+         Port ID: 0
+         Port Mode: Mixed
+         Port Connection Number: 0
+         SAS Address: 51402EC01526FD80
+         Port Location: Internal
+         Port Phy Count: 4
+
+   Port Name: 2I
+         Port ID: 1
+         Port Mode: Mixed
+         Port Connection Number: 1
+         SAS Address: 51402EC01526FD84
+         Port Location: Internal
+         Port Phy Count: 4
+
+   Array: A
+      Interface Type: Solid State SATA
+      Unused Space: 0 MB (0.00%)
+      Used Space: 3.49 TB (100.00%)
+      Status: OK
+      MultiDomain Status: OK
+      Array Type: Data
+      Smart Path: disable
+
+
+      Logical Drive: 1
+         Size: 1.75 TB
+         Fault Tolerance: 6
+         Heads: 255
+         Sectors Per Track: 32
+         Cylinders: 65535
+         Strip Size: 256 KB
+         Full Stripe Size: 512 KB
+         Status: OK
+         Unrecoverable Media Errors: None
+         MultiDomain Status: OK
+         Caching:  Enabled
+         Parity Initialization Status: Initialization Completed
+         Last Surface Scan Completed: True
+         Last Surface Scan Completion Timestamp: 2024-05-15 14:14:19
+         Last Surface Scan Duration: 1 hr 26 mins 52 secs
+         Unique Identifier: 600508B1001C8CC3C673A109DD66DDBB
+         Disk Name: /dev/sda
+         Mount Points: 1.7 TiB Partition   2, 512 MiB Partition   1 /, /boot/efi
+         Disk Partition Information
+            Partition   2: Basic, 1.7 TiB, /
+            Partition   1: Basic, 512 MiB, /boot/efi
+         Logical Drive Label: LD-SSD
+         Drive Type: Data
+         LD Acceleration Method: Controller Cache
+
+
+      physicaldrive 2I:1:1
+         Port: 2I
+         Box: 1
+         Bay: 1
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: Solid State SATA
+         Size: 960 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/4096
+         Firmware Revision: D0MU075
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MTFDDAK960TCB
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 34
+         Maximum Temperature (C): 38
+         Usage remaining: 98.00%
+         Power On Hours: 45068
+         Estimated Life Remaining based on workload to date: 92013 days
+         SSD Smart Trip Wearout: False
+         PHY Count: 1
+         PHY Transfer Rate: 6.0Gbps
+         PHY Physical Link Rate: 6.0Gbps
+         PHY Maximum Link Rate: 6.0Gbps
+         Drive Authentication Status: OK
+         Carrier Application Version: 11
+         Carrier Bootloader Version: 6
+         Sanitize Erase Supported: True
+         Sanitize Freeze Lock Supported: True
+         Sanitize Anti-Freeze Lock Supported: True
+         Sanitize Lock: None
+         Unrestricted Sanitize Supported: True
+         Shingled Magnetic Recording Support: None
+         Drive Unique ID: 33BF2C5DD81EC5C8
+
+      physicaldrive 2I:1:2
+         Port: 2I
+         Box: 1
+         Bay: 2
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: Solid State SATA
+         Size: 960 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/4096
+         Firmware Revision: D0MU075
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MTFDDAK960TCB
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 34
+         Maximum Temperature (C): 35
+         Usage remaining: 98.00%
+         Power On Hours: 45068
+         Estimated Life Remaining based on workload to date: 92013 days
+         SSD Smart Trip Wearout: False
+         PHY Count: 1
+         PHY Transfer Rate: 6.0Gbps
+         PHY Physical Link Rate: 6.0Gbps
+         PHY Maximum Link Rate: 6.0Gbps
+         Drive Authentication Status: OK
+         Carrier Application Version: 11
+         Carrier Bootloader Version: 6
+         Sanitize Erase Supported: True
+         Sanitize Freeze Lock Supported: True
+         Sanitize Anti-Freeze Lock Supported: True
+         Sanitize Lock: None
+         Unrestricted Sanitize Supported: True
+         Shingled Magnetic Recording Support: None
+         Drive Unique ID: 70F2A7A96CE53401
+
+      physicaldrive 2I:1:3
+         Port: 2I
+         Box: 1
+         Bay: 3
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: Solid State SATA
+         Size: 960 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/4096
+         Firmware Revision: D0MU075
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MTFDDAK960TCB
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 28
+         Maximum Temperature (C): 36
+         Usage remaining: 97.00%
+         Power On Hours: 43032
+         Estimated Life Remaining based on workload to date: 57973 days
+         SSD Smart Trip Wearout: False
+         PHY Count: 1
+         PHY Transfer Rate: 6.0Gbps
+         PHY Physical Link Rate: 6.0Gbps
+         PHY Maximum Link Rate: 6.0Gbps
+         Drive Authentication Status: OK
+         Carrier Application Version: 11
+         Carrier Bootloader Version: 6
+         Sanitize Erase Supported: True
+         Sanitize Freeze Lock Supported: True
+         Sanitize Anti-Freeze Lock Supported: True
+         Sanitize Lock: None
+         Unrestricted Sanitize Supported: True
+         Shingled Magnetic Recording Support: None
+         Drive Unique ID: 19B9A16C9A418BC9
+
+      physicaldrive 2I:1:4
+         Port: 2I
+         Box: 1
+         Bay: 4
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: Solid State SATA
+         Size: 960 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/4096
+         Firmware Revision: D0MU075
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MTFDDAK960TCB
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 30
+         Maximum Temperature (C): 42
+         Usage remaining: 100.00%
+         Power On Hours: 45128
+         SSD Smart Trip Wearout: False
+         PHY Count: 1
+         PHY Transfer Rate: 6.0Gbps
+         PHY Physical Link Rate: 6.0Gbps
+         PHY Maximum Link Rate: 6.0Gbps
+         Drive Authentication Status: OK
+         Carrier Application Version: 11
+         Carrier Bootloader Version: 6
+         Sanitize Erase Supported: True
+         Sanitize Freeze Lock Supported: True
+         Sanitize Anti-Freeze Lock Supported: True
+         Sanitize Lock: None
+         Unrestricted Sanitize Supported: True
+         Shingled Magnetic Recording Support: None
+         Drive Unique ID: 60E5A2F4F88397DB
+
+
+   SEP (Vendor ID HPE, Model Smart Adapter) 379
+      Device Number: 379
+      Firmware Version: 6.52
+      WWID: REDACTED
+      Vendor ID: HPE
+      Model: Smart Adapter

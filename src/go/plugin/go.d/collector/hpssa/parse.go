@@ -124,7 +124,7 @@ func parseSsacliControllersInfo(data []byte) (map[string]*hpssaController, error
 		case line == "":
 			section = ""
 			continue
-		case strings.HasPrefix(line, "Smart Array"):
+		case strings.HasPrefix(line, "HPE Smart Array"), strings.HasPrefix(line, "Smart Array"):
 			section = "controller"
 
 			v, err := parseControllerLine(line)
