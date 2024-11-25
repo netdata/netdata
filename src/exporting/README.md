@@ -11,7 +11,7 @@ The exporting engine has a modular structure and supports metric exporting via m
 the same time. You can have different update intervals and filters configured for every exporting connector instance.
 
 When you enable the exporting engine and a connector, the Netdata Agent exports metrics _beginning from the time you
-restart its process_, not the entire [database of long-term metrics](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
+restart its process_, not the entire [database of long-term metrics](/src/database/README.md).
 
 Since Netdata collects thousands of metrics per server per second, which would easily congest any database server when
 several Netdata servers are sending data to it, Netdata allows sending metrics at a lower frequency, by resampling them.

@@ -16,6 +16,7 @@ When the context is clear, we can omit the "Netdata" prefix for brevity.
 | Term                 | Definition                                         |
 |----------------------|----------------------------------------------------|
 | **Tier** (**Tiers**) | Database storage layers with different granularity |
+| **Mode(s)**          | The different Modes of the Database                |
 
 ## Streaming
 

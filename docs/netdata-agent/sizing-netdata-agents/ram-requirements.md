@@ -1,6 +1,6 @@
 # RAM Utilization
 
-Using the default [Database Tier configuration](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md), Netdata needs about 16KiB per unique metric collected, independently of the data collection frequency.
+Using the default [Database Tier configuration](/src/database/README.md#tiers), Netdata needs about 16KiB per unique metric collected, independently of the data collection frequency.
 
 ## Children
 

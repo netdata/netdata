@@ -1,153 +1,141 @@
 # Database
 
-Netdata is fully capable of long-term metrics storage, at per-second granularity, via its default database engine
-(`dbengine`). But to remain as flexible as possible, Netdata supports several storage options:
+Netdata stores detailed metrics at one-second granularity using its Database engine.
 
-1. `dbengine`, (the default) data are in database files. The [Database Engine](/src/database/engine/README.md) works like a
-   traditional database. There is some amount of RAM dedicated to data caching and indexing and the rest of the data
-   reside compressed on disk. The number of history entries is not fixed in this case, but depends on the configured
-   disk space and the effective compression ratio of the data stored. This is the **only mode** that supports changing
-   the data collection update frequency (`update every`) **without losing** the previously stored metrics. For more
-   details see [here](/src/database/engine/README.md).
+## Modes
 
-2. `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
+| Mode       | Description                                                                                                                                                                                                                                           |
+|------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `dbengine` | Stores data in a database with RAM for caching and indexing, while keeping compressed data on disk. Storage capacity depends on available disk space and data compression ratio.  For details, see [Database Engine](/src/database/engine/README.md). |
+| `ram`      | Stores data entirely in memory without disk persistence.                                                                                                                                                                                              |
+| `none`     | Operates without storage (metrics can only be streamed to another Agent).                                                                                                                                                                             |
 
-3. `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the fallback for all others
-   except `none`.
+The default `dbengine` mode is optimized for:
 
-4. `none`, without a database (collected metrics can only be streamed to another Netdata).
+- Long-term data retention
+- Parent nodes in [Centralization](/docs/observability-centralization-points/README.md) setups
 
-## Which database mode to use
+For resource-constrained environments, particularly Child nodes in Centralization setups, consider using `ram`.
 
-The default mode `[db].mode = dbengine` has been designed to scale for longer retentions and is the only mode suitable
-for parent Agents in the _Parent - Child_ setups
-
-The other available database modes are designed to minimize resource utilization and should only be considered on
-[Parent - Child](/docs/observability-centralization-points/README.md) setups at the children side and only when the
-resource constraints are very strict.
-
-So,
-
-- On a single node setup, use `[db].mode = dbengine`.
-- On a [Parent - Child](/docs/observability-centralization-points/README.md) setup, use `[db].mode = dbengine` on the
-  parent to increase retention, and a more resource-efficient mode like, `dbengine` with light retention settings, `ram`, or `none` for the children to minimize resource utilization.
-
-## Choose your database mode
-
-You can select the database mode by editing `netdata.conf` and setting:
+Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) to open `netdata.conf` and set your preferred mode:
 
 ```text
 [db]
-  # dbengine (default), ram (the default if dbengine not available), alloc, none
+  # dbengine, ram, none
   mode = dbengine
 ```
 
-## Netdata Longer Metrics Retention
+## Tiers
 
-Metrics retention is controlled only by the disk space allocated to storing metrics. But it also affects the memory and
-CPU required by the Agent to query longer timeframes.
+Netdata offers a granular approach to data retention, allowing you to manage storage based on both **time** and **disk space**. This provides greater control and helps you optimize storage usage for your specific needs.
 
-Since Netdata Agents usually run on the edge, on production systems, Netdata Agent **parents** should be considered.
-When having a [**parent - child**](/docs/observability-centralization-points/README.md) setup, the child (the
-Netdata Agent running on a production system) delegates all of its functions, including longer metrics retention and
-querying, to the parent node that can dedicate more resources to this task. A single Netdata Agent parent can centralize
-multiple children Netdata Agents (dozens, hundreds, or even thousands depending on its available resources).
+**Default Retention Limits**:
 
-## Running Netdata on embedded devices
+| Tier |     Resolution      | Time Limit | Size Limit (min 256 MB) |
+|:----:|:-------------------:|:----------:|:-----------------------:|
+|  0   |  high (per second)  |    14d     |          1 GiB          |
+|  1   | middle (per minute) |    3mo     |          1 GiB          |
+|  2   |   low (per hour)    |     2y     |          1 GiB          |
 
-Embedded devices typically have very limited RAM resources available.
+> **Note**
+>
+> If a user sets a disk space size less than 256 MB for a tier, Netdata will automatically adjust it to 256 MB.
 
-There are two settings for you to configure:
+With these defaults, Netdata requires approximately 4 GiB of storage space (including metadata).
 
-1. `[db].update every`, which controls the data collection frequency
-2. `[db].retention`, which controls the size of the database in memory (except for `[db].mode = dbengine`)
+### Retention Settings
 
-By default `[db].update every = 1` and `[db].retention = 3600`. This gives you an hour of data with per second updates.
+> **Important**
+>
+> In a Parent-Child setup, these settings manage the entire storage space used by the Parent for storing metrics collected both by itself and its Children.
 
-If you set `[db].update every = 2` and `[db].retention = 1800`, you will still have an hour of data, but collected once
-every 2 seconds. This will **cut in half** both CPU and RAM resources consumed by Netdata. Of course experiment a bit to find the right setting.
-On very weak devices you might have to use `[db].update every = 5` and `[db].retention = 720` (still 1 hour of data, but
-1/5 of the CPU and RAM resources).
+You can fine-tune retention for each tier by setting a time limit or size limit. Setting a limit to 0 disables it. This enables the following retention strategies:
 
-You can also disable [data collection plugins](/src/collectors/README.md) that you don't need. Disabling such plugins will also
-free both CPU and RAM resources.
+| Setting                        | Retention Behavior                                                                                                                       |
+|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| Size Limit = 0, Time Limit > 0 | **Time based:** data is stored for a specific duration regardless of disk usage                                                          |
+| Time Limit = 0, Size Limit > 0 | **Space based:** data is stored with a disk space limit, regardless of time                                                              |
+| Time Limit > 0, Size Limit > 0 | **Combined time and space limits:** data is deleted once it reaches either the time limit or the disk space limit, whichever comes first |
 
-## Memory optimizations
+You can change these limits using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) to open `netdata.conf`:
 
-### KSM
+```text
+[db]
+    mode = dbengine
+    storage tiers = 3
 
-KSM performs memory deduplication by scanning through main memory for physical pages that have identical content, and
-identifies the virtual pages that are mapped to those physical pages. It leaves one page unchanged, and re-maps each
-duplicate page to point to the same physical page. Netdata offers all of its in-memory database to kernel for
-deduplication.
+    # Tier 0, per second data. Set to 0 for no limit.
+    dbengine tier 0 retention size = 1GiB
+    dbengine tier 0 retention time = 14d
 
-In the past, KSM has been criticized for consuming a lot of CPU resources. This is true when KSM is used for
-deduplicating certain applications, but it is not true for Netdata. Agent's memory is written very infrequently
-(if you have 24 hours of metrics in Netdata, each byte at the in-memory database will be updated just once per day). KSM
-is a solution that will provide 60+% memory savings to Netdata.
+    # Tier 1, per minute data. Set to 0 for no limit.
+    dbengine tier 1 retention size = 1GiB
+    dbengine tier 1 retention time = 3mo
 
-### Enable KSM in kernel
-
-To enable KSM in kernel, you need to run a kernel compiled with the following:
-
-```sh
-CONFIG_KSM=y
+    # Tier 2, per hour data. Set to 0 for no limit.
+    dbengine tier 2 retention size = 1GiB
+    dbengine tier 2 retention time = 2y
 ```
 
-When KSM is enabled at the kernel, it is just available for the user to enable it.
+### Monitoring Retention Utilization
 
-If you build a kernel with `CONFIG_KSM=y`, you will just get a few files in `/sys/kernel/mm/ksm`. Nothing else
-happens. There is no performance penalty (apart from the memory this code occupies into the kernel).
+Netdata provides a visual representation of storage utilization for both the time and space limits across all Tiers under "Netdata" -> "dbengine retention" on the dashboard. This chart shows exactly how your storage space (disk space limits) and time (time limits) are used for metric retention.
 
-The files that `CONFIG_KSM=y` offers include:
+### Legacy configuration
 
-- `/sys/kernel/mm/ksm/run` by default `0`. You have to set this to `1` for the kernel to spawn `ksmd`.
-- `/sys/kernel/mm/ksm/sleep_millisecs`, by default `20`. The frequency ksmd should evaluate memory for deduplication.
-- `/sys/kernel/mm/ksm/pages_to_scan`, by default `100`. The amount of pages ksmd will evaluate on each run.
+<details><summary>v1.99.0 and prior</summary>
 
-So, by default `ksmd` is just disabled. It will not harm performance and the user/admin can control the CPU resources
-they are willing to have used by `ksmd`.
+Netdata prior to v2 supports the following configuration options in  `netdata.conf`.
+They have the same defaults as the latest v2, but the unit of each value is given in the option name, not at the value.
 
-### Run `ksmd` kernel daemon
-
-To activate / run `ksmd,` you need to run the following:
-
-```sh
-echo 1 >/sys/kernel/mm/ksm/run
-echo 1000 >/sys/kernel/mm/ksm/sleep_millisecs
+```text
+storage tiers = 3
+# Tier 0, per second data. Set to 0 for no limit.
+dbengine tier 0 disk space MB = 1024
+dbengine tier 0 retention days = 14
+# Tier 1, per minute data. Set to 0 for no limit.
+dbengine tier 1 disk space MB = 1024
+dbengine tier 1 retention days = 90
+# Tier 2, per hour data. Set to 0 for no limit.
+dbengine tier 2 disk space MB = 1024
+dbengine tier 2 retention days = 730
 ```
 
-With these settings, ksmd does not even appear in the running process list (it will run once per second and evaluate 100
-pages for de-duplication).
+</details>
 
-Put the above lines in your boot sequence (`/etc/rc.local` or equivalent) to have `ksmd` run at boot.
+<details><summary>v1.45.6 and prior</summary>
 
-### Monitoring Kernel Memory de-duplication performance
+Netdata versions prior to v1.46.0 relied on disk space-based retention.
 
-Netdata will create charts for kernel memory de-duplication performance, the **deduper (ksm)** charts can be seen under the **Memory** section in the Netdata UI.
+**Default Retention Limits**:
 
-#### KSM summary
+| Tier |     Resolution      | Size Limit |
+|:----:|:-------------------:|:----------:|
+|  0   |  high (per second)  |   256 MB   |
+|  1   | middle (per minute) |   128 MB   |
+|  2   |   low (per hour)    |   64 GiB   |
 
-The summary gives you a quick idea of how much savings (in terms of bytes and in terms of percentage) KSM is able to achieve.
+You can change these limits in `netdata.conf`:
 
-![image](https://user-images.githubusercontent.com/24860547/199454880-123ae7c4-071a-4811-95b8-18cf4e4f60a2.png)
+```text
+[db]
+    mode = dbengine
+    storage tiers = 3
+    # Tier 0, per second data
+    dbengine multihost disk space MB = 256
+    # Tier 1, per minute data
+    dbengine tier 1 multihost disk space MB = 1024
+    # Tier 2, per hour data
+    dbengine tier 2 multihost disk space MB = 1024
+```
 
-#### KSM pages merge performance
+</details>
 
-This chart indicates the performance of page merging. **Shared** indicates used shared pages, **Unshared** indicates memory no longer shared (pages are unique but repeatedly checked for merging), **Sharing** indicates memory currently shared(how many more sites are sharing the pages, i.e. how much saved) and **Volatile** indicates volatile pages (changing too fast to be placed in a tree).
+## Cache sizes
 
-A high ratio of Sharing to Shared indicates good sharing, but a high ratio of Unshared to Sharing indicates wasted effort.
+There are two cache sizes that can be configured in `netdata.conf` to better optimize the Database:
 
-![image](https://user-images.githubusercontent.com/24860547/199455374-d63fd2c2-e12b-4ddf-947b-35371215eb05.png)
+1. `[db].dbengine page cache size`: this is the main cache that keeps metrics data into memory. When data is not found in it, the extent cache is consulted, and if not found in that too, they are loaded from the disk.
+2. `[db].dbengine extent cache size`: this is the compressed extent cache. It keeps in memory compressed data blocks, as they appear on disk, to avoid reading them again. Data found in the extent cache but not in the main cache have to be uncompressed to be queried.
 
-#### KSM savings
-
-This chart shows the amount of memory saved by KSM. **Savings** indicates saved memory. **Offered** indicates memory marked as mergeable.
-
-![image](https://user-images.githubusercontent.com/24860547/199455604-43cd9248-1f6e-4c31-be56-e0b9e432f48a.png)
-
-#### KSM effectiveness
-
-This chart tells you how well KSM is doing at what it is supposed to. It does this by charting the percentage of the mergeable pages that are currently merged.
-
-![image](https://user-images.githubusercontent.com/24860547/199455770-4d7991ff-6b7e-4d96-9d23-33ffc572b370.png)
+Both of them are dynamically adjusted to use some of the total memory computed above. The configuration in `netdata.conf` allows providing additional memory to them, increasing their caching efficiency.
