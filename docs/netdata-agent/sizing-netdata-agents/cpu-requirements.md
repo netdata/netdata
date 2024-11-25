@@ -6,7 +6,7 @@ Netdata's CPU usage depends on the features you enable. For details, see [resour
 
 With default settings on Children, CPU utilization typically falls within the range of 1% to 5% of a single core. This includes the combined resource usage of:
 
-- Three Database Tiers for data storage
+- Three Database Tiers for storage
 - ML for Anomaly Detection
 - Per-second data collection
 - Alerts
