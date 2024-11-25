@@ -75,7 +75,7 @@ def main():
         invalid_cats = set(module['meta']['monitored_instance']['categories']) - valid_categories
 
         if invalid_cats:
-            print(f':error file={ check_path }:Invalid categories found in module { idx } in { check_path }: { ", ".joiin(invalid_cats) }.')
+            print(f':error file={ check_path }:Invalid categories found in module { idx } in { check_path }: { ", ".join(invalid_cats) }.')
             failed = True
 
     if failed:
