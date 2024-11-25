@@ -95,7 +95,6 @@ Use the alphabetized list below to find the answer to your single-term questions
 
 - [**Metrics Streaming Replication**](/docs/observability-centralization-points/README.md): Each node running Netdata can stream the metrics it collects, in real time, to another node. Metric streaming allows you to replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database (TSDB).
 
-- [**Module**](/src/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module): A type of collector.
 
 ## N
 
