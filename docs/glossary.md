@@ -35,7 +35,7 @@ Use the alphabetized list below to find the answer to your single-term questions
 
 - [**Cloud** or **Netdata Cloud**](/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
-- [**Collector**](/src/collectors/README.md#collector-architecture-and-terminology): A catch-all term for any Netdata process that gathers metrics from an endpoint.
+- [**Collector**](/src/collectors/README.md): A catch-all term for any Netdata process that gathers metrics from an endpoint.
 
 - [**Community**](https://community.netdata.cloud/): As a company with a passion and genesis in open-source, we are not just very proud of our community, but we consider our users, fans, and chatters to be an imperative part of the Netdata experience and culture.
 
@@ -75,7 +75,7 @@ Use the alphabetized list below to find the answer to your single-term questions
 
 ## I
 
-- [**Internal plugins**](/src/collectors/README.md#collector-architecture-and-terminology): These gather metrics from `/proc`, `/sys`, and other Linux kernel sources. They are written in `C` and run as threads within the Netdata daemon.
+- [**Internal plugins**](/src/collectors/README.md): These gather metrics from `/proc`, `/sys`, and other Linux kernel sources. They are written in `C` and run as threads within the Netdata daemon.
 
 ## K
 
@@ -111,7 +111,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Obsoletion**(of nodes)](/docs/dashboards-and-charts/nodes-tab.md): Removing nodes from a space.
 
-- [**Orchestrators**](/src/collectors/README.md#collector-architecture-and-terminology): External plugins that run and manage one or more modules. They run as independent processes.
+- [**Orchestrators**](/src/collectors/README.md): External plugins that run and manage one or more modules. They run as independent processes.
 
 ## P
 

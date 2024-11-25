@@ -17,16 +17,16 @@ Netdata for production use.
 
 The following table summarizes the effect of each optimization on the CPU, RAM and Disk IO utilization in production.
 
-| Optimization                                                                                                                      | CPU                | RAM                | Disk IO            |
-|-----------------------------------------------------------------------------------------------------------------------------------|--------------------|--------------------|--------------------|
-| [Use streaming and replication](#use-streaming-and-replication)                                                                   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| [Disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors)                                                 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| [Reduce data collection frequency](#reduce-collection-frequency)                                                                  | :heavy_check_mark: |                    | :heavy_check_mark: |
-| [Change how long Netdata stores metrics](/src/database/README.md#tiers) |                    | :heavy_check_mark: | :heavy_check_mark: |
-| [Use a different metric storage database](/src/database/README.md)                                                                |                    | :heavy_check_mark: | :heavy_check_mark: |
-| [Disable machine learning](#disable-machine-learning)                                                                             | :heavy_check_mark: |                    |                    |
-| [Use a reverse proxy](#run-netdata-behind-a-proxy)                                                                                | :heavy_check_mark: |                    |                    |
-| [Disable/lower gzip compression for the Agent dashboard](#disablelower-gzip-compression-for-the-dashboard)                        | :heavy_check_mark: |                    |                    |
+| Optimization                                                                                               | CPU                | RAM                | Disk IO            |
+|------------------------------------------------------------------------------------------------------------|--------------------|--------------------|--------------------|
+| [Use streaming and replication](#use-streaming-and-replication)                                            | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| [Disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors)                          | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| [Reduce data collection frequency](#reduce-collection-frequency)                                           | :heavy_check_mark: |                    | :heavy_check_mark: |
+| [Change how long Netdata stores metrics](/src/database/README.md#tiers)                                    |                    | :heavy_check_mark: | :heavy_check_mark: |
+| [Use a different metric storage database](/src/database/README.md)                                         |                    | :heavy_check_mark: | :heavy_check_mark: |
+| [Disable machine learning](#disable-machine-learning)                                                      | :heavy_check_mark: |                    |                    |
+| [Use a reverse proxy](#run-netdata-behind-a-proxy)                                                         | :heavy_check_mark: |                    |                    |
+| [Disable/lower gzip compression for the Agent dashboard](#disablelower-gzip-compression-for-the-dashboard) | :heavy_check_mark: |                    |                    |
 
 ## Resources required by a default Netdata installation
 
@@ -127,8 +127,7 @@ See [using a different metric storage database](/src/database/README.md).
 
 ## Disable unneeded plugins or collectors
 
-If you know that you don't need an [entire plugin or a specific
-collector](/src/collectors/README.md#collector-architecture-and-terminology),
+If you know that you don't need an [entire plugin or a specific collector](/src/collectors/README.md),
 you can disable any of them. Keep in mind that if a plugin/collector has nothing to do, it simply shuts down and doesn’t consume system resources. You will only improve the Agent's performance by disabling plugins/collectors that are
 actively collecting metrics.
 
@@ -191,8 +190,7 @@ every` for an individual collector is less than the global, the Netdata Agent us
 the [collectors configuration reference](/src/collectors/REFERENCE.md) for
 details.
 
-To reduce the frequency of
-an [internal_plugin/collector](/src/collectors/README.md#collector-architecture-and-terminology),
+To reduce the frequency of an [internal_plugin/collector](/src/collectors/README.md),
 open `netdata.conf` and find the appropriate section. For example, to reduce the frequency of the `apps` plugin, which
 collects and visualizes metrics on application resource utilization:
 
