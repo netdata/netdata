@@ -208,8 +208,6 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
-set(NEED_PROTOBUF True)
-
 if(ENABLE_PLUGIN_GO)
     include(NetdataGoTools)
 
@@ -245,12 +243,10 @@ if(ENABLE_WEBRTC)
         FetchContent_MakeAvailable(libdatachannel)
 endif()
 
-if(NEED_PROTOBUF)
-        include(NetdataProtobuf)
+include(NetdataProtobuf)
 
-        if(ENABLE_BUNDLED_PROTOBUF)
-                netdata_bundle_protobuf()
-        endif()
+if(ENABLE_BUNDLED_PROTOBUF)
+        netdata_bundle_protobuf()
 endif()
 
 set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
@@ -590,13 +586,7 @@ else()
         pkg_check_modules(CRYPTO IMPORTED_TARGET REQUIRED libcrypto)
 endif()
 
-#
-# figure out if we need protoc/protobuf
-#
-
-if(NEED_PROTOBUF)
-        netdata_detect_protobuf()
-endif()
+netdata_detect_protobuf()
 
 #
 # source files
@@ -2553,9 +2543,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
 )
 
-if(NEED_PROTOBUF)
-        netdata_add_protobuf(netdata)
-endif()
+netdata_add_protobuf(netdata)
 
 #
 # build systemd-cat-native
