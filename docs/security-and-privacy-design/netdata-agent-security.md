@@ -32,8 +32,8 @@ configures it.
 
 The Netdata Agent's web API can also use TLS if configured.
 
-When Netdata Agents are claimed to Netdata Cloud, the communication happens via MQTT over Web Sockets over TLS, and
-public/private keys are used for authorizing access. These keys are exchanged during the claiming process (usually
+When Netdata Agents are connected to the Cloud, the communication happens via MQTT over Web Sockets over TLS, and
+public/private keys are used for authorizing access. These keys are exchanged during the connecting process (usually
 during the provisioning of each Agent).
 
 ## Authentication

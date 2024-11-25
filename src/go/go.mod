@@ -39,12 +39,12 @@ require (
 	github.com/mattn/go-xmlrpc v0.0.3
 	github.com/miekg/dns v1.1.62
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/prometheus-community/pro-bing v0.4.2-0.20241106090159-5a5f1d731cf5
+	github.com/prometheus-community/pro-bing v0.5.0
 	github.com/prometheus/common v0.60.1
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/sijms/go-ora/v2 v2.8.22
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
 	github.com/valyala/fastjson v1.6.4
 	github.com/vmware/govmomi v0.46.2

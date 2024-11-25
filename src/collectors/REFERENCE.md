@@ -1,138 +1,103 @@
-# Collectors configuration reference
+# Collector configuration
 
-The list of supported collectors can be found in [the documentation](/src/collectors/COLLECTORS.md),
-and on [our website](https://www.netdata.cloud/integrations). The documentation of each collector provides all the
-necessary configuration options and prerequisites for that collector. In most cases, either the charts are automatically generated
-without any configuration, or you just fulfil those prerequisites and [configure the collector](#configure-a-collector).
+Find available collectors in the [Collecting Metrics](/src/collectors/README.md) guide and on our [Integrations page](https://www.netdata.cloud/integrations).
 
-If the application you are interested in monitoring is not listed in our integrations, the collectors list includes
-the available options to
-[add your application to Netdata](https://github.com/netdata/netdata/edit/master/src/collectors/COLLECTORS.md#add-your-application-to-netdata).
+Each collector's documentation includes detailed setup instructions and configuration options. Most collectors either work automatically without configuration or require minimal setup to begin collecting data.
 
-If we do support your collector but the charts described in the documentation don't appear on your dashboard, the reason will
-be one of the following:
+> **Info**
+>
+> Enable and configure Go collectors directly through the UI using the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md).
 
-- The entire data collection plugin is disabled by default. Read how to [enable and disable plugins](#enable-and-disable-plugins)
+## Enable or disable Collectors and Plugins
 
-- The data collection plugin is enabled, but a specific data collection module is disabled. Read how to
-    [enable and disable a specific collection module](#enable-and-disable-a-specific-collection-module).
+Most collectors and plugins are enabled by default. You can selectively disable them to optimize performance.
 
-- Autodetection failed. Read how to [configure](#configure-a-collector) and [troubleshoot](#troubleshoot-a-collector) a collector.
+**To disable plugins**:
 
-## Enable and disable plugins
+1. Open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config).
+2. Navigate to the `[plugins]` section
+3. Uncomment the relevant line and set it to `no`
 
-You can enable or disable individual plugins by opening `netdata.conf` and scrolling down to the `[plugins]` section.
-This section features a list of Netdata's plugins, with a boolean setting to enable or disable them. The exception is
-`statsd.plugin`, which has its own `[statsd]` section. Your `[plugins]` section should look similar to this:
+   ```text
+   [plugins]
+       proc = yes
+       python.d = no
+   ```
 
-```text
-[plugins]
-    # timex = yes
-    # idlejitter = yes
-    # netdata monitoring = yes
-    # tc = yes
-    # diskspace = yes
-    # proc = yes
-    # cgroups = yes
-    # enable running new plugins = yes
-    # check for new plugins every = 60
-    # slabinfo = no
-    # python.d = yes
-    # perf = yes
-    # ioping = yes
-    # fping = yes
-    # nfacct = yes
-    # go.d = yes
-    # apps = yes
-    # ebpf = yes
-    # charts.d = yes
-    # statsd = yes
-```
+**To disable specific collectors**:
 
-By default, most plugins are enabled, so you don't need to enable them explicitly to use their collectors. To enable or
-disable any specific plugin, remove the comment (`#`) and change the boolean setting to `yes` or `no`.
+1. Open the corresponding plugin configuration file:
+   ```bash
+   sudo ./edit-config go.d.conf
+   ```
+2. Uncomment the collector's line and set it to `no`:
+   ```yaml
+   modules:
+       xyz_collector: no
+   ```
+3. [Restart](/docs/netdata-agent/start-stop-restart.md) the Agent after making changes.
 
-## Enable and disable a specific collection module
+## Adjust data collection frequency
 
-You can enable/disable of the collection modules supported by `go.d`, `python.d` or `charts.d` individually, using the
-configuration file of that orchestrator. For example, you can change the behavior of the Go orchestrator, or any of its
-collectors, by editing `go.d.conf`.
+You can modify how often collectors gather metrics to optimize CPU usage. This can be done globally or for specific collectors.
 
-Use `edit-config` from your [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory)
-to open the orchestrator primary configuration file:
+### Global
 
-```bash
-cd /etc/netdata
-sudo ./edit-config go.d.conf
-```
+1. Open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config).
+2. Set the `update every` value (default is `1`, meaning one-second intervals):
+    ```text
+    [global]
+        update every = 2
+    ```
 
-Within this file, you can either disable the orchestrator entirely (`enabled: yes`), or find a specific collector and
-enable/disable it with `yes` and `no` settings. Uncomment any line you change to ensure the Netdata daemon reads it on
-start.
+3. [Restart](/docs/netdata-agent/start-stop-restart.md) the Agent after making changes.
 
-After you make your changes, restart the Agent with the [appropriate method](/docs/netdata-agent/start-stop-restart.md) for your system.
+### Specific Plugin or Collector
 
-## Configure a collector
+**For Plugins**:
 
-Most collector modules come with **auto-detection**, configured to work out-of-the-box on popular operating systems with
-the default settings.
+1. Open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config).
+2. Locate the plugin's section and set its frequency:
 
-However, there are cases that auto-detection fails. Usually, the reason is that the applications to be monitored do not
-allow Netdata to connect. In most of the cases, allowing the user `netdata` from `localhost` to connect and collect
-metrics, will automatically enable data collection for the application in question (it will require a Netdata restart).
+    ```text
+    [plugin:apps]
+        update every = 5
+    ```
+3. [Restart](/docs/netdata-agent/start-stop-restart.md) the Agent after making changes.
 
-When Netdata starts up, each collector searches for exposed metrics on the default endpoint established by that service
-or application's standard installation procedure. For example,
-the [Nginx collector](/src/go/plugin/go.d/modules/nginx/README.md) searches at
-`http://127.0.0.1/stub_status` for exposed metrics in the correct format. If an Nginx web server is running and exposes
-metrics on that endpoint, the collector begins gathering them.
+**For Collectors**:
 
-However, not every node or infrastructure uses standard ports, paths, files, or naming conventions. You may need to
-enable or configure a collector to gather all available metrics from your systems, containers, or applications.
-
-First, [find the collector](/src/collectors/COLLECTORS.md) you want to edit
-and open its documentation. Some software has collectors written in multiple languages. In these cases, you should always
-pick the collector written in Go.
-
-Use `edit-config` from your
-[Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory)
-to open a collector's configuration file. For example, edit the Nginx collector with the following:
-
-```bash
-./edit-config go.d/nginx.conf
-```
-
-Each configuration file describes every available option and offers examples to help you tweak Netdata's settings
-according to your needs. In addition, every collector's documentation shows the exact command you need to run to
-configure that collector. Uncomment any line you change to ensure the collector's orchestrator or the Netdata daemon
-read it on start.
-
-After you make your changes, restart the Agent with the [appropriate method](/docs/netdata-agent/start-stop-restart.md) for your system.
+Each collector has its own configuration format and options. Refer to the collector's documentation for specific instructions on adjusting its data collection frequency.
 
 ## Troubleshoot a collector
 
-First, navigate to your plugins directory, which is usually at `/usr/libexec/netdata/plugins.d/`. If that's not the case
-on your system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the plugins directory,
-switch to the `netdata` user.
+1. Navigate to the plugins directory. If not found, check the `plugins directory` setting in `netdata.conf`.
+   ```bash
+   cd /usr/libexec/netdata/plugins.d/
+   ```
+2. Switch to the netdata user.
+   ```bash
+   sudo su -s /bin/bash netdata
+   ```
+3. Run debug mode
 
-```bash
-cd /usr/libexec/netdata/plugins.d/
-sudo su -s /bin/bash netdata
-```
+   ```bash
+   # Go collectors
+   ./go.d.plugin -d -m <MODULE_NAME>
 
-The next step is based on the collector's orchestrator.
+   # Python collectors
+   ./python.d.plugin <MODULE_NAME> debug trace
+   
+   # Bash collectors
+   ./charts.d.plugin debug 1 <MODULE_NAME>
+   ```
+4. Analyze output
 
-```bash
-# Go orchestrator (go.d.plugin)
-./go.d.plugin -d -m <MODULE_NAME>
+The debug output will show:
 
-# Python orchestrator (python.d.plugin)
-./python.d.plugin <MODULE_NAME> debug trace
+- Configuration issues
+- Connection problems
+- Permission errors
+- Other potential failures
 
-# Bash orchestrator (bash.d.plugin)
-./charts.d.plugin debug 1 <MODULE_NAME>
-```
-
-The output from the relevant command will provide valuable troubleshooting information. If you can't figure out how to
-enable the collector using the details from this output, feel free to [join our Discord server](https://discord.com/invite/2mEmfW735j),
-to get help from our experts.
+Need help interpreting the results? Join our [Discord community](https://discord.com/invite/2mEmfW735j) for expert assistance.

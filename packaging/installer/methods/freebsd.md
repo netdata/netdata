@@ -118,7 +118,7 @@ The following options are mutually exclusive and specify special operations othe
 - `--reinstall-even-if-unsafe`: If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things (for example, if we cannot detect what type of installation it is). If there is not an existing install, install Netdata normally.
 - `--reinstall-clean`: If there is an existing install, uninstall it before trying to install Netdata. Fails if there is no existing install.
 - `--uninstall`: Uninstall an existing installation of Netdata. Fails if there is no existing install.
-- `--claim-only`: If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
+- `--claim-only`: If there is an existing install, only try to connect it without attempting to update it. If there is no existing install, install and connect Netdata normally.
 - `--repositories-only`: Only install repository configuration packages instead of doing a full install of Netdata. Automatically sets --native-only.
 - `--prepare-offline-install-source`: Instead of installing the Agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](/packaging/installer/methods/offline.md) for more info.
 

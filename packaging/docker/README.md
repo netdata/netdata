@@ -135,7 +135,7 @@ volumes:
 
 > :bookmark_tabs: Note
 >
-> If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "
+> If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "
 > Add Nodes" button in your Space's "Nodes" view.
 
 ### With systemd units monitoring
@@ -531,7 +531,7 @@ docker run -d --name=netdata \
 
 > :bookmark_tabs: Note
 >
-> If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "
+> If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "
 > Add Nodes" button in your Space's "Nodes" view.
 
 ## Docker tags

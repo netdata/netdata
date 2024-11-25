@@ -24,7 +24,7 @@ An API key is a key created with `uuidgen` and is used for authentication and/or
 
 #### Child config
 
-As mentioned above, we do not recommend to claim the Child to Cloud directly during your setup.
+As mentioned above, we do not recommend to connect the Child to Cloud directly during your setup.
 
 This is done in order to reduce the footprint of the Netdata Agent on your production system, as some capabilities can be switched OFF for the Child and kept ON for the Parent.
 

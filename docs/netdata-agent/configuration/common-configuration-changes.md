@@ -21,35 +21,6 @@ changes reflected in those visualizations due to the way Netdata Cloud proxies m
 
 Read our doc on [increasing long-term metrics storage](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md) for details.
 
-### Reduce the data collection frequency
-
-Change `update every` in
-the [`[global]` section](/src/daemon/config/README.md#global-section-options)
-of `netdata.conf` so
-that it is greater than `1`. An `update every` of `5` means the Netdata Agent enforces a _minimum_ collection frequency
-of 5 seconds.
-
-```text
-[global]
-    update every = 5
-```
-
-Every collector and plugin has its own `update every` setting, which you can also change in the `go.d.conf`,
-`python.d.conf` or `charts.d.conf` files, or in individual collector configuration files. If the `update
-every` for an individual collector is less than the global, the Netdata Agent uses the global setting. See
-the [enable or configure a collector](/src/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module)
-doc for details.
-
-### Disable a collector or plugin
-
-Turn off entire plugins in
-the [`[plugins]` section](/src/daemon/config/README.md#plugins-section-options)
-of
-`netdata.conf`.
-
-To disable specific collectors, open `go.d.conf`, `python.d.conf` or `charts.d.conf` and find the line
-for that specific module. Uncomment the line and change its value to `no`.
-
 ## Modify alerts and notifications
 
 Netdata's health monitoring watchdog uses hundreds of pre-configured health entities, with intelligent thresholds, to

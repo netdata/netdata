@@ -2,10 +2,16 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.0.2...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.0.3...HEAD)
 
 **Merged pull requests:**
 
+- update gorilla comp internal charts family [\#19068](https://github.com/netdata/netdata/pull/19068) ([ilyam8](https://github.com/ilyam8))
+- docs\(systemd-journal.plugin\): correct "Full-text search" [\#19066](https://github.com/netdata/netdata/pull/19066) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#19065](https://github.com/netdata/netdata/pull/19065) ([netdatabot](https://github.com/netdatabot))
+- Register service to delay start [\#19063](https://github.com/netdata/netdata/pull/19063) ([stelfrag](https://github.com/stelfrag))
+- add links to mssql perflib object docs [\#19062](https://github.com/netdata/netdata/pull/19062) ([ilyam8](https://github.com/ilyam8))
+- claim -\> connect in docs [\#19060](https://github.com/netdata/netdata/pull/19060) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump k8s.io/client-go from 0.31.2 to 0.31.3 in /src/go [\#19059](https://github.com/netdata/netdata/pull/19059) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/vmware/govmomi from 0.46.1 to 0.46.2 in /src/go [\#19058](https://github.com/netdata/netdata/pull/19058) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Windows doc updates [\#19054](https://github.com/netdata/netdata/pull/19054) ([Ancairon](https://github.com/Ancairon))
@@ -82,6 +88,10 @@
 - Update Windows Documentation [\#18928](https://github.com/netdata/netdata/pull/18928) ([thiagoftsm](https://github.com/thiagoftsm))
 - IIS Metadata [\#18765](https://github.com/netdata/netdata/pull/18765) ([thiagoftsm](https://github.com/thiagoftsm))
 - Bump github.com/Wing924/ltsv from 0.3.1 to 0.4.0 in /src/go [\#18636](https://github.com/netdata/netdata/pull/18636) ([dependabot[bot]](https://github.com/apps/dependabot))
+
+## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.0.2...v2.0.3)
 
 ## [v2.0.2](https://github.com/netdata/netdata/tree/v2.0.2) (2024-11-21)
 
@@ -434,13 +444,6 @@
 - remove save-database from netdatacli usage [\#18519](https://github.com/netdata/netdata/pull/18519) ([ilyam8](https://github.com/ilyam8))
 - improve netdatacli docs [\#18518](https://github.com/netdata/netdata/pull/18518) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18517](https://github.com/netdata/netdata/pull/18517) ([netdatabot](https://github.com/netdatabot))
-- go.d/varnish update meta [\#18516](https://github.com/netdata/netdata/pull/18516) ([ilyam8](https://github.com/ilyam8))
-- Bump github.com/jackc/pgx/v5 from 5.7.0 to 5.7.1 in /src/go [\#18515](https://github.com/netdata/netdata/pull/18515) ([dependabot[bot]](https://github.com/apps/dependabot))
-- go.d update redis lib to v9 [\#18513](https://github.com/netdata/netdata/pull/18513) ([ilyam8](https://github.com/ilyam8))
-- go.d/varnish: add docker support [\#18512](https://github.com/netdata/netdata/pull/18512) ([ilyam8](https://github.com/ilyam8))
-- go.d add function to execute a command inside a Docker container [\#18509](https://github.com/netdata/netdata/pull/18509) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18508](https://github.com/netdata/netdata/pull/18508) ([netdatabot](https://github.com/netdatabot))
-- server dashboard v3 static files, when available [\#18507](https://github.com/netdata/netdata/pull/18507) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

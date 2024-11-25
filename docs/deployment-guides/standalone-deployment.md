@@ -134,7 +134,7 @@ flowchart LR
 
 ### Configuration steps for standalone Netdata Agents with Netdata Cloud
 
-- Install Netdata Agents using the commands given by Netdata Cloud, so that they will be automatically connected to your Netdata Cloud space. Otherwise, install Netdata Agents and then claim them via the command line or their dashboard.
+- Install Netdata Agents using the commands given by Netdata Cloud so that they will be automatically connected to your Space. Otherwise, install Netdata Agents and connect them via the command line or their dashboard.
 
 - Optionally: disable their direct dashboard access to secure them.
 
