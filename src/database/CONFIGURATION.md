@@ -99,3 +99,10 @@ You can change these limits in `netdata.conf`:
 </details>
 
 ## Cache sizes
+
+There are two cache sizes that can be configured in `netdata.conf` to better optimize the Database:
+
+1. `[db].dbengine page cache size`: controls the size of the cache that keeps metric data on memory.
+2. `[db].dbengine extent cache size`: controls the size of the cache that keeps in memory compressed data blocks.
+
+Both of them are dynamically adjusted to use some of the total memory computed above. The configuration in `netdata.conf` allows providing additional memory to them, increasing their caching efficiency.
