@@ -7,6 +7,7 @@
 #include <sys/syscall.h>
 #endif
 
+#include "mem_available.h"
 #include "random.h"
 #include "timestamps.h"
 #include "setproctitle.h"

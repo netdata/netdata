@@ -73,6 +73,7 @@
 #cmakedefine HAVE_ARC4RANDOM_UNIFORM
 #cmakedefine HAVE_RAND_S
 #cmakedefine HAVE_GETRANDOM
+#cmakedefine HAVE_SYSINFO
 
 #cmakedefine HAVE_BACKTRACE
 #cmakedefine HAVE_CLOSE_RANGE

@@ -411,6 +411,7 @@ check_function_exists(backtrace HAVE_BACKTRACE)
 check_function_exists(arc4random_buf HAVE_ARC4RANDOM_BUF)
 check_function_exists(arc4random_uniform HAVE_ARC4RANDOM_UNIFORM)
 check_function_exists(getrandom HAVE_GETRANDOM)
+check_function_exists(sysinfo HAVE_SYSINFO)
 
 #
 # check source compilation
@@ -904,6 +905,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/socket/socket-peers.c
         src/libnetdata/socket/socket-peers.h
         src/libnetdata/libjudy/judyl-typed.h
+        src/libnetdata/os/mem_available.c
+        src/libnetdata/os/mem_available.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
