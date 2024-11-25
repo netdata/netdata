@@ -225,11 +225,6 @@ else()
 endif()
 
 
-set(MI_BUILD_SHARED Off)
-set(MI_BUILD_STATIC On)
-set(MI_BUILD_OBJECT Off)
-set(MI_BUILD_TESTS Off)
-
 include(FetchContent)
 FetchContent_Declare(
         mimalloc
@@ -1869,7 +1864,7 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 
 
 target_link_libraries(libnetdata PUBLIC
-        mimalloc-static
+        mimalloc
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
         "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid>"
