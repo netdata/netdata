@@ -18,8 +18,8 @@ alternative, like the guide available from
 
 For more specifics on the collection modules used in this guide, read the respective pages in our documentation:
 
-- [HDFS](/src/go/plugin/go.d/modules/hdfs/README.md)
-- [Zookeeper](/src/go/plugin/go.d/modules/zookeeper/README.md)
+- [HDFS](/src/go/plugin/go.d/collector/hdfs/README.md)
+- [Zookeeper](/src/go/plugin/go.d/collector/zookeeper/README.md)
 
 ## Set up your HDFS and Zookeeper installations
 

@@ -1,5 +1,5 @@
 # This collector will not appear in documentation, as the go version is preferred,
-# /src/go/plugin/go.d/modules/haproxy/README.md
+# /src/go/plugin/go.d/collector/haproxy/README.md
 #
 #
 #  meta:

@@ -14,5 +14,5 @@ To troubleshoot this issue, check for:
 
 ### Useful resources
 
-1. [HTTP endpoint monitoring with Netdata](/src/go/plugin/go.d/modules/httpcheck/integrations/http_endpoints.md)
+1. [HTTP endpoint monitoring with Netdata](/src/go/plugin/go.d/collector/httpcheck/integrations/http_endpoints.md)
 
