@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-
 from pathlib import Path
 
 from jsonschema import ValidationError
@@ -18,17 +17,17 @@ def main():
     check_path = Path(sys.argv[1])
 
     if not check_path.is_file():
-        print(f':error file={ check_path }:{ check_path } does not appear to be a regular file.')
+        print(f':error file={check_path}:{check_path} does not appear to be a regular file.')
         return 1
 
     if check_path.match(SINGLE_PATTERN):
         variant = 'single'
-        print(f':debug:{ check_path } appears to be single-module metadata.')
+        print(f':debug:{check_path} appears to be single-module metadata.')
     elif check_path.match(MULTI_PATTERN):
         variant = 'multi'
-        print(f':debug:{ check_path } appears to be multi-module metadata.')
+        print(f':debug:{check_path} appears to be multi-module metadata.')
     else:
-        print(f':error file={ check_path }:{ check_path } does not match required file name format.')
+        print(f':error file={check_path}:{check_path} does not match required file name format.')
         return 1
 
     categories = load_yaml(CATEGORIES_FILE)
@@ -42,7 +41,7 @@ def main():
     data = load_yaml(check_path)
 
     if not data:
-        print(f':error file={ check_path }:Failed to load data from { check_path }.')
+        print(f':error file={check_path}:Failed to load data from {check_path}.')
         return 1
 
     check_modules = []
@@ -51,7 +50,7 @@ def main():
         try:
             SINGLE_VALIDATOR.validate(data)
         except ValidationError as e:
-            print(f':error file={ check_path }:Failed to validate { check_path } against the schema.')
+            print(f':error file={check_path}:Failed to validate {check_path} against the schema.')
             raise e
         else:
             check_modules.append(data)
@@ -59,7 +58,7 @@ def main():
         try:
             MULTI_VALIDATOR.validate(data)
         except ValidationError as e:
-            print(f':error file={ check_path }:Failed to validate { check_path } against the schema.')
+            print(f':error file={check_path}:Failed to validate {check_path} against the schema.')
             raise e
         else:
             for item in data['modules']:
@@ -75,7 +74,8 @@ def main():
         invalid_cats = set(module['meta']['monitored_instance']['categories']) - valid_categories
 
         if invalid_cats:
-            print(f':error file={ check_path }:Invalid categories found in module { idx } in { check_path }: { ", ".join(invalid_cats) }.')
+            print(
+                f':error file={check_path}:Invalid categories found in module {idx} in {check_path}: {", ".join(invalid_cats)}.')
             failed = True
 
     if failed:
