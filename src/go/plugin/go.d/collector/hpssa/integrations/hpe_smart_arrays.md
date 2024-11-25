@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/hpssa/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/hpssa/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/hpssa/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/hpssa/metadata.yaml"
 sidebar_label: "HPE Smart Arrays"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Storage, Mount Points and Filesystems"

@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/sensors/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/sensors/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/sensors/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/sensors/metadata.yaml"
 sidebar_label: "Linux Sensors"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Hardware Devices and Sensors"

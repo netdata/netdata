@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/wireguard/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/wireguard/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/wireguard/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/wireguard/metadata.yaml"
 sidebar_label: "WireGuard"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/VPNs"

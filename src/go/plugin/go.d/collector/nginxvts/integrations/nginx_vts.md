@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/nginxvts/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/nginxvts/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/nginxvts/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/nginxvts/metadata.yaml"
 sidebar_label: "NGINX VTS"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Web Servers and Web Proxies"

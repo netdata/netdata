@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/supervisord/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/supervisord/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/supervisord/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/supervisord/metadata.yaml"
 sidebar_label: "Supervisor"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Processes and System Services"

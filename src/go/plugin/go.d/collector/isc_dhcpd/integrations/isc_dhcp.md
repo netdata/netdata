@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/isc_dhcpd/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/isc_dhcpd/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/isc_dhcpd/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/isc_dhcpd/metadata.yaml"
 sidebar_label: "ISC DHCP"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/DNS and DHCP Servers"

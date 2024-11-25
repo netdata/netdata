@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/prometheus/integrations/twincat_ads_web_service.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/prometheus/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/integrations/twincat_ads_web_service.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/metadata.yaml"
 sidebar_label: "TwinCAT ADS Web Service"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Generic Collecting Metrics"

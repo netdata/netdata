@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/prometheus/integrations/tado_smart_heating_solution.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/prometheus/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/integrations/tado_smart_heating_solution.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/metadata.yaml"
 sidebar_label: "Tado smart heating solution"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/IoT Devices"

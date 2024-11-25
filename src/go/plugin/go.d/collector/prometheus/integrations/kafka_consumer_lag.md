@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/prometheus/integrations/kafka_consumer_lag.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/modules/prometheus/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/integrations/kafka_consumer_lag.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/metadata.yaml"
 sidebar_label: "Kafka Consumer Lag"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Service Discovery / Registry"
