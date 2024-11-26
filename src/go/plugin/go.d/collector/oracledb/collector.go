@@ -24,8 +24,8 @@ func init() {
 	})
 }
 
-func New() *OracleDB {
-	return &OracleDB{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout:         confopt.Duration(time.Second * 2),
 			charts:          globalCharts.Copy(),
@@ -48,32 +48,32 @@ type Config struct {
 	seenWaitClasses map[string]bool
 }
 
-type OracleDB struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
 	db *sql.DB
 }
 
-func (o *OracleDB) Configuration() any {
-	return o.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (o *OracleDB) Init() error {
-	dsn, err := o.validateDSN()
+func (c *Collector) Init() error {
+	dsn, err := c.validateDSN()
 	if err != nil {
 		return fmt.Errorf("invalid oracle DSN: %w", err)
 	}
 
-	o.publicDSN = dsn
+	c.publicDSN = dsn
 
 	return nil
 }
 
-func (o *OracleDB) Check() error {
-	mx, err := o.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
-		return fmt.Errorf("failed to collect metrics [%s]: %w", o.publicDSN, err)
+		return fmt.Errorf("failed to collect metrics [%s]: %w", c.publicDSN, err)
 	}
 	if len(mx) == 0 {
 		return errors.New("no metrics collected")
@@ -82,14 +82,14 @@ func (o *OracleDB) Check() error {
 	return nil
 }
 
-func (o *OracleDB) Charts() *module.Charts {
-	return o.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (o *OracleDB) Collect() map[string]int64 {
-	mx, err := o.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		o.Error(fmt.Sprintf("failed to collect metrics [%s]: %s", o.publicDSN, err))
+		c.Error(fmt.Sprintf("failed to collect metrics [%s]: %s", c.publicDSN, err))
 	}
 
 	if len(mx) == 0 {
@@ -99,11 +99,11 @@ func (o *OracleDB) Collect() map[string]int64 {
 	return mx
 }
 
-func (o *OracleDB) Cleanup() {
-	if o.db != nil {
-		if err := o.db.Close(); err != nil {
-			o.Errorf("cleanup: error on closing connection [%s]: %v", o.publicDSN, err)
+func (c *Collector) Cleanup() {
+	if c.db != nil {
+		if err := c.db.Close(); err != nil {
+			c.Errorf("cleanup: error on closing connection [%s]: %v", c.publicDSN, err)
 		}
-		o.db = nil
+		c.db = nil
 	}
 }

@@ -32,13 +32,13 @@ WHERE
     = (SELECT max(intsize_csec) FROM sys.v_$sysmetric)
 `
 
-func (o *OracleDB) collectSysMetrics(mx map[string]int64) error {
+func (c *Collector) collectSysMetrics(mx map[string]int64) error {
 	q := querySysMetrics
-	o.Debugf("executing query: %s", q)
+	c.Debugf("executing query: %s", q)
 
 	var name, val string
 
-	return o.doQuery(q, func(column, value string, lineEnd bool) error {
+	return c.doQuery(q, func(column, value string, lineEnd bool) error {
 		switch column {
 		case "METRIC_NAME":
 			name = value

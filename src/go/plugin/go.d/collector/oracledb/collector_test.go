@@ -46,15 +46,15 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestOracleDB_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &OracleDB{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestOracleDB_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestOracleDB_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -67,49 +67,49 @@ func TestOracleDB_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ora := New()
-			ora.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, ora.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, ora.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestOracleDB_Cleanup(t *testing.T) {
-	tests := map[string]func(t *testing.T) (ora *OracleDB, cleanup func()){
-		"db connection not initialized": func(t *testing.T) (ora *OracleDB, cleanup func()) {
+func TestCollector_Cleanup(t *testing.T) {
+	tests := map[string]func(t *testing.T) (collr *Collector, cleanup func()){
+		"db connection not initialized": func(t *testing.T) (collr *Collector, cleanup func()) {
 			return New(), func() {}
 		},
-		"db connection initialized": func(t *testing.T) (ora *OracleDB, cleanup func()) {
+		"db connection initialized": func(t *testing.T) (collr *Collector, cleanup func()) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
 
 			mock.ExpectClose()
-			ora = New()
-			ora.db = db
+			collr = New()
+			collr.db = db
 			cleanup = func() { _ = db.Close() }
 
-			return ora, cleanup
+			return collr, cleanup
 		},
 	}
 
 	for name, prepare := range tests {
 		t.Run(name, func(t *testing.T) {
-			ora, cleanup := prepare(t)
+			collr, cleanup := prepare(t)
 			defer cleanup()
 
-			assert.NotPanics(t, ora.Cleanup)
-			assert.Nil(t, ora.db)
+			assert.NotPanics(t, collr.Cleanup)
+			assert.Nil(t, collr.db)
 		})
 	}
 
 }
 
-func TestOracleDB_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func(t *testing.T, m sqlmock.Sqlmock)
 		wantFail    bool
@@ -137,26 +137,26 @@ func TestOracleDB_Check(t *testing.T) {
 				sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual),
 			)
 			require.NoError(t, err)
-			ora := New()
-			ora.DSN = "oracle://user:pass@127.0.0.1:32001/XE"
-			ora.db = db
+			collr := New()
+			collr.DSN = "oracle://user:pass@127.0.0.1:32001/XE"
+			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, ora.Init())
+			require.NoError(t, collr.Init())
 
 			test.prepareMock(t, mock)
 
 			if test.wantFail {
-				assert.Error(t, ora.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, ora.Check())
+				assert.NoError(t, collr.Check())
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
 }
 
-func TestOracleDB_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func(t *testing.T, m sqlmock.Sqlmock)
 		wantCharts  int
@@ -238,21 +238,21 @@ func TestOracleDB_Collect(t *testing.T) {
 				sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual),
 			)
 			require.NoError(t, err)
-			ora := New()
-			ora.DSN = "oracle://user:pass@127.0.0.1:32001/XE"
-			ora.db = db
+			collr := New()
+			collr.DSN = "oracle://user:pass@127.0.0.1:32001/XE"
+			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, ora.Init())
+			require.NoError(t, collr.Init())
 
 			test.prepareMock(t, mock)
 
-			mx := ora.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {
-				assert.Equal(t, test.wantCharts, len(*ora.Charts()), "wantCharts")
-				module.TestMetricsHasAllChartsDims(t, ora.Charts(), mx)
+				assert.Equal(t, test.wantCharts, len(*collr.Charts()), "wantCharts")
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 
 			assert.NoError(t, mock.ExpectationsWereMet())
