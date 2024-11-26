@@ -25,7 +25,7 @@ func init() {
 	})
 }
 
-func New() *HDFS {
+func New() *Collector {
 	config := Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{
@@ -37,7 +37,7 @@ func New() *HDFS {
 		},
 	}
 
-	return &HDFS{
+	return &Collector{
 		Config: config,
 	}
 }
@@ -47,49 +47,41 @@ type Config struct {
 	UpdateEvery    int `yaml:"update_every" json:"update_every"`
 }
 
-type (
-	HDFS struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		httpClient *http.Client
+	httpClient *http.Client
 
-		nodeType
-	}
 	nodeType string
-)
-
-const (
-	dataNodeType nodeType = "DataNode"
-	nameNodeType nodeType = "NameNode"
-)
-
-func (h *HDFS) Configuration() any {
-	return h.Config
 }
 
-func (h *HDFS) Init() error {
-	if h.URL == "" {
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("URL is required but not set")
 	}
 
-	httpClient, err := web.NewHTTPClient(h.ClientConfig)
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP client: %v", err)
 	}
-	h.httpClient = httpClient
+	c.httpClient = httpClient
 
 	return nil
 }
 
-func (h *HDFS) Check() error {
-	typ, err := h.determineNodeType()
+func (c *Collector) Check() error {
+	typ, err := c.determineNodeType()
 	if err != nil {
 		return fmt.Errorf("error on node type determination : %v", err)
 	}
-	h.nodeType = typ
+	c.nodeType = typ
 
-	mx, err := h.collect()
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -101,8 +93,8 @@ func (h *HDFS) Check() error {
 	return nil
 }
 
-func (h *HDFS) Charts() *Charts {
-	switch h.nodeType {
+func (c *Collector) Charts() *Charts {
+	switch c.nodeType {
 	default:
 		return nil
 	case nameNodeType:
@@ -112,18 +104,18 @@ func (h *HDFS) Charts() *Charts {
 	}
 }
 
-func (h *HDFS) Collect() map[string]int64 {
-	mx, err := h.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		h.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (h *HDFS) Cleanup() {
-	if h.httpClient != nil {
-		h.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }

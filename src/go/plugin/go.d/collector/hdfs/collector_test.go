@@ -35,24 +35,24 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestHDFS_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &HDFS{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestHDFS_Init(t *testing.T) {
-	job := New()
+func TestCollector_Init(t *testing.T) {
+	collr := New()
 
-	assert.NoError(t, job.Init())
+	assert.NoError(t, collr.Init())
 }
 
-func TestHDFS_InitErrorOnCreatingClientWrongTLSCA(t *testing.T) {
-	job := New()
-	job.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
+func TestCollector_InitErrorOnCreatingClientWrongTLSCA(t *testing.T) {
+	collr := New()
+	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, job.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestHDFS_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -60,15 +60,15 @@ func TestHDFS_Check(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	assert.NoError(t, job.Check())
-	assert.NotZero(t, job.nodeType)
+	assert.NoError(t, collr.Check())
+	assert.NotZero(t, collr.nodeType)
 }
 
-func TestHDFS_CheckDataNode(t *testing.T) {
+func TestCollector_CheckDataNode(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -76,15 +76,15 @@ func TestHDFS_CheckDataNode(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	assert.NoError(t, job.Check())
-	assert.Equal(t, dataNodeType, job.nodeType)
+	assert.NoError(t, collr.Check())
+	assert.Equal(t, dataNodeType, collr.nodeType)
 }
 
-func TestHDFS_CheckNameNode(t *testing.T) {
+func TestCollector_CheckNameNode(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -92,15 +92,15 @@ func TestHDFS_CheckNameNode(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	assert.NoError(t, job.Check())
-	assert.Equal(t, nameNodeType, job.nodeType)
+	assert.NoError(t, collr.Check())
+	assert.Equal(t, nameNodeType, collr.nodeType)
 }
 
-func TestHDFS_CheckErrorOnNodeTypeDetermination(t *testing.T) {
+func TestCollector_CheckErrorOnNodeTypeDetermination(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -108,50 +108,50 @@ func TestHDFS_CheckErrorOnNodeTypeDetermination(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	assert.Error(t, job.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestHDFS_CheckNoResponse(t *testing.T) {
-	job := New()
-	job.URL = "http://127.0.0.1:38001/jmx"
-	require.NoError(t, job.Init())
+func TestCollector_CheckNoResponse(t *testing.T) {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001/jmx"
+	require.NoError(t, collr.Init())
 
-	assert.Error(t, job.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestHDFS_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.Nil(t, New().Charts())
 }
 
-func TestHDFS_ChartsUnknownNode(t *testing.T) {
-	job := New()
+func TestCollector_ChartsUnknownNode(t *testing.T) {
+	collr := New()
 
-	assert.Nil(t, job.Charts())
+	assert.Nil(t, collr.Charts())
 }
 
-func TestHDFS_ChartsDataNode(t *testing.T) {
-	job := New()
-	job.nodeType = dataNodeType
+func TestCollector_ChartsDataNode(t *testing.T) {
+	collr := New()
+	collr.nodeType = dataNodeType
 
-	assert.Equal(t, dataNodeCharts(), job.Charts())
+	assert.Equal(t, dataNodeCharts(), collr.Charts())
 }
 
-func TestHDFS_ChartsNameNode(t *testing.T) {
-	job := New()
-	job.nodeType = nameNodeType
+func TestCollector_ChartsNameNode(t *testing.T) {
+	collr := New()
+	collr.nodeType = nameNodeType
 
-	assert.Equal(t, nameNodeCharts(), job.Charts())
+	assert.Equal(t, nameNodeCharts(), collr.Charts())
 }
 
-func TestHDFS_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestHDFS_CollectDataNode(t *testing.T) {
+func TestCollector_CollectDataNode(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -159,10 +159,10 @@ func TestHDFS_CollectDataNode(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"dna_bytes_read":                     80689178,
@@ -200,10 +200,10 @@ func TestHDFS_CollectDataNode(t *testing.T) {
 		"rpc_sent_bytes":                     187,
 	}
 
-	assert.Equal(t, expected, job.Collect())
+	assert.Equal(t, expected, collr.Collect())
 }
 
-func TestHDFS_CollectNameNode(t *testing.T) {
+func TestCollector_CollectNameNode(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -211,10 +211,10 @@ func TestHDFS_CollectNameNode(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"fsns_blocks_total":                  15,
@@ -259,10 +259,10 @@ func TestHDFS_CollectNameNode(t *testing.T) {
 		"rpc_sent_bytes":                     25067414,
 	}
 
-	assert.Equal(t, expected, job.Collect())
+	assert.Equal(t, expected, collr.Collect())
 }
 
-func TestHDFS_CollectUnknownNode(t *testing.T) {
+func TestCollector_CollectUnknownNode(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -270,22 +270,22 @@ func TestHDFS_CollectUnknownNode(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	assert.Panics(t, func() { _ = job.Collect() })
+	assert.Panics(t, func() { _ = collr.Collect() })
 }
 
-func TestHDFS_CollectNoResponse(t *testing.T) {
-	job := New()
-	job.URL = "http://127.0.0.1:38001/jmx"
-	require.NoError(t, job.Init())
+func TestCollector_CollectNoResponse(t *testing.T) {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001/jmx"
+	require.NoError(t, collr.Init())
 
-	assert.Nil(t, job.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestHDFS_CollectReceiveInvalidResponse(t *testing.T) {
+func TestCollector_CollectReceiveInvalidResponse(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -293,14 +293,14 @@ func TestHDFS_CollectReceiveInvalidResponse(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	assert.Nil(t, job.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestHDFS_CollectReceive404(t *testing.T) {
+func TestCollector_CollectReceive404(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -308,9 +308,9 @@ func TestHDFS_CollectReceive404(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	assert.Nil(t, job.Collect())
+	assert.Nil(t, collr.Collect())
 }
