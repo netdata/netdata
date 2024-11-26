@@ -10,26 +10,26 @@ import (
 	"strings"
 )
 
-func (t *Tor) collect() (map[string]int64, error) {
-	if t.conn == nil {
-		conn, err := t.establishConnection()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.conn == nil {
+		conn, err := c.establishConnection()
 		if err != nil {
 			return nil, err
 		}
-		t.conn = conn
+		c.conn = conn
 	}
 
 	mx := make(map[string]int64)
-	if err := t.collectServerInfo(mx); err != nil {
-		t.Cleanup()
+	if err := c.collectServerInfo(mx); err != nil {
+		c.Cleanup()
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (t *Tor) collectServerInfo(mx map[string]int64) error {
-	resp, err := t.conn.getInfo("traffic/read", "traffic/written", "uptime")
+func (c *Collector) collectServerInfo(mx map[string]int64) error {
+	resp, err := c.conn.getInfo("traffic/read", "traffic/written", "uptime")
 	if err != nil {
 		return err
 	}
@@ -54,8 +54,8 @@ func (t *Tor) collectServerInfo(mx map[string]int64) error {
 	return nil
 }
 
-func (t *Tor) establishConnection() (controlConn, error) {
-	conn := t.newConn(t.Config)
+func (c *Collector) establishConnection() (controlConn, error) {
+	conn := c.newConn(c.Config)
 
 	if err := conn.connect(); err != nil {
 		return nil, err

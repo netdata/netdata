@@ -33,11 +33,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestTor_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Tor{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestTor_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -58,25 +58,25 @@ func TestTor_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tor := New()
-			tor.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, tor.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, tor.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestTor_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestTor_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() (*Tor, *mockTorDaemon)
+		prepare  func() (*Collector, *mockTorDaemon)
 		wantFail bool
 	}{
 		"success on valid response": {
@@ -90,7 +90,7 @@ func TestTor_Check(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tor, daemon := test.prepare()
+			collr, daemon := test.prepare()
 
 			defer func() {
 				assert.NoError(t, daemon.Close(), "daemon.Close()")
@@ -105,15 +105,15 @@ func TestTor_Check(t *testing.T) {
 				t.Errorf("mock tor daemon start timed out")
 			}
 
-			require.NoError(t, tor.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, tor.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, tor.Check())
+				assert.NoError(t, collr.Check())
 			}
 
-			tor.Cleanup()
+			collr.Cleanup()
 
 			select {
 			case <-daemon.stopped:
@@ -124,9 +124,9 @@ func TestTor_Check(t *testing.T) {
 	}
 }
 
-func TestTor_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func() (*Tor, *mockTorDaemon)
+		prepare     func() (*Collector, *mockTorDaemon)
 		wantMetrics map[string]int64
 		wantCharts  int
 	}{
@@ -147,7 +147,7 @@ func TestTor_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tor, daemon := test.prepare()
+			collr, daemon := test.prepare()
 
 			defer func() {
 				assert.NoError(t, daemon.Close(), "daemon.Close()")
@@ -162,19 +162,19 @@ func TestTor_Collect(t *testing.T) {
 				t.Errorf("mock tor daemon start timed out")
 			}
 
-			require.NoError(t, tor.Init())
+			require.NoError(t, collr.Init())
 
-			mx := tor.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
-			assert.Equal(t, test.wantCharts, len(*tor.Charts()), "want charts")
+			assert.Equal(t, test.wantCharts, len(*collr.Charts()), "want charts")
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, tor.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 
-			tor.Cleanup()
+			collr.Cleanup()
 
 			select {
 			case <-daemon.stopped:
@@ -185,20 +185,20 @@ func TestTor_Collect(t *testing.T) {
 	}
 }
 
-func prepareCaseOk() (*Tor, *mockTorDaemon) {
+func prepareCaseOk() (*Collector, *mockTorDaemon) {
 	daemon := &mockTorDaemon{
 		addr:    "127.0.0.1:65001",
 		started: make(chan struct{}),
 		stopped: make(chan struct{}),
 	}
 
-	tor := New()
-	tor.Address = daemon.addr
+	collr := New()
+	collr.Address = daemon.addr
 
-	return tor, daemon
+	return collr, daemon
 }
 
-func prepareCaseConnectionRefused() (*Tor, *mockTorDaemon) {
+func prepareCaseConnectionRefused() (*Collector, *mockTorDaemon) {
 	ch := make(chan struct{})
 	close(ch)
 
@@ -209,10 +209,10 @@ func prepareCaseConnectionRefused() (*Tor, *mockTorDaemon) {
 		stopped:   ch,
 	}
 
-	tor := New()
-	tor.Address = daemon.addr
+	collr := New()
+	collr.Address = daemon.addr
 
-	return tor, daemon
+	return collr, daemon
 }
 
 type mockTorDaemon struct {

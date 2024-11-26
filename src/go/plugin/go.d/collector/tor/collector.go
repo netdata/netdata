@@ -22,8 +22,8 @@ func init() {
 	})
 }
 
-func New() *Tor {
-	return &Tor{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:9051",
 			Timeout: confopt.Duration(time.Second * 1),
@@ -40,7 +40,7 @@ type Config struct {
 	Password    string           `yaml:"password" json:"password"`
 }
 
-type Tor struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -50,20 +50,20 @@ type Tor struct {
 	conn    controlConn
 }
 
-func (t *Tor) Configuration() any {
-	return t.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (t *Tor) Init() error {
-	if t.Address == "" {
+func (c *Collector) Init() error {
+	if c.Address == "" {
 		return errors.New("config: address not set")
 	}
 
 	return nil
 }
 
-func (t *Tor) Check() error {
-	mx, err := t.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -75,14 +75,14 @@ func (t *Tor) Check() error {
 	return nil
 }
 
-func (t *Tor) Charts() *module.Charts {
-	return t.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (t *Tor) Collect() map[string]int64 {
-	mx, err := t.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		t.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -92,9 +92,9 @@ func (t *Tor) Collect() map[string]int64 {
 	return mx
 }
 
-func (t *Tor) Cleanup() {
-	if t.conn != nil {
-		t.conn.disconnect()
-		t.conn = nil
+func (c *Collector) Cleanup() {
+	if c.conn != nil {
+		c.conn.disconnect()
+		c.conn = nil
 	}
 }
