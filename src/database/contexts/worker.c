@@ -1103,6 +1103,7 @@ void *rrdcontext_main(void *ptr) {
     heartbeat_t hb;
     heartbeat_init(&hb, RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC);
 
+    size_t last_metrics_first_ut = now_realtime_usec();
     usec_t last_metrics_ut = 0;
 
     while (service_running(SERVICE_CONTEXT)) {
@@ -1143,11 +1144,12 @@ void *rrdcontext_main(void *ptr) {
             if (host->rrdctx.contexts)
                 dictionary_garbage_collect(host->rrdctx.contexts);
 
-            // recalculate metrics every 30 seconds
-            if(last_metrics_ut + 30 * USEC_PER_SEC > now_ut)
+            // recalculate metrics every 33 seconds, but do it every second for the first 123 seconds
+            if(last_metrics_ut + 33 * USEC_PER_SEC > now_ut)
                 continue;
 
-            last_metrics_ut = now_ut;
+            if(last_metrics_first_ut + 123 * USEC_PER_SEC < now_ut)
+                last_metrics_ut = now_ut;
 
             worker_is_busy(WORKER_JOB_HOSTS_CTX_METRICS);
 
