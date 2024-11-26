@@ -35,11 +35,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestAuthoritativeNS_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &AuthoritativeNS{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestAuthoritativeNS_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -72,21 +72,21 @@ func TestAuthoritativeNS_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ns := New()
-			ns.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, ns.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, ns.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestAuthoritativeNS_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() (ns *AuthoritativeNS, cleanup func())
+		prepare  func() (collr *Collector, cleanup func())
 		wantFail bool
 	}{
 		"success on valid response v4.3.0": {
@@ -112,32 +112,32 @@ func TestAuthoritativeNS_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ns, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
-			require.NoError(t, ns.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, ns.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, ns.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestAuthoritativeNS_Charts(t *testing.T) {
-	ns := New()
-	require.NoError(t, ns.Init())
-	assert.NotNil(t, ns.Charts())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestAuthoritativeNS_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestAuthoritativeNS_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() (p *AuthoritativeNS, cleanup func())
+		prepare       func() (collr *Collector, cleanup func())
 		wantCollected map[string]int64
 	}{
 		"success on valid response v4.3.0": {
@@ -240,63 +240,63 @@ func TestAuthoritativeNS_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ns, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
-			require.NoError(t, ns.Init())
+			require.NoError(t, collr.Init())
 
-			mx := ns.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				module.TestMetricsHasAllChartsDims(t, ns.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func preparePowerDNSAuthoritativeNSV430() (*AuthoritativeNS, func()) {
+func preparePowerDNSAuthoritativeNSV430() (*Collector, func()) {
 	srv := preparePowerDNSAuthoritativeNSEndpoint()
-	ns := New()
-	ns.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return ns, srv.Close
+	return collr, srv.Close
 }
 
-func preparePowerDNSAuthoritativeNSRecursorData() (*AuthoritativeNS, func()) {
+func preparePowerDNSAuthoritativeNSRecursorData() (*Collector, func()) {
 	srv := preparePowerDNSRecursorEndpoint()
-	ns := New()
-	ns.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return ns, srv.Close
+	return collr, srv.Close
 }
 
-func preparePowerDNSAuthoritativeNSInvalidData() (*AuthoritativeNS, func()) {
+func preparePowerDNSAuthoritativeNSInvalidData() (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	ns := New()
-	ns.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return ns, srv.Close
+	return collr, srv.Close
 }
 
-func preparePowerDNSAuthoritativeNS404() (*AuthoritativeNS, func()) {
+func preparePowerDNSAuthoritativeNS404() (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	ns := New()
-	ns.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return ns, srv.Close
+	return collr, srv.Close
 }
 
-func preparePowerDNSAuthoritativeNSConnectionRefused() (*AuthoritativeNS, func()) {
-	ns := New()
-	ns.URL = "http://127.0.0.1:38001"
+func preparePowerDNSAuthoritativeNSConnectionRefused() (*Collector, func()) {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001"
 
-	return ns, func() {}
+	return collr, func() {}
 }
 
 func preparePowerDNSAuthoritativeNSEndpoint() *httptest.Server {

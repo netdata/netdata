@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *AuthoritativeNS {
-	return &AuthoritativeNS{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -45,7 +45,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type AuthoritativeNS struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -54,33 +54,33 @@ type AuthoritativeNS struct {
 	httpClient *http.Client
 }
 
-func (ns *AuthoritativeNS) Configuration() any {
-	return ns.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (ns *AuthoritativeNS) Init() error {
-	err := ns.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	client, err := ns.initHTTPClient()
+	client, err := c.initHTTPClient()
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
-	ns.httpClient = client
+	c.httpClient = client
 
-	cs, err := ns.initCharts()
+	cs, err := c.initCharts()
 	if err != nil {
 		return fmt.Errorf("init charts: %v", err)
 	}
-	ns.charts = cs
+	c.charts = cs
 
 	return nil
 }
 
-func (ns *AuthoritativeNS) Check() error {
-	mx, err := ns.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -90,14 +90,14 @@ func (ns *AuthoritativeNS) Check() error {
 	return nil
 }
 
-func (ns *AuthoritativeNS) Charts() *module.Charts {
-	return ns.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (ns *AuthoritativeNS) Collect() map[string]int64 {
-	ms, err := ns.collect()
+func (c *Collector) Collect() map[string]int64 {
+	ms, err := c.collect()
 	if err != nil {
-		ns.Error(err)
+		c.Error(err)
 	}
 
 	if len(ms) == 0 {
@@ -106,9 +106,9 @@ func (ns *AuthoritativeNS) Collect() map[string]int64 {
 	return ms
 }
 
-func (ns *AuthoritativeNS) Cleanup() {
-	if ns.httpClient == nil {
+func (c *Collector) Cleanup() {
+	if c.httpClient == nil {
 		return
 	}
-	ns.httpClient.CloseIdleConnections()
+	c.httpClient.CloseIdleConnections()
 }
