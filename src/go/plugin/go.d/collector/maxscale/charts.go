@@ -186,7 +186,7 @@ var (
 	}
 )
 
-func (m *MaxScale) addServerCharts(id, addr string) {
+func (c *Collector) addServerCharts(id, addr string) {
 	srvCharts := serverChartsTmpl.Copy()
 
 	for _, chart := range *srvCharts {
@@ -201,16 +201,16 @@ func (m *MaxScale) addServerCharts(id, addr string) {
 		}
 	}
 
-	if err := m.Charts().Add(*srvCharts...); err != nil {
-		m.Warning(err)
+	if err := c.Charts().Add(*srvCharts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *MaxScale) removeServerCharts(id string) {
+func (c *Collector) removeServerCharts(id string) {
 	px := fmt.Sprintf("server_%s_", id)
 	px = cleanChartID(px)
 
-	for _, chart := range *m.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

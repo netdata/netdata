@@ -36,11 +36,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestMaxScale_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &MaxScale{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestMaxScale_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -61,22 +61,22 @@ func TestMaxScale_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ms := New()
-			ms.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, ms.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, ms.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestMaxScale_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (nu *MaxScale, cleanup func())
+		prepare  func(t *testing.T) (nu *Collector, cleanup func())
 	}{
 		"success on valid response": {
 			wantFail: false,
@@ -102,25 +102,25 @@ func TestMaxScale_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ms, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, ms.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, ms.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestMaxScale_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestMaxScale_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare         func(t *testing.T) (nu *MaxScale, cleanup func())
+		prepare         func(t *testing.T) (nu *Collector, cleanup func())
 		wantNumOfCharts int
 		wantMetrics     map[string]int64
 	}{
@@ -178,25 +178,25 @@ func TestMaxScale_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ms, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			_ = ms.Check()
+			_ = collr.Check()
 
-			mx := ms.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				assert.Equal(t, test.wantNumOfCharts, len(*ms.Charts()), "want charts")
+				assert.Equal(t, test.wantNumOfCharts, len(*collr.Charts()), "want charts")
 
-				module.TestMetricsHasAllChartsDims(t, ms.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func caseOk(t *testing.T) (*MaxScale, func()) {
+func caseOk(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -211,14 +211,14 @@ func caseOk(t *testing.T) (*MaxScale, func()) {
 				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
-	ms := New()
-	ms.URL = srv.URL
-	require.NoError(t, ms.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ms, srv.Close
+	return collr, srv.Close
 }
 
-func caseUnexpectedJsonResponse(t *testing.T) (*MaxScale, func()) {
+func caseUnexpectedJsonResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	resp := `
 {
@@ -241,44 +241,44 @@ func caseUnexpectedJsonResponse(t *testing.T) (*MaxScale, func()) {
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(resp))
 		}))
-	ms := New()
-	ms.URL = srv.URL
-	require.NoError(t, ms.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ms, srv.Close
+	return collr, srv.Close
 }
 
-func caseInvalidDataResponse(t *testing.T) (*MaxScale, func()) {
+func caseInvalidDataResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	ms := New()
-	ms.URL = srv.URL
-	require.NoError(t, ms.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ms, srv.Close
+	return collr, srv.Close
 }
 
-func caseConnectionRefused(t *testing.T) (*MaxScale, func()) {
+func caseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	ms := New()
-	ms.URL = "http://127.0.0.1:65001"
-	require.NoError(t, ms.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	require.NoError(t, collr.Init())
 
-	return ms, func() {}
+	return collr, func() {}
 }
 
-func case404(t *testing.T) (*MaxScale, func()) {
+func case404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	ms := New()
-	ms.URL = srv.URL
-	require.NoError(t, ms.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ms, srv.Close
+	return collr, srv.Close
 }

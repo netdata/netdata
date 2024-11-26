@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *MaxScale {
-	return &MaxScale{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -49,7 +49,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type MaxScale struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -60,29 +60,29 @@ type MaxScale struct {
 	seenServers map[string]bool
 }
 
-func (m *MaxScale) Configuration() any {
-	return m.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (m *MaxScale) Init() error {
-	if m.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("URL required but not set")
 	}
 
-	httpClient, err := web.NewHTTPClient(m.ClientConfig)
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("failed initializing http client: %w", err)
 	}
-	m.httpClient = httpClient
+	c.httpClient = httpClient
 
-	m.Debugf("using URL %s", m.URL)
-	m.Debugf("using timeout: %s", m.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (m *MaxScale) Check() error {
-	mx, err := m.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -94,22 +94,22 @@ func (m *MaxScale) Check() error {
 	return nil
 }
 
-func (m *MaxScale) Charts() *module.Charts {
-	return m.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (m *MaxScale) Collect() map[string]int64 {
-	mx, err := m.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		m.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (m *MaxScale) Cleanup() {
-	if m.httpClient != nil {
-		m.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }
