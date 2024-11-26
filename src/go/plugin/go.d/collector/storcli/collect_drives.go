@@ -56,7 +56,7 @@ type storNumber string // some int values can be 'N/A'
 
 func (n *storNumber) UnmarshalJSON(b []byte) error { *n = storNumber(b); return nil }
 
-func (s *StorCli) collectMegaRaidDrives(mx map[string]int64, resp *drivesInfoResponse) error {
+func (c *Collector) collectMegaRaidDrives(mx map[string]int64, resp *drivesInfoResponse) error {
 	if resp == nil {
 		return nil
 	}
@@ -102,9 +102,9 @@ func (s *StorCli) collectMegaRaidDrives(mx map[string]int64, resp *drivesInfoRes
 				continue
 			}
 
-			if !s.drives[attrs.WWN] {
-				s.drives[attrs.WWN] = true
-				s.addPhysDriveCharts(cntrlIdx, info, state, attrs)
+			if !c.drives[attrs.WWN] {
+				c.drives[attrs.WWN] = true
+				c.addPhysDriveCharts(cntrlIdx, info, state, attrs)
 			}
 
 			px := fmt.Sprintf("phys_drive_%s_cntrl_%d_", attrs.WWN, cntrlIdx)
@@ -135,8 +135,8 @@ func (s *StorCli) collectMegaRaidDrives(mx map[string]int64, resp *drivesInfoRes
 	return nil
 }
 
-func (s *StorCli) queryDrivesInfo() (*drivesInfoResponse, error) {
-	bs, err := s.exec.drivesInfo()
+func (c *Collector) queryDrivesInfo() (*drivesInfoResponse, error) {
+	bs, err := c.exec.drivesInfo()
 	if err != nil {
 		return nil, err
 	}

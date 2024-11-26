@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *StorCli {
-	return &StorCli{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -45,41 +45,35 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type (
-	StorCli struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec storCli
+	exec storCli
 
-		controllers map[string]bool
-		drives      map[string]bool
-		bbu         map[string]bool
-	}
-	storCli interface {
-		controllersInfo() ([]byte, error)
-		drivesInfo() ([]byte, error)
-	}
-)
-
-func (s *StorCli) Configuration() any {
-	return s.Config
+	controllers map[string]bool
+	drives      map[string]bool
+	bbu         map[string]bool
 }
 
-func (s *StorCli) Init() error {
-	storExec, err := s.initStorCliExec()
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	storExec, err := c.initStorCliExec()
 	if err != nil {
 		return fmt.Errorf("storcli exec initialization: %v", err)
 	}
-	s.exec = storExec
+	c.exec = storExec
 
 	return nil
 }
 
-func (s *StorCli) Check() error {
-	mx, err := s.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -91,14 +85,14 @@ func (s *StorCli) Check() error {
 	return nil
 }
 
-func (s *StorCli) Charts() *module.Charts {
-	return s.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (s *StorCli) Collect() map[string]int64 {
-	mx, err := s.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		s.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -108,4 +102,4 @@ func (s *StorCli) Collect() map[string]int64 {
 	return mx
 }
 
-func (s *StorCli) Cleanup() {}
+func (c *Collector) Cleanup() {}

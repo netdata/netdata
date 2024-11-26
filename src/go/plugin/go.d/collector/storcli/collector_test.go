@@ -37,11 +37,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestStorCli_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &StorCli{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestStorCli_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -54,58 +54,58 @@ func TestStorCli_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			stor := New()
+			collr := New()
 
 			if test.wantFail {
-				assert.Error(t, stor.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, stor.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestStorCli_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *StorCli
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *StorCli {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *StorCli {
-				stor := New()
-				stor.exec = prepareMockMegaRaidOK()
-				_ = stor.Check()
-				return stor
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockMegaRaidOK()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *StorCli {
-				stor := New()
-				stor.exec = prepareMockMegaRaidOK()
-				_ = stor.Collect()
-				return stor
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockMegaRaidOK()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			stor := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, stor.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestStorCli_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestStorCli_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockStorCliExec
 		wantFail    bool
@@ -130,20 +130,20 @@ func TestStorCli_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			stor := New()
+			collr := New()
 			mock := test.prepareMock()
-			stor.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, stor.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, stor.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestStorCli_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockStorCliExec
 		wantMetrics map[string]int64
@@ -226,17 +226,17 @@ func TestStorCli_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			stor := New()
+			collr := New()
 			mock := test.prepareMock()
-			stor.exec = mock
+			collr.exec = mock
 
-			mx := stor.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
-			assert.Len(t, *stor.Charts(), test.wantCharts, "wantCharts")
+			assert.Len(t, *collr.Charts(), test.wantCharts, "wantCharts")
 
-			module.TestMetricsHasAllChartsDims(t, stor.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }
