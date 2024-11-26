@@ -39,11 +39,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestApache_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Apache{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestApache_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -72,22 +72,22 @@ func TestApache_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			apache := New()
-			apache.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, apache.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, apache.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestApache_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (apache *Apache, cleanup func())
+		prepare  func(t *testing.T) (collr *Collector, cleanup func())
 	}{
 		"success on simple status MPM Event": {
 			wantFail: false,
@@ -121,25 +121,25 @@ func TestApache_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			apache, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, apache.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, apache.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestApache_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestApache_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare         func(t *testing.T) (apache *Apache, cleanup func())
+		prepare         func(t *testing.T) (collr *Collector, cleanup func())
 		wantNumOfCharts int
 		wantMetrics     map[string]int64
 	}{
@@ -244,102 +244,102 @@ func TestApache_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			apache, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			_ = apache.Check()
+			_ = collr.Check()
 
-			collected := apache.Collect()
+			collected := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, collected)
-			assert.Equal(t, test.wantNumOfCharts, len(*apache.Charts()))
+			assert.Equal(t, test.wantNumOfCharts, len(*collr.Charts()))
 		})
 	}
 }
 
-func caseMPMEventSimpleStatus(t *testing.T) (*Apache, func()) {
+func caseMPMEventSimpleStatus(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataSimpleStatusMPMEvent)
 		}))
-	apache := New()
-	apache.URL = srv.URL + "/server-status?auto"
-	require.NoError(t, apache.Init())
+	collr := New()
+	collr.URL = srv.URL + "/server-status?auto"
+	require.NoError(t, collr.Init())
 
-	return apache, srv.Close
+	return collr, srv.Close
 }
 
-func caseMPMEventExtendedStatus(t *testing.T) (*Apache, func()) {
+func caseMPMEventExtendedStatus(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataExtendedStatusMPMEvent)
 		}))
-	apache := New()
-	apache.URL = srv.URL + "/server-status?auto"
-	require.NoError(t, apache.Init())
+	collr := New()
+	collr.URL = srv.URL + "/server-status?auto"
+	require.NoError(t, collr.Init())
 
-	return apache, srv.Close
+	return collr, srv.Close
 }
 
-func caseMPMPreforkExtendedStatus(t *testing.T) (*Apache, func()) {
+func caseMPMPreforkExtendedStatus(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataExtendedStatusMPMPrefork)
 		}))
-	apache := New()
-	apache.URL = srv.URL + "/server-status?auto"
-	require.NoError(t, apache.Init())
+	collr := New()
+	collr.URL = srv.URL + "/server-status?auto"
+	require.NoError(t, collr.Init())
 
-	return apache, srv.Close
+	return collr, srv.Close
 }
 
-func caseLighttpdResponse(t *testing.T) (*Apache, func()) {
+func caseLighttpdResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataLighttpdStatus)
 		}))
-	apache := New()
-	apache.URL = srv.URL + "/server-status?auto"
-	require.NoError(t, apache.Init())
+	collr := New()
+	collr.URL = srv.URL + "/server-status?auto"
+	require.NoError(t, collr.Init())
 
-	return apache, srv.Close
+	return collr, srv.Close
 }
 
-func caseInvalidDataResponse(t *testing.T) (*Apache, func()) {
+func caseInvalidDataResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	apache := New()
-	apache.URL = srv.URL + "/server-status?auto"
-	require.NoError(t, apache.Init())
+	collr := New()
+	collr.URL = srv.URL + "/server-status?auto"
+	require.NoError(t, collr.Init())
 
-	return apache, srv.Close
+	return collr, srv.Close
 }
 
-func caseConnectionRefused(t *testing.T) (*Apache, func()) {
+func caseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	apache := New()
-	apache.URL = "http://127.0.0.1:65001/server-status?auto"
-	require.NoError(t, apache.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001/server-status?auto"
+	require.NoError(t, collr.Init())
 
-	return apache, func() {}
+	return collr, func() {}
 }
 
-func case404(t *testing.T) (*Apache, func()) {
+func case404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	apache := New()
-	apache.URL = srv.URL + "/server-status?auto"
-	require.NoError(t, apache.Init())
+	collr := New()
+	collr.URL = srv.URL + "/server-status?auto"
+	require.NoError(t, collr.Init())
 
-	return apache, srv.Close
+	return collr, srv.Close
 }

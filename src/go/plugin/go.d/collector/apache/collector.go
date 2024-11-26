@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *Apache {
-	return &Apache{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -48,7 +48,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Apache struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -59,29 +59,29 @@ type Apache struct {
 	once *sync.Once
 }
 
-func (a *Apache) Configuration() any {
-	return a.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (a *Apache) Init() error {
-	if err := a.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	httpClient, err := a.initHTTPClient()
+	httpClient, err := c.initHTTPClient()
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
-	a.httpClient = httpClient
+	c.httpClient = httpClient
 
-	a.Debugf("using URL %s", a.URL)
-	a.Debugf("using timeout: %s", a.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (a *Apache) Check() error {
-	mx, err := a.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -92,14 +92,14 @@ func (a *Apache) Check() error {
 	return nil
 }
 
-func (a *Apache) Charts() *module.Charts {
-	return a.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (a *Apache) Collect() map[string]int64 {
-	mx, err := a.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		a.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -108,8 +108,8 @@ func (a *Apache) Collect() map[string]int64 {
 	return mx
 }
 
-func (a *Apache) Cleanup() {
-	if a.httpClient != nil {
-		a.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }
