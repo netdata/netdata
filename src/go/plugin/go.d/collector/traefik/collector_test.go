@@ -33,11 +33,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestTraefik_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Traefik{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestTraefik_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -64,30 +64,30 @@ func TestTraefik_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rdb := New()
-			rdb.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, rdb.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, rdb.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestTraefik_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestTraefik_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestTraefik_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (tk *Traefik, cleanup func())
+		prepare  func(t *testing.T) (collr *Collector, cleanup func())
 	}{
 		"success on valid response v2.3.1": {
 			wantFail: false,
@@ -109,21 +109,21 @@ func TestTraefik_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tk, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, tk.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, tk.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestTraefik_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func(t *testing.T) (tk *Traefik, cleanup func())
+		prepare       func(t *testing.T) (collr *Collector, cleanup func())
 		wantCollected []map[string]int64
 	}{
 		"success on valid response v2.2.1": {
@@ -238,35 +238,35 @@ func TestTraefik_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tk, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			var mx map[string]int64
 			for _, want := range test.wantCollected {
-				mx = tk.Collect()
+				mx = collr.Collect()
 				assert.Equal(t, want, mx)
 			}
 			if len(test.wantCollected) > 0 {
-				module.TestMetricsHasAllChartsDims(t, tk.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareCaseTraefikV221Metrics(t *testing.T) (*Traefik, func()) {
+func prepareCaseTraefikV221Metrics(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataVer221Metrics)
 		}))
-	h := New()
-	h.URL = srv.URL
-	require.NoError(t, h.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return h, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseTraefikEntrypointRequestDuration(t *testing.T) (*Traefik, func()) {
+func prepareCaseTraefikEntrypointRequestDuration(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	var num int
 	srv := httptest.NewServer(http.HandlerFunc(
@@ -296,14 +296,14 @@ traefik_entrypoint_request_duration_seconds_count{code="300",entrypoint="web",me
 `))
 			}
 		}))
-	h := New()
-	h.URL = srv.URL
-	require.NoError(t, h.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return h, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseNotTraefikMetrics(t *testing.T) (*Traefik, func()) {
+func prepareCaseNotTraefikMetrics(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -324,31 +324,31 @@ application_backend_http_responses_total{proxy="infra-traefik-web",code="other"}
 application_backend_http_responses_total{proxy="infra-vernemq-ws",code="other"} 0
 `))
 		}))
-	h := New()
-	h.URL = srv.URL
-	require.NoError(t, h.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return h, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCase404Response(t *testing.T) (*Traefik, func()) {
+func prepareCase404Response(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	h := New()
-	h.URL = srv.URL
-	require.NoError(t, h.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return h, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseConnectionRefused(t *testing.T) (*Traefik, func()) {
+func prepareCaseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	h := New()
-	h.URL = "http://127.0.0.1:38001"
-	require.NoError(t, h.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001"
+	require.NoError(t, collr.Init())
 
-	return h, func() {}
+	return collr, func() {}
 }

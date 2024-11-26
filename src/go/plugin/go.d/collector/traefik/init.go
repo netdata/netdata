@@ -10,20 +10,20 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (t *Traefik) validateConfig() error {
-	if t.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("'url' is not set")
 	}
 	return nil
 }
 
-func (t *Traefik) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(t.ClientConfig)
+func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	prom := prometheus.NewWithSelector(httpClient, t.RequestConfig, sr)
+	prom := prometheus.NewWithSelector(httpClient, c.RequestConfig, sr)
 	return prom, nil
 }
 

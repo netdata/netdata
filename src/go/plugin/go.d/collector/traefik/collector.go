@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Traefik {
-	return &Traefik{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -52,7 +52,7 @@ type Config struct {
 }
 
 type (
-	Traefik struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -80,26 +80,26 @@ type (
 	}
 )
 
-func (t *Traefik) Configuration() any {
-	return t.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (t *Traefik) Init() error {
-	if err := t.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prom, err := t.initPrometheusClient()
+	prom, err := c.initPrometheusClient()
 	if err != nil {
 		return fmt.Errorf("prometheus client initialization: %v", err)
 	}
-	t.prom = prom
+	c.prom = prom
 
 	return nil
 }
 
-func (t *Traefik) Check() error {
-	mx, err := t.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -109,14 +109,14 @@ func (t *Traefik) Check() error {
 	return nil
 }
 
-func (t *Traefik) Charts() *module.Charts {
-	return t.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (t *Traefik) Collect() map[string]int64 {
-	mx, err := t.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		t.Error(err)
+		c.Error(err)
 		return nil
 	}
 
@@ -126,4 +126,4 @@ func (t *Traefik) Collect() map[string]int64 {
 	return mx
 }
 
-func (t *Traefik) Cleanup() {}
+func (c *Collector) Cleanup() {}
