@@ -24,8 +24,8 @@ func init() {
 	})
 }
 
-func New() *Supervisord {
-	return &Supervisord{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			URL: "http://127.0.0.1:9001/RPC2",
 			ClientConfig: web.ClientConfig{
@@ -44,44 +44,38 @@ type Config struct {
 	web.ClientConfig `yaml:",inline" json:""`
 }
 
-type (
-	Supervisord struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		client supervisorClient
+	client supervisorClient
 
-		cache map[string]map[string]bool // map[group][procName]collected
-	}
-	supervisorClient interface {
-		getAllProcessInfo() ([]processStatus, error)
-		closeIdleConnections()
-	}
-)
-
-func (s *Supervisord) Configuration() any {
-	return s.Config
+	cache map[string]map[string]bool // map[group][procName]collected
 }
 
-func (s *Supervisord) Init() error {
-	err := s.verifyConfig()
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	err := c.verifyConfig()
 	if err != nil {
 		return fmt.Errorf("verify config: %v", err)
 	}
 
-	client, err := s.initSupervisorClient()
+	client, err := c.initSupervisorClient()
 	if err != nil {
 		return fmt.Errorf("init supervisord client: %v", err)
 	}
-	s.client = client
+	c.client = client
 
 	return nil
 }
 
-func (s *Supervisord) Check() error {
-	mx, err := s.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -91,14 +85,14 @@ func (s *Supervisord) Check() error {
 	return nil
 }
 
-func (s *Supervisord) Charts() *module.Charts {
-	return s.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (s *Supervisord) Collect() map[string]int64 {
-	ms, err := s.collect()
+func (c *Collector) Collect() map[string]int64 {
+	ms, err := c.collect()
 	if err != nil {
-		s.Error(err)
+		c.Error(err)
 	}
 
 	if len(ms) == 0 {
@@ -107,8 +101,8 @@ func (s *Supervisord) Collect() map[string]int64 {
 	return ms
 }
 
-func (s *Supervisord) Cleanup() {
-	if s.client != nil {
-		s.client.closeIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.client != nil {
+		c.client.closeIdleConnections()
 	}
 }

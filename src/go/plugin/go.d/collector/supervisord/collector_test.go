@@ -27,11 +27,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestSupervisord_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Supervisord{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestSupervisord_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -51,21 +51,21 @@ func TestSupervisord_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			supvr := New()
-			supvr.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, supvr.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, supvr.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestSupervisord_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(t *testing.T) *Supervisord
+		prepare  func(t *testing.T) *Collector
 		wantFail bool
 	}{
 		"success on valid response": {
@@ -82,41 +82,41 @@ func TestSupervisord_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			supvr := test.prepare(t)
-			defer supvr.Cleanup()
+			collr := test.prepare(t)
+			defer collr.Cleanup()
 
 			if test.wantFail {
-				assert.Error(t, supvr.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, supvr.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestSupervisord_Charts(t *testing.T) {
-	supvr := New()
-	require.NoError(t, supvr.Init())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
 
-	assert.NotNil(t, supvr.Charts())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestSupervisord_Cleanup(t *testing.T) {
-	supvr := New()
-	assert.NotPanics(t, supvr.Cleanup)
+func TestCollector_Cleanup(t *testing.T) {
+	collr := New()
+	assert.NotPanics(t, collr.Cleanup)
 
-	require.NoError(t, supvr.Init())
+	require.NoError(t, collr.Init())
 	m := &mockSupervisorClient{}
-	supvr.client = m
+	collr.client = m
 
-	supvr.Cleanup()
+	collr.Cleanup()
 
 	assert.True(t, m.calledCloseIdleConnections)
 }
 
-func TestSupervisord_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func(t *testing.T) *Supervisord
+		prepare       func(t *testing.T) *Collector
 		wantCollected map[string]int64
 	}{
 		"success on valid response": {
@@ -166,37 +166,37 @@ func TestSupervisord_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			supvr := test.prepare(t)
-			defer supvr.Cleanup()
+			collr := test.prepare(t)
+			defer collr.Cleanup()
 
-			mx := supvr.Collect()
+			mx := collr.Collect()
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				module.TestMetricsHasAllChartsDims(t, supvr.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareSupervisordSuccessOnGetAllProcessInfo(t *testing.T) *Supervisord {
-	supvr := New()
-	require.NoError(t, supvr.Init())
-	supvr.client = &mockSupervisorClient{}
-	return supvr
+func prepareSupervisordSuccessOnGetAllProcessInfo(t *testing.T) *Collector {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.client = &mockSupervisorClient{}
+	return collr
 }
 
-func prepareSupervisordZeroProcessesOnGetAllProcessInfo(t *testing.T) *Supervisord {
-	supvr := New()
-	require.NoError(t, supvr.Init())
-	supvr.client = &mockSupervisorClient{returnZeroProcesses: true}
-	return supvr
+func prepareSupervisordZeroProcessesOnGetAllProcessInfo(t *testing.T) *Collector {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.client = &mockSupervisorClient{returnZeroProcesses: true}
+	return collr
 }
 
-func prepareSupervisordErrorOnGetAllProcessInfo(t *testing.T) *Supervisord {
-	supvr := New()
-	require.NoError(t, supvr.Init())
-	supvr.client = &mockSupervisorClient{errOnGetAllProcessInfo: true}
-	return supvr
+func prepareSupervisordErrorOnGetAllProcessInfo(t *testing.T) *Collector {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.client = &mockSupervisorClient{errOnGetAllProcessInfo: true}
+	return collr
 }
 
 type mockSupervisorClient struct {
