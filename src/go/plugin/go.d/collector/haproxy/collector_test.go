@@ -33,11 +33,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestHaproxy_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Haproxy{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestHaproxy_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -64,30 +64,30 @@ func TestHaproxy_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rdb := New()
-			rdb.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, rdb.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, rdb.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestHaproxy_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestHaproxy_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestHaproxy_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (h *Haproxy, cleanup func())
+		prepare  func(t *testing.T) (h *Collector, cleanup func())
 	}{
 		"success on valid response v2.3.1": {
 			wantFail: false,
@@ -109,21 +109,21 @@ func TestHaproxy_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			h, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, h.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, h.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestHaproxy_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func(t *testing.T) (h *Haproxy, cleanup func())
+		prepare       func(t *testing.T) (c *Collector, cleanup func())
 		wantCollected map[string]int64
 	}{
 		"success on valid response v2.3.1": {
@@ -170,33 +170,33 @@ func TestHaproxy_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			h, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := h.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				module.TestMetricsHasAllChartsDims(t, h.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareCaseHaproxyV231Metrics(t *testing.T) (*Haproxy, func()) {
+func prepareCaseHaproxyV231Metrics(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataVer2310Metrics)
 		}))
-	h := New()
-	h.URL = srv.URL
-	require.NoError(t, h.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return h, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseNotHaproxyMetrics(t *testing.T) (*Haproxy, func()) {
+func prepareCaseNotHaproxyMetrics(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -217,31 +217,31 @@ application_backend_http_responses_total{proxy="infra-traefik-web",code="other"}
 application_backend_http_responses_total{proxy="infra-vernemq-ws",code="other"} 0
 `))
 		}))
-	h := New()
-	h.URL = srv.URL
-	require.NoError(t, h.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return h, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCase404Response(t *testing.T) (*Haproxy, func()) {
+func prepareCase404Response(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	h := New()
-	h.URL = srv.URL
-	require.NoError(t, h.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return h, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseConnectionRefused(t *testing.T) (*Haproxy, func()) {
+func prepareCaseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	h := New()
-	h.URL = "http://127.0.0.1:38001"
-	require.NoError(t, h.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001"
+	require.NoError(t, collr.Init())
 
-	return h, func() {}
+	return collr, func() {}
 }

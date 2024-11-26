@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Haproxy {
-	return &Haproxy{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -49,7 +49,7 @@ type Config struct {
 	UpdateEvery    int `yaml:"update_every" json:"update_every"`
 }
 
-type Haproxy struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -61,26 +61,26 @@ type Haproxy struct {
 	proxies         map[string]bool
 }
 
-func (h *Haproxy) Configuration() any {
-	return h.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (h *Haproxy) Init() error {
-	if err := h.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prom, err := h.initPrometheusClient()
+	prom, err := c.initPrometheusClient()
 	if err != nil {
 		return fmt.Errorf("prometheus client initialization: %v", err)
 	}
-	h.prom = prom
+	c.prom = prom
 
 	return nil
 }
 
-func (h *Haproxy) Check() error {
-	mx, err := h.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -90,14 +90,14 @@ func (h *Haproxy) Check() error {
 	return nil
 }
 
-func (h *Haproxy) Charts() *module.Charts {
-	return h.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (h *Haproxy) Collect() map[string]int64 {
-	mx, err := h.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		h.Error(err)
+		c.Error(err)
 		return nil
 	}
 
@@ -107,8 +107,8 @@ func (h *Haproxy) Collect() map[string]int64 {
 	return mx
 }
 
-func (h *Haproxy) Cleanup() {
-	if h.prom != nil && h.prom.HTTPClient() != nil {
-		h.prom.HTTPClient().CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.prom != nil && c.prom.HTTPClient() != nil {
+		c.prom.HTTPClient().CloseIdleConnections()
 	}
 }
