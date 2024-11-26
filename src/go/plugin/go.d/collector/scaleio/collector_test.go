@@ -34,66 +34,66 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestScaleIO_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &ScaleIO{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestScaleIO_Init(t *testing.T) {
-	scaleIO := New()
-	scaleIO.Username = "username"
-	scaleIO.Password = "password"
+func TestCollector_Init(t *testing.T) {
+	collr := New()
+	collr.Username = "username"
+	collr.Password = "password"
 
-	assert.NoError(t, scaleIO.Init())
+	assert.NoError(t, collr.Init())
 }
-func TestScaleIO_Init_UsernameAndPasswordNotSet(t *testing.T) {
+func TestCollector_Init_UsernameAndPasswordNotSet(t *testing.T) {
 	assert.Error(t, New().Init())
 }
 
-func TestScaleIO_Init_ErrorOnCreatingClientWrongTLSCA(t *testing.T) {
-	job := New()
-	job.Username = "username"
-	job.Password = "password"
-	job.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
+func TestCollector_Init_ErrorOnCreatingClientWrongTLSCA(t *testing.T) {
+	collr := New()
+	collr.Username = "username"
+	collr.Password = "password"
+	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, job.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestScaleIO_Check(t *testing.T) {
-	srv, _, scaleIO := prepareSrvMockScaleIO(t)
+func TestCollector_Check(t *testing.T) {
+	srv, _, collr := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.NoError(t, scaleIO.Init())
+	require.NoError(t, collr.Init())
 
-	assert.NoError(t, scaleIO.Check())
+	assert.NoError(t, collr.Check())
 }
 
-func TestScaleIO_Check_ErrorOnLogin(t *testing.T) {
-	srv, mock, scaleIO := prepareSrvMockScaleIO(t)
+func TestCollector_Check_ErrorOnLogin(t *testing.T) {
+	srv, mock, collr := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.NoError(t, scaleIO.Init())
+	require.NoError(t, collr.Init())
 	mock.Password = "new password"
 
-	assert.Error(t, scaleIO.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestScaleIO_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestScaleIO_Cleanup(t *testing.T) {
-	srv, _, scaleIO := prepareSrvMockScaleIO(t)
+func TestCollector_Cleanup(t *testing.T) {
+	srv, _, collr := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.NoError(t, scaleIO.Init())
-	require.NoError(t, scaleIO.Check())
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
-	scaleIO.Cleanup()
-	assert.False(t, scaleIO.client.LoggedIn())
+	collr.Cleanup()
+	assert.False(t, collr.client.LoggedIn())
 }
 
-func TestScaleIO_Collect(t *testing.T) {
-	srv, _, scaleIO := prepareSrvMockScaleIO(t)
+func TestCollector_Collect(t *testing.T) {
+	srv, _, collr := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.NoError(t, scaleIO.Init())
-	require.NoError(t, scaleIO.Check())
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"sdc_6076fd0f00000000_bandwidth_read":                                    0,
@@ -298,47 +298,47 @@ func TestScaleIO_Collect(t *testing.T) {
 		"system_total_iops_write":                                                617200,
 	}
 
-	mx := scaleIO.Collect()
+	mx := collr.Collect()
 
 	assert.Equal(t, expected, mx)
 
-	testCharts(t, scaleIO, mx)
+	testCharts(t, collr, mx)
 }
 
-func TestScaleIO_Collect_ConnectionRefused(t *testing.T) {
-	srv, _, scaleIO := prepareSrvMockScaleIO(t)
+func TestCollector_Collect_ConnectionRefused(t *testing.T) {
+	srv, _, collr := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.NoError(t, scaleIO.Init())
-	require.NoError(t, scaleIO.Check())
-	scaleIO.client.Request.URL = "http://127.0.0.1:38001"
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
+	collr.client.Request.URL = "http://127.0.0.1:38001"
 
-	assert.Nil(t, scaleIO.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func testCharts(t *testing.T, scaleIO *ScaleIO, collected map[string]int64) {
+func testCharts(t *testing.T, collr *Collector, collected map[string]int64) {
 	t.Helper()
-	ensureStoragePoolChartsAreCreated(t, scaleIO)
-	ensureSdcChartsAreCreated(t, scaleIO)
-	module.TestMetricsHasAllChartsDims(t, scaleIO.Charts(), collected)
+	ensureStoragePoolChartsAreCreated(t, collr)
+	ensureSdcChartsAreCreated(t, collr)
+	module.TestMetricsHasAllChartsDims(t, collr.Charts(), collected)
 }
 
-func ensureStoragePoolChartsAreCreated(t *testing.T, scaleIO *ScaleIO) {
-	for _, pool := range scaleIO.discovered.pool {
+func ensureStoragePoolChartsAreCreated(t *testing.T, collr *Collector) {
+	for _, pool := range collr.discovered.pool {
 		for _, chart := range *newStoragePoolCharts(pool) {
-			assert.Truef(t, scaleIO.Charts().Has(chart.ID), "chart '%s' is not created", chart.ID)
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' is not created", chart.ID)
 		}
 	}
 }
 
-func ensureSdcChartsAreCreated(t *testing.T, scaleIO *ScaleIO) {
-	for _, sdc := range scaleIO.discovered.sdc {
+func ensureSdcChartsAreCreated(t *testing.T, collr *Collector) {
+	for _, sdc := range collr.discovered.sdc {
 		for _, chart := range *newSdcCharts(sdc) {
-			assert.Truef(t, scaleIO.Charts().Has(chart.ID), "chart '%s' is not created", chart.ID)
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' is not created", chart.ID)
 		}
 	}
 }
 
-func prepareSrvMockScaleIO(t *testing.T) (*httptest.Server, *client.MockScaleIOAPIServer, *ScaleIO) {
+func prepareSrvMockScaleIO(t *testing.T) (*httptest.Server, *client.MockScaleIOAPIServer, *Collector) {
 	t.Helper()
 	const (
 		user     = "user"
@@ -365,9 +365,9 @@ func prepareSrvMockScaleIO(t *testing.T) (*httptest.Server, *client.MockScaleIOA
 	srv := httptest.NewServer(&mock)
 	require.NoError(t, err)
 
-	scaleIO := New()
-	scaleIO.URL = srv.URL
-	scaleIO.Username = user
-	scaleIO.Password = password
-	return srv, &mock, scaleIO
+	collr := New()
+	collr.URL = srv.URL
+	collr.Username = user
+	collr.Password = password
+	return srv, &mock, collr
 }

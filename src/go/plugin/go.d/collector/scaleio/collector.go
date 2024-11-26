@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *ScaleIO {
-	return &ScaleIO{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -48,7 +48,7 @@ type Config struct {
 }
 
 type (
-	ScaleIO struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -67,32 +67,32 @@ type (
 	}
 )
 
-func (s *ScaleIO) Configuration() any {
-	return s.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (s *ScaleIO) Init() error {
-	if s.Username == "" || s.Password == "" {
+func (c *Collector) Init() error {
+	if c.Username == "" || c.Password == "" {
 		return errors.New("config: username and password aren't set")
 	}
 
-	c, err := client.New(s.ClientConfig, s.RequestConfig)
+	cli, err := client.New(c.ClientConfig, c.RequestConfig)
 	if err != nil {
 		return fmt.Errorf("error on creating ScaleIO client: %v", err)
 	}
-	s.client = c
+	c.client = cli
 
-	s.Debugf("using URL %s", s.URL)
-	s.Debugf("using timeout: %s", s.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (s *ScaleIO) Check() error {
-	if err := s.client.Login(); err != nil {
+func (c *Collector) Check() error {
+	if err := c.client.Login(); err != nil {
 		return err
 	}
-	mx, err := s.collect()
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -102,14 +102,14 @@ func (s *ScaleIO) Check() error {
 	return nil
 }
 
-func (s *ScaleIO) Charts() *module.Charts {
-	return s.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (s *ScaleIO) Collect() map[string]int64 {
-	mx, err := s.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		s.Error(err)
+		c.Error(err)
 		return nil
 	}
 
@@ -119,9 +119,9 @@ func (s *ScaleIO) Collect() map[string]int64 {
 	return mx
 }
 
-func (s *ScaleIO) Cleanup() {
-	if s.client == nil {
+func (c *Collector) Cleanup() {
+	if c.client == nil {
 		return
 	}
-	_ = s.client.Logout()
+	_ = c.client.Logout()
 }

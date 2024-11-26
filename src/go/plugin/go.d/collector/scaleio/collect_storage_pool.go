@@ -4,11 +4,11 @@ package scaleio
 
 import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/scaleio/client"
 
-func (s *ScaleIO) collectStoragePool(ss map[string]client.StoragePoolStatistics) map[string]storagePoolMetrics {
+func (c *Collector) collectStoragePool(ss map[string]client.StoragePoolStatistics) map[string]storagePoolMetrics {
 	ms := make(map[string]storagePoolMetrics, len(ss))
 
 	for id, stats := range ss {
-		pool, ok := s.discovered.pool[id]
+		pool, ok := c.discovered.pool[id]
 		if !ok {
 			continue
 		}
