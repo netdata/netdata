@@ -30,8 +30,8 @@ func init() {
 	})
 }
 
-func New() *Prometheus {
-	return &Prometheus{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				ClientConfig: web.ClientConfig{
@@ -63,7 +63,7 @@ type Config struct {
 	} `yaml:"fallback_type,omitempty" json:"fallback_type"`
 }
 
-type Prometheus struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -78,38 +78,38 @@ type Prometheus struct {
 	}
 }
 
-func (p *Prometheus) Configuration() any {
-	return p.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (p *Prometheus) Init() error {
-	if err := p.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("validating config: %v", err)
 	}
 
-	prom, err := p.initPrometheusClient()
+	prom, err := c.initPrometheusClient()
 	if err != nil {
 		return fmt.Errorf("init prometheus client: %v", err)
 	}
-	p.prom = prom
+	c.prom = prom
 
-	m, err := p.initFallbackTypeMatcher(p.FallbackType.Counter)
+	m, err := c.initFallbackTypeMatcher(c.FallbackType.Counter)
 	if err != nil {
 		return fmt.Errorf("init counter fallback type matcher: %v", err)
 	}
-	p.fallbackType.counter = m
+	c.fallbackType.counter = m
 
-	m, err = p.initFallbackTypeMatcher(p.FallbackType.Gauge)
+	m, err = c.initFallbackTypeMatcher(c.FallbackType.Gauge)
 	if err != nil {
 		return fmt.Errorf("init counter fallback type matcher: %v", err)
 	}
-	p.fallbackType.gauge = m
+	c.fallbackType.gauge = m
 
 	return nil
 }
 
-func (p *Prometheus) Check() error {
-	mx, err := p.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -119,14 +119,14 @@ func (p *Prometheus) Check() error {
 	return nil
 }
 
-func (p *Prometheus) Charts() *module.Charts {
-	return p.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (p *Prometheus) Collect() map[string]int64 {
-	mx, err := p.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -135,8 +135,8 @@ func (p *Prometheus) Collect() map[string]int64 {
 	return mx
 }
 
-func (p *Prometheus) Cleanup() {
-	if p.prom != nil && p.prom.HTTPClient() != nil {
-		p.prom.HTTPClient().CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.prom != nil && c.prom.HTTPClient() != nil {
+		c.prom.HTTPClient().CloseIdleConnections()
 	}
 }

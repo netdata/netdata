@@ -31,11 +31,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestPrometheus_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Prometheus{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestPrometheus_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -59,48 +59,48 @@ func TestPrometheus_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			prom := New()
-			prom.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, prom.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, prom.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestPrometheus_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 
-	prom := New()
-	prom.URL = "http://127.0.0.1"
-	require.NoError(t, prom.Init())
-	assert.NotPanics(t, prom.Cleanup)
+	collr := New()
+	collr.URL = "http://127.0.0.1"
+	require.NoError(t, collr.Init())
+	assert.NotPanics(t, collr.Cleanup)
 }
 
-func TestPrometheus_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() (prom *Prometheus, cleanup func())
+		prepare  func() (collr *Collector, cleanup func())
 		wantFail bool
 	}{
 		"success if endpoint returns valid metrics in prometheus format": {
 			wantFail: false,
-			prepare: func() (prom *Prometheus, cleanup func()) {
+			prepare: func() (collr *Collector, cleanup func()) {
 				srv := httptest.NewServer(http.HandlerFunc(
 					func(w http.ResponseWriter, r *http.Request) {
 						_, _ = w.Write([]byte(`test_counter_no_meta_metric_1_total{label1="value1"} 11`))
 					}))
-				prom = New()
-				prom.URL = srv.URL
+				collr = New()
+				collr.URL = srv.URL
 
-				return prom, srv.Close
+				return collr, srv.Close
 			},
 		},
 		"fail if the total num of metrics exceeds the limit": {
 			wantFail: true,
-			prepare: func() (prom *Prometheus, cleanup func()) {
+			prepare: func() (collr *Collector, cleanup func()) {
 				srv := httptest.NewServer(http.HandlerFunc(
 					func(w http.ResponseWriter, r *http.Request) {
 						_, _ = w.Write([]byte(`
@@ -108,16 +108,16 @@ test_counter_no_meta_metric_1_total{label1="value1"} 11
 test_counter_no_meta_metric_1_total{label1="value2"} 11
 `))
 					}))
-				prom = New()
-				prom.URL = srv.URL
-				prom.MaxTS = 1
+				collr = New()
+				collr.URL = srv.URL
+				collr.MaxTS = 1
 
-				return prom, srv.Close
+				return collr, srv.Close
 			},
 		},
 		"fail if the num time series in the metric exceeds the limit": {
 			wantFail: true,
-			prepare: func() (prom *Prometheus, cleanup func()) {
+			prepare: func() (collr *Collector, cleanup func()) {
 				srv := httptest.NewServer(http.HandlerFunc(
 					func(w http.ResponseWriter, r *http.Request) {
 						_, _ = w.Write([]byte(`
@@ -125,81 +125,81 @@ test_counter_no_meta_metric_1_total{label1="value1"} 11
 test_counter_no_meta_metric_1_total{label1="value2"} 11
 `))
 					}))
-				prom = New()
-				prom.URL = srv.URL
-				prom.MaxTSPerMetric = 1
+				collr = New()
+				collr.URL = srv.URL
+				collr.MaxTSPerMetric = 1
 
-				return prom, srv.Close
+				return collr, srv.Close
 			},
 		},
 		"fail if metrics have no expected prefix": {
 			wantFail: true,
-			prepare: func() (prom *Prometheus, cleanup func()) {
+			prepare: func() (collr *Collector, cleanup func()) {
 				srv := httptest.NewServer(http.HandlerFunc(
 					func(w http.ResponseWriter, r *http.Request) {
 						_, _ = w.Write([]byte(`test_counter_no_meta_metric_1_total{label1="value1"} 11`))
 					}))
-				prom = New()
-				prom.URL = srv.URL
-				prom.ExpectedPrefix = "prefix_"
+				collr = New()
+				collr.URL = srv.URL
+				collr.ExpectedPrefix = "prefix_"
 
-				return prom, srv.Close
+				return collr, srv.Close
 			},
 		},
 		"fail if endpoint returns data not in prometheus format": {
 			wantFail: true,
-			prepare: func() (prom *Prometheus, cleanup func()) {
+			prepare: func() (collr *Collector, cleanup func()) {
 				srv := httptest.NewServer(http.HandlerFunc(
 					func(w http.ResponseWriter, r *http.Request) {
 						_, _ = w.Write([]byte("hello and\n goodbye"))
 					}))
-				prom = New()
-				prom.URL = srv.URL
+				collr = New()
+				collr.URL = srv.URL
 
-				return prom, srv.Close
+				return collr, srv.Close
 			},
 		},
 		"fail if connection refused": {
 			wantFail: true,
-			prepare: func() (prom *Prometheus, cleanup func()) {
-				prom = New()
-				prom.URL = "http://127.0.0.1:38001/metrics"
+			prepare: func() (collr *Collector, cleanup func()) {
+				collr = New()
+				collr.URL = "http://127.0.0.1:38001/metrics"
 
-				return prom, func() {}
+				return collr, func() {}
 			},
 		},
 		"fail if endpoint returns 404": {
 			wantFail: true,
-			prepare: func() (prom *Prometheus, cleanup func()) {
+			prepare: func() (collr *Collector, cleanup func()) {
 				srv := httptest.NewServer(http.HandlerFunc(
 					func(w http.ResponseWriter, r *http.Request) {
 						w.WriteHeader(http.StatusNotFound)
 					}))
-				prom = New()
-				prom.URL = srv.URL
+				collr = New()
+				collr.URL = srv.URL
 
-				return prom, srv.Close
+				return collr, srv.Close
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			prom, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, prom.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, prom.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, prom.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestPrometheus_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	type testCaseStep struct {
 		desc          string
 		input         string
@@ -207,7 +207,7 @@ func TestPrometheus_Collect(t *testing.T) {
 		wantCharts    int
 	}
 	tests := map[string]struct {
-		prepare func() *Prometheus
+		prepare func() *Collector
 		steps   []testCaseStep
 	}{
 		"Gauge": {
@@ -510,10 +510,10 @@ test_histogram_no_meta_1_duration_seconds_count{label1="value1"} 6
 			},
 		},
 		"match Untyped as Gauge": {
-			prepare: func() *Prometheus {
-				prom := New()
-				prom.FallbackType.Gauge = []string{"test_gauge_no_meta*"}
-				return prom
+			prepare: func() *Collector {
+				collr := New()
+				collr.FallbackType.Gauge = []string{"test_gauge_no_meta*"}
+				return collr
 			},
 			steps: []testCaseStep{
 				{
@@ -537,10 +537,10 @@ test_gauge_no_meta_metric_1{label1="value2"} 12
 			},
 		},
 		"match Untyped as Counter": {
-			prepare: func() *Prometheus {
-				prom := New()
-				prom.FallbackType.Counter = []string{"test_gauge_no_meta*"}
-				return prom
+			prepare: func() *Collector {
+				collr := New()
+				collr.FallbackType.Counter = []string{"test_gauge_no_meta*"}
+				return collr
 			},
 			steps: []testCaseStep{
 				{
@@ -567,7 +567,7 @@ test_gauge_no_meta_metric_1{label1="value2"} 12
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			prom := test.prepare()
+			collr := test.prepare()
 
 			var metrics []byte
 			srv := httptest.NewServer(http.HandlerFunc(
@@ -576,8 +576,8 @@ test_gauge_no_meta_metric_1{label1="value2"} 12
 				}))
 			defer srv.Close()
 
-			prom.URL = srv.URL
-			require.NoError(t, prom.Init())
+			collr.URL = srv.URL
+			require.NoError(t, collr.Init())
 
 			for num, step := range test.steps {
 				t.Run(fmt.Sprintf("step num %d ('%s')", num+1, step.desc), func(t *testing.T) {
@@ -587,12 +587,12 @@ test_gauge_no_meta_metric_1{label1="value2"} 12
 					var mx map[string]int64
 
 					for i := 0; i < maxNotSeenTimes+1; i++ {
-						mx = prom.Collect()
+						mx = collr.Collect()
 					}
 
 					assert.Equal(t, step.wantCollected, mx)
-					removeObsoleteCharts(prom.Charts())
-					assert.Len(t, *prom.Charts(), step.wantCharts)
+					removeObsoleteCharts(collr.Charts())
+					assert.Len(t, *collr.Charts(), step.wantCharts)
 				})
 			}
 		})

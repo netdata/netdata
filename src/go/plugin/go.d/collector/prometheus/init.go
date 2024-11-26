@@ -12,29 +12,29 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (p *Prometheus) validateConfig() error {
-	if p.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("'url' can not be empty")
 	}
 	return nil
 }
 
-func (p *Prometheus) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(p.ClientConfig)
+func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("init HTTP client: %v", err)
 	}
 
-	req := p.RequestConfig.Copy()
-	if p.BearerTokenFile != "" {
-		token, err := os.ReadFile(p.BearerTokenFile)
+	req := c.RequestConfig.Copy()
+	if c.BearerTokenFile != "" {
+		token, err := os.ReadFile(c.BearerTokenFile)
 		if err != nil {
 			return nil, fmt.Errorf("bearer token file: %v", err)
 		}
 		req.Headers["Authorization"] = "Bearer " + string(token)
 	}
 
-	sr, err := p.Selector.Parse()
+	sr, err := c.Selector.Parse()
 	if err != nil {
 		return nil, fmt.Errorf("parsing selector: %v", err)
 	}
@@ -45,7 +45,7 @@ func (p *Prometheus) initPrometheusClient() (prometheus.Prometheus, error) {
 	return prometheus.New(httpClient, req), nil
 }
 
-func (p *Prometheus) initFallbackTypeMatcher(expr []string) (matcher.Matcher, error) {
+func (c *Collector) initFallbackTypeMatcher(expr []string) (matcher.Matcher, error) {
 	if len(expr) == 0 {
 		return nil, nil
 	}
