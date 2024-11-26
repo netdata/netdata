@@ -35,11 +35,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestSystemdUnits_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &SystemdUnits{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestSystemdUnits_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -60,121 +60,121 @@ func TestSystemdUnits_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			systemd := New()
-			systemd.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, systemd.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, systemd.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestSystemdUnits_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *SystemdUnits
+		prepare  func() *Collector
 		wantFail bool
 	}{
 		"success on systemd v230+": {
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.Include = []string{"*"}
-				systemd.client = prepareOKClient(230)
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.Include = []string{"*"}
+				collr.client = prepareOKClient(230)
+				return collr
 			},
 		},
 		"success on systemd v230-": {
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.Include = []string{"*"}
-				systemd.client = prepareOKClient(220)
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.Include = []string{"*"}
+				collr.client = prepareOKClient(220)
+				return collr
 			},
 		},
 		"fails when all unites are filtered": {
 			wantFail: true,
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.Include = []string{"*.not_exists"}
-				systemd.client = prepareOKClient(230)
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.Include = []string{"*.not_exists"}
+				collr.client = prepareOKClient(230)
+				return collr
 			},
 		},
 		"fails on error on connect": {
 			wantFail: true,
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.client = prepareClientErrOnConnect()
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.client = prepareClientErrOnConnect()
+				return collr
 			},
 		},
 		"fails on error on get manager property": {
 			wantFail: true,
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.client = prepareClientErrOnGetManagerProperty()
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.client = prepareClientErrOnGetManagerProperty()
+				return collr
 			},
 		},
 		"fails on error on list units": {
 			wantFail: true,
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.client = prepareClientErrOnListUnits()
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.client = prepareClientErrOnListUnits()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			systemd := test.prepare()
-			require.NoError(t, systemd.Init())
+			collr := test.prepare()
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, systemd.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, systemd.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestSystemdUnits_Charts(t *testing.T) {
-	systemd := New()
-	require.NoError(t, systemd.Init())
-	assert.NotNil(t, systemd.Charts())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestSystemdUnits_Cleanup(t *testing.T) {
-	systemd := New()
-	systemd.Include = []string{"*"}
+func TestCollector_Cleanup(t *testing.T) {
+	collr := New()
+	collr.Include = []string{"*"}
 	client := prepareOKClient(230)
-	systemd.client = client
+	collr.client = client
 
-	require.NoError(t, systemd.Init())
-	require.NotNil(t, systemd.Collect())
-	conn := systemd.conn
-	systemd.Cleanup()
+	require.NoError(t, collr.Init())
+	require.NotNil(t, collr.Collect())
+	conn := collr.conn
+	collr.Cleanup()
 
-	assert.Nil(t, systemd.conn)
+	assert.Nil(t, collr.conn)
 	v, _ := conn.(*mockConn)
 	assert.True(t, v.closeCalled)
 }
 
-func TestSystemdUnits_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() *SystemdUnits
+		prepare       func() *Collector
 		wantCollected map[string]int64
 	}{
 		"success v230+ on collecting all unit type": {
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.Include = []string{"*"}
-				systemd.client = prepareOKClient(230)
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.Include = []string{"*"}
+				collr.client = prepareOKClient(230)
+				return collr
 			},
 			wantCollected: map[string]int64{
 				"unit_dbus_socket_state_activating":                                0,
@@ -385,12 +385,12 @@ func TestSystemdUnits_Collect(t *testing.T) {
 			},
 		},
 		"success v230+ on collecting all unit type with skip transient": {
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.Include = []string{"*"}
-				systemd.SkipTransient = true
-				systemd.client = prepareOKClient(230)
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.Include = []string{"*"}
+				collr.SkipTransient = true
+				collr.client = prepareOKClient(230)
+				return collr
 			},
 			wantCollected: map[string]int64{
 				"unit_systemd-ask-password-wall_service_state_activating":   0,
@@ -416,11 +416,11 @@ func TestSystemdUnits_Collect(t *testing.T) {
 			},
 		},
 		"success v230- on collecting all unit types": {
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.Include = []string{"*"}
-				systemd.client = prepareOKClient(220)
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.Include = []string{"*"}
+				collr.client = prepareOKClient(220)
+				return collr
 			},
 			wantCollected: map[string]int64{
 				"unit_dbus_socket_state_activating":                                0,
@@ -631,11 +631,11 @@ func TestSystemdUnits_Collect(t *testing.T) {
 			},
 		},
 		"success v230+ on collecting only 'service' units": {
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.Include = []string{"*.service"}
-				systemd.client = prepareOKClient(230)
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.Include = []string{"*.service"}
+				collr.client = prepareOKClient(230)
+				return collr
 			},
 			wantCollected: map[string]int64{
 				"unit_systemd-ask-password-wall_service_state_activating":   0,
@@ -661,11 +661,11 @@ func TestSystemdUnits_Collect(t *testing.T) {
 			},
 		},
 		"success v230- on collecting only 'service' units": {
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.Include = []string{"*.service"}
-				systemd.client = prepareOKClient(220)
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.Include = []string{"*.service"}
+				collr.client = prepareOKClient(220)
+				return collr
 			},
 			wantCollected: map[string]int64{
 				"unit_systemd-ask-password-wall_service_state_activating":   0,
@@ -691,13 +691,13 @@ func TestSystemdUnits_Collect(t *testing.T) {
 			},
 		},
 		"success v230+ on collecting only 'service' units and files": {
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.Include = []string{"*.service"}
-				systemd.IncludeUnitFiles = []string{"*.service", "*.slice"}
-				systemd.CollectUnitFiles = true
-				systemd.client = prepareOKClient(230)
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.Include = []string{"*.service"}
+				collr.IncludeUnitFiles = []string{"*.service", "*.slice"}
+				collr.CollectUnitFiles = true
+				collr.client = prepareOKClient(230)
+				return collr
 			},
 			wantCollected: map[string]int64{
 				"unit_file_/lib/systemd/system/machine.slice_state_alias":                             0,
@@ -814,35 +814,35 @@ func TestSystemdUnits_Collect(t *testing.T) {
 			},
 		},
 		"fails when all unites are filtered": {
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.Include = []string{"*.not_exists"}
-				systemd.client = prepareOKClient(230)
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.Include = []string{"*.not_exists"}
+				collr.client = prepareOKClient(230)
+				return collr
 			},
 			wantCollected: nil,
 		},
 		"fails on error on connect": {
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.client = prepareClientErrOnConnect()
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.client = prepareClientErrOnConnect()
+				return collr
 			},
 			wantCollected: nil,
 		},
 		"fails on error on get manager property": {
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.client = prepareClientErrOnGetManagerProperty()
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.client = prepareClientErrOnGetManagerProperty()
+				return collr
 			},
 			wantCollected: nil,
 		},
 		"fails on error on list units": {
-			prepare: func() *SystemdUnits {
-				systemd := New()
-				systemd.client = prepareClientErrOnListUnits()
-				return systemd
+			prepare: func() *Collector {
+				collr := New()
+				collr.client = prepareClientErrOnListUnits()
+				return collr
 			},
 			wantCollected: nil,
 		},
@@ -850,33 +850,33 @@ func TestSystemdUnits_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			systemd := test.prepare()
-			require.NoError(t, systemd.Init())
+			collr := test.prepare()
+			require.NoError(t, collr.Init())
 
 			var mx map[string]int64
 
 			for i := 0; i < 10; i++ {
-				mx = systemd.Collect()
+				mx = collr.Collect()
 			}
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				module.TestMetricsHasAllChartsDims(t, systemd.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func TestSystemdUnits_connectionReuse(t *testing.T) {
-	systemd := New()
-	systemd.Include = []string{"*"}
+func TestCollector_connectionReuse(t *testing.T) {
+	collr := New()
+	collr.Include = []string{"*"}
 	client := prepareOKClient(230)
-	systemd.client = client
-	require.NoError(t, systemd.Init())
+	collr.client = client
+	require.NoError(t, collr.Init())
 
 	var collected map[string]int64
 	for i := 0; i < 10; i++ {
-		collected = systemd.Collect()
+		collected = collr.Collect()
 	}
 
 	assert.NotEmpty(t, collected)

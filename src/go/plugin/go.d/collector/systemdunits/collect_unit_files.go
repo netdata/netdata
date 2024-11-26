@@ -31,28 +31,28 @@ var unitFileStates = []string{
 	"bad",
 }
 
-func (s *SystemdUnits) collectUnitFiles(mx map[string]int64, conn systemdConnection) error {
-	if s.systemdVersion < 230 {
+func (c *Collector) collectUnitFiles(mx map[string]int64, conn systemdConnection) error {
+	if c.systemdVersion < 230 {
 		return nil
 	}
 
-	if now := time.Now(); now.After(s.lastListUnitFilesTime.Add(s.CollectUnitFilesEvery.Duration())) {
-		unitFiles, err := s.getUnitFilesByPatterns(conn)
+	if now := time.Now(); now.After(c.lastListUnitFilesTime.Add(c.CollectUnitFilesEvery.Duration())) {
+		unitFiles, err := c.getUnitFilesByPatterns(conn)
 		if err != nil {
 			return err
 		}
-		s.lastListUnitFilesTime = now
-		s.cachedUnitFiles = unitFiles
+		c.lastListUnitFilesTime = now
+		c.cachedUnitFiles = unitFiles
 	}
 
 	seen := make(map[string]bool)
 
-	for _, unitFile := range s.cachedUnitFiles {
+	for _, unitFile := range c.cachedUnitFiles {
 		seen[unitFile.Path] = true
 
-		if !s.seenUnitFiles[unitFile.Path] {
-			s.seenUnitFiles[unitFile.Path] = true
-			s.addUnitFileCharts(unitFile.Path)
+		if !c.seenUnitFiles[unitFile.Path] {
+			c.seenUnitFiles[unitFile.Path] = true
+			c.addUnitFileCharts(unitFile.Path)
 		}
 
 		px := fmt.Sprintf("unit_file_%s_state_", unitFile.Path)
@@ -62,23 +62,23 @@ func (s *SystemdUnits) collectUnitFiles(mx map[string]int64, conn systemdConnect
 		mx[px+strings.ToLower(unitFile.Type)] = 1
 	}
 
-	for k := range s.seenUnitFiles {
+	for k := range c.seenUnitFiles {
 		if !seen[k] {
-			delete(s.seenUnitFiles, k)
-			s.removeUnitFileCharts(k)
+			delete(c.seenUnitFiles, k)
+			c.removeUnitFileCharts(k)
 		}
 	}
 
 	return nil
 }
 
-func (s *SystemdUnits) getUnitFilesByPatterns(conn systemdConnection) ([]dbus.UnitFile, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), s.Timeout.Duration())
+func (c *Collector) getUnitFilesByPatterns(conn systemdConnection) ([]dbus.UnitFile, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	s.Debugf("calling function 'ListUnitFilesByPatterns'")
+	c.Debugf("calling function 'ListUnitFilesByPatterns'")
 
-	unitFiles, err := conn.ListUnitFilesByPatternsContext(ctx, nil, s.IncludeUnitFiles)
+	unitFiles, err := conn.ListUnitFilesByPatternsContext(ctx, nil, c.IncludeUnitFiles)
 	if err != nil {
 		return nil, fmt.Errorf("error on ListUnitFilesByPatterns: %v", err)
 	}
@@ -87,7 +87,7 @@ func (s *SystemdUnits) getUnitFilesByPatterns(conn systemdConnection) ([]dbus.Un
 		unitFiles[i].Path = cleanUnitName(unitFiles[i].Path)
 	}
 
-	s.Debugf("got %d unit files", len(unitFiles))
+	c.Debugf("got %d unit files", len(unitFiles))
 
 	return unitFiles, nil
 }

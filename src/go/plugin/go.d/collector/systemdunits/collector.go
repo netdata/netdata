@@ -31,8 +31,8 @@ func init() {
 	})
 }
 
-func New() *SystemdUnits {
-	return &SystemdUnits{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout:               confopt.Duration(time.Second * 2),
 			Include:               []string{"*.service"},
@@ -59,7 +59,7 @@ type Config struct {
 	CollectUnitFilesEvery confopt.Duration `yaml:"collect_unit_files_every,omitempty" json:"collect_unit_files_every"`
 }
 
-type SystemdUnits struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -79,31 +79,31 @@ type SystemdUnits struct {
 	charts *module.Charts
 }
 
-func (s *SystemdUnits) Configuration() any {
-	return s.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (s *SystemdUnits) Init() error {
-	if err := s.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	sr, err := s.initUnitSelector()
+	sr, err := c.initUnitSelector()
 	if err != nil {
 		return fmt.Errorf("init unit selector: %v", err)
 	}
-	s.unitSr = sr
+	c.unitSr = sr
 
-	s.Debugf("timeout: %s", s.Timeout)
-	s.Debugf("units: patterns '%v'", s.Include)
-	s.Debugf("unit files: enabled '%v', every '%s', patterns: %v",
-		s.CollectUnitFiles, s.CollectUnitFilesEvery, s.IncludeUnitFiles)
+	c.Debugf("timeout: %s", c.Timeout)
+	c.Debugf("units: patterns '%v'", c.Include)
+	c.Debugf("unit files: enabled '%v', every '%s', patterns: %v",
+		c.CollectUnitFiles, c.CollectUnitFilesEvery, c.IncludeUnitFiles)
 
 	return nil
 }
 
-func (s *SystemdUnits) Check() error {
-	mx, err := s.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -115,14 +115,14 @@ func (s *SystemdUnits) Check() error {
 	return nil
 }
 
-func (s *SystemdUnits) Charts() *module.Charts {
-	return s.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (s *SystemdUnits) Collect() map[string]int64 {
-	mx, err := s.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		s.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -131,6 +131,6 @@ func (s *SystemdUnits) Collect() map[string]int64 {
 	return mx
 }
 
-func (s *SystemdUnits) Cleanup() {
-	s.closeConnection()
+func (c *Collector) Cleanup() {
+	c.closeConnection()
 }
