@@ -30,8 +30,8 @@ func init() {
 	})
 }
 
-func New() *MySQL {
-	return &MySQL{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			DSN:     "root@tcp(localhost:3306)/",
 			Timeout: confopt.Duration(time.Second),
@@ -62,7 +62,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type MySQL struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -98,38 +98,38 @@ type MySQL struct {
 	varPerformanceSchema     string
 }
 
-func (m *MySQL) Configuration() any {
-	return m.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (m *MySQL) Init() error {
-	if m.MyCNF != "" {
-		dsn, err := dsnFromFile(m.MyCNF)
+func (c *Collector) Init() error {
+	if c.MyCNF != "" {
+		dsn, err := dsnFromFile(c.MyCNF)
 		if err != nil {
 			return err
 		}
-		m.DSN = dsn
+		c.DSN = dsn
 	}
 
-	if m.DSN == "" {
+	if c.DSN == "" {
 		return errors.New("config: dsn not set")
 	}
 
-	cfg, err := mysql.ParseDSN(m.DSN)
+	cfg, err := mysql.ParseDSN(c.DSN)
 	if err != nil {
 		return fmt.Errorf("error on parsing DSN: %v", err)
 	}
 
 	cfg.Passwd = strings.Repeat("x", len(cfg.Passwd))
-	m.safeDSN = cfg.FormatDSN()
+	c.safeDSN = cfg.FormatDSN()
 
-	m.Debugf("using DSN [%s]", m.DSN)
+	c.Debugf("using DSN [%s]", c.DSN)
 
 	return nil
 }
 
-func (m *MySQL) Check() error {
-	mx, err := m.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -139,14 +139,14 @@ func (m *MySQL) Check() error {
 	return nil
 }
 
-func (m *MySQL) Charts() *module.Charts {
-	return m.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (m *MySQL) Collect() map[string]int64 {
-	mx, err := m.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		m.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -155,12 +155,12 @@ func (m *MySQL) Collect() map[string]int64 {
 	return mx
 }
 
-func (m *MySQL) Cleanup() {
-	if m.db == nil {
+func (c *Collector) Cleanup() {
+	if c.db == nil {
 		return
 	}
-	if err := m.db.Close(); err != nil {
-		m.Errorf("cleanup: error on closing the mysql database [%s]: %v", m.safeDSN, err)
+	if err := c.db.Close(); err != nil {
+		c.Errorf("cleanup: error on closing the mysql database [%s]: %v", c.safeDSN, err)
 	}
-	m.db = nil
+	c.db = nil
 }

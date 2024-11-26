@@ -14,19 +14,19 @@ const (
 	queryShowAllSlavesStatus = "SHOW ALL SLAVES STATUS;"
 )
 
-func (m *MySQL) collectSlaveStatus(mx map[string]int64) error {
+func (c *Collector) collectSlaveStatus(mx map[string]int64) error {
 	// https://mariadb.com/docs/reference/es/sql-statements/SHOW_ALL_SLAVES_STATUS/
 	mariaDBMinVer := semver.Version{Major: 10, Minor: 2, Patch: 0}
 	mysqlMinVer := semver.Version{Major: 8, Minor: 0, Patch: 22}
 	var q string
-	if m.isMariaDB && m.version.GTE(mariaDBMinVer) {
+	if c.isMariaDB && c.version.GTE(mariaDBMinVer) {
 		q = queryShowAllSlavesStatus
-	} else if !m.isMariaDB && m.version.GTE(mysqlMinVer) {
+	} else if !c.isMariaDB && c.version.GTE(mysqlMinVer) {
 		q = queryShowReplicaStatus
 	} else {
 		q = queryShowSlaveStatus
 	}
-	m.Debugf("executing query: '%s'", q)
+	c.Debugf("executing query: '%s'", q)
 
 	v := struct {
 		name         string
@@ -35,7 +35,7 @@ func (m *MySQL) collectSlaveStatus(mx map[string]int64) error {
 		ioRunning    int64
 	}{}
 
-	_, err := m.collectQuery(q, func(column, value string, lineEnd bool) {
+	_, err := c.collectQuery(q, func(column, value string, lineEnd bool) {
 		switch column {
 		case "Connection_name", "Channel_Name":
 			v.name = value
@@ -47,9 +47,9 @@ func (m *MySQL) collectSlaveStatus(mx map[string]int64) error {
 			v.ioRunning = parseInt(convertSlaveIORunning(value))
 		}
 		if lineEnd {
-			if !m.collectedReplConns[v.name] {
-				m.collectedReplConns[v.name] = true
-				m.addSlaveReplicationConnCharts(v.name)
+			if !c.collectedReplConns[v.name] {
+				c.collectedReplConns[v.name] = true
+				c.addSlaveReplicationConnCharts(v.name)
 			}
 			s := strings.ToLower(slaveMetricSuffix(v.name))
 			mx["seconds_behind_master"+s] = v.behindMaster

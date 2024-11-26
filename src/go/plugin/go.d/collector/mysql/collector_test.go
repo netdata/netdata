@@ -96,11 +96,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestMySQL_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &MySQL{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestMySQL_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -113,52 +113,52 @@ func TestMySQL_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mySQL := New()
-			mySQL.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, mySQL.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, mySQL.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestMySQL_Cleanup(t *testing.T) {
-	tests := map[string]func(t *testing.T) (mySQL *MySQL, cleanup func()){
-		"db connection not initialized": func(t *testing.T) (mySQL *MySQL, cleanup func()) {
+func TestCollector_Cleanup(t *testing.T) {
+	tests := map[string]func(t *testing.T) (collr *Collector, cleanup func()){
+		"db connection not initialized": func(t *testing.T) (collr *Collector, cleanup func()) {
 			return New(), func() {}
 		},
-		"db connection initialized": func(t *testing.T) (mySQL *MySQL, cleanup func()) {
+		"db connection initialized": func(t *testing.T) (collr *Collector, cleanup func()) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
 
 			mock.ExpectClose()
-			mySQL = New()
-			mySQL.db = db
+			collr = New()
+			collr.db = db
 			cleanup = func() { _ = db.Close() }
 
-			return mySQL, cleanup
+			return collr, cleanup
 		},
 	}
 
 	for name, prepare := range tests {
 		t.Run(name, func(t *testing.T) {
-			mySQL, cleanup := prepare(t)
+			collr, cleanup := prepare(t)
 			defer cleanup()
 
-			assert.NotPanics(t, mySQL.Cleanup)
-			assert.Nil(t, mySQL.db)
+			assert.NotPanics(t, collr.Cleanup)
+			assert.Nil(t, collr.db)
 		})
 	}
 }
 
-func TestMySQL_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestMySQL_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func(t *testing.T, m sqlmock.Sqlmock)
 		wantFail    bool
@@ -253,28 +253,28 @@ func TestMySQL_Check(t *testing.T) {
 				sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual),
 			)
 			require.NoError(t, err)
-			my := New()
-			my.db = db
+			collr := New()
+			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, my.Init())
+			require.NoError(t, collr.Init())
 
 			test.prepareMock(t, mock)
 
 			if test.wantFail {
-				assert.Error(t, my.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, my.Check())
+				assert.NoError(t, collr.Check())
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
 }
 
-func TestMySQL_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	type testCaseStep struct {
 		prepareMock func(t *testing.T, m sqlmock.Sqlmock)
-		check       func(t *testing.T, my *MySQL)
+		check       func(t *testing.T, my *Collector)
 	}
 	tests := map[string][]testCaseStep{
 		"MariaDB-Standalone[v5.5.46]: success on all queries": {
@@ -289,8 +289,8 @@ func TestMySQL_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowSlaveStatus, nil)
 					mockExpect(t, m, queryShowProcessList, dataMariaVer5564ProcessList)
 				},
-				check: func(t *testing.T, my *MySQL) {
-					mx := my.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"aborted_connects":                      0,
@@ -407,7 +407,7 @@ func TestMySQL_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, my, mx)
+					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -424,8 +424,8 @@ func TestMySQL_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
-				check: func(t *testing.T, my *MySQL) {
-					mx := my.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 
@@ -589,7 +589,7 @@ func TestMySQL_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, my, mx)
+					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -606,8 +606,8 @@ func TestMySQL_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
-				check: func(t *testing.T, my *MySQL) {
-					mx := my.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"aborted_connects":                        2,
@@ -773,7 +773,7 @@ func TestMySQL_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, my, mx)
+					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -790,8 +790,8 @@ func TestMySQL_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
-				check: func(t *testing.T, my *MySQL) {
-					mx := my.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"aborted_connects":                        2,
@@ -960,7 +960,7 @@ func TestMySQL_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, my, mx)
+					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -977,8 +977,8 @@ func TestMySQL_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
-				check: func(t *testing.T, my *MySQL) {
-					mx := my.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"aborted_connects":                        2,
@@ -1141,7 +1141,7 @@ func TestMySQL_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, my, mx)
+					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -1158,8 +1158,8 @@ func TestMySQL_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowUserStatistics, dataMariaGaleraClusterVer1084UserStatistics)
 					mockExpect(t, m, queryShowProcessList, dataMariaGaleraClusterVer1084ProcessList)
 				},
-				check: func(t *testing.T, my *MySQL) {
-					mx := my.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"aborted_connects":                        0,
@@ -1338,7 +1338,7 @@ func TestMySQL_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, my, mx)
+					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -1354,8 +1354,8 @@ func TestMySQL_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowReplicaStatus, dataMySQLVer8030ReplicaStatusMultiSource)
 					mockExpect(t, m, queryShowProcessListPS, dataMySQLVer8030ProcessList)
 				},
-				check: func(t *testing.T, my *MySQL) {
-					mx := my.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"aborted_connects":                      0,
@@ -1476,7 +1476,7 @@ func TestMySQL_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, my, mx)
+					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -1493,8 +1493,8 @@ func TestMySQL_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowUserStatistics, dataPerconaVer8029UserStatistics)
 					mockExpect(t, m, queryShowProcessListPS, dataPerconaV8029ProcessList)
 				},
-				check: func(t *testing.T, my *MySQL) {
-					mx := my.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"aborted_connects":                        1,
@@ -1637,7 +1637,7 @@ func TestMySQL_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, my, mx)
+					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -1649,16 +1649,16 @@ func TestMySQL_Collect(t *testing.T) {
 				sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual),
 			)
 			require.NoError(t, err)
-			my := New()
-			my.db = db
+			collr := New()
+			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, my.Init())
+			require.NoError(t, collr.Init())
 
 			for i, step := range test {
 				t.Run(fmt.Sprintf("step[%d]", i), func(t *testing.T) {
 					step.prepareMock(t, mock)
-					step.check(t, my)
+					step.check(t, collr)
 				})
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
@@ -1666,11 +1666,11 @@ func TestMySQL_Collect(t *testing.T) {
 	}
 }
 
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, mySQL *MySQL, mx map[string]int64) {
-	module.TestMetricsHasAllChartsDimsSkip(t, mySQL.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
-		if mySQL.isMariaDB {
+func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, collr *Collector, mx map[string]int64) {
+	module.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
+		if collr.isMariaDB {
 			// https://mariadb.com/kb/en/server-status-variables/#connection_errors_accept
-			if mySQL.version.LT(semver.Version{Major: 10, Minor: 0, Patch: 4}) && chart.ID == "connection_errors" {
+			if collr.version.LT(semver.Version{Major: 10, Minor: 0, Patch: 4}) && chart.ID == "connection_errors" {
 				return true
 			}
 		}
