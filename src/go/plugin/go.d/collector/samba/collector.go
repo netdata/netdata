@@ -27,8 +27,8 @@ func init() {
 	})
 }
 
-func New() *Samba {
-	return &Samba{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -42,7 +42,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type Samba struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -52,22 +52,22 @@ type Samba struct {
 	exec smbStatusBinary
 }
 
-func (s *Samba) Configuration() any {
-	return s.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (s *Samba) Init() error {
-	smbStatus, err := s.initSmbStatusBinary()
+func (c *Collector) Init() error {
+	smbStatus, err := c.initSmbStatusBinary()
 	if err != nil {
 		return fmt.Errorf("smbstatus exec initialization: %v", err)
 	}
-	s.exec = smbStatus
+	c.exec = smbStatus
 
 	return nil
 }
 
-func (s *Samba) Check() error {
-	mx, err := s.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -79,14 +79,14 @@ func (s *Samba) Check() error {
 	return nil
 }
 
-func (s *Samba) Charts() *module.Charts {
-	return s.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (s *Samba) Collect() map[string]int64 {
-	mx, err := s.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		s.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -96,4 +96,4 @@ func (s *Samba) Collect() map[string]int64 {
 	return mx
 }
 
-func (s *Samba) Cleanup() {}
+func (c *Collector) Cleanup() {}

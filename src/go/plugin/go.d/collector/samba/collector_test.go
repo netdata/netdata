@@ -31,11 +31,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestSamba_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Samba{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestSamba_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -48,59 +48,59 @@ func TestSamba_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			smb := New()
-			smb.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, smb.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, smb.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestSamba_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Samba
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *Samba {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Samba {
-				smb := New()
-				smb.exec = prepareMockOk()
-				_ = smb.Check()
-				return smb
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOk()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Samba {
-				smb := New()
-				smb.exec = prepareMockOk()
-				_ = smb.Collect()
-				return smb
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOk()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			smb := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, smb.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestSambaCharts(t *testing.T) {
+func TestCollectorCharts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestSamba_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockSmbStatusBinary
 		wantFail    bool
@@ -125,20 +125,20 @@ func TestSamba_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			smb := New()
+			collr := New()
 			mock := test.prepareMock()
-			smb.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, smb.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, smb.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestSamba_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockSmbStatusBinary
 		wantMetrics map[string]int64
@@ -284,17 +284,17 @@ func TestSamba_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			smb := New()
+			collr := New()
 			mock := test.prepareMock()
-			smb.exec = mock
+			collr.exec = mock
 
-			mx := smb.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				assert.Len(t, *smb.Charts(), test.wantCharts, "want charts")
-				module.TestMetricsHasAllChartsDims(t, smb.Charts(), mx)
+				assert.Len(t, *collr.Charts(), test.wantCharts, "want charts")
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
