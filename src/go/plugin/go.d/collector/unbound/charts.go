@@ -420,86 +420,86 @@ var (
 	}
 )
 
-func (u *Unbound) updateCharts() {
-	if len(u.curCache.threads) > 1 {
-		for v := range u.curCache.threads {
-			if !u.cache.threads[v] {
-				u.cache.threads[v] = true
-				u.addThreadCharts(v)
+func (c *Collector) updateCharts() {
+	if len(c.curCache.threads) > 1 {
+		for v := range c.curCache.threads {
+			if !c.cache.threads[v] {
+				c.cache.threads[v] = true
+				c.addThreadCharts(v)
 			}
 		}
 	}
 	// 0-6 rcodes always included
-	if hasExtendedData := len(u.curCache.answerRCode) > 0; !hasExtendedData {
+	if hasExtendedData := len(c.curCache.answerRCode) > 0; !hasExtendedData {
 		return
 	}
 
-	if !u.extChartsCreated {
-		charts := extendedCharts(u.Cumulative)
-		if err := u.Charts().Add(*charts...); err != nil {
-			u.Warningf("add extended charts: %v", err)
+	if !c.extChartsCreated {
+		charts := extendedCharts(c.Cumulative)
+		if err := c.Charts().Add(*charts...); err != nil {
+			c.Warningf("add extended charts: %v", err)
 		}
-		u.extChartsCreated = true
+		c.extChartsCreated = true
 	}
 
-	for v := range u.curCache.queryType {
-		if !u.cache.queryType[v] {
-			u.cache.queryType[v] = true
-			u.addDimToQueryTypeChart(v)
+	for v := range c.curCache.queryType {
+		if !c.cache.queryType[v] {
+			c.cache.queryType[v] = true
+			c.addDimToQueryTypeChart(v)
 		}
 	}
-	for v := range u.curCache.queryClass {
-		if !u.cache.queryClass[v] {
-			u.cache.queryClass[v] = true
-			u.addDimToQueryClassChart(v)
+	for v := range c.curCache.queryClass {
+		if !c.cache.queryClass[v] {
+			c.cache.queryClass[v] = true
+			c.addDimToQueryClassChart(v)
 		}
 	}
-	for v := range u.curCache.queryOpCode {
-		if !u.cache.queryOpCode[v] {
-			u.cache.queryOpCode[v] = true
-			u.addDimToQueryOpCodeChart(v)
+	for v := range c.curCache.queryOpCode {
+		if !c.cache.queryOpCode[v] {
+			c.cache.queryOpCode[v] = true
+			c.addDimToQueryOpCodeChart(v)
 		}
 	}
-	for v := range u.curCache.answerRCode {
-		if !u.cache.answerRCode[v] {
-			u.cache.answerRCode[v] = true
-			u.addDimToAnswerRcodeChart(v)
+	for v := range c.curCache.answerRCode {
+		if !c.cache.answerRCode[v] {
+			c.cache.answerRCode[v] = true
+			c.addDimToAnswerRcodeChart(v)
 		}
-	}
-}
-
-func (u *Unbound) addThreadCharts(thread string) {
-	charts := threadCharts(thread, u.Cumulative)
-	if err := u.Charts().Add(*charts...); err != nil {
-		u.Warningf("add '%s' charts: %v", thread, err)
 	}
 }
 
-func (u *Unbound) addDimToQueryTypeChart(typ string) {
-	u.addDimToChart(queryTypeChart.ID, "num.query.type."+typ, typ)
-}
-func (u *Unbound) addDimToQueryClassChart(class string) {
-	u.addDimToChart(queryClassChart.ID, "num.query.class."+class, class)
-}
-func (u *Unbound) addDimToQueryOpCodeChart(opcode string) {
-	u.addDimToChart(queryOpCodeChart.ID, "num.query.opcode."+opcode, opcode)
-}
-func (u *Unbound) addDimToAnswerRcodeChart(rcode string) {
-	u.addDimToChart(answerRCodeChart.ID, "num.answer.rcode."+rcode, rcode)
+func (c *Collector) addThreadCharts(thread string) {
+	charts := threadCharts(thread, c.Cumulative)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("add '%s' charts: %v", thread, err)
+	}
 }
 
-func (u *Unbound) addDimToChart(chartID, dimID, dimName string) {
-	chart := u.Charts().Get(chartID)
+func (c *Collector) addDimToQueryTypeChart(typ string) {
+	c.addDimToChart(queryTypeChart.ID, "num.query.type."+typ, typ)
+}
+func (c *Collector) addDimToQueryClassChart(class string) {
+	c.addDimToChart(queryClassChart.ID, "num.query.class."+class, class)
+}
+func (c *Collector) addDimToQueryOpCodeChart(opcode string) {
+	c.addDimToChart(queryOpCodeChart.ID, "num.query.opcode."+opcode, opcode)
+}
+func (c *Collector) addDimToAnswerRcodeChart(rcode string) {
+	c.addDimToChart(answerRCodeChart.ID, "num.answer.rcode."+rcode, rcode)
+}
+
+func (c *Collector) addDimToChart(chartID, dimID, dimName string) {
+	chart := c.Charts().Get(chartID)
 	if chart == nil {
-		u.Warningf("add '%s' dim: couldn't find '%s' chart", dimID, chartID)
+		c.Warningf("add '%s' dim: couldn't find '%s' chart", dimID, chartID)
 		return
 	}
 	dim := &Dim{ID: dimID, Name: dimName}
-	if u.Cumulative {
+	if c.Cumulative {
 		dim.Algo = module.Incremental
 	}
 	if err := chart.AddDim(dim); err != nil {
-		u.Warningf("add '%s' dim: %v", dimID, err)
+		c.Warningf("add '%s' dim: %v", dimID, err)
 		return
 	}
 	chart.MarkNotCreated()

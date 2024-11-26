@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Unbound {
-	return &Unbound{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address:    "127.0.0.1:8953",
 			ConfPath:   "/etc/unbound/unbound.conf",
@@ -54,7 +54,7 @@ type Config struct {
 	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 
-type Unbound struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -68,31 +68,31 @@ type Unbound struct {
 	extChartsCreated bool
 }
 
-func (u *Unbound) Configuration() any {
-	return u.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (u *Unbound) Init() error {
-	if enabled := u.initConfig(); !enabled {
+func (c *Collector) Init() error {
+	if enabled := c.initConfig(); !enabled {
 		return errors.New("remote control is disabled in the configuration file")
 	}
 
-	if err := u.initClient(); err != nil {
+	if err := c.initClient(); err != nil {
 		return fmt.Errorf("creating client: %v", err)
 	}
 
-	u.charts = charts(u.Cumulative)
+	c.charts = charts(c.Cumulative)
 
-	u.Debugf("using address: %s, cumulative: %v, use_tls: %v, timeout: %s", u.Address, u.Cumulative, u.UseTLS, u.Timeout)
-	if u.UseTLS {
-		u.Debugf("using tls_skip_verify: %v, tls_key: %s, tls_cert: %s", u.InsecureSkipVerify, u.TLSKey, u.TLSCert)
+	c.Debugf("using address: %s, cumulative: %v, use_tls: %v, timeout: %s", c.Address, c.Cumulative, c.UseTLS, c.Timeout)
+	if c.UseTLS {
+		c.Debugf("using tls_skip_verify: %v, tls_key: %s, tls_cert: %s", c.InsecureSkipVerify, c.TLSKey, c.TLSCert)
 	}
 
 	return nil
 }
 
-func (u *Unbound) Check() error {
-	mx, err := u.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -102,14 +102,14 @@ func (u *Unbound) Check() error {
 	return nil
 }
 
-func (u *Unbound) Charts() *module.Charts {
-	return u.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (u *Unbound) Collect() map[string]int64 {
-	mx, err := u.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		u.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -118,8 +118,8 @@ func (u *Unbound) Collect() map[string]int64 {
 	return mx
 }
 
-func (u *Unbound) Cleanup() {
-	if u.client != nil {
-		_ = u.client.Disconnect()
+func (c *Collector) Cleanup() {
+	if c.client != nil {
+		_ = c.client.Disconnect()
 	}
 }

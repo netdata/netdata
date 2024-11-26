@@ -50,105 +50,105 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestUnbound_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Unbound{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestUnbound_Init(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
+func TestCollector_Init(t *testing.T) {
+	collr := prepareNonTLSUnbound()
 
-	assert.NoError(t, unbound.Init())
+	assert.NoError(t, collr.Init())
 }
 
-func TestUnbound_Init_SetEverythingFromUnboundConf(t *testing.T) {
-	unbound := New()
-	unbound.ConfPath = "testdata/unbound.conf"
+func TestCollector_Init_SetEverythingFromUnboundConf(t *testing.T) {
+	collr := New()
+	collr.ConfPath = "testdata/unbound.conf"
 	expectedConfig := Config{
 		Address:    "10.0.0.1:8954",
-		ConfPath:   unbound.ConfPath,
-		Timeout:    unbound.Timeout,
+		ConfPath:   collr.ConfPath,
+		Timeout:    collr.Timeout,
 		Cumulative: true,
 		UseTLS:     false,
 		TLSConfig: tlscfg.TLSConfig{
 			TLSCert:            "/etc/unbound/unbound_control_other.pem",
 			TLSKey:             "/etc/unbound/unbound_control_other.key",
-			InsecureSkipVerify: unbound.TLSConfig.InsecureSkipVerify,
+			InsecureSkipVerify: collr.TLSConfig.InsecureSkipVerify,
 		},
 	}
 
-	assert.NoError(t, unbound.Init())
-	assert.Equal(t, expectedConfig, unbound.Config)
+	assert.NoError(t, collr.Init())
+	assert.Equal(t, expectedConfig, collr.Config)
 }
 
-func TestUnbound_Init_DisabledInUnboundConf(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
-	unbound.ConfPath = "testdata/unbound_disabled.conf"
+func TestCollector_Init_DisabledInUnboundConf(t *testing.T) {
+	collr := prepareNonTLSUnbound()
+	collr.ConfPath = "testdata/unbound_disabled.conf"
 
-	assert.Error(t, unbound.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestUnbound_Init_HandleEmptyConfig(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
-	unbound.ConfPath = "testdata/unbound_empty.conf"
+func TestCollector_Init_HandleEmptyConfig(t *testing.T) {
+	collr := prepareNonTLSUnbound()
+	collr.ConfPath = "testdata/unbound_empty.conf"
 
-	assert.NoError(t, unbound.Init())
+	assert.NoError(t, collr.Init())
 }
 
-func TestUnbound_Init_HandleNonExistentConfig(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
-	unbound.ConfPath = "testdata/unbound_non_existent.conf"
+func TestCollector_Init_HandleNonExistentConfig(t *testing.T) {
+	collr := prepareNonTLSUnbound()
+	collr.ConfPath = "testdata/unbound_non_existent.conf"
 
-	assert.NoError(t, unbound.Init())
+	assert.NoError(t, collr.Init())
 }
 
-func TestUnbound_Check(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
-	require.NoError(t, unbound.Init())
-	unbound.client = mockUnboundClient{data: dataCommonStats, err: false}
+func TestCollector_Check(t *testing.T) {
+	collr := prepareNonTLSUnbound()
+	require.NoError(t, collr.Init())
+	collr.client = mockUnboundClient{data: dataCommonStats, err: false}
 
-	assert.NoError(t, unbound.Check())
+	assert.NoError(t, collr.Check())
 }
 
-func TestUnbound_Check_ErrorDuringScrapingUnbound(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
-	require.NoError(t, unbound.Init())
-	unbound.client = mockUnboundClient{err: true}
+func TestCollector_Check_ErrorDuringScrapingUnbound(t *testing.T) {
+	collr := prepareNonTLSUnbound()
+	require.NoError(t, collr.Init())
+	collr.client = mockUnboundClient{err: true}
 
-	assert.Error(t, unbound.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestUnbound_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestUnbound_Charts(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
-	require.NoError(t, unbound.Init())
+func TestCollector_Charts(t *testing.T) {
+	collr := prepareNonTLSUnbound()
+	require.NoError(t, collr.Init())
 
-	assert.NotNil(t, unbound.Charts())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestUnbound_Collect(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
-	require.NoError(t, unbound.Init())
-	unbound.client = mockUnboundClient{data: dataCommonStats, err: false}
+func TestCollector_Collect(t *testing.T) {
+	collr := prepareNonTLSUnbound()
+	require.NoError(t, collr.Init())
+	collr.client = mockUnboundClient{data: dataCommonStats, err: false}
 
-	collected := unbound.Collect()
-	assert.Equal(t, expectedCommon, collected)
-	testCharts(t, unbound, collected)
+	mx := collr.Collect()
+	assert.Equal(t, expectedCommon, mx)
+	testCharts(t, collr, mx)
 }
 
-func TestUnbound_Collect_ExtendedStats(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
-	require.NoError(t, unbound.Init())
-	unbound.client = mockUnboundClient{data: dataExtendedStats, err: false}
+func TestCollector_Collect_ExtendedStats(t *testing.T) {
+	collr := prepareNonTLSUnbound()
+	require.NoError(t, collr.Init())
+	collr.client = mockUnboundClient{data: dataExtendedStats, err: false}
 
-	collected := unbound.Collect()
-	assert.Equal(t, expectedExtended, collected)
-	testCharts(t, unbound, collected)
+	mx := collr.Collect()
+	assert.Equal(t, expectedExtended, mx)
+	testCharts(t, collr, mx)
 }
 
-func TestUnbound_Collect_LifeCycleCumulativeExtendedStats(t *testing.T) {
+func TestCollector_Collect_LifeCycleCumulativeExtendedStats(t *testing.T) {
 	tests := []struct {
 		input    []byte
 		expected map[string]int64
@@ -158,25 +158,25 @@ func TestUnbound_Collect_LifeCycleCumulativeExtendedStats(t *testing.T) {
 		{input: dataLifeCycleCumulative3, expected: expectedCumulative3},
 	}
 
-	unbound := prepareNonTLSUnbound()
-	unbound.Cumulative = true
-	require.NoError(t, unbound.Init())
+	collr := prepareNonTLSUnbound()
+	collr.Cumulative = true
+	require.NoError(t, collr.Init())
 	ubClient := &mockUnboundClient{err: false}
-	unbound.client = ubClient
+	collr.client = ubClient
 
-	var collected map[string]int64
+	var mx map[string]int64
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("run %d", i+1), func(t *testing.T) {
 			ubClient.data = test.input
-			collected = unbound.Collect()
-			assert.Equal(t, test.expected, collected)
+			mx = collr.Collect()
+			assert.Equal(t, test.expected, mx)
 		})
 	}
 
-	testCharts(t, unbound, collected)
+	testCharts(t, collr, mx)
 }
 
-func TestUnbound_Collect_LifeCycleResetExtendedStats(t *testing.T) {
+func TestCollector_Collect_LifeCycleResetExtendedStats(t *testing.T) {
 	tests := []struct {
 		input    []byte
 		expected map[string]int64
@@ -186,63 +186,63 @@ func TestUnbound_Collect_LifeCycleResetExtendedStats(t *testing.T) {
 		{input: dataLifeCycleReset3, expected: expectedReset3},
 	}
 
-	unbound := prepareNonTLSUnbound()
-	unbound.Cumulative = false
-	require.NoError(t, unbound.Init())
+	collr := prepareNonTLSUnbound()
+	collr.Cumulative = false
+	require.NoError(t, collr.Init())
 	ubClient := &mockUnboundClient{err: false}
-	unbound.client = ubClient
+	collr.client = ubClient
 
-	var collected map[string]int64
+	var mx map[string]int64
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("run %d", i+1), func(t *testing.T) {
 			ubClient.data = test.input
-			collected = unbound.Collect()
-			assert.Equal(t, test.expected, collected)
+			mx = collr.Collect()
+			assert.Equal(t, test.expected, mx)
 		})
 	}
 
-	testCharts(t, unbound, collected)
+	testCharts(t, collr, mx)
 }
 
-func TestUnbound_Collect_EmptyResponse(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
-	require.NoError(t, unbound.Init())
-	unbound.client = mockUnboundClient{data: []byte{}, err: false}
+func TestCollector_Collect_EmptyResponse(t *testing.T) {
+	collr := prepareNonTLSUnbound()
+	require.NoError(t, collr.Init())
+	collr.client = mockUnboundClient{data: []byte{}, err: false}
 
-	assert.Nil(t, unbound.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestUnbound_Collect_ErrorResponse(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
-	require.NoError(t, unbound.Init())
-	unbound.client = mockUnboundClient{data: []byte("error unknown command 'unknown'"), err: false}
+func TestCollector_Collect_ErrorResponse(t *testing.T) {
+	collr := prepareNonTLSUnbound()
+	require.NoError(t, collr.Init())
+	collr.client = mockUnboundClient{data: []byte("error unknown command 'unknown'"), err: false}
 
-	assert.Nil(t, unbound.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestUnbound_Collect_ErrorOnSend(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
-	require.NoError(t, unbound.Init())
-	unbound.client = mockUnboundClient{err: true}
+func TestCollector_Collect_ErrorOnSend(t *testing.T) {
+	collr := prepareNonTLSUnbound()
+	require.NoError(t, collr.Init())
+	collr.client = mockUnboundClient{err: true}
 
-	assert.Nil(t, unbound.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestUnbound_Collect_ErrorOnParseBadSyntax(t *testing.T) {
-	unbound := prepareNonTLSUnbound()
-	require.NoError(t, unbound.Init())
+func TestCollector_Collect_ErrorOnParseBadSyntax(t *testing.T) {
+	collr := prepareNonTLSUnbound()
+	require.NoError(t, collr.Init())
 	data := strings.Repeat("zk_avg_latency	0\nzk_min_latency	0\nzk_mix_latency	0\n", 10)
-	unbound.client = mockUnboundClient{data: []byte(data), err: false}
+	collr.client = mockUnboundClient{data: []byte(data), err: false}
 
-	assert.Nil(t, unbound.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func prepareNonTLSUnbound() *Unbound {
-	unbound := New()
-	unbound.ConfPath = ""
-	unbound.UseTLS = false
+func prepareNonTLSUnbound() *Collector {
+	collr := New()
+	collr.ConfPath = ""
+	collr.UseTLS = false
 
-	return unbound
+	return collr
 }
 
 type mockUnboundClient struct {
@@ -269,16 +269,16 @@ func (m mockUnboundClient) Command(_ string, process socket.Processor) error {
 	return nil
 }
 
-func testCharts(t *testing.T, unbound *Unbound, mx map[string]int64) {
+func testCharts(t *testing.T, collr *Collector, mx map[string]int64) {
 	t.Helper()
-	ensureChartsCreatedForEveryThread(t, unbound)
-	ensureExtendedChartsCreated(t, unbound)
-	module.TestMetricsHasAllChartsDimsSkip(t, unbound.Charts(), mx, func(_ *module.Chart, dim *module.Dim) bool {
+	ensureChartsCreatedForEveryThread(t, collr)
+	ensureExtendedChartsCreated(t, collr)
+	module.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(_ *module.Chart, dim *module.Dim) bool {
 		return dim.ID == "mem.mod.ipsecmod"
 	})
 }
 
-func ensureChartsCreatedForEveryThread(t *testing.T, u *Unbound) {
+func ensureChartsCreatedForEveryThread(t *testing.T, u *Collector) {
 	for thread := range u.cache.threads {
 		for _, chart := range *threadCharts(thread, u.Cumulative) {
 			assert.Truef(t, u.Charts().Has(chart.ID), "chart '%s' is not created for '%s' thread", chart.ID, thread)
@@ -286,7 +286,7 @@ func ensureChartsCreatedForEveryThread(t *testing.T, u *Unbound) {
 	}
 }
 
-func ensureExtendedChartsCreated(t *testing.T, u *Unbound) {
+func ensureExtendedChartsCreated(t *testing.T, u *Collector) {
 	if len(u.cache.answerRCode) == 0 {
 		return
 	}
