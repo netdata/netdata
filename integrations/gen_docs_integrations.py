@@ -11,7 +11,7 @@ def cleanup():
     """
     clean directories that are either data collection or exporting integrations
     """
-    for element in Path("src/go/plugin/go.d/modules").glob('**/*/'):
+    for element in Path("src/go/plugin/go.d/collector").glob('**/*/'):
         if "integrations" in str(element):
             shutil.rmtree(element)
     for element in Path("src/collectors").glob('**/*/'):

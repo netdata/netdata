@@ -2,7 +2,7 @@
 
 ## Deployment Options Overview
 
-This section provides a quick overview for a few common deployment options for Netdata.
+This section provides a quick overview of a few common deployment options for Netdata.
 
 You can read about [Standalone Deployment](/docs/deployment-guides/standalone-deployment.md) and [Deployment with Centralization Points](/docs/deployment-guides/deployment-with-centralization-points.md) in the documentation inside this section.
 
@@ -24,9 +24,9 @@ An API key is a key created with `uuidgen` and is used for authentication and/or
 
 #### Child config
 
-As mentioned above, we do not recommend to connect the Child to Cloud directly during your setup.
+As mentioned above, we do not recommend connecting the Child to Cloud directly during your setup.
 
-This is done in order to reduce the footprint of the Netdata Agent on your production system, as some capabilities can be switched OFF for the Child and kept ON for the Parent.
+This is done to reduce the footprint of the Netdata Agent on your production system, as some capabilities can be switched OFF for the Child and kept ON for the Parent.
 
 In this example, Machine Learning and Alerting are disabled for the Child, so that the Parent can take the load. We also use RAM instead of disk to store metrics with limited retention, covering temporary network issues.
 
@@ -34,14 +34,14 @@ In this example, Machine Learning and Alerting are disabled for the Child, so th
 
 On the child node, edit `netdata.conf` by using the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script and set the following parameters:
 
-```yaml
+```text
 [db]
     # https://github.com/netdata/netdata/blob/master/src/database/README.md
     # none = no retention, ram = some retention in ram
     mode = ram
     # The retention in seconds.
-    # This provides some tolerance to the time the child has to find a parent in
-    # order to transfer the data. For IoT this can be lowered to 120.
+    # This provides some tolerance to the time the child has to find a parent 
+    # to transfer the data. For IoT, this can be lowered to 120.
     retention = 1200
     # The granularity of metrics, in seconds.
     # You may increase this to lower CPU resources.
@@ -56,8 +56,7 @@ On the child node, edit `netdata.conf` by using the [edit-config](/docs/netdata-
     # Disable remote access to the local dashboard
     bind to = lo
 [plugins]
-    # Uncomment the following line to disable all external plugins on extreme
-    # IoT cases by default.
+    # Uncomment the following line to disable all external plugins on extreme IoT cases by default.
     # enable running new plugins = no
 ```
 
@@ -65,7 +64,7 @@ On the child node, edit `netdata.conf` by using the [edit-config](/docs/netdata-
 
 To edit `stream.conf`, use again the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script and set the following parameters:
 
-```yaml
+```text
 [stream]
     # Stream metrics to another Netdata
     enabled = yes
@@ -77,7 +76,7 @@ To edit `stream.conf`, use again the [edit-config](/docs/netdata-agent/configura
 
 #### Parent config
 
-For the Parent, besides setting up streaming, this example also provides configuration for multiple [tiers of metrics storage](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md), for 10 Children, with about 2k metrics each. This allows for:
+For the Parent, besides setting up streaming, this example also provides configuration for multiple [tiers of metrics storage](/src/database/README.md#tiers), for 10 Children, with about 2k metrics each. This allows for:
 
 - 1s granularity at tier 0 for 1 week
 - 1m granularity at tier 1 for 1 month
@@ -92,7 +91,7 @@ Requiring:
 
 On the Parent, edit `netdata.conf` by using the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script and set the following parameters:
 
-```yaml
+```text
 [db]
     mode = dbengine
     dbengine tier backfill = new
@@ -124,19 +123,19 @@ On the Parent node, edit `stream.conf` by using the [edit-config](/docs/netdata-
 
 ```yaml
 [API_KEY]
-    # Accept metrics streaming from other Agents with the specified API key
-    enabled = yes
+  # Accept metrics streaming from other Agents with the specified API key
+  enabled = yes
 ```
 
 ### Active–Active Parents
 
-In order to setup active–active streaming between Parent 1 and Parent 2, Parent 1 needs to be instructed to stream data to Parent 2 and Parent 2 to stream data to Parent 1. The Child Agents need to be configured with the addresses of both Parent Agents. An Agent will only connect to one Parent at a time, falling back to the next upon failure. These examples use the same API key between Parent Agents and for connections for Child Agents.
+To set up active–active streaming between Parent 1 and Parent 2, Parent 1 needs to be instructed to stream data to Parent 2 and Parent 2 to stream data to Parent 1. The Child Agents need to be configured with the addresses of both Parent Agents. An Agent will only connect to one Parent at a time, falling back to the next upon failure. These examples use the same API key between Parent Agents and for connections for Child Agents.
 
 On both Netdata Parent and all Child Agents, edit `stream.conf` by using the [edit-config](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script:
 
 #### stream.conf on Parent 1
 
-```yaml
+```text
 [stream]
     # Stream metrics to another Netdata
     enabled = yes
@@ -147,11 +146,12 @@ On both Netdata Parent and all Child Agents, edit `stream.conf` by using the [ed
 [API_KEY]
     # Accept metrics streams from Parent 2 and Child Agents
     enabled = yes
+
 ```
 
 #### stream.conf on Parent 2
 
-```yaml
+```text
 [stream]
     # Stream metrics to another Netdata
     enabled = yes
@@ -165,7 +165,7 @@ On both Netdata Parent and all Child Agents, edit `stream.conf` by using the [ed
 
 #### stream.conf on Child Agents
 
-```yaml
+```text
 [stream]
     # Stream metrics to another Netdata
     enabled = yes
@@ -193,7 +193,7 @@ We also suggest that you:
 
    For increased security, user management and access to our latest features, tools and troubleshooting solutions.
 
-2. [Change how long Netdata stores metrics](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md)
+2. [Change how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers)
 
    To control Netdata's memory use, when you have a lot of ephemeral metrics.
 

@@ -28,7 +28,7 @@ COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'charts.d.plugin', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'python.d.plugin', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'modules', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector', True),
 ]
 
 DEPLOY_SOURCES = [
@@ -998,9 +998,11 @@ def main():
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
     deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
     exporters, clean_exporters, ids = render_exporters(categories, exporters, ids)
-    agent_notifications, clean_agent_notifications, ids = render_agent_notifications(categories, agent_notifications,ids)
-    cloud_notifications, clean_cloud_notifications, ids = render_cloud_notifications(categories, cloud_notifications,ids)
-    logs, clean_logs, ids = render_logs(categories, logs,ids)
+    agent_notifications, clean_agent_notifications, ids = render_agent_notifications(categories, agent_notifications,
+                                                                                     ids)
+    cloud_notifications, clean_cloud_notifications, ids = render_cloud_notifications(categories, cloud_notifications,
+                                                                                     ids)
+    logs, clean_logs, ids = render_logs(categories, logs, ids)
     authentications, clean_authentications, ids = render_authentications(categories, authentications, ids)
 
     integrations = collectors + deploy + exporters + agent_notifications + cloud_notifications + logs + authentications

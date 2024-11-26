@@ -36,7 +36,7 @@ gantt
 **Configuring dbengine mode and retention**:
 
 - Enable dbengine mode: The dbengine mode is already the default, so no configuration change is necessary. For reference, the dbengine mode can be configured by setting `[db].mode` to `dbengine` in `netdata.conf`.
-- Adjust retention (optional): see [Change how long Netdata stores metrics](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
+- Adjust retention (optional): see [Change how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
 ## `ram`
 

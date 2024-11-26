@@ -69,7 +69,7 @@ metrics from each using the [cgroups data collector](/src/collectors/cgroups.plu
 ## Enable Apache monitoring
 
 Let's begin by configuring Apache to work with Netdata's [Apache data
-collector](/src/go/plugin/go.d/modules/apache/README.md).
+collector](/src/go/plugin/go.d/collector/apache/README.md).
 
 Actually, there's nothing for you to do to enable Apache monitoring with Netdata.
 
@@ -80,7 +80,7 @@ metrics](https://httpd.apache.org/docs/2.4/mod/mod_status.html), which is just _
 ## Enable web log monitoring
 
 The Netdata Agent also comes with a [web log
-collector](/src/go/plugin/go.d/modules/weblog/README.md), which reads Apache's access
+collector](/src/go/plugin/go.d/collector/weblog/README.md), which reads Apache's access
 log file, processes each line, and converts them into per-second metrics. On Debian systems, it reads the file at
 `/var/log/apache2/access.log`.
 
@@ -93,7 +93,7 @@ monitoring.
 
 Because your MySQL database is password-protected, you do need to tell MySQL to allow the `netdata` user to connect to
 without a password. Netdata's [MySQL data
-collector](/src/go/plugin/go.d/modules/mysql/README.md) collects metrics in _read-only_
+collector](/src/go/plugin/go.d/collector/mysql/README.md) collects metrics in _read-only_
 mode, without being able to alter or affect operations in any way.
 
 First, log into the MySQL shell. Then, run the following three commands, one at a time:
@@ -112,7 +112,7 @@ Unlike Apache or MySQL, PHP isn't a service that you can monitor directly, unles
 with [StatsD](/src/collectors/statsd.plugin/README.md).
 
 However, if you use [PHP-FPM](https://php-fpm.org/) in your LAMP stack, you can monitor that process with our [PHP-FPM
-data collector](/src/go/plugin/go.d/modules/phpfpm/README.md).
+data collector](/src/go/plugin/go.d/collector/phpfpm/README.md).
 
 Open your PHP-FPM configuration for editing, replacing `7.4` with your version of PHP:
 
@@ -214,7 +214,7 @@ services. The per-second metrics granularity means you have the most accurate in
 any LAMP-related issues.
 
 Another powerful way to monitor the availability of a LAMP stack is the [`httpcheck`
-collector](/src/go/plugin/go.d/modules/httpcheck/README.md), which pings a web server at
+collector](/src/go/plugin/go.d/collector/httpcheck/README.md), which pings a web server at
 a regular interval and tells you whether if and how quickly it's responding. The `response_match` option also lets you
 monitor when the web server's response isn't what you expect it to be, which might happen if PHP-FPM crashes, for
 example.
@@ -230,8 +230,8 @@ source of issues faster with [Metric Correlations](/docs/metric-correlations.md)
 ### Related reference documentation
 
 - [Netdata Agent · Get started](/packaging/installer/README.md)
-- [Netdata Agent · Apache data collector](/src/go/plugin/go.d/modules/apache/README.md)
-- [Netdata Agent · Web log collector](/src/go/plugin/go.d/modules/weblog/README.md)
-- [Netdata Agent · MySQL data collector](/src/go/plugin/go.d/modules/mysql/README.md)
-- [Netdata Agent · PHP-FPM data collector](/src/go/plugin/go.d/modules/phpfpm/README.md)
+- [Netdata Agent · Apache data collector](/src/go/plugin/go.d/collector/apache/README.md)
+- [Netdata Agent · Web log collector](/src/go/plugin/go.d/collector/weblog/README.md)
+- [Netdata Agent · MySQL data collector](/src/go/plugin/go.d/collector/mysql/README.md)
+- [Netdata Agent · PHP-FPM data collector](/src/go/plugin/go.d/collector/phpfpm/README.md)
 
