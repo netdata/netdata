@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *NvidiaSmi {
-	return &NvidiaSmi{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 10),
 			// Disable loop mode on Windows due to go.d.plugin's non-graceful exit
@@ -49,7 +49,7 @@ type Config struct {
 	LoopMode    bool             `yaml:"loop_mode,omitempty" json:"loop_mode"`
 }
 
-type NvidiaSmi struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -62,27 +62,27 @@ type NvidiaSmi struct {
 	migs map[string]bool
 }
 
-func (nv *NvidiaSmi) Configuration() any {
-	return nv.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (nv *NvidiaSmi) Init() error {
-	if nv.exec == nil {
-		if runtime.GOOS == "windows" && nv.LoopMode {
-			nv.LoopMode = false
+func (c *Collector) Init() error {
+	if c.exec == nil {
+		if runtime.GOOS == "windows" && c.LoopMode {
+			c.LoopMode = false
 		}
-		smi, err := nv.initNvidiaSmiExec()
+		smi, err := c.initNvidiaSmiExec()
 		if err != nil {
 			return err
 		}
-		nv.exec = smi
+		c.exec = smi
 	}
 
 	return nil
 }
 
-func (nv *NvidiaSmi) Check() error {
-	mx, err := nv.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -92,14 +92,14 @@ func (nv *NvidiaSmi) Check() error {
 	return nil
 }
 
-func (nv *NvidiaSmi) Charts() *module.Charts {
-	return nv.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (nv *NvidiaSmi) Collect() map[string]int64 {
-	mx, err := nv.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		nv.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -108,11 +108,11 @@ func (nv *NvidiaSmi) Collect() map[string]int64 {
 	return mx
 }
 
-func (nv *NvidiaSmi) Cleanup() {
-	if nv.exec != nil {
-		if err := nv.exec.stop(); err != nil {
-			nv.Errorf("cleanup: %v", err)
+func (c *Collector) Cleanup() {
+	if c.exec != nil {
+		if err := c.exec.stop(); err != nil {
+			c.Errorf("cleanup: %v", err)
 		}
-		nv.exec = nil
+		c.exec = nil
 	}
 }

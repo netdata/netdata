@@ -40,45 +40,45 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestNvidiaSmi_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &NvidiaSmi{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestNvidiaSmi_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(nv *NvidiaSmi)
+		prepare  func(*Collector)
 		wantFail bool
 	}{
 		"fails if can't local nvidia-smi": {
 			wantFail: true,
-			prepare: func(nv *NvidiaSmi) {
-				nv.binName += "!!!"
+			prepare: func(collr *Collector) {
+				collr.binName += "!!!"
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			nv := New()
+			collr := New()
 
-			test.prepare(nv)
+			test.prepare(collr)
 
 			if test.wantFail {
-				assert.Error(t, nv.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, nv.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestNvidiaSmi_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestNvidiaSmi_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(nv *NvidiaSmi)
+		prepare  func(*Collector)
 		wantFail bool
 	}{
 		"success A100-SXM4 MIG": {
@@ -105,30 +105,30 @@ func TestNvidiaSmi_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			nv := New()
+			collr := New()
 
-			test.prepare(nv)
+			test.prepare(collr)
 
 			if test.wantFail {
-				assert.Error(t, nv.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, nv.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestNvidiaSmi_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	type testCaseStep struct {
-		prepare func(nv *NvidiaSmi)
-		check   func(t *testing.T, nv *NvidiaSmi)
+		prepare func(*Collector)
+		check   func(*testing.T, *Collector)
 	}
 	tests := map[string][]testCaseStep{
 		"success A100-SXM4 MIG": {
 			{
 				prepare: prepareCaseMIGA100,
-				check: func(t *testing.T, nv *NvidiaSmi) {
-					mx := nv.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"gpu_GPU-27b94a00-ed54-5c24-b1fd-1054085de32a_bar1_memory_usage_free":                            68718428160,
@@ -187,8 +187,8 @@ func TestNvidiaSmi_Collect(t *testing.T) {
 		"success RTX 4090 Driver 535": {
 			{
 				prepare: prepareCaseRTX4090Driver535,
-				check: func(t *testing.T, nv *NvidiaSmi) {
-					mx := nv.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"gpu_GPU-71d1acc2-662d-2166-bf9f-65272d2fc437_bar1_memory_usage_free":             267386880,
@@ -237,8 +237,8 @@ func TestNvidiaSmi_Collect(t *testing.T) {
 		"success RTX 3060": {
 			{
 				prepare: prepareCaseRTX3060,
-				check: func(t *testing.T, nv *NvidiaSmi) {
-					mx := nv.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"gpu_GPU-473d8d0f-d462-185c-6b36-6fc23e23e571_bar1_memory_usage_free":             8586788864,
@@ -286,8 +286,8 @@ func TestNvidiaSmi_Collect(t *testing.T) {
 		"success Tesla P100": {
 			{
 				prepare: prepareCaseTeslaP100,
-				check: func(t *testing.T, nv *NvidiaSmi) {
-					mx := nv.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"gpu_GPU-d3da8716-eaab-75db-efc1-60e88e1cd55e_bar1_memory_usage_free":             17177772032,
@@ -334,8 +334,8 @@ func TestNvidiaSmi_Collect(t *testing.T) {
 		"success RTX 2080 Win": {
 			{
 				prepare: prepareCaseRTX2080Win,
-				check: func(t *testing.T, nv *NvidiaSmi) {
-					mx := nv.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"gpu_GPU-fbd55ed4-1eec-4423-0a47-ad594b4333e3_bar1_memory_usage_free":             266338304,
@@ -383,8 +383,8 @@ func TestNvidiaSmi_Collect(t *testing.T) {
 		"fails on queryGPUInfo error": {
 			{
 				prepare: prepareCaseErrOnQueryGPUInfo,
-				check: func(t *testing.T, nv *NvidiaSmi) {
-					mx := nv.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					assert.Equal(t, map[string]int64(nil), mx)
 				},
@@ -394,12 +394,12 @@ func TestNvidiaSmi_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			nv := New()
+			collr := New()
 
 			for i, step := range test {
 				t.Run(fmt.Sprintf("step[%d]", i), func(t *testing.T) {
-					step.prepare(nv)
-					step.check(t, nv)
+					step.prepare(collr)
+					step.check(t, collr)
 				})
 			}
 		})
@@ -422,26 +422,26 @@ func (m *mockNvidiaSmi) stop() error {
 	return nil
 }
 
-func prepareCaseMIGA100(nv *NvidiaSmi) {
-	nv.exec = &mockNvidiaSmi{gpuInfo: dataXMLA100SXM4MIG}
+func prepareCaseMIGA100(collr *Collector) {
+	collr.exec = &mockNvidiaSmi{gpuInfo: dataXMLA100SXM4MIG}
 }
 
-func prepareCaseRTX3060(nv *NvidiaSmi) {
-	nv.exec = &mockNvidiaSmi{gpuInfo: dataXMLRTX3060}
+func prepareCaseRTX3060(collr *Collector) {
+	collr.exec = &mockNvidiaSmi{gpuInfo: dataXMLRTX3060}
 }
 
-func prepareCaseRTX4090Driver535(nv *NvidiaSmi) {
-	nv.exec = &mockNvidiaSmi{gpuInfo: dataXMLRTX4090Driver535}
+func prepareCaseRTX4090Driver535(collr *Collector) {
+	collr.exec = &mockNvidiaSmi{gpuInfo: dataXMLRTX4090Driver535}
 }
 
-func prepareCaseTeslaP100(nv *NvidiaSmi) {
-	nv.exec = &mockNvidiaSmi{gpuInfo: dataXMLTeslaP100}
+func prepareCaseTeslaP100(collr *Collector) {
+	collr.exec = &mockNvidiaSmi{gpuInfo: dataXMLTeslaP100}
 }
 
-func prepareCaseRTX2080Win(nv *NvidiaSmi) {
-	nv.exec = &mockNvidiaSmi{gpuInfo: dataXMLRTX2080Win}
+func prepareCaseRTX2080Win(collr *Collector) {
+	collr.exec = &mockNvidiaSmi{gpuInfo: dataXMLRTX2080Win}
 }
 
-func prepareCaseErrOnQueryGPUInfo(nv *NvidiaSmi) {
-	nv.exec = &mockNvidiaSmi{errOnQueryGPUInfo: true}
+func prepareCaseErrOnQueryGPUInfo(collr *Collector) {
+	collr.exec = &mockNvidiaSmi{errOnQueryGPUInfo: true}
 }
