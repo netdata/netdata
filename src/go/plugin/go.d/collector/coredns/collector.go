@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *CoreDNS {
-	return &CoreDNS{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -53,7 +53,7 @@ type Config struct {
 	PerZoneStats   matcher.SimpleExpr `yaml:"per_zone_stats,omitempty" json:"per_zone_stats"`
 }
 
-type CoreDNS struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -70,42 +70,42 @@ type CoreDNS struct {
 	metricNames      requestMetricsNames
 }
 
-func (cd *CoreDNS) Configuration() any {
-	return cd.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (cd *CoreDNS) Init() error {
-	if err := cd.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	sm, err := cd.initPerServerMatcher()
+	sm, err := c.initPerServerMatcher()
 	if err != nil {
 		return fmt.Errorf("init per_server_stats: %v", err)
 	}
 	if sm != nil {
-		cd.perServerMatcher = sm
+		c.perServerMatcher = sm
 	}
 
-	zm, err := cd.initPerZoneMatcher()
+	zm, err := c.initPerZoneMatcher()
 	if err != nil {
 		return fmt.Errorf("init per_zone_stats: %v", err)
 	}
 	if zm != nil {
-		cd.perZoneMatcher = zm
+		c.perZoneMatcher = zm
 	}
 
-	prom, err := cd.initPrometheusClient()
+	prom, err := c.initPrometheusClient()
 	if err != nil {
 		return fmt.Errorf("init prometheus client: %v", err)
 	}
-	cd.prom = prom
+	c.prom = prom
 
 	return nil
 }
 
-func (cd *CoreDNS) Check() error {
-	mx, err := cd.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -116,23 +116,23 @@ func (cd *CoreDNS) Check() error {
 	return nil
 }
 
-func (cd *CoreDNS) Charts() *Charts {
-	return cd.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (cd *CoreDNS) Collect() map[string]int64 {
-	mx, err := cd.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 
 	if err != nil {
-		cd.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (cd *CoreDNS) Cleanup() {
-	if cd.prom != nil && cd.prom.HTTPClient() != nil {
-		cd.prom.HTTPClient().CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.prom != nil && c.prom.HTTPClient() != nil {
+		c.prom.HTTPClient().CloseIdleConnections()
 	}
 }

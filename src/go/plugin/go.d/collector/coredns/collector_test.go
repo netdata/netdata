@@ -41,29 +41,29 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestCoreDNS_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &CoreDNS{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestCoreDNS_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestCoreDNS_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestCoreDNS_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	assert.NoError(t, New().Init())
 }
 
-func TestCoreDNS_InitNG(t *testing.T) {
-	job := New()
-	job.URL = ""
-	assert.Error(t, job.Init())
+func TestCollector_InitNG(t *testing.T) {
+	collr := New()
+	collr.URL = ""
+	assert.Error(t, collr.Init())
 }
 
-func TestCoreDNS_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := []struct {
 		name string
 		data []byte
@@ -81,22 +81,22 @@ func TestCoreDNS_Check(t *testing.T) {
 					}))
 			defer ts.Close()
 
-			job := New()
-			job.URL = ts.URL + "/metrics"
-			require.NoError(t, job.Init())
-			assert.NoError(t, job.Check())
+			collr := New()
+			collr.URL = ts.URL + "/metrics"
+			require.NoError(t, collr.Init())
+			assert.NoError(t, collr.Check())
 		})
 	}
 }
 
-func TestCoreDNS_CheckNG(t *testing.T) {
-	job := New()
-	job.URL = "http://127.0.0.1:38001/metrics"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+func TestCollector_CheckNG(t *testing.T) {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001/metrics"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestCoreDNS_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := []struct {
 		name string
 		data []byte
@@ -114,12 +114,12 @@ func TestCoreDNS_Collect(t *testing.T) {
 					}))
 			defer ts.Close()
 
-			job := New()
-			job.URL = ts.URL + "/metrics"
-			job.PerServerStats.Includes = []string{"glob:*"}
-			job.PerZoneStats.Includes = []string{"glob:*"}
-			require.NoError(t, job.Init())
-			require.NoError(t, job.Check())
+			collr := New()
+			collr.URL = ts.URL + "/metrics"
+			collr.PerServerStats.Includes = []string{"glob:*"}
+			collr.PerZoneStats.Includes = []string{"glob:*"}
+			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Check())
 
 			expected := map[string]int64{
 				"coredns.io._request_per_ip_family_v4":     19,
@@ -441,12 +441,12 @@ func TestCoreDNS_Collect(t *testing.T) {
 				"ya.ru._response_total":                    21,
 			}
 
-			assert.Equal(t, expected, job.Collect())
+			assert.Equal(t, expected, collr.Collect())
 		})
 	}
 }
 
-func TestCoreDNS_CollectNoLoad(t *testing.T) {
+func TestCollector_CollectNoLoad(t *testing.T) {
 	tests := []struct {
 		name string
 		data []byte
@@ -463,12 +463,12 @@ func TestCoreDNS_CollectNoLoad(t *testing.T) {
 					}))
 			defer ts.Close()
 
-			job := New()
-			job.URL = ts.URL + "/metrics"
-			job.PerServerStats.Includes = []string{"glob:*"}
-			job.PerZoneStats.Includes = []string{"glob:*"}
-			require.NoError(t, job.Init())
-			require.NoError(t, job.Check())
+			collr := New()
+			collr.URL = ts.URL + "/metrics"
+			collr.PerServerStats.Includes = []string{"glob:*"}
+			collr.PerZoneStats.Includes = []string{"glob:*"}
+			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Check())
 
 			expected := map[string]int64{
 				"no_matching_zone_dropped_total": 0,
@@ -520,13 +520,13 @@ func TestCoreDNS_CollectNoLoad(t *testing.T) {
 				"response_total":                 0,
 			}
 
-			assert.Equal(t, expected, job.Collect())
+			assert.Equal(t, expected, collr.Collect())
 		})
 	}
 
 }
 
-func TestCoreDNS_InvalidData(t *testing.T) {
+func TestCollector_InvalidData(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -534,13 +534,13 @@ func TestCoreDNS_InvalidData(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/metrics"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/metrics"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestCoreDNS_404(t *testing.T) {
+func TestCollector_404(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -548,13 +548,13 @@ func TestCoreDNS_404(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/metrics"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/metrics"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestCoreDNS_CollectNoVersion(t *testing.T) {
+func TestCollector_CollectNoVersion(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -562,12 +562,12 @@ func TestCoreDNS_CollectNoVersion(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/metrics"
-	job.PerServerStats.Includes = []string{"glob:*"}
-	job.PerZoneStats.Includes = []string{"glob:*"}
-	require.NoError(t, job.Init())
-	require.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/metrics"
+	collr.PerServerStats.Includes = []string{"glob:*"}
+	collr.PerZoneStats.Includes = []string{"glob:*"}
+	require.NoError(t, collr.Init())
+	require.Error(t, collr.Check())
 
-	assert.Nil(t, job.Collect())
+	assert.Nil(t, collr.Collect())
 }
