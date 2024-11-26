@@ -30,8 +30,8 @@ func init() {
 	})
 }
 
-func New() *X509Check {
-	return &X509Check{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout:        confopt.Duration(time.Second * 2),
 			CheckFullChain: false,
@@ -51,7 +51,7 @@ type Config struct {
 	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 
-type X509Check struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -62,26 +62,26 @@ type X509Check struct {
 	seenCerts map[string]bool
 }
 
-func (x *X509Check) Configuration() any {
-	return x.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (x *X509Check) Init() error {
-	if err := x.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prov, err := x.initProvider()
+	prov, err := c.initProvider()
 	if err != nil {
 		return fmt.Errorf("certificate provider init: %v", err)
 	}
-	x.prov = prov
+	c.prov = prov
 
 	return nil
 }
 
-func (x *X509Check) Check() error {
-	mx, err := x.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -91,14 +91,14 @@ func (x *X509Check) Check() error {
 	return nil
 }
 
-func (x *X509Check) Charts() *module.Charts {
-	return x.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (x *X509Check) Collect() map[string]int64 {
-	mx, err := x.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		x.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -107,4 +107,4 @@ func (x *X509Check) Collect() map[string]int64 {
 	return mx
 }
 
-func (x *X509Check) Cleanup() {}
+func (c *Collector) Cleanup() {}

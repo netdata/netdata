@@ -29,22 +29,22 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestX509Check_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &X509Check{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestX509Check_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestX509Check_Charts(t *testing.T) {
-	x509Check := New()
-	x509Check.Source = "https://example.com"
-	require.NoError(t, x509Check.Init())
-	assert.NotNil(t, x509Check.Charts())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	collr.Source = "https://example.com"
+	require.NoError(t, collr.Init())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestX509Check_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	const (
 		file = iota
 		net
@@ -86,22 +86,22 @@ func TestX509Check_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			x509Check := New()
-			x509Check.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.err {
-				assert.Error(t, x509Check.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				require.NoError(t, x509Check.Init())
+				require.NoError(t, collr.Init())
 
 				var typeOK bool
 				switch test.providerType {
 				case file:
-					_, typeOK = x509Check.prov.(*fromFile)
+					_, typeOK = collr.prov.(*fromFile)
 				case net:
-					_, typeOK = x509Check.prov.(*fromNet)
+					_, typeOK = collr.prov.(*fromNet)
 				case smtp:
-					_, typeOK = x509Check.prov.(*fromSMTP)
+					_, typeOK = collr.prov.(*fromSMTP)
 				}
 
 				assert.True(t, typeOK)
@@ -110,43 +110,43 @@ func TestX509Check_Init(t *testing.T) {
 	}
 }
 
-func TestX509Check_Check(t *testing.T) {
-	x509Check := New()
-	x509Check.prov = &mockProvider{certs: []*x509.Certificate{{}}}
+func TestCollector_Check(t *testing.T) {
+	collr := New()
+	collr.prov = &mockProvider{certs: []*x509.Certificate{{}}}
 
-	assert.NoError(t, x509Check.Check())
+	assert.NoError(t, collr.Check())
 }
 
-func TestX509Check_Check_ReturnsFalseOnProviderError(t *testing.T) {
-	x509Check := New()
-	x509Check.prov = &mockProvider{err: true}
+func TestCollector_Check_ReturnsFalseOnProviderError(t *testing.T) {
+	collr := New()
+	collr.prov = &mockProvider{err: true}
 
-	assert.Error(t, x509Check.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestX509Check_Collect(t *testing.T) {
-	x509Check := New()
-	x509Check.Source = "https://example.com"
-	require.NoError(t, x509Check.Init())
-	x509Check.prov = &mockProvider{certs: []*x509.Certificate{{}}}
+func TestCollector_Collect(t *testing.T) {
+	collr := New()
+	collr.Source = "https://example.com"
+	require.NoError(t, collr.Init())
+	collr.prov = &mockProvider{certs: []*x509.Certificate{{}}}
 
-	mx := x509Check.Collect()
+	mx := collr.Collect()
 
 	assert.NotZero(t, mx)
-	module.TestMetricsHasAllChartsDims(t, x509Check.Charts(), mx)
+	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
-func TestX509Check_Collect_ReturnsNilOnProviderError(t *testing.T) {
-	x509Check := New()
-	x509Check.prov = &mockProvider{err: true}
+func TestCollector_Collect_ReturnsNilOnProviderError(t *testing.T) {
+	collr := New()
+	collr.prov = &mockProvider{err: true}
 
-	assert.Nil(t, x509Check.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestX509Check_Collect_ReturnsNilOnZeroCertificates(t *testing.T) {
-	x509Check := New()
-	x509Check.prov = &mockProvider{certs: []*x509.Certificate{}}
-	mx := x509Check.Collect()
+func TestCollector_Collect_ReturnsNilOnZeroCertificates(t *testing.T) {
+	collr := New()
+	collr.prov = &mockProvider{certs: []*x509.Certificate{}}
+	mx := collr.Collect()
 
 	assert.Nil(t, mx)
 }
