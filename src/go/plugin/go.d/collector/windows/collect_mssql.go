@@ -40,7 +40,7 @@ const (
 	metricMSSQLDatabaseWriteTransactions       = "windows_mssql_databases_write_transactions"
 )
 
-func (w *Windows) collectMSSQL(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectMSSQL(mx map[string]int64, pms prometheus.Series) {
 	instances := make(map[string]bool)
 	dbs := make(map[string]bool)
 	px := "mssql_instance_"
@@ -223,31 +223,31 @@ func (w *Windows) collectMSSQL(mx map[string]int64, pms prometheus.Series) {
 	}
 
 	for v := range instances {
-		if !w.cache.mssqlInstances[v] {
-			w.cache.mssqlInstances[v] = true
-			w.addMSSQLInstanceCharts(v)
+		if !c.cache.mssqlInstances[v] {
+			c.cache.mssqlInstances[v] = true
+			c.addMSSQLInstanceCharts(v)
 		}
 	}
-	for v := range w.cache.mssqlInstances {
+	for v := range c.cache.mssqlInstances {
 		if !instances[v] {
-			delete(w.cache.mssqlInstances, v)
-			w.removeMSSQLInstanceCharts(v)
+			delete(c.cache.mssqlInstances, v)
+			c.removeMSSQLInstanceCharts(v)
 		}
 	}
 
 	for v := range dbs {
-		if !w.cache.mssqlDBs[v] {
-			w.cache.mssqlDBs[v] = true
+		if !c.cache.mssqlDBs[v] {
+			c.cache.mssqlDBs[v] = true
 			if s := strings.Split(v, ":"); len(s) == 2 {
-				w.addMSSQLDBCharts(s[0], s[1])
+				c.addMSSQLDBCharts(s[0], s[1])
 			}
 		}
 	}
-	for v := range w.cache.mssqlDBs {
+	for v := range c.cache.mssqlDBs {
 		if !dbs[v] {
-			delete(w.cache.mssqlDBs, v)
+			delete(c.cache.mssqlDBs, v)
 			if s := strings.Split(v, ":"); len(s) == 2 {
-				w.removeMSSQLDBCharts(s[0], s[1])
+				c.removeMSSQLDBCharts(s[0], s[1])
 			}
 		}
 	}

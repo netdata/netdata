@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *Windows {
-	return &Windows{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				ClientConfig: web.ClientConfig{
@@ -77,7 +77,7 @@ type Config struct {
 }
 
 type (
-	Windows struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -118,26 +118,26 @@ type (
 	}
 )
 
-func (w *Windows) Configuration() any {
-	return w.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (w *Windows) Init() error {
-	if err := w.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prom, err := w.initPrometheusClient()
+	prom, err := c.initPrometheusClient()
 	if err != nil {
 		return fmt.Errorf("init prometheus clients: %v", err)
 	}
-	w.prom = prom
+	c.prom = prom
 
 	return nil
 }
 
-func (w *Windows) Check() error {
-	mx, err := w.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -147,14 +147,14 @@ func (w *Windows) Check() error {
 	return nil
 }
 
-func (w *Windows) Charts() *module.Charts {
-	return w.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (w *Windows) Collect() map[string]int64 {
-	ms, err := w.collect()
+func (c *Collector) Collect() map[string]int64 {
+	ms, err := c.collect()
 	if err != nil {
-		w.Error(err)
+		c.Error(err)
 	}
 
 	if len(ms) == 0 {
@@ -163,8 +163,8 @@ func (w *Windows) Collect() map[string]int64 {
 	return ms
 }
 
-func (w *Windows) Cleanup() {
-	if w.prom != nil && w.prom.HTTPClient() != nil {
-		w.prom.HTTPClient().CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.prom != nil && c.prom.HTTPClient() != nil {
+		c.prom.HTTPClient().CloseIdleConnections()
 	}
 }

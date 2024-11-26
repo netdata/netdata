@@ -34,15 +34,15 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestWindows_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Windows{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
-	assert.IsType(t, (*Windows)(nil), New())
+	assert.IsType(t, (*Collector)(nil), New())
 }
 
-func TestWindows_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -63,21 +63,21 @@ func TestWindows_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			win := New()
-			win.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, win.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, win.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestWindows_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() (win *Windows, cleanup func())
+		prepare  func() (collr *Collector, cleanup func())
 		wantFail bool
 	}{
 		"success on valid response v0.20.0": {
@@ -99,31 +99,31 @@ func TestWindows_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			win, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, win.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, win.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, win.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestWindows_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestWindows_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestWindows_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() (win *Windows, cleanup func())
+		prepare       func() (collr *Collector, cleanup func())
 		wantCollected map[string]int64
 	}{
 		"success on valid response v0.20.0": {
@@ -796,12 +796,12 @@ func TestWindows_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			win, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, win.Init())
+			require.NoError(t, collr.Init())
 
-			mx := win.Collect()
+			mx := collr.Collect()
 
 			if mx != nil && test.wantCollected != nil {
 				mx["system_up_time"] = test.wantCollected["system_up_time"]
@@ -809,201 +809,201 @@ func TestWindows_Collect(t *testing.T) {
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				testCharts(t, win, mx)
+				testCharts(t, collr, mx)
 			}
 		})
 	}
 }
 
-func testCharts(t *testing.T, win *Windows, mx map[string]int64) {
-	ensureChartsDimsCreated(t, win)
-	module.TestMetricsHasAllChartsDims(t, win.Charts(), mx)
+func testCharts(t *testing.T, collr *Collector, mx map[string]int64) {
+	ensureChartsDimsCreated(t, collr)
+	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
-func ensureChartsDimsCreated(t *testing.T, w *Windows) {
+func ensureChartsDimsCreated(t *testing.T, collr *Collector) {
 	for _, chart := range cpuCharts {
-		if w.cache.collection[collectorCPU] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorCPU] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range memCharts {
-		if w.cache.collection[collectorMemory] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorMemory] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range tcpCharts {
-		if w.cache.collection[collectorTCP] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorTCP] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range osCharts {
-		if w.cache.collection[collectorOS] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorOS] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range systemCharts {
-		if w.cache.collection[collectorSystem] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorSystem] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range logonCharts {
-		if w.cache.collection[collectorLogon] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorLogon] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range processesCharts {
-		if w.cache.collection[collectorProcess] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorProcess] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range netFrameworkCLRExceptionsChartsTmpl {
-		if w.cache.collection[collectorNetFrameworkCLRExceptions] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorNetFrameworkCLRExceptions] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range netFrameworkCLRInteropChartsTmpl {
-		if w.cache.collection[collectorNetFrameworkCLRInterop] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorNetFrameworkCLRInterop] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range netFrameworkCLRJITChartsTmpl {
-		if w.cache.collection[collectorNetFrameworkCLRJIT] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorNetFrameworkCLRJIT] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range netFrameworkCLRLoadingChartsTmpl {
-		if w.cache.collection[collectorNetFrameworkCLRLoading] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorNetFrameworkCLRLoading] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range netFrameworkCLRLocksAndThreadsChartsTmpl {
-		if w.cache.collection[collectorNetFrameworkCLRLocksAndThreads] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorNetFrameworkCLRLocksAndThreads] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range netFrameworkCLRMemoryChartsTmpl {
-		if w.cache.collection[collectorNetFrameworkCLRMemory] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorNetFrameworkCLRMemory] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range netFrameworkCLRRemotingChartsTmpl {
-		if w.cache.collection[collectorNetFrameworkCLRRemoting] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorNetFrameworkCLRRemoting] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 	for _, chart := range netFrameworkCLRSecurityChartsTmpl {
-		if w.cache.collection[collectorNetFrameworkCLRSecurity] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorNetFrameworkCLRSecurity] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
 
-	for core := range w.cache.cores {
+	for core := range collr.cache.cores {
 		for _, chart := range cpuCoreChartsTmpl {
 			id := fmt.Sprintf(chart.ID, core)
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' core", id, core)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' core", id, core)
 		}
 	}
-	for disk := range w.cache.volumes {
+	for disk := range collr.cache.volumes {
 		for _, chart := range diskChartsTmpl {
 			id := fmt.Sprintf(chart.ID, disk)
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' disk", id, disk)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' disk", id, disk)
 		}
 	}
-	for nic := range w.cache.nics {
+	for nic := range collr.cache.nics {
 		for _, chart := range nicChartsTmpl {
 			id := fmt.Sprintf(chart.ID, nic)
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' nic", id, nic)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' nic", id, nic)
 		}
 	}
-	for zone := range w.cache.thermalZones {
+	for zone := range collr.cache.thermalZones {
 		for _, chart := range thermalzoneChartsTmpl {
 			id := fmt.Sprintf(chart.ID, zone)
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' thermalzone", id, zone)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' thermalzone", id, zone)
 		}
 	}
-	for svc := range w.cache.services {
+	for svc := range collr.cache.services {
 		for _, chart := range serviceChartsTmpl {
 			id := fmt.Sprintf(chart.ID, svc)
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' service", id, svc)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' service", id, svc)
 		}
 	}
-	for website := range w.cache.iis {
+	for website := range collr.cache.iis {
 		for _, chart := range iisWebsiteChartsTmpl {
 			id := fmt.Sprintf(chart.ID, website)
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' website", id, website)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' website", id, website)
 		}
 	}
-	for instance := range w.cache.mssqlInstances {
+	for instance := range collr.cache.mssqlInstances {
 		for _, chart := range mssqlInstanceChartsTmpl {
 			id := fmt.Sprintf(chart.ID, instance)
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' instance", id, instance)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' instance", id, instance)
 		}
 	}
-	for instanceDB := range w.cache.mssqlDBs {
+	for instanceDB := range collr.cache.mssqlDBs {
 		s := strings.Split(instanceDB, ":")
 		if assert.Lenf(t, s, 2, "can not extract intance/database from cache.mssqlDBs") {
 			instance, db := s[0], s[1]
 			for _, chart := range mssqlDatabaseChartsTmpl {
 				id := fmt.Sprintf(chart.ID, db, instance)
-				assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' instance", id, instance)
+				assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' instance", id, instance)
 			}
 		}
 	}
 	for _, chart := range adCharts {
-		if w.cache.collection[collectorAD] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorAD] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
-	for template := range w.cache.adcs {
+	for template := range collr.cache.adcs {
 		for _, chart := range adcsCertTemplateChartsTmpl {
 			id := fmt.Sprintf(chart.ID, template)
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' template certificate", id, template)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' template certificate", id, template)
 		}
 	}
-	for name := range w.cache.collectors {
+	for name := range collr.cache.collectors {
 		for _, chart := range collectorChartsTmpl {
 			id := fmt.Sprintf(chart.ID, name)
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' collector", id, name)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' collector", id, name)
 		}
 	}
 
 	for _, chart := range processesCharts {
-		if chart = w.Charts().Get(chart.ID); chart == nil {
+		if chart = collr.Charts().Get(chart.ID); chart == nil {
 			continue
 		}
-		for proc := range w.cache.processes {
+		for proc := range collr.cache.processes {
 			var found bool
 			for _, dim := range chart.Dims {
 				if found = strings.HasPrefix(dim.ID, "process_"+proc); found {
@@ -1015,73 +1015,73 @@ func ensureChartsDimsCreated(t *testing.T, w *Windows) {
 	}
 
 	for _, chart := range hypervChartsTmpl {
-		if w.cache.collection[collectorHyperv] {
-			assert.Truef(t, w.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
+		if collr.cache.collection[collectorHyperv] {
+			assert.Truef(t, collr.Charts().Has(chart.ID), "chart '%s' not created", chart.ID)
 		} else {
-			assert.Falsef(t, w.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
+			assert.Falsef(t, collr.Charts().Has(chart.ID), "chart '%s' created", chart.ID)
 		}
 	}
-	for vm := range w.cache.hypervVMMem {
+	for vm := range collr.cache.hypervVMMem {
 		for _, chart := range hypervVMChartsTemplate {
 			id := fmt.Sprintf(chart.ID, hypervCleanName(vm))
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' virtual machine", id, vm)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' virtual machine", id, vm)
 		}
 	}
-	for device := range w.cache.hypervVMDevices {
+	for device := range collr.cache.hypervVMDevices {
 		for _, chart := range hypervVMDeviceChartsTemplate {
 			id := fmt.Sprintf(chart.ID, hypervCleanName(device))
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' vm storage device", id, device)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' vm storage device", id, device)
 		}
 	}
-	for iface := range w.cache.hypervVMInterfaces {
+	for iface := range collr.cache.hypervVMInterfaces {
 		for _, chart := range hypervVMInterfaceChartsTemplate {
 			id := fmt.Sprintf(chart.ID, hypervCleanName(iface))
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' vm network interface", id, iface)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' vm network interface", id, iface)
 		}
 	}
-	for vswitch := range w.cache.hypervVswitch {
+	for vswitch := range collr.cache.hypervVswitch {
 		for _, chart := range hypervVswitchChartsTemplate {
 			id := fmt.Sprintf(chart.ID, hypervCleanName(vswitch))
-			assert.Truef(t, w.Charts().Has(id), "charts has no '%s' chart for '%s' virtual switch", id, vswitch)
+			assert.Truef(t, collr.Charts().Has(id), "charts has no '%s' chart for '%s' virtual switch", id, vswitch)
 		}
 	}
 }
 
-func prepareWindowsV0200() (win *Windows, cleanup func()) {
+func prepareWindowsV0200() (collr *Collector, cleanup func()) {
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataVer0200Metrics)
 		}))
 
-	win = New()
-	win.URL = ts.URL
-	return win, ts.Close
+	collr = New()
+	collr.URL = ts.URL
+	return collr, ts.Close
 }
 
-func prepareWindowsReturnsInvalidData() (win *Windows, cleanup func()) {
+func prepareWindowsReturnsInvalidData() (collr *Collector, cleanup func()) {
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
 
-	win = New()
-	win.URL = ts.URL
-	return win, ts.Close
+	collr = New()
+	collr.URL = ts.URL
+	return collr, ts.Close
 }
 
-func prepareWindowsConnectionRefused() (win *Windows, cleanup func()) {
-	win = New()
-	win.URL = "http://127.0.0.1:38001"
-	return win, func() {}
+func prepareWindowsConnectionRefused() (collr *Collector, cleanup func()) {
+	collr = New()
+	collr.URL = "http://127.0.0.1:38001"
+	return collr, func() {}
 }
 
-func prepareWindowsResponse404() (win *Windows, cleanup func()) {
+func prepareWindowsResponse404() (collr *Collector, cleanup func()) {
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
 
-	win = New()
-	win.URL = ts.URL
-	return win, ts.Close
+	collr = New()
+	collr.URL = ts.URL
+	return collr, ts.Close
 }

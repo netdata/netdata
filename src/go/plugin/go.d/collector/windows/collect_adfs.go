@@ -102,10 +102,10 @@ var adfsMetrics = []string{
 	metricADFSWSTrustTokenRequestsSuccessTotal,
 }
 
-func (w *Windows) collectADFS(mx map[string]int64, pms prometheus.Series) {
-	if !w.cache.collection[collectorADFS] {
-		w.cache.collection[collectorADFS] = true
-		w.addADFSCharts()
+func (c *Collector) collectADFS(mx map[string]int64, pms prometheus.Series) {
+	if !c.cache.collection[collectorADFS] {
+		c.cache.collection[collectorADFS] = true
+		c.addADFSCharts()
 	}
 
 	for _, pm := range pms.FindByNames(adfsMetrics...) {

@@ -10,10 +10,10 @@ const (
 	metricLogonType = "windows_logon_logon_type"
 )
 
-func (w *Windows) collectLogon(mx map[string]int64, pms prometheus.Series) {
-	if !w.cache.collection[collectorLogon] {
-		w.cache.collection[collectorLogon] = true
-		w.addLogonCharts()
+func (c *Collector) collectLogon(mx map[string]int64, pms prometheus.Series) {
+	if !c.cache.collection[collectorLogon] {
+		c.cache.collection[collectorLogon] = true
+		c.addLogonCharts()
 	}
 
 	for _, pm := range pms.FindByName(metricLogonType) {

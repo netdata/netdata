@@ -4180,15 +4180,15 @@ var (
 	}
 )
 
-func (w *Windows) addCPUCharts() {
+func (c *Collector) addCPUCharts() {
 	charts := cpuCharts.Copy()
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) addCPUCoreCharts(core string) {
+func (c *Collector) addCPUCoreCharts(core string) {
 	charts := cpuCoreChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4201,25 +4201,25 @@ func (w *Windows) addCPUCoreCharts(core string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeCPUCoreCharts(core string) {
+func (c *Collector) removeCPUCoreCharts(core string) {
 	px := fmt.Sprintf("cpu_core_%s", core)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addMemoryCharts() {
+func (c *Collector) addMemoryCharts() {
 	charts := memCharts.Copy()
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) addDiskCharts(disk string) {
+func (c *Collector) addDiskCharts(disk string) {
 	charts := diskChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4232,17 +4232,17 @@ func (w *Windows) addDiskCharts(disk string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeDiskCharts(disk string) {
+func (c *Collector) removeDiskCharts(disk string) {
 	px := fmt.Sprintf("logical_disk_%s", disk)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addNICCharts(nic string) {
+func (c *Collector) addNICCharts(nic string) {
 	charts := nicChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4255,65 +4255,65 @@ func (w *Windows) addNICCharts(nic string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeNICCharts(nic string) {
+func (c *Collector) removeNICCharts(nic string) {
 	px := fmt.Sprintf("nic_%s", nic)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addTCPCharts() {
+func (c *Collector) addTCPCharts() {
 	charts := tcpCharts.Copy()
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) addOSCharts() {
+func (c *Collector) addOSCharts() {
 	charts := osCharts.Copy()
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) addSystemCharts() {
+func (c *Collector) addSystemCharts() {
 	charts := systemCharts.Copy()
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) addLogonCharts() {
+func (c *Collector) addLogonCharts() {
 	charts := logonCharts.Copy()
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) addADFSCharts() {
+func (c *Collector) addADFSCharts() {
 	charts := adfsCharts.Copy()
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) addExchangeCharts() {
+func (c *Collector) addExchangeCharts() {
 	charts := exchangeCharts.Copy()
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) addExchangeWorkloadCharts(name string) {
+func (c *Collector) addExchangeWorkloadCharts(name string) {
 	charts := exchangeWorkloadChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4326,17 +4326,17 @@ func (w *Windows) addExchangeWorkloadCharts(name string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeExchangeWorkloadCharts(name string) {
+func (c *Collector) removeExchangeWorkloadCharts(name string) {
 	px := fmt.Sprintf("exchange_workload_%s", name)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addExchangeLDAPCharts(name string) {
+func (c *Collector) addExchangeLDAPCharts(name string) {
 	charts := exchangeLDAPChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4349,17 +4349,17 @@ func (w *Windows) addExchangeLDAPCharts(name string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeExchangeLDAPCharts(name string) {
+func (c *Collector) removeExchangeLDAPCharts(name string) {
 	px := fmt.Sprintf("exchange_ldap_%s", name)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addExchangeHTTPProxyCharts(name string) {
+func (c *Collector) addExchangeHTTPProxyCharts(name string) {
 	charts := exchangeHTTPProxyChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4372,17 +4372,17 @@ func (w *Windows) addExchangeHTTPProxyCharts(name string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeExchangeHTTPProxyCharts(name string) {
+func (c *Collector) removeExchangeHTTPProxyCharts(name string) {
 	px := fmt.Sprintf("exchange_http_proxy_%s", name)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addThermalZoneCharts(zone string) {
+func (c *Collector) addThermalZoneCharts(zone string) {
 	charts := thermalzoneChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4395,17 +4395,17 @@ func (w *Windows) addThermalZoneCharts(zone string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeThermalZoneCharts(zone string) {
+func (c *Collector) removeThermalZoneCharts(zone string) {
 	px := fmt.Sprintf("thermalzone_%s", zone)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addIISWebsiteCharts(website string) {
+func (c *Collector) addIISWebsiteCharts(website string) {
 	charts := iisWebsiteChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4418,17 +4418,17 @@ func (w *Windows) addIISWebsiteCharts(website string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeIIWebsiteSCharts(website string) {
+func (c *Collector) removeIIWebsiteSCharts(website string) {
 	px := fmt.Sprintf("iis_website_%s", website)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addMSSQLDBCharts(instance string, dbname string) {
+func (c *Collector) addMSSQLDBCharts(instance string, dbname string) {
 	charts := mssqlDatabaseChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4442,17 +4442,17 @@ func (w *Windows) addMSSQLDBCharts(instance string, dbname string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeMSSQLDBCharts(instance string, dbname string) {
+func (c *Collector) removeMSSQLDBCharts(instance string, dbname string) {
 	px := fmt.Sprintf("mssql_db_%s_instance_%s", dbname, instance)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addMSSQLInstanceCharts(instance string) {
+func (c *Collector) addMSSQLInstanceCharts(instance string) {
 	charts := mssqlInstanceChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4465,33 +4465,33 @@ func (w *Windows) addMSSQLInstanceCharts(instance string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeMSSQLInstanceCharts(instance string) {
+func (c *Collector) removeMSSQLInstanceCharts(instance string) {
 	px := fmt.Sprintf("mssql_instance_%s", instance)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addProcessesCharts() {
+func (c *Collector) addProcessesCharts() {
 	charts := processesCharts.Copy()
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) addADCharts() {
+func (c *Collector) addADCharts() {
 	charts := adCharts.Copy()
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) addCertificateTemplateCharts(template string) {
+func (c *Collector) addCertificateTemplateCharts(template string) {
 	charts := adcsCertTemplateChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4504,18 +4504,18 @@ func (w *Windows) addCertificateTemplateCharts(template string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeCertificateTemplateCharts(template string) {
+func (c *Collector) removeCertificateTemplateCharts(template string) {
 	px := fmt.Sprintf("adcs_cert_template_%s", template)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addProcessToCharts(procID string) {
-	for _, chart := range *w.Charts() {
+func (c *Collector) addProcessToCharts(procID string) {
+	for _, chart := range *c.Charts() {
 		var dim *module.Dim
 		switch chart.ID {
 		case processesCPUUtilizationTotalChart.ID:
@@ -4550,15 +4550,15 @@ func (w *Windows) addProcessToCharts(procID string) {
 		}
 
 		if err := chart.AddDim(dim); err != nil {
-			w.Warning(err)
+			c.Warning(err)
 			continue
 		}
 		chart.MarkNotCreated()
 	}
 }
 
-func (w *Windows) removeProcessFromCharts(procID string) {
-	for _, chart := range *w.Charts() {
+func (c *Collector) removeProcessFromCharts(procID string) {
+	for _, chart := range *c.Charts() {
 		var id string
 		switch chart.ID {
 		case processesCPUUtilizationTotalChart.ID:
@@ -4582,14 +4582,14 @@ func (w *Windows) removeProcessFromCharts(procID string) {
 		}
 
 		if err := chart.MarkDimRemove(id, false); err != nil {
-			w.Warning(err)
+			c.Warning(err)
 			continue
 		}
 		chart.MarkNotCreated()
 	}
 }
 
-func (w *Windows) addProcessNetFrameworkExceptionsCharts(procName string) {
+func (c *Collector) addProcessNetFrameworkExceptionsCharts(procName string) {
 	charts := netFrameworkCLRExceptionsChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4602,17 +4602,17 @@ func (w *Windows) addProcessNetFrameworkExceptionsCharts(procName string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeProcessFromNetFrameworkExceptionsCharts(procName string) {
+func (c *Collector) removeProcessFromNetFrameworkExceptionsCharts(procName string) {
 	px := fmt.Sprintf("netframework_%s_clrexception", strings.ToLower(procName))
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addProcessNetFrameworkInteropCharts(procName string) {
+func (c *Collector) addProcessNetFrameworkInteropCharts(procName string) {
 	charts := netFrameworkCLRInteropChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4625,17 +4625,17 @@ func (w *Windows) addProcessNetFrameworkInteropCharts(procName string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeProcessNetFrameworkInteropCharts(procName string) {
+func (c *Collector) removeProcessNetFrameworkInteropCharts(procName string) {
 	px := fmt.Sprintf("netframework_%s_clrinterop", strings.ToLower(procName))
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addProcessNetFrameworkJITCharts(procName string) {
+func (c *Collector) addProcessNetFrameworkJITCharts(procName string) {
 	charts := netFrameworkCLRJITChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4648,17 +4648,17 @@ func (w *Windows) addProcessNetFrameworkJITCharts(procName string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeProcessNetFrameworkJITCharts(procName string) {
+func (c *Collector) removeProcessNetFrameworkJITCharts(procName string) {
 	px := fmt.Sprintf("netframework_%s_clrjit", strings.ToLower(procName))
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addProcessNetFrameworkLoadingCharts(procName string) {
+func (c *Collector) addProcessNetFrameworkLoadingCharts(procName string) {
 	charts := netFrameworkCLRLoadingChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4671,17 +4671,17 @@ func (w *Windows) addProcessNetFrameworkLoadingCharts(procName string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeProcessNetFrameworkLoadingCharts(procName string) {
+func (c *Collector) removeProcessNetFrameworkLoadingCharts(procName string) {
 	px := fmt.Sprintf("netframework_%s_clrloading", strings.ToLower(procName))
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addProcessNetFrameworkLocksAndThreadsCharts(procName string) {
+func (c *Collector) addProcessNetFrameworkLocksAndThreadsCharts(procName string) {
 	charts := netFrameworkCLRLocksAndThreadsChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4694,17 +4694,17 @@ func (w *Windows) addProcessNetFrameworkLocksAndThreadsCharts(procName string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeProcessNetFrameworkLocksAndThreadsCharts(procName string) {
+func (c *Collector) removeProcessNetFrameworkLocksAndThreadsCharts(procName string) {
 	px := fmt.Sprintf("netframework_%s_clrlocksandthreads", strings.ToLower(procName))
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addProcessNetFrameworkMemoryCharts(procName string) {
+func (c *Collector) addProcessNetFrameworkMemoryCharts(procName string) {
 	charts := netFrameworkCLRMemoryChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4717,17 +4717,17 @@ func (w *Windows) addProcessNetFrameworkMemoryCharts(procName string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeProcessNetFrameworkMemoryCharts(procName string) {
+func (c *Collector) removeProcessNetFrameworkMemoryCharts(procName string) {
 	px := fmt.Sprintf("netframework_%s_clrmemory", strings.ToLower(procName))
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addProcessNetFrameworkRemotingCharts(procName string) {
+func (c *Collector) addProcessNetFrameworkRemotingCharts(procName string) {
 	charts := netFrameworkCLRRemotingChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4740,17 +4740,17 @@ func (w *Windows) addProcessNetFrameworkRemotingCharts(procName string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeProcessNetFrameworkRemotingCharts(procName string) {
+func (c *Collector) removeProcessNetFrameworkRemotingCharts(procName string) {
 	px := fmt.Sprintf("netframework_%s_clrremoting", strings.ToLower(procName))
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addProcessNetFrameworkSecurityCharts(procName string) {
+func (c *Collector) addProcessNetFrameworkSecurityCharts(procName string) {
 	charts := netFrameworkCLRSecurityChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4763,17 +4763,17 @@ func (w *Windows) addProcessNetFrameworkSecurityCharts(procName string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeProcessNetFrameworkSecurityCharts(procName string) {
+func (c *Collector) removeProcessNetFrameworkSecurityCharts(procName string) {
 	px := fmt.Sprintf("netframework_%s_clrsecurity", strings.ToLower(procName))
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addServiceCharts(svc string) {
+func (c *Collector) addServiceCharts(svc string) {
 	charts := serviceChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4786,17 +4786,17 @@ func (w *Windows) addServiceCharts(svc string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeServiceCharts(svc string) {
+func (c *Collector) removeServiceCharts(svc string) {
 	px := fmt.Sprintf("service_%s", svc)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addCollectorCharts(name string) {
+func (c *Collector) addCollectorCharts(name string) {
 	charts := collectorChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -4809,20 +4809,20 @@ func (w *Windows) addCollectorCharts(name string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) addHypervCharts() {
+func (c *Collector) addHypervCharts() {
 	charts := hypervChartsTmpl.Copy()
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) addHypervVMCharts(vm string) {
+func (c *Collector) addHypervVMCharts(vm string) {
 	charts := hypervVMChartsTemplate.Copy()
 	n := hypervCleanName(vm)
 
@@ -4836,17 +4836,17 @@ func (w *Windows) addHypervVMCharts(vm string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeHypervVMCharts(vm string) {
+func (c *Collector) removeHypervVMCharts(vm string) {
 	px := fmt.Sprintf("vm_%s", hypervCleanName(vm))
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addHypervVMDeviceCharts(device string) {
+func (c *Collector) addHypervVMDeviceCharts(device string) {
 	charts := hypervVMDeviceChartsTemplate.Copy()
 	n := hypervCleanName(device)
 
@@ -4860,17 +4860,17 @@ func (w *Windows) addHypervVMDeviceCharts(device string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeHypervVMDeviceCharts(device string) {
+func (c *Collector) removeHypervVMDeviceCharts(device string) {
 	px := fmt.Sprintf("vm_device_%s", hypervCleanName(device))
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addHypervVMInterfaceCharts(iface string) {
+func (c *Collector) addHypervVMInterfaceCharts(iface string) {
 	charts := hypervVMInterfaceChartsTemplate.Copy()
 	n := hypervCleanName(iface)
 
@@ -4884,17 +4884,17 @@ func (w *Windows) addHypervVMInterfaceCharts(iface string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeHypervVMInterfaceCharts(iface string) {
+func (c *Collector) removeHypervVMInterfaceCharts(iface string) {
 	px := fmt.Sprintf("vm_interface_%s", hypervCleanName(iface))
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) addHypervVSwitchCharts(vswitch string) {
+func (c *Collector) addHypervVSwitchCharts(vswitch string) {
 	charts := hypervVswitchChartsTemplate.Copy()
 	n := hypervCleanName(vswitch)
 
@@ -4908,23 +4908,23 @@ func (w *Windows) addHypervVSwitchCharts(vswitch string) {
 		}
 	}
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *Windows) removeHypervVSwitchCharts(vswitch string) {
+func (c *Collector) removeHypervVSwitchCharts(vswitch string) {
 	px := fmt.Sprintf("vswitch_%s", hypervCleanName(vswitch))
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) removeCollectorCharts(name string) {
+func (c *Collector) removeCollectorCharts(name string) {
 	px := fmt.Sprintf("collector_%s", name)
-	w.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (w *Windows) removeCharts(prefix string) {
-	for _, chart := range *w.Charts() {
+func (c *Collector) removeCharts(prefix string) {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
