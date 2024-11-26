@@ -54,11 +54,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestSmartctl_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Smartctl{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestSmartctl_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -79,54 +79,54 @@ func TestSmartctl_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			smart := New()
+			collr := New()
 
 			if test.wantFail {
-				assert.Error(t, smart.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, smart.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestSmartctl_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Smartctl
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *Smartctl {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Smartctl {
-				smart := New()
-				smart.exec = prepareMockOkTypeSata()
-				_ = smart.Check()
-				return smart
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOkTypeSata()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Smartctl {
-				smart := New()
-				smart.exec = prepareMockOkTypeSata()
-				_ = smart.Collect()
-				return smart
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOkTypeSata()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			smart := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, smart.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestSmartctl_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockSmartctlCliExec
 		wantFail    bool
@@ -155,20 +155,20 @@ func TestSmartctl_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			smart := New()
+			collr := New()
 			mock := test.prepareMock()
-			smart.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, smart.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, smart.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestSmartctl_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock   func() *mockSmartctlCliExec
 		prepareConfig func() Config
@@ -353,25 +353,25 @@ func TestSmartctl_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			smart := New()
+			collr := New()
 			if test.prepareConfig != nil {
-				smart.Config = test.prepareConfig()
+				collr.Config = test.prepareConfig()
 			}
 			mock := test.prepareMock()
-			smart.exec = mock
-			smart.ScanEvery = confopt.Duration(time.Microsecond * 1)
-			smart.PollDevicesEvery = confopt.Duration(time.Microsecond * 1)
+			collr.exec = mock
+			collr.ScanEvery = confopt.Duration(time.Microsecond * 1)
+			collr.PollDevicesEvery = confopt.Duration(time.Microsecond * 1)
 
 			var mx map[string]int64
 			for i := 0; i < 10; i++ {
-				mx = smart.Collect()
+				mx = collr.Collect()
 			}
 
 			assert.Equal(t, test.wantMetrics, mx)
 
-			assert.Len(t, *smart.Charts(), test.wantCharts, "wantCharts")
+			assert.Len(t, *collr.Charts(), test.wantCharts, "wantCharts")
 
-			module.TestMetricsHasAllChartsDims(t, smart.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }

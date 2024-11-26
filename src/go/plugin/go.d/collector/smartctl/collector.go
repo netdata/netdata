@@ -13,8 +13,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-
-	"github.com/tidwall/gjson"
 )
 
 //go:embed "config_schema.json"
@@ -31,8 +29,8 @@ func init() {
 	})
 }
 
-func New() *Smartctl {
-	return &Smartctl{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout:          confopt.Duration(time.Second * 5),
 			ScanEvery:        confopt.Duration(time.Minute * 15),
@@ -63,59 +61,53 @@ type (
 	}
 )
 
-type (
-	Smartctl struct {
-		module.Base
-		Config `yaml:",inline" data:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" data:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec smartctlCli
+	exec smartctlCli
 
-		deviceSr matcher.Matcher
+	deviceSr matcher.Matcher
 
-		lastScanTime   time.Time
-		forceScan      bool
-		scannedDevices map[string]*scanDevice
+	lastScanTime   time.Time
+	forceScan      bool
+	scannedDevices map[string]*scanDevice
 
-		lastDevicePollTime time.Time
-		forceDevicePoll    bool
+	lastDevicePollTime time.Time
+	forceDevicePoll    bool
 
-		seenDevices map[string]bool
-		mx          map[string]int64
-	}
-	smartctlCli interface {
-		scan(open bool) (*gjson.Result, error)
-		deviceInfo(deviceName, deviceType, powerMode string) (*gjson.Result, error)
-	}
-)
-
-func (s *Smartctl) Configuration() any {
-	return s.Config
+	seenDevices map[string]bool
+	mx          map[string]int64
 }
 
-func (s *Smartctl) Init() error {
-	if err := s.validateConfig(); err != nil {
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %s", err)
 	}
 
-	sr, err := s.initDeviceSelector()
+	sr, err := c.initDeviceSelector()
 	if err != nil {
 		return fmt.Errorf("device selector initialization: %v", err)
 	}
-	s.deviceSr = sr
+	c.deviceSr = sr
 
-	smartctlExec, err := s.initSmartctlCli()
+	smartctlExec, err := c.initSmartctlCli()
 	if err != nil {
 		return fmt.Errorf("smartctl exec initialization: %v", err)
 	}
-	s.exec = smartctlExec
+	c.exec = smartctlExec
 
 	return nil
 }
 
-func (s *Smartctl) Check() error {
-	mx, err := s.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -127,14 +119,14 @@ func (s *Smartctl) Check() error {
 	return nil
 }
 
-func (s *Smartctl) Charts() *module.Charts {
-	return s.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (s *Smartctl) Collect() map[string]int64 {
-	mx, err := s.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		s.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -144,4 +136,4 @@ func (s *Smartctl) Collect() map[string]int64 {
 	return mx
 }
 
-func (s *Smartctl) Cleanup() {}
+func (c *Collector) Cleanup() {}

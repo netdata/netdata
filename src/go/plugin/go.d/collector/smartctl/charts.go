@@ -173,34 +173,34 @@ var (
 	}
 )
 
-func (s *Smartctl) addDeviceCharts(dev *smartDevice) {
+func (c *Collector) addDeviceCharts(dev *smartDevice) {
 	charts := module.Charts{}
 
-	if cs := s.newDeviceCharts(dev); cs != nil && len(*cs) > 0 {
+	if cs := c.newDeviceCharts(dev); cs != nil && len(*cs) > 0 {
 		if err := charts.Add(*cs...); err != nil {
-			s.Warning(err)
+			c.Warning(err)
 		}
 	}
-	if cs := s.newDeviceSmartAttrCharts(dev); cs != nil && len(*cs) > 0 {
+	if cs := c.newDeviceSmartAttrCharts(dev); cs != nil && len(*cs) > 0 {
 		if err := charts.Add(*cs...); err != nil {
-			s.Warning(err)
+			c.Warning(err)
 		}
 	}
-	if cs := s.newDeviceScsiErrorLogCharts(dev); cs != nil && len(*cs) > 0 {
+	if cs := c.newDeviceScsiErrorLogCharts(dev); cs != nil && len(*cs) > 0 {
 		if err := charts.Add(*cs...); err != nil {
-			s.Warning(err)
+			c.Warning(err)
 		}
 	}
 
-	if err := s.Charts().Add(charts...); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (s *Smartctl) removeDeviceCharts(scanDev *scanDevice) {
+func (c *Collector) removeDeviceCharts(scanDev *scanDevice) {
 	px := fmt.Sprintf("device_%s_%s_", scanDev.shortName(), scanDev.typ)
 
-	for _, chart := range *s.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
@@ -208,7 +208,7 @@ func (s *Smartctl) removeDeviceCharts(scanDev *scanDevice) {
 	}
 }
 
-func (s *Smartctl) newDeviceCharts(dev *smartDevice) *module.Charts {
+func (c *Collector) newDeviceCharts(dev *smartDevice) *module.Charts {
 
 	charts := deviceChartsTmpl.Copy()
 
@@ -244,7 +244,7 @@ func (s *Smartctl) newDeviceCharts(dev *smartDevice) *module.Charts {
 	return charts
 }
 
-func (s *Smartctl) newDeviceSmartAttrCharts(dev *smartDevice) *module.Charts {
+func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice) *module.Charts {
 	attrs, ok := dev.ataSmartAttributeTable()
 	if !ok {
 		return nil
@@ -287,14 +287,14 @@ func (s *Smartctl) newDeviceSmartAttrCharts(dev *smartDevice) *module.Charts {
 		}
 
 		if err := charts.Add(cs...); err != nil {
-			s.Warning(err)
+			c.Warning(err)
 		}
 	}
 
 	return &charts
 }
 
-func (s *Smartctl) newDeviceScsiErrorLogCharts(dev *smartDevice) *module.Charts {
+func (c *Collector) newDeviceScsiErrorLogCharts(dev *smartDevice) *module.Charts {
 	if dev.deviceType() != "scsi" || !dev.data.Get("scsi_error_counter_log").Exists() {
 		return nil
 	}
