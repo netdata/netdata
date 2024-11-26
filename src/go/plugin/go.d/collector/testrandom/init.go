@@ -8,29 +8,29 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-func (tr *TestRandom) validateConfig() error {
-	if tr.Config.Charts.Num <= 0 && tr.Config.HiddenCharts.Num <= 0 {
+func (c *Collector) validateConfig() error {
+	if c.Config.Charts.Num <= 0 && c.Config.HiddenCharts.Num <= 0 {
 		return errors.New("'charts->num' or `hidden_charts->num` must be > 0")
 	}
-	if tr.Config.Charts.Num > 0 && tr.Config.Charts.Dims <= 0 {
+	if c.Config.Charts.Num > 0 && c.Config.Charts.Dims <= 0 {
 		return errors.New("'charts->dimensions' must be > 0")
 	}
-	if tr.Config.HiddenCharts.Num > 0 && tr.Config.HiddenCharts.Dims <= 0 {
+	if c.Config.HiddenCharts.Num > 0 && c.Config.HiddenCharts.Dims <= 0 {
 		return errors.New("'hidden_charts->dimensions' must be > 0")
 	}
 	return nil
 }
 
-func (tr *TestRandom) initCharts() (*module.Charts, error) {
+func (c *Collector) initCharts() (*module.Charts, error) {
 	charts := &module.Charts{}
 
 	var ctx int
-	v := calcContextEvery(tr.Config.Charts.Num, tr.Config.Charts.Contexts)
-	for i := 0; i < tr.Config.Charts.Num; i++ {
-		if i != 0 && v != 0 && ctx < (tr.Config.Charts.Contexts-1) && i%v == 0 {
+	v := calcContextEvery(c.Config.Charts.Num, c.Config.Charts.Contexts)
+	for i := 0; i < c.Config.Charts.Num; i++ {
+		if i != 0 && v != 0 && ctx < (c.Config.Charts.Contexts-1) && i%v == 0 {
 			ctx++
 		}
-		chart := newChart(i, ctx, tr.Config.Charts.Labels, module.ChartType(tr.Config.Charts.Type))
+		chart := newChart(i, ctx, c.Config.Charts.Labels, module.ChartType(c.Config.Charts.Type))
 
 		if err := charts.Add(chart); err != nil {
 			return nil, err
@@ -38,12 +38,12 @@ func (tr *TestRandom) initCharts() (*module.Charts, error) {
 	}
 
 	ctx = 0
-	v = calcContextEvery(tr.Config.HiddenCharts.Num, tr.Config.HiddenCharts.Contexts)
-	for i := 0; i < tr.Config.HiddenCharts.Num; i++ {
-		if i != 0 && v != 0 && ctx < (tr.Config.HiddenCharts.Contexts-1) && i%v == 0 {
+	v = calcContextEvery(c.Config.HiddenCharts.Num, c.Config.HiddenCharts.Contexts)
+	for i := 0; i < c.Config.HiddenCharts.Num; i++ {
+		if i != 0 && v != 0 && ctx < (c.Config.HiddenCharts.Contexts-1) && i%v == 0 {
 			ctx++
 		}
-		chart := newHiddenChart(i, ctx, tr.Config.HiddenCharts.Labels, module.ChartType(tr.Config.HiddenCharts.Type))
+		chart := newHiddenChart(i, ctx, c.Config.HiddenCharts.Labels, module.ChartType(c.Config.HiddenCharts.Type))
 
 		if err := charts.Add(chart); err != nil {
 			return nil, err

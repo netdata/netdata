@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *TestRandom {
-	return &TestRandom{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Charts: ConfigCharts{
 				Num:  1,
@@ -59,7 +59,7 @@ type (
 	}
 )
 
-type TestRandom struct {
+type Collector struct {
 	module.Base // should be embedded by every module
 	Config      `yaml:",inline"`
 
@@ -68,36 +68,36 @@ type TestRandom struct {
 	collectedDims map[string]bool
 }
 
-func (tr *TestRandom) Configuration() any {
-	return tr.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (tr *TestRandom) Init() error {
-	err := tr.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	charts, err := tr.initCharts()
+	charts, err := c.initCharts()
 	if err != nil {
 		return fmt.Errorf("charts init: %v", err)
 	}
-	tr.charts = charts
+	c.charts = charts
 	return nil
 }
 
-func (tr *TestRandom) Check() error {
+func (c *Collector) Check() error {
 	return nil
 }
 
-func (tr *TestRandom) Charts() *module.Charts {
-	return tr.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (tr *TestRandom) Collect() map[string]int64 {
-	mx, err := tr.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		tr.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -106,4 +106,4 @@ func (tr *TestRandom) Collect() map[string]int64 {
 	return mx
 }
 
-func (tr *TestRandom) Cleanup() {}
+func (c *Collector) Cleanup() {}

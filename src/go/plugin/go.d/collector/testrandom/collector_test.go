@@ -26,15 +26,15 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestTestRandom_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &TestRandom{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
-	assert.IsType(t, (*TestRandom)(nil), New())
+	assert.IsType(t, (*Collector)(nil), New())
 }
 
-func TestTestRandom_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -105,21 +105,21 @@ func TestTestRandom_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tr := New()
-			tr.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, tr.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, tr.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestTestRandom_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *TestRandom
+		prepare  func() *Collector
 		wantFail bool
 	}{
 		"success on default":                            {prepare: prepareTRDefault},
@@ -130,58 +130,58 @@ func TestTestRandom_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tr := test.prepare()
-			require.NoError(t, tr.Init())
+			collr := test.prepare()
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, tr.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, tr.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestTestRandom_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	tests := map[string]struct {
-		prepare func(t *testing.T) *TestRandom
+		prepare func(t *testing.T) *Collector
 		wantNil bool
 	}{
 		"not initialized collector": {
 			wantNil: true,
-			prepare: func(t *testing.T) *TestRandom {
+			prepare: func(t *testing.T) *Collector {
 				return New()
 			},
 		},
 		"initialized collector": {
-			prepare: func(t *testing.T) *TestRandom {
-				tr := New()
-				require.NoError(t, tr.Init())
-				return tr
+			prepare: func(t *testing.T) *Collector {
+				collr := New()
+				require.NoError(t, collr.Init())
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tr := test.prepare(t)
+			collr := test.prepare(t)
 
 			if test.wantNil {
-				assert.Nil(t, tr.Charts())
+				assert.Nil(t, collr.Charts())
 			} else {
-				assert.NotNil(t, tr.Charts())
+				assert.NotNil(t, collr.Charts())
 			}
 		})
 	}
 }
 
-func TestTestRandom_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestTestRandom_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() *TestRandom
+		prepare       func() *Collector
 		wantCollected map[string]int64
 	}{
 		"default config": {
@@ -252,22 +252,22 @@ func TestTestRandom_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tr := test.prepare()
-			require.NoError(t, tr.Init())
+			collr := test.prepare()
+			require.NoError(t, collr.Init())
 
-			mx := tr.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
-			module.TestMetricsHasAllChartsDims(t, tr.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }
 
-func prepareTRDefault() *TestRandom {
+func prepareTRDefault() *Collector {
 	return prepareTR(New().Config)
 }
 
-func prepareTROnlyCharts() *TestRandom {
+func prepareTROnlyCharts() *Collector {
 	return prepareTR(Config{
 		Charts: ConfigCharts{
 			Num:  2,
@@ -276,7 +276,7 @@ func prepareTROnlyCharts() *TestRandom {
 	})
 }
 
-func prepareTROnlyHiddenCharts() *TestRandom {
+func prepareTROnlyHiddenCharts() *Collector {
 	return prepareTR(Config{
 		HiddenCharts: ConfigCharts{
 			Num:  2,
@@ -285,7 +285,7 @@ func prepareTROnlyHiddenCharts() *TestRandom {
 	})
 }
 
-func prepareTRChartsAndHiddenCharts() *TestRandom {
+func prepareTRChartsAndHiddenCharts() *Collector {
 	return prepareTR(Config{
 		Charts: ConfigCharts{
 			Num:  2,
@@ -298,9 +298,9 @@ func prepareTRChartsAndHiddenCharts() *TestRandom {
 	})
 }
 
-func prepareTR(cfg Config) *TestRandom {
-	tr := New()
-	tr.Config = cfg
-	tr.randInt = func() int64 { return 1 }
-	return tr
+func prepareTR(cfg Config) *Collector {
+	collr := New()
+	collr.Config = cfg
+	collr.randInt = func() int64 { return 1 }
+	return collr
 }
