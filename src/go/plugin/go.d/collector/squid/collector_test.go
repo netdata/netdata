@@ -31,11 +31,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestSquid_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Squid{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestSquid_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -56,26 +56,26 @@ func TestSquid_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			squid := New()
-			squid.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, squid.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, squid.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestSquid_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestSquid_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (*Squid, func())
+		prepare  func(t *testing.T) (*Collector, func())
 	}{
 		"success case": {
 			wantFail: false,
@@ -97,21 +97,21 @@ func TestSquid_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			squid, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, squid.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, squid.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestSquid_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func(t *testing.T) (*Squid, func())
+		prepare     func(t *testing.T) (*Collector, func())
 		wantMetrics map[string]int64
 		wantCharts  int
 	}{
@@ -144,22 +144,22 @@ func TestSquid_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			squid, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := squid.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				assert.Equal(t, test.wantCharts, len(*squid.Charts()))
-				module.TestMetricsHasAllChartsDims(t, squid.Charts(), mx)
+				assert.Equal(t, test.wantCharts, len(*collr.Charts()))
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareCaseSuccess(t *testing.T) (*Squid, func()) {
+func prepareCaseSuccess(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -171,14 +171,14 @@ func prepareCaseSuccess(t *testing.T) (*Squid, func()) {
 			}
 		}))
 
-	squid := New()
-	squid.URL = srv.URL
-	require.NoError(t, squid.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return squid, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseUnexpectedResponse(t *testing.T) (*Squid, func()) {
+func prepareCaseUnexpectedResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	resp := []byte(`
 Lorem ipsum dolor sit amet, consectetur adipiscing elit.
@@ -190,14 +190,14 @@ Fusce et felis pulvinar, posuere sem non, porttitor eros.`)
 			_, _ = w.Write(resp)
 		}))
 
-	squid := New()
-	squid.URL = srv.URL
-	require.NoError(t, squid.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return squid, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseEmptyResponse(t *testing.T) (*Squid, func()) {
+func prepareCaseEmptyResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	resp := []byte(``)
 
@@ -206,18 +206,18 @@ func prepareCaseEmptyResponse(t *testing.T) (*Squid, func()) {
 			_, _ = w.Write(resp)
 		}))
 
-	squid := New()
-	squid.URL = srv.URL
-	require.NoError(t, squid.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return squid, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseConnectionRefused(t *testing.T) (*Squid, func()) {
+func prepareCaseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	squid := New()
-	squid.URL = "http://127.0.0.1:65001"
-	require.NoError(t, squid.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	require.NoError(t, collr.Init())
 
-	return squid, func() {}
+	return collr, func() {}
 }

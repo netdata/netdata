@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Squid {
-	return &Squid{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -46,7 +46,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Squid struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -55,29 +55,29 @@ type Squid struct {
 	httpClient *http.Client
 }
 
-func (s *Squid) Configuration() any {
-	return s.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (s *Squid) Init() error {
-	if s.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("config: url not set")
 	}
 
-	client, err := web.NewHTTPClient(s.ClientConfig)
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init http client: %w", err)
 	}
-	s.httpClient = client
+	c.httpClient = client
 
-	s.Debugf("using URL %s", s.URL)
-	s.Debugf("using timeout: %s", s.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (s *Squid) Check() error {
-	mx, err := s.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -89,14 +89,14 @@ func (s *Squid) Check() error {
 	return nil
 }
 
-func (s *Squid) Charts() *module.Charts {
-	return s.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (s *Squid) Collect() map[string]int64 {
-	mx, err := s.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		s.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -106,8 +106,8 @@ func (s *Squid) Collect() map[string]int64 {
 	return mx
 }
 
-func (s *Squid) Cleanup() {
-	if s.httpClient != nil {
-		s.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }
