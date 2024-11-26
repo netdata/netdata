@@ -11,8 +11,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-
-	probing "github.com/prometheus-community/pro-bing"
 )
 
 //go:embed "config_schema.json"
@@ -29,8 +27,8 @@ func init() {
 	})
 }
 
-func New() *Ping {
-	return &Ping{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Network:     "ip",
 			Privileged:  true,
@@ -54,44 +52,39 @@ type Config struct {
 	Interface   string           `yaml:"interface,omitempty" json:"interface"`
 }
 
-type (
-	Ping struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		prober    prober
-		newProber func(pingProberConfig, *logger.Logger) prober
+	prober    prober
+	newProber func(pingProberConfig, *logger.Logger) prober
 
-		hosts map[string]bool
-	}
-	prober interface {
-		ping(host string) (*probing.Statistics, error)
-	}
-)
-
-func (p *Ping) Configuration() any {
-	return p.Config
+	hosts map[string]bool
 }
 
-func (p *Ping) Init() error {
-	err := p.validateConfig()
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	pr, err := p.initProber()
+	pr, err := c.initProber()
 	if err != nil {
 		return fmt.Errorf("init prober: %v", err)
 	}
-	p.prober = pr
+	c.prober = pr
 
 	return nil
 }
 
-func (p *Ping) Check() error {
-	mx, err := p.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -102,14 +95,14 @@ func (p *Ping) Check() error {
 	return nil
 }
 
-func (p *Ping) Charts() *module.Charts {
-	return p.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (p *Ping) Collect() map[string]int64 {
-	mx, err := p.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -118,4 +111,4 @@ func (p *Ping) Collect() map[string]int64 {
 	return mx
 }
 
-func (p *Ping) Cleanup() {}
+func (c *Collector) Cleanup() {}

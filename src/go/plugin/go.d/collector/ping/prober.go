@@ -11,6 +11,10 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 )
 
+type prober interface {
+	ping(host string) (*probing.Statistics, error)
+}
+
 func newPingProber(conf pingProberConfig, log *logger.Logger) prober {
 	return &pingProber{
 		network:       conf.network,

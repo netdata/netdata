@@ -30,11 +30,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestPing_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Ping{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestPing_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -54,31 +54,31 @@ func TestPing_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ping := New()
-			ping.Config = test.config
-			ping.UpdateEvery = 1
+			collr := New()
+			collr.Config = test.config
+			collr.UpdateEvery = 1
 
 			if test.wantFail {
-				assert.Error(t, ping.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, ping.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestPing_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestPing_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestPing_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) *Ping
+		prepare  func(t *testing.T) *Collector
 	}{
 		"success when ping does not return an error": {
 			wantFail: false,
@@ -92,20 +92,20 @@ func TestPing_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ping := test.prepare(t)
+			collr := test.prepare(t)
 
 			if test.wantFail {
-				assert.Error(t, ping.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, ping.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestPing_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func(t *testing.T) *Ping
+		prepare       func(t *testing.T) *Collector
 		wantMetrics   map[string]int64
 		wantNumCharts int
 	}{
@@ -145,39 +145,39 @@ func TestPing_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ping := test.prepare(t)
+			collr := test.prepare(t)
 
-			mx := ping.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				assert.Len(t, *ping.Charts(), test.wantNumCharts)
+				assert.Len(t, *collr.Charts(), test.wantNumCharts)
 			}
 		})
 	}
 }
 
-func casePingSuccess(t *testing.T) *Ping {
-	ping := New()
-	ping.UpdateEvery = 1
-	ping.Hosts = []string{"192.0.2.1", "192.0.2.2", "example.com"}
-	ping.newProber = func(_ pingProberConfig, _ *logger.Logger) prober {
+func casePingSuccess(t *testing.T) *Collector {
+	collr := New()
+	collr.UpdateEvery = 1
+	collr.Hosts = []string{"192.0.2.1", "192.0.2.2", "example.com"}
+	collr.newProber = func(_ pingProberConfig, _ *logger.Logger) prober {
 		return &mockProber{}
 	}
-	require.NoError(t, ping.Init())
-	return ping
+	require.NoError(t, collr.Init())
+	return collr
 }
 
-func casePingError(t *testing.T) *Ping {
-	ping := New()
-	ping.UpdateEvery = 1
-	ping.Hosts = []string{"192.0.2.1", "192.0.2.2", "example.com"}
-	ping.newProber = func(_ pingProberConfig, _ *logger.Logger) prober {
+func casePingError(t *testing.T) *Collector {
+	collr := New()
+	collr.UpdateEvery = 1
+	collr.Hosts = []string{"192.0.2.1", "192.0.2.2", "example.com"}
+	collr.newProber = func(_ pingProberConfig, _ *logger.Logger) prober {
 		return &mockProber{errOnPing: true}
 	}
-	require.NoError(t, ping.Init())
-	return ping
+	require.NoError(t, collr.Init())
+	return collr
 }
 
 type mockProber struct {
