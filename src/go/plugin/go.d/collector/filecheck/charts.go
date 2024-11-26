@@ -107,84 +107,84 @@ var (
 	}
 )
 
-func (f *Filecheck) updateFileCharts(infos []*statInfo) {
+func (c *Collector) updateFileCharts(infos []*statInfo) {
 	seen := make(map[string]bool)
 
 	for _, info := range infos {
 		seen[info.path] = true
 
-		sf := f.seenFiles.getp(info.path)
+		sf := c.seenFiles.getp(info.path)
 
 		if !sf.hasExistenceCharts {
 			sf.hasExistenceCharts = true
-			f.addFileCharts(info.path,
+			c.addFileCharts(info.path,
 				fileExistenceStatusChartTmpl.Copy(),
 			)
 		}
 
 		if !sf.hasOtherCharts && info.fi != nil {
 			sf.hasOtherCharts = true
-			f.addFileCharts(info.path,
+			c.addFileCharts(info.path,
 				fileModificationTimeAgoChartTmpl.Copy(),
 				fileSizeChartTmpl.Copy(),
 			)
 
 		} else if sf.hasOtherCharts && info.fi == nil {
 			sf.hasOtherCharts = false
-			f.removeFileOtherCharts(info.path)
+			c.removeFileOtherCharts(info.path)
 		}
 	}
 
-	for path := range f.seenFiles.items {
+	for path := range c.seenFiles.items {
 		if !seen[path] {
-			delete(f.seenFiles.items, path)
-			f.removeFileAllCharts(path)
+			delete(c.seenFiles.items, path)
+			c.removeFileAllCharts(path)
 		}
 	}
 }
 
-func (f *Filecheck) updateDirCharts(infos []*statInfo) {
+func (c *Collector) updateDirCharts(infos []*statInfo) {
 	seen := make(map[string]bool)
 
 	for _, info := range infos {
 		seen[info.path] = true
 
-		sd := f.seenDirs.getp(info.path)
+		sd := c.seenDirs.getp(info.path)
 
 		if !sd.hasExistenceCharts {
 			sd.hasExistenceCharts = true
-			f.addDirCharts(info.path,
+			c.addDirCharts(info.path,
 				dirExistenceStatusChartTmpl.Copy(),
 			)
 		}
 
 		if !sd.hasOtherCharts && info.fi != nil {
 			sd.hasOtherCharts = true
-			f.addDirCharts(info.path,
+			c.addDirCharts(info.path,
 				dirModificationTimeAgoChartTmpl.Copy(),
 				dirFilesCountChartTmpl.Copy(),
 			)
-			if f.Dirs.CollectDirSize {
-				f.addDirCharts(info.path,
+			if c.Dirs.CollectDirSize {
+				c.addDirCharts(info.path,
 					dirSizeChartTmpl.Copy(),
 				)
 			}
 
 		} else if sd.hasOtherCharts && info.fi == nil {
 			sd.hasOtherCharts = false
-			f.removeDirOtherCharts(info.path)
+			c.removeDirOtherCharts(info.path)
 		}
 	}
 
-	for path := range f.seenDirs.items {
+	for path := range c.seenDirs.items {
 		if !seen[path] {
-			delete(f.seenDirs.items, path)
-			f.removeDirAllCharts(path)
+			delete(c.seenDirs.items, path)
+			c.removeDirAllCharts(path)
 		}
 	}
 }
 
-func (f *Filecheck) addFileCharts(filePath string, chartsTmpl ...*module.Chart) {
+func (c *Collector) addFileCharts(filePath string, chartsTmpl ...*module.Chart) {
 	cs := append(module.Charts{}, chartsTmpl...)
 	charts := cs.Copy()
 
@@ -198,12 +198,12 @@ func (f *Filecheck) addFileCharts(filePath string, chartsTmpl ...*module.Chart) 
 		}
 	}
 
-	if err := f.Charts().Add(*charts...); err != nil {
-		f.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (f *Filecheck) addDirCharts(dirPath string, chartsTmpl ...*module.Chart) {
+func (c *Collector) addDirCharts(dirPath string, chartsTmpl ...*module.Chart) {
 	cs := append(module.Charts{}, chartsTmpl...)
 	charts := cs.Copy()
 
@@ -217,41 +217,41 @@ func (f *Filecheck) addDirCharts(dirPath string, chartsTmpl ...*module.Chart) {
 		}
 	}
 
-	if err := f.Charts().Add(*charts...); err != nil {
-		f.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (f *Filecheck) removeFileAllCharts(filePath string) {
+func (c *Collector) removeFileAllCharts(filePath string) {
 	px := fmt.Sprintf("file_%s_", cleanPath(filePath))
-	f.removeCharts(func(id string) bool {
+	c.removeCharts(func(id string) bool {
 		return strings.HasPrefix(id, px)
 	})
 }
 
-func (f *Filecheck) removeFileOtherCharts(filePath string) {
+func (c *Collector) removeFileOtherCharts(filePath string) {
 	px := fmt.Sprintf("file_%s_", cleanPath(filePath))
-	f.removeCharts(func(id string) bool {
+	c.removeCharts(func(id string) bool {
 		return strings.HasPrefix(id, px) && !strings.HasSuffix(id, "existence_status")
 	})
 }
 
-func (f *Filecheck) removeDirAllCharts(dirPath string) {
+func (c *Collector) removeDirAllCharts(dirPath string) {
 	px := fmt.Sprintf("dir_%s_", cleanPath(dirPath))
-	f.removeCharts(func(id string) bool {
+	c.removeCharts(func(id string) bool {
 		return strings.HasPrefix(id, px)
 	})
 }
 
-func (f *Filecheck) removeDirOtherCharts(dirPath string) {
+func (c *Collector) removeDirOtherCharts(dirPath string) {
 	px := fmt.Sprintf("dir_%s_", cleanPath(dirPath))
-	f.removeCharts(func(id string) bool {
+	c.removeCharts(func(id string) bool {
 		return strings.HasPrefix(id, px) && !strings.HasSuffix(id, "existence_status")
 	})
 }
 
-func (f *Filecheck) removeCharts(match func(id string) bool) {
-	for _, chart := range *f.Charts() {
+func (c *Collector) removeCharts(match func(id string) bool) {
+	for _, chart := range *c.Charts() {
 		if match(chart.ID) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

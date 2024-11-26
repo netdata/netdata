@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *Filecheck {
-	return &Filecheck{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			DiscoveryEvery: confopt.Duration(time.Minute * 1),
 			Files:          filesConfig{},
@@ -57,7 +57,7 @@ type (
 	}
 )
 
-type Filecheck struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -74,46 +74,46 @@ type Filecheck struct {
 	seenDirs         *seenItems
 }
 
-func (f *Filecheck) Configuration() any {
-	return f.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (f *Filecheck) Init() error {
-	err := f.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	ff, err := f.initFilesFilter()
+	ff, err := c.initFilesFilter()
 	if err != nil {
 		return fmt.Errorf("files filter initialization: %v", err)
 	}
-	f.filesFilter = ff
+	c.filesFilter = ff
 
-	df, err := f.initDirsFilter()
+	df, err := c.initDirsFilter()
 	if err != nil {
 		return fmt.Errorf("dirs filter initialization: %v", err)
 	}
-	f.dirsFilter = df
+	c.dirsFilter = df
 
-	f.Debugf("monitored files: %v", f.Files.Include)
-	f.Debugf("monitored dirs: %v", f.Dirs.Include)
+	c.Debugf("monitored files: %v", c.Files.Include)
+	c.Debugf("monitored dirs: %v", c.Dirs.Include)
 
 	return nil
 }
 
-func (f *Filecheck) Check() error {
+func (c *Collector) Check() error {
 	return nil
 }
 
-func (f *Filecheck) Charts() *module.Charts {
-	return f.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (f *Filecheck) Collect() map[string]int64 {
-	mx, err := f.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		f.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -123,4 +123,4 @@ func (f *Filecheck) Collect() map[string]int64 {
 	return mx
 }
 
-func (f *Filecheck) Cleanup() {}
+func (c *Collector) Cleanup() {}

@@ -8,19 +8,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
-func (f *Filecheck) validateConfig() error {
-	if len(f.Files.Include) == 0 && len(f.Dirs.Include) == 0 {
+func (c *Collector) validateConfig() error {
+	if len(c.Files.Include) == 0 && len(c.Dirs.Include) == 0 {
 		return errors.New("both 'files->include' and 'dirs->include' are empty")
 	}
 	return nil
 }
 
-func (f *Filecheck) initFilesFilter() (matcher.Matcher, error) {
-	return newFilter(f.Files.Exclude)
+func (c *Collector) initFilesFilter() (matcher.Matcher, error) {
+	return newFilter(c.Files.Exclude)
 }
 
-func (f *Filecheck) initDirsFilter() (matcher.Matcher, error) {
-	return newFilter(f.Dirs.Exclude)
+func (c *Collector) initDirsFilter() (matcher.Matcher, error) {
+	return newFilter(c.Dirs.Exclude)
 }
 
 func newFilter(patterns []string) (matcher.Matcher, error) {

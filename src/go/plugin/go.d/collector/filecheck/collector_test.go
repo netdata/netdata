@@ -27,15 +27,15 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestFilecheck_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Filecheck{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestFilecheck_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestFilecheck_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -96,21 +96,21 @@ func TestFilecheck_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			fc := New()
-			fc.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, fc.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				require.NoError(t, fc.Init())
+				require.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestFilecheck_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Filecheck
+		prepare func() *Collector
 	}{
 		"collect files":                   {prepare: prepareFilecheckFiles},
 		"collect files filepath pattern":  {prepare: prepareFilecheckGlobFiles},
@@ -123,18 +123,18 @@ func TestFilecheck_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			fc := test.prepare()
-			require.NoError(t, fc.Init())
+			collr := test.prepare()
+			require.NoError(t, collr.Init())
 
-			assert.NoError(t, fc.Check())
+			assert.NoError(t, collr.Check())
 		})
 	}
 }
 
-func TestFilecheck_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	// TODO: should use TEMP dir and create files/dirs dynamically during a test case
 	tests := map[string]struct {
-		prepare       func() *Filecheck
+		prepare       func() *Collector
 		wantCollected map[string]int64
 	}{
 		"collect files": {
@@ -238,94 +238,94 @@ func TestFilecheck_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			fc := test.prepare()
-			require.NoError(t, fc.Init())
+			collr := test.prepare()
+			require.NoError(t, collr.Init())
 
-			mx := fc.Collect()
+			mx := collr.Collect()
 
 			copyModTime(test.wantCollected, mx)
 
 			assert.Equal(t, test.wantCollected, mx)
 
-			module.TestMetricsHasAllChartsDims(t, fc.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }
 
-func prepareFilecheckFiles() *Filecheck {
-	fc := New()
-	fc.Config.Files.Include = []string{
+func prepareFilecheckFiles() *Collector {
+	collr := New()
+	collr.Config.Files.Include = []string{
 		"testdata/empty_file.log",
 		"testdata/file.log",
 		"testdata/non_existent_file.log",
 	}
-	return fc
+	return collr
 }
 
-func prepareFilecheckGlobFiles() *Filecheck {
-	fc := New()
-	fc.Config.Files.Include = []string{
+func prepareFilecheckGlobFiles() *Collector {
+	collr := New()
+	collr.Config.Files.Include = []string{
 		"testdata/*.log",
 	}
-	return fc
+	return collr
 }
 
-func prepareFilecheckNonExistentFiles() *Filecheck {
-	fc := New()
-	fc.Config.Files.Include = []string{
+func prepareFilecheckNonExistentFiles() *Collector {
+	collr := New()
+	collr.Config.Files.Include = []string{
 		"testdata/non_existent_file.log",
 	}
-	return fc
+	return collr
 }
 
-func prepareFilecheckDirs() *Filecheck {
-	fc := New()
-	fc.Config.Dirs.Include = []string{
+func prepareFilecheckDirs() *Collector {
+	collr := New()
+	collr.Config.Dirs.Include = []string{
 		"testdata/dir",
 		"testdata/non_existent_dir",
 	}
-	return fc
+	return collr
 }
 
-func prepareFilecheckGlobDirs() *Filecheck {
-	fc := New()
-	fc.Config.Dirs.Include = []string{
+func prepareFilecheckGlobDirs() *Collector {
+	collr := New()
+	collr.Config.Dirs.Include = []string{
 		"testdata/*ir",
 		"testdata/non_existent_dir",
 	}
-	return fc
+	return collr
 }
 
-func prepareFilecheckDirsWithoutSize() *Filecheck {
-	fc := New()
-	fc.Config.Dirs.Include = []string{
+func prepareFilecheckDirsWithoutSize() *Collector {
+	collr := New()
+	collr.Config.Dirs.Include = []string{
 		"testdata/dir",
 		"testdata/non_existent_dir",
 	}
-	return fc
+	return collr
 }
 
-func prepareFilecheckNonExistentDirs() *Filecheck {
-	fc := New()
-	fc.Config.Dirs.Include = []string{
+func prepareFilecheckNonExistentDirs() *Collector {
+	collr := New()
+	collr.Config.Dirs.Include = []string{
 		"testdata/non_existent_dir",
 	}
-	return fc
+	return collr
 }
 
-func prepareFilecheckFilesDirs() *Filecheck {
-	fc := New()
-	fc.Config.Dirs.CollectDirSize = true
-	fc.Config.Files.Include = []string{
+func prepareFilecheckFilesDirs() *Collector {
+	collr := New()
+	collr.Config.Dirs.CollectDirSize = true
+	collr.Config.Files.Include = []string{
 		"testdata/empty_file.log",
 		"testdata/file.log",
 		"testdata/non_existent_file.log",
 	}
-	fc.Config.Dirs.Include = []string{
+	collr.Config.Dirs.Include = []string{
 		"testdata/dir",
 		"testdata/non_existent_dir",
 	}
-	return fc
+	return collr
 }
 
 func copyModTime(dst, src map[string]int64) {
