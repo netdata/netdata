@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *ActiveMQ {
-	return &ActiveMQ{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -56,7 +56,7 @@ type Config struct {
 	TopicsFilter   string `yaml:"topics_filter,omitempty" json:"topics_filter"`
 }
 
-type ActiveMQ struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -70,39 +70,39 @@ type ActiveMQ struct {
 	topicsFilter matcher.Matcher
 }
 
-func (a *ActiveMQ) Configuration() any {
-	return a.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (a *ActiveMQ) Init() error {
-	if err := a.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	qf, err := a.initQueuesFiler()
+	qf, err := c.initQueuesFiler()
 	if err != nil {
 		return fmt.Errorf("init queues filer: %v", err)
 	}
-	a.queuesFilter = qf
+	c.queuesFilter = qf
 
-	tf, err := a.initTopicsFilter()
+	tf, err := c.initTopicsFilter()
 	if err != nil {
 		return fmt.Errorf("init topics filter: %v", err)
 	}
-	a.topicsFilter = tf
+	c.topicsFilter = tf
 
-	client, err := web.NewHTTPClient(a.ClientConfig)
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("create http client: %v", err)
 	}
 
-	a.apiClient = newAPIClient(client, a.RequestConfig, a.Webadmin)
+	c.apiClient = newAPIClient(client, c.RequestConfig, c.Webadmin)
 
 	return nil
 }
 
-func (a *ActiveMQ) Check() error {
-	mx, err := a.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -113,21 +113,21 @@ func (a *ActiveMQ) Check() error {
 	return nil
 }
 
-func (a *ActiveMQ) Charts() *Charts {
-	return a.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (a *ActiveMQ) Cleanup() {
-	if a.apiClient != nil && a.apiClient.httpClient != nil {
-		a.apiClient.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.apiClient != nil && c.apiClient.httpClient != nil {
+		c.apiClient.httpClient.CloseIdleConnections()
 	}
 }
 
-func (a *ActiveMQ) Collect() map[string]int64 {
-	mx, err := a.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 
 	if err != nil {
-		a.Error(err)
+		c.Error(err)
 		return nil
 	}
 

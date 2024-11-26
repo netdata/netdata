@@ -30,8 +30,8 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestActiveMQ_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &ActiveMQ{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 var (
@@ -151,20 +151,20 @@ var (
 	}
 )
 
-func TestActiveMQ_Init(t *testing.T) {
-	job := New()
+func TestCollector_Init(t *testing.T) {
+	collr := New()
 
 	// NG case
-	job.Webadmin = ""
-	assert.Error(t, job.Init())
+	collr.Webadmin = ""
+	assert.Error(t, collr.Init())
 
 	// OK case
-	job.Webadmin = "webadmin"
-	assert.NoError(t, job.Init())
-	assert.NotNil(t, job.apiClient)
+	collr.Webadmin = "webadmin"
+	assert.NoError(t, collr.Init())
+	assert.NotNil(t, collr.apiClient)
 }
 
-func TestActiveMQ_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -177,23 +177,23 @@ func TestActiveMQ_Check(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
-	job.Webadmin = "webadmin"
+	collr := New()
+	collr.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
+	collr.Webadmin = "webadmin"
 
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 }
 
-func TestActiveMQ_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestActiveMQ_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestActiveMQ_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	var collectNum int
 	getQueues := func() string { return queuesData[collectNum] }
 	getTopics := func() string { return topicsData[collectNum] }
@@ -210,12 +210,12 @@ func TestActiveMQ_Collect(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
-	job.Webadmin = "webadmin"
+	collr := New()
+	collr.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
+	collr.Webadmin = "webadmin"
 
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	cases := []struct {
 		expected  map[string]int64
@@ -303,38 +303,38 @@ func TestActiveMQ_Collect(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		require.Equal(t, c.expected, job.Collect())
-		assert.Len(t, job.activeQueues, c.numQueues)
-		assert.Len(t, job.activeTopics, c.numTopics)
-		assert.Len(t, *job.charts, c.numCharts)
+		require.Equal(t, c.expected, collr.Collect())
+		assert.Len(t, collr.activeQueues, c.numQueues)
+		assert.Len(t, collr.activeTopics, c.numTopics)
+		assert.Len(t, *collr.charts, c.numCharts)
 		collectNum++
 	}
 }
 
-func TestActiveMQ_404(t *testing.T) {
+func TestCollector_404(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 	}))
 	defer ts.Close()
 
-	job := New()
-	job.Webadmin = "webadmin"
-	job.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
+	collr := New()
+	collr.Webadmin = "webadmin"
+	collr.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
 
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestActiveMQ_InvalidData(t *testing.T) {
+func TestCollector_InvalidData(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("hello and goodbye!"))
 	}))
 	defer ts.Close()
 
-	mod := New()
-	mod.Webadmin = "webadmin"
-	mod.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
+	collr := New()
+	collr.Webadmin = "webadmin"
+	collr.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
 
-	require.NoError(t, mod.Init())
-	assert.Error(t, mod.Check())
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
