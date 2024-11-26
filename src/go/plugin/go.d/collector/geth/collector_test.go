@@ -25,6 +25,6 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestGeth_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Geth{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }

@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Geth {
-	return &Geth{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -46,7 +46,7 @@ type Config struct {
 	UpdateEvery    int `yaml:"update_every" json:"update_every"`
 }
 
-type Geth struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -55,26 +55,26 @@ type Geth struct {
 	prom prometheus.Prometheus
 }
 
-func (g *Geth) Configuration() any {
-	return g.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (g *Geth) Init() error {
-	if err := g.validateConfig(); err != nil {
-		return fmt.Errorf("error on validating config: %g", err)
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
+		return fmt.Errorf("error on validating config: %v", err)
 	}
 
-	prom, err := g.initPrometheusClient()
+	prom, err := c.initPrometheusClient()
 	if err != nil {
-		return fmt.Errorf("error on initializing prometheus client: %g", err)
+		return fmt.Errorf("error on initializing prometheus client: %v", err)
 	}
-	g.prom = prom
+	c.prom = prom
 
 	return nil
 }
 
-func (g *Geth) Check() error {
-	mx, err := g.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -84,14 +84,14 @@ func (g *Geth) Check() error {
 	return nil
 }
 
-func (g *Geth) Charts() *Charts {
-	return g.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (g *Geth) Collect() map[string]int64 {
-	mx, err := g.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		g.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -100,8 +100,8 @@ func (g *Geth) Collect() map[string]int64 {
 	return mx
 }
 
-func (g *Geth) Cleanup() {
-	if g.prom != nil && g.prom.HTTPClient() != nil {
-		g.prom.HTTPClient().CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.prom != nil && c.prom.HTTPClient() != nil {
+		c.prom.HTTPClient().CloseIdleConnections()
 	}
 }
