@@ -31,65 +31,65 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestSquidLog_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &SquidLog{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
 	assert.Implements(t, (*module.Module)(nil), New())
 }
 
-func TestSquidLog_Init(t *testing.T) {
-	squidlog := New()
+func TestCollector_Init(t *testing.T) {
+	collr := New()
 
-	assert.NoError(t, squidlog.Init())
+	assert.NoError(t, collr.Init())
 }
 
-func TestSquidLog_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 }
 
-func TestSquidLog_Check_ErrorOnCreatingLogReaderNoLogFile(t *testing.T) {
-	squid := New()
-	defer squid.Cleanup()
-	squid.Path = "testdata/not_exists.log"
-	require.NoError(t, squid.Init())
+func TestCollector_Check_ErrorOnCreatingLogReaderNoLogFile(t *testing.T) {
+	collr := New()
+	defer collr.Cleanup()
+	collr.Path = "testdata/not_exists.log"
+	require.NoError(t, collr.Init())
 
-	assert.Error(t, squid.Check())
+	assert.Error(t, collr.Check())
 }
 
 func TestSquid_Check_ErrorOnCreatingParserUnknownFormat(t *testing.T) {
-	squid := New()
-	defer squid.Cleanup()
-	squid.Path = "testdata/unknown.log"
-	require.NoError(t, squid.Init())
+	collr := New()
+	defer collr.Cleanup()
+	collr.Path = "testdata/unknown.log"
+	require.NoError(t, collr.Init())
 
-	assert.Error(t, squid.Check())
+	assert.Error(t, collr.Check())
 }
 
 func TestSquid_Check_ErrorOnCreatingParserZeroKnownFields(t *testing.T) {
-	squid := New()
-	defer squid.Cleanup()
-	squid.Path = "testdata/access.log"
-	squid.ParserConfig.CSV.Format = "$one $two"
-	require.NoError(t, squid.Init())
+	collr := New()
+	defer collr.Cleanup()
+	collr.Path = "testdata/access.log"
+	collr.ParserConfig.CSV.Format = "$one $two"
+	require.NoError(t, collr.Init())
 
-	assert.Error(t, squid.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestSquidLog_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.Nil(t, New().Charts())
 
-	squid := prepareSquidCollect(t)
-	assert.NotNil(t, squid.Charts())
+	collr := prepareSquidCollect(t)
+	assert.NotNil(t, collr.Charts())
 
 }
 
-func TestSquidLog_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestSquidLog_Collect(t *testing.T) {
-	squid := prepareSquidCollect(t)
+func TestCollector_Collect(t *testing.T) {
+	collr := prepareSquidCollect(t)
 
 	expected := map[string]int64{
 		"bytes_sent":                                         6827357,
@@ -159,14 +159,14 @@ func TestSquidLog_Collect(t *testing.T) {
 		"unmatched":                                          16,
 	}
 
-	collected := squid.Collect()
+	collected := collr.Collect()
 
 	assert.Equal(t, expected, collected)
-	testCharts(t, squid, collected)
+	testCharts(t, collr, collected)
 }
 
-func TestSquidLog_Collect_ReturnOldDataIfNothingRead(t *testing.T) {
-	squid := prepareSquidCollect(t)
+func TestCollector_Collect_ReturnOldDataIfNothingRead(t *testing.T) {
+	collr := prepareSquidCollect(t)
 
 	expected := map[string]int64{
 		"bytes_sent":                                         6827357,
@@ -236,37 +236,37 @@ func TestSquidLog_Collect_ReturnOldDataIfNothingRead(t *testing.T) {
 		"unmatched":                                          16,
 	}
 
-	_ = squid.Collect()
+	_ = collr.Collect()
 
-	mx := squid.Collect()
+	mx := collr.Collect()
 
 	assert.Equal(t, expected, mx)
 
-	testCharts(t, squid, mx)
+	testCharts(t, collr, mx)
 }
 
-func testCharts(t *testing.T, squidlog *SquidLog, mx map[string]int64) {
+func testCharts(t *testing.T, collr *Collector, mx map[string]int64) {
 	t.Helper()
-	ensureChartsDynamicDimsCreated(t, squidlog)
-	module.TestMetricsHasAllChartsDims(t, squidlog.Charts(), mx)
+	ensureChartsDynamicDimsCreated(t, collr)
+	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
-func ensureChartsDynamicDimsCreated(t *testing.T, squid *SquidLog) {
-	ensureDynamicDimsCreated(t, squid, cacheCodeChart.ID, pxCacheCode, squid.mx.CacheCode)
-	ensureDynamicDimsCreated(t, squid, cacheCodeTransportTagChart.ID, pxTransportTag, squid.mx.CacheCodeTransportTag)
-	ensureDynamicDimsCreated(t, squid, cacheCodeHandlingTagChart.ID, pxHandlingTag, squid.mx.CacheCodeHandlingTag)
-	ensureDynamicDimsCreated(t, squid, cacheCodeObjectTagChart.ID, pxObjectTag, squid.mx.CacheCodeObjectTag)
-	ensureDynamicDimsCreated(t, squid, cacheCodeLoadSourceTagChart.ID, pxSourceTag, squid.mx.CacheCodeLoadSourceTag)
-	ensureDynamicDimsCreated(t, squid, cacheCodeErrorTagChart.ID, pxErrorTag, squid.mx.CacheCodeErrorTag)
-	ensureDynamicDimsCreated(t, squid, httpRespCodesChart.ID, pxHTTPCode, squid.mx.HTTPRespCode)
-	ensureDynamicDimsCreated(t, squid, reqMethodChart.ID, pxReqMethod, squid.mx.ReqMethod)
-	ensureDynamicDimsCreated(t, squid, hierCodeChart.ID, pxHierCode, squid.mx.HierCode)
-	ensureDynamicDimsCreated(t, squid, serverAddrChart.ID, pxSrvAddr, squid.mx.Server)
-	ensureDynamicDimsCreated(t, squid, mimeTypeChart.ID, pxMimeType, squid.mx.MimeType)
+func ensureChartsDynamicDimsCreated(t *testing.T, collr *Collector) {
+	ensureDynamicDimsCreated(t, collr, cacheCodeChart.ID, pxCacheCode, collr.mx.CacheCode)
+	ensureDynamicDimsCreated(t, collr, cacheCodeTransportTagChart.ID, pxTransportTag, collr.mx.CacheCodeTransportTag)
+	ensureDynamicDimsCreated(t, collr, cacheCodeHandlingTagChart.ID, pxHandlingTag, collr.mx.CacheCodeHandlingTag)
+	ensureDynamicDimsCreated(t, collr, cacheCodeObjectTagChart.ID, pxObjectTag, collr.mx.CacheCodeObjectTag)
+	ensureDynamicDimsCreated(t, collr, cacheCodeLoadSourceTagChart.ID, pxSourceTag, collr.mx.CacheCodeLoadSourceTag)
+	ensureDynamicDimsCreated(t, collr, cacheCodeErrorTagChart.ID, pxErrorTag, collr.mx.CacheCodeErrorTag)
+	ensureDynamicDimsCreated(t, collr, httpRespCodesChart.ID, pxHTTPCode, collr.mx.HTTPRespCode)
+	ensureDynamicDimsCreated(t, collr, reqMethodChart.ID, pxReqMethod, collr.mx.ReqMethod)
+	ensureDynamicDimsCreated(t, collr, hierCodeChart.ID, pxHierCode, collr.mx.HierCode)
+	ensureDynamicDimsCreated(t, collr, serverAddrChart.ID, pxSrvAddr, collr.mx.Server)
+	ensureDynamicDimsCreated(t, collr, mimeTypeChart.ID, pxMimeType, collr.mx.MimeType)
 }
 
-func ensureDynamicDimsCreated(t *testing.T, squid *SquidLog, chartID, dimPrefix string, data metrix.CounterVec) {
-	chart := squid.Charts().Get(chartID)
+func ensureDynamicDimsCreated(t *testing.T, collr *Collector, chartID, dimPrefix string, data metrix.CounterVec) {
+	chart := collr.Charts().Get(chartID)
 	assert.NotNilf(t, chart, "chart '%s' is not created", chartID)
 	if chart == nil {
 		return
@@ -277,18 +277,18 @@ func ensureDynamicDimsCreated(t *testing.T, squid *SquidLog, chartID, dimPrefix 
 	}
 }
 
-func prepareSquidCollect(t *testing.T) *SquidLog {
+func prepareSquidCollect(t *testing.T) *Collector {
 	t.Helper()
-	squid := New()
-	squid.Path = "testdata/access.log"
-	require.NoError(t, squid.Init())
-	require.NoError(t, squid.Check())
-	defer squid.Cleanup()
+	collr := New()
+	collr.Path = "testdata/access.log"
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
+	defer collr.Cleanup()
 
-	p, err := logs.NewCSVParser(squid.ParserConfig.CSV, bytes.NewReader(dataNativeFormatAccessLog))
+	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataNativeFormatAccessLog))
 	require.NoError(t, err)
-	squid.parser = p
-	return squid
+	collr.parser = p
+	return collr
 }
 
 // generateLogs is used to populate 'testdata/access.log'

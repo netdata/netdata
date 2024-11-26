@@ -21,8 +21,8 @@ func init() {
 	})
 }
 
-func New() *SquidLog {
-	return &SquidLog{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Path:        "/var/log/squid/access.log",
 			ExcludePath: "*.gz",
@@ -47,7 +47,7 @@ type Config struct {
 	logs.ParserConfig `yaml:",inline" json:""`
 }
 
-type SquidLog struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -60,41 +60,41 @@ type SquidLog struct {
 	mx *metricsData
 }
 
-func (s *SquidLog) Configuration() any {
-	return s.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (s *SquidLog) Init() error {
-	s.line = newEmptyLogLine()
-	s.mx = newMetricsData()
+func (c *Collector) Init() error {
+	c.line = newEmptyLogLine()
+	c.mx = newMetricsData()
 	return nil
 }
 
-func (s *SquidLog) Check() error {
+func (c *Collector) Check() error {
 	// Note: these inits are here to make auto-detection retry working
-	if err := s.createLogReader(); err != nil {
+	if err := c.createLogReader(); err != nil {
 		return fmt.Errorf("failed to create log reader: %v", err)
 	}
 
-	if err := s.createParser(); err != nil {
+	if err := c.createParser(); err != nil {
 		return fmt.Errorf("failed to create log parser: %v", err)
 	}
 
-	if err := s.createCharts(s.line); err != nil {
+	if err := c.createCharts(c.line); err != nil {
 		return fmt.Errorf("failed to create log charts: %v", err)
 	}
 
 	return nil
 }
 
-func (s *SquidLog) Charts() *module.Charts {
-	return s.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (s *SquidLog) Collect() map[string]int64 {
-	mx, err := s.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		s.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -103,8 +103,8 @@ func (s *SquidLog) Collect() map[string]int64 {
 	return mx
 }
 
-func (s *SquidLog) Cleanup() {
-	if s.file != nil {
-		_ = s.file.Close()
+func (c *Collector) Cleanup() {
+	if c.file != nil {
+		_ = c.file.Close()
 	}
 }
