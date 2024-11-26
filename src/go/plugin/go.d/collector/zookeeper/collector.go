@@ -24,8 +24,8 @@ func init() {
 	})
 }
 
-func New() *Zookeeper {
-	return &Zookeeper{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:2181",
 			Timeout: confopt.Duration(time.Second),
@@ -41,38 +41,33 @@ type Config struct {
 	UseTLS           bool `yaml:"use_tls,omitempty" json:"use_tls"`
 }
 
-type (
-	Zookeeper struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		fetcher
-	}
-	fetcher interface {
-		fetch(command string) ([]string, error)
-	}
-)
-
-func (z *Zookeeper) Configuration() any {
-	return z.Config
+	fetcher
 }
 
-func (z *Zookeeper) Init() error {
-	if err := z.verifyConfig(); err != nil {
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	if err := c.verifyConfig(); err != nil {
 		return fmt.Errorf("invalid config: %v", err)
 	}
 
-	f, err := z.initZookeeperFetcher()
+	f, err := c.initZookeeperFetcher()
 	if err != nil {
 		return fmt.Errorf("init zookeeper fetcher: %v", err)
 	}
-	z.fetcher = f
+	c.fetcher = f
 
 	return nil
 }
 
-func (z *Zookeeper) Check() error {
-	mx, err := z.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -82,14 +77,14 @@ func (z *Zookeeper) Check() error {
 	return nil
 }
 
-func (z *Zookeeper) Charts() *Charts {
+func (c *Collector) Charts() *Charts {
 	return charts.Copy()
 }
 
-func (z *Zookeeper) Collect() map[string]int64 {
-	mx, err := z.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		z.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -98,4 +93,4 @@ func (z *Zookeeper) Collect() map[string]int64 {
 	return mx
 }
 
-func (z *Zookeeper) Cleanup() {}
+func (c *Collector) Cleanup() {}

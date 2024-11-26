@@ -12,6 +12,10 @@ import (
 
 const limitReadLines = 2000
 
+type fetcher interface {
+	fetch(command string) ([]string, error)
+}
+
 type zookeeperFetcher struct {
 	socket.Client
 }

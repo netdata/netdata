@@ -34,53 +34,53 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestZookeeper_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Zookeeper{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestZookeeper_Init(t *testing.T) {
-	job := New()
+func TestCollector_Init(t *testing.T) {
+	collr := New()
 
-	assert.NoError(t, job.Init())
-	assert.NotNil(t, job.fetcher)
+	assert.NoError(t, collr.Init())
+	assert.NotNil(t, collr.fetcher)
 }
 
-func TestZookeeper_InitErrorOnCreatingTLSConfig(t *testing.T) {
-	job := New()
-	job.UseTLS = true
-	job.TLSConfig.TLSCA = "testdata/tls"
+func TestCollector_InitErrorOnCreatingTLSConfig(t *testing.T) {
+	collr := New()
+	collr.UseTLS = true
+	collr.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, job.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestZookeeper_Check(t *testing.T) {
-	job := New()
-	require.NoError(t, job.Init())
-	job.fetcher = &mockZookeeperFetcher{data: dataMntrMetrics}
+func TestCollector_Check(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.fetcher = &mockZookeeperFetcher{data: dataMntrMetrics}
 
-	assert.NoError(t, job.Check())
+	assert.NoError(t, collr.Check())
 }
 
-func TestZookeeper_CheckErrorOnFetch(t *testing.T) {
-	job := New()
-	require.NoError(t, job.Init())
-	job.fetcher = &mockZookeeperFetcher{err: true}
+func TestCollector_CheckErrorOnFetch(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.fetcher = &mockZookeeperFetcher{err: true}
 
-	assert.Error(t, job.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestZookeeper_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestZookeeper_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestZookeeper_Collect(t *testing.T) {
-	job := New()
-	require.NoError(t, job.Init())
-	job.fetcher = &mockZookeeperFetcher{data: dataMntrMetrics}
+func TestCollector_Collect(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.fetcher = &mockZookeeperFetcher{data: dataMntrMetrics}
 
 	expected := map[string]int64{
 		"approximate_data_size":      44,
@@ -99,42 +99,42 @@ func TestZookeeper_Collect(t *testing.T) {
 		"znode_count":                5,
 	}
 
-	mx := job.Collect()
+	mx := collr.Collect()
 
 	assert.Equal(t, expected, mx)
-	module.TestMetricsHasAllChartsDims(t, job.Charts(), mx)
+	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
-func TestZookeeper_CollectMntrNotInWhiteList(t *testing.T) {
-	job := New()
-	require.NoError(t, job.Init())
-	job.fetcher = &mockZookeeperFetcher{data: dataMntrNotInWhiteListResponse}
+func TestCollector_CollectMntrNotInWhiteList(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.fetcher = &mockZookeeperFetcher{data: dataMntrNotInWhiteListResponse}
 
-	assert.Nil(t, job.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestZookeeper_CollectMntrEmptyResponse(t *testing.T) {
-	job := New()
-	require.NoError(t, job.Init())
-	job.fetcher = &mockZookeeperFetcher{}
+func TestCollector_CollectMntrEmptyResponse(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.fetcher = &mockZookeeperFetcher{}
 
-	assert.Nil(t, job.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestZookeeper_CollectMntrInvalidData(t *testing.T) {
-	job := New()
-	require.NoError(t, job.Init())
-	job.fetcher = &mockZookeeperFetcher{data: []byte("hello \nand good buy\n")}
+func TestCollector_CollectMntrInvalidData(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.fetcher = &mockZookeeperFetcher{data: []byte("hello \nand good buy\n")}
 
-	assert.Nil(t, job.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestZookeeper_CollectMntrReceiveError(t *testing.T) {
-	job := New()
-	require.NoError(t, job.Init())
-	job.fetcher = &mockZookeeperFetcher{err: true}
+func TestCollector_CollectMntrReceiveError(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.fetcher = &mockZookeeperFetcher{err: true}
 
-	assert.Nil(t, job.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
 type mockZookeeperFetcher struct {

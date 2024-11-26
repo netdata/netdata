@@ -8,14 +8,14 @@ import (
 	"strings"
 )
 
-func (z *Zookeeper) collect() (map[string]int64, error) {
-	return z.collectMntr()
+func (c *Collector) collect() (map[string]int64, error) {
+	return c.collectMntr()
 }
 
-func (z *Zookeeper) collectMntr() (map[string]int64, error) {
+func (c *Collector) collectMntr() (map[string]int64, error) {
 	const command = "mntr"
 
-	lines, err := z.fetch("mntr")
+	lines, err := c.fetch("mntr")
 	if err != nil {
 		return nil, err
 	}
