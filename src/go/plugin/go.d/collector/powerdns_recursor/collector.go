@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Recursor {
-	return &Recursor{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -45,7 +45,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Recursor struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -54,33 +54,33 @@ type Recursor struct {
 	httpClient *http.Client
 }
 
-func (r *Recursor) Configuration() any {
-	return r.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (r *Recursor) Init() error {
-	err := r.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	client, err := r.initHTTPClient()
+	client, err := c.initHTTPClient()
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
-	r.httpClient = client
+	c.httpClient = client
 
-	cs, err := r.initCharts()
+	cs, err := c.initCharts()
 	if err != nil {
 		return fmt.Errorf("init charts: %v", err)
 	}
-	r.charts = cs
+	c.charts = cs
 
 	return nil
 }
 
-func (r *Recursor) Check() error {
-	mx, err := r.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -90,14 +90,14 @@ func (r *Recursor) Check() error {
 	return nil
 }
 
-func (r *Recursor) Charts() *module.Charts {
-	return r.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (r *Recursor) Collect() map[string]int64 {
-	ms, err := r.collect()
+func (c *Collector) Collect() map[string]int64 {
+	ms, err := c.collect()
 	if err != nil {
-		r.Error(err)
+		c.Error(err)
 	}
 
 	if len(ms) == 0 {
@@ -106,9 +106,9 @@ func (r *Recursor) Collect() map[string]int64 {
 	return ms
 }
 
-func (r *Recursor) Cleanup() {
-	if r.httpClient == nil {
+func (c *Collector) Cleanup() {
+	if c.httpClient == nil {
 		return
 	}
-	r.httpClient.CloseIdleConnections()
+	c.httpClient.CloseIdleConnections()
 }

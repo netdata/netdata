@@ -35,11 +35,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestRecursor_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Recursor{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestRecursor_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -72,21 +72,21 @@ func TestRecursor_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			recursor := New()
-			recursor.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, recursor.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, recursor.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestRecursor_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() (r *Recursor, cleanup func())
+		prepare  func() (collr *Collector, cleanup func())
 		wantFail bool
 	}{
 		"success on valid response v4.3.1": {
@@ -112,32 +112,32 @@ func TestRecursor_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			recursor, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
-			require.NoError(t, recursor.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, recursor.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, recursor.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestRecursor_Charts(t *testing.T) {
-	recursor := New()
-	require.NoError(t, recursor.Init())
-	assert.NotNil(t, recursor.Charts())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestRecursor_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestRecursor_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() (r *Recursor, cleanup func())
+		prepare       func() (collr *Collector, cleanup func())
 		wantCollected map[string]int64
 	}{
 		"success on valid response v4.3.1": {
@@ -275,63 +275,63 @@ func TestRecursor_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			recursor, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
-			require.NoError(t, recursor.Init())
+			require.NoError(t, collr.Init())
 
-			mx := recursor.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				module.TestMetricsHasAllChartsDims(t, recursor.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func preparePowerDNSRecursorV431() (*Recursor, func()) {
+func preparePowerDNSRecursorV431() (*Collector, func()) {
 	srv := preparePowerDNSRecursorEndpoint()
-	recursor := New()
-	recursor.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return recursor, srv.Close
+	return collr, srv.Close
 }
 
-func preparePowerDNSRecursorAuthoritativeData() (*Recursor, func()) {
+func preparePowerDNSRecursorAuthoritativeData() (*Collector, func()) {
 	srv := preparePowerDNSAuthoritativeEndpoint()
-	recursor := New()
-	recursor.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return recursor, srv.Close
+	return collr, srv.Close
 }
 
-func preparePowerDNSRecursorInvalidData() (*Recursor, func()) {
+func preparePowerDNSRecursorInvalidData() (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	recursor := New()
-	recursor.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return recursor, srv.Close
+	return collr, srv.Close
 }
 
-func preparePowerDNSRecursor404() (*Recursor, func()) {
+func preparePowerDNSRecursor404() (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	recursor := New()
-	recursor.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return recursor, srv.Close
+	return collr, srv.Close
 }
 
-func preparePowerDNSRecursorConnectionRefused() (*Recursor, func()) {
-	recursor := New()
-	recursor.URL = "http://127.0.0.1:38001"
+func preparePowerDNSRecursorConnectionRefused() (*Collector, func()) {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001"
 
-	return recursor, func() {}
+	return collr, func() {}
 }
 
 func preparePowerDNSRecursorEndpoint() *httptest.Server {
