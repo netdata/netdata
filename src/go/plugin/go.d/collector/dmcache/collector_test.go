@@ -30,11 +30,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestDmCace_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &DmCache{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestDmCache_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -47,59 +47,59 @@ func TestDmCache_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			lvm := New()
-			lvm.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, lvm.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, lvm.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestDmCache_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *DmCache
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *DmCache {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *DmCache {
-				lvm := New()
-				lvm.exec = prepareMockOK()
-				_ = lvm.Check()
-				return lvm
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOK()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *DmCache {
-				lvm := New()
-				lvm.exec = prepareMockOK()
-				_ = lvm.Collect()
-				return lvm
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOK()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			lvm := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, lvm.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestDmCache_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestDmCache_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockDmsetupExec
 		wantFail    bool
@@ -124,14 +124,14 @@ func TestDmCache_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dmcache := New()
+			collr := New()
 			mock := test.prepareMock()
-			dmcache.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, dmcache.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, dmcache.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
@@ -187,17 +187,17 @@ func TestLVM_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dmcache := New()
+			collr := New()
 			mock := test.prepareMock()
-			dmcache.exec = mock
+			collr.exec = mock
 
-			mx := dmcache.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
-			assert.Len(t, *dmcache.Charts(), test.wantCharts, "wantCharts")
+			assert.Len(t, *collr.Charts(), test.wantCharts, "wantCharts")
 
-			module.TestMetricsHasAllChartsDims(t, dmcache.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }

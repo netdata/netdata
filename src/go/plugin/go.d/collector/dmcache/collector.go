@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *DmCache {
-	return &DmCache{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -43,27 +43,22 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type (
-	DmCache struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec dmsetupCLI
+	exec dmsetupCli
 
-		devices map[string]bool
-	}
-	dmsetupCLI interface {
-		cacheStatus() ([]byte, error)
-	}
-)
+	devices map[string]bool
+}
 
-func (c *DmCache) Configuration() any {
+func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *DmCache) Init() error {
+func (c *Collector) Init() error {
 	dmsetup, err := c.initDmsetupCLI()
 	if err != nil {
 		return fmt.Errorf("dmsetup exec initialization: %v", err)
@@ -73,7 +68,7 @@ func (c *DmCache) Init() error {
 	return nil
 }
 
-func (c *DmCache) Check() error {
+func (c *Collector) Check() error {
 	mx, err := c.collect()
 	if err != nil {
 		return err
@@ -86,11 +81,11 @@ func (c *DmCache) Check() error {
 	return nil
 }
 
-func (c *DmCache) Charts() *module.Charts {
+func (c *Collector) Charts() *module.Charts {
 	return c.charts
 }
 
-func (c *DmCache) Collect() map[string]int64 {
+func (c *Collector) Collect() map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -103,4 +98,4 @@ func (c *DmCache) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *DmCache) Cleanup() {}
+func (c *Collector) Cleanup() {}
