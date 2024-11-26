@@ -35,11 +35,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestPika_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Pika{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestPika_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -66,21 +66,21 @@ func TestPika_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pika := New()
-			pika.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, pika.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, pika.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestPika_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(t *testing.T) *Pika
+		prepare  func(t *testing.T) *Collector
 		wantFail bool
 	}{
 		"success on valid response v3.4.0": {
@@ -98,40 +98,40 @@ func TestPika_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pika := test.prepare(t)
+			collr := test.prepare(t)
 
 			if test.wantFail {
-				assert.Error(t, pika.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, pika.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestPika_Charts(t *testing.T) {
-	pika := New()
-	require.NoError(t, pika.Init())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
 
-	assert.NotNil(t, pika.Charts())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestPika_Cleanup(t *testing.T) {
-	pika := New()
-	assert.NotPanics(t, pika.Cleanup)
+func TestCollector_Cleanup(t *testing.T) {
+	collr := New()
+	assert.NotPanics(t, collr.Cleanup)
 
-	require.NoError(t, pika.Init())
+	require.NoError(t, collr.Init())
 	m := &mockRedisClient{}
-	pika.pdb = m
+	collr.pdb = m
 
-	pika.Cleanup()
+	collr.Cleanup()
 
 	assert.True(t, m.calledClose)
 }
 
-func TestPika_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func(t *testing.T) *Pika
+		prepare       func(t *testing.T) *Collector
 		wantCollected map[string]int64
 	}{
 		"success on valid response v3.4.0": {
@@ -185,59 +185,59 @@ func TestPika_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pika := test.prepare(t)
+			collr := test.prepare(t)
 
-			mx := pika.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				module.TestMetricsHasAllChartsDims(t, pika.Charts(), mx)
-				ensureCollectedCommandsAddedToCharts(t, pika)
-				ensureCollectedDbsAddedToCharts(t, pika)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				ensureCollectedCommandsAddedToCharts(t, collr)
+				ensureCollectedDbsAddedToCharts(t, collr)
 			}
 		})
 	}
 }
 
-func preparePikaV340(t *testing.T) *Pika {
-	pika := New()
-	require.NoError(t, pika.Init())
-	pika.pdb = &mockRedisClient{
+func preparePikaV340(t *testing.T) *Collector {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.pdb = &mockRedisClient{
 		result: dataVer340InfoAll,
 	}
-	return pika
+	return collr
 }
 
-func preparePikaErrorOnInfo(t *testing.T) *Pika {
-	pika := New()
-	require.NoError(t, pika.Init())
-	pika.pdb = &mockRedisClient{
+func preparePikaErrorOnInfo(t *testing.T) *Collector {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.pdb = &mockRedisClient{
 		errOnInfo: true,
 	}
-	return pika
+	return collr
 }
 
-func preparePikaWithRedisMetrics(t *testing.T) *Pika {
-	pika := New()
-	require.NoError(t, pika.Init())
-	pika.pdb = &mockRedisClient{
+func preparePikaWithRedisMetrics(t *testing.T) *Collector {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.pdb = &mockRedisClient{
 		result: dataRedisInfoAll,
 	}
-	return pika
+	return collr
 }
 
-func ensureCollectedCommandsAddedToCharts(t *testing.T, pika *Pika) {
+func ensureCollectedCommandsAddedToCharts(t *testing.T, collr *Collector) {
 	for _, id := range []string{
 		chartCommandsCalls.ID,
 	} {
-		chart := pika.Charts().Get(id)
+		chart := collr.Charts().Get(id)
 		require.NotNilf(t, chart, "'%s' chart is not in charts", id)
-		assert.Lenf(t, chart.Dims, len(pika.collectedCommands),
+		assert.Lenf(t, chart.Dims, len(collr.collectedCommands),
 			"'%s' chart unexpected number of dimensions", id)
 	}
 }
 
-func ensureCollectedDbsAddedToCharts(t *testing.T, pika *Pika) {
+func ensureCollectedDbsAddedToCharts(t *testing.T, collr *Collector) {
 	for _, id := range []string{
 		chartDbStringsKeys.ID,
 		chartDbStringsExpiresKeys.ID,
@@ -255,9 +255,9 @@ func ensureCollectedDbsAddedToCharts(t *testing.T, pika *Pika) {
 		chartDbSetsExpiresKeys.ID,
 		chartDbSetsInvalidKeys.ID,
 	} {
-		chart := pika.Charts().Get(id)
+		chart := collr.Charts().Get(id)
 		require.NotNilf(t, chart, "'%s' chart is not in charts", id)
-		assert.Lenf(t, chart.Dims, len(pika.collectedDbs),
+		assert.Lenf(t, chart.Dims, len(collr.collectedDbs),
 			"'%s' chart unexpected number of dimensions", id)
 	}
 }

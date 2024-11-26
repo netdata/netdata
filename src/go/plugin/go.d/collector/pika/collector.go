@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *Pika {
-	return &Pika{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "redis://@localhost:9221",
 			Timeout: confopt.Duration(time.Second),
@@ -48,7 +48,7 @@ type Config struct {
 }
 
 type (
-	Pika struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -67,33 +67,33 @@ type (
 	}
 )
 
-func (p *Pika) Configuration() any {
-	return p.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (p *Pika) Init() error {
-	err := p.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	pdb, err := p.initRedisClient()
+	pdb, err := c.initRedisClient()
 	if err != nil {
 		return fmt.Errorf("init redis client: %v", err)
 	}
-	p.pdb = pdb
+	c.pdb = pdb
 
-	charts, err := p.initCharts()
+	charts, err := c.initCharts()
 	if err != nil {
 		return fmt.Errorf("init charts: %v", err)
 	}
-	p.charts = charts
+	c.charts = charts
 
 	return nil
 }
 
-func (p *Pika) Check() error {
-	mx, err := p.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -103,14 +103,14 @@ func (p *Pika) Check() error {
 	return nil
 }
 
-func (p *Pika) Charts() *module.Charts {
-	return p.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (p *Pika) Collect() map[string]int64 {
-	ms, err := p.collect()
+func (c *Collector) Collect() map[string]int64 {
+	ms, err := c.collect()
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 	}
 
 	if len(ms) == 0 {
@@ -119,13 +119,13 @@ func (p *Pika) Collect() map[string]int64 {
 	return ms
 }
 
-func (p *Pika) Cleanup() {
-	if p.pdb == nil {
+func (c *Collector) Cleanup() {
+	if c.pdb == nil {
 		return
 	}
-	err := p.pdb.Close()
+	err := c.pdb.Close()
 	if err != nil {
-		p.Warningf("cleanup: error on closing redis client [%s]: %v", p.Address, err)
+		c.Warningf("cleanup: error on closing redis client [%s]: %v", c.Address, err)
 	}
-	p.pdb = nil
+	c.pdb = nil
 }
