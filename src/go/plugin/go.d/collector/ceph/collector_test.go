@@ -43,12 +43,12 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestCeph_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Ceph{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestCeph_Init(t *testing.T) {
-	tesceph := map[string]struct {
+func TestCollector_Init(t *testing.T) {
+	tests := map[string]struct {
 		wantFail bool
 		config   Config
 	}{
@@ -66,24 +66,24 @@ func TestCeph_Init(t *testing.T) {
 		},
 	}
 
-	for name, test := range tesceph {
+	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ceph := New()
-			ceph.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, ceph.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, ceph.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestCeph_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (ceph *Ceph, cleanup func())
+		prepare  func(t *testing.T) (collr *Collector, cleanup func())
 	}{
 		"success with valid API key": {
 			wantFail: false,
@@ -101,25 +101,25 @@ func TestCeph_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ceph, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, ceph.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, ceph.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestCeph_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestCeph_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare         func(t *testing.T) (ceph *Ceph, cleanup func())
+		prepare         func(t *testing.T) (collr *Collector, cleanup func())
 		wantNumOfCharts int
 		wantMetrics     map[string]int64
 	}{
@@ -224,25 +224,25 @@ func TestCeph_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ceph, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			_ = ceph.Check()
+			_ = collr.Check()
 
-			mx := ceph.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				assert.Equal(t, test.wantNumOfCharts, len(*ceph.Charts()), "want charts")
+				assert.Equal(t, test.wantNumOfCharts, len(*collr.Charts()), "want charts")
 
-				module.TestMetricsHasAllChartsDims(t, ceph.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func caseOk(t *testing.T) (*Ceph, func()) {
+func caseOk(t *testing.T) (*Collector, func()) {
 	t.Helper()
 
 	loginResp, _ := json.Marshal(authLoginResp{Token: "secret_token"})
@@ -295,37 +295,37 @@ func caseOk(t *testing.T) (*Ceph, func()) {
 			}
 		}))
 
-	ceph := New()
-	ceph.URL = srv.URL
-	ceph.Username = "user"
-	ceph.Password = "password"
-	require.NoError(t, ceph.Init())
+	collr := New()
+	collr.URL = srv.URL
+	collr.Username = "user"
+	collr.Password = "password"
+	require.NoError(t, collr.Init())
 
-	return ceph, srv.Close
+	return collr, srv.Close
 }
 
-func caseConnectionRefused(t *testing.T) (*Ceph, func()) {
+func caseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	ceph := New()
-	ceph.URL = "http://127.0.0.1:65001"
-	ceph.Username = "user"
-	ceph.Password = "password"
-	require.NoError(t, ceph.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	collr.Username = "user"
+	collr.Password = "password"
+	require.NoError(t, collr.Init())
 
-	return ceph, func() {}
+	return collr, func() {}
 }
 
-func case404(t *testing.T) (*Ceph, func()) {
+func case404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	ceph := New()
-	ceph.URL = srv.URL
-	ceph.Username = "user"
-	ceph.Password = "password"
-	require.NoError(t, ceph.Init())
+	collr := New()
+	collr.URL = srv.URL
+	collr.Username = "user"
+	collr.Password = "password"
+	require.NoError(t, collr.Init())
 
-	return ceph, srv.Close
+	return collr, srv.Close
 }

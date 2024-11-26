@@ -504,7 +504,7 @@ var (
 	}
 )
 
-func (c *Ceph) addClusterCharts() {
+func (c *Collector) addClusterCharts() {
 	charts := clusterCharts.Copy()
 
 	for _, chart := range *charts {
@@ -518,7 +518,7 @@ func (c *Ceph) addClusterCharts() {
 	}
 }
 
-func (c *Ceph) addOsdCharts(osdUuid, devClass, osdName string) {
+func (c *Collector) addOsdCharts(osdUuid, devClass, osdName string) {
 	charts := osdChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -540,7 +540,7 @@ func (c *Ceph) addOsdCharts(osdUuid, devClass, osdName string) {
 	}
 }
 
-func (c *Ceph) addPoolCharts(poolName string) {
+func (c *Collector) addPoolCharts(poolName string) {
 	charts := poolChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -560,7 +560,7 @@ func (c *Ceph) addPoolCharts(poolName string) {
 	}
 }
 
-func (c *Ceph) removeCharts(prefix string) {
+func (c *Collector) removeCharts(prefix string) {
 	prefix = cleanChartID(prefix)
 	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {

@@ -30,8 +30,8 @@ func init() {
 	})
 }
 
-func New() *Ceph {
-	return &Ceph{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -56,7 +56,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Ceph struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -73,11 +73,11 @@ type Ceph struct {
 	seenOsds  map[string]bool
 }
 
-func (c *Ceph) Configuration() any {
+func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Ceph) Init() error {
+func (c *Collector) Init() error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("invalid config: %v", err)
 	}
@@ -91,7 +91,7 @@ func (c *Ceph) Init() error {
 	return nil
 }
 
-func (c *Ceph) Check() error {
+func (c *Collector) Check() error {
 	mx, err := c.collect()
 	if err != nil {
 		return err
@@ -104,11 +104,11 @@ func (c *Ceph) Check() error {
 	return nil
 }
 
-func (c *Ceph) Charts() *module.Charts {
+func (c *Collector) Charts() *module.Charts {
 	return c.charts
 }
 
-func (c *Ceph) Collect() map[string]int64 {
+func (c *Collector) Collect() map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -121,7 +121,7 @@ func (c *Ceph) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *Ceph) Cleanup() {
+func (c *Collector) Cleanup() {
 	if c.httpClient != nil {
 		if err := c.authLogout(); err != nil {
 			c.Warningf("failed to logout: %v", err)

@@ -23,7 +23,7 @@ type (
 	}
 )
 
-func (c *Ceph) authLogin() (string, error) {
+func (c *Collector) authLogin() (string, error) {
 	// https://docs.ceph.com/en/reef/mgr/ceph_api/#post--api-auth
 
 	req, err := func() (*http.Request, error) {
@@ -72,7 +72,7 @@ func (c *Ceph) authLogin() (string, error) {
 	return tok.Token, nil
 }
 
-func (c *Ceph) authCheck() (bool, error) {
+func (c *Collector) authCheck() (bool, error) {
 	// https://docs.ceph.com/en/reef/mgr/ceph_api/#post--api-auth-check
 	if c.token == "" {
 		return false, nil
@@ -112,7 +112,7 @@ func (c *Ceph) authCheck() (bool, error) {
 	return resp.Username != "", nil
 }
 
-func (c *Ceph) authLogout() error {
+func (c *Collector) authLogout() error {
 	// https://docs.ceph.com/en/reef/mgr/ceph_api/#post--api-auth-logout
 
 	if c.token == "" {

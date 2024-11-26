@@ -14,7 +14,7 @@ import (
 
 const precision = 1000
 
-func (c *Ceph) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
 	if err := c.auth(); err != nil {
@@ -43,7 +43,7 @@ func (c *Ceph) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Ceph) auth() error {
+func (c *Collector) auth() error {
 	if c.token != "" {
 		ok, err := c.authCheck()
 		if err != nil {
@@ -64,7 +64,7 @@ func (c *Ceph) auth() error {
 	return nil
 }
 
-func (c *Ceph) getFsid() (string, error) {
+func (c *Collector) getFsid() (string, error) {
 	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiMonitor)
 	if err != nil {
 		return "", err
@@ -93,7 +93,7 @@ func (c *Ceph) getFsid() (string, error) {
 	return resp.MonStatus.MonMap.FSID, nil
 }
 
-func (c *Ceph) webClient(statusCodes ...int) *web.Client {
+func (c *Collector) webClient(statusCodes ...int) *web.Client {
 	return web.DoHTTP(c.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
 		if slices.Contains(statusCodes, resp.StatusCode) {
 			return true, nil
