@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *Fail2Ban {
-	return &Fail2Ban{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -44,44 +44,38 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type (
-	Fail2Ban struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec fail2banClientCli
+	exec fail2banClientCli
 
-		discoverEvery    time.Duration
-		lastDiscoverTime time.Time
-		forceDiscover    bool
-		jails            []string
+	discoverEvery    time.Duration
+	lastDiscoverTime time.Time
+	forceDiscover    bool
+	jails            []string
 
-		seenJails map[string]bool
-	}
-	fail2banClientCli interface {
-		status() ([]byte, error)
-		jailStatus(s string) ([]byte, error)
-	}
-)
-
-func (f *Fail2Ban) Configuration() any {
-	return f.Config
+	seenJails map[string]bool
 }
 
-func (f *Fail2Ban) Init() error {
-	f2bClientExec, err := f.initFail2banClientCliExec()
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	f2bClientExec, err := c.initFail2banClientCliExec()
 	if err != nil {
 		return fmt.Errorf("fail2ban-client exec initialization: %v", err)
 	}
-	f.exec = f2bClientExec
+	c.exec = f2bClientExec
 
 	return nil
 }
 
-func (f *Fail2Ban) Check() error {
-	mx, err := f.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -93,14 +87,14 @@ func (f *Fail2Ban) Check() error {
 	return nil
 }
 
-func (f *Fail2Ban) Charts() *module.Charts {
-	return f.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (f *Fail2Ban) Collect() map[string]int64 {
-	mx, err := f.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		f.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -110,4 +104,4 @@ func (f *Fail2Ban) Collect() map[string]int64 {
 	return mx
 }
 
-func (f *Fail2Ban) Cleanup() {}
+func (c *Collector) Cleanup() {}

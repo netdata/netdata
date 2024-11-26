@@ -48,7 +48,7 @@ var (
 	}
 )
 
-func (f *Fail2Ban) addJailCharts(jail string) {
+func (c *Collector) addJailCharts(jail string) {
 	charts := jailChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -61,14 +61,14 @@ func (f *Fail2Ban) addJailCharts(jail string) {
 		}
 	}
 
-	if err := f.Charts().Add(*charts...); err != nil {
-		f.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (f *Fail2Ban) removeJailCharts(jail string) {
+func (c *Collector) removeJailCharts(jail string) {
 	px := fmt.Sprintf("jail_%s_", jail)
-	for _, chart := range *f.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

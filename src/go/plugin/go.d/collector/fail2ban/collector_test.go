@@ -36,11 +36,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestFail2Ban_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Fail2Ban{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestFail2Ban_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -53,59 +53,59 @@ func TestFail2Ban_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			f2b := New()
-			f2b.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, f2b.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, f2b.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestFail2Ban_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Fail2Ban
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *Fail2Ban {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Fail2Ban {
-				f2b := New()
-				f2b.exec = prepareMockOk()
-				_ = f2b.Check()
-				return f2b
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOk()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Fail2Ban {
-				f2b := New()
-				f2b.exec = prepareMockOk()
-				_ = f2b.Collect()
-				return f2b
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOk()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			f2b := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, f2b.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestFail2Ban_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestFail2Ban_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockFail2BanClientCliExec
 		wantFail    bool
@@ -126,20 +126,20 @@ func TestFail2Ban_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			f2b := New()
+			collr := New()
 			mock := test.prepareMock()
-			f2b.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, f2b.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, f2b.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestFail2Ban_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockFail2BanClientCliExec
 		wantMetrics map[string]int64
@@ -165,18 +165,18 @@ func TestFail2Ban_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			f2b := New()
+			collr := New()
 			mock := test.prepareMock()
-			f2b.exec = mock
+			collr.exec = mock
 
-			mx := f2b.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				assert.Len(t, *f2b.Charts(), len(jailChartsTmpl)*2, "wantCharts")
+				assert.Len(t, *collr.Charts(), len(jailChartsTmpl)*2, "wantCharts")
 
-				module.TestMetricsHasAllChartsDims(t, f2b.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}

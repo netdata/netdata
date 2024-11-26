@@ -14,30 +14,30 @@ import (
 	"time"
 )
 
-func (f *Fail2Ban) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	now := time.Now()
 
-	if now.Sub(f.lastDiscoverTime) > f.discoverEvery || f.forceDiscover {
-		jails, err := f.discoverJails()
+	if now.Sub(c.lastDiscoverTime) > c.discoverEvery || c.forceDiscover {
+		jails, err := c.discoverJails()
 		if err != nil {
 			return nil, err
 		}
-		f.jails = jails
-		f.lastDiscoverTime = now
-		f.forceDiscover = false
+		c.jails = jails
+		c.lastDiscoverTime = now
+		c.forceDiscover = false
 	}
 
 	mx := make(map[string]int64)
 
-	if err := f.collectJails(mx); err != nil {
+	if err := c.collectJails(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (f *Fail2Ban) discoverJails() ([]string, error) {
-	bs, err := f.exec.status()
+func (c *Collector) discoverJails() ([]string, error) {
+	bs, err := c.exec.status()
 	if err != nil {
 		return nil, err
 	}
@@ -51,20 +51,20 @@ func (f *Fail2Ban) discoverJails() ([]string, error) {
 		return nil, errors.New("no jails found")
 	}
 
-	f.Debugf("discovered %d jails: %v", len(jails), jails)
+	c.Debugf("discovered %d jails: %v", len(jails), jails)
 
 	return jails, nil
 }
 
-func (f *Fail2Ban) collectJails(mx map[string]int64) error {
+func (c *Collector) collectJails(mx map[string]int64) error {
 	seen := make(map[string]bool)
 
-	for _, jail := range f.jails {
-		f.Debugf("querying status for jail '%s'", jail)
-		bs, err := f.exec.jailStatus(jail)
+	for _, jail := range c.jails {
+		c.Debugf("querying status for jail '%s'", jail)
+		bs, err := c.exec.jailStatus(jail)
 		if err != nil {
 			if errors.Is(err, errJailNotExist) {
-				f.forceDiscover = true
+				c.forceDiscover = true
 				continue
 			}
 			return err
@@ -75,9 +75,9 @@ func (f *Fail2Ban) collectJails(mx map[string]int64) error {
 			return err
 		}
 
-		if !f.seenJails[jail] {
-			f.seenJails[jail] = true
-			f.addJailCharts(jail)
+		if !c.seenJails[jail] {
+			c.seenJails[jail] = true
+			c.addJailCharts(jail)
 		}
 		seen[jail] = true
 
@@ -87,10 +87,10 @@ func (f *Fail2Ban) collectJails(mx map[string]int64) error {
 		mx[px+"currently_banned"] = banned
 	}
 
-	for jail := range f.seenJails {
+	for jail := range c.seenJails {
 		if !seen[jail] {
-			delete(f.seenJails, jail)
-			f.removeJailCharts(jail)
+			delete(c.seenJails, jail)
+			c.removeJailCharts(jail)
 		}
 	}
 
