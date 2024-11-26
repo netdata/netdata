@@ -19,7 +19,7 @@ type agentCheck struct {
 	ServiceTags []string
 }
 
-func (c *Consul) collectChecks(mx map[string]int64) error {
+func (c *Collector) collectChecks(mx map[string]int64) error {
 	req, err := c.createRequest(urlPathAgentChecks)
 	if err != nil {
 		return err

@@ -59,11 +59,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestConsul_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Consul{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestConsul_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -84,22 +84,22 @@ func TestConsul_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			consul := New()
-			consul.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, consul.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, consul.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestConsul_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (consul *Consul, cleanup func())
+		prepare  func(t *testing.T) (collr *Collector, cleanup func())
 	}{
 		"success on response from Consul v1.13.2 server": {
 			wantFail: false,
@@ -137,21 +137,21 @@ func TestConsul_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			consul, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, consul.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, consul.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestConsul_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare         func(t *testing.T) (consul *Consul, cleanup func())
+		prepare         func(t *testing.T) (collr *Collector, cleanup func())
 		wantNumOfCharts int
 		wantMetrics     map[string]int64
 	}{
@@ -532,23 +532,23 @@ func TestConsul_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			consul, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := consul.Collect()
+			mx := collr.Collect()
 
 			delete(mx, "autopilot_server_stable_time")
 			delete(test.wantMetrics, "autopilot_server_stable_time")
 
 			require.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {
-				assert.Equal(t, test.wantNumOfCharts, len(*consul.Charts()))
+				assert.Equal(t, test.wantNumOfCharts, len(*collr.Charts()))
 			}
 		})
 	}
 }
 
-func caseConsulV1143CloudServerResponse(t *testing.T) (*Consul, func()) {
+func caseConsulV1143CloudServerResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -568,15 +568,15 @@ func caseConsulV1143CloudServerResponse(t *testing.T) (*Consul, func()) {
 			}
 		}))
 
-	consul := New()
-	consul.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	require.NoError(t, consul.Init())
+	require.NoError(t, collr.Init())
 
-	return consul, srv.Close
+	return collr, srv.Close
 }
 
-func caseConsulV1132ServerResponse(t *testing.T) (*Consul, func()) {
+func caseConsulV1132ServerResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -596,15 +596,15 @@ func caseConsulV1132ServerResponse(t *testing.T) (*Consul, func()) {
 			}
 		}))
 
-	consul := New()
-	consul.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	require.NoError(t, consul.Init())
+	require.NoError(t, collr.Init())
 
-	return consul, srv.Close
+	return collr, srv.Close
 }
 
-func caseConsulV1132ServerWithHostnameResponse(t *testing.T) (*Consul, func()) {
+func caseConsulV1132ServerWithHostnameResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -624,15 +624,15 @@ func caseConsulV1132ServerWithHostnameResponse(t *testing.T) (*Consul, func()) {
 			}
 		}))
 
-	consul := New()
-	consul.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	require.NoError(t, consul.Init())
+	require.NoError(t, collr.Init())
 
-	return consul, srv.Close
+	return collr, srv.Close
 }
 
-func caseConsulV1132ServerWithDisabledPrometheus(t *testing.T) (*Consul, func()) {
+func caseConsulV1132ServerWithDisabledPrometheus(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -650,15 +650,15 @@ func caseConsulV1132ServerWithDisabledPrometheus(t *testing.T) (*Consul, func())
 			}
 		}))
 
-	consul := New()
-	consul.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	require.NoError(t, consul.Init())
+	require.NoError(t, collr.Init())
 
-	return consul, srv.Close
+	return collr, srv.Close
 }
 
-func caseConsulV1132ClientResponse(t *testing.T) (*Consul, func()) {
+func caseConsulV1132ClientResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -674,48 +674,48 @@ func caseConsulV1132ClientResponse(t *testing.T) (*Consul, func()) {
 			}
 		}))
 
-	consul := New()
-	consul.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	require.NoError(t, consul.Init())
+	require.NoError(t, collr.Init())
 
-	return consul, srv.Close
+	return collr, srv.Close
 }
 
-func caseInvalidDataResponse(t *testing.T) (*Consul, func()) {
+func caseInvalidDataResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
 
-	consul := New()
-	consul.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	require.NoError(t, consul.Init())
+	require.NoError(t, collr.Init())
 
-	return consul, srv.Close
+	return collr, srv.Close
 }
 
-func caseConnectionRefused(t *testing.T) (*Consul, func()) {
+func caseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	consul := New()
-	consul.URL = "http://127.0.0.1:65535/"
-	require.NoError(t, consul.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65535/"
+	require.NoError(t, collr.Init())
 
-	return consul, func() {}
+	return collr, func() {}
 }
 
-func case404(t *testing.T) (*Consul, func()) {
+func case404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
 
-	consul := New()
-	consul.URL = srv.URL
-	require.NoError(t, consul.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return consul, srv.Close
+	return collr, srv.Close
 }

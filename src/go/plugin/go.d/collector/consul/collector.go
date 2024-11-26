@@ -32,8 +32,8 @@ func init() {
 	})
 }
 
-func New() *Consul {
-	return &Consul{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -57,7 +57,7 @@ type Config struct {
 	ACLToken       string `yaml:"acl_token,omitempty" json:"acl_token"`
 }
 
-type Consul struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -75,11 +75,11 @@ type Consul struct {
 	checks            map[string]bool
 }
 
-func (c *Consul) Configuration() any {
+func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Consul) Init() error {
+func (c *Collector) Init() error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
@@ -99,7 +99,7 @@ func (c *Consul) Init() error {
 	return nil
 }
 
-func (c *Consul) Check() error {
+func (c *Collector) Check() error {
 	mx, err := c.collect()
 	if err != nil {
 		return err
@@ -111,11 +111,11 @@ func (c *Consul) Check() error {
 	return nil
 }
 
-func (c *Consul) Charts() *module.Charts {
+func (c *Collector) Charts() *module.Charts {
 	return c.charts
 }
 
-func (c *Consul) Collect() map[string]int64 {
+func (c *Collector) Collect() map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -127,7 +127,7 @@ func (c *Consul) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *Consul) Cleanup() {
+func (c *Collector) Cleanup() {
 	if c.httpClient != nil {
 		c.httpClient.CloseIdleConnections()
 	}

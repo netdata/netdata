@@ -11,20 +11,20 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (c *Consul) validateConfig() error {
+func (c *Collector) validateConfig() error {
 	if c.URL == "" {
 		return errors.New("'url' not set")
 	}
 	return nil
 }
 
-func (c *Consul) initHTTPClient() (*http.Client, error) {
+func (c *Collector) initHTTPClient() (*http.Client, error) {
 	return web.NewHTTPClient(c.ClientConfig)
 }
 
 const urlPathAgentMetrics = "/v1/agent/metrics"
 
-func (c *Consul) initPrometheusClient(httpClient *http.Client) (prometheus.Prometheus, error) {
+func (c *Collector) initPrometheusClient(httpClient *http.Client) (prometheus.Prometheus, error) {
 	r, err := web.NewHTTPRequest(c.RequestConfig.Copy())
 	if err != nil {
 		return nil, err
