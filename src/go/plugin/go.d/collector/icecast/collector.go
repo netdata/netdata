@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Icecast {
-	return &Icecast{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -48,7 +48,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Icecast struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -59,29 +59,29 @@ type Icecast struct {
 	httpClient *http.Client
 }
 
-func (ic *Icecast) Configuration() any {
-	return ic.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (ic *Icecast) Init() error {
-	if ic.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(ic.ClientConfig)
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("creating http client: %w", err)
 	}
-	ic.httpClient = client
+	c.httpClient = client
 
-	ic.Debugf("using URL %s", ic.URL)
-	ic.Debugf("using timeout: %s", ic.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (ic *Icecast) Check() error {
-	mx, err := ic.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -93,14 +93,14 @@ func (ic *Icecast) Check() error {
 	return nil
 }
 
-func (ic *Icecast) Charts() *module.Charts {
-	return ic.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (ic *Icecast) Collect() map[string]int64 {
-	mx, err := ic.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		ic.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -110,8 +110,8 @@ func (ic *Icecast) Collect() map[string]int64 {
 	return mx
 }
 
-func (ic *Icecast) Cleanup() {
-	if ic.httpClient != nil {
-		ic.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }

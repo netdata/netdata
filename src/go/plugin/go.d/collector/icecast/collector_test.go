@@ -36,11 +36,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestIcecast_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Icecast{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestIcecast_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -61,26 +61,26 @@ func TestIcecast_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			icecast := New()
-			icecast.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, icecast.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, icecast.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestIcecast_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestIcecast_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (*Icecast, func())
+		prepare  func(t *testing.T) (*Collector, func())
 	}{
 		"success multiple sources": {
 			wantFail: false,
@@ -110,21 +110,21 @@ func TestIcecast_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			icecast, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, icecast.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, icecast.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestIcecast_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func(t *testing.T) (*Icecast, func())
+		prepare     func(t *testing.T) (*Collector, func())
 		wantMetrics map[string]int64
 		wantCharts  int
 	}{
@@ -159,21 +159,21 @@ func TestIcecast_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			icecast, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := icecast.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {
-				assert.Equal(t, test.wantCharts, len(*icecast.Charts()))
-				module.TestMetricsHasAllChartsDims(t, icecast.Charts(), mx)
+				assert.Equal(t, test.wantCharts, len(*collr.Charts()))
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareCaseMultipleSources(t *testing.T) (*Icecast, func()) {
+func prepareCaseMultipleSources(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -185,14 +185,14 @@ func prepareCaseMultipleSources(t *testing.T) (*Icecast, func()) {
 			}
 		}))
 
-	icecast := New()
-	icecast.URL = srv.URL
-	require.NoError(t, icecast.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return icecast, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseSingleSource(t *testing.T) (*Icecast, func()) {
+func prepareCaseSingleSource(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -204,14 +204,14 @@ func prepareCaseSingleSource(t *testing.T) (*Icecast, func()) {
 			}
 		}))
 
-	icecast := New()
-	icecast.URL = srv.URL
-	require.NoError(t, icecast.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return icecast, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseNoSources(t *testing.T) (*Icecast, func()) {
+func prepareCaseNoSources(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -223,14 +223,14 @@ func prepareCaseNoSources(t *testing.T) (*Icecast, func()) {
 			}
 		}))
 
-	icecast := New()
-	icecast.URL = srv.URL
-	require.NoError(t, icecast.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return icecast, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseUnexpectedJsonResponse(t *testing.T) (*Icecast, func()) {
+func prepareCaseUnexpectedJsonResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	resp := `
 {
@@ -254,32 +254,32 @@ func prepareCaseUnexpectedJsonResponse(t *testing.T) (*Icecast, func()) {
 			_, _ = w.Write([]byte(resp))
 		}))
 
-	icecast := New()
-	icecast.URL = srv.URL
-	require.NoError(t, icecast.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return icecast, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseInvalidFormatResponse(t *testing.T) (*Icecast, func()) {
+func prepareCaseInvalidFormatResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
 
-	icecast := New()
-	icecast.URL = srv.URL
-	require.NoError(t, icecast.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return icecast, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseConnectionRefused(t *testing.T) (*Icecast, func()) {
+func prepareCaseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	icecast := New()
-	icecast.URL = "http://127.0.0.1:65001"
-	require.NoError(t, icecast.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	require.NoError(t, collr.Init())
 
-	return icecast, func() {}
+	return collr, func() {}
 }
