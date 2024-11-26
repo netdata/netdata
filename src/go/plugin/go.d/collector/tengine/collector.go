@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Tengine {
-	return &Tengine{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -46,7 +46,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Tengine struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -55,29 +55,29 @@ type Tengine struct {
 	httpClient *http.Client
 }
 
-func (t *Tengine) Configuration() any {
-	return t.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (t *Tengine) Init() error {
-	if t.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("config: url not set")
 	}
 
-	httpClient, err := web.NewHTTPClient(t.ClientConfig)
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("error on creating http client : %v", err)
 	}
-	t.httpClient = httpClient
+	c.httpClient = httpClient
 
-	t.Debugf("using URL: %s", t.URL)
-	t.Debugf("using timeout: %s", t.Timeout)
+	c.Debugf("using URL: %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (t *Tengine) Check() error {
-	mx, err := t.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -89,14 +89,14 @@ func (t *Tengine) Check() error {
 	return nil
 }
 
-func (t *Tengine) Charts() *module.Charts {
-	return t.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (t *Tengine) Collect() map[string]int64 {
-	mx, err := t.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		t.Error(err)
+		c.Error(err)
 		return nil
 	}
 
@@ -107,8 +107,8 @@ func (t *Tengine) Collect() map[string]int64 {
 	return mx
 }
 
-func (t *Tengine) Cleanup() {
-	if t.httpClient != nil {
-		t.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }

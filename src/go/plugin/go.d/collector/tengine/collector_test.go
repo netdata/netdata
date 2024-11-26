@@ -31,21 +31,21 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestTengine_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Tengine{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestTengine_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestTengine_Init(t *testing.T) {
-	job := New()
+func TestCollector_Init(t *testing.T) {
+	collr := New()
 
-	require.NoError(t, job.Init())
+	require.NoError(t, collr.Init())
 }
 
-func TestTengine_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -53,23 +53,23 @@ func TestTengine_Check(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	assert.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	assert.NoError(t, collr.Check())
 }
 
-func TestTengine_CheckNG(t *testing.T) {
-	job := New()
+func TestCollector_CheckNG(t *testing.T) {
+	collr := New()
 
-	job.URL = "http://127.0.0.1:38001/us"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr.URL = "http://127.0.0.1:38001/us"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestTengine_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
+func TestCollector_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
 
-func TestTengine_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -77,10 +77,10 @@ func TestTengine_Collect(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"bytes_in":                 5944,
@@ -114,10 +114,10 @@ func TestTengine_Collect(t *testing.T) {
 		"ups_tries":                268,
 	}
 
-	assert.Equal(t, expected, job.Collect())
+	assert.Equal(t, expected, collr.Collect())
 }
 
-func TestTengine_InvalidData(t *testing.T) {
+func TestCollector_InvalidData(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -125,13 +125,13 @@ func TestTengine_InvalidData(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestTengine_404(t *testing.T) {
+func TestCollector_404(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -139,8 +139,8 @@ func TestTengine_404(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
