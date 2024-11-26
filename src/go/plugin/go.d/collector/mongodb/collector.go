@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Mongo {
-	return &Mongo{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			URI:     "mongodb://localhost:27017",
 			Timeout: confopt.Duration(time.Second),
@@ -55,7 +55,7 @@ type Config struct {
 	Databases   matcher.SimpleExpr `yaml:"databases,omitempty" json:"databases"`
 }
 
-type Mongo struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -71,24 +71,24 @@ type Mongo struct {
 	shards         map[string]bool
 }
 
-func (m *Mongo) Configuration() any {
-	return m.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (m *Mongo) Init() error {
-	if err := m.verifyConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.verifyConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	if err := m.initDatabaseSelector(); err != nil {
+	if err := c.initDatabaseSelector(); err != nil {
 		return fmt.Errorf("init database selector: %v", err)
 	}
 
 	return nil
 }
 
-func (m *Mongo) Check() error {
-	mx, err := m.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -98,29 +98,29 @@ func (m *Mongo) Check() error {
 	return nil
 }
 
-func (m *Mongo) Charts() *module.Charts {
-	return m.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (m *Mongo) Collect() map[string]int64 {
-	mx, err := m.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		m.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
-		m.Warning("no values collected")
+		c.Warning("no values collected")
 		return nil
 	}
 
 	return mx
 }
 
-func (m *Mongo) Cleanup() {
-	if m.conn == nil {
+func (c *Collector) Cleanup() {
+	if c.conn == nil {
 		return
 	}
-	if err := m.conn.close(); err != nil {
-		m.Warningf("cleanup: error on closing mongo conn: %v", err)
+	if err := c.conn.close(); err != nil {
+		c.Warningf("cleanup: error on closing mongo conn: %v", err)
 	}
 }

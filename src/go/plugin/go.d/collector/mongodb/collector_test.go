@@ -39,11 +39,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestMongo_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Mongo{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestMongo_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -71,60 +71,60 @@ func TestMongo_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mongo := New()
-			mongo.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, mongo.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, mongo.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestMongo_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestMongo_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare   func(t *testing.T) *Mongo
+		prepare   func(t *testing.T) *Collector
 		wantClose bool
 	}{
 		"client not initialized": {
 			wantClose: false,
-			prepare: func(t *testing.T) *Mongo {
+			prepare: func(t *testing.T) *Collector {
 				return New()
 			},
 		},
 		"client initialized": {
 			wantClose: true,
-			prepare: func(t *testing.T) *Mongo {
-				mongo := New()
-				mongo.conn = caseMongod()
-				_ = mongo.conn.initClient("", 0)
+			prepare: func(t *testing.T) *Collector {
+				collr := New()
+				collr.conn = caseMongod()
+				_ = collr.conn.initClient("", 0)
 
-				return mongo
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mongo := test.prepare(t)
+			collr := test.prepare(t)
 
-			require.NotPanics(t, mongo.Cleanup)
+			require.NotPanics(t, collr.Cleanup)
 			if test.wantClose {
-				mock, ok := mongo.conn.(*mockMongoClient)
+				collr, ok := collr.conn.(*mockMongoClient)
 				require.True(t, ok)
-				assert.True(t, mock.closeCalled)
+				assert.True(t, collr.closeCalled)
 			}
 		})
 	}
 }
 
-func TestMongo_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepare  func() *mockMongoClient
 		wantFail bool
@@ -145,22 +145,22 @@ func TestMongo_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mongo := prepareMongo()
-			defer mongo.Cleanup()
-			mongo.conn = test.prepare()
+			collr := prepareMongo()
+			defer collr.Cleanup()
+			collr.conn = test.prepare()
 
-			require.NoError(t, mongo.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, mongo.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, mongo.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestMongo_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepare       func() *mockMongoClient
 		wantCollected map[string]int64
@@ -596,23 +596,23 @@ func TestMongo_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mongo := prepareMongo()
-			defer mongo.Cleanup()
-			mongo.conn = test.prepare()
+			collr := prepareMongo()
+			defer collr.Cleanup()
+			collr.conn = test.prepare()
 
-			require.NoError(t, mongo.Init())
+			require.NoError(t, collr.Init())
 
-			mx := mongo.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
 		})
 	}
 }
 
-func prepareMongo() *Mongo {
-	m := New()
-	m.Databases = matcher.SimpleExpr{Includes: []string{"* *"}}
-	return m
+func prepareMongo() *Collector {
+	collr := New()
+	collr.Databases = matcher.SimpleExpr{Includes: []string{"* *"}}
+	return collr
 }
 
 func caseMongodReplicaSet() *mockMongoClient {
