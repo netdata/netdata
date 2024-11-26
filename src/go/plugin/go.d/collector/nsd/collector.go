@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *Nsd {
-	return &Nsd{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -42,7 +42,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type Nsd struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -51,22 +51,22 @@ type Nsd struct {
 	exec nsdControlBinary
 }
 
-func (n *Nsd) Configuration() any {
-	return n.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (n *Nsd) Init() error {
-	nsdControl, err := n.initNsdControlExec()
+func (c *Collector) Init() error {
+	nsdControl, err := c.initNsdControlExec()
 	if err != nil {
 		return fmt.Errorf("nsd-control exec initialization: %v", err)
 	}
-	n.exec = nsdControl
+	c.exec = nsdControl
 
 	return nil
 }
 
-func (n *Nsd) Check() error {
-	mx, err := n.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -78,14 +78,14 @@ func (n *Nsd) Check() error {
 	return nil
 }
 
-func (n *Nsd) Charts() *module.Charts {
-	return n.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (n *Nsd) Collect() map[string]int64 {
-	mx, err := n.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		n.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -95,4 +95,4 @@ func (n *Nsd) Collect() map[string]int64 {
 	return mx
 }
 
-func (n *Nsd) Cleanup() {}
+func (c *Collector) Cleanup() {}

@@ -33,11 +33,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestNsd_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Nsd{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestNsd_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -50,59 +50,59 @@ func TestNsd_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			nsd := New()
-			nsd.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, nsd.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, nsd.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestNsd_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Nsd
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *Nsd {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Nsd {
-				nsd := New()
-				nsd.exec = prepareMockOK()
-				_ = nsd.Check()
-				return nsd
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOK()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Nsd {
-				nsd := New()
-				nsd.exec = prepareMockOK()
-				_ = nsd.Collect()
-				return nsd
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOK()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			nsd := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, nsd.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestNsd_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestNsd_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockNsdControl
 		wantFail    bool
@@ -127,20 +127,20 @@ func TestNsd_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			nsd := New()
+			collr := New()
 			mock := test.prepareMock()
-			nsd.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, nsd.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, nsd.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestNsd_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockNsdControl
 		wantMetrics map[string]int64
@@ -284,17 +284,17 @@ func TestNsd_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			nsd := New()
+			collr := New()
 			mock := test.prepareMock()
-			nsd.exec = mock
+			collr.exec = mock
 
-			mx := nsd.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				assert.Len(t, *nsd.Charts(), len(charts))
-				module.TestMetricsHasAllChartsDims(t, nsd.Charts(), mx)
+				assert.Len(t, *collr.Charts(), len(charts))
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
