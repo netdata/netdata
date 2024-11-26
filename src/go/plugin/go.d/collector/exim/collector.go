@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *Exim {
-	return &Exim{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -40,7 +40,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type Exim struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -49,22 +49,22 @@ type Exim struct {
 	exec eximBinary
 }
 
-func (e *Exim) Configuration() any {
-	return e.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (e *Exim) Init() error {
-	exim, err := e.initEximExec()
+func (c *Collector) Init() error {
+	exim, err := c.initEximExec()
 	if err != nil {
 		return fmt.Errorf("exim exec initialization: %v", err)
 	}
-	e.exec = exim
+	c.exec = exim
 
 	return nil
 }
 
-func (e *Exim) Check() error {
-	mx, err := e.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -76,14 +76,14 @@ func (e *Exim) Check() error {
 	return nil
 }
 
-func (e *Exim) Charts() *module.Charts {
-	return e.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (e *Exim) Collect() map[string]int64 {
-	mx, err := e.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		e.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -93,4 +93,4 @@ func (e *Exim) Collect() map[string]int64 {
 	return mx
 }
 
-func (e *Exim) Cleanup() {}
+func (c *Collector) Cleanup() {}

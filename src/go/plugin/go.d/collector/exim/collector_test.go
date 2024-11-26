@@ -28,11 +28,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestExim_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Exim{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestExim_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -45,59 +45,59 @@ func TestExim_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			exim := New()
-			exim.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, exim.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, exim.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestExim_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Exim
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *Exim {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Exim {
-				exim := New()
-				exim.exec = prepareMockOK()
-				_ = exim.Check()
-				return exim
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOK()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Exim {
-				exim := New()
-				exim.exec = prepareMockOK()
-				_ = exim.Collect()
-				return exim
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOK()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			exim := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, exim.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestEximCharts(t *testing.T) {
+func TestCollectorCharts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestExim_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockEximExec
 		wantFail    bool
@@ -122,20 +122,20 @@ func TestExim_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			exim := New()
+			collr := New()
 			mock := test.prepareMock()
-			exim.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, exim.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, exim.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestExim_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockEximExec
 		wantMetrics map[string]int64
@@ -162,17 +162,17 @@ func TestExim_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			exim := New()
+			collr := New()
 			mock := test.prepareMock()
-			exim.exec = mock
+			collr.exec = mock
 
-			mx := exim.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				assert.Len(t, *exim.Charts(), len(charts))
-				module.TestMetricsHasAllChartsDims(t, exim.Charts(), mx)
+				assert.Len(t, *collr.Charts(), len(charts))
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
