@@ -55,6 +55,11 @@ func (n *nvmeNumber) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+type nvmeCli interface {
+	list() (*nvmeDeviceList, error)
+	smartLog(devicePath string) (*nvmeDeviceSmartLog, error)
+}
+
 type nvmeCLIExec struct {
 	ndsudoPath string
 	timeout    time.Duration

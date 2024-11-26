@@ -239,7 +239,7 @@ var (
 	}
 )
 
-func (n *NVMe) addDeviceCharts(devicePath, model string) {
+func (c *Collector) addDeviceCharts(devicePath, model string) {
 	device := extractDeviceFromPath(devicePath)
 
 	charts := deviceChartsTmpl.Copy()
@@ -255,17 +255,17 @@ func (n *NVMe) addDeviceCharts(devicePath, model string) {
 		}
 	}
 
-	if err := n.Charts().Add(*charts...); err != nil {
-		n.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (n *NVMe) removeDeviceCharts(devicePath string) {
+func (c *Collector) removeDeviceCharts(devicePath string) {
 	device := extractDeviceFromPath(devicePath)
 
 	px := fmt.Sprintf("device_%s", device)
 
-	for _, chart := range *n.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

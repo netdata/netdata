@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *NVMe {
-	return &NVMe{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -46,42 +46,36 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type (
-	NVMe struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec nvmeCLI
+	exec nvmeCli
 
-		devicePaths      map[string]bool
-		listDevicesTime  time.Time
-		listDevicesEvery time.Duration
-		forceListDevices bool
-	}
-	nvmeCLI interface {
-		list() (*nvmeDeviceList, error)
-		smartLog(devicePath string) (*nvmeDeviceSmartLog, error)
-	}
-)
-
-func (n *NVMe) Configuration() any {
-	return n.Config
+	devicePaths      map[string]bool
+	listDevicesTime  time.Time
+	listDevicesEvery time.Duration
+	forceListDevices bool
 }
 
-func (n *NVMe) Init() error {
-	nvmeExec, err := n.initNVMeCLIExec()
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	nvmeExec, err := c.initNVMeCLIExec()
 	if err != nil {
 		return fmt.Errorf("init nvme-cli exec: %v", err)
 	}
-	n.exec = nvmeExec
+	c.exec = nvmeExec
 
 	return nil
 }
 
-func (n *NVMe) Check() error {
-	mx, err := n.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -91,14 +85,14 @@ func (n *NVMe) Check() error {
 	return nil
 }
 
-func (n *NVMe) Charts() *module.Charts {
-	return n.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (n *NVMe) Collect() map[string]int64 {
-	mx, err := n.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		n.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -107,4 +101,4 @@ func (n *NVMe) Collect() map[string]int64 {
 	return mx
 }
 
-func (n *NVMe) Cleanup() {}
+func (c *Collector) Cleanup() {}

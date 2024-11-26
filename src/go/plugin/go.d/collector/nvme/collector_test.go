@@ -41,11 +41,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestNVMe_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &NVMe{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestNVMe_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -58,29 +58,29 @@ func TestNVMe_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			nv := New()
+			collr := New()
 
 			if test.wantFail {
-				assert.Error(t, nv.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, nv.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestNVMe_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestNVMe_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestNVMe_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(n *NVMe)
+		prepare  func(*Collector)
 	}{
 		"success if all calls successful": {
 			wantFail: false,
@@ -102,31 +102,31 @@ func TestNVMe_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			n := New()
+			collr := New()
 
-			test.prepare(n)
+			test.prepare(collr)
 
 			if test.wantFail {
-				assert.Error(t, n.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, n.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestNVMe_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	type testCaseStep struct {
-		prepare func(n *NVMe)
-		check   func(t *testing.T, n *NVMe)
+		prepare func(*Collector)
+		check   func(*testing.T, *Collector)
 	}
 
 	tests := map[string][]testCaseStep{
 		"success if all calls successful": {
 			{
 				prepare: prepareCaseOK,
-				check: func(t *testing.T, n *NVMe) {
-					mx := n.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"device_nvme0n1_available_spare":                              100,
@@ -188,8 +188,8 @@ func TestNVMe_Collect(t *testing.T) {
 		"success if all calls successful with string values": {
 			{
 				prepare: prepareCaseStringValuesOK,
-				check: func(t *testing.T, n *NVMe) {
-					mx := n.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"device_nvme0n1_available_spare":                              100,
@@ -251,8 +251,8 @@ func TestNVMe_Collect(t *testing.T) {
 		"success if all calls successful with float values": {
 			{
 				prepare: prepareCaseFloatValuesOK,
-				check: func(t *testing.T, n *NVMe) {
-					mx := n.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"device_nvme0n1_available_spare":                              100,
@@ -314,8 +314,8 @@ func TestNVMe_Collect(t *testing.T) {
 		"fail if 'nvme list' returns an empty list": {
 			{
 				prepare: prepareCaseEmptyList,
-				check: func(t *testing.T, n *NVMe) {
-					mx := n.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					assert.Equal(t, (map[string]int64)(nil), mx)
 				},
@@ -324,8 +324,8 @@ func TestNVMe_Collect(t *testing.T) {
 		"fail if 'nvme list' returns an error": {
 			{
 				prepare: prepareCaseErrOnList,
-				check: func(t *testing.T, n *NVMe) {
-					mx := n.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					assert.Equal(t, (map[string]int64)(nil), mx)
 				},
@@ -334,8 +334,8 @@ func TestNVMe_Collect(t *testing.T) {
 		"fail if 'nvme smart-log' returns an error": {
 			{
 				prepare: prepareCaseErrOnSmartLog,
-				check: func(t *testing.T, n *NVMe) {
-					mx := n.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					assert.Equal(t, (map[string]int64)(nil), mx)
 				},
@@ -345,40 +345,40 @@ func TestNVMe_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			n := New()
+			collr := New()
 
 			for i, step := range test {
 				t.Run(fmt.Sprintf("step[%d]", i), func(t *testing.T) {
-					step.prepare(n)
-					step.check(t, n)
+					step.prepare(collr)
+					step.check(t, collr)
 				})
 			}
 		})
 	}
 }
 
-func prepareCaseOK(n *NVMe) {
-	n.exec = &mockNVMeCLIExec{}
+func prepareCaseOK(collr *Collector) {
+	collr.exec = &mockNVMeCLIExec{}
 }
 
-func prepareCaseStringValuesOK(n *NVMe) {
-	n.exec = &mockNVMeCLIExec{smartLogString: true}
+func prepareCaseStringValuesOK(collr *Collector) {
+	collr.exec = &mockNVMeCLIExec{smartLogString: true}
 }
 
-func prepareCaseFloatValuesOK(n *NVMe) {
-	n.exec = &mockNVMeCLIExec{smartLogFloat: true}
+func prepareCaseFloatValuesOK(collr *Collector) {
+	collr.exec = &mockNVMeCLIExec{smartLogFloat: true}
 }
 
-func prepareCaseEmptyList(n *NVMe) {
-	n.exec = &mockNVMeCLIExec{emptyList: true}
+func prepareCaseEmptyList(collr *Collector) {
+	collr.exec = &mockNVMeCLIExec{emptyList: true}
 }
 
-func prepareCaseErrOnList(n *NVMe) {
-	n.exec = &mockNVMeCLIExec{errOnList: true}
+func prepareCaseErrOnList(collr *Collector) {
+	collr.exec = &mockNVMeCLIExec{errOnList: true}
 }
 
-func prepareCaseErrOnSmartLog(n *NVMe) {
-	n.exec = &mockNVMeCLIExec{errOnSmartLog: true}
+func prepareCaseErrOnSmartLog(collr *Collector) {
+	collr.exec = &mockNVMeCLIExec{errOnSmartLog: true}
 }
 
 type mockNVMeCLIExec struct {
