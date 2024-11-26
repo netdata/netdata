@@ -34,11 +34,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestBoinc_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Boinc{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestBoinc_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -59,59 +59,59 @@ func TestBoinc_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			boinc := New()
-			boinc.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, boinc.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, boinc.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestBoinc_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Boinc
+		prepare func() *Collector
 	}{
 		"not initialized": {
-			prepare: func() *Boinc {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Boinc {
-				boinc := New()
-				boinc.newConn = func(Config, *logger.Logger) boincConn { return prepareMockOk() }
-				_ = boinc.Check()
-				return boinc
+			prepare: func() *Collector {
+				collr := New()
+				collr.newConn = func(Config, *logger.Logger) boincConn { return prepareMockOk() }
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Boinc {
-				boinc := New()
-				boinc.newConn = func(Config, *logger.Logger) boincConn { return prepareMockOk() }
-				_ = boinc.Collect()
-				return boinc
+			prepare: func() *Collector {
+				collr := New()
+				collr.newConn = func(Config, *logger.Logger) boincConn { return prepareMockOk() }
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			boinc := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, boinc.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestBoinc_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestBoinc_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockBoincConn
 		wantFail    bool
@@ -128,20 +128,20 @@ func TestBoinc_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			boinc := New()
+			collr := New()
 			mock := test.prepareMock()
-			boinc.newConn = func(Config, *logger.Logger) boincConn { return mock }
+			collr.newConn = func(Config, *logger.Logger) boincConn { return mock }
 
 			if test.wantFail {
-				assert.Error(t, boinc.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, boinc.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestBoinc_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock             func() *mockBoincConn
 		wantMetrics             map[string]int64
@@ -212,20 +212,20 @@ func TestBoinc_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			boinc := New()
+			collr := New()
 			mock := test.prepareMock()
-			boinc.newConn = func(Config, *logger.Logger) boincConn { return mock }
+			collr.newConn = func(Config, *logger.Logger) boincConn { return mock }
 
-			mx := boinc.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, boinc.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 
 			assert.Equal(t, test.disconnectBeforeCleanup, mock.disconnectCalled, "disconnect before cleanup")
-			boinc.Cleanup()
+			collr.Cleanup()
 			assert.Equal(t, test.disconnectAfterCleanup, mock.disconnectCalled, "disconnect after cleanup")
 		})
 	}

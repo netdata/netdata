@@ -23,8 +23,8 @@ func init() {
 	})
 }
 
-func New() *Boinc {
-	return &Boinc{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:31416",
 			Timeout: confopt.Duration(time.Second * 1),
@@ -41,7 +41,7 @@ type Config struct {
 	Password    string           `yaml:"password" json:"password"`
 }
 
-type Boinc struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -51,20 +51,20 @@ type Boinc struct {
 	conn    boincConn
 }
 
-func (b *Boinc) Configuration() any {
-	return b.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (b *Boinc) Init() error {
-	if b.Address == "" {
+func (c *Collector) Init() error {
+	if c.Address == "" {
 		return errors.New("config: 'address' not set")
 	}
 
 	return nil
 }
 
-func (b *Boinc) Check() error {
-	mx, err := b.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -76,14 +76,14 @@ func (b *Boinc) Check() error {
 	return nil
 }
 
-func (b *Boinc) Charts() *module.Charts {
-	return b.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (b *Boinc) Collect() map[string]int64 {
-	mx, err := b.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		b.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -93,9 +93,9 @@ func (b *Boinc) Collect() map[string]int64 {
 	return mx
 }
 
-func (b *Boinc) Cleanup() {
-	if b.conn != nil {
-		b.conn.disconnect()
-		b.conn = nil
+func (c *Collector) Cleanup() {
+	if c.conn != nil {
+		c.conn.disconnect()
+		c.conn = nil
 	}
 }
