@@ -17,8 +17,8 @@ import (
 
 const precision = 10
 
-func (w *W1sensor) collect() (map[string]int64, error) {
-	des, err := os.ReadDir(w.SensorsPath)
+func (c *Collector) collect() (map[string]int64, error) {
+	des, err := os.ReadDir(c.SensorsPath)
 	if err != nil {
 		return nil, err
 	}
@@ -31,34 +31,34 @@ func (w *W1sensor) collect() (map[string]int64, error) {
 			continue
 		}
 		if !isW1sensorDir(de.Name()) {
-			w.Debugf("'%s' is not a w1sensor directory, skipping it", filepath.Join(w.SensorsPath, de.Name()))
+			c.Debugf("'%s' is not a w1sensor directory, skipping it", filepath.Join(c.SensorsPath, de.Name()))
 			continue
 		}
 
-		filename := filepath.Join(w.SensorsPath, de.Name(), "w1_slave")
+		filename := filepath.Join(c.SensorsPath, de.Name(), "w1_slave")
 
 		temp, err := readW1sensorTemperature(filename)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
-				w.Debugf("'%s' doesn't have 'w1_slave', skipping it", filepath.Join(w.SensorsPath, de.Name()))
+				c.Debugf("'%s' doesn't have 'w1_slave', skipping it", filepath.Join(c.SensorsPath, de.Name()))
 				continue
 			}
 			return nil, fmt.Errorf("failed to read temperature from '%s': %w", filename, err)
 		}
 
 		seen[de.Name()] = true
-		if !w.seenSensors[de.Name()] {
-			w.addSensorChart(de.Name())
+		if !c.seenSensors[de.Name()] {
+			c.addSensorChart(de.Name())
 
 		}
 
 		mx[fmt.Sprintf("w1sensor_%s_temperature", de.Name())] = temp
 	}
 
-	for id := range w.seenSensors {
+	for id := range c.seenSensors {
 		if !seen[id] {
-			delete(w.seenSensors, id)
-			w.removeSensorChart(id)
+			delete(c.seenSensors, id)
+			c.removeSensorChart(id)
 		}
 	}
 

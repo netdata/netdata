@@ -30,7 +30,7 @@ var (
 	}
 )
 
-func (w *W1sensor) addSensorChart(id string) {
+func (c *Collector) addSensorChart(id string) {
 	chart := sensorChartTmpl.Copy()
 
 	chart.ID = fmt.Sprintf(chart.ID, id)
@@ -42,15 +42,15 @@ func (w *W1sensor) addSensorChart(id string) {
 		dim.ID = fmt.Sprintf(dim.ID, id)
 	}
 
-	if err := w.Charts().Add(chart); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 
 }
 
-func (w *W1sensor) removeSensorChart(id string) {
+func (c *Collector) removeSensorChart(id string) {
 	px := fmt.Sprintf("w1sensor_%s", id)
-	for _, chart := range *w.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

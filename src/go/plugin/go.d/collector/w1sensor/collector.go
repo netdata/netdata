@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *W1sensor {
-	return &W1sensor{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			SensorsPath: "/sys/bus/w1/devices",
 		},
@@ -40,31 +40,29 @@ type Config struct {
 	SensorsPath string `yaml:"sensors_path,omitempty" json:"sensors_path"`
 }
 
-type (
-	W1sensor struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		seenSensors map[string]bool
-	}
-)
-
-func (w *W1sensor) Configuration() any {
-	return w.Config
+	seenSensors map[string]bool
 }
 
-func (w *W1sensor) Init() error {
-	if w.SensorsPath == "" {
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	if c.SensorsPath == "" {
 		return errors.New("config: no sensors path specified")
 	}
 
 	return nil
 }
 
-func (w *W1sensor) Check() error {
-	mx, err := w.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -76,14 +74,14 @@ func (w *W1sensor) Check() error {
 	return nil
 }
 
-func (w *W1sensor) Charts() *module.Charts {
-	return w.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (w *W1sensor) Collect() map[string]int64 {
-	mx, err := w.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		w.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -93,4 +91,4 @@ func (w *W1sensor) Collect() map[string]int64 {
 	return mx
 }
 
-func (w *W1sensor) Cleanup() {}
+func (c *Collector) Cleanup() {}

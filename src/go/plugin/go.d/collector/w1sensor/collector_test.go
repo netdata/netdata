@@ -28,11 +28,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestW1sensor_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &W1sensor{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestW1sensor_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -47,13 +47,13 @@ func TestW1sensor_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			w1 := New()
-			w1.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, w1.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, w1.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
@@ -61,45 +61,45 @@ func TestW1sensor_Init(t *testing.T) {
 
 func TestAP_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *W1sensor
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *W1sensor {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *W1sensor {
-				w1 := prepareCaseOk()
-				_ = w1.Check()
-				return w1
+			prepare: func() *Collector {
+				collr := prepareCaseOk()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *W1sensor {
-				w1 := prepareCaseOk()
-				_ = w1.Collect()
-				return w1
+			prepare: func() *Collector {
+				collr := prepareCaseOk()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			w1 := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, w1.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestW1sensor_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestW1sensor_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepareMock func() *W1sensor
+		prepareMock func() *Collector
 		wantFail    bool
 	}{
 		"success case": {
@@ -114,12 +114,12 @@ func TestW1sensor_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			w1 := test.prepareMock()
+			collr := test.prepareMock()
 
 			if test.wantFail {
-				assert.Error(t, w1.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, w1.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
@@ -127,7 +127,7 @@ func TestW1sensor_Check(t *testing.T) {
 
 func TestW1Sensors_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepareMock func() *W1sensor
+		prepareMock func() *Collector
 		wantMetrics map[string]int64
 		wantCharts  int
 	}{
@@ -149,27 +149,27 @@ func TestW1Sensors_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			w1 := test.prepareMock()
+			collr := test.prepareMock()
 
-			mx := w1.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
-			assert.Equal(t, test.wantCharts, len(*w1.Charts()), "wantCharts")
+			assert.Equal(t, test.wantCharts, len(*collr.Charts()), "wantCharts")
 
-			module.TestMetricsHasAllChartsDims(t, w1.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }
 
-func prepareCaseOk() *W1sensor {
-	w1 := New()
-	w1.SensorsPath = "testdata/devices"
-	return w1
+func prepareCaseOk() *Collector {
+	collr := New()
+	collr.SensorsPath = "testdata/devices"
+	return collr
 }
 
-func prepareCaseNoSensorsDir() *W1sensor {
-	w1 := New()
-	w1.SensorsPath = "testdata/devices!"
-	return w1
+func prepareCaseNoSensorsDir() *Collector {
+	collr := New()
+	collr.SensorsPath = "testdata/devices!"
+	return collr
 }
