@@ -244,14 +244,14 @@ The plugin supports searching through all fields of log entries using text patte
 
 **Multiple Patterns**:
 
-- Separate patterns with ` | ` (pipe character with spaces on both sides).
+- Separate patterns with `|` (pipe character).
 - Multiple patterns are combined with OR logic.
-- Example: `error | warning` matches entries containing either `error` OR `warning`.
+- Example: `error|warning` matches entries containing either `error` OR `warning`.
 
 **Negative Patterns**:
 
 - Prefix pattern with `!` to exclude matching entries.
-- Example: `!systemd | *` matches any entry that does NOT contain `systemd`.
+- Example: `!systemd|*` matches any entry that does NOT contain `systemd`.
 
 ## Query performance
 
