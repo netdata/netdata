@@ -2256,9 +2256,9 @@ bool facets_row_finished(FACETS *facets, usec_t usec) {
     facets->operations.rows.evaluated++;
 
     if(unlikely((facets->query && facets->keys_filtered_by_query &&
-                (!facets->current_row.keys_matched_by_query_positive || facets->current_row.keys_matched_by_query_negative)) ||
-                (facets->timeframe.before_ut && usec > facets->timeframe.before_ut) ||
-                (facets->timeframe.after_ut && usec < facets->timeframe.after_ut))) {
+                 !facets->current_row.keys_matched_by_query_positive) ||
+                 (facets->timeframe.before_ut && usec > facets->timeframe.before_ut) ||
+                 (facets->timeframe.after_ut && usec < facets->timeframe.after_ut))) {
         // this row is not useful
         // 1. not matched by full text search, or
         // 2. not in our timeframe
