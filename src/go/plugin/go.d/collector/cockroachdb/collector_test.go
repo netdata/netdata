@@ -33,59 +33,59 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestCockroachDB_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &CockroachDB{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
 	assert.Implements(t, (*module.Module)(nil), New())
 }
 
-func TestCockroachDB_Init(t *testing.T) {
-	cdb := prepareCockroachDB()
+func TestCollector_Init(t *testing.T) {
+	collr := prepareCockroachDB()
 
-	assert.NoError(t, cdb.Init())
+	assert.NoError(t, collr.Init())
 }
 
-func TestCockroachDB_Init_ReturnsFalseIfConfigURLIsNotSet(t *testing.T) {
-	cdb := prepareCockroachDB()
-	cdb.URL = ""
+func TestCollector_Init_ReturnsFalseIfConfigURLIsNotSet(t *testing.T) {
+	collr := prepareCockroachDB()
+	collr.URL = ""
 
-	assert.Error(t, cdb.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestCockroachDB_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
-	cdb := prepareCockroachDB()
-	cdb.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
+func TestCollector_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
+	collr := prepareCockroachDB()
+	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, cdb.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestCockroachDB_Check(t *testing.T) {
-	cdb, srv := prepareClientServer(t)
+func TestCollector_Check(t *testing.T) {
+	collr, srv := prepareClientServer(t)
 	defer srv.Close()
 
-	assert.NoError(t, cdb.Check())
+	assert.NoError(t, collr.Check())
 }
 
-func TestCockroachDB_Check_ReturnsFalseIfConnectionRefused(t *testing.T) {
-	cdb := New()
-	cdb.URL = "http://127.0.0.1:38001/metrics"
-	require.NoError(t, cdb.Init())
+func TestCollector_Check_ReturnsFalseIfConnectionRefused(t *testing.T) {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001/metrics"
+	require.NoError(t, collr.Init())
 
-	assert.Error(t, cdb.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestCockroachDB_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestCockroachDB_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestCockroachDB_Collect(t *testing.T) {
-	cdb, srv := prepareClientServer(t)
+func TestCollector_Collect(t *testing.T) {
+	collr, srv := prepareClientServer(t)
 	defer srv.Close()
 
 	expected := map[string]int64{
@@ -221,98 +221,98 @@ func TestCockroachDB_Collect(t *testing.T) {
 		"valcount":                                     124081,
 	}
 
-	mx := cdb.Collect()
+	mx := collr.Collect()
 
 	assert.Equal(t, expected, mx)
 
-	module.TestMetricsHasAllChartsDims(t, cdb.Charts(), mx)
+	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
-func TestCockroachDB_Collect_ReturnsNilIfNotCockroachDBMetrics(t *testing.T) {
-	cdb, srv := prepareClientServerNotCockroachDBMetricResponse(t)
+func TestCollector_Collect_ReturnsNilIfNotCockroachDBMetrics(t *testing.T) {
+	collr, srv := prepareClientServerNotCockroachDBMetricResponse(t)
 	defer srv.Close()
 
-	assert.Nil(t, cdb.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestCockroachDB_Collect_ReturnsNilIfConnectionRefused(t *testing.T) {
-	cdb := prepareCockroachDB()
-	require.NoError(t, cdb.Init())
+func TestCollector_Collect_ReturnsNilIfConnectionRefused(t *testing.T) {
+	collr := prepareCockroachDB()
+	require.NoError(t, collr.Init())
 
-	assert.Nil(t, cdb.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestCockroachDB_Collect_ReturnsNilIfReceiveInvalidResponse(t *testing.T) {
-	cdb, ts := prepareClientServerInvalidDataResponse(t)
+func TestCollector_Collect_ReturnsNilIfReceiveInvalidResponse(t *testing.T) {
+	collr, ts := prepareClientServerInvalidDataResponse(t)
 	defer ts.Close()
 
-	assert.Nil(t, cdb.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestCockroachDB_Collect_ReturnsNilIfReceiveResponse404(t *testing.T) {
-	cdb, ts := prepareClientServerResponse404(t)
+func TestCollector_Collect_ReturnsNilIfReceiveResponse404(t *testing.T) {
+	collr, ts := prepareClientServerResponse404(t)
 	defer ts.Close()
 
-	assert.Nil(t, cdb.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func prepareCockroachDB() *CockroachDB {
-	cdb := New()
-	cdb.URL = "http://127.0.0.1:38001/metrics"
-	return cdb
+func prepareCockroachDB() *Collector {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001/metrics"
+	return collr
 }
 
-func prepareClientServer(t *testing.T) (*CockroachDB, *httptest.Server) {
+func prepareClientServer(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataExpectedMetrics)
 		}))
 
-	cdb := New()
-	cdb.URL = ts.URL
-	require.NoError(t, cdb.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	return cdb, ts
+	return collr, ts
 }
 
-func prepareClientServerNotCockroachDBMetricResponse(t *testing.T) (*CockroachDB, *httptest.Server) {
+func prepareClientServerNotCockroachDBMetricResponse(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataUnexpectedMetrics)
 		}))
 
-	cdb := New()
-	cdb.URL = ts.URL
-	require.NoError(t, cdb.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	return cdb, ts
+	return collr, ts
 }
 
-func prepareClientServerInvalidDataResponse(t *testing.T) (*CockroachDB, *httptest.Server) {
+func prepareClientServerInvalidDataResponse(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
 
-	cdb := New()
-	cdb.URL = ts.URL
-	require.NoError(t, cdb.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	return cdb, ts
+	return collr, ts
 }
 
-func prepareClientServerResponse404(t *testing.T) (*CockroachDB, *httptest.Server) {
+func prepareClientServerResponse404(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
 
-	cdb := New()
-	cdb.URL = ts.URL
-	require.NoError(t, cdb.Init())
-	return cdb, ts
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	return collr, ts
 }

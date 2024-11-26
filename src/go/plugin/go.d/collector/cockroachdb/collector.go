@@ -32,8 +32,8 @@ func init() {
 	})
 }
 
-func New() *CockroachDB {
-	return &CockroachDB{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -53,7 +53,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type CockroachDB struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -62,11 +62,11 @@ type CockroachDB struct {
 	prom prometheus.Prometheus
 }
 
-func (c *CockroachDB) Configuration() any {
+func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *CockroachDB) Init() error {
+func (c *Collector) Init() error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("error on validating config: %v", err)
 	}
@@ -85,7 +85,7 @@ func (c *CockroachDB) Init() error {
 	return nil
 }
 
-func (c *CockroachDB) Check() error {
+func (c *Collector) Check() error {
 	mx, err := c.collect()
 	if err != nil {
 		return err
@@ -97,11 +97,11 @@ func (c *CockroachDB) Check() error {
 	return nil
 }
 
-func (c *CockroachDB) Charts() *Charts {
+func (c *Collector) Charts() *Charts {
 	return c.charts
 }
 
-func (c *CockroachDB) Collect() map[string]int64 {
+func (c *Collector) Collect() map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -113,7 +113,7 @@ func (c *CockroachDB) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *CockroachDB) Cleanup() {
+func (c *Collector) Cleanup() {
 	if c.prom != nil && c.prom.HTTPClient() != nil {
 		c.prom.HTTPClient().CloseIdleConnections()
 	}

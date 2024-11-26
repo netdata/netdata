@@ -13,7 +13,7 @@ func validCockroachDBMetrics(scraped prometheus.Series) bool {
 	return scraped.FindByName("sql_restart_savepoint_count_internal").Len() > 0
 }
 
-func (c *CockroachDB) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	scraped, err := c.prom.ScrapeSeries()
 	if err != nil {
 		return nil, err
