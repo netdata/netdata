@@ -44,11 +44,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestPihole_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Pihole{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestPihole_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -69,22 +69,22 @@ func TestPihole_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			p := New()
-			p.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, p.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, p.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestPihole_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (p *Pihole, cleanup func())
+		prepare  func(t *testing.T) (collr *Collector, cleanup func())
 	}{
 		"success with web password": {
 			wantFail: false,
@@ -102,25 +102,25 @@ func TestPihole_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			p, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, p.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, p.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestPihole_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestPihole_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func(t *testing.T) (p *Pihole, cleanup func())
+		prepare       func(t *testing.T) (collr *Collector, cleanup func())
 		wantMetrics   map[string]int64
 		wantNumCharts int
 	}{
@@ -165,51 +165,51 @@ func TestPihole_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			p, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := p.Collect()
+			mx := collr.Collect()
 
 			copyBlockListLastUpdate(mx, test.wantMetrics)
 			require.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {
-				assert.Len(t, *p.Charts(), test.wantNumCharts)
+				assert.Len(t, *collr.Charts(), test.wantNumCharts)
 			}
 		})
 	}
 }
 
-func caseSuccessWithWebPassword(t *testing.T) (*Pihole, func()) {
-	p, srv := New(), mockPiholeServer{}.newPiholeHTTPServer()
+func caseSuccessWithWebPassword(t *testing.T) (*Collector, func()) {
+	collr, srv := New(), mockPiholeServer{}.newPiholeHTTPServer()
 
-	p.SetupVarsPath = pathSetupVarsOK
-	p.URL = srv.URL
+	collr.SetupVarsPath = pathSetupVarsOK
+	collr.URL = srv.URL
 
-	require.NoError(t, p.Init())
+	require.NoError(t, collr.Init())
 
-	return p, srv.Close
+	return collr, srv.Close
 }
 
-func caseFailNoWebPassword(t *testing.T) (*Pihole, func()) {
-	p, srv := New(), mockPiholeServer{}.newPiholeHTTPServer()
+func caseFailNoWebPassword(t *testing.T) (*Collector, func()) {
+	collr, srv := New(), mockPiholeServer{}.newPiholeHTTPServer()
 
-	p.SetupVarsPath = pathSetupVarsWrong
-	p.URL = srv.URL
+	collr.SetupVarsPath = pathSetupVarsWrong
+	collr.URL = srv.URL
 
-	require.NoError(t, p.Init())
+	require.NoError(t, collr.Init())
 
-	return p, srv.Close
+	return collr, srv.Close
 }
 
-func caseFailUnsupportedVersion(t *testing.T) (*Pihole, func()) {
-	p, srv := New(), mockPiholeServer{unsupportedVersion: true}.newPiholeHTTPServer()
+func caseFailUnsupportedVersion(t *testing.T) (*Collector, func()) {
+	collr, srv := New(), mockPiholeServer{unsupportedVersion: true}.newPiholeHTTPServer()
 
-	p.SetupVarsPath = pathSetupVarsOK
-	p.URL = srv.URL
+	collr.SetupVarsPath = pathSetupVarsOK
+	collr.URL = srv.URL
 
-	require.NoError(t, p.Init())
+	require.NoError(t, collr.Init())
 
-	return p, srv.Close
+	return collr, srv.Close
 }
 
 type mockPiholeServer struct {

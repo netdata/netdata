@@ -29,8 +29,8 @@ func init() {
 	})
 }
 
-func New() *Pihole {
-	return &Pihole{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -55,7 +55,7 @@ type Config struct {
 	SetupVarsPath  string `yaml:"setup_vars_path" json:"setup_vars_path"`
 }
 
-type Pihole struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -68,33 +68,33 @@ type Pihole struct {
 	checkVersion bool
 }
 
-func (p *Pihole) Configuration() any {
-	return p.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (p *Pihole) Init() error {
-	if err := p.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	httpClient, err := p.initHTTPClient()
+	httpClient, err := c.initHTTPClient()
 	if err != nil {
 		return fmt.Errorf("init http client: %v", err)
 	}
-	p.httpClient = httpClient
+	c.httpClient = httpClient
 
-	p.Password = p.getWebPassword()
-	if p.Password == "" {
-		p.Warning("no web password, not all metrics available")
+	c.Password = c.getWebPassword()
+	if c.Password == "" {
+		c.Warning("no web password, not all metrics available")
 	} else {
-		p.Debugf("web password: %s", p.Password)
+		c.Debugf("web password: %s", c.Password)
 	}
 
 	return nil
 }
 
-func (p *Pihole) Check() error {
-	mx, err := p.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -104,14 +104,14 @@ func (p *Pihole) Check() error {
 	return nil
 }
 
-func (p *Pihole) Charts() *module.Charts {
-	return p.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (p *Pihole) Collect() map[string]int64 {
-	mx, err := p.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -121,8 +121,8 @@ func (p *Pihole) Collect() map[string]int64 {
 	return mx
 }
 
-func (p *Pihole) Cleanup() {
-	if p.httpClient != nil {
-		p.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }

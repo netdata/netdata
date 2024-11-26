@@ -32,35 +32,35 @@ const (
 	precision = 1000
 )
 
-func (p *Pihole) collect() (map[string]int64, error) {
-	if p.checkVersion {
-		ver, err := p.queryAPIVersion()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.checkVersion {
+		ver, err := c.queryAPIVersion()
 		if err != nil {
 			return nil, err
 		}
 		if ver != wantAPIVersion {
 			return nil, fmt.Errorf("API version: %d, supported version: %d", ver, wantAPIVersion)
 		}
-		p.checkVersion = false
+		c.checkVersion = false
 	}
 
 	pmx := new(piholeMetrics)
-	p.queryMetrics(pmx, true)
+	c.queryMetrics(pmx, true)
 
 	if pmx.hasQueryTypes() {
-		p.addQueriesTypesOnce.Do(p.addChartDNSQueriesType)
+		c.addQueriesTypesOnce.Do(c.addChartDNSQueriesType)
 	}
 	if pmx.hasForwarders() {
-		p.addFwsDestinationsOnce.Do(p.addChartDNSQueriesForwardedDestinations)
+		c.addFwsDestinationsOnce.Do(c.addChartDNSQueriesForwardedDestinations)
 	}
 
 	mx := make(map[string]int64)
-	p.collectMetrics(mx, pmx)
+	c.collectMetrics(mx, pmx)
 
 	return mx, nil
 }
 
-func (p *Pihole) collectMetrics(mx map[string]int64, pmx *piholeMetrics) {
+func (c *Collector) collectMetrics(mx map[string]int64, pmx *piholeMetrics) {
 	if pmx.hasSummary() {
 		mx["ads_blocked_today"] = pmx.summary.AdsBlockedToday
 		mx["ads_percentage_today"] = int64(pmx.summary.AdsPercentageToday * 100)
@@ -100,16 +100,16 @@ func (p *Pihole) collectMetrics(mx map[string]int64, pmx *piholeMetrics) {
 	}
 }
 
-func (p *Pihole) queryMetrics(pmx *piholeMetrics, doConcurrently bool) {
+func (c *Collector) queryMetrics(pmx *piholeMetrics, doConcurrently bool) {
 	type task func(*piholeMetrics)
 
-	var tasks = []task{p.querySummary}
+	var tasks = []task{c.querySummary}
 
-	if p.Password != "" {
+	if c.Password != "" {
 		tasks = []task{
-			p.querySummary,
-			p.queryQueryTypes,
-			p.queryForwardedDestinations,
+			c.querySummary,
+			c.queryQueryTypes,
+			c.queryForwardedDestinations,
 		}
 	}
 
@@ -132,84 +132,84 @@ func (p *Pihole) queryMetrics(pmx *piholeMetrics, doConcurrently bool) {
 	wg.Wait()
 }
 
-func (p *Pihole) querySummary(pmx *piholeMetrics) {
-	req, err := web.NewHTTPRequestWithPath(p.RequestConfig, urlPathAPI)
+func (c *Collector) querySummary(pmx *piholeMetrics) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPI)
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 		return
 	}
 
 	req.URL.RawQuery = url.Values{
-		urlQueryKeyAuth:       []string{p.Password},
+		urlQueryKeyAuth:       []string{c.Password},
 		urlQueryKeySummaryRaw: []string{"true"},
 	}.Encode()
 
 	var v summaryRawMetrics
-	if err = p.doHTTP(req, &v); err != nil {
-		p.Error(err)
+	if err = c.doHTTP(req, &v); err != nil {
+		c.Error(err)
 		return
 	}
 
 	pmx.summary = &v
 }
 
-func (p *Pihole) queryQueryTypes(pmx *piholeMetrics) {
-	req, err := web.NewHTTPRequestWithPath(p.RequestConfig, urlPathAPI)
+func (c *Collector) queryQueryTypes(pmx *piholeMetrics) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPI)
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 		return
 	}
 
 	req.URL.RawQuery = url.Values{
-		urlQueryKeyAuth:          []string{p.Password},
+		urlQueryKeyAuth:          []string{c.Password},
 		urlQueryKeyGetQueryTypes: []string{"true"},
 	}.Encode()
 
 	var v queryTypesMetrics
-	err = p.doHTTP(req, &v)
+	err = c.doHTTP(req, &v)
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 		return
 	}
 
 	pmx.queryTypes = &v
 }
 
-func (p *Pihole) queryForwardedDestinations(pmx *piholeMetrics) {
-	req, err := web.NewHTTPRequestWithPath(p.RequestConfig, urlPathAPI)
+func (c *Collector) queryForwardedDestinations(pmx *piholeMetrics) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPI)
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 		return
 	}
 
 	req.URL.RawQuery = url.Values{
-		urlQueryKeyAuth:                   []string{p.Password},
+		urlQueryKeyAuth:                   []string{c.Password},
 		urlQueryKeyGetForwardDestinations: []string{"true"},
 	}.Encode()
 
 	var v forwardDestinations
-	err = p.doHTTP(req, &v)
+	err = c.doHTTP(req, &v)
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 		return
 	}
 
 	pmx.forwarders = &v
 }
 
-func (p *Pihole) queryAPIVersion() (int, error) {
-	req, err := web.NewHTTPRequestWithPath(p.RequestConfig, urlPathAPI)
+func (c *Collector) queryAPIVersion() (int, error) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPI)
 	if err != nil {
 		return 0, err
 	}
 
 	req.URL.RawQuery = url.Values{
-		urlQueryKeyAuth:       []string{p.Password},
+		urlQueryKeyAuth:       []string{c.Password},
 		urlQueryKeyAPIVersion: []string{"true"},
 	}.Encode()
 
 	var v piholeAPIVersion
-	err = p.doHTTP(req, &v)
+	err = c.doHTTP(req, &v)
 	if err != nil {
 		return 0, err
 	}
@@ -217,8 +217,8 @@ func (p *Pihole) queryAPIVersion() (int, error) {
 	return v.Version, nil
 }
 
-func (p *Pihole) doHTTP(req *http.Request, dst any) error {
-	return web.DoHTTP(p.httpClient).Request(req, func(body io.Reader) error {
+func (c *Collector) doHTTP(req *http.Request, dst any) error {
+	return web.DoHTTP(c.httpClient).Request(req, func(body io.Reader) error {
 		content, err := io.ReadAll(body)
 		if err != nil {
 			return fmt.Errorf("failed to read response: %v", err)
