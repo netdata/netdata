@@ -522,18 +522,18 @@ func newMySQLCommandCountersCharts(command string) *module.Charts {
 	return charts
 }
 
-func (p *ProxySQL) addMySQLCommandCountersCharts(command string) {
+func (c *Collector) addMySQLCommandCountersCharts(command string) {
 	charts := newMySQLCommandCountersCharts(command)
 
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *ProxySQL) removeMySQLCommandCountersCharts(command string) {
+func (c *Collector) removeMySQLCommandCountersCharts(command string) {
 	prefix := "mysql_command_" + strings.ToLower(command)
 
-	for _, chart := range *p.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
@@ -585,18 +585,18 @@ func newMySQLUserCharts(username string) *module.Charts {
 	return charts
 }
 
-func (p *ProxySQL) addMySQLUsersCharts(username string) {
+func (c *Collector) addMySQLUsersCharts(username string) {
 	charts := newMySQLUserCharts(username)
 
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *ProxySQL) removeMySQLUserCharts(user string) {
+func (c *Collector) removeMySQLUserCharts(user string) {
 	prefix := "mysql_user_" + user
 
-	for _, chart := range *p.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
@@ -706,18 +706,18 @@ func newBackendCharts(hg, host, port string) *module.Charts {
 	return charts
 }
 
-func (p *ProxySQL) addBackendCharts(hg, host, port string) {
+func (c *Collector) addBackendCharts(hg, host, port string) {
 	charts := newBackendCharts(hg, host, port)
 
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *ProxySQL) removeBackendCharts(hg, host, port string) {
+func (c *Collector) removeBackendCharts(hg, host, port string) {
 	prefix := "backend_" + backendID(hg, host, port)
 
-	for _, chart := range *p.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

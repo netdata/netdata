@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *ProxySQL {
-	return &ProxySQL{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			DSN:     "stats:stats@tcp(127.0.0.1:6032)/",
 			Timeout: confopt.Duration(time.Second),
@@ -49,7 +49,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type ProxySQL struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -61,22 +61,22 @@ type ProxySQL struct {
 	cache *cache
 }
 
-func (p *ProxySQL) Configuration() any {
-	return p.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (p *ProxySQL) Init() error {
-	if p.DSN == "" {
+func (c *Collector) Init() error {
+	if c.DSN == "" {
 		return errors.New("dsn not set")
 	}
 
-	p.Debugf("using DSN [%s]", p.DSN)
+	c.Debugf("using DSN [%s]", c.DSN)
 
 	return nil
 }
 
-func (p *ProxySQL) Check() error {
-	mx, err := p.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -86,14 +86,14 @@ func (p *ProxySQL) Check() error {
 	return nil
 }
 
-func (p *ProxySQL) Charts() *module.Charts {
-	return p.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (p *ProxySQL) Collect() map[string]int64 {
-	mx, err := p.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -102,12 +102,12 @@ func (p *ProxySQL) Collect() map[string]int64 {
 	return mx
 }
 
-func (p *ProxySQL) Cleanup() {
-	if p.db == nil {
+func (c *Collector) Cleanup() {
+	if c.db == nil {
 		return
 	}
-	if err := p.db.Close(); err != nil {
-		p.Errorf("cleanup: error on closing the ProxySQL instance [%s]: %v", p.DSN, err)
+	if err := c.db.Close(); err != nil {
+		c.Errorf("cleanup: error on closing the ProxySQL instance [%s]: %v", c.DSN, err)
 	}
-	p.db = nil
+	c.db = nil
 }

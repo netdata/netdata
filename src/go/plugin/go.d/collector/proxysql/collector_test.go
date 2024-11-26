@@ -48,11 +48,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestProxySQL_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &ProxySQL{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestProxySQL_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -69,52 +69,52 @@ func TestProxySQL_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			proxySQL := New()
-			proxySQL.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, proxySQL.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, proxySQL.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestProxySQL_Cleanup(t *testing.T) {
-	tests := map[string]func(t *testing.T) (proxySQL *ProxySQL, cleanup func()){
-		"db connection not initialized": func(t *testing.T) (proxySQL *ProxySQL, cleanup func()) {
+func TestCollector_Cleanup(t *testing.T) {
+	tests := map[string]func(t *testing.T) (collr *Collector, cleanup func()){
+		"db connection not initialized": func(t *testing.T) (collr *Collector, cleanup func()) {
 			return New(), func() {}
 		},
-		"db connection initialized": func(t *testing.T) (proxySQL *ProxySQL, cleanup func()) {
+		"db connection initialized": func(t *testing.T) (collr *Collector, cleanup func()) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
 
 			mock.ExpectClose()
-			proxySQL = New()
-			proxySQL.db = db
+			collr = New()
+			collr.db = db
 			cleanup = func() { _ = db.Close() }
 
-			return proxySQL, cleanup
+			return collr, cleanup
 		},
 	}
 
 	for name, prepare := range tests {
 		t.Run(name, func(t *testing.T) {
-			proxySQL, cleanup := prepare(t)
+			collr, cleanup := prepare(t)
 			defer cleanup()
 
-			assert.NotPanics(t, proxySQL.Cleanup)
-			assert.Nil(t, proxySQL.db)
+			assert.NotPanics(t, collr.Cleanup)
+			assert.Nil(t, collr.db)
 		})
 	}
 }
 
-func TestProxySQL_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestProxySQL_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func(t *testing.T, m sqlmock.Sqlmock)
 		wantFail    bool
@@ -172,28 +172,28 @@ func TestProxySQL_Check(t *testing.T) {
 				sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual),
 			)
 			require.NoError(t, err)
-			proxySQL := New()
-			proxySQL.db = db
+			collr := New()
+			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, proxySQL.Init())
+			require.NoError(t, collr.Init())
 
 			test.prepareMock(t, mock)
 
 			if test.wantFail {
-				assert.Error(t, proxySQL.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, proxySQL.Check())
+				assert.NoError(t, collr.Check())
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
 }
 
-func TestProxySQL_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	type testCaseStep struct {
 		prepareMock func(t *testing.T, m sqlmock.Sqlmock)
-		check       func(t *testing.T, my *ProxySQL)
+		check       func(t *testing.T, my *Collector)
 	}
 	tests := map[string][]testCaseStep{
 
@@ -207,7 +207,7 @@ func TestProxySQL_Collect(t *testing.T) {
 					mockExpect(t, m, queryStatsMySQLUsers, dataVer2010StatsMySQLUsers)
 					mockExpect(t, m, queryStatsMySQLConnectionPool, dataVer2010StatsMySQLConnectionPool)
 				},
-				check: func(t *testing.T, my *ProxySQL) {
+				check: func(t *testing.T, my *Collector) {
 					mx := my.Collect()
 
 					expected := map[string]int64{
