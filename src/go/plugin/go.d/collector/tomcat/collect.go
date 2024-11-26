@@ -16,8 +16,8 @@ var (
 	urlQueryServerStatus = url.Values{"XML": {"true"}}.Encode()
 )
 
-func (t *Tomcat) collect() (map[string]int64, error) {
-	mx, err := t.collectServerStatus()
+func (c *Collector) collect() (map[string]int64, error) {
+	mx, err := c.collectServerStatus()
 	if err != nil {
 		return nil, err
 	}
@@ -25,8 +25,8 @@ func (t *Tomcat) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (t *Tomcat) collectServerStatus() (map[string]int64, error) {
-	resp, err := t.queryServerStatus()
+func (c *Collector) collectServerStatus() (map[string]int64, error) {
+	resp, err := c.queryServerStatus()
 	if err != nil {
 		return nil, err
 	}
@@ -43,9 +43,9 @@ func (t *Tomcat) collectServerStatus() (map[string]int64, error) {
 		ti.CurrentThreadsIdle = ti.CurrentThreadCount - ti.CurrentThreadsBusy
 
 		seenConns[v.Name] = true
-		if !t.seenConnectors[v.Name] {
-			t.seenConnectors[v.Name] = true
-			t.addConnectorCharts(v.Name)
+		if !c.seenConnectors[v.Name] {
+			c.seenConnectors[v.Name] = true
+			c.addConnectorCharts(v.Name)
 		}
 	}
 
@@ -53,23 +53,23 @@ func (t *Tomcat) collectServerStatus() (map[string]int64, error) {
 		resp.JVM.MemoryPools[i].STMKey = cleanName(v.Name)
 
 		seenPools[v.Name] = true
-		if !t.seenMemPools[v.Name] {
-			t.seenMemPools[v.Name] = true
-			t.addMemPoolCharts(v.Name, v.Type)
+		if !c.seenMemPools[v.Name] {
+			c.seenMemPools[v.Name] = true
+			c.addMemPoolCharts(v.Name, v.Type)
 		}
 	}
 
-	for name := range t.seenConnectors {
+	for name := range c.seenConnectors {
 		if !seenConns[name] {
-			delete(t.seenConnectors, name)
-			t.removeConnectorCharts(name)
+			delete(c.seenConnectors, name)
+			c.removeConnectorCharts(name)
 		}
 	}
 
-	for name := range t.seenMemPools {
+	for name := range c.seenMemPools {
 		if !seenPools[name] {
-			delete(t.seenMemPools, name)
-			t.removeMemoryPoolCharts(name)
+			delete(c.seenMemPools, name)
+			c.removeMemoryPoolCharts(name)
 		}
 	}
 
@@ -83,8 +83,8 @@ func cleanName(name string) string {
 	return strings.ToLower(r.Replace(name))
 }
 
-func (t *Tomcat) queryServerStatus() (*serverStatusResponse, error) {
-	req, err := web.NewHTTPRequestWithPath(t.RequestConfig, urlPathServerStatus)
+func (c *Collector) queryServerStatus() (*serverStatusResponse, error) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathServerStatus)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (t *Tomcat) queryServerStatus() (*serverStatusResponse, error) {
 	req.URL.RawQuery = urlQueryServerStatus
 
 	var status serverStatusResponse
-	if err := web.DoHTTP(t.httpClient).RequestXML(req, &status); err != nil {
+	if err := web.DoHTTP(c.httpClient).RequestXML(req, &status); err != nil {
 		return nil, err
 	}
 

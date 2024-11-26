@@ -32,11 +32,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestTomcat_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Tomcat{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestTomcat_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -57,26 +57,26 @@ func TestTomcat_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tomcat := New()
-			tomcat.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, tomcat.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, tomcat.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestTomcat_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestTomcat_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (*Tomcat, func())
+		prepare  func(t *testing.T) (*Collector, func())
 	}{
 		"success case": {
 			wantFail: false,
@@ -98,21 +98,21 @@ func TestTomcat_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tomcat, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, tomcat.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, tomcat.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestTomcat_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func(t *testing.T) (tomcat *Tomcat, cleanup func())
+		prepare     func(t *testing.T) (collr *Collector, cleanup func())
 		wantMetrics map[string]int64
 		wantCharts  int
 	}{
@@ -178,22 +178,22 @@ func TestTomcat_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			tomcat, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := tomcat.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				assert.Equal(t, test.wantCharts, len(*tomcat.Charts()))
-				module.TestMetricsHasAllChartsDims(t, tomcat.Charts(), mx)
+				assert.Equal(t, test.wantCharts, len(*collr.Charts()))
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareCaseSuccess(t *testing.T) (*Tomcat, func()) {
+func prepareCaseSuccess(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -208,23 +208,23 @@ func prepareCaseSuccess(t *testing.T) (*Tomcat, func()) {
 				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
-	tomcat := New()
-	tomcat.URL = srv.URL
-	require.NoError(t, tomcat.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return tomcat, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseConnectionRefused(t *testing.T) (*Tomcat, func()) {
+func prepareCaseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	tomcat := New()
-	tomcat.URL = "http://127.0.0.1:65001"
-	require.NoError(t, tomcat.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	require.NoError(t, collr.Init())
 
-	return tomcat, func() {}
+	return collr, func() {}
 }
 
-func prepareCaseUnexpectedXMLResponse(t *testing.T) (*Tomcat, func()) {
+func prepareCaseUnexpectedXMLResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	resp := `
 <?xml version="1.0" encoding="UTF-8" ?>
@@ -250,23 +250,23 @@ func prepareCaseUnexpectedXMLResponse(t *testing.T) (*Tomcat, func()) {
 			_, _ = w.Write([]byte(resp))
 		}))
 
-	tomcat := New()
-	tomcat.URL = srv.URL
-	require.NoError(t, tomcat.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return tomcat, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseInvalidFormatResponse(t *testing.T) (*Tomcat, func()) {
+func prepareCaseInvalidFormatResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
 
-	tomcat := New()
-	tomcat.URL = srv.URL
-	require.NoError(t, tomcat.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return tomcat, srv.Close
+	return collr, srv.Close
 }

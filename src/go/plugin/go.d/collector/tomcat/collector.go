@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Tomcat {
-	return &Tomcat{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -48,7 +48,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Tomcat struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -60,30 +60,30 @@ type Tomcat struct {
 	seenMemPools   map[string]bool
 }
 
-func (t *Tomcat) Configuration() any {
-	return t.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (t *Tomcat) Init() error {
-	if err := t.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	httpClient, err := t.initHTTPClient()
+	httpClient, err := c.initHTTPClient()
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
 
-	t.httpClient = httpClient
+	c.httpClient = httpClient
 
-	t.Debugf("using URL %s", t.URL)
-	t.Debugf("using timeout: %s", t.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (t *Tomcat) Check() error {
-	mx, err := t.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -95,14 +95,14 @@ func (t *Tomcat) Check() error {
 	return nil
 }
 
-func (t *Tomcat) Charts() *module.Charts {
-	return t.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (t *Tomcat) Collect() map[string]int64 {
-	mx, err := t.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		t.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -112,8 +112,8 @@ func (t *Tomcat) Collect() map[string]int64 {
 	return mx
 }
 
-func (t *Tomcat) Cleanup() {
-	if t.httpClient != nil {
-		t.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }
