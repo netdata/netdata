@@ -27,8 +27,8 @@ func init() {
 	})
 }
 
-func New() *PortCheck {
-	return &PortCheck{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -52,7 +52,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type PortCheck struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -69,26 +69,26 @@ type PortCheck struct {
 	doUdpPorts   bool
 }
 
-func (pc *PortCheck) Configuration() any {
-	return pc.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (pc *PortCheck) Init() error {
-	if err := pc.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	pc.tcpPorts, pc.udpPorts = pc.initPorts()
+	c.tcpPorts, c.udpPorts = c.initPorts()
 
-	pc.Debugf("using host: %s", pc.Host)
-	pc.Debugf("using ports: tcp %v udp %v", pc.Ports, pc.UDPPorts)
-	pc.Debugf("using connection timeout: %s", pc.Timeout)
+	c.Debugf("using host: %s", c.Host)
+	c.Debugf("using ports: tcp %v udp %v", c.Ports, c.UDPPorts)
+	c.Debugf("using connection timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (pc *PortCheck) Check() error {
-	mx, err := pc.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -100,14 +100,14 @@ func (pc *PortCheck) Check() error {
 	return nil
 }
 
-func (pc *PortCheck) Charts() *module.Charts {
-	return pc.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (pc *PortCheck) Collect() map[string]int64 {
-	mx, err := pc.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		pc.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -117,4 +117,4 @@ func (pc *PortCheck) Collect() map[string]int64 {
 	return mx
 }
 
-func (pc *PortCheck) Cleanup() {}
+func (c *Collector) Cleanup() {}

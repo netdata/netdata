@@ -19,11 +19,11 @@ type tcpPort struct {
 	latency        int
 }
 
-func (pc *PortCheck) checkTCPPort(port *tcpPort) {
+func (c *Collector) checkTCPPort(port *tcpPort) {
 	start := time.Now()
 
-	addr := pc.address(port.number)
-	conn, err := pc.dialTCP("tcp", addr, pc.Timeout.Duration())
+	addr := c.address(port.number)
+	conn, err := c.dialTCP("tcp", addr, c.Timeout.Duration())
 
 	dur := time.Since(start)
 
@@ -35,18 +35,18 @@ func (pc *PortCheck) checkTCPPort(port *tcpPort) {
 
 	if err != nil {
 		if v, ok := err.(interface{ Timeout() bool }); ok && v.Timeout() {
-			pc.setTcpPortCheckState(port, tcpPortCheckStateTimeout)
+			c.setTcpPortCheckState(port, tcpPortCheckStateTimeout)
 		} else {
-			pc.setTcpPortCheckState(port, tcpPortCheckStateFailed)
+			c.setTcpPortCheckState(port, tcpPortCheckStateFailed)
 		}
 		return
 	}
 
-	pc.setTcpPortCheckState(port, tcpPortCheckStateSuccess)
+	c.setTcpPortCheckState(port, tcpPortCheckStateSuccess)
 	port.latency = durationToMs(dur)
 }
 
-func (pc *PortCheck) setTcpPortCheckState(port *tcpPort, state string) {
+func (c *Collector) setTcpPortCheckState(port *tcpPort, state string) {
 	if port.status != state {
 		port.status = state
 		port.statusChangeTs = time.Now()

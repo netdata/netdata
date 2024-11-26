@@ -30,52 +30,52 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestPortCheck_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &PortCheck{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestPortCheck_Init(t *testing.T) {
-	job := New()
+func TestCollector_Init(t *testing.T) {
+	collr := New()
 
-	job.Host = "127.0.0.1"
-	job.Ports = []int{39001, 39002}
-	assert.NoError(t, job.Init())
-	assert.Len(t, job.tcpPorts, 2)
+	collr.Host = "127.0.0.1"
+	collr.Ports = []int{39001, 39002}
+	assert.NoError(t, collr.Init())
+	assert.Len(t, collr.tcpPorts, 2)
 }
-func TestPortCheck_InitNG(t *testing.T) {
-	job := New()
+func TestCollector_InitNG(t *testing.T) {
+	collr := New()
 
-	assert.Error(t, job.Init())
-	job.Host = "127.0.0.1"
-	assert.Error(t, job.Init())
-	job.Ports = []int{39001, 39002}
-	assert.NoError(t, job.Init())
+	assert.Error(t, collr.Init())
+	collr.Host = "127.0.0.1"
+	assert.Error(t, collr.Init())
+	collr.Ports = []int{39001, 39002}
+	assert.NoError(t, collr.Init())
 }
 
-func TestPortCheck_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	assert.Error(t, New().Check())
 }
 
-func TestPortCheck_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestPortCheck_Charts(t *testing.T) {
-	job := New()
-	job.Ports = []int{1, 2}
-	job.Host = "localhost"
-	require.NoError(t, job.Init())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	collr.Ports = []int{1, 2}
+	collr.Host = "localhost"
+	require.NoError(t, collr.Init())
 }
 
-func TestPortCheck_Collect(t *testing.T) {
-	job := New()
+func TestCollector_Collect(t *testing.T) {
+	collr := New()
 
-	job.Host = "127.0.0.1"
-	job.Ports = []int{39001, 39002}
-	job.UpdateEvery = 5
-	job.dialTCP = testDial(nil)
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	collr.Host = "127.0.0.1"
+	collr.Ports = []int{39001, 39002}
+	collr.UpdateEvery = 5
+	collr.dialTCP = testDial(nil)
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	copyLatencyDuration := func(dst, src map[string]int64) {
 		for k := range dst {
@@ -86,73 +86,73 @@ func TestPortCheck_Collect(t *testing.T) {
 	}
 
 	expected := map[string]int64{
-		"tcp_port_39001_current_state_duration": int64(job.UpdateEvery * 2),
+		"tcp_port_39001_current_state_duration": int64(collr.UpdateEvery * 2),
 		"tcp_port_39001_failed":                 0,
 		"tcp_port_39001_latency":                0,
 		"tcp_port_39001_success":                1,
 		"tcp_port_39001_timeout":                0,
-		"tcp_port_39002_current_state_duration": int64(job.UpdateEvery * 2),
+		"tcp_port_39002_current_state_duration": int64(collr.UpdateEvery * 2),
 		"tcp_port_39002_failed":                 0,
 		"tcp_port_39002_latency":                0,
 		"tcp_port_39002_success":                1,
 		"tcp_port_39002_timeout":                0,
 	}
-	mx := job.Collect()
+	mx := collr.Collect()
 	copyLatencyDuration(expected, mx)
 
 	assert.Equal(t, expected, mx)
 
 	expected = map[string]int64{
-		"tcp_port_39001_current_state_duration": int64(job.UpdateEvery) * 3,
+		"tcp_port_39001_current_state_duration": int64(collr.UpdateEvery) * 3,
 		"tcp_port_39001_failed":                 0,
 		"tcp_port_39001_latency":                0,
 		"tcp_port_39001_success":                1,
 		"tcp_port_39001_timeout":                0,
-		"tcp_port_39002_current_state_duration": int64(job.UpdateEvery) * 3,
+		"tcp_port_39002_current_state_duration": int64(collr.UpdateEvery) * 3,
 		"tcp_port_39002_failed":                 0,
 		"tcp_port_39002_latency":                0,
 		"tcp_port_39002_success":                1,
 		"tcp_port_39002_timeout":                0,
 	}
-	mx = job.Collect()
+	mx = collr.Collect()
 	copyLatencyDuration(expected, mx)
 
 	assert.Equal(t, expected, mx)
 
-	job.dialTCP = testDial(errors.New("checkStateFailed"))
+	collr.dialTCP = testDial(errors.New("checkStateFailed"))
 
 	expected = map[string]int64{
-		"tcp_port_39001_current_state_duration": int64(job.UpdateEvery),
+		"tcp_port_39001_current_state_duration": int64(collr.UpdateEvery),
 		"tcp_port_39001_failed":                 1,
 		"tcp_port_39001_latency":                0,
 		"tcp_port_39001_success":                0,
 		"tcp_port_39001_timeout":                0,
-		"tcp_port_39002_current_state_duration": int64(job.UpdateEvery),
+		"tcp_port_39002_current_state_duration": int64(collr.UpdateEvery),
 		"tcp_port_39002_failed":                 1,
 		"tcp_port_39002_latency":                0,
 		"tcp_port_39002_success":                0,
 		"tcp_port_39002_timeout":                0,
 	}
-	mx = job.Collect()
+	mx = collr.Collect()
 	copyLatencyDuration(expected, mx)
 
 	assert.Equal(t, expected, mx)
 
-	job.dialTCP = testDial(timeoutError{})
+	collr.dialTCP = testDial(timeoutError{})
 
 	expected = map[string]int64{
-		"tcp_port_39001_current_state_duration": int64(job.UpdateEvery),
+		"tcp_port_39001_current_state_duration": int64(collr.UpdateEvery),
 		"tcp_port_39001_failed":                 0,
 		"tcp_port_39001_latency":                0,
 		"tcp_port_39001_success":                0,
 		"tcp_port_39001_timeout":                1,
-		"tcp_port_39002_current_state_duration": int64(job.UpdateEvery),
+		"tcp_port_39002_current_state_duration": int64(collr.UpdateEvery),
 		"tcp_port_39002_latency":                0,
 		"tcp_port_39002_success":                0,
 		"tcp_port_39002_timeout":                1,
 		"tcp_port_39002_failed":                 0,
 	}
-	mx = job.Collect()
+	mx = collr.Collect()
 	copyLatencyDuration(expected, mx)
 
 	assert.Equal(t, expected, mx)
