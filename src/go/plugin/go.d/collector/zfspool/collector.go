@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *ZFSPool {
-	return &ZFSPool{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			BinaryPath: "/usr/bin/zpool",
 			Timeout:    confopt.Duration(time.Second * 2),
@@ -46,44 +46,38 @@ type Config struct {
 	BinaryPath  string           `yaml:"binary_path,omitempty" json:"binary_path"`
 }
 
-type (
-	ZFSPool struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec zpoolCLI
+	exec zpoolCli
 
-		seenZpools map[string]bool
-		seenVdevs  map[string]bool
-	}
-	zpoolCLI interface {
-		list() ([]byte, error)
-		listWithVdev(pool string) ([]byte, error)
-	}
-)
-
-func (z *ZFSPool) Configuration() any {
-	return z.Config
+	seenZpools map[string]bool
+	seenVdevs  map[string]bool
 }
 
-func (z *ZFSPool) Init() error {
-	if err := z.validateConfig(); err != nil {
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %s", err)
 	}
 
-	zpoolExec, err := z.initZPoolCLIExec()
+	zpoolExec, err := c.initZPoolCLIExec()
 	if err != nil {
 		return fmt.Errorf("zpool exec initialization: %v", err)
 	}
-	z.exec = zpoolExec
+	c.exec = zpoolExec
 
 	return nil
 }
 
-func (z *ZFSPool) Check() error {
-	mx, err := z.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -95,14 +89,14 @@ func (z *ZFSPool) Check() error {
 	return nil
 }
 
-func (z *ZFSPool) Charts() *module.Charts {
-	return z.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (z *ZFSPool) Collect() map[string]int64 {
-	mx, err := z.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		z.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -112,4 +106,4 @@ func (z *ZFSPool) Collect() map[string]int64 {
 	return mx
 }
 
-func (z *ZFSPool) Cleanup() {}
+func (c *Collector) Cleanup() {}

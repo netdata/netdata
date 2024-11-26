@@ -11,15 +11,15 @@ import (
 	"strings"
 )
 
-func (z *ZFSPool) validateConfig() error {
-	if z.BinaryPath == "" {
+func (c *Collector) validateConfig() error {
+	if c.BinaryPath == "" {
 		return errors.New("no zpool binary path specified")
 	}
 	return nil
 }
 
-func (z *ZFSPool) initZPoolCLIExec() (zpoolCLI, error) {
-	binPath := z.BinaryPath
+func (c *Collector) initZPoolCLIExec() (zpoolCli, error) {
+	binPath := c.BinaryPath
 
 	if !strings.HasPrefix(binPath, "/") {
 		path, err := exec.LookPath(binPath)
@@ -33,8 +33,8 @@ func (z *ZFSPool) initZPoolCLIExec() (zpoolCLI, error) {
 		return nil, err
 	}
 
-	zpoolExec := newZpoolCLIExec(binPath, z.Timeout.Duration())
-	zpoolExec.Logger = z.Logger
+	zpoolExec := newZpoolCLIExec(binPath, c.Timeout.Duration())
+	zpoolExec.Logger = c.Logger
 
 	return zpoolExec, nil
 }

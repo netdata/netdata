@@ -115,7 +115,7 @@ var (
 	}
 )
 
-func (z *ZFSPool) addZpoolCharts(name string) {
+func (c *Collector) addZpoolCharts(name string) {
 	charts := zpoolChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -128,17 +128,17 @@ func (z *ZFSPool) addZpoolCharts(name string) {
 		}
 	}
 
-	if err := z.Charts().Add(*charts...); err != nil {
-		z.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (z *ZFSPool) removeZpoolCharts(name string) {
+func (c *Collector) removeZpoolCharts(name string) {
 	px := fmt.Sprintf("zfspool_%s_", name)
-	z.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (z *ZFSPool) addVdevCharts(pool, vdev string) {
+func (c *Collector) addVdevCharts(pool, vdev string) {
 	charts := vdevChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -152,18 +152,18 @@ func (z *ZFSPool) addVdevCharts(pool, vdev string) {
 		}
 	}
 
-	if err := z.Charts().Add(*charts...); err != nil {
-		z.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (z *ZFSPool) removeVdevCharts(vdev string) {
+func (c *Collector) removeVdevCharts(vdev string) {
 	px := fmt.Sprintf("vdev_%s_", cleanVdev(vdev))
-	z.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (z *ZFSPool) removeCharts(px string) {
-	for _, chart := range *z.Charts() {
+func (c *Collector) removeCharts(px string) {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

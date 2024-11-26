@@ -39,11 +39,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestZFSPool_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &ZFSPool{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestZFSPool_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -64,59 +64,59 @@ func TestZFSPool_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			zp := New()
-			zp.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, zp.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, zp.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestZFSPool_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *ZFSPool
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *ZFSPool {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *ZFSPool {
-				zp := New()
-				zp.exec = prepareMockOk()
-				_ = zp.Check()
-				return zp
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOk()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *ZFSPool {
-				zp := New()
-				zp.exec = prepareMockOk()
-				_ = zp.Collect()
-				return zp
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOk()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			zp := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, zp.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestZFSPool_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestZFSPool_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockZpoolCLIExec
 		wantFail    bool
@@ -141,20 +141,20 @@ func TestZFSPool_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			zp := New()
+			collr := New()
 			mock := test.prepareMock()
-			zp.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, zp.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, zp.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestZFSPool_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockZpoolCLIExec
 		wantMetrics map[string]int64
@@ -377,20 +377,20 @@ func TestZFSPool_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			zp := New()
+			collr := New()
 			mock := test.prepareMock()
-			zp.exec = mock
+			collr.exec = mock
 
-			mx := zp.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				want := len(zpoolChartsTmpl)*len(zp.seenZpools) + len(vdevChartsTmpl)*len(zp.seenVdevs)
+				want := len(zpoolChartsTmpl)*len(collr.seenZpools) + len(vdevChartsTmpl)*len(collr.seenVdevs)
 
-				assert.Len(t, *zp.Charts(), want, "want charts")
+				assert.Len(t, *collr.Charts(), want, "want charts")
 
-				module.TestMetricsHasAllChartsDimsSkip(t, zp.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
+				module.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
 					return strings.HasPrefix(chart.ID, "zfspool_zion") && !strings.HasSuffix(chart.ID, "health_state")
 				})
 			}
@@ -398,7 +398,7 @@ func TestZFSPool_Collect(t *testing.T) {
 	}
 }
 
-func TestZFSPool_parseZpoolListDevOutput(t *testing.T) {
+func TestCollector_parseZpoolListDevOutput(t *testing.T) {
 	tests := map[string]struct {
 		input string
 		want  []vdevEntry
