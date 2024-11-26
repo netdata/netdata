@@ -38,11 +38,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestIPFS_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &IPFS{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestIPFS_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -63,26 +63,26 @@ func TestIPFS_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ipfs := New()
-			ipfs.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, ipfs.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, ipfs.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestIPFS_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestIPFS_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (*IPFS, func())
+		prepare  func(t *testing.T) (*Collector, func())
 	}{
 		"success default config": {
 			wantFail: false,
@@ -108,21 +108,21 @@ func TestIPFS_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ipfs, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, ipfs.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, ipfs.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestIPFS_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func(t *testing.T) (*IPFS, func())
+		prepare     func(t *testing.T) (*Collector, func())
 		wantMetrics map[string]int64
 	}{
 		"success default config": {
@@ -159,21 +159,21 @@ func TestIPFS_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ipfs, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := ipfs.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, ipfs.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareCaseOkDefault(t *testing.T) (*IPFS, func()) {
+func prepareCaseOkDefault(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -191,24 +191,24 @@ func prepareCaseOkDefault(t *testing.T) (*IPFS, func()) {
 			}
 		}))
 
-	ipfs := New()
-	ipfs.URL = srv.URL
-	require.NoError(t, ipfs.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ipfs, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseOkAllQueriesEnabled(t *testing.T) (*IPFS, func()) {
+func prepareCaseOkAllQueriesEnabled(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	ipfs, cleanup := prepareCaseOkDefault(t)
+	collr, cleanup := prepareCaseOkDefault(t)
 
-	ipfs.QueryRepoApi = true
-	ipfs.QueryPinApi = true
+	collr.QueryRepoApi = true
+	collr.QueryPinApi = true
 
-	return ipfs, cleanup
+	return collr, cleanup
 }
 
-func prepareCaseUnexpectedJsonResponse(t *testing.T) (*IPFS, func()) {
+func prepareCaseUnexpectedJsonResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	resp := `
 {
@@ -232,32 +232,32 @@ func prepareCaseUnexpectedJsonResponse(t *testing.T) (*IPFS, func()) {
 			_, _ = w.Write([]byte(resp))
 		}))
 
-	ipfs := New()
-	ipfs.URL = srv.URL
-	require.NoError(t, ipfs.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ipfs, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseInvalidFormatResponse(t *testing.T) (*IPFS, func()) {
+func prepareCaseInvalidFormatResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
 
-	ipfs := New()
-	ipfs.URL = srv.URL
-	require.NoError(t, ipfs.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ipfs, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseConnectionRefused(t *testing.T) (*IPFS, func()) {
+func prepareCaseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	ipfs := New()
-	ipfs.URL = "http://127.0.0.1:65001"
-	require.NoError(t, ipfs.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	require.NoError(t, collr.Init())
 
-	return ipfs, func() {}
+	return collr, func() {}
 }

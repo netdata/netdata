@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *IPFS {
-	return &IPFS{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -51,7 +51,7 @@ type Config struct {
 	QueryRepoApi   bool `yaml:"repoapi" json:"repoapi"`
 }
 
-type IPFS struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -60,38 +60,38 @@ type IPFS struct {
 	httpClient *http.Client
 }
 
-func (ip *IPFS) Configuration() any {
-	return ip.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (ip *IPFS) Init() error {
-	if ip.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(ip.ClientConfig)
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("http client init: %w", err)
 	}
-	ip.httpClient = client
+	c.httpClient = client
 
-	if !ip.QueryPinApi {
-		_ = ip.Charts().Remove(repoPinnedObjChart.ID)
+	if !c.QueryPinApi {
+		_ = c.Charts().Remove(repoPinnedObjChart.ID)
 	}
-	if !ip.QueryRepoApi {
-		_ = ip.Charts().Remove(datastoreUtilizationChart.ID)
-		_ = ip.Charts().Remove(repoSizeChart.ID)
-		_ = ip.Charts().Remove(repoObjChart.ID)
+	if !c.QueryRepoApi {
+		_ = c.Charts().Remove(datastoreUtilizationChart.ID)
+		_ = c.Charts().Remove(repoSizeChart.ID)
+		_ = c.Charts().Remove(repoObjChart.ID)
 	}
 
-	ip.Debugf("using URL %s", ip.URL)
-	ip.Debugf("using timeout: %s", ip.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (ip *IPFS) Check() error {
-	mx, err := ip.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -103,14 +103,14 @@ func (ip *IPFS) Check() error {
 	return nil
 }
 
-func (ip *IPFS) Charts() *module.Charts {
-	return ip.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (ip *IPFS) Collect() map[string]int64 {
-	mx, err := ip.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		ip.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -120,8 +120,8 @@ func (ip *IPFS) Collect() map[string]int64 {
 	return mx
 }
 
-func (ip *IPFS) Cleanup() {
-	if ip.httpClient != nil {
-		ip.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }
