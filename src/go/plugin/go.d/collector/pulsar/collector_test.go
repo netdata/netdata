@@ -41,11 +41,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestPulsar_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Pulsar{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestPulsar_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -76,25 +76,25 @@ func TestPulsar_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pulsar := New()
-			pulsar.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, pulsar.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, pulsar.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestPulsar_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestPulsar_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(*testing.T) (*Pulsar, *httptest.Server)
+		prepare  func(*testing.T) (*Collector, *httptest.Server)
 		wantFail bool
 	}{
 		"standalone v2.5.0 namespaces": {prepare: prepareClientServerStdV250Namespaces},
@@ -107,26 +107,26 @@ func TestPulsar_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pulsar, srv := test.prepare(t)
+			collr, srv := test.prepare(t)
 			defer srv.Close()
 
 			if test.wantFail {
-				assert.Error(t, pulsar.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, pulsar.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestPulsar_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 
 }
 
-func TestPulsar_Collect_ReturnsNilOnErrors(t *testing.T) {
+func TestCollector_Collect_ReturnsNilOnErrors(t *testing.T) {
 	tests := map[string]struct {
-		prepare func(*testing.T) (*Pulsar, *httptest.Server)
+		prepare func(*testing.T) (*Collector, *httptest.Server)
 	}{
 		"non pulsar":         {prepare: prepareClientServerNonPulsar},
 		"invalid data":       {prepare: prepareClientServerInvalidData},
@@ -136,17 +136,17 @@ func TestPulsar_Collect_ReturnsNilOnErrors(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pulsar, srv := test.prepare(t)
+			collr, srv := test.prepare(t)
 			defer srv.Close()
 
-			assert.Nil(t, pulsar.Collect())
+			assert.Nil(t, collr.Collect())
 		})
 	}
 }
 
-func TestPulsar_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(*testing.T) (*Pulsar, *httptest.Server)
+		prepare  func(*testing.T) (*Collector, *httptest.Server)
 		expected map[string]int64
 	}{
 		"standalone v2.5.0 namespaces": {
@@ -165,42 +165,42 @@ func TestPulsar_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pulsar, srv := test.prepare(t)
+			collr, srv := test.prepare(t)
 			defer srv.Close()
 
 			for i := 0; i < 10; i++ {
-				_ = pulsar.Collect()
+				_ = collr.Collect()
 			}
-			mx := pulsar.Collect()
+			mx := collr.Collect()
 
 			require.NotNil(t, mx)
 			require.Equal(t, test.expected, mx)
-			module.TestMetricsHasAllChartsDims(t, pulsar.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }
 
-func TestPulsar_Collect_RemoveAddNamespacesTopicsInRuntime(t *testing.T) {
-	pulsar, srv := prepareClientServersDynamicStdV250Topics(t)
+func TestCollector_Collect_RemoveAddNamespacesTopicsInRuntime(t *testing.T) {
+	collr, srv := prepareClientServersDynamicStdV250Topics(t)
 	defer srv.Close()
 
 	oldNsCharts := Charts{}
 
-	require.NotNil(t, pulsar.Collect())
-	oldLength := len(*pulsar.Charts())
+	require.NotNil(t, collr.Collect())
+	oldLength := len(*collr.Charts())
 
-	for _, chart := range *pulsar.Charts() {
-		for ns := range pulsar.cache.namespaces {
+	for _, chart := range *collr.Charts() {
+		for ns := range collr.cache.namespaces {
 			if ns.name != "public/functions" && chart.Fam == "ns "+ns.name {
 				_ = oldNsCharts.Add(chart)
 			}
 		}
 	}
 
-	require.NotNil(t, pulsar.Collect())
+	require.NotNil(t, collr.Collect())
 
-	l := oldLength + len(*pulsar.nsCharts)*2 // 2 new namespaces
-	assert.Truef(t, len(*pulsar.Charts()) == l, "expected %d charts, but got %d", l, len(*pulsar.Charts()))
+	l := oldLength + len(*collr.nsCharts)*2 // 2 new namespaces
+	assert.Truef(t, len(*collr.Charts()) == l, "expected %d charts, but got %d", l, len(*collr.Charts()))
 
 	for _, chart := range oldNsCharts {
 		assert.Truef(t, chart.Obsolete, "expected chart '%s' Obsolete flag is set", chart.ID)
@@ -212,43 +212,43 @@ func TestPulsar_Collect_RemoveAddNamespacesTopicsInRuntime(t *testing.T) {
 	}
 }
 
-func prepareClientServerStdV250Namespaces(t *testing.T) (*Pulsar, *httptest.Server) {
+func prepareClientServerStdV250Namespaces(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataVer250Namespaces)
 		}))
 
-	pulsar := New()
-	pulsar.URL = srv.URL
-	require.NoError(t, pulsar.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return pulsar, srv
+	return collr, srv
 }
 
-func prepareClientServerStdV250Topics(t *testing.T) (*Pulsar, *httptest.Server) {
+func prepareClientServerStdV250Topics(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataVer250Topics)
 		}))
 
-	pulsar := New()
-	pulsar.URL = srv.URL
-	require.NoError(t, pulsar.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return pulsar, srv
+	return collr, srv
 }
 
-func prepareClientServerStdV250TopicsFiltered(t *testing.T) (*Pulsar, *httptest.Server) {
+func prepareClientServerStdV250TopicsFiltered(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
-	pulsar, srv := prepareClientServerStdV250Topics(t)
-	pulsar.topicFilter = matcher.FALSE()
+	collr, srv := prepareClientServerStdV250Topics(t)
+	collr.topicFilter = matcher.FALSE()
 
-	return pulsar, srv
+	return collr, srv
 }
 
-func prepareClientServersDynamicStdV250Topics(t *testing.T) (*Pulsar, *httptest.Server) {
+func prepareClientServersDynamicStdV250Topics(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	var i int
 	srv := httptest.NewServer(http.HandlerFunc(
@@ -261,64 +261,64 @@ func prepareClientServersDynamicStdV250Topics(t *testing.T) (*Pulsar, *httptest.
 			i++
 		}))
 
-	pulsar := New()
-	pulsar.URL = srv.URL
-	require.NoError(t, pulsar.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return pulsar, srv
+	return collr, srv
 }
 
-func prepareClientServerNonPulsar(t *testing.T) (*Pulsar, *httptest.Server) {
+func prepareClientServerNonPulsar(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataNonPulsarMetrics)
 		}))
 
-	pulsar := New()
-	pulsar.URL = srv.URL
-	require.NoError(t, pulsar.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return pulsar, srv
+	return collr, srv
 }
 
-func prepareClientServerInvalidData(t *testing.T) (*Pulsar, *httptest.Server) {
+func prepareClientServerInvalidData(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
 
-	pulsar := New()
-	pulsar.URL = srv.URL
-	require.NoError(t, pulsar.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return pulsar, srv
+	return collr, srv
 }
 
-func prepareClientServer404(t *testing.T) (*Pulsar, *httptest.Server) {
+func prepareClientServer404(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
 
-	pulsar := New()
-	pulsar.URL = srv.URL
-	require.NoError(t, pulsar.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return pulsar, srv
+	return collr, srv
 }
 
-func prepareClientServerConnectionRefused(t *testing.T) (*Pulsar, *httptest.Server) {
+func prepareClientServerConnectionRefused(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(nil)
 
-	pulsar := New()
-	pulsar.URL = "http://127.0.0.1:38001/metrics"
-	require.NoError(t, pulsar.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001/metrics"
+	require.NoError(t, collr.Init())
 
-	return pulsar, srv
+	return collr, srv
 }
 
 var expectedStandaloneV250Namespaces = map[string]int64{

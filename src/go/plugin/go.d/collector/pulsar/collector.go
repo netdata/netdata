@@ -30,8 +30,8 @@ func init() {
 	})
 }
 
-func New() *Pulsar {
-	return &Pulsar{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -61,7 +61,7 @@ type Config struct {
 	TopicFilter    matcher.SimpleExpr `yaml:"topic_filter,omitempty" json:"topic_filter"`
 }
 
-type Pulsar struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -77,32 +77,32 @@ type Pulsar struct {
 	topicChartsMapping map[string]string
 }
 
-func (p *Pulsar) Configuration() any {
-	return p.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (p *Pulsar) Init() error {
-	if err := p.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prom, err := p.initPrometheusClient()
+	prom, err := c.initPrometheusClient()
 	if err != nil {
 		return fmt.Errorf("init prometheus client: %v", err)
 	}
-	p.prom = prom
+	c.prom = prom
 
-	m, err := p.initTopicFilerMatcher()
+	m, err := c.initTopicFilerMatcher()
 	if err != nil {
 		return fmt.Errorf("init topic filer: %v", err)
 	}
-	p.topicFilter = m
+	c.topicFilter = m
 
 	return nil
 }
 
-func (p *Pulsar) Check() error {
-	mx, err := p.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -112,14 +112,14 @@ func (p *Pulsar) Check() error {
 	return nil
 }
 
-func (p *Pulsar) Charts() *Charts {
-	return p.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (p *Pulsar) Collect() map[string]int64 {
-	mx, err := p.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -128,8 +128,8 @@ func (p *Pulsar) Collect() map[string]int64 {
 	return mx
 }
 
-func (p *Pulsar) Cleanup() {
-	if p.prom != nil && p.prom.HTTPClient() != nil {
-		p.prom.HTTPClient().CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.prom != nil && c.prom.HTTPClient() != nil {
+		c.prom.HTTPClient().CloseIdleConnections()
 	}
 }
