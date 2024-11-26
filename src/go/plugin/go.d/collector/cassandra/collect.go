@@ -14,7 +14,7 @@ const (
 	suffixValue = "_value"
 )
 
-func (c *Cassandra) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	pms, err := c.prom.ScrapeSeries()
 	if err != nil {
 		return nil, err
@@ -22,7 +22,7 @@ func (c *Cassandra) collect() (map[string]int64, error) {
 
 	if c.validateMetrics {
 		if !isCassandraMetrics(pms) {
-			return nil, errors.New("collected metrics aren't Cassandra metrics")
+			return nil, errors.New("collected metrics aren't Collector metrics")
 		}
 		c.validateMetrics = false
 	}
@@ -36,7 +36,7 @@ func (c *Cassandra) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Cassandra) resetMetrics() {
+func (c *Collector) resetMetrics() {
 	cm := newCassandraMetrics()
 	for key, p := range c.mx.threadPools {
 		cm.threadPools[key] = &threadPoolMetrics{
@@ -47,7 +47,7 @@ func (c *Cassandra) resetMetrics() {
 	c.mx = cm
 }
 
-func (c *Cassandra) processMetric(mx map[string]int64) {
+func (c *Collector) processMetric(mx map[string]int64) {
 	c.mx.clientReqTotalLatencyReads.write(mx, "client_request_total_latency_reads")
 	c.mx.clientReqTotalLatencyWrites.write(mx, "client_request_total_latency_writes")
 	c.mx.clientReqLatencyReads.write(mx, "client_request_latency_reads")
@@ -138,7 +138,7 @@ func (c *Cassandra) processMetric(mx map[string]int64) {
 	}
 }
 
-func (c *Cassandra) collectMetrics(pms prometheus.Series) {
+func (c *Collector) collectMetrics(pms prometheus.Series) {
 	c.collectClientRequestMetrics(pms)
 	c.collectDroppedMessagesMetrics(pms)
 	c.collectThreadPoolsMetrics(pms)
@@ -148,7 +148,7 @@ func (c *Cassandra) collectMetrics(pms prometheus.Series) {
 	c.collectCompactionMetrics(pms)
 }
 
-func (c *Cassandra) collectClientRequestMetrics(pms prometheus.Series) {
+func (c *Collector) collectClientRequestMetrics(pms prometheus.Series) {
 	const metric = "org_apache_cassandra_metrics_clientrequest"
 
 	var rw struct{ read, write *metricValue }
@@ -222,7 +222,7 @@ func (c *Cassandra) collectClientRequestMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Cassandra) collectCacheMetrics(pms prometheus.Series) {
+func (c *Collector) collectCacheMetrics(pms prometheus.Series) {
 	const metric = "org_apache_cassandra_metrics_cache"
 
 	var hm struct{ hits, misses *metricValue }
@@ -270,7 +270,7 @@ func (c *Cassandra) collectCacheMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Cassandra) collectThreadPoolsMetrics(pms prometheus.Series) {
+func (c *Collector) collectThreadPoolsMetrics(pms prometheus.Series) {
 	const metric = "org_apache_cassandra_metrics_threadpools"
 
 	for _, pm := range pms.FindByName(metric + suffixValue) {
@@ -301,7 +301,7 @@ func (c *Cassandra) collectThreadPoolsMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Cassandra) collectStorageMetrics(pms prometheus.Series) {
+func (c *Collector) collectStorageMetrics(pms prometheus.Series) {
 	const metric = "org_apache_cassandra_metrics_storage"
 
 	for _, pm := range pms.FindByName(metric + suffixCount) {
@@ -316,7 +316,7 @@ func (c *Cassandra) collectStorageMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Cassandra) collectDroppedMessagesMetrics(pms prometheus.Series) {
+func (c *Collector) collectDroppedMessagesMetrics(pms prometheus.Series) {
 	const metric = "org_apache_cassandra_metrics_droppedmessage"
 
 	for _, pm := range pms.FindByName(metric + suffixCount) {
@@ -324,7 +324,7 @@ func (c *Cassandra) collectDroppedMessagesMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Cassandra) collectJVMMetrics(pms prometheus.Series) {
+func (c *Collector) collectJVMMetrics(pms prometheus.Series) {
 	const metricMemUsed = "jvm_memory_bytes_used"
 	const metricGC = "jvm_gc_collection_seconds"
 
@@ -362,7 +362,7 @@ func (c *Cassandra) collectJVMMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Cassandra) collectCompactionMetrics(pms prometheus.Series) {
+func (c *Collector) collectCompactionMetrics(pms prometheus.Series) {
 	const metric = "org_apache_cassandra_metrics_compaction"
 
 	for _, pm := range pms.FindByName(metric + suffixValue) {
@@ -385,7 +385,7 @@ func (c *Cassandra) collectCompactionMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Cassandra) getThreadPoolMetrics(name string) *threadPoolMetrics {
+func (c *Collector) getThreadPoolMetrics(name string) *threadPoolMetrics {
 	pool, ok := c.mx.threadPools[name]
 	if !ok {
 		pool = &threadPoolMetrics{name: name}

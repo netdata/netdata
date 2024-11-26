@@ -32,15 +32,15 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestCassandra_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Cassandra{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
-	assert.IsType(t, (*Cassandra)(nil), New())
+	assert.IsType(t, (*Collector)(nil), New())
 }
 
-func TestCassandra_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -61,21 +61,21 @@ func TestCassandra_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			c := New()
-			c.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, c.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, c.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestCassandra_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() (c *Cassandra, cleanup func())
+		prepare  func() (c *Collector, cleanup func())
 		wantFail bool
 	}{
 		"success on valid response": {
@@ -97,27 +97,27 @@ func TestCassandra_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			c, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, c.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, c.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, c.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestCassandra_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestCassandra_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() (c *Cassandra, cleanup func())
+		prepare       func() (c *Collector, cleanup func())
 		wantCollected map[string]int64
 	}{
 		"success on valid response": {
@@ -246,53 +246,53 @@ func TestCassandra_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			c, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, c.Init())
+			require.NoError(t, collr.Init())
 
-			mx := c.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
 		})
 	}
 }
 
-func prepareCassandra() (c *Cassandra, cleanup func()) {
+func prepareCassandra() (collr *Collector, cleanup func()) {
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataExpectedMetrics)
 		}))
 
-	c = New()
-	c.URL = ts.URL
-	return c, ts.Close
+	collr = New()
+	collr.URL = ts.URL
+	return collr, ts.Close
 }
 
-func prepareCassandraInvalidData() (c *Cassandra, cleanup func()) {
+func prepareCassandraInvalidData() (collr *Collector, cleanup func()) {
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
 
-	c = New()
-	c.URL = ts.URL
-	return c, ts.Close
+	collr = New()
+	collr.URL = ts.URL
+	return collr, ts.Close
 }
 
-func prepareCassandraConnectionRefused() (c *Cassandra, cleanup func()) {
-	c = New()
-	c.URL = "http://127.0.0.1:38001"
-	return c, func() {}
+func prepareCassandraConnectionRefused() (collr *Collector, cleanup func()) {
+	collr = New()
+	collr.URL = "http://127.0.0.1:38001"
+	return collr, func() {}
 }
 
-func prepareCassandraResponse404() (c *Cassandra, cleanup func()) {
+func prepareCassandraResponse404() (collr *Collector, cleanup func()) {
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
 
-	c = New()
-	c.URL = ts.URL
-	return c, ts.Close
+	collr = New()
+	collr.URL = ts.URL
+	return collr, ts.Close
 }

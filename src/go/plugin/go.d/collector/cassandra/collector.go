@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *Cassandra {
-	return &Cassandra{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -51,7 +51,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Cassandra struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -64,11 +64,11 @@ type Cassandra struct {
 	mx *cassandraMetrics
 }
 
-func (c *Cassandra) Configuration() any {
+func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Cassandra) Init() error {
+func (c *Collector) Init() error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("error on validating config: %v", err)
 	}
@@ -82,7 +82,7 @@ func (c *Cassandra) Init() error {
 	return nil
 }
 
-func (c *Cassandra) Check() error {
+func (c *Collector) Check() error {
 	mx, err := c.collect()
 	if err != nil {
 		return err
@@ -94,11 +94,11 @@ func (c *Cassandra) Check() error {
 	return nil
 }
 
-func (c *Cassandra) Charts() *module.Charts {
+func (c *Collector) Charts() *module.Charts {
 	return c.charts
 }
 
-func (c *Cassandra) Collect() map[string]int64 {
+func (c *Collector) Collect() map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -110,7 +110,7 @@ func (c *Cassandra) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *Cassandra) Cleanup() {
+func (c *Collector) Cleanup() {
 	if c.prom != nil && c.prom.HTTPClient() != nil {
 		c.prom.HTTPClient().CloseIdleConnections()
 	}

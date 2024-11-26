@@ -9,14 +9,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (c *Cassandra) validateConfig() error {
+func (c *Collector) validateConfig() error {
 	if c.URL == "" {
 		return errors.New("'url' is not set")
 	}
 	return nil
 }
 
-func (c *Cassandra) initPrometheusClient() (prometheus.Prometheus, error) {
+func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
