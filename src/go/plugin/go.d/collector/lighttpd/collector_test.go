@@ -31,26 +31,26 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestLighttpd_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Lighttpd{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestLighttpd_Cleanup(t *testing.T) { New().Cleanup() }
+func TestCollector_Cleanup(t *testing.T) { New().Cleanup() }
 
-func TestLighttpd_Init(t *testing.T) {
-	job := New()
+func TestCollector_Init(t *testing.T) {
+	collr := New()
 
-	require.NoError(t, job.Init())
+	require.NoError(t, collr.Init())
 }
 
-func TestLighttpd_InitNG(t *testing.T) {
-	job := New()
+func TestCollector_InitNG(t *testing.T) {
+	collr := New()
 
-	job.URL = ""
-	assert.Error(t, job.Init())
+	collr.URL = ""
+	assert.Error(t, collr.Init())
 }
 
-func TestLighttpd_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -58,23 +58,23 @@ func TestLighttpd_Check(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/server-status?auto"
-	require.NoError(t, job.Init())
-	assert.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/server-status?auto"
+	require.NoError(t, collr.Init())
+	assert.NoError(t, collr.Check())
 }
 
-func TestLighttpd_CheckNG(t *testing.T) {
-	job := New()
+func TestCollector_CheckNG(t *testing.T) {
+	collr := New()
 
-	job.URL = "http://127.0.0.1:38001/server-status?auto"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr.URL = "http://127.0.0.1:38001/server-status?auto"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestLighttpd_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
+func TestCollector_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
 
-func TestLighttpd_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -82,10 +82,10 @@ func TestLighttpd_Collect(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/server-status?auto"
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/server-status?auto"
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"scoreboard_waiting":        125,
@@ -108,10 +108,10 @@ func TestLighttpd_Collect(t *testing.T) {
 		"total_accesses":            12,
 	}
 
-	assert.Equal(t, expected, job.Collect())
+	assert.Equal(t, expected, collr.Collect())
 }
 
-func TestLighttpd_InvalidData(t *testing.T) {
+func TestCollector_InvalidData(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -119,13 +119,13 @@ func TestLighttpd_InvalidData(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/server-status?auto"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/server-status?auto"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestLighttpd_ApacheData(t *testing.T) {
+func TestCollector_ApacheData(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -133,13 +133,13 @@ func TestLighttpd_ApacheData(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/server-status?auto"
-	require.NoError(t, job.Init())
-	require.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/server-status?auto"
+	require.NoError(t, collr.Init())
+	require.Error(t, collr.Check())
 }
 
-func TestLighttpd_404(t *testing.T) {
+func TestCollector_404(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -147,8 +147,8 @@ func TestLighttpd_404(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/server-status?auto"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/server-status?auto"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }

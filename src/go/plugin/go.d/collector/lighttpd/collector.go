@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *Lighttpd {
-	return &Lighttpd{Config: Config{
+func New() *Collector {
+	return &Collector{Config: Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{
 				URL: "http://127.0.0.1/server-status?auto",
@@ -46,7 +46,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Lighttpd struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -55,32 +55,32 @@ type Lighttpd struct {
 	httpClient *http.Client
 }
 
-func (l *Lighttpd) Configuration() any {
-	return l.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (l *Lighttpd) Init() error {
-	if l.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("URL is required but not set")
 	}
-	if !strings.HasSuffix(l.URL, "?auto") {
-		return fmt.Errorf("bad URL '%s', should ends in '?auto'", l.URL)
+	if !strings.HasSuffix(c.URL, "?auto") {
+		return fmt.Errorf("bad URL '%s', should ends in '?auto'", c.URL)
 	}
 
-	httpClient, err := web.NewHTTPClient(l.ClientConfig)
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create http client: %v", err)
 	}
-	l.httpClient = httpClient
+	c.httpClient = httpClient
 
-	l.Debugf("using URL %s", l.URL)
-	l.Debugf("using timeout: %s", l.Timeout.Duration())
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout.Duration())
 
 	return nil
 }
 
-func (l *Lighttpd) Check() error {
-	mx, err := l.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -92,22 +92,22 @@ func (l *Lighttpd) Check() error {
 	return nil
 }
 
-func (l *Lighttpd) Charts() *Charts {
-	return l.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (l *Lighttpd) Collect() map[string]int64 {
-	mx, err := l.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		l.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (l *Lighttpd) Cleanup() {
-	if l.httpClient != nil {
-		l.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }
