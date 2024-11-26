@@ -22,8 +22,8 @@ func init() {
 	})
 }
 
-func New() *Gearman {
-	return &Gearman{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:4730",
 			Timeout: confopt.Duration(time.Second * 1),
@@ -41,7 +41,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout" json:"timeout"`
 }
 
-type Gearman struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -54,20 +54,20 @@ type Gearman struct {
 	seenPriorityTasks map[string]bool
 }
 
-func (g *Gearman) Configuration() any {
-	return g.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (g *Gearman) Init() error {
-	if g.Address == "" {
+func (c *Collector) Init() error {
+	if c.Address == "" {
 		return errors.New("config: 'address' not set")
 	}
 
 	return nil
 }
 
-func (g *Gearman) Check() error {
-	mx, err := g.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -79,14 +79,14 @@ func (g *Gearman) Check() error {
 	return nil
 }
 
-func (g *Gearman) Charts() *module.Charts {
-	return g.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (g *Gearman) Collect() map[string]int64 {
-	mx, err := g.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		g.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -96,9 +96,9 @@ func (g *Gearman) Collect() map[string]int64 {
 	return mx
 }
 
-func (g *Gearman) Cleanup() {
-	if g.conn != nil {
-		g.conn.disconnect()
-		g.conn = nil
+func (c *Collector) Cleanup() {
+	if c.conn != nil {
+		c.conn.disconnect()
+		c.conn = nil
 	}
 }

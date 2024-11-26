@@ -33,11 +33,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestGearman_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Gearman{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestGearman_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -58,59 +58,59 @@ func TestGearman_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			gear := New()
-			gear.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, gear.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, gear.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestGearman_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Gearman
+		prepare func() *Collector
 	}{
 		"not initialized": {
-			prepare: func() *Gearman {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Gearman {
-				gear := New()
-				gear.newConn = func(config Config) gearmanConn { return prepareMockOk() }
-				_ = gear.Check()
-				return gear
+			prepare: func() *Collector {
+				collr := New()
+				collr.newConn = func(Config) gearmanConn { return prepareMockOk() }
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Gearman {
-				gear := New()
-				gear.newConn = func(config Config) gearmanConn { return prepareMockOk() }
-				_ = gear.Collect()
-				return gear
+			prepare: func() *Collector {
+				collr := New()
+				collr.newConn = func(Config) gearmanConn { return prepareMockOk() }
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			gear := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, gear.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestGearman_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestGearman_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockGearmanConn
 		wantFail    bool
@@ -135,20 +135,20 @@ func TestGearman_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			gear := New()
+			collr := New()
 			mock := test.prepareMock()
-			gear.newConn = func(config Config) gearmanConn { return mock }
+			collr.newConn = func(Config) gearmanConn { return mock }
 
 			if test.wantFail {
-				assert.Error(t, gear.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, gear.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestGearman_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock             func() *mockGearmanConn
 		wantMetrics             map[string]int64
@@ -234,21 +234,21 @@ func TestGearman_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			gear := New()
+			collr := New()
 			mock := test.prepareMock()
-			gear.newConn = func(config Config) gearmanConn { return mock }
+			collr.newConn = func(Config) gearmanConn { return mock }
 
-			mx := gear.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx, "want metrics")
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, gear.Charts(), mx)
-				assert.Equal(t, test.wantCharts, len(*gear.Charts()), "want charts")
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				assert.Equal(t, test.wantCharts, len(*collr.Charts()), "want charts")
 			}
 
 			assert.Equal(t, test.disconnectBeforeCleanup, mock.disconnectCalled, "disconnect before cleanup")
-			gear.Cleanup()
+			collr.Cleanup()
 			assert.Equal(t, test.disconnectAfterCleanup, mock.disconnectCalled, "disconnect after cleanup")
 		})
 	}

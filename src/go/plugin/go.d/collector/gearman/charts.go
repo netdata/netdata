@@ -107,25 +107,25 @@ var (
 	}
 )
 
-func (g *Gearman) addFunctionStatusCharts(name string) {
-	g.addFunctionCharts(name, functionStatusChartsTmpl.Copy())
+func (c *Collector) addFunctionStatusCharts(name string) {
+	c.addFunctionCharts(name, functionStatusChartsTmpl.Copy())
 }
 
-func (g *Gearman) removeFunctionStatusCharts(name string) {
+func (c *Collector) removeFunctionStatusCharts(name string) {
 	px := fmt.Sprintf("function_%s_", cleanFunctionName(name))
-	g.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (g *Gearman) addFunctionPriorityStatusCharts(name string) {
-	g.addFunctionCharts(name, functionPriorityStatusChartsTmpl.Copy())
+func (c *Collector) addFunctionPriorityStatusCharts(name string) {
+	c.addFunctionCharts(name, functionPriorityStatusChartsTmpl.Copy())
 }
 
-func (g *Gearman) removeFunctionPriorityStatusCharts(name string) {
+func (c *Collector) removeFunctionPriorityStatusCharts(name string) {
 	px := fmt.Sprintf("prio_function_%s_", cleanFunctionName(name))
-	g.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (g *Gearman) addFunctionCharts(name string, charts *module.Charts) {
+func (c *Collector) addFunctionCharts(name string, charts *module.Charts) {
 	charts = charts.Copy()
 
 	for _, chart := range *charts {
@@ -138,13 +138,13 @@ func (g *Gearman) addFunctionCharts(name string, charts *module.Charts) {
 		}
 	}
 
-	if err := g.Charts().Add(*charts...); err != nil {
-		g.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (g *Gearman) removeCharts(px string) {
-	for _, chart := range *g.Charts() {
+func (c *Collector) removeCharts(px string) {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
