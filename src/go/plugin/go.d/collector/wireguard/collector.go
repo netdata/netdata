@@ -24,8 +24,8 @@ func init() {
 	})
 }
 
-func New() *WireGuard {
-	return &WireGuard{
+func New() *Collector {
+	return &Collector{
 		newWGClient:  func() (wgClient, error) { return wgctrl.New() },
 		charts:       &module.Charts{},
 		devices:      make(map[string]bool),
@@ -39,7 +39,7 @@ type Config struct {
 }
 
 type (
-	WireGuard struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -59,16 +59,16 @@ type (
 	}
 )
 
-func (w *WireGuard) Configuration() any {
-	return w.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (w *WireGuard) Init() error {
+func (c *Collector) Init() error {
 	return nil
 }
 
-func (w *WireGuard) Check() error {
-	mx, err := w.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -78,14 +78,14 @@ func (w *WireGuard) Check() error {
 	return nil
 }
 
-func (w *WireGuard) Charts() *module.Charts {
-	return w.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (w *WireGuard) Collect() map[string]int64 {
-	mx, err := w.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		w.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -94,12 +94,12 @@ func (w *WireGuard) Collect() map[string]int64 {
 	return mx
 }
 
-func (w *WireGuard) Cleanup() {
-	if w.client == nil {
+func (c *Collector) Cleanup() {
+	if c.client == nil {
 		return
 	}
-	if err := w.client.Close(); err != nil {
-		w.Warningf("cleanup: error on closing connection: %v", err)
+	if err := c.client.Close(); err != nil {
+		c.Warningf("cleanup: error on closing connection: %v", err)
 	}
-	w.client = nil
+	c.client = nil
 }

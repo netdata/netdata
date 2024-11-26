@@ -31,51 +31,51 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestWireGuard_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &WireGuard{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestWireGuard_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	assert.NoError(t, New().Init())
 }
 
-func TestWireGuard_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.Len(t, *New().Charts(), 0)
 
 }
 
-func TestWireGuard_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare   func(w *WireGuard)
+		prepare   func(w *Collector)
 		wantClose bool
 	}{
 		"after New": {
 			wantClose: false,
-			prepare:   func(w *WireGuard) {},
+			prepare:   func(*Collector) {},
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(w *WireGuard) { _ = w.Init() },
+			prepare:   func(c *Collector) { _ = c.Init() },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(w *WireGuard) { _ = w.Init(); _ = w.Check() },
+			prepare:   func(c *Collector) { _ = c.Init(); _ = c.Check() },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(w *WireGuard) { _ = w.Init(); _ = w.Collect() },
+			prepare:   func(c *Collector) { _ = c.Init(); _ = c.Collect() },
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			w := New()
+			collr := New()
 			m := &mockClient{}
-			w.newWGClient = func() (wgClient, error) { return m, nil }
+			collr.newWGClient = func() (wgClient, error) { return m, nil }
 
-			test.prepare(w)
+			test.prepare(collr)
 
-			require.NotPanics(t, w.Cleanup)
+			require.NotPanics(t, collr.Cleanup)
 
 			if test.wantClose {
 				assert.True(t, m.closeCalled)
@@ -86,69 +86,69 @@ func TestWireGuard_Cleanup(t *testing.T) {
 	}
 }
 
-func TestWireGuard_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(w *WireGuard)
+		prepare  func(w *Collector)
 	}{
 		"success when devices and peers found": {
 			wantFail: false,
-			prepare: func(w *WireGuard) {
+			prepare: func(collr *Collector) {
 				m := &mockClient{}
 				d1 := prepareDevice(1)
 				d1.Peers = append(d1.Peers, preparePeer("11"))
 				d1.Peers = append(d1.Peers, preparePeer("12"))
 				m.devices = append(m.devices, d1)
-				w.client = m
+				collr.client = m
 			},
 		},
 		"success when devices and no peers found": {
 			wantFail: false,
-			prepare: func(w *WireGuard) {
+			prepare: func(collr *Collector) {
 				m := &mockClient{}
 				m.devices = append(m.devices, prepareDevice(1))
-				w.client = m
+				collr.client = m
 			},
 		},
 		"fail when no devices and no peers found": {
 			wantFail: true,
-			prepare: func(w *WireGuard) {
-				w.client = &mockClient{}
+			prepare: func(collr *Collector) {
+				collr.client = &mockClient{}
 			},
 		},
 		"fail when error on retrieving devices": {
 			wantFail: true,
-			prepare: func(w *WireGuard) {
-				w.client = &mockClient{errOnDevices: true}
+			prepare: func(collr *Collector) {
+				collr.client = &mockClient{errOnDevices: true}
 			},
 		},
 		"fail when error on creating client": {
 			wantFail: true,
-			prepare: func(w *WireGuard) {
-				w.newWGClient = func() (wgClient, error) { return nil, errors.New("mock.newWGClient() error") }
+			prepare: func(collr *Collector) {
+				collr.newWGClient = func() (wgClient, error) { return nil, errors.New("mock.newWGClient() error") }
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			w := New()
-			require.NoError(t, w.Init())
-			test.prepare(w)
+			collr := New()
+			require.NoError(t, collr.Init())
+			test.prepare(collr)
 
 			if test.wantFail {
-				assert.Error(t, w.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, w.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestWireGuard_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	type testCaseStep struct {
-		prepareMock func(m *mockClient)
-		check       func(t *testing.T, w *WireGuard)
+		prepareMock func(*mockClient)
+		check       func(*testing.T, *Collector)
 	}
 	tests := map[string][]testCaseStep{
 		"several devices no peers": {
@@ -157,8 +157,8 @@ func TestWireGuard_Collect(t *testing.T) {
 					m.devices = append(m.devices, prepareDevice(1))
 					m.devices = append(m.devices, prepareDevice(2))
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					mx := w.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"device_wg1_peers":    0,
@@ -171,7 +171,7 @@ func TestWireGuard_Collect(t *testing.T) {
 
 					copyLatestHandshake(mx, expected)
 					assert.Equal(t, expected, mx)
-					assert.Equal(t, len(deviceChartsTmpl)*2, len(*w.Charts()))
+					assert.Equal(t, len(deviceChartsTmpl)*2, len(*collr.Charts()))
 				},
 			},
 		},
@@ -188,8 +188,8 @@ func TestWireGuard_Collect(t *testing.T) {
 					d2.Peers = append(d2.Peers, preparePeer("22"))
 					m.devices = append(m.devices, d2)
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					mx := w.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"device_wg1_peers":    2,
@@ -214,7 +214,7 @@ func TestWireGuard_Collect(t *testing.T) {
 
 					copyLatestHandshake(mx, expected)
 					assert.Equal(t, expected, mx)
-					assert.Equal(t, len(deviceChartsTmpl)*2+len(peerChartsTmpl)*4, len(*w.Charts()))
+					assert.Equal(t, len(deviceChartsTmpl)*2+len(peerChartsTmpl)*4, len(*collr.Charts()))
 				},
 			},
 		},
@@ -228,8 +228,8 @@ func TestWireGuard_Collect(t *testing.T) {
 					d1.Peers = append(d1.Peers, prepareNoLastHandshakePeer("14"))
 					m.devices = append(m.devices, d1)
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					mx := w.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"device_wg1_peers":    4,
@@ -245,7 +245,7 @@ func TestWireGuard_Collect(t *testing.T) {
 
 					copyLatestHandshake(mx, expected)
 					assert.Equal(t, expected, mx)
-					assert.Equal(t, len(deviceChartsTmpl)+len(peerChartsTmpl)*2, len(*w.Charts()))
+					assert.Equal(t, len(deviceChartsTmpl)+len(peerChartsTmpl)*2, len(*collr.Charts()))
 				},
 			},
 		},
@@ -254,17 +254,17 @@ func TestWireGuard_Collect(t *testing.T) {
 				prepareMock: func(m *mockClient) {
 					m.devices = append(m.devices, prepareDevice(1))
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					_ = w.Collect()
-					assert.Equal(t, len(deviceChartsTmpl)*1, len(*w.Charts()))
+				check: func(t *testing.T, collr *Collector) {
+					_ = collr.Collect()
+					assert.Equal(t, len(deviceChartsTmpl)*1, len(*collr.Charts()))
 				},
 			},
 			{
 				prepareMock: func(m *mockClient) {
 					m.devices = append(m.devices, prepareDevice(2))
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					mx := w.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"device_wg1_peers":    0,
@@ -276,7 +276,7 @@ func TestWireGuard_Collect(t *testing.T) {
 					}
 					copyLatestHandshake(mx, expected)
 					assert.Equal(t, expected, mx)
-					assert.Equal(t, len(deviceChartsTmpl)*2, len(*w.Charts()))
+					assert.Equal(t, len(deviceChartsTmpl)*2, len(*collr.Charts()))
 
 				},
 			},
@@ -287,18 +287,18 @@ func TestWireGuard_Collect(t *testing.T) {
 					m.devices = append(m.devices, prepareDevice(1))
 					m.devices = append(m.devices, prepareDevice(2))
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					_ = w.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					_ = collr.Collect()
 				},
 			},
 			{
 				prepareMock: func(m *mockClient) {
 					m.devices = m.devices[:len(m.devices)-1]
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					_ = w.Collect()
-					assert.Equal(t, len(deviceChartsTmpl)*2, len(*w.Charts()))
-					assert.Equal(t, 0, calcObsoleteCharts(w.Charts()))
+				check: func(t *testing.T, collr *Collector) {
+					_ = collr.Collect()
+					assert.Equal(t, len(deviceChartsTmpl)*2, len(*collr.Charts()))
+					assert.Equal(t, 0, calcObsoleteCharts(collr.Charts()))
 				},
 			},
 		},
@@ -308,20 +308,20 @@ func TestWireGuard_Collect(t *testing.T) {
 					m.devices = append(m.devices, prepareDevice(1))
 					m.devices = append(m.devices, prepareDevice(2))
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					_ = w.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					_ = collr.Collect()
 				},
 			},
 			{
 				prepareMock: func(m *mockClient) {
 					m.devices = m.devices[:len(m.devices)-1]
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					w.cleanupEvery = time.Second
+				check: func(t *testing.T, collr *Collector) {
+					collr.cleanupEvery = time.Second
 					time.Sleep(time.Second)
-					_ = w.Collect()
-					assert.Equal(t, len(deviceChartsTmpl)*2, len(*w.Charts()))
-					assert.Equal(t, len(deviceChartsTmpl)*1, calcObsoleteCharts(w.Charts()))
+					_ = collr.Collect()
+					assert.Equal(t, len(deviceChartsTmpl)*2, len(*collr.Charts()))
+					assert.Equal(t, len(deviceChartsTmpl)*1, calcObsoleteCharts(collr.Charts()))
 				},
 			},
 		},
@@ -330,9 +330,9 @@ func TestWireGuard_Collect(t *testing.T) {
 				prepareMock: func(m *mockClient) {
 					m.devices = append(m.devices, prepareDevice(1))
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					_ = w.Collect()
-					assert.Equal(t, len(deviceChartsTmpl)*1, len(*w.Charts()))
+				check: func(t *testing.T, collr *Collector) {
+					_ = collr.Collect()
+					assert.Equal(t, len(deviceChartsTmpl)*1, len(*collr.Charts()))
 				},
 			},
 			{
@@ -340,8 +340,8 @@ func TestWireGuard_Collect(t *testing.T) {
 					d1 := m.devices[0]
 					d1.Peers = append(d1.Peers, preparePeer("11"))
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					mx := w.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"device_wg1_peers":    1,
@@ -353,7 +353,7 @@ func TestWireGuard_Collect(t *testing.T) {
 					}
 					copyLatestHandshake(mx, expected)
 					assert.Equal(t, expected, mx)
-					assert.Equal(t, len(deviceChartsTmpl)*1+len(peerChartsTmpl)*1, len(*w.Charts()))
+					assert.Equal(t, len(deviceChartsTmpl)*1+len(peerChartsTmpl)*1, len(*collr.Charts()))
 				},
 			},
 		},
@@ -365,8 +365,8 @@ func TestWireGuard_Collect(t *testing.T) {
 					d1.Peers = append(d1.Peers, preparePeer("12"))
 					m.devices = append(m.devices, d1)
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					_ = w.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					_ = collr.Collect()
 				},
 			},
 			{
@@ -374,10 +374,10 @@ func TestWireGuard_Collect(t *testing.T) {
 					d1 := m.devices[0]
 					d1.Peers = d1.Peers[:len(d1.Peers)-1]
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					_ = w.Collect()
-					assert.Equal(t, len(deviceChartsTmpl)*1+len(peerChartsTmpl)*2, len(*w.Charts()))
-					assert.Equal(t, 0, calcObsoleteCharts(w.Charts()))
+				check: func(t *testing.T, collr *Collector) {
+					_ = collr.Collect()
+					assert.Equal(t, len(deviceChartsTmpl)*1+len(peerChartsTmpl)*2, len(*collr.Charts()))
+					assert.Equal(t, 0, calcObsoleteCharts(collr.Charts()))
 				},
 			},
 		},
@@ -389,8 +389,8 @@ func TestWireGuard_Collect(t *testing.T) {
 					d1.Peers = append(d1.Peers, preparePeer("12"))
 					m.devices = append(m.devices, d1)
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					_ = w.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					_ = collr.Collect()
 				},
 			},
 			{
@@ -398,20 +398,20 @@ func TestWireGuard_Collect(t *testing.T) {
 					d1 := m.devices[0]
 					d1.Peers = d1.Peers[:len(d1.Peers)-1]
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					w.cleanupEvery = time.Second
+				check: func(t *testing.T, collr *Collector) {
+					collr.cleanupEvery = time.Second
 					time.Sleep(time.Second)
-					_ = w.Collect()
-					assert.Equal(t, len(deviceChartsTmpl)*1+len(peerChartsTmpl)*2, len(*w.Charts()))
-					assert.Equal(t, len(peerChartsTmpl)*1, calcObsoleteCharts(w.Charts()))
+					_ = collr.Collect()
+					assert.Equal(t, len(deviceChartsTmpl)*1+len(peerChartsTmpl)*2, len(*collr.Charts()))
+					assert.Equal(t, len(peerChartsTmpl)*1, calcObsoleteCharts(collr.Charts()))
 				},
 			},
 		},
 		"fails if no devices found": {
 			{
 				prepareMock: func(m *mockClient) {},
-				check: func(t *testing.T, w *WireGuard) {
-					assert.Equal(t, map[string]int64(nil), w.Collect())
+				check: func(t *testing.T, collr *Collector) {
+					assert.Equal(t, map[string]int64(nil), collr.Collect())
 				},
 			},
 		},
@@ -420,8 +420,8 @@ func TestWireGuard_Collect(t *testing.T) {
 				prepareMock: func(m *mockClient) {
 					m.errOnDevices = true
 				},
-				check: func(t *testing.T, w *WireGuard) {
-					assert.Equal(t, map[string]int64(nil), w.Collect())
+				check: func(t *testing.T, collr *Collector) {
+					assert.Equal(t, map[string]int64(nil), collr.Collect())
 				},
 			},
 		},
@@ -429,15 +429,15 @@ func TestWireGuard_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			w := New()
-			require.NoError(t, w.Init())
+			collr := New()
+			require.NoError(t, collr.Init())
 			m := &mockClient{}
-			w.client = m
+			collr.client = m
 
 			for i, step := range test {
 				t.Run(fmt.Sprintf("step[%d]", i), func(t *testing.T) {
 					step.prepareMock(m)
-					step.check(t, w)
+					step.check(t, collr)
 				})
 			}
 		})

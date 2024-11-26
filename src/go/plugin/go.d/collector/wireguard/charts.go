@@ -96,18 +96,18 @@ func newDeviceCharts(device string) *module.Charts {
 	return charts
 }
 
-func (w *WireGuard) addNewDeviceCharts(device string) {
+func (c *Collector) addNewDeviceCharts(device string) {
 	charts := newDeviceCharts(device)
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *WireGuard) removeDeviceCharts(device string) {
+func (c *Collector) removeDeviceCharts(device string) {
 	prefix := fmt.Sprintf("device_%s", device)
 
-	for _, c := range *w.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()
@@ -132,18 +132,18 @@ func newPeerCharts(id, device, pubKey string) *module.Charts {
 	return charts
 }
 
-func (w *WireGuard) addNewPeerCharts(id, device, pubKey string) {
+func (c *Collector) addNewPeerCharts(id, device, pubKey string) {
 	charts := newPeerCharts(id, device, pubKey)
 
-	if err := w.Charts().Add(*charts...); err != nil {
-		w.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (w *WireGuard) removePeerCharts(id string) {
+func (c *Collector) removePeerCharts(id string) {
 	prefix := fmt.Sprintf("peer_%s", id)
 
-	for _, c := range *w.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()
