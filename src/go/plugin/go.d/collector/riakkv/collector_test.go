@@ -33,11 +33,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestRiakKv_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &RiakKv{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestRiakKv_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -58,22 +58,22 @@ func TestRiakKv_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			riak := New()
-			riak.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, riak.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, riak.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestRiakKv_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (riak *RiakKv, cleanup func())
+		prepare  func(t *testing.T) (collr *Collector, cleanup func())
 	}{
 		"success on valid response": {
 			wantFail: false,
@@ -95,25 +95,25 @@ func TestRiakKv_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			riak, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, riak.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, riak.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestRiakKv_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestRiakKv_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func(t *testing.T) (riak *RiakKv, cleanup func())
+		prepare     func(t *testing.T) (collr *Collector, cleanup func())
 		wantMetrics map[string]int64
 	}{
 		"success on valid response": {
@@ -199,67 +199,67 @@ func TestRiakKv_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			riak, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			_ = riak.Check()
+			_ = collr.Check()
 
-			mx := riak.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				require.True(t, len(*riak.Charts()) > 0, "charts > 0")
-				module.TestMetricsHasAllChartsDims(t, riak.Charts(), mx)
+				require.True(t, len(*collr.Charts()) > 0, "charts > 0")
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func caseOkResponse(t *testing.T) (*RiakKv, func()) {
+func caseOkResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataStats)
 		}))
-	riak := New()
-	riak.URL = srv.URL
-	require.NoError(t, riak.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return riak, srv.Close
+	return collr, srv.Close
 }
 
-func caseInvalidDataResponse(t *testing.T) (*RiakKv, func()) {
+func caseInvalidDataResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	riak := New()
-	riak.URL = srv.URL
-	require.NoError(t, riak.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return riak, srv.Close
+	return collr, srv.Close
 }
 
-func caseConnectionRefused(t *testing.T) (*RiakKv, func()) {
+func caseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	rk := New()
-	rk.URL = "http://127.0.0.1:65001"
-	require.NoError(t, rk.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	require.NoError(t, collr.Init())
 
-	return rk, func() {}
+	return collr, func() {}
 }
 
-func case404(t *testing.T) (*RiakKv, func()) {
+func case404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	riak := New()
-	riak.URL = srv.URL
-	require.NoError(t, riak.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return riak, srv.Close
+	return collr, srv.Close
 }

@@ -32,8 +32,8 @@ func init() {
 	})
 }
 
-func New() *RiakKv {
-	return &RiakKv{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -55,7 +55,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type RiakKv struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -65,29 +65,29 @@ type RiakKv struct {
 	httpClient *http.Client
 }
 
-func (r *RiakKv) Configuration() any {
-	return r.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (r *RiakKv) Init() error {
-	if r.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("config: url not set")
 	}
 
-	httpClient, err := web.NewHTTPClient(r.ClientConfig)
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
-	r.httpClient = httpClient
+	c.httpClient = httpClient
 
-	r.Debugf("using URL %s", r.URL)
-	r.Debugf("using timeout: %s", r.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (r *RiakKv) Check() error {
-	mx, err := r.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -98,14 +98,14 @@ func (r *RiakKv) Check() error {
 	return nil
 }
 
-func (r *RiakKv) Charts() *module.Charts {
-	return r.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (r *RiakKv) Collect() map[string]int64 {
-	mx, err := r.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		r.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -114,8 +114,8 @@ func (r *RiakKv) Collect() map[string]int64 {
 	return mx
 }
 
-func (r *RiakKv) Cleanup() {
-	if r.httpClient != nil {
-		r.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }
