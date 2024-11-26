@@ -15,28 +15,28 @@ import (
 
 const precision = 1000 // float values multiplier and dimensions divisor
 
-func (r *Redis) collect() (map[string]int64, error) {
-	info, err := r.rdb.Info(context.Background(), "all").Result()
+func (c *Collector) collect() (map[string]int64, error) {
+	info, err := c.rdb.Info(context.Background(), "all").Result()
 	if err != nil {
 		return nil, err
 	}
 
-	if r.server == "" {
+	if c.server == "" {
 		s, v, err := extractServerVersion(info)
 		if err != nil {
 			return nil, fmt.Errorf("can not extract server app and version: %v", err)
 		}
-		r.server, r.version = s, v
-		r.Debugf(`server="%s",version="%s"`, s, v)
+		c.server, c.version = s, v
+		c.Debugf(`server="%s",version="%s"`, s, v)
 	}
 
-	if r.server != "redis" {
-		return nil, fmt.Errorf("unsupported server app, want=redis, got=%s", r.server)
+	if c.server != "redis" {
+		return nil, fmt.Errorf("unsupported server app, want=redis, got=%s", c.server)
 	}
 
 	mx := make(map[string]int64)
-	r.collectInfo(mx, info)
-	r.collectPingLatency(mx)
+	c.collectInfo(mx, info)
+	c.collectPingLatency(mx)
 
 	return mx, nil
 }

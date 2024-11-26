@@ -36,11 +36,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestRedis_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Redis{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestRedis_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -67,21 +67,21 @@ func TestRedis_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rdb := New()
-			rdb.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, rdb.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, rdb.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestRedis_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(t *testing.T) *Redis
+		prepare  func(t *testing.T) *Collector
 		wantFail bool
 	}{
 		"success on valid response v6.0.9": {
@@ -99,40 +99,40 @@ func TestRedis_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rdb := test.prepare(t)
+			collr := test.prepare(t)
 
 			if test.wantFail {
-				assert.Error(t, rdb.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, rdb.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestRedis_Charts(t *testing.T) {
-	rdb := New()
-	require.NoError(t, rdb.Init())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
 
-	assert.NotNil(t, rdb.Charts())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestRedis_Cleanup(t *testing.T) {
-	rdb := New()
-	assert.NotPanics(t, rdb.Cleanup)
+func TestCollector_Cleanup(t *testing.T) {
+	collr := New()
+	assert.NotPanics(t, collr.Cleanup)
 
-	require.NoError(t, rdb.Init())
+	require.NoError(t, collr.Init())
 	m := &mockRedisClient{}
-	rdb.rdb = m
+	collr.rdb = m
 
-	rdb.Cleanup()
+	collr.Cleanup()
 
 	assert.True(t, m.calledClose)
 }
 
-func TestRedis_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func(t *testing.T) *Redis
+		prepare       func(t *testing.T) *Collector
 		wantCollected map[string]int64
 	}{
 		"success on valid response v6.0.9": {
@@ -242,7 +242,7 @@ func TestRedis_Collect(t *testing.T) {
 				"rdb_last_bgsave_status":          0,
 				"rdb_last_bgsave_time_sec":        0,
 				"rdb_last_cow_size":               290816,
-				"rdb_last_save_time":              56978305,
+				"rdb_last_save_time":              125697993,
 				"redis_git_dirty":                 0,
 				"redis_git_sha1":                  0,
 				"rejected_connections":            0,
@@ -296,69 +296,69 @@ func TestRedis_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rdb := test.prepare(t)
+			collr := test.prepare(t)
 
-			mx := rdb.Collect()
+			mx := collr.Collect()
 
 			copyTimeRelatedMetrics(mx, test.wantCollected)
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				module.TestMetricsHasAllChartsDims(t, rdb.Charts(), mx)
-				ensureCollectedCommandsAddedToCharts(t, rdb)
-				ensureCollectedDbsAddedToCharts(t, rdb)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				ensureCollectedCommandsAddedToCharts(t, collr)
+				ensureCollectedDbsAddedToCharts(t, collr)
 			}
 		})
 	}
 }
 
-func prepareRedisV609(t *testing.T) *Redis {
-	rdb := New()
-	require.NoError(t, rdb.Init())
-	rdb.rdb = &mockRedisClient{
+func prepareRedisV609(t *testing.T) *Collector {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.rdb = &mockRedisClient{
 		result: dataVer609InfoAll,
 	}
-	return rdb
+	return collr
 }
 
-func prepareRedisErrorOnInfo(t *testing.T) *Redis {
-	rdb := New()
-	require.NoError(t, rdb.Init())
-	rdb.rdb = &mockRedisClient{
+func prepareRedisErrorOnInfo(t *testing.T) *Collector {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.rdb = &mockRedisClient{
 		errOnInfo: true,
 	}
-	return rdb
+	return collr
 }
 
-func prepareRedisWithPikaMetrics(t *testing.T) *Redis {
-	rdb := New()
-	require.NoError(t, rdb.Init())
-	rdb.rdb = &mockRedisClient{
+func prepareRedisWithPikaMetrics(t *testing.T) *Collector {
+	collr := New()
+	require.NoError(t, collr.Init())
+	collr.rdb = &mockRedisClient{
 		result: dataPikaInfoAll,
 	}
-	return rdb
+	return collr
 }
-func ensureCollectedCommandsAddedToCharts(t *testing.T, rdb *Redis) {
+func ensureCollectedCommandsAddedToCharts(t *testing.T, collr *Collector) {
 	for _, id := range []string{
 		chartCommandsCalls.ID,
 		chartCommandsUsec.ID,
 		chartCommandsUsecPerSec.ID,
 	} {
-		chart := rdb.Charts().Get(id)
+		chart := collr.Charts().Get(id)
 		require.NotNilf(t, chart, "'%s' chart is not in charts", id)
-		assert.Lenf(t, chart.Dims, len(rdb.collectedCommands),
+		assert.Lenf(t, chart.Dims, len(collr.collectedCommands),
 			"'%s' chart unexpected number of dimensions", id)
 	}
 }
 
-func ensureCollectedDbsAddedToCharts(t *testing.T, rdb *Redis) {
+func ensureCollectedDbsAddedToCharts(t *testing.T, collr *Collector) {
 	for _, id := range []string{
 		chartKeys.ID,
 		chartExpiresKeys.ID,
 	} {
-		chart := rdb.Charts().Get(id)
+		chart := collr.Charts().Get(id)
 		require.NotNilf(t, chart, "'%s' chart is not in charts", id)
-		assert.Lenf(t, chart.Dims, len(rdb.collectedDbs),
+		assert.Lenf(t, chart.Dims, len(collr.collectedDbs),
 			"'%s' chart unexpected number of dimensions", id)
 	}
 }

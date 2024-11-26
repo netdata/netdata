@@ -7,21 +7,21 @@ import (
 	"time"
 )
 
-func (r *Redis) collectPingLatency(mx map[string]int64) {
-	r.pingSummary.Reset()
+func (c *Collector) collectPingLatency(mx map[string]int64) {
+	c.pingSummary.Reset()
 
-	for i := 0; i < r.PingSamples; i++ {
+	for i := 0; i < c.PingSamples; i++ {
 		now := time.Now()
-		_, err := r.rdb.Ping(context.Background()).Result()
+		_, err := c.rdb.Ping(context.Background()).Result()
 		elapsed := time.Since(now)
 
 		if err != nil {
-			r.Debug(err)
+			c.Debug(err)
 			continue
 		}
 
-		r.pingSummary.Observe(float64(elapsed.Microseconds()))
+		c.pingSummary.Observe(float64(elapsed.Microseconds()))
 	}
 
-	r.pingSummary.WriteTo(mx, "ping_latency", 1, 1)
+	c.pingSummary.WriteTo(mx, "ping_latency", 1, 1)
 }

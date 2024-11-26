@@ -30,8 +30,8 @@ func init() {
 	})
 }
 
-func New() *Redis {
-	return &Redis{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address:     "redis://@localhost:6379",
 			Timeout:     confopt.Duration(time.Second),
@@ -57,7 +57,7 @@ type Config struct {
 }
 
 type (
-	Redis struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -80,33 +80,33 @@ type (
 	}
 )
 
-func (r *Redis) Configuration() any {
-	return r.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (r *Redis) Init() error {
-	err := r.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	rdb, err := r.initRedisClient()
+	rdb, err := c.initRedisClient()
 	if err != nil {
 		return fmt.Errorf("init redis client: %v", err)
 	}
-	r.rdb = rdb
+	c.rdb = rdb
 
-	charts, err := r.initCharts()
+	charts, err := c.initCharts()
 	if err != nil {
 		return fmt.Errorf("init charts: %v", err)
 	}
-	r.charts = charts
+	c.charts = charts
 
 	return nil
 }
 
-func (r *Redis) Check() error {
-	mx, err := r.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -116,14 +116,14 @@ func (r *Redis) Check() error {
 	return nil
 }
 
-func (r *Redis) Charts() *module.Charts {
-	return r.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (r *Redis) Collect() map[string]int64 {
-	ms, err := r.collect()
+func (c *Collector) Collect() map[string]int64 {
+	ms, err := c.collect()
 	if err != nil {
-		r.Error(err)
+		c.Error(err)
 	}
 
 	if len(ms) == 0 {
@@ -132,13 +132,13 @@ func (r *Redis) Collect() map[string]int64 {
 	return ms
 }
 
-func (r *Redis) Cleanup() {
-	if r.rdb == nil {
+func (c *Collector) Cleanup() {
+	if c.rdb == nil {
 		return
 	}
-	err := r.rdb.Close()
+	err := c.rdb.Close()
 	if err != nil {
-		r.Warningf("cleanup: error on closing redis client [%s]: %v", r.Address, err)
+		c.Warningf("cleanup: error on closing redis client [%s]: %v", c.Address, err)
 	}
-	r.rdb = nil
+	c.rdb = nil
 }
