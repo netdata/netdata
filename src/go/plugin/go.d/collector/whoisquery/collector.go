@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *WhoisQuery {
-	return &WhoisQuery{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout:       confopt.Duration(time.Second * 5),
 			DaysUntilWarn: 30,
@@ -44,7 +44,7 @@ type Config struct {
 	DaysUntilCrit int64            `yaml:"days_until_expiration_critical,omitempty" json:"days_until_expiration_critical"`
 }
 
-type WhoisQuery struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -53,28 +53,28 @@ type WhoisQuery struct {
 	prov provider
 }
 
-func (w *WhoisQuery) Configuration() any {
-	return w.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (w *WhoisQuery) Init() error {
-	if err := w.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prov, err := w.initProvider()
+	prov, err := c.initProvider()
 	if err != nil {
 		return fmt.Errorf("init whois provider: %v", err)
 	}
-	w.prov = prov
+	c.prov = prov
 
-	w.charts = w.initCharts()
+	c.charts = c.initCharts()
 
 	return nil
 }
 
-func (w *WhoisQuery) Check() error {
-	mx, err := w.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -84,14 +84,14 @@ func (w *WhoisQuery) Check() error {
 	return nil
 }
 
-func (w *WhoisQuery) Charts() *module.Charts {
-	return w.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (w *WhoisQuery) Collect() map[string]int64 {
-	mx, err := w.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		w.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -100,4 +100,4 @@ func (w *WhoisQuery) Collect() map[string]int64 {
 	return mx
 }
 
-func (w *WhoisQuery) Cleanup() {}
+func (c *Collector) Cleanup() {}

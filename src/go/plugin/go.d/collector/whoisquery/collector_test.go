@@ -27,23 +27,23 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestWhoisQuery_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &WhoisQuery{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestWhoisQuery_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestWhoisQuery_Charts(t *testing.T) {
-	whoisquery := New()
-	whoisquery.Source = "example.com"
-	require.NoError(t, whoisquery.Init())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	collr.Source = "example.com"
+	require.NoError(t, collr.Init())
 
-	assert.NotNil(t, whoisquery.Charts())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestWhoisQuery_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	const net = iota
 	tests := map[string]struct {
 		config       Config
@@ -62,17 +62,17 @@ func TestWhoisQuery_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			whoisquery := New()
-			whoisquery.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.err {
-				assert.Error(t, whoisquery.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				require.NoError(t, whoisquery.Init())
+				require.NoError(t, collr.Init())
 
 				var typeOK bool
 				if test.providerType == net {
-					_, typeOK = whoisquery.prov.(*whoisClient)
+					_, typeOK = collr.prov.(*whoisClient)
 				}
 
 				assert.True(t, typeOK)
@@ -81,27 +81,27 @@ func TestWhoisQuery_Init(t *testing.T) {
 	}
 }
 
-func TestWhoisQuery_Check(t *testing.T) {
-	whoisquery := New()
-	whoisquery.prov = &mockProvider{remTime: 12345.678}
+func TestCollector_Check(t *testing.T) {
+	collr := New()
+	collr.prov = &mockProvider{remTime: 12345.678}
 
-	assert.NoError(t, whoisquery.Check())
+	assert.NoError(t, collr.Check())
 }
 
-func TestWhoisQuery_Check_ReturnsFalseOnProviderError(t *testing.T) {
-	whoisquery := New()
-	whoisquery.prov = &mockProvider{err: true}
+func TestCollector_Check_ReturnsFalseOnProviderError(t *testing.T) {
+	collr := New()
+	collr.prov = &mockProvider{err: true}
 
-	assert.Error(t, whoisquery.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestWhoisQuery_Collect(t *testing.T) {
-	whoisquery := New()
-	whoisquery.Source = "example.com"
-	require.NoError(t, whoisquery.Init())
-	whoisquery.prov = &mockProvider{remTime: 12345}
+func TestCollector_Collect(t *testing.T) {
+	collr := New()
+	collr.Source = "example.com"
+	require.NoError(t, collr.Init())
+	collr.prov = &mockProvider{remTime: 12345}
 
-	mx := whoisquery.Collect()
+	mx := collr.Collect()
 
 	expected := map[string]int64{
 		"expiry":                         12345,
@@ -111,16 +111,16 @@ func TestWhoisQuery_Collect(t *testing.T) {
 
 	assert.NotZero(t, mx)
 	assert.Equal(t, expected, mx)
-	module.TestMetricsHasAllChartsDims(t, whoisquery.Charts(), mx)
+	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
-func TestWhoisQuery_Collect_ReturnsNilOnProviderError(t *testing.T) {
-	whoisquery := New()
-	whoisquery.Source = "example.com"
-	require.NoError(t, whoisquery.Init())
-	whoisquery.prov = &mockProvider{err: true}
+func TestCollector_Collect_ReturnsNilOnProviderError(t *testing.T) {
+	collr := New()
+	collr.Source = "example.com"
+	require.NoError(t, collr.Init())
+	collr.prov = &mockProvider{err: true}
 
-	assert.Nil(t, whoisquery.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
 type mockProvider struct {
