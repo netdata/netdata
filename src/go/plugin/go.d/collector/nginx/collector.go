@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Nginx {
-	return &Nginx{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -46,7 +46,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Nginx struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -55,29 +55,29 @@ type Nginx struct {
 	httpClient *http.Client
 }
 
-func (n *Nginx) Configuration() any {
-	return n.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (n *Nginx) Init() error {
-	if n.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("nginx URL required but not set")
 	}
 
-	httpClient, err := web.NewHTTPClient(n.ClientConfig)
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("failed initializing http client: %w", err)
 	}
-	n.httpClient = httpClient
+	c.httpClient = httpClient
 
-	n.Debugf("using URL %s", n.URL)
-	n.Debugf("using timeout: %s", n.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (n *Nginx) Check() error {
-	mx, err := n.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -89,22 +89,22 @@ func (n *Nginx) Check() error {
 	return nil
 }
 
-func (n *Nginx) Charts() *Charts {
-	return n.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (n *Nginx) Collect() map[string]int64 {
-	mx, err := n.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		n.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (n *Nginx) Cleanup() {
-	if n.httpClient != nil {
-		n.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }
