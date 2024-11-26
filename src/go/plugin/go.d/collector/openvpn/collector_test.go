@@ -29,43 +29,43 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestOpenVPN_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &OpenVPN{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestOpenVPN_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	assert.NoError(t, New().Init())
 }
 
-func TestOpenVPN_Check(t *testing.T) {
-	job := New()
+func TestCollector_Check(t *testing.T) {
+	collr := New()
 
-	require.NoError(t, job.Init())
-	job.client = prepareMockOpenVPNClient()
-	require.NoError(t, job.Check())
+	require.NoError(t, collr.Init())
+	collr.client = prepareMockOpenVPNClient()
+	require.NoError(t, collr.Check())
 }
 
-func TestOpenVPN_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestOpenVPN_Cleanup(t *testing.T) {
-	job := New()
+func TestCollector_Cleanup(t *testing.T) {
+	collr := New()
 
-	assert.NotPanics(t, job.Cleanup)
-	require.NoError(t, job.Init())
-	job.client = prepareMockOpenVPNClient()
-	require.NoError(t, job.Check())
-	job.Cleanup()
+	assert.NotPanics(t, collr.Cleanup)
+	require.NoError(t, collr.Init())
+	collr.client = prepareMockOpenVPNClient()
+	require.NoError(t, collr.Check())
+	collr.Cleanup()
 }
 
-func TestOpenVPN_Collect(t *testing.T) {
-	job := New()
+func TestCollector_Collect(t *testing.T) {
+	collr := New()
 
-	require.NoError(t, job.Init())
-	job.perUserMatcher = matcher.TRUE()
-	job.client = prepareMockOpenVPNClient()
-	require.NoError(t, job.Check())
+	require.NoError(t, collr.Init())
+	collr.perUserMatcher = matcher.TRUE()
+	collr.client = prepareMockOpenVPNClient()
+	require.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"bytes_in":            1,
@@ -75,21 +75,21 @@ func TestOpenVPN_Collect(t *testing.T) {
 		"name_bytes_sent":     2,
 	}
 
-	mx := job.Collect()
+	mx := collr.Collect()
 	require.NotNil(t, mx)
 	delete(mx, "name_connection_time")
 	assert.Equal(t, expected, mx)
 }
 
-func TestOpenVPN_Collect_UNDEFUsername(t *testing.T) {
-	job := New()
+func TestCollector_Collect_UNDEFUsername(t *testing.T) {
+	collr := New()
 
-	require.NoError(t, job.Init())
-	job.perUserMatcher = matcher.TRUE()
+	require.NoError(t, collr.Init())
+	collr.perUserMatcher = matcher.TRUE()
 	cl := prepareMockOpenVPNClient()
 	cl.users = testUsersUNDEF
-	job.client = cl
-	require.NoError(t, job.Check())
+	collr.client = cl
+	require.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"bytes_in":                   1,
@@ -99,8 +99,9 @@ func TestOpenVPN_Collect_UNDEFUsername(t *testing.T) {
 		"common_name_bytes_sent":     2,
 	}
 
-	mx := job.Collect()
+	mx := collr.Collect()
 	require.NotNil(t, mx)
+
 	delete(mx, "common_name_connection_time")
 	assert.Equal(t, expected, mx)
 }

@@ -7,22 +7,22 @@ import (
 	"time"
 )
 
-func (o *OpenVPN) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	var err error
 
-	if err := o.client.Connect(); err != nil {
+	if err := c.client.Connect(); err != nil {
 		return nil, err
 	}
-	defer func() { _ = o.client.Disconnect() }()
+	defer func() { _ = c.client.Disconnect() }()
 
 	mx := make(map[string]int64)
 
-	if err = o.collectLoadStats(mx); err != nil {
+	if err = c.collectLoadStats(mx); err != nil {
 		return nil, err
 	}
 
-	if o.perUserMatcher != nil {
-		if err = o.collectUsers(mx); err != nil {
+	if c.perUserMatcher != nil {
+		if err = c.collectUsers(mx); err != nil {
 			return nil, err
 		}
 	}
@@ -30,8 +30,8 @@ func (o *OpenVPN) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (o *OpenVPN) collectLoadStats(mx map[string]int64) error {
-	stats, err := o.client.LoadStats()
+func (c *Collector) collectLoadStats(mx map[string]int64) error {
+	stats, err := c.client.LoadStats()
 	if err != nil {
 		return err
 	}
@@ -42,8 +42,8 @@ func (o *OpenVPN) collectLoadStats(mx map[string]int64) error {
 	return nil
 }
 
-func (o *OpenVPN) collectUsers(mx map[string]int64) error {
-	users, err := o.client.Users()
+func (c *Collector) collectUsers(mx map[string]int64) error {
+	users, err := c.client.Users()
 	if err != nil {
 		return err
 	}
@@ -58,13 +58,13 @@ func (o *OpenVPN) collectUsers(mx map[string]int64) error {
 			name = user.Username
 		}
 
-		if !o.perUserMatcher.MatchString(name) {
+		if !c.perUserMatcher.MatchString(name) {
 			continue
 		}
-		if !o.collectedUsers[name] {
-			o.collectedUsers[name] = true
-			if err := o.addUserCharts(name); err != nil {
-				o.Warning(err)
+		if !c.collectedUsers[name] {
+			c.collectedUsers[name] = true
+			if err := c.addUserCharts(name); err != nil {
+				c.Warning(err)
 			}
 		}
 		mx[name+"_bytes_received"] = user.BytesReceived
@@ -74,7 +74,7 @@ func (o *OpenVPN) collectUsers(mx map[string]int64) error {
 	return nil
 }
 
-func (o *OpenVPN) addUserCharts(userName string) error {
+func (c *Collector) addUserCharts(userName string) error {
 	cs := userCharts.Copy()
 
 	for _, chart := range *cs {
@@ -86,5 +86,5 @@ func (o *OpenVPN) addUserCharts(userName string) error {
 		}
 		chart.MarkNotCreated()
 	}
-	return o.charts.Add(*cs...)
+	return c.charts.Add(*cs...)
 }

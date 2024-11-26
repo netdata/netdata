@@ -24,8 +24,8 @@ func init() {
 	})
 }
 
-func New() *OpenVPN {
-	return &OpenVPN{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:7505",
 			Timeout: confopt.Duration(time.Second),
@@ -44,7 +44,7 @@ type Config struct {
 }
 
 type (
-	OpenVPN struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -63,51 +63,51 @@ type (
 	}
 )
 
-func (o *OpenVPN) Configuration() any {
-	return o.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (o *OpenVPN) Init() error {
-	if err := o.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return err
 	}
 
-	m, err := o.initPerUserMatcher()
+	m, err := c.initPerUserMatcher()
 	if err != nil {
 		return err
 	}
-	o.perUserMatcher = m
+	c.perUserMatcher = m
 
-	o.client = o.initClient()
+	c.client = c.initClient()
 
-	o.Infof("using address: %s, timeout: %s", o.Address, o.Timeout)
+	c.Infof("using address: %s, timeout: %s", c.Address, c.Timeout)
 
 	return nil
 }
 
-func (o *OpenVPN) Check() error {
-	if err := o.client.Connect(); err != nil {
+func (c *Collector) Check() error {
+	if err := c.client.Connect(); err != nil {
 		return err
 	}
-	defer func() { _ = o.client.Disconnect() }()
+	defer func() { _ = c.client.Disconnect() }()
 
-	ver, err := o.client.Version()
+	ver, err := c.client.Version()
 	if err != nil {
-		o.Cleanup()
+		c.Cleanup()
 		return err
 	}
 
-	o.Infof("connected to OpenVPN v%d.%d.%d, Management v%d", ver.Major, ver.Minor, ver.Patch, ver.Management)
+	c.Infof("connected to OpenVPN v%d.%d.%d, Management v%d", ver.Major, ver.Minor, ver.Patch, ver.Management)
 
 	return nil
 }
 
-func (o *OpenVPN) Charts() *Charts { return o.charts }
+func (c *Collector) Charts() *Charts { return c.charts }
 
-func (o *OpenVPN) Collect() map[string]int64 {
-	mx, err := o.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		o.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -116,9 +116,9 @@ func (o *OpenVPN) Collect() map[string]int64 {
 	return mx
 }
 
-func (o *OpenVPN) Cleanup() {
-	if o.client == nil {
+func (c *Collector) Cleanup() {
+	if c.client == nil {
 		return
 	}
-	_ = o.client.Disconnect()
+	_ = c.client.Disconnect()
 }

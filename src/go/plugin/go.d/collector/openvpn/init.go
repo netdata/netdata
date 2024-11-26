@@ -8,21 +8,21 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
 )
 
-func (o *OpenVPN) validateConfig() error {
+func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (o *OpenVPN) initPerUserMatcher() (matcher.Matcher, error) {
-	if o.PerUserStats.Empty() {
+func (c *Collector) initPerUserMatcher() (matcher.Matcher, error) {
+	if c.PerUserStats.Empty() {
 		return nil, nil
 	}
-	return o.PerUserStats.Parse()
+	return c.PerUserStats.Parse()
 }
 
-func (o *OpenVPN) initClient() *client.Client {
+func (c *Collector) initClient() *client.Client {
 	config := socket.Config{
-		Address: o.Address,
-		Timeout: o.Timeout.Duration(),
+		Address: c.Address,
+		Timeout: c.Timeout.Duration(),
 	}
 	return &client.Client{Client: socket.New(config)}
 }
