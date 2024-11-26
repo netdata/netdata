@@ -38,149 +38,149 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestKubeState_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &KubeState{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestKubeState_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func() *KubeState
+		prepare  func() *Collector
 	}{
 		"success when no error on initializing K8s client": {
 			wantFail: false,
-			prepare: func() *KubeState {
-				ks := New()
-				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
-				return ks
+			prepare: func() *Collector {
+				collr := New()
+				collr.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
+				return collr
 			},
 		},
 		"fail when get an error on initializing K8s client": {
 			wantFail: true,
-			prepare: func() *KubeState {
-				ks := New()
-				ks.newKubeClient = func() (kubernetes.Interface, error) { return nil, errors.New("newKubeClient() error") }
-				return ks
+			prepare: func() *Collector {
+				collr := New()
+				collr.newKubeClient = func() (kubernetes.Interface, error) { return nil, errors.New("newKubeClient() error") }
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ks := test.prepare()
+			collr := test.prepare()
 
 			if test.wantFail {
-				assert.Error(t, ks.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, ks.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestKubeState_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func() *KubeState
+		prepare  func() *Collector
 	}{
 		"success when connected to the K8s API": {
 			wantFail: false,
-			prepare: func() *KubeState {
-				ks := New()
-				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
-				return ks
+			prepare: func() *Collector {
+				collr := New()
+				collr.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
+				return collr
 			},
 		},
 		"fail when not connected to the K8s API": {
 			wantFail: true,
-			prepare: func() *KubeState {
-				ks := New()
+			prepare: func() *Collector {
+				collr := New()
 				client := &brokenInfoKubeClient{fake.NewClientset()}
-				ks.newKubeClient = func() (kubernetes.Interface, error) { return client, nil }
-				return ks
+				collr.newKubeClient = func() (kubernetes.Interface, error) { return client, nil }
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ks := test.prepare()
-			require.NoError(t, ks.Init())
+			collr := test.prepare()
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, ks.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, ks.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestKubeState_Charts(t *testing.T) {
-	ks := New()
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
 
-	assert.NotEmpty(t, *ks.Charts())
+	assert.NotEmpty(t, *collr.Charts())
 }
 
-func TestKubeState_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare   func() *KubeState
+		prepare   func() *Collector
 		doInit    bool
 		doCollect bool
 	}{
 		"before init": {
 			doInit:    false,
 			doCollect: false,
-			prepare: func() *KubeState {
-				ks := New()
-				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
-				return ks
+			prepare: func() *Collector {
+				collr := New()
+				collr.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
+				return collr
 			},
 		},
 		"after init": {
 			doInit:    true,
 			doCollect: false,
-			prepare: func() *KubeState {
-				ks := New()
-				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
-				return ks
+			prepare: func() *Collector {
+				collr := New()
+				collr.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
+				return collr
 			},
 		},
 		"after collect": {
 			doInit:    true,
 			doCollect: true,
-			prepare: func() *KubeState {
-				ks := New()
-				ks.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
-				return ks
+			prepare: func() *Collector {
+				collr := New()
+				collr.newKubeClient = func() (kubernetes.Interface, error) { return fake.NewClientset(), nil }
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ks := test.prepare()
+			collr := test.prepare()
 
 			if test.doInit {
-				_ = ks.Init()
+				_ = collr.Init()
 			}
 			if test.doCollect {
-				_ = ks.Collect()
-				time.Sleep(ks.initDelay)
+				_ = collr.Collect()
+				time.Sleep(collr.initDelay)
 			}
 
-			assert.NotPanics(t, ks.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 			time.Sleep(time.Second)
 			if test.doCollect {
-				assert.True(t, ks.discoverer.stopped())
+				assert.True(t, collr.discoverer.stopped())
 			}
 		})
 	}
 }
 
-func TestKubeState_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	type (
-		testCaseStep func(t *testing.T, ks *KubeState)
+		testCaseStep func(t *testing.T, ks *Collector)
 		testCase     struct {
 			client kubernetes.Interface
 			steps  []testCaseStep
@@ -196,8 +196,8 @@ func TestKubeState_Collect(t *testing.T) {
 					newNode("node01"),
 				)
 
-				step1 := func(t *testing.T, ks *KubeState) {
-					mx := ks.Collect()
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 					expected := map[string]int64{
 						"discovery_node_discoverer_state":              1,
 						"discovery_pod_discoverer_state":               1,
@@ -246,9 +246,9 @@ func TestKubeState_Collect(t *testing.T) {
 					assert.Equal(t, expected, mx)
 					assert.Equal(t,
 						len(nodeChartsTmpl)+len(baseCharts),
-						len(*ks.Charts()),
+						len(*collr.Charts()),
 					)
-					module.TestMetricsHasAllChartsDims(t, ks.Charts(), mx)
+					module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 				}
 
 				return testCase{
@@ -264,8 +264,8 @@ func TestKubeState_Collect(t *testing.T) {
 					pod,
 				)
 
-				step1 := func(t *testing.T, ks *KubeState) {
-					mx := ks.Collect()
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 					expected := map[string]int64{
 						"discovery_node_discoverer_state":                                                        1,
 						"discovery_pod_discoverer_state":                                                         1,
@@ -345,9 +345,9 @@ func TestKubeState_Collect(t *testing.T) {
 					assert.Equal(t, expected, mx)
 					assert.Equal(t,
 						len(podChartsTmpl)+len(containerChartsTmpl)*len(pod.Spec.Containers)+len(baseCharts),
-						len(*ks.Charts()),
+						len(*collr.Charts()),
 					)
-					module.TestMetricsHasAllChartsDims(t, ks.Charts(), mx)
+					module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 				}
 
 				return testCase{
@@ -365,8 +365,8 @@ func TestKubeState_Collect(t *testing.T) {
 					pod,
 				)
 
-				step1 := func(t *testing.T, ks *KubeState) {
-					mx := ks.Collect()
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 					expected := map[string]int64{
 						"discovery_node_discoverer_state":                                                        1,
 						"discovery_pod_discoverer_state":                                                         1,
@@ -484,9 +484,9 @@ func TestKubeState_Collect(t *testing.T) {
 					assert.Equal(t, expected, mx)
 					assert.Equal(t,
 						len(nodeChartsTmpl)+len(podChartsTmpl)+len(containerChartsTmpl)*len(pod.Spec.Containers)+len(baseCharts),
-						len(*ks.Charts()),
+						len(*collr.Charts()),
 					)
-					module.TestMetricsHasAllChartsDims(t, ks.Charts(), mx)
+					module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 				}
 
 				return testCase{
@@ -504,13 +504,13 @@ func TestKubeState_Collect(t *testing.T) {
 					node,
 					pod,
 				)
-				step1 := func(t *testing.T, ks *KubeState) {
-					_ = ks.Collect()
+				step1 := func(t *testing.T, collr *Collector) {
+					_ = collr.Collect()
 					_ = client.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 				}
 
-				step2 := func(t *testing.T, ks *KubeState) {
-					mx := ks.Collect()
+				step2 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 					expected := map[string]int64{
 						"discovery_node_discoverer_state":              1,
 						"discovery_pod_discoverer_state":               1,
@@ -558,13 +558,13 @@ func TestKubeState_Collect(t *testing.T) {
 					assert.Equal(t, expected, mx)
 					assert.Equal(t,
 						len(nodeChartsTmpl)+len(podChartsTmpl)+len(containerChartsTmpl)*len(pod.Spec.Containers)+len(baseCharts),
-						len(*ks.Charts()),
+						len(*collr.Charts()),
 					)
 					assert.Equal(t,
 						len(podChartsTmpl)+len(containerChartsTmpl)*len(pod.Spec.Containers),
-						calcObsoleteCharts(*ks.Charts()),
+						calcObsoleteCharts(*collr.Charts()),
 					)
-					module.TestMetricsHasAllChartsDims(t, ks.Charts(), mx)
+					module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 				}
 
 				return testCase{
@@ -585,21 +585,21 @@ func TestKubeState_Collect(t *testing.T) {
 				)
 				podUpdated := newPod(node.Name, "pod01") // with set Spec.NodeName
 
-				step1 := func(t *testing.T, ks *KubeState) {
-					_ = ks.Collect()
-					for _, c := range *ks.Charts() {
+				step1 := func(t *testing.T, collr *Collector) {
+					_ = collr.Collect()
+					for _, c := range *collr.Charts() {
 						if strings.HasPrefix(c.ID, "pod_") {
 							ok := isLabelValueSet(c, labelKeyNodeName)
 							assert.Falsef(t, ok, "chart '%s' has no empty %s label", c.ID, labelKeyNodeName)
 						}
 					}
 				}
-				step2 := func(t *testing.T, ks *KubeState) {
+				step2 := func(t *testing.T, collr *Collector) {
 					_, _ = client.CoreV1().Pods(podOrig.Namespace).Update(ctx, podUpdated, metav1.UpdateOptions{})
 					time.Sleep(time.Millisecond * 50)
-					_ = ks.Collect()
+					_ = collr.Collect()
 
-					for _, c := range *ks.Charts() {
+					for _, c := range *collr.Charts() {
 						if strings.HasPrefix(c.ID, "pod_") {
 							ok := isLabelValueSet(c, labelKeyNodeName)
 							assert.Truef(t, ok, "chart '%s' has empty %s label", c.ID, labelKeyNodeName)
@@ -623,13 +623,13 @@ func TestKubeState_Collect(t *testing.T) {
 					node,
 					pod1,
 				)
-				step1 := func(t *testing.T, ks *KubeState) {
-					_ = ks.Collect()
+				step1 := func(t *testing.T, collr *Collector) {
+					_ = collr.Collect()
 					_, _ = client.CoreV1().Pods(pod1.Namespace).Create(ctx, pod2, metav1.CreateOptions{})
 				}
 
-				step2 := func(t *testing.T, ks *KubeState) {
-					mx := ks.Collect()
+				step2 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 					expected := map[string]int64{
 						"discovery_node_discoverer_state":                                                        1,
 						"discovery_pod_discoverer_state":                                                         1,
@@ -820,9 +820,9 @@ func TestKubeState_Collect(t *testing.T) {
 							len(containerChartsTmpl)*len(pod1.Spec.Containers)+
 							len(containerChartsTmpl)*len(pod2.Spec.Containers)+
 							len(baseCharts),
-						len(*ks.Charts()),
+						len(*collr.Charts()),
 					)
-					module.TestMetricsHasAllChartsDims(t, ks.Charts(), mx)
+					module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 				}
 
 				return testCase{
@@ -837,21 +837,21 @@ func TestKubeState_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			test := creator.create(t)
 
-			ks := New()
-			ks.newKubeClient = func() (kubernetes.Interface, error) { return test.client, nil }
+			collr := New()
+			collr.newKubeClient = func() (kubernetes.Interface, error) { return test.client, nil }
 
-			require.NoError(t, ks.Init())
-			require.NoError(t, ks.Check())
-			defer ks.Cleanup()
+			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Check())
+			defer collr.Cleanup()
 
 			for i, executeStep := range test.steps {
 				if i == 0 {
-					_ = ks.Collect()
-					time.Sleep(ks.initDelay)
+					_ = collr.Collect()
+					time.Sleep(collr.initDelay)
 				} else {
 					time.Sleep(time.Second)
 				}
-				executeStep(t, ks)
+				executeStep(t, collr)
 			}
 		})
 	}
