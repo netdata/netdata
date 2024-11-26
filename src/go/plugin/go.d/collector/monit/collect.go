@@ -18,25 +18,25 @@ var (
 	urlQueryStatus = url.Values{"format": {"xml"}, "level": {"full"}}.Encode()
 )
 
-func (m *Monit) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := m.collectStatus(mx); err != nil {
+	if err := c.collectStatus(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (m *Monit) collectStatus(mx map[string]int64) error {
-	status, err := m.fetchStatus()
+func (c *Collector) collectStatus(mx map[string]int64) error {
+	status, err := c.fetchStatus()
 	if err != nil {
 		return err
 	}
 
 	if status.Server == nil {
 		// not Monit
-		return errors.New("invalid Monit status response: missing server data")
+		return errors.New("invalid Collector status response: missing server data")
 	}
 
 	mx["uptime"] = status.Server.Uptime
@@ -46,9 +46,9 @@ func (m *Monit) collectStatus(mx map[string]int64) error {
 	for _, svc := range status.Services {
 		seen[svc.id()] = true
 
-		if _, ok := m.seenServices[svc.id()]; !ok {
-			m.seenServices[svc.id()] = svc
-			m.addServiceCheckCharts(svc, status.Server)
+		if _, ok := c.seenServices[svc.id()]; !ok {
+			c.seenServices[svc.id()] = svc
+			c.addServiceCheckCharts(svc, status.Server)
 		}
 
 		px := fmt.Sprintf("service_check_type_%s_name_%s_status_", svc.svcType(), svc.Name)
@@ -61,25 +61,25 @@ func (m *Monit) collectStatus(mx map[string]int64) error {
 		}
 	}
 
-	for id, svc := range m.seenServices {
+	for id, svc := range c.seenServices {
 		if !seen[id] {
-			delete(m.seenServices, id)
-			m.removeServiceCharts(svc)
+			delete(c.seenServices, id)
+			c.removeServiceCharts(svc)
 		}
 	}
 
 	return nil
 }
 
-func (m *Monit) fetchStatus() (*monitStatus, error) {
-	req, err := web.NewHTTPRequestWithPath(m.RequestConfig, urlPathStatus)
+func (c *Collector) fetchStatus() (*monitStatus, error) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathStatus)
 	if err != nil {
 		return nil, err
 	}
 	req.URL.RawQuery = urlQueryStatus
 
 	var status monitStatus
-	if err := web.DoHTTP(m.httpClient).RequestXML(req, &status, func(d *xml.Decoder) {
+	if err := web.DoHTTP(c.httpClient).RequestXML(req, &status, func(d *xml.Decoder) {
 		d.CharsetReader = charset.NewReaderLabel
 	}); err != nil {
 		return nil, err

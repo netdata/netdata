@@ -33,11 +33,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestMonit_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Monit{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestMonit_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -58,22 +58,22 @@ func TestMonit_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			monit := New()
-			monit.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, monit.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, monit.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestMonit_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (monit *Monit, cleanup func())
+		prepare  func(t *testing.T) (monit *Collector, cleanup func())
 	}{
 		"success on valid response": {
 			wantFail: false,
@@ -99,25 +99,25 @@ func TestMonit_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			monit, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, monit.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, monit.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestMonit_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestMonit_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare         func(t *testing.T) (monit *Monit, cleanup func())
+		prepare         func(t *testing.T) (monit *Collector, cleanup func())
 		wantNumOfCharts int
 		wantMetrics     map[string]int64
 	}{
@@ -252,24 +252,24 @@ func TestMonit_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			monit, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			_ = monit.Check()
+			_ = collr.Check()
 
-			mx := monit.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, monit.Charts(), mx)
-				assert.Equal(t, test.wantNumOfCharts, len(*monit.Charts()), "want number of charts")
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				assert.Equal(t, test.wantNumOfCharts, len(*collr.Charts()), "want number of charts")
 			}
 		})
 	}
 }
 
-func caseOk(t *testing.T) (*Monit, func()) {
+func caseOk(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -279,14 +279,14 @@ func caseOk(t *testing.T) (*Monit, func()) {
 			}
 			_, _ = w.Write(dataStatus)
 		}))
-	monit := New()
-	monit.URL = srv.URL
-	require.NoError(t, monit.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return monit, srv.Close
+	return collr, srv.Close
 }
 
-func caseUnexpectedXMLResponse(t *testing.T) (*Monit, func()) {
+func caseUnexpectedXMLResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	data := `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -328,44 +328,44 @@ func caseUnexpectedXMLResponse(t *testing.T) (*Monit, func()) {
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(data))
 		}))
-	monit := New()
-	monit.URL = srv.URL
-	require.NoError(t, monit.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return monit, srv.Close
+	return collr, srv.Close
 }
 
-func caseInvalidDataResponse(t *testing.T) (*Monit, func()) {
+func caseInvalidDataResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	monit := New()
-	monit.URL = srv.URL
-	require.NoError(t, monit.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return monit, srv.Close
+	return collr, srv.Close
 }
 
-func caseConnectionRefused(t *testing.T) (*Monit, func()) {
+func caseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	monit := New()
-	monit.URL = "http://127.0.0.1:65001"
-	require.NoError(t, monit.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	require.NoError(t, collr.Init())
 
-	return monit, func() {}
+	return collr, func() {}
 }
 
-func case404(t *testing.T) (*Monit, func()) {
+func case404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	monit := New()
-	monit.URL = srv.URL
-	require.NoError(t, monit.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return monit, srv.Close
+	return collr, srv.Close
 }
