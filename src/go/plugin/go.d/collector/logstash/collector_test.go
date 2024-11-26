@@ -33,11 +33,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestLogstash_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Logstash{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestLogstash_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -58,30 +58,30 @@ func TestLogstash_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ls := New()
-			ls.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, ls.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, ls.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestLogstash_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestLogstash_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestLogstash_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (ls *Logstash, cleanup func())
+		prepare  func(t *testing.T) (ls *Collector, cleanup func())
 	}{
 		"success on valid response": {
 			wantFail: false,
@@ -103,21 +103,21 @@ func TestLogstash_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ls, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, ls.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, ls.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestLogstash_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare         func(t *testing.T) (ls *Logstash, cleanup func())
+		prepare         func(t *testing.T) (ls *Collector, cleanup func())
 		wantNumOfCharts int
 		wantMetrics     map[string]int64
 	}{
@@ -172,21 +172,21 @@ func TestLogstash_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ls, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := ls.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {
-				assert.Equal(t, test.wantNumOfCharts, len(*ls.Charts()))
-				module.TestMetricsHasAllChartsDims(t, ls.Charts(), mx)
+				assert.Equal(t, test.wantNumOfCharts, len(*collr.Charts()))
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func caseValidResponse(t *testing.T) (*Logstash, func()) {
+func caseValidResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -197,44 +197,44 @@ func caseValidResponse(t *testing.T) (*Logstash, func()) {
 				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
-	ls := New()
-	ls.URL = srv.URL
-	require.NoError(t, ls.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ls, srv.Close
+	return collr, srv.Close
 }
 
-func caseInvalidDataResponse(t *testing.T) (*Logstash, func()) {
+func caseInvalidDataResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	ls := New()
-	ls.URL = srv.URL
-	require.NoError(t, ls.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ls, srv.Close
+	return collr, srv.Close
 }
 
-func caseConnectionRefused(t *testing.T) (*Logstash, func()) {
+func caseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	ls := New()
-	ls.URL = "http://127.0.0.1:65001"
-	require.NoError(t, ls.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	require.NoError(t, collr.Init())
 
-	return ls, func() {}
+	return collr, func() {}
 }
 
-func case404(t *testing.T) (*Logstash, func()) {
+func case404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	ls := New()
-	ls.URL = srv.URL
-	require.NoError(t, ls.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ls, srv.Close
+	return collr, srv.Close
 }

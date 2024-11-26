@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Logstash {
-	return &Logstash{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -47,7 +47,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Logstash struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -58,29 +58,29 @@ type Logstash struct {
 	pipelines map[string]bool
 }
 
-func (l *Logstash) Configuration() any {
-	return l.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (l *Logstash) Init() error {
-	if l.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("config: 'url' cannot be empty")
 	}
 
-	httpClient, err := web.NewHTTPClient(l.ClientConfig)
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
-	l.httpClient = httpClient
+	c.httpClient = httpClient
 
-	l.Debugf("using URL %s", l.URL)
-	l.Debugf("using timeout: %s", l.Timeout.Duration())
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout.Duration())
 
 	return nil
 }
 
-func (l *Logstash) Check() error {
-	mx, err := l.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -90,14 +90,14 @@ func (l *Logstash) Check() error {
 	return nil
 }
 
-func (l *Logstash) Charts() *module.Charts {
-	return l.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (l *Logstash) Collect() map[string]int64 {
-	mx, err := l.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		l.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -106,8 +106,8 @@ func (l *Logstash) Collect() map[string]int64 {
 	return mx
 }
 
-func (l *Logstash) Cleanup() {
-	if l.httpClient != nil {
-		l.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }
