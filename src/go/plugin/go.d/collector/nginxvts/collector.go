@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *NginxVTS {
-	return &NginxVTS{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -48,7 +48,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type NginxVTS struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -57,40 +57,40 @@ type NginxVTS struct {
 	httpClient *http.Client
 }
 
-func (vts *NginxVTS) Configuration() any {
-	return vts.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (vts *NginxVTS) Cleanup() {
-	if vts.httpClient == nil {
+func (c *Collector) Cleanup() {
+	if c.httpClient == nil {
 		return
 	}
-	vts.httpClient.CloseIdleConnections()
+	c.httpClient.CloseIdleConnections()
 }
 
-func (vts *NginxVTS) Init() error {
-	err := vts.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config: %v", err)
 	}
 
-	httpClient, err := vts.initHTTPClient()
+	httpClient, err := c.initHTTPClient()
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
-	vts.httpClient = httpClient
+	c.httpClient = httpClient
 
-	charts, err := vts.initCharts()
+	charts, err := c.initCharts()
 	if err != nil {
 		return fmt.Errorf("init charts: %v", err)
 	}
-	vts.charts = charts
+	c.charts = charts
 
 	return nil
 }
 
-func (vts *NginxVTS) Check() error {
-	mx, err := vts.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -100,14 +100,14 @@ func (vts *NginxVTS) Check() error {
 	return nil
 }
 
-func (vts *NginxVTS) Charts() *module.Charts {
-	return vts.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (vts *NginxVTS) Collect() map[string]int64 {
-	mx, err := vts.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		vts.Error(err)
+		c.Error(err)
 		return nil
 	}
 	if len(mx) == 0 {

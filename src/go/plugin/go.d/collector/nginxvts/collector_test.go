@@ -33,11 +33,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestNginxVTS_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &NginxVTS{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestNginxVTS_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config          Config
 		wantNumOfCharts int
@@ -71,22 +71,22 @@ func TestNginxVTS_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			es := New()
-			es.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, es.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, es.Init())
-				assert.Equal(t, test.wantNumOfCharts, len(*es.Charts()))
+				assert.NoError(t, collr.Init())
+				assert.Equal(t, test.wantNumOfCharts, len(*collr.Charts()))
 			}
 		})
 	}
 }
 
-func TestNginxVTS_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(*testing.T) (vts *NginxVTS, cleanup func())
+		prepare  func(*testing.T) (collr *Collector, cleanup func())
 		wantFail bool
 	}{
 		"valid data":         {prepare: prepareNginxVTSValidData},
@@ -97,30 +97,29 @@ func TestNginxVTS_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			vts, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, vts.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, vts.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestNginxVTS_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.Nil(t, New().Charts())
 }
 
-func TestNginxVTS_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestNginxVTS_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		// prepare       func() *NginxVTS
-		prepare       func(t *testing.T) (vts *NginxVTS, cleanup func())
+		prepare       func(t *testing.T) (collr *Collector, cleanup func())
 		wantCollected map[string]int64
 		checkCharts   bool
 	}{
@@ -167,67 +166,67 @@ func TestNginxVTS_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			vts, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := vts.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
 			if test.checkCharts {
-				module.TestMetricsHasAllChartsDims(t, vts.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareNginxVTS(t *testing.T, createNginxVTS func() *NginxVTS) (vts *NginxVTS, cleanup func()) {
+func prepareNginxVTS(t *testing.T, createNginxVTS func() *Collector) (collr *Collector, cleanup func()) {
 	t.Helper()
-	vts = createNginxVTS()
+	collr = createNginxVTS()
 	srv := prepareNginxVTSEndpoint()
-	vts.URL = srv.URL
+	collr.URL = srv.URL
 
-	require.NoError(t, vts.Init())
+	require.NoError(t, collr.Init())
 
-	return vts, srv.Close
+	return collr, srv.Close
 }
 
-func prepareNginxVTSValidData(t *testing.T) (vts *NginxVTS, cleanup func()) {
+func prepareNginxVTSValidData(t *testing.T) (collr *Collector, cleanup func()) {
 	return prepareNginxVTS(t, New)
 }
 
-func prepareNginxVTSInvalidData(t *testing.T) (*NginxVTS, func()) {
+func prepareNginxVTSInvalidData(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	vts := New()
-	vts.URL = srv.URL
-	require.NoError(t, vts.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return vts, srv.Close
+	return collr, srv.Close
 }
 
-func prepareNginxVTS404(t *testing.T) (*NginxVTS, func()) {
+func prepareNginxVTS404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	vts := New()
-	vts.URL = srv.URL
-	require.NoError(t, vts.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return vts, srv.Close
+	return collr, srv.Close
 }
 
-func prepareNginxVTSConnectionRefused(t *testing.T) (*NginxVTS, func()) {
+func prepareNginxVTSConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	vts := New()
-	vts.URL = "http://127.0.0.1:18080"
-	require.NoError(t, vts.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:18080"
+	require.NoError(t, collr.Init())
 
-	return vts, func() {}
+	return collr, func() {}
 }
 
 func prepareNginxVTSEndpoint() *httptest.Server {
