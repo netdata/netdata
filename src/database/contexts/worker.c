@@ -1084,7 +1084,8 @@ void *rrdcontext_main(void *ptr) {
 
     worker_register("RRDCONTEXT");
     worker_register_job_name(WORKER_JOB_HOSTS, "hosts");
-    worker_register_job_name(WORKER_JOB_HOSTS_METRICS, "metrics");
+    worker_register_job_name(WORKER_JOB_HOSTS_CTX_METRICS, "ctx metrics");
+    worker_register_job_name(WORKER_JOB_HOSTS_RRD_METRICS, "rrd metrics");
     worker_register_job_name(WORKER_JOB_CHECK, "dedup checks");
     worker_register_job_name(WORKER_JOB_SEND, "sent contexts");
     worker_register_job_name(WORKER_JOB_DEQUEUE, "deduplicated contexts");
@@ -1101,6 +1102,8 @@ void *rrdcontext_main(void *ptr) {
 
     heartbeat_t hb;
     heartbeat_init(&hb, RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC);
+
+    usec_t last_metrics_ut = 0;
 
     while (service_running(SERVICE_CONTEXT)) {
         worker_is_idle();
@@ -1140,7 +1143,13 @@ void *rrdcontext_main(void *ptr) {
             if (host->rrdctx.contexts)
                 dictionary_garbage_collect(host->rrdctx.contexts);
 
-            worker_is_busy(WORKER_JOB_HOSTS_METRICS);
+            // recalculate metrics every 30 seconds
+            if(last_metrics_ut + 30 * USEC_PER_SEC > now_ut)
+                continue;
+
+            last_metrics_ut = now_ut;
+
+            worker_is_busy(WORKER_JOB_HOSTS_CTX_METRICS);
 
             // calculate the number of available metrics and instances of the host
             // FIXME: available metrics and instances should always be up to date (atomic +/-1)
@@ -1153,6 +1162,8 @@ void *rrdcontext_main(void *ptr) {
             dfe_done(rc);
             __atomic_store_n(&host->rrdctx.metrics, metrics, __ATOMIC_RELAXED);
             __atomic_store_n(&host->rrdctx.instances, instances, __ATOMIC_RELAXED);
+
+            worker_is_busy(WORKER_JOB_HOSTS_RRD_METRICS);
 
             // calculate the number of collected metrics and instances of the host
             // FIXME: collected metrics and instances should always be up to date (atomic +/-1)
