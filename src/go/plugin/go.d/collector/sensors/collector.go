@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *Sensors {
-	return &Sensors{
+func New() *Collector {
+	return &Collector{
 		Config:      Config{},
 		charts:      &module.Charts{},
 		seenSensors: make(map[string]bool),
@@ -46,7 +46,7 @@ type Config struct {
 }
 
 type (
-	Sensors struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -61,20 +61,20 @@ type (
 	}
 )
 
-func (s *Sensors) Configuration() any {
-	return s.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (s *Sensors) Init() error {
+func (c *Collector) Init() error {
 	sc := lmsensors.New()
-	sc.Logger = s.Logger
-	s.sc = sc
+	sc.Logger = c.Logger
+	c.sc = sc
 
 	return nil
 }
 
-func (s *Sensors) Check() error {
-	mx, err := s.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -86,14 +86,14 @@ func (s *Sensors) Check() error {
 	return nil
 }
 
-func (s *Sensors) Charts() *module.Charts {
-	return s.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (s *Sensors) Collect() map[string]int64 {
-	mx, err := s.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		s.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -103,4 +103,4 @@ func (s *Sensors) Collect() map[string]int64 {
 	return mx
 }
 
-func (s *Sensors) Cleanup() {}
+func (c *Collector) Cleanup() {}

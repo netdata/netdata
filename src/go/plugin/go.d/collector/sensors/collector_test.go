@@ -31,11 +31,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestSensors_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Sensors{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestSensors_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -48,59 +48,59 @@ func TestSensors_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			sensors := New()
-			sensors.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, sensors.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, sensors.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestSensors_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Sensors
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *Sensors {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Sensors {
-				sensors := New()
-				sensors.sc = prepareMockScannerOk()
-				_ = sensors.Check()
-				return sensors
+			prepare: func() *Collector {
+				collr := New()
+				collr.sc = prepareMockScannerOk()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Sensors {
-				sensors := New()
-				sensors.sc = prepareMockScannerOk()
-				_ = sensors.Collect()
-				return sensors
+			prepare: func() *Collector {
+				collr := New()
+				collr.sc = prepareMockScannerOk()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			sensors := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, sensors.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestSensors_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestSensors_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockScanner
 		wantFail    bool
@@ -117,19 +117,19 @@ func TestSensors_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			sensors := New()
-			sensors.sc = test.prepareMock()
+			collr := New()
+			collr.sc = test.prepareMock()
 
 			if test.wantFail {
-				assert.Error(t, sensors.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, sensors.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestSensors_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareScanner func() *mockScanner
 		wantMetrics    map[string]int64
@@ -264,21 +264,21 @@ func TestSensors_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			sensors := New()
-			sensors.sc = test.prepareScanner()
+			collr := New()
+			collr.sc = test.prepareScanner()
 
 			var mx map[string]int64
 
 			for i := 0; i < 10; i++ {
-				mx = sensors.Collect()
+				mx = collr.Collect()
 			}
 
 			assert.Equal(t, test.wantMetrics, mx)
 
-			assert.Len(t, *sensors.Charts(), test.wantCharts)
+			assert.Len(t, *collr.Charts(), test.wantCharts)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, sensors.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}

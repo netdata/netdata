@@ -14,12 +14,12 @@ import (
 
 const precision = 1000
 
-func (s *Sensors) collect() (map[string]int64, error) {
-	if s.sc == nil {
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.sc == nil {
 		return nil, errors.New("sysfs scanner is not initialized")
 	}
 
-	chips, err := s.sc.Scan()
+	chips, err := c.sc.Scan()
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (s *Sensors) collect() (map[string]int64, error) {
 		}
 	}
 
-	s.updateCharts(chips)
+	c.updateCharts(chips)
 
 	return mx, nil
 }
