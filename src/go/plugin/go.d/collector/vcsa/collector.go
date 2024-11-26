@@ -27,8 +27,8 @@ func init() {
 	})
 }
 
-func New() *VCSA {
-	return &VCSA{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				ClientConfig: web.ClientConfig{
@@ -46,7 +46,7 @@ type Config struct {
 }
 
 type (
-	VCSA struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -70,34 +70,34 @@ type (
 	}
 )
 
-func (vc *VCSA) Configuration() any {
-	return vc.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (vc *VCSA) Init() error {
-	if err := vc.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("invalid config: %v", err)
 	}
 
-	c, err := vc.initHealthClient()
+	cli, err := c.initHealthClient()
 	if err != nil {
 		return fmt.Errorf("error on creating health client : %vc", err)
 	}
-	vc.client = c
+	c.client = cli
 
-	vc.Debugf("using URL %s", vc.URL)
-	vc.Debugf("using timeout: %s", vc.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (vc *VCSA) Check() error {
-	err := vc.client.Login()
+func (c *Collector) Check() error {
+	err := c.client.Login()
 	if err != nil {
 		return err
 	}
 
-	mx, err := vc.collect()
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -109,14 +109,14 @@ func (vc *VCSA) Check() error {
 	return nil
 }
 
-func (vc *VCSA) Charts() *module.Charts {
-	return vc.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (vc *VCSA) Collect() map[string]int64 {
-	mx, err := vc.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		vc.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -125,12 +125,12 @@ func (vc *VCSA) Collect() map[string]int64 {
 	return mx
 }
 
-func (vc *VCSA) Cleanup() {
-	if vc.client == nil {
+func (c *Collector) Cleanup() {
+	if c.client == nil {
 		return
 	}
-	err := vc.client.Logout()
+	err := c.client.Logout()
 	if err != nil {
-		vc.Errorf("error on logout : %v", err)
+		c.Errorf("error on logout : %v", err)
 	}
 }

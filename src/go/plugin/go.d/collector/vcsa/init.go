@@ -9,21 +9,21 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (vc *VCSA) validateConfig() error {
-	if vc.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("URL not set")
 	}
-	if vc.Username == "" || vc.Password == "" {
+	if c.Username == "" || c.Password == "" {
 		return errors.New("username or password not set")
 	}
 	return nil
 }
 
-func (vc *VCSA) initHealthClient() (*client.Client, error) {
-	httpClient, err := web.NewHTTPClient(vc.ClientConfig)
+func (c *Collector) initHealthClient() (*client.Client, error) {
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return client.New(httpClient, vc.URL, vc.Username, vc.Password), nil
+	return client.New(httpClient, c.URL, c.Username, c.Password), nil
 }

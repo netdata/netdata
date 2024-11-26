@@ -27,83 +27,83 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestVCSA_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &VCSA{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestVCSA_Init(t *testing.T) {
-	job := prepareVCSA()
+func TestCollector_Init(t *testing.T) {
+	collr := prepareVCSA()
 
-	assert.NoError(t, job.Init())
-	assert.NotNil(t, job.client)
+	assert.NoError(t, collr.Init())
+	assert.NotNil(t, collr.client)
 }
 
-func TestVCenter_InitErrorOnValidatingInitParameters(t *testing.T) {
-	job := New()
+func TestCollector_InitErrorOnValidatingInitParameters(t *testing.T) {
+	collr := New()
 
-	assert.Error(t, job.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestVCenter_InitErrorOnCreatingClient(t *testing.T) {
-	job := prepareVCSA()
-	job.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
+func TestCollector_InitErrorOnCreatingClient(t *testing.T) {
+	collr := prepareVCSA()
+	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, job.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestVCenter_Check(t *testing.T) {
-	job := prepareVCSA()
-	require.NoError(t, job.Init())
-	job.client = &mockVCenterHealthClient{}
+func TestCollector_Check(t *testing.T) {
+	collr := prepareVCSA()
+	require.NoError(t, collr.Init())
+	collr.client = &mockVCenterHealthClient{}
 
-	assert.NoError(t, job.Check())
+	assert.NoError(t, collr.Check())
 }
 
-func TestVCenter_CheckErrorOnLogin(t *testing.T) {
-	job := prepareVCSA()
-	require.NoError(t, job.Init())
-	job.client = &mockVCenterHealthClient{
+func TestCollector_CheckErrorOnLogin(t *testing.T) {
+	collr := prepareVCSA()
+	require.NoError(t, collr.Init())
+	collr.client = &mockVCenterHealthClient{
 		login: func() error { return errors.New("login mock error") },
 	}
 
-	assert.Error(t, job.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestVCenter_CheckEnsureLoggedIn(t *testing.T) {
-	job := prepareVCSA()
-	require.NoError(t, job.Init())
+func TestCollector_CheckEnsureLoggedIn(t *testing.T) {
+	collr := prepareVCSA()
+	require.NoError(t, collr.Init())
 	mock := &mockVCenterHealthClient{}
-	job.client = mock
+	collr.client = mock
 
-	assert.NoError(t, job.Check())
+	assert.NoError(t, collr.Check())
 	assert.True(t, mock.loginCalls == 1)
 }
 
-func TestVCenter_Cleanup(t *testing.T) {
-	job := prepareVCSA()
-	require.NoError(t, job.Init())
+func TestCollector_Cleanup(t *testing.T) {
+	collr := prepareVCSA()
+	require.NoError(t, collr.Init())
 	mock := &mockVCenterHealthClient{}
-	job.client = mock
-	job.Cleanup()
+	collr.client = mock
+	collr.Cleanup()
 
 	assert.True(t, mock.logoutCalls == 1)
 }
 
-func TestVCenter_CleanupWithNilClient(t *testing.T) {
-	job := prepareVCSA()
+func TestCollector_CleanupWithNilClient(t *testing.T) {
+	collr := prepareVCSA()
 
-	assert.NotPanics(t, job.Cleanup)
+	assert.NotPanics(t, collr.Cleanup)
 }
 
-func TestVCenter_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestVCenter_Collect(t *testing.T) {
-	job := prepareVCSA()
-	require.NoError(t, job.Init())
+func TestCollector_Collect(t *testing.T) {
+	collr := prepareVCSA()
+	require.NoError(t, collr.Init())
 	mock := &mockVCenterHealthClient{}
-	job.client = mock
+	collr.client = mock
 
 	expected := map[string]int64{
 		"applmgmt_status_gray":             0,
@@ -155,33 +155,33 @@ func TestVCenter_Collect(t *testing.T) {
 		"system_status_yellow":             0,
 	}
 
-	assert.Equal(t, expected, job.Collect())
+	assert.Equal(t, expected, collr.Collect())
 }
 
-func TestVCenter_CollectEnsurePingIsCalled(t *testing.T) {
-	job := prepareVCSA()
-	require.NoError(t, job.Init())
+func TestCollector_CollectEnsurePingIsCalled(t *testing.T) {
+	collr := prepareVCSA()
+	require.NoError(t, collr.Init())
 	mock := &mockVCenterHealthClient{}
-	job.client = mock
-	job.Collect()
+	collr.client = mock
+	collr.Collect()
 
 	assert.True(t, mock.pingCalls == 1)
 }
 
-func TestVCenter_CollectErrorOnPing(t *testing.T) {
-	job := prepareVCSA()
-	require.NoError(t, job.Init())
+func TestCollector_CollectErrorOnPing(t *testing.T) {
+	collr := prepareVCSA()
+	require.NoError(t, collr.Init())
 	mock := &mockVCenterHealthClient{
 		ping: func() error { return errors.New("ping mock error") },
 	}
-	job.client = mock
+	collr.client = mock
 
-	assert.Zero(t, job.Collect())
+	assert.Zero(t, collr.Collect())
 }
 
-func TestVCenter_CollectErrorOnHealthCalls(t *testing.T) {
-	job := prepareVCSA()
-	require.NoError(t, job.Init())
+func TestCollector_CollectErrorOnHealthCalls(t *testing.T) {
+	collr := prepareVCSA()
+	require.NoError(t, collr.Init())
 	mock := &mockVCenterHealthClient{
 		applMgmt:         func() (string, error) { return "", errors.New("applMgmt mock error") },
 		databaseStorage:  func() (string, error) { return "", errors.New("databaseStorage mock error") },
@@ -192,12 +192,12 @@ func TestVCenter_CollectErrorOnHealthCalls(t *testing.T) {
 		swap:             func() (string, error) { return "", errors.New("swap mock error") },
 		system:           func() (string, error) { return "", errors.New("system mock error") },
 	}
-	job.client = mock
+	collr.client = mock
 
-	assert.Zero(t, job.Collect())
+	assert.Zero(t, collr.Collect())
 }
 
-func prepareVCSA() *VCSA {
+func prepareVCSA() *Collector {
 	vc := New()
 	vc.URL = "https://127.0.0.1:38001"
 	vc.Username = "user"
