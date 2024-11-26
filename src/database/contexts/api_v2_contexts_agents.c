@@ -108,7 +108,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                 buffer_json_member_add_double(wb, "disk_percent", percent);
             }
 
-            if(first_time_s) {
+            if(first_time_s < now_s) {
                 time_t retention = now_s - first_time_s;
 
                 buffer_json_member_add_time_t(wb, "from", first_time_s);
