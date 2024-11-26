@@ -29,8 +29,8 @@ func init() {
 	})
 }
 
-func New() *KubeProxy {
-	return &KubeProxy{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -50,7 +50,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type KubeProxy struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -59,26 +59,26 @@ type KubeProxy struct {
 	prom prometheus.Prometheus
 }
 
-func (kp *KubeProxy) Configuration() any {
-	return kp.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (kp *KubeProxy) Init() error {
-	if err := kp.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prom, err := kp.initPrometheusClient()
+	prom, err := c.initPrometheusClient()
 	if err != nil {
 		return fmt.Errorf("init prometheus client: %v", err)
 	}
-	kp.prom = prom
+	c.prom = prom
 
 	return nil
 }
 
-func (kp *KubeProxy) Check() error {
-	mx, err := kp.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -88,23 +88,23 @@ func (kp *KubeProxy) Check() error {
 	return nil
 }
 
-func (kp *KubeProxy) Charts() *Charts {
-	return kp.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (kp *KubeProxy) Collect() map[string]int64 {
-	mx, err := kp.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 
 	if err != nil {
-		kp.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (kp *KubeProxy) Cleanup() {
-	if kp.prom != nil && kp.prom.HTTPClient() != nil {
-		kp.prom.HTTPClient().CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.prom != nil && c.prom.HTTPClient() != nil {
+		c.prom.HTTPClient().CloseIdleConnections()
 	}
 }

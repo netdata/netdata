@@ -31,29 +31,29 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestKubeProxy_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &KubeProxy{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestKubeProxy_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestKubeProxy_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestKubeProxy_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	assert.NoError(t, New().Init())
 }
 
-func TestKubeProxy_InitNG(t *testing.T) {
-	job := New()
-	job.URL = ""
-	assert.Error(t, job.Init())
+func TestCollector_InitNG(t *testing.T) {
+	collr := New()
+	collr.URL = ""
+	assert.Error(t, collr.Init())
 }
 
-func TestKubeProxy_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -61,20 +61,20 @@ func TestKubeProxy_Check(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/metrics"
-	require.NoError(t, job.Init())
-	assert.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/metrics"
+	require.NoError(t, collr.Init())
+	assert.NoError(t, collr.Check())
 }
 
-func TestKubeProxy_CheckNG(t *testing.T) {
-	job := New()
-	job.URL = "http://127.0.0.1:38001/metrics"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+func TestCollector_CheckNG(t *testing.T) {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001/metrics"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestKubeProxy_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -82,10 +82,10 @@ func TestKubeProxy_Collect(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/metrics"
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/metrics"
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"sync_proxy_rules_count":           2669,
@@ -114,10 +114,10 @@ func TestKubeProxy_Collect(t *testing.T) {
 		"http_request_duration_099":        9464,
 	}
 
-	assert.Equal(t, expected, job.Collect())
+	assert.Equal(t, expected, collr.Collect())
 }
 
-func TestKubeProxy_InvalidData(t *testing.T) {
+func TestCollector_InvalidData(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -125,13 +125,13 @@ func TestKubeProxy_InvalidData(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/metrics"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/metrics"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestKubeProxy_404(t *testing.T) {
+func TestCollector_404(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -139,8 +139,8 @@ func TestKubeProxy_404(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/metrics"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/metrics"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
