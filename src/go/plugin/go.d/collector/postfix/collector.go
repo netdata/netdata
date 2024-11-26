@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *Postfix {
-	return &Postfix{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			BinaryPath: "/usr/sbin/postqueue",
 			Timeout:    confopt.Duration(time.Second * 2),
@@ -42,40 +42,35 @@ type Config struct {
 	BinaryPath  string           `yaml:"binary_path,omitempty" json:"binary_path"`
 }
 
-type (
-	Postfix struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec postqueueBinary
-	}
-	postqueueBinary interface {
-		list() ([]byte, error)
-	}
-)
-
-func (p *Postfix) Configuration() any {
-	return p.Config
+	exec postqueueBinary
 }
 
-func (p *Postfix) Init() error {
-	if err := p.validateConfig(); err != nil {
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %s", err)
 	}
 
-	pq, err := p.initPostqueueExec()
+	pq, err := c.initPostqueueExec()
 	if err != nil {
 		return fmt.Errorf("postqueue exec initialization: %v", err)
 	}
-	p.exec = pq
+	c.exec = pq
 
 	return nil
 }
 
-func (p *Postfix) Check() error {
-	mx, err := p.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -87,14 +82,14 @@ func (p *Postfix) Check() error {
 	return nil
 }
 
-func (p *Postfix) Charts() *module.Charts {
-	return p.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (p *Postfix) Collect() map[string]int64 {
-	mx, err := p.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -104,4 +99,4 @@ func (p *Postfix) Collect() map[string]int64 {
 	return mx
 }
 
-func (p *Postfix) Cleanup() {}
+func (c *Collector) Cleanup() {}

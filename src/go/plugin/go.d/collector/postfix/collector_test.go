@@ -30,11 +30,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestPostfix_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Postfix{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestPostfix_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -55,29 +55,29 @@ func TestPostfix_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pf := New()
-			pf.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, pf.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, pf.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestPostfix_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Postfix
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *Postfix {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Postfix {
+			prepare: func() *Collector {
 				pf := New()
 				pf.exec = prepareMockOK()
 				_ = pf.Check()
@@ -85,7 +85,7 @@ func TestPostfix_Cleanup(t *testing.T) {
 			},
 		},
 		"after collect": {
-			prepare: func() *Postfix {
+			prepare: func() *Collector {
 				pf := New()
 				pf.exec = prepareMockOK()
 				_ = pf.Collect()
@@ -96,18 +96,18 @@ func TestPostfix_Cleanup(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pf := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, pf.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestPostfix_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestPostfix_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockPostqueueExec
 		wantFail    bool
@@ -136,20 +136,20 @@ func TestPostfix_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pf := New()
+			collr := New()
 			mock := test.prepareMock()
-			pf.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, pf.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, pf.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestPostfix_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockPostqueueExec
 		wantMetrics map[string]int64
@@ -184,11 +184,11 @@ func TestPostfix_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pf := New()
+			collr := New()
 			mock := test.prepareMock()
-			pf.exec = mock
+			collr.exec = mock
 
-			mx := pf.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 		})
