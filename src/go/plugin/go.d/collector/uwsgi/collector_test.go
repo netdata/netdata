@@ -32,11 +32,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestUwsgi_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Uwsgi{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestUwsgi_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -57,59 +57,59 @@ func TestUwsgi_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			uw := New()
-			uw.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, uw.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, uw.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestUwsgi_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Uwsgi
+		prepare func() *Collector
 	}{
 		"not initialized": {
-			prepare: func() *Uwsgi {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Uwsgi {
-				uw := New()
-				uw.conn = prepareMockOk()
-				_ = uw.Check()
-				return uw
+			prepare: func() *Collector {
+				collr := New()
+				collr.conn = prepareMockOk()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Uwsgi {
-				uw := New()
-				uw.conn = prepareMockOk()
-				_ = uw.Collect()
-				return uw
+			prepare: func() *Collector {
+				collr := New()
+				collr.conn = prepareMockOk()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			uw := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, uw.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestUwsgi_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestUwsgi_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockUwsgiConn
 		wantFail    bool
@@ -134,20 +134,20 @@ func TestUwsgi_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			uw := New()
+			collr := New()
 			mock := test.prepareMock()
-			uw.conn = mock
+			collr.conn = mock
 
 			if test.wantFail {
-				assert.Error(t, uw.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, uw.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestUwsgi_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock             func() *mockUwsgiConn
 		wantMetrics             map[string]int64
@@ -235,18 +235,18 @@ func TestUwsgi_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			uw := New()
+			collr := New()
 			mock := test.prepareMock()
-			uw.conn = mock
+			collr.conn = mock
 
-			mx := uw.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, uw.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
-			assert.Equal(t, test.wantCharts, len(*uw.Charts()), "want charts")
+			assert.Equal(t, test.wantCharts, len(*collr.Charts()), "want charts")
 		})
 	}
 }

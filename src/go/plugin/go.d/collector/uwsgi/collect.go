@@ -28,22 +28,22 @@ type workerStats struct {
 	AvgRT         int64  `json:"avg_rt"`
 }
 
-func (u *Uwsgi) collect() (map[string]int64, error) {
-	stats, err := u.conn.queryStats()
+func (c *Collector) collect() (map[string]int64, error) {
+	stats, err := c.conn.queryStats()
 	if err != nil {
 		return nil, fmt.Errorf("failed to query stats: %v", err)
 	}
 
 	mx := make(map[string]int64)
 
-	if err := u.collectStats(mx, stats); err != nil {
+	if err := c.collectStats(mx, stats); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (u *Uwsgi) collectStats(mx map[string]int64, stats []byte) error {
+func (c *Collector) collectStats(mx map[string]int64, stats []byte) error {
 	var resp statsResponse
 	if err := json.Unmarshal(stats, &resp); err != nil {
 		return fmt.Errorf("failed to json decode stats response: %v", err)
@@ -71,9 +71,9 @@ func (u *Uwsgi) collectStats(mx map[string]int64, stats []byte) error {
 
 		seen[w.ID] = true
 
-		if !u.seenWorkers[w.ID] {
-			u.seenWorkers[w.ID] = true
-			u.addWorkerCharts(w.ID)
+		if !c.seenWorkers[w.ID] {
+			c.seenWorkers[w.ID] = true
+			c.addWorkerCharts(w.ID)
 		}
 
 		px := fmt.Sprintf("worker_%d_", w.ID)
@@ -95,10 +95,10 @@ func (u *Uwsgi) collectStats(mx map[string]int64, stats []byte) error {
 		mx[px+"request_handling_status_not_accepting"] = metrix.Bool(w.Accepting == 0)
 	}
 
-	for id := range u.seenWorkers {
+	for id := range c.seenWorkers {
 		if !seen[id] {
-			delete(u.seenWorkers, id)
-			u.removeWorkerCharts(id)
+			delete(c.seenWorkers, id)
+			c.removeWorkerCharts(id)
 		}
 	}
 

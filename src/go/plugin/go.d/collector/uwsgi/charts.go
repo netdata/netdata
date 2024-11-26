@@ -243,7 +243,7 @@ var (
 	}
 )
 
-func (u *Uwsgi) addWorkerCharts(workerID int) {
+func (c *Collector) addWorkerCharts(workerID int) {
 	charts := workerChartsTmpl.Copy()
 
 	id := strconv.Itoa(workerID)
@@ -258,15 +258,15 @@ func (u *Uwsgi) addWorkerCharts(workerID int) {
 		}
 	}
 
-	if err := u.Charts().Add(*charts...); err != nil {
-		u.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (u *Uwsgi) removeWorkerCharts(workerID int) {
+func (c *Collector) removeWorkerCharts(workerID int) {
 	px := fmt.Sprintf("worker_%d_", workerID)
 
-	for _, chart := range *u.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

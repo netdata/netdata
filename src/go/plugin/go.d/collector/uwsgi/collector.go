@@ -22,8 +22,8 @@ func init() {
 	})
 }
 
-func New() *Uwsgi {
-	return &Uwsgi{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:1717",
 			Timeout: confopt.Duration(time.Second * 1),
@@ -39,7 +39,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout" json:"timeout"`
 }
 
-type Uwsgi struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -50,22 +50,22 @@ type Uwsgi struct {
 	seenWorkers map[int]bool
 }
 
-func (u *Uwsgi) Configuration() any {
-	return u.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (u *Uwsgi) Init() error {
-	if u.Address == "" {
+func (c *Collector) Init() error {
+	if c.Address == "" {
 		return errors.New("config: 'address' not set")
 	}
 
-	u.conn = newUwsgiConn(u.Config)
+	c.conn = newUwsgiConn(c.Config)
 
 	return nil
 }
 
-func (u *Uwsgi) Check() error {
-	mx, err := u.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -77,14 +77,14 @@ func (u *Uwsgi) Check() error {
 	return nil
 }
 
-func (u *Uwsgi) Charts() *module.Charts {
-	return u.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (u *Uwsgi) Collect() map[string]int64 {
-	mx, err := u.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		u.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -94,4 +94,4 @@ func (u *Uwsgi) Collect() map[string]int64 {
 	return mx
 }
 
-func (u *Uwsgi) Cleanup() {}
+func (c *Collector) Cleanup() {}
