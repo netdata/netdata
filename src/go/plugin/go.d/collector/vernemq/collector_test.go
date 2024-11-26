@@ -34,11 +34,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestVerneMQ_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &VerneMQ{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestVerneMQ_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -59,30 +59,30 @@ func TestVerneMQ_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			vmq := New()
-			vmq.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, vmq.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, vmq.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestVerneMQ_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestVerneMQ_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestVerneMQ_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (vmq *VerneMQ, cleanup func())
+		prepare  func(t *testing.T) (collr *Collector, cleanup func())
 	}{
 		"success on valid response v1.10.1": {
 			wantFail: false,
@@ -112,21 +112,21 @@ func TestVerneMQ_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			vmq, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, vmq.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, vmq.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestVerneMQ_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare         func(t *testing.T) (vmq *VerneMQ, cleanup func())
+		prepare         func(t *testing.T) (collr *Collector, cleanup func())
 		wantNumOfCharts int
 		wantMetrics     map[string]int64
 	}{
@@ -639,51 +639,51 @@ func TestVerneMQ_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			vmq, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := vmq.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				assert.Equal(t, test.wantNumOfCharts, len(*vmq.Charts()), "want charts")
+				assert.Equal(t, test.wantNumOfCharts, len(*collr.Charts()), "want charts")
 
-				module.TestMetricsHasAllChartsDims(t, vmq.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func caseOkVer201(t *testing.T) (*VerneMQ, func()) {
+func caseOkVer201(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataVer201Metrics)
 		}))
 
-	vmq := New()
-	vmq.URL = srv.URL
-	require.NoError(t, vmq.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return vmq, srv.Close
+	return collr, srv.Close
 }
 
-func caseOkVer1101(t *testing.T) (*VerneMQ, func()) {
+func caseOkVer1101(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataVer1101Metrics)
 		}))
 
-	vmq := New()
-	vmq.URL = srv.URL
-	require.NoError(t, vmq.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return vmq, srv.Close
+	return collr, srv.Close
 }
 
-func caseUnexpectedPrometheusMetrics(t *testing.T) (*VerneMQ, func()) {
+func caseUnexpectedPrometheusMetrics(t *testing.T) (*Collector, func()) {
 	data := `
 # HELP wmi_os_process_memory_limix_bytes OperatingSystem.MaxProcessMemorySize
 # TYPE wmi_os_process_memory_limix_bytes gauge
@@ -701,45 +701,45 @@ wmi_os_processes_limit 4.294967295e+09
 			_, _ = w.Write([]byte(data))
 		}))
 
-	vmq := New()
-	vmq.URL = srv.URL
-	require.NoError(t, vmq.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return vmq, srv.Close
+	return collr, srv.Close
 }
 
-func caseInvalidDataResponse(t *testing.T) (*VerneMQ, func()) {
+func caseInvalidDataResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	vmq := New()
-	vmq.URL = srv.URL
-	require.NoError(t, vmq.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return vmq, srv.Close
+	return collr, srv.Close
 }
 
-func caseConnectionRefused(t *testing.T) (*VerneMQ, func()) {
+func caseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	vmq := New()
-	vmq.URL = "http://127.0.0.1:65001"
-	require.NoError(t, vmq.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	require.NoError(t, collr.Init())
 
-	return vmq, func() {}
+	return collr, func() {}
 }
 
-func case404(t *testing.T) (*VerneMQ, func()) {
+func case404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
 
-	vmq := New()
-	vmq.URL = srv.URL
-	require.NoError(t, vmq.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return vmq, srv.Close
+	return collr, srv.Close
 }

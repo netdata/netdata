@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *VerneMQ {
-	return &VerneMQ{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -47,7 +47,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type VerneMQ struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -63,26 +63,26 @@ type VerneMQ struct {
 	seenNodes map[string]bool
 }
 
-func (v *VerneMQ) Configuration() any {
-	return v.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (v *VerneMQ) Init() error {
-	if err := v.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prom, err := v.initPrometheusClient()
+	prom, err := c.initPrometheusClient()
 	if err != nil {
 		return fmt.Errorf("init prometheus client: %v", err)
 	}
-	v.prom = prom
+	c.prom = prom
 
 	return nil
 }
 
-func (v *VerneMQ) Check() error {
-	mx, err := v.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -94,14 +94,14 @@ func (v *VerneMQ) Check() error {
 	return nil
 }
 
-func (v *VerneMQ) Charts() *module.Charts {
-	return v.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (v *VerneMQ) Collect() map[string]int64 {
-	mx, err := v.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		v.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -111,8 +111,8 @@ func (v *VerneMQ) Collect() map[string]int64 {
 	return mx
 }
 
-func (v *VerneMQ) Cleanup() {
-	if v.prom != nil && v.prom.HTTPClient() != nil {
-		v.prom.HTTPClient().CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.prom != nil && c.prom.HTTPClient() != nil {
+		c.prom.HTTPClient().CloseIdleConnections()
 	}
 }
