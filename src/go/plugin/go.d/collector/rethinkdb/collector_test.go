@@ -34,11 +34,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestRethinkdb_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Rethinkdb{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestRethinkdb_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -59,61 +59,61 @@ func TestRethinkdb_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rdb := New()
-			rdb.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, rdb.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, rdb.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestRethinkdb_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Rethinkdb
+		prepare func() *Collector
 	}{
 		"not initialized": {
-			prepare: func() *Rethinkdb {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Rethinkdb {
-				rdb := New()
-				rdb.newConn = func(config Config) (rdbConn, error) {
+			prepare: func() *Collector {
+				collr := New()
+				collr.newConn = func(config Config) (rdbConn, error) {
 					return &mockRethinkdbConn{dataStats: dataStats}, nil
 				}
-				_ = rdb.Check()
-				return rdb
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Rethinkdb {
-				rdb := New()
-				rdb.newConn = func(config Config) (rdbConn, error) {
+			prepare: func() *Collector {
+				collr := New()
+				collr.newConn = func(config Config) (rdbConn, error) {
 					return &mockRethinkdbConn{dataStats: dataStats}, nil
 				}
-				_ = rdb.Check()
-				return rdb
+				_ = collr.Check()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rdb := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, rdb.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestRethinkdb_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *Rethinkdb
+		prepare  func() *Collector
 		wantFail bool
 	}{
 		"success on valid response": {
@@ -132,26 +132,26 @@ func TestRethinkdb_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rdb := test.prepare()
+			collr := test.prepare()
 
 			if test.wantFail {
-				assert.Error(t, rdb.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, rdb.Check())
+				assert.NoError(t, collr.Check())
 			}
 
-			if m, ok := rdb.rdb.(*mockRethinkdbConn); ok {
+			if m, ok := collr.rdb.(*mockRethinkdbConn); ok {
 				assert.False(t, m.disconnectCalled, "rdb close before cleanup")
-				rdb.Cleanup()
+				collr.Cleanup()
 				assert.True(t, m.disconnectCalled, "rdb close after cleanup")
 			}
 		})
 	}
 }
 
-func TestRethinkdb_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func() *Rethinkdb
+		prepare     func() *Collector
 		wantMetrics map[string]int64
 		wantCharts  int
 		skipChart   func(chart *module.Chart, dim *module.Dim) bool
@@ -201,51 +201,51 @@ func TestRethinkdb_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rdb := test.prepare()
+			collr := test.prepare()
 
-			require.NoError(t, rdb.Init())
+			require.NoError(t, collr.Init())
 
-			mx := rdb.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
-			assert.Equal(t, test.wantCharts, len(*rdb.Charts()))
+			assert.Equal(t, test.wantCharts, len(*collr.Charts()))
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDimsSkip(t, rdb.Charts(), mx, test.skipChart)
+				module.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, test.skipChart)
 			}
 
-			if m, ok := rdb.rdb.(*mockRethinkdbConn); ok {
+			if m, ok := collr.rdb.(*mockRethinkdbConn); ok {
 				assert.False(t, m.disconnectCalled, "rdb close before cleanup")
-				rdb.Cleanup()
+				collr.Cleanup()
 				assert.True(t, m.disconnectCalled, "rdb close after cleanup")
 			}
 		})
 	}
 }
 
-func prepareCaseOk() *Rethinkdb {
-	rdb := New()
-	rdb.newConn = func(cfg Config) (rdbConn, error) {
+func prepareCaseOk() *Collector {
+	collr := New()
+	collr.newConn = func(cfg Config) (rdbConn, error) {
 		return &mockRethinkdbConn{dataStats: dataStats}, nil
 	}
-	return rdb
+	return collr
 }
 
-func prepareCaseErrOnStats() *Rethinkdb {
-	rdb := New()
-	rdb.newConn = func(cfg Config) (rdbConn, error) {
+func prepareCaseErrOnStats() *Collector {
+	collr := New()
+	collr.newConn = func(cfg Config) (rdbConn, error) {
 		return &mockRethinkdbConn{errOnStats: true}, nil
 	}
-	return rdb
+	return collr
 }
 
-func prepareCaseErrOnConnect() *Rethinkdb {
-	rdb := New()
-	rdb.newConn = func(cfg Config) (rdbConn, error) {
+func prepareCaseErrOnConnect() *Collector {
+	collr := New()
+	collr.newConn = func(cfg Config) (rdbConn, error) {
 		return nil, errors.New("mock failed to connect")
 	}
-	return rdb
+	return collr
 }
 
 type mockRethinkdbConn struct {

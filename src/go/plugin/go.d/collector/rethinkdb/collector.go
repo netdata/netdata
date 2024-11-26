@@ -22,8 +22,8 @@ func init() {
 	})
 }
 
-func New() *Rethinkdb {
-	return &Rethinkdb{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:28015",
 			Timeout: confopt.Duration(time.Second * 1),
@@ -43,33 +43,31 @@ type Config struct {
 	Password    string           `yaml:"password,omitempty" json:"password"`
 }
 
-type (
-	Rethinkdb struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		newConn func(cfg Config) (rdbConn, error)
-		rdb     rdbConn
+	newConn func(cfg Config) (rdbConn, error)
+	rdb     rdbConn
 
-		seenServers map[string]bool
-	}
-)
-
-func (r *Rethinkdb) Configuration() any {
-	return r.Config
+	seenServers map[string]bool
 }
 
-func (r *Rethinkdb) Init() error {
-	if r.Address == "" {
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	if c.Address == "" {
 		return errors.New("config: address is not set")
 	}
 	return nil
 }
 
-func (r *Rethinkdb) Check() error {
-	mx, err := r.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -79,14 +77,14 @@ func (r *Rethinkdb) Check() error {
 	return nil
 }
 
-func (r *Rethinkdb) Charts() *module.Charts {
-	return r.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (r *Rethinkdb) Collect() map[string]int64 {
-	ms, err := r.collect()
+func (c *Collector) Collect() map[string]int64 {
+	ms, err := c.collect()
 	if err != nil {
-		r.Error(err)
+		c.Error(err)
 	}
 
 	if len(ms) == 0 {
@@ -95,11 +93,11 @@ func (r *Rethinkdb) Collect() map[string]int64 {
 	return ms
 }
 
-func (r *Rethinkdb) Cleanup() {
-	if r.rdb != nil {
-		if err := r.rdb.close(); err != nil {
-			r.Warningf("cleanup: error on closing client [%s]: %v", r.Address, err)
+func (c *Collector) Cleanup() {
+	if c.rdb != nil {
+		if err := c.rdb.close(); err != nil {
+			c.Warningf("cleanup: error on closing client [%s]: %v", c.Address, err)
 		}
-		r.rdb = nil
+		c.rdb = nil
 	}
 }
