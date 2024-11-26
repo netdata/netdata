@@ -46,11 +46,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestPgBouncer_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &PgBouncer{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestPgBouncer_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -67,23 +67,23 @@ func TestPgBouncer_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			p := New()
-			p.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, p.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, p.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestPgBouncer_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestPgBouncer_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func(t *testing.T, m sqlmock.Sqlmock)
 		wantFail    bool
@@ -125,28 +125,28 @@ func TestPgBouncer_Check(t *testing.T) {
 				sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual),
 			)
 			require.NoError(t, err)
-			p := New()
-			p.db = db
+			collr := New()
+			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, p.Init())
+			require.NoError(t, collr.Init())
 
 			test.prepareMock(t, mock)
 
 			if test.wantFail {
-				assert.Error(t, p.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, p.Check())
+				assert.NoError(t, collr.Check())
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
 }
 
-func TestPgBouncer_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	type testCaseStep struct {
-		prepareMock func(t *testing.T, m sqlmock.Sqlmock)
-		check       func(t *testing.T, p *PgBouncer)
+		prepareMock func(*testing.T, sqlmock.Sqlmock)
+		check       func(*testing.T, *Collector)
 	}
 	tests := map[string][]testCaseStep{
 		"Success on all queries (v1.17.0)": {
@@ -158,8 +158,8 @@ func TestPgBouncer_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowStats, dataVer1170Stats)
 					mockExpect(t, m, queryShowPools, dataVer1170Pools)
 				},
-				check: func(t *testing.T, p *PgBouncer) {
-					mx := p.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 
 					expected := map[string]int64{
 						"cl_conns_utilization":              47,
@@ -250,8 +250,8 @@ func TestPgBouncer_Collect(t *testing.T) {
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpectErr(m, queryShowVersion)
 				},
-				check: func(t *testing.T, p *PgBouncer) {
-					mx := p.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 					var expected map[string]int64
 					assert.Equal(t, expected, mx)
 				},
@@ -262,8 +262,8 @@ func TestPgBouncer_Collect(t *testing.T) {
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataVer170Version)
 				},
-				check: func(t *testing.T, p *PgBouncer) {
-					mx := p.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 					var expected map[string]int64
 					assert.Equal(t, expected, mx)
 				},
@@ -275,8 +275,8 @@ func TestPgBouncer_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowVersion, dataVer1170Version)
 					mockExpectErr(m, queryShowConfig)
 				},
-				check: func(t *testing.T, p *PgBouncer) {
-					mx := p.Collect()
+				check: func(t *testing.T, collr *Collector) {
+					mx := collr.Collect()
 					var expected map[string]int64
 					assert.Equal(t, expected, mx)
 				},
@@ -290,16 +290,16 @@ func TestPgBouncer_Collect(t *testing.T) {
 				sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual),
 			)
 			require.NoError(t, err)
-			p := New()
-			p.db = db
+			collr := New()
+			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, p.Init())
+			require.NoError(t, collr.Init())
 
 			for i, step := range test {
 				t.Run(fmt.Sprintf("step[%d]", i), func(t *testing.T) {
 					step.prepareMock(t, mock)
-					step.check(t, p)
+					step.check(t, collr)
 				})
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())

@@ -27,8 +27,8 @@ func init() {
 	})
 }
 
-func New() *PgBouncer {
-	return &PgBouncer{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second),
 			DSN:     "postgres://postgres:postgres@127.0.0.1:6432/pgbouncer",
@@ -47,7 +47,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type PgBouncer struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -63,12 +63,12 @@ type PgBouncer struct {
 	metrics *metrics
 }
 
-func (p *PgBouncer) Configuration() any {
-	return p.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (p *PgBouncer) Init() error {
-	err := p.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
@@ -76,8 +76,8 @@ func (p *PgBouncer) Init() error {
 	return nil
 }
 
-func (p *PgBouncer) Check() error {
-	mx, err := p.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -87,14 +87,14 @@ func (p *PgBouncer) Check() error {
 	return nil
 }
 
-func (p *PgBouncer) Charts() *module.Charts {
-	return p.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (p *PgBouncer) Collect() map[string]int64 {
-	mx, err := p.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -103,12 +103,12 @@ func (p *PgBouncer) Collect() map[string]int64 {
 	return mx
 }
 
-func (p *PgBouncer) Cleanup() {
-	if p.db == nil {
+func (c *Collector) Cleanup() {
+	if c.db == nil {
 		return
 	}
-	if err := p.db.Close(); err != nil {
-		p.Warningf("cleanup: error on closing the PgBouncer database [%s]: %v", p.DSN, err)
+	if err := c.db.Close(); err != nil {
+		c.Warningf("cleanup: error on closing the PgBouncer database [%s]: %v", c.DSN, err)
 	}
-	p.db = nil
+	c.db = nil
 }
