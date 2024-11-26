@@ -33,25 +33,24 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestApcupsd_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Apcupsd{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestApcupsd_Cleanup(t *testing.T) {
-	apc := New()
-
-	require.NotPanics(t, apc.Cleanup)
+func TestCollector_Cleanup(t *testing.T) {
+	collr := New()
+	require.NotPanics(t, collr.Cleanup)
 
 	mock := prepareMockOk()
-	apc.newConn = func(Config) apcupsdConn { return mock }
+	collr.newConn = func(Config) apcupsdConn { return mock }
 
-	require.NoError(t, apc.Init())
-	_ = apc.Collect()
-	require.NotPanics(t, apc.Cleanup)
+	require.NoError(t, collr.Init())
+	_ = collr.Collect()
+	require.NotPanics(t, collr.Cleanup)
 	assert.True(t, mock.calledDisconnect)
 }
 
-func TestApcupsd_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -68,19 +67,19 @@ func TestApcupsd_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			apc := New()
-			apc.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, apc.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, apc.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestApcupsd_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockApcupsdConn
 		wantFail    bool
@@ -105,27 +104,27 @@ func TestApcupsd_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			apc := New()
-			apc.newConn = func(Config) apcupsdConn { return test.prepareMock() }
+			collr := New()
+			collr.newConn = func(Config) apcupsdConn { return test.prepareMock() }
 
-			require.NoError(t, apc.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, apc.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, apc.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestApcupsd_Charts(t *testing.T) {
-	apc := New()
-	require.NoError(t, apc.Init())
-	assert.NotNil(t, apc.Charts())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestApcupsd_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock        func() *mockApcupsdConn
 		wantCollected      map[string]int64
@@ -205,13 +204,13 @@ func TestApcupsd_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			apc := New()
-			require.NoError(t, apc.Init())
+			collr := New()
+			require.NoError(t, collr.Init())
 
 			mock := test.prepareMock()
-			apc.newConn = func(Config) apcupsdConn { return mock }
+			collr.newConn = func(Config) apcupsdConn { return mock }
 
-			mx := apc.Collect()
+			mx := collr.Collect()
 
 			if _, ok := mx["battery_seconds_since_replacement"]; ok {
 				mx["battery_seconds_since_replacement"] = 86400
@@ -221,11 +220,11 @@ func TestApcupsd_Collect(t *testing.T) {
 
 			if len(test.wantCollected) > 0 {
 				if strings.Contains(name, "commlost") {
-					module.TestMetricsHasAllChartsDimsSkip(t, apc.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
+					module.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
 						return chart.ID != statusChart.ID
 					})
 				} else {
-					module.TestMetricsHasAllChartsDims(t, apc.Charts(), mx)
+					module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 				}
 			}
 

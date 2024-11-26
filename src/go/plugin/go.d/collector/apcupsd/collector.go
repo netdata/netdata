@@ -22,8 +22,8 @@ func init() {
 	})
 }
 
-func New() *Apcupsd {
-	return &Apcupsd{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:3551",
 			Timeout: confopt.Duration(time.Second * 3),
@@ -39,7 +39,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type Apcupsd struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -49,20 +49,20 @@ type Apcupsd struct {
 	newConn func(Config) apcupsdConn
 }
 
-func (a *Apcupsd) Configuration() any {
-	return a.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (a *Apcupsd) Init() error {
-	if a.Address == "" {
+func (c *Collector) Init() error {
+	if c.Address == "" {
 		return errors.New("config: 'address' not set")
 	}
 
 	return nil
 }
 
-func (a *Apcupsd) Check() error {
-	mx, err := a.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -72,14 +72,14 @@ func (a *Apcupsd) Check() error {
 	return nil
 }
 
-func (a *Apcupsd) Charts() *module.Charts {
-	return a.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (a *Apcupsd) Collect() map[string]int64 {
-	mx, err := a.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		a.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -88,11 +88,11 @@ func (a *Apcupsd) Collect() map[string]int64 {
 	return mx
 }
 
-func (a *Apcupsd) Cleanup() {
-	if a.conn != nil {
-		if err := a.conn.disconnect(); err != nil {
-			a.Warningf("error on disconnect: %v", err)
+func (c *Collector) Cleanup() {
+	if c.conn != nil {
+		if err := c.conn.disconnect(); err != nil {
+			c.Warningf("error on disconnect: %v", err)
 		}
-		a.conn = nil
+		c.conn = nil
 	}
 }
