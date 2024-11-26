@@ -22,8 +22,8 @@ func init() {
 	})
 }
 
-func New() *Dovecot {
-	return &Dovecot{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:24242",
 			Timeout: confopt.Duration(time.Second * 1),
@@ -39,7 +39,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout" json:"timeout"`
 }
 
-type Dovecot struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -49,20 +49,20 @@ type Dovecot struct {
 	conn    dovecotConn
 }
 
-func (d *Dovecot) Configuration() any {
-	return d.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (d *Dovecot) Init() error {
-	if d.Address == "" {
+func (c *Collector) Init() error {
+	if c.Address == "" {
 		return errors.New("config: 'address' not set")
 	}
 
 	return nil
 }
 
-func (d *Dovecot) Check() error {
-	mx, err := d.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -74,14 +74,14 @@ func (d *Dovecot) Check() error {
 	return nil
 }
 
-func (d *Dovecot) Charts() *module.Charts {
-	return d.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (d *Dovecot) Collect() map[string]int64 {
-	mx, err := d.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		d.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -91,9 +91,9 @@ func (d *Dovecot) Collect() map[string]int64 {
 	return mx
 }
 
-func (d *Dovecot) Cleanup() {
-	if d.conn != nil {
-		d.conn.disconnect()
-		d.conn = nil
+func (c *Collector) Cleanup() {
+	if c.conn != nil {
+		c.conn.disconnect()
+		c.conn = nil
 	}
 }

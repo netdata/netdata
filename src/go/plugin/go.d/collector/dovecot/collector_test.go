@@ -30,11 +30,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestDovecot_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Dovecot{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestDovecot_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -55,59 +55,59 @@ func TestDovecot_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dovecot := New()
-			dovecot.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, dovecot.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, dovecot.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestDovecot_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Dovecot
+		prepare func() *Collector
 	}{
 		"not initialized": {
-			prepare: func() *Dovecot {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Dovecot {
-				dovecot := New()
-				dovecot.newConn = func(config Config) dovecotConn { return prepareMockOk() }
-				_ = dovecot.Check()
-				return dovecot
+			prepare: func() *Collector {
+				collr := New()
+				collr.newConn = func(Config) dovecotConn { return prepareMockOk() }
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Dovecot {
-				dovecot := New()
-				dovecot.newConn = func(config Config) dovecotConn { return prepareMockOk() }
-				_ = dovecot.Collect()
-				return dovecot
+			prepare: func() *Collector {
+				collr := New()
+				collr.newConn = func(Config) dovecotConn { return prepareMockOk() }
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dovecot := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, dovecot.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestDovecot_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestDovecot_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockDovecotConn
 		wantFail    bool
@@ -132,20 +132,20 @@ func TestDovecot_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dovecot := New()
+			collr := New()
 			mock := test.prepareMock()
-			dovecot.newConn = func(config Config) dovecotConn { return mock }
+			collr.newConn = func(Config) dovecotConn { return mock }
 
 			if test.wantFail {
-				assert.Error(t, dovecot.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, dovecot.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestDovecot_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock             func() *mockDovecotConn
 		wantMetrics             map[string]int64
@@ -208,20 +208,20 @@ func TestDovecot_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dovecot := New()
+			collr := New()
 			mock := test.prepareMock()
-			dovecot.newConn = func(config Config) dovecotConn { return mock }
+			collr.newConn = func(Config) dovecotConn { return mock }
 
-			mx := dovecot.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, dovecot.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 
 			assert.Equal(t, test.disconnectBeforeCleanup, mock.disconnectCalled, "disconnect before cleanup")
-			dovecot.Cleanup()
+			collr.Cleanup()
 			assert.Equal(t, test.disconnectAfterCleanup, mock.disconnectCalled, "disconnect after cleanup")
 		})
 	}
