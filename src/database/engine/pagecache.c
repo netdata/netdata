@@ -1112,7 +1112,7 @@ void pgc_and_mrg_initialize(void)
 
     open_cache = pgc_create(
             "OPEN_PGC",
-            open_cache_size,                             // the default is 1MB
+            open_cache_size,
             open_cache_free_clean_page_callback,
             2,
             NULL,
@@ -1121,7 +1121,7 @@ void pgc_and_mrg_initialize(void)
             pgc_max_evictors(),
             1000,
             1,
-            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE,
+            PGC_OPTIONS_AUTOSCALE, // flushing inline: all dirty pages are just converted to clean
             0,
             sizeof(struct extent_io_data)
     );
@@ -1138,7 +1138,7 @@ void pgc_and_mrg_initialize(void)
             pgc_max_evictors(),
             1000,
             1,
-            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE,
+            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE, // no flushing needed
             0,
             0
     );
