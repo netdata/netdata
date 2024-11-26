@@ -10,20 +10,20 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (r *RabbitMQ) collectQueues(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(r.RequestConfig, urlPathAPIQueues)
+func (c *Collector) collectQueues(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPIQueues)
 	if err != nil {
 		return fmt.Errorf("failed to create queues stats request: %w", err)
 	}
 
 	var resp []apiQueueResp
 
-	if err := r.webClient().RequestJSON(req, &resp); err != nil {
+	if err := c.webClient().RequestJSON(req, &resp); err != nil {
 		return err
 	}
 
 	for _, q := range resp {
-		r.cache.getQueue(q).seen = true
+		c.cache.getQueue(q).seen = true
 
 		px := fmt.Sprintf("queue_%s_vhost_%s_node_%s_", q.Name, q.Vhost, q.Node)
 

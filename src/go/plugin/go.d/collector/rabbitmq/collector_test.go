@@ -40,11 +40,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestRabbitMQ_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &RabbitMQ{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestRabbitMQ_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -65,34 +65,34 @@ func TestRabbitMQ_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rmq := New()
-			rmq.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, rmq.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, rmq.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestRabbitMQ_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestRabbitMQ_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 
-	rmq := New()
-	require.NoError(t, rmq.Init())
+	collr := New()
+	require.NoError(t, collr.Init())
 
-	assert.NotPanics(t, rmq.Cleanup)
+	assert.NotPanics(t, collr.Cleanup)
 }
 
-func TestRabbitMQ_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() (*RabbitMQ, func())
+		prepare  func() (*Collector, func())
 		wantFail bool
 	}{
 		"success on valid response": {wantFail: false, prepare: caseClusterOk},
@@ -102,23 +102,23 @@ func TestRabbitMQ_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rmq, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, rmq.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, rmq.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, rmq.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestRabbitMQ_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() (*RabbitMQ, func())
+		prepare       func() (*Collector, func())
 		wantCollected map[string]int64
 		wantCharts    int
 	}{
@@ -356,24 +356,24 @@ func TestRabbitMQ_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rmq, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, rmq.Init())
+			require.NoError(t, collr.Init())
 
-			mx := rmq.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
 
 			if len(test.wantCollected) > 0 {
-				assert.Equal(t, test.wantCharts, len(*rmq.Charts()))
-				module.TestMetricsHasAllChartsDims(t, rmq.Charts(), mx)
+				assert.Equal(t, test.wantCharts, len(*collr.Charts()))
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func caseClusterOk() (*RabbitMQ, func()) {
+func caseClusterOk() (*Collector, func()) {
 	srv := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -392,14 +392,14 @@ func caseClusterOk() (*RabbitMQ, func()) {
 					w.WriteHeader(404)
 				}
 			}))
-	rmq := New()
-	rmq.URL = srv.URL
-	rmq.CollectQueues = true
+	collr := New()
+	collr.URL = srv.URL
+	collr.CollectQueues = true
 
-	return rmq, srv.Close
+	return collr, srv.Close
 }
 
-func caseUnexpectedJsonResponse() (*RabbitMQ, func()) {
+func caseUnexpectedJsonResponse() (*Collector, func()) {
 	resp := `
 {
     "elephant": {
@@ -421,30 +421,30 @@ func caseUnexpectedJsonResponse() (*RabbitMQ, func()) {
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(resp))
 		}))
-	rmq := New()
-	rmq.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return rmq, srv.Close
+	return collr, srv.Close
 }
 
-func caseInvalidDataResponse() (*RabbitMQ, func()) {
+func caseInvalidDataResponse() (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	rmq := New()
-	rmq.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return rmq, srv.Close
+	return collr, srv.Close
 }
 
-func case404() (*RabbitMQ, func()) {
+func case404() (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	rmq := New()
-	rmq.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return rmq, srv.Close
+	return collr, srv.Close
 }

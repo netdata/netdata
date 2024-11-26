@@ -9,20 +9,20 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (r *RabbitMQ) collectNodes(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(r.RequestConfig, urlPathAPINodes)
+func (c *Collector) collectNodes(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPINodes)
 	if err != nil {
 		return fmt.Errorf("failed to create node stats request: %w", err)
 	}
 
 	var resp []apiNodeResp
 
-	if err := r.webClient().RequestJSON(req, &resp); err != nil {
+	if err := c.webClient().RequestJSON(req, &resp); err != nil {
 		return err
 	}
 
 	for _, node := range resp {
-		r.cache.getNode(node).seen = true
+		c.cache.getNode(node).seen = true
 
 		px := fmt.Sprintf("node_%s_", node.Name)
 
@@ -57,7 +57,7 @@ func (r *RabbitMQ) collectNodes(mx map[string]int64) error {
 		mx[px+"uptime"] = node.Uptime / 1000 // ms to seconds
 
 		for _, peer := range node.ClusterLinks {
-			r.cache.getNodeClusterPeer(node, peer).seen = true
+			c.cache.getNodeClusterPeer(node, peer).seen = true
 
 			mx[px+"peer_"+peer.Name+"_cluster_link_recv_bytes"] = peer.RecvBytes
 			mx[px+"peer_"+peer.Name+"_cluster_link_send_bytes"] = peer.SendBytes
