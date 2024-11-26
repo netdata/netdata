@@ -33,11 +33,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestDNSdist_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &DNSdist{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestDNSdist_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -70,31 +70,31 @@ func TestDNSdist_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ns := New()
-			ns.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, ns.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, ns.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestDNSdist_Charts(t *testing.T) {
-	dist := New()
-	require.NoError(t, dist.Init())
-	assert.NotNil(t, dist.Charts())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestDNSdist_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestDNSdist_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() (dist *DNSdist, cleanup func())
+		prepare  func() (collr *Collector, cleanup func())
 		wantFail bool
 	}{
 		"success on valid response v1.5.1": {
@@ -117,22 +117,22 @@ func TestDNSdist_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dist, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
-			require.NoError(t, dist.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, dist.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, dist.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestDNSdist_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() (dist *DNSdist, cleanup func())
+		prepare       func() (collr *Collector, cleanup func())
 		wantCollected map[string]int64
 	}{
 		"success on valid response v1.5.1": {
@@ -185,55 +185,55 @@ func TestDNSdist_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dist, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
-			require.NoError(t, dist.Init())
+			require.NoError(t, collr.Init())
 
-			mx := dist.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				module.TestMetricsHasAllChartsDims(t, dist.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func preparePowerDNSdistV151() (*DNSdist, func()) {
+func preparePowerDNSdistV151() (*Collector, func()) {
 	srv := preparePowerDNSDistEndpoint()
-	ns := New()
-	ns.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return ns, srv.Close
+	return collr, srv.Close
 }
 
-func preparePowerDNSdist404() (*DNSdist, func()) {
+func preparePowerDNSdist404() (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	ns := New()
-	ns.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return ns, srv.Close
+	return collr, srv.Close
 }
 
-func preparePowerDNSdistConnectionRefused() (*DNSdist, func()) {
-	ns := New()
-	ns.URL = "http://127.0.0.1:38001"
+func preparePowerDNSdistConnectionRefused() (*Collector, func()) {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001"
 
-	return ns, func() {}
+	return collr, func() {}
 }
 
-func preparePowerDNSdistInvalidData() (*DNSdist, func()) {
+func preparePowerDNSdistInvalidData() (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	ns := New()
-	ns.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return ns, srv.Close
+	return collr, srv.Close
 }
 
 func preparePowerDNSDistEndpoint() *httptest.Server {

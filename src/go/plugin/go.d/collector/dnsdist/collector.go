@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *DNSdist {
-	return &DNSdist{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -48,7 +48,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type DNSdist struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -57,33 +57,33 @@ type DNSdist struct {
 	httpClient *http.Client
 }
 
-func (d *DNSdist) Configuration() any {
-	return d.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (d *DNSdist) Init() error {
-	err := d.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	client, err := d.initHTTPClient()
+	client, err := c.initHTTPClient()
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
-	d.httpClient = client
+	c.httpClient = client
 
-	cs, err := d.initCharts()
+	cs, err := c.initCharts()
 	if err != nil {
 		return fmt.Errorf("init charts: %v", err)
 	}
-	d.charts = cs
+	c.charts = cs
 
 	return nil
 }
 
-func (d *DNSdist) Check() error {
-	mx, err := d.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -94,14 +94,14 @@ func (d *DNSdist) Check() error {
 	return nil
 }
 
-func (d *DNSdist) Charts() *module.Charts {
-	return d.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (d *DNSdist) Collect() map[string]int64 {
-	ms, err := d.collect()
+func (c *Collector) Collect() map[string]int64 {
+	ms, err := c.collect()
 	if err != nil {
-		d.Error(err)
+		c.Error(err)
 	}
 
 	if len(ms) == 0 {
@@ -111,9 +111,9 @@ func (d *DNSdist) Collect() map[string]int64 {
 	return ms
 }
 
-func (d *DNSdist) Cleanup() {
-	if d.httpClient == nil {
+func (c *Collector) Cleanup() {
+	if c.httpClient == nil {
 		return
 	}
-	d.httpClient.CloseIdleConnections()
+	c.httpClient.CloseIdleConnections()
 }
