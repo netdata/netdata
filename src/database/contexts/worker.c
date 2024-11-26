@@ -1084,6 +1084,7 @@ void *rrdcontext_main(void *ptr) {
 
     worker_register("RRDCONTEXT");
     worker_register_job_name(WORKER_JOB_HOSTS, "hosts");
+    worker_register_job_name(WORKER_JOB_HOSTS_METRICS, "metrics");
     worker_register_job_name(WORKER_JOB_CHECK, "dedup checks");
     worker_register_job_name(WORKER_JOB_SEND, "sent contexts");
     worker_register_job_name(WORKER_JOB_DEQUEUE, "deduplicated contexts");
@@ -1139,7 +1140,10 @@ void *rrdcontext_main(void *ptr) {
             if (host->rrdctx.contexts)
                 dictionary_garbage_collect(host->rrdctx.contexts);
 
-            // calculate the number of metrics and instances in the host
+            worker_is_busy(WORKER_JOB_HOSTS_METRICS);
+
+            // calculate the number of available metrics and instances of the host
+            // FIXME: available metrics and instances should always be up to date (atomic +/-1)
             RRDCONTEXT *rc;
             uint32_t metrics = 0, instances = 0;
             dfe_start_read(host->rrdctx.contexts, rc) {
@@ -1147,8 +1151,22 @@ void *rrdcontext_main(void *ptr) {
                 instances += dictionary_entries(rc->rrdinstances);
             }
             dfe_done(rc);
-            host->rrdctx.metrics = metrics;
-            host->rrdctx.instances = instances;
+            __atomic_store_n(&host->rrdctx.metrics, metrics, __ATOMIC_RELAXED);
+            __atomic_store_n(&host->rrdctx.instances, instances, __ATOMIC_RELAXED);
+
+            // calculate the number of collected metrics and instances of the host
+            // FIXME: collected metrics and instances should always be up to date (atomic +/-1)
+            RRDSET *st;
+            metrics = instances = 0;
+            rrdset_foreach_read(st, host) {
+                if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_COLLECTION_FINISHED)) {
+                    instances++;
+                    metrics += dictionary_entries(st->rrddim_root_index);
+                }
+            }
+            rrdset_foreach_done(st);
+            __atomic_store_n(&host->collected.metrics, metrics, __ATOMIC_RELAXED);
+            __atomic_store_n(&host->collected.instances, instances, __ATOMIC_RELAXED);
         }
         dfe_done(host);
 

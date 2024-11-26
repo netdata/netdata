@@ -222,6 +222,9 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
             s->ingest.status = RRDHOST_INGEST_STATUS_OFFLINE;
     }
 
+    s->ingest.collected.metrics = host->collected.metrics;
+    s->ingest.collected.instances = host->collected.instances;
+
     if(host == localhost)
         s->ingest.type = RRDHOST_INGEST_TYPE_LOCALHOST;
     else if(has_receiver)

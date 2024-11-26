@@ -18,18 +18,19 @@
 #define LOG_TRANSITIONS false
 
 #define WORKER_JOB_HOSTS            1
-#define WORKER_JOB_CHECK            2
-#define WORKER_JOB_SEND             3
-#define WORKER_JOB_DEQUEUE          4
-#define WORKER_JOB_RETENTION        5
-#define WORKER_JOB_QUEUED           6
-#define WORKER_JOB_CLEANUP          7
-#define WORKER_JOB_CLEANUP_DELETE   8
-#define WORKER_JOB_PP_METRIC        9 // post-processing metrics
-#define WORKER_JOB_PP_INSTANCE     10 // post-processing instances
-#define WORKER_JOB_PP_CONTEXT      11 // post-processing contexts
-#define WORKER_JOB_HUB_QUEUE_SIZE  12
-#define WORKER_JOB_PP_QUEUE_SIZE   13
+#define WORKER_JOB_HOSTS_METRICS    2
+#define WORKER_JOB_CHECK            3
+#define WORKER_JOB_SEND             4
+#define WORKER_JOB_DEQUEUE          5
+#define WORKER_JOB_RETENTION        6
+#define WORKER_JOB_QUEUED           7
+#define WORKER_JOB_CLEANUP          8
+#define WORKER_JOB_CLEANUP_DELETE   9
+#define WORKER_JOB_PP_METRIC       10 // post-processing metrics
+#define WORKER_JOB_PP_INSTANCE     11 // post-processing instances
+#define WORKER_JOB_PP_CONTEXT      12 // post-processing contexts
+#define WORKER_JOB_HUB_QUEUE_SIZE  13
+#define WORKER_JOB_PP_QUEUE_SIZE   14
 
 
 typedef enum __attribute__ ((__packed__)) {

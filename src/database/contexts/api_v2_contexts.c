@@ -220,6 +220,8 @@ static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *
         buffer_json_member_add_string(wb, "status", rrdhost_ingest_status_to_string(s->ingest.status));
         buffer_json_member_add_time_t(wb, "since", s->ingest.since);
         buffer_json_member_add_time_t(wb, "age", s->now - s->ingest.since);
+        buffer_json_member_add_uint64(wb, "instances", s->ingest.collected.instances);
+        buffer_json_member_add_uint64(wb, "metrics", s->ingest.collected.metrics);
 
         if(s->ingest.type == RRDHOST_INGEST_TYPE_CHILD) {
             if(s->ingest.status == RRDHOST_INGEST_STATUS_OFFLINE)
@@ -449,27 +451,6 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
                     buffer_json_member_add_time_t(wb, "last_time", s.db.last_time_s);
                     buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);
 
-                    spinlock_lock(&s.host->accounting.spinlock);
-                    int64_t count = 0;
-
-                    if (s.host->accounting.cache_timestamp &&
-                        ctl->now - s.host->accounting.cache_timestamp < host->rrd_update_every * 1.5)
-                        count = s.host->accounting.currently_collected;
-                    else {
-                        Pvoid_t *Pvalue;
-                        bool first = true;
-                        Word_t dimension_id = 0;
-                        while ((Pvalue = JudyLFirstThenNext(s.host->accounting.JudyL, &dimension_id, &first))) {
-                            RRDDIM *rd = *Pvalue;
-                            if (rd->collector.last_collected_time.tv_sec > ctl->now - (rd->rrdset->update_every * 2))
-                                count++;
-                        }
-                        s.host->accounting.currently_collected = count;
-                        s.host->accounting.cache_timestamp = ctl->now;
-                    }
-                    spinlock_unlock(&s.host->accounting.spinlock);
-
-                    buffer_json_member_add_uint64(wb, "currently_collected_metrics", count);
                     buffer_json_member_add_uint64(wb, "instances", s.db.instances);
                     buffer_json_member_add_uint64(wb, "contexts", s.db.contexts);
                 }
