@@ -28,15 +28,15 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestDHCPd_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &DHCPd{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestDHCPd_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestDHCPd_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -80,21 +80,21 @@ func TestDHCPd_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dhcpd := New()
-			dhcpd.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, dhcpd.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, dhcpd.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestDHCPd_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *DHCPd
+		prepare  func() *Collector
 		wantFail bool
 	}{
 		"lease db not exists":                     {prepare: prepareDHCPdLeasesNotExists, wantFail: true},
@@ -107,32 +107,32 @@ func TestDHCPd_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dhcpd := test.prepare()
-			require.NoError(t, dhcpd.Init())
+			collr := test.prepare()
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, dhcpd.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, dhcpd.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestDHCPd_Charts(t *testing.T) {
-	dhcpd := New()
-	dhcpd.LeasesPath = "leases_path"
-	dhcpd.Pools = []PoolConfig{
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	collr.LeasesPath = "leases_path"
+	collr.Pools = []PoolConfig{
 		{Name: "name", Networks: "192.0.2.0/24"},
 	}
-	require.NoError(t, dhcpd.Init())
+	require.NoError(t, collr.Init())
 
-	assert.NotNil(t, dhcpd.Charts())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestDHCPd_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() *DHCPd
+		prepare       func() *Collector
 		wantCollected map[string]int64
 	}{
 		"lease db not exists": {
@@ -225,22 +225,22 @@ func TestDHCPd_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dhcpd := test.prepare()
-			require.NoError(t, dhcpd.Init())
+			collr := test.prepare()
+			require.NoError(t, collr.Init())
 
-			mx := dhcpd.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(mx) > 0 {
-				module.TestMetricsHasAllChartsDims(t, dhcpd.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareDHCPdLeasesNotExists() *DHCPd {
-	dhcpd := New()
-	dhcpd.Config = Config{
+func prepareDHCPdLeasesNotExists() *Collector {
+	collr := New()
+	collr.Config = Config{
 		LeasesPath: "testdata/dhcpd.leases_not_exists",
 		Pools: []PoolConfig{
 			{Name: "net1", Networks: "192.168.3.0/25"},
@@ -251,12 +251,12 @@ func prepareDHCPdLeasesNotExists() *DHCPd {
 			{Name: "net6", Networks: "10.254.255.0/24"},
 		},
 	}
-	return dhcpd
+	return collr
 }
 
-func prepareDHCPdLeasesEmpty() *DHCPd {
-	dhcpd := New()
-	dhcpd.Config = Config{
+func prepareDHCPdLeasesEmpty() *Collector {
+	collr := New()
+	collr.Config = Config{
 		LeasesPath: "testdata/dhcpd.leases_empty",
 		Pools: []PoolConfig{
 			{Name: "net1", Networks: "192.168.3.0/25"},
@@ -267,12 +267,12 @@ func prepareDHCPdLeasesEmpty() *DHCPd {
 			{Name: "net6", Networks: "10.254.255.0/24"},
 		},
 	}
-	return dhcpd
+	return collr
 }
 
-func prepareDHCPdLeasesIPv4() *DHCPd {
-	dhcpd := New()
-	dhcpd.Config = Config{
+func prepareDHCPdLeasesIPv4() *Collector {
+	collr := New()
+	collr.Config = Config{
 		LeasesPath: "testdata/dhcpd.leases_ipv4",
 		Pools: []PoolConfig{
 			{Name: "net1", Networks: "192.168.3.0/25"},
@@ -283,12 +283,12 @@ func prepareDHCPdLeasesIPv4() *DHCPd {
 			{Name: "net6", Networks: "10.254.255.0/24"},
 		},
 	}
-	return dhcpd
+	return collr
 }
 
-func prepareDHCPdLeasesIPv4Backup() *DHCPd {
-	dhcpd := New()
-	dhcpd.Config = Config{
+func prepareDHCPdLeasesIPv4Backup() *Collector {
+	collr := New()
+	collr.Config = Config{
 		LeasesPath: "testdata/dhcpd.leases_ipv4_backup",
 		Pools: []PoolConfig{
 			{Name: "net1", Networks: "192.168.3.0/25"},
@@ -299,12 +299,12 @@ func prepareDHCPdLeasesIPv4Backup() *DHCPd {
 			{Name: "net6", Networks: "10.254.255.0/24"},
 		},
 	}
-	return dhcpd
+	return collr
 }
 
-func prepareDHCPdLeasesIPv4Inactive() *DHCPd {
-	dhcpd := New()
-	dhcpd.Config = Config{
+func prepareDHCPdLeasesIPv4Inactive() *Collector {
+	collr := New()
+	collr.Config = Config{
 		LeasesPath: "testdata/dhcpd.leases_ipv4_inactive",
 		Pools: []PoolConfig{
 			{Name: "net1", Networks: "192.168.3.0/25"},
@@ -315,17 +315,17 @@ func prepareDHCPdLeasesIPv4Inactive() *DHCPd {
 			{Name: "net6", Networks: "10.254.255.0/24"},
 		},
 	}
-	return dhcpd
+	return collr
 }
 
-func prepareDHCPdLeasesIPv6() *DHCPd {
-	dhcpd := New()
-	dhcpd.Config = Config{
+func prepareDHCPdLeasesIPv6() *Collector {
+	collr := New()
+	collr.Config = Config{
 		LeasesPath: "testdata/dhcpd.leases_ipv6",
 		Pools: []PoolConfig{
 			{Name: "net1", Networks: "2001:db8::-2001:db8::a"},
 			{Name: "net2", Networks: "2001:db8:0:1::-2001:db8:0:1::a"},
 		},
 	}
-	return dhcpd
+	return collr
 }

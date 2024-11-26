@@ -27,8 +27,8 @@ func init() {
 	})
 }
 
-func New() *DHCPd {
-	return &DHCPd{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			LeasesPath: "/var/lib/dhcp/dhcpd.leases",
 		},
@@ -50,7 +50,7 @@ type (
 	}
 )
 
-type DHCPd struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -61,36 +61,36 @@ type DHCPd struct {
 	collected     map[string]int64
 }
 
-func (d *DHCPd) Configuration() any {
-	return d.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (d *DHCPd) Init() error {
-	err := d.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	pools, err := d.initPools()
+	pools, err := c.initPools()
 	if err != nil {
 		return fmt.Errorf("ip pools init: %v", err)
 	}
-	d.pools = pools
+	c.pools = pools
 
-	charts, err := d.initCharts(pools)
+	charts, err := c.initCharts(pools)
 	if err != nil {
 		return fmt.Errorf("charts init: %v", err)
 	}
-	d.charts = charts
+	c.charts = charts
 
-	d.Debugf("monitoring leases file: %v", d.Config.LeasesPath)
-	d.Debugf("monitoring ip pools: %v", d.Config.Pools)
+	c.Debugf("monitoring leases file: %v", c.Config.LeasesPath)
+	c.Debugf("monitoring ip pools: %v", c.Config.Pools)
 
 	return nil
 }
 
-func (d *DHCPd) Check() error {
-	mx, err := d.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -100,14 +100,14 @@ func (d *DHCPd) Check() error {
 	return nil
 }
 
-func (d *DHCPd) Charts() *module.Charts {
-	return d.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (d *DHCPd) Collect() map[string]int64 {
-	mx, err := d.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		d.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -117,4 +117,4 @@ func (d *DHCPd) Collect() map[string]int64 {
 	return mx
 }
 
-func (d *DHCPd) Cleanup() {}
+func (c *Collector) Cleanup() {}
