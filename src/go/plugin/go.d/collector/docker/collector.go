@@ -30,8 +30,8 @@ func init() {
 	})
 }
 
-func New() *Docker {
-	return &Docker{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address:              docker.DefaultDockerHost,
 			Timeout:              confopt.Duration(time.Second * 2),
@@ -54,7 +54,7 @@ type Config struct {
 }
 
 type (
-	Docker struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -75,20 +75,20 @@ type (
 	}
 )
 
-func (d *Docker) Configuration() any {
-	return d.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (d *Docker) Init() error {
-	if addr := dockerhost.FromEnv(); addr != "" && d.Address == docker.DefaultDockerHost {
-		d.Infof("using docker host from environment: %s ", addr)
-		d.Address = addr
+func (c *Collector) Init() error {
+	if addr := dockerhost.FromEnv(); addr != "" && c.Address == docker.DefaultDockerHost {
+		c.Infof("using docker host from environment: %s ", addr)
+		c.Address = addr
 	}
 	return nil
 }
 
-func (d *Docker) Check() error {
-	mx, err := d.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -99,14 +99,14 @@ func (d *Docker) Check() error {
 	return nil
 }
 
-func (d *Docker) Charts() *module.Charts {
-	return d.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (d *Docker) Collect() map[string]int64 {
-	mx, err := d.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		d.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -115,12 +115,12 @@ func (d *Docker) Collect() map[string]int64 {
 	return mx
 }
 
-func (d *Docker) Cleanup() {
-	if d.client == nil {
+func (c *Collector) Cleanup() {
+	if c.client == nil {
 		return
 	}
-	if err := d.client.Close(); err != nil {
-		d.Warningf("error on closing docker client: %v", err)
+	if err := c.client.Close(); err != nil {
+		c.Warningf("error on closing docker client: %v", err)
 	}
-	d.client = nil
+	c.client = nil
 }

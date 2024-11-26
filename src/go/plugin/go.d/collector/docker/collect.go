@@ -13,42 +13,42 @@ import (
 	typesImage "github.com/docker/docker/api/types/image"
 )
 
-func (d *Docker) collect() (map[string]int64, error) {
-	if d.client == nil {
-		client, err := d.newClient(d.Config)
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.client == nil {
+		client, err := c.newClient(c.Config)
 		if err != nil {
 			return nil, err
 		}
-		d.client = client
+		c.client = client
 	}
 
-	if !d.verNegotiated {
-		d.verNegotiated = true
-		d.negotiateAPIVersion()
+	if !c.verNegotiated {
+		c.verNegotiated = true
+		c.negotiateAPIVersion()
 	}
 
-	defer func() { _ = d.client.Close() }()
+	defer func() { _ = c.client.Close() }()
 
 	mx := make(map[string]int64)
 
-	if err := d.collectInfo(mx); err != nil {
+	if err := c.collectInfo(mx); err != nil {
 		return nil, err
 	}
-	if err := d.collectImages(mx); err != nil {
+	if err := c.collectImages(mx); err != nil {
 		return nil, err
 	}
-	if err := d.collectContainers(mx); err != nil {
+	if err := c.collectContainers(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (d *Docker) collectInfo(mx map[string]int64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration())
+func (c *Collector) collectInfo(mx map[string]int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	info, err := d.client.Info(ctx)
+	info, err := c.client.Info(ctx)
 	if err != nil {
 		return err
 	}
@@ -60,11 +60,11 @@ func (d *Docker) collectInfo(mx map[string]int64) error {
 	return nil
 }
 
-func (d *Docker) collectImages(mx map[string]int64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration())
+func (c *Collector) collectImages(mx map[string]int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	images, err := d.client.ImageList(ctx, typesImage.ListOptions{})
+	images, err := c.client.ImageList(ctx, typesImage.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -103,18 +103,18 @@ var (
 	}
 )
 
-func (d *Docker) collectContainers(mx map[string]int64) error {
+func (c *Collector) collectContainers(mx map[string]int64) error {
 	containerSet := make(map[string][]types.Container)
 
 	for _, status := range containerHealthStatuses {
 		if err := func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration())
+			ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 			defer cancel()
 
-			v, err := d.client.ContainerList(ctx, typesContainer.ListOptions{
+			v, err := c.client.ContainerList(ctx, typesContainer.ListOptions{
 				All:     true,
 				Filters: filters.NewArgs(filters.KeyValuePair{Key: "health", Value: status}),
-				Size:    d.CollectContainerSize,
+				Size:    c.CollectContainerSize,
 			})
 			if err != nil {
 				return err
@@ -156,9 +156,9 @@ func (d *Docker) collectContainers(mx map[string]int64) error {
 
 			seen[name] = true
 
-			if !d.containers[name] {
-				d.containers[name] = true
-				d.addContainerCharts(name, cntr.Image)
+			if !c.containers[name] {
+				c.containers[name] = true
+				c.addContainerCharts(name, cntr.Image)
 			}
 
 			px := fmt.Sprintf("container_%s_", name)
@@ -182,19 +182,19 @@ func (d *Docker) collectContainers(mx map[string]int64) error {
 		}
 	}
 
-	for name := range d.containers {
+	for name := range c.containers {
 		if !seen[name] {
-			delete(d.containers, name)
-			d.removeContainerCharts(name)
+			delete(c.containers, name)
+			c.removeContainerCharts(name)
 		}
 	}
 
 	return nil
 }
 
-func (d *Docker) negotiateAPIVersion() {
-	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration())
+func (c *Collector) negotiateAPIVersion() {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	d.client.NegotiateAPIVersion(ctx)
+	c.client.NegotiateAPIVersion(ctx)
 }

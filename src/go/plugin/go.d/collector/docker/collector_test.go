@@ -32,11 +32,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestDocker_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Docker{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestDocker_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -55,54 +55,54 @@ func TestDocker_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			d := New()
-			d.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, d.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, d.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestDocker_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.Equal(t, len(summaryCharts), len(*New().Charts()))
 }
 
-func TestDocker_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare   func(d *Docker)
+		prepare   func(*Collector)
 		wantClose bool
 	}{
 		"after New": {
 			wantClose: false,
-			prepare:   func(d *Docker) {},
+			prepare:   func(*Collector) {},
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(d *Docker) { _ = d.Init() },
+			prepare:   func(c *Collector) { _ = c.Init() },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(d *Docker) { _ = d.Init(); _ = d.Check() },
+			prepare:   func(c *Collector) { _ = c.Init(); _ = c.Check() },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(d *Docker) { _ = d.Init(); d.Collect() },
+			prepare:   func(c *Collector) { _ = c.Init(); c.Collect() },
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			m := &mockClient{}
-			d := New()
-			d.newClient = prepareNewClientFunc(m)
+			collr := New()
+			collr.newClient = prepareNewClientFunc(m)
 
-			test.prepare(d)
+			test.prepare(collr)
 
-			require.NotPanics(t, d.Cleanup)
+			require.NotPanics(t, collr.Cleanup)
 
 			if test.wantClose {
 				assert.True(t, m.closeCalled)
@@ -113,44 +113,44 @@ func TestDocker_Cleanup(t *testing.T) {
 	}
 }
 
-func TestDocker_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *Docker
+		prepare  func() *Collector
 		wantFail bool
 	}{
 		"case success": {
 			wantFail: false,
-			prepare: func() *Docker {
+			prepare: func() *Collector {
 				return prepareCaseSuccess()
 			},
 		},
 		"case success without container size": {
 			wantFail: false,
-			prepare: func() *Docker {
+			prepare: func() *Collector {
 				return prepareCaseSuccessWithoutContainerSize()
 			},
 		},
 		"fail on case err on Info()": {
 			wantFail: true,
-			prepare: func() *Docker {
+			prepare: func() *Collector {
 				return prepareCaseErrOnInfo()
 			},
 		},
 		"fail on case err on ImageList()": {
 			wantFail: true,
-			prepare: func() *Docker {
+			prepare: func() *Collector {
 				return prepareCaseErrOnImageList()
 			},
 		},
 		"fail on case err on ContainerList()": {
 			wantFail: true,
-			prepare: func() *Docker {
+			prepare: func() *Collector {
 				return prepareCaseErrOnContainerList()
 			},
 		},
 		"fail on case err on creating Docker client": {
 			wantFail: true,
-			prepare: func() *Docker {
+			prepare: func() *Collector {
 				return prepareCaseErrCreatingClient()
 			},
 		},
@@ -158,28 +158,26 @@ func TestDocker_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			d := test.prepare()
+			collr := test.prepare()
 
-			require.NoError(t, d.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, d.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, d.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestDocker_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *Docker
+		prepare  func() *Collector
 		expected map[string]int64
 	}{
 		"case success": {
-			prepare: func() *Docker {
-				return prepareCaseSuccess()
-			},
+			prepare: prepareCaseSuccess,
 			expected: map[string]int64{
 				"container_container10_health_status_healthy":               0,
 				"container_container10_health_status_none":                  0,
@@ -419,9 +417,7 @@ func TestDocker_Collect(t *testing.T) {
 			},
 		},
 		"case success without container size": {
-			prepare: func() *Docker {
-				return prepareCaseSuccessWithoutContainerSize()
-			},
+			prepare: prepareCaseSuccessWithoutContainerSize,
 			expected: map[string]int64{
 				"container_container10_health_status_healthy":               0,
 				"container_container10_health_status_none":                  0,
@@ -661,43 +657,35 @@ func TestDocker_Collect(t *testing.T) {
 			},
 		},
 		"fail on case err on Info()": {
-			prepare: func() *Docker {
-				return prepareCaseErrOnInfo()
-			},
+			prepare:  prepareCaseErrOnInfo,
 			expected: nil,
 		},
 		"fail on case err on ImageList()": {
-			prepare: func() *Docker {
-				return prepareCaseErrOnImageList()
-			},
+			prepare:  prepareCaseErrOnImageList,
 			expected: nil,
 		},
 		"fail on case err on ContainerList()": {
-			prepare: func() *Docker {
-				return prepareCaseErrOnContainerList()
-			},
+			prepare:  prepareCaseErrOnContainerList,
 			expected: nil,
 		},
 		"fail on case err on creating Docker client": {
-			prepare: func() *Docker {
-				return prepareCaseErrCreatingClient()
-			},
+			prepare:  prepareCaseErrCreatingClient,
 			expected: nil,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			d := test.prepare()
+			collr := test.prepare()
 
-			require.NoError(t, d.Init())
+			require.NoError(t, collr.Init())
 
-			mx := d.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.expected, mx)
 
-			if d.client != nil {
-				m, ok := d.client.(*mockClient)
+			if collr.client != nil {
+				m, ok := collr.client.(*mockClient)
 				require.True(t, ok)
 				require.True(t, m.negotiateAPIVersionCalled)
 			}
@@ -706,42 +694,42 @@ func TestDocker_Collect(t *testing.T) {
 	}
 }
 
-func prepareCaseSuccess() *Docker {
-	d := New()
-	d.CollectContainerSize = true
-	d.newClient = prepareNewClientFunc(&mockClient{})
-	return d
+func prepareCaseSuccess() *Collector {
+	collr := New()
+	collr.CollectContainerSize = true
+	collr.newClient = prepareNewClientFunc(&mockClient{})
+	return collr
 }
 
-func prepareCaseSuccessWithoutContainerSize() *Docker {
-	d := New()
-	d.CollectContainerSize = false
-	d.newClient = prepareNewClientFunc(&mockClient{})
-	return d
+func prepareCaseSuccessWithoutContainerSize() *Collector {
+	collr := New()
+	collr.CollectContainerSize = false
+	collr.newClient = prepareNewClientFunc(&mockClient{})
+	return collr
 }
 
-func prepareCaseErrOnInfo() *Docker {
-	d := New()
-	d.newClient = prepareNewClientFunc(&mockClient{errOnInfo: true})
-	return d
+func prepareCaseErrOnInfo() *Collector {
+	collr := New()
+	collr.newClient = prepareNewClientFunc(&mockClient{errOnInfo: true})
+	return collr
 }
 
-func prepareCaseErrOnImageList() *Docker {
-	d := New()
-	d.newClient = prepareNewClientFunc(&mockClient{errOnImageList: true})
-	return d
+func prepareCaseErrOnImageList() *Collector {
+	collr := New()
+	collr.newClient = prepareNewClientFunc(&mockClient{errOnImageList: true})
+	return collr
 }
 
-func prepareCaseErrOnContainerList() *Docker {
-	d := New()
-	d.newClient = prepareNewClientFunc(&mockClient{errOnContainerList: true})
-	return d
+func prepareCaseErrOnContainerList() *Collector {
+	collr := New()
+	collr.newClient = prepareNewClientFunc(&mockClient{errOnContainerList: true})
+	return collr
 }
 
-func prepareCaseErrCreatingClient() *Docker {
-	d := New()
-	d.newClient = prepareNewClientFunc(nil)
-	return d
+func prepareCaseErrCreatingClient() *Collector {
+	collr := New()
+	collr.newClient = prepareNewClientFunc(nil)
+	return collr
 }
 
 func prepareNewClientFunc(m *mockClient) func(_ Config) (dockerClient, error) {
