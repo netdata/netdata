@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *MegaCli {
-	return &MegaCli{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -45,41 +45,35 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type (
-	MegaCli struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec megaCli
+	exec megaCli
 
-		adapters map[string]bool
-		drives   map[string]bool
-		bbu      map[string]bool
-	}
-	megaCli interface {
-		physDrivesInfo() ([]byte, error)
-		bbuInfo() ([]byte, error)
-	}
-)
-
-func (m *MegaCli) Configuration() any {
-	return m.Config
+	adapters map[string]bool
+	drives   map[string]bool
+	bbu      map[string]bool
 }
 
-func (m *MegaCli) Init() error {
-	lvmExec, err := m.initMegaCliExec()
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	lvmExec, err := c.initMegaCliExec()
 	if err != nil {
 		return fmt.Errorf("init megacli exec: %v", err)
 	}
-	m.exec = lvmExec
+	c.exec = lvmExec
 
 	return nil
 }
 
-func (m *MegaCli) Check() error {
-	mx, err := m.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -91,14 +85,14 @@ func (m *MegaCli) Check() error {
 	return nil
 }
 
-func (m *MegaCli) Charts() *module.Charts {
-	return m.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (m *MegaCli) Collect() map[string]int64 {
-	mx, err := m.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		m.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -108,4 +102,4 @@ func (m *MegaCli) Collect() map[string]int64 {
 	return mx
 }
 
-func (m *MegaCli) Cleanup() {}
+func (c *Collector) Cleanup() {}

@@ -37,11 +37,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestMegaCli_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &MegaCli{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestMegaCli_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -54,58 +54,58 @@ func TestMegaCli_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mega := New()
+			collr := New()
 
 			if test.wantFail {
-				assert.Error(t, mega.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, mega.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestMegaCli_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *MegaCli
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *MegaCli {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *MegaCli {
-				mega := New()
-				mega.exec = prepareMockOK()
-				_ = mega.Check()
-				return mega
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOK()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *MegaCli {
-				mega := New()
-				mega.exec = prepareMockOK()
-				_ = mega.Collect()
-				return mega
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOK()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mega := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, mega.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestMegaCli_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestMegaCli_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockMegaCliExec
 		wantFail    bool
@@ -134,20 +134,20 @@ func TestMegaCli_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mega := New()
+			collr := New()
 			mock := test.prepareMock()
-			mega.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, mega.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, mega.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestMegaCli_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockMegaCliExec
 		wantMetrics map[string]int64
@@ -231,16 +231,16 @@ func TestMegaCli_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mega := New()
+			collr := New()
 			mock := test.prepareMock()
-			mega.exec = mock
+			collr.exec = mock
 
-			mx := mega.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
-			assert.Len(t, *mega.Charts(), test.wantCharts)
+			assert.Len(t, *collr.Charts(), test.wantCharts)
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, mega.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
