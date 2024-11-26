@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *PHPDaemon {
-	return &PHPDaemon{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -47,7 +47,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type PHPDaemon struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -57,29 +57,29 @@ type PHPDaemon struct {
 	httpClient *http.Client
 }
 
-func (p *PHPDaemon) Configuration() any {
-	return p.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (p *PHPDaemon) Init() error {
-	if p.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("phpDaemon URL is required but not set")
 	}
 
-	httpClient, err := web.NewHTTPClient(p.ClientConfig)
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize http client: %w", err)
 	}
-	p.httpClient = httpClient
+	c.httpClient = httpClient
 
-	p.Debugf("using URL %s", p.URL)
-	p.Debugf("using timeout: %s", p.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (p *PHPDaemon) Check() error {
-	mx, err := p.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -91,22 +91,22 @@ func (p *PHPDaemon) Check() error {
 	return nil
 }
 
-func (p *PHPDaemon) Charts() *Charts {
-	return p.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (p *PHPDaemon) Collect() map[string]int64 {
-	mx, err := p.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (p *PHPDaemon) Cleanup() {
-	if p.httpClient != nil {
-		p.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }

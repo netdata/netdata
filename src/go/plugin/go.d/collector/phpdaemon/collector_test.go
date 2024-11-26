@@ -31,17 +31,17 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestPHPDaemon_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &PHPDaemon{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestPHPDaemon_Init(t *testing.T) {
-	job := New()
+func TestCollector_Init(t *testing.T) {
+	collr := New()
 
-	require.NoError(t, job.Init())
+	require.NoError(t, collr.Init())
 }
 
-func TestPHPDaemon_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -49,24 +49,24 @@ func TestPHPDaemon_Check(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	assert.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	assert.NoError(t, collr.Check())
 }
 
-func TestPHPDaemon_CheckNG(t *testing.T) {
-	job := New()
-	job.URL = "http://127.0.0.1:38001"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+func TestCollector_CheckNG(t *testing.T) {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestPHPDaemon_Charts(t *testing.T) {
-	job := New()
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
 
-	assert.NotNil(t, job.Charts())
-	assert.False(t, job.charts.Has(uptimeChart.ID))
+	assert.NotNil(t, collr.Charts())
+	assert.False(t, collr.charts.Has(uptimeChart.ID))
 
 	ts := httptest.NewServer(
 		http.HandlerFunc(
@@ -75,17 +75,17 @@ func TestPHPDaemon_Charts(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	assert.NoError(t, job.Check())
-	assert.True(t, job.charts.Has(uptimeChart.ID))
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	assert.NoError(t, collr.Check())
+	assert.True(t, collr.charts.Has(uptimeChart.ID))
 }
 
-func TestPHPDaemon_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestPHPDaemon_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -93,10 +93,10 @@ func TestPHPDaemon_Collect(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	assert.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	assert.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"alive":       350,
@@ -110,11 +110,11 @@ func TestPHPDaemon_Collect(t *testing.T) {
 		"uptime":      15765,
 	}
 
-	assert.Equal(t, expected, job.Collect())
+	assert.Equal(t, expected, collr.Collect())
 
 }
 
-func TestPHPDaemon_InvalidData(t *testing.T) {
+func TestCollector_InvalidData(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -122,13 +122,13 @@ func TestPHPDaemon_InvalidData(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestPHPDaemon_404(t *testing.T) {
+func TestCollector_404(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -136,8 +136,8 @@ func TestPHPDaemon_404(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
