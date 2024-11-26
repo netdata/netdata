@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *Hpssa {
-	return &Hpssa{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -44,41 +44,36 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type (
-	Hpssa struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec ssacli
+	exec ssacliBinary
 
-		seenControllers map[string]*hpssaController
-		seenArrays      map[string]*hpssaArray
-		seenLDrives     map[string]*hpssaLogicalDrive
-		seenPDrives     map[string]*hpssaPhysicalDrive
-	}
-	ssacli interface {
-		controllersInfo() ([]byte, error)
-	}
-)
-
-func (h *Hpssa) Configuration() any {
-	return h.Config
+	seenControllers map[string]*hpssaController
+	seenArrays      map[string]*hpssaArray
+	seenLDrives     map[string]*hpssaLogicalDrive
+	seenPDrives     map[string]*hpssaPhysicalDrive
 }
 
-func (h *Hpssa) Init() error {
-	ssacli, err := h.initSsacliExec()
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	ssacli, err := c.initSsacliBinary()
 	if err != nil {
 		return fmt.Errorf("ssacli exec initialization: %v", err)
 	}
-	h.exec = ssacli
+	c.exec = ssacli
 
 	return nil
 }
 
-func (h *Hpssa) Check() error {
-	mx, err := h.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -90,14 +85,14 @@ func (h *Hpssa) Check() error {
 	return nil
 }
 
-func (h *Hpssa) Charts() *module.Charts {
-	return h.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (h *Hpssa) Collect() map[string]int64 {
-	mx, err := h.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		h.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -107,4 +102,4 @@ func (h *Hpssa) Collect() map[string]int64 {
 	return mx
 }
 
-func (h *Hpssa) Cleanup() {}
+func (c *Collector) Cleanup() {}

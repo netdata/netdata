@@ -37,7 +37,7 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestHpssa_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -50,58 +50,58 @@ func TestHpssa_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			hpe := New()
+			collr := New()
 
 			if test.wantFail {
-				assert.Error(t, hpe.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, hpe.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestHpssa_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Hpssa
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *Hpssa {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Hpssa {
-				hpe := New()
-				hpe.exec = prepareMockOkP212andP410i()
-				_ = hpe.Check()
-				return hpe
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOkP212andP410i()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Hpssa {
-				hpe := New()
-				hpe.exec = prepareMockOkP212andP410i()
-				_ = hpe.Collect()
-				return hpe
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOkP212andP410i()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			hpe := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, hpe.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestHpssa_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestHpssa_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockSsacliExec
 		wantFail    bool
@@ -134,20 +134,20 @@ func TestHpssa_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			hpe := New()
+			collr := New()
 			mock := test.prepareMock()
-			hpe.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, hpe.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, hpe.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestHpssa_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockSsacliExec
 		wantMetrics map[string]int64
@@ -381,23 +381,23 @@ func TestHpssa_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			hpe := New()
+			collr := New()
 			mock := test.prepareMock()
-			hpe.exec = mock
+			collr.exec = mock
 
-			mx := hpe.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
-			assert.Len(t, *hpe.Charts(), test.wantCharts, "wantCharts")
+			assert.Len(t, *collr.Charts(), test.wantCharts, "wantCharts")
 
-			module.TestMetricsHasAllChartsDims(t, hpe.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }
 
-func TestHpssa_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Hpssa{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func prepareMockOkP212andP410i() *mockSsacliExec {
