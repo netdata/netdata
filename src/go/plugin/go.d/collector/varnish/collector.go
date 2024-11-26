@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *Varnish {
-	return &Varnish{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -46,7 +46,7 @@ type Config struct {
 	DockerContainer string           `yaml:"docker_container,omitempty" json:"docker_container,omitempty"`
 }
 
-type Varnish struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -58,22 +58,22 @@ type Varnish struct {
 	seenStorages map[string]bool
 }
 
-func (v *Varnish) Configuration() any {
-	return v.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (v *Varnish) Init() error {
-	vs, err := v.initVarnishstatBinary()
+func (c *Collector) Init() error {
+	vs, err := c.initVarnishstatBinary()
 	if err != nil {
 		return fmt.Errorf("init varnishstat exec: %v", err)
 	}
-	v.exec = vs
+	c.exec = vs
 
 	return nil
 }
 
-func (v *Varnish) Check() error {
-	mx, err := v.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -85,14 +85,14 @@ func (v *Varnish) Check() error {
 	return nil
 }
 
-func (v *Varnish) Charts() *module.Charts {
-	return v.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (v *Varnish) Collect() map[string]int64 {
-	mx, err := v.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		v.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -102,4 +102,4 @@ func (v *Varnish) Collect() map[string]int64 {
 	return mx
 }
 
-func (v *Varnish) Cleanup() {}
+func (c *Collector) Cleanup() {}

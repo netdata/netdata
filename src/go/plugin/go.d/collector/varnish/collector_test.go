@@ -30,11 +30,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestVarnish_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Varnish{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestVarnish_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -47,59 +47,59 @@ func TestVarnish_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			varnish := New()
-			varnish.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, varnish.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, varnish.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestVarnish_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Varnish
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *Varnish {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Varnish {
-				varnish := New()
-				varnish.exec = prepareMockOkVer71()
-				_ = varnish.Check()
-				return varnish
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOkVer71()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Varnish {
-				varnish := New()
-				varnish.exec = prepareMockOkVer71()
-				_ = varnish.Collect()
-				return varnish
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOkVer71()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			varnish := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, varnish.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestVarnish_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestVarnish_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockVarnishstatExec
 		wantFail    bool
@@ -120,19 +120,19 @@ func TestVarnish_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			varnish := New()
-			varnish.exec = test.prepareMock()
+			collr := New()
+			collr.exec = test.prepareMock()
 
 			if test.wantFail {
-				assert.Error(t, varnish.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, varnish.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestVarnish_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockVarnishstatExec
 		wantMetrics map[string]int64
@@ -203,16 +203,16 @@ func TestVarnish_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			varnish := New()
-			varnish.exec = test.prepareMock()
+			collr := New()
+			collr.exec = test.prepareMock()
 
-			mx := varnish.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				assert.Equal(t, test.wantCharts, len(*varnish.Charts()))
-				module.TestMetricsHasAllChartsDims(t, varnish.Charts(), mx)
+				assert.Equal(t, test.wantCharts, len(*collr.Charts()))
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
