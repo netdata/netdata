@@ -31,11 +31,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestLogind_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Logind{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestLogind_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -48,53 +48,53 @@ func TestLogind_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			l := New()
-			l.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, l.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, l.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestLogind_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.Equal(t, len(charts), len(*New().Charts()))
 }
 
-func TestLogind_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
 		wantClose bool
-		prepare   func(l *Logind)
+		prepare   func(l *Collector)
 	}{
 		"after New": {
 			wantClose: false,
-			prepare:   func(l *Logind) {},
+			prepare:   func(l *Collector) {},
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(l *Logind) { _ = l.Init() },
+			prepare:   func(l *Collector) { _ = l.Init() },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(l *Logind) { _ = l.Init(); _ = l.Check() },
+			prepare:   func(l *Collector) { _ = l.Init(); _ = l.Check() },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(l *Logind) { _ = l.Init(); l.Collect() },
+			prepare:   func(l *Collector) { _ = l.Init(); l.Collect() },
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			l := New()
+			collr := New()
 			m := prepareConnOK()
-			l.newLogindConn = func(Config) (logindConnection, error) { return m, nil }
-			test.prepare(l)
+			collr.newLogindConn = func(Config) (logindConnection, error) { return m, nil }
+			test.prepare(collr)
 
-			require.NotPanics(t, l.Cleanup)
+			require.NotPanics(t, collr.Cleanup)
 
 			if test.wantClose {
 				assert.True(t, m.closeCalled)
@@ -105,7 +105,7 @@ func TestLogind_Cleanup(t *testing.T) {
 	}
 }
 
-func TestLogind_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		prepare  func() *mockConn
@@ -138,20 +138,20 @@ func TestLogind_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			l := New()
-			require.NoError(t, l.Init())
-			l.conn = test.prepare()
+			collr := New()
+			require.NoError(t, collr.Init())
+			collr.conn = test.prepare()
 
 			if test.wantFail {
-				assert.Error(t, l.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, l.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestLogind_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepare  func() *mockConn
 		expected map[string]int64
@@ -212,11 +212,11 @@ func TestLogind_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			l := New()
-			require.NoError(t, l.Init())
-			l.conn = test.prepare()
+			collr := New()
+			require.NoError(t, collr.Init())
+			collr.conn = test.prepare()
 
-			mx := l.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.expected, mx)
 		})

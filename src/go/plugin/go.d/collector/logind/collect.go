@@ -8,31 +8,31 @@ import (
 	"strings"
 )
 
-func (l *Logind) collect() (map[string]int64, error) {
-	if l.conn == nil {
-		conn, err := l.newLogindConn(l.Config)
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.conn == nil {
+		conn, err := c.newLogindConn(c.Config)
 		if err != nil {
 			return nil, err
 		}
-		l.conn = conn
+		c.conn = conn
 	}
 
 	mx := make(map[string]int64)
 
 	// https://www.freedesktop.org/wiki/Software/systemd/logind/ (Session Objects)
-	if err := l.collectSessions(mx); err != nil {
+	if err := c.collectSessions(mx); err != nil {
 		return nil, err
 	}
 	// https://www.freedesktop.org/wiki/Software/systemd/logind/ (User Objects)
-	if err := l.collectUsers(mx); err != nil {
+	if err := c.collectUsers(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (l *Logind) collectSessions(mx map[string]int64) error {
-	sessions, err := l.conn.ListSessions()
+func (c *Collector) collectSessions(mx map[string]int64) error {
+	sessions, err := c.conn.ListSessions()
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (l *Logind) collectSessions(mx map[string]int64) error {
 	mx["sessions_state_closing"] = 0
 
 	for _, session := range sessions {
-		props, err := l.conn.GetSessionProperties(session.Path)
+		props, err := c.conn.GetSessionProperties(session.Path)
 		if err != nil {
 			return err
 		}
@@ -68,7 +68,7 @@ func (l *Logind) collectSessions(mx map[string]int64) error {
 			case "unspecified":
 				mx["sessions_type_other"]++
 			default:
-				l.Debugf("unknown session type '%s' for session '%s/%s'", typ, session.User, session.ID)
+				c.Debugf("unknown session type '%s' for session '%s/%s'", typ, session.User, session.ID)
 				mx["sessions_type_other"]++
 			}
 		}
@@ -83,15 +83,15 @@ func (l *Logind) collectSessions(mx map[string]int64) error {
 			case "closing":
 				mx["sessions_state_closing"]++
 			default:
-				l.Debugf("unknown session state '%s' for session '%s/%s'", state, session.User, session.ID)
+				c.Debugf("unknown session state '%s' for session '%s/%s'", state, session.User, session.ID)
 			}
 		}
 	}
 	return nil
 }
 
-func (l *Logind) collectUsers(mx map[string]int64) error {
-	users, err := l.conn.ListUsers()
+func (c *Collector) collectUsers(mx map[string]int64) error {
+	users, err := c.conn.ListUsers()
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func (l *Logind) collectUsers(mx map[string]int64) error {
 	mx["users_state_closing"] = 0
 
 	for _, user := range users {
-		v, err := l.conn.GetUserProperty(user.Path, "State")
+		v, err := c.conn.GetUserProperty(user.Path, "State")
 		if err != nil {
 			return err
 		}
@@ -122,7 +122,7 @@ func (l *Logind) collectUsers(mx map[string]int64) error {
 		case "closing":
 			mx["users_state_closing"]++
 		default:
-			l.Debugf("unknown user state '%s' for user '%s/%d'", state, user.Name, user.UID)
+			c.Debugf("unknown user state '%s' for user '%s/%d'", state, user.Name, user.UID)
 		}
 	}
 	return nil

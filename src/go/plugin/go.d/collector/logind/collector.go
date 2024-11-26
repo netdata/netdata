@@ -27,8 +27,8 @@ func init() {
 	})
 }
 
-func New() *Logind {
-	return &Logind{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second),
 		},
@@ -44,7 +44,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type Logind struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -54,16 +54,16 @@ type Logind struct {
 	newLogindConn func(config Config) (logindConnection, error)
 }
 
-func (l *Logind) Configuration() any {
-	return l.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (l *Logind) Init() error {
+func (c *Collector) Init() error {
 	return nil
 }
 
-func (l *Logind) Check() error {
-	mx, err := l.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -73,14 +73,14 @@ func (l *Logind) Check() error {
 	return nil
 }
 
-func (l *Logind) Charts() *module.Charts {
-	return l.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (l *Logind) Collect() map[string]int64 {
-	mx, err := l.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		l.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -89,8 +89,8 @@ func (l *Logind) Collect() map[string]int64 {
 	return mx
 }
 
-func (l *Logind) Cleanup() {
-	if l.conn != nil {
-		l.conn.Close()
+func (c *Collector) Cleanup() {
+	if c.conn != nil {
+		c.conn.Close()
 	}
 }
