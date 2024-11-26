@@ -34,11 +34,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestEnvoy_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Envoy{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestEnvoy_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -59,41 +59,41 @@ func TestEnvoy_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			envoy := New()
-			envoy.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, envoy.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, envoy.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 
 }
 
-func TestEnvoy_Cleanup(t *testing.T) {
-	envoy := New()
-	assert.NotPanics(t, envoy.Cleanup)
+func TestCollector_Cleanup(t *testing.T) {
+	collr := New()
+	assert.NotPanics(t, collr.Cleanup)
 
-	require.NoError(t, envoy.Init())
-	assert.NotPanics(t, envoy.Cleanup)
+	require.NoError(t, collr.Init())
+	assert.NotPanics(t, collr.Cleanup)
 }
 
-func TestEnvoy_Charts(t *testing.T) {
-	envoy, cleanup := prepareCaseEnvoyStats()
+func TestCollector_Charts(t *testing.T) {
+	collr, cleanup := prepareCaseEnvoyStats()
 	defer cleanup()
 
-	require.Empty(t, *envoy.Charts())
+	require.Empty(t, *collr.Charts())
 
-	require.NoError(t, envoy.Init())
-	_ = envoy.Collect()
-	require.NotEmpty(t, *envoy.Charts())
+	require.NoError(t, collr.Init())
+	_ = collr.Collect()
+	require.NotEmpty(t, *collr.Charts())
 }
 
-func TestEnvoy_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() (envoy *Envoy, cleanup func())
+		prepare  func() (collr *Collector, cleanup func())
 		wantFail bool
 	}{
 		"case envoy consul dataplane": {
@@ -116,23 +116,23 @@ func TestEnvoy_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			envoy, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, envoy.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, envoy.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, envoy.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestEnvoy_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func() (envoy *Envoy, cleanup func())
+		prepare     func() (collr *Collector, cleanup func())
 		wantMetrics map[string]int64
 	}{
 		"case envoy consul dataplane": {
@@ -496,59 +496,59 @@ func TestEnvoy_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			envoy, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, envoy.Init())
+			require.NoError(t, collr.Init())
 
-			mx := envoy.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
-			module.TestMetricsHasAllChartsDims(t, envoy.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }
 
-func prepareCaseEnvoyConsulDataplaneStats() (*Envoy, func()) {
+func prepareCaseEnvoyConsulDataplaneStats() (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataEnvoyConsulDataplane)
 		}))
-	envoy := New()
-	envoy.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return envoy, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseEnvoyStats() (*Envoy, func()) {
+func prepareCaseEnvoyStats() (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataEnvoy)
 		}))
-	envoy := New()
-	envoy.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return envoy, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseInvalidDataResponse() (*Envoy, func()) {
+func prepareCaseInvalidDataResponse() (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	envoy := New()
-	envoy.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return envoy, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCase404() (*Envoy, func()) {
+func prepareCase404() (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	envoy := New()
-	envoy.URL = srv.URL
+	collr := New()
+	collr.URL = srv.URL
 
-	return envoy, srv.Close
+	return collr, srv.Close
 }

@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Envoy {
-	return &Envoy{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -54,7 +54,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Envoy struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -70,26 +70,26 @@ type Envoy struct {
 	listenerDownstream      map[string]bool
 }
 
-func (e *Envoy) Configuration() any {
-	return e.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (e *Envoy) Init() error {
-	if err := e.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prom, err := e.initPrometheusClient()
+	prom, err := c.initPrometheusClient()
 	if err != nil {
 		return fmt.Errorf("init Prometheus client: %v", err)
 	}
-	e.prom = prom
+	c.prom = prom
 
 	return nil
 }
 
-func (e *Envoy) Check() error {
-	mx, err := e.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -100,14 +100,14 @@ func (e *Envoy) Check() error {
 	return nil
 }
 
-func (e *Envoy) Charts() *module.Charts {
-	return e.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (e *Envoy) Collect() map[string]int64 {
-	mx, err := e.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		e.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -116,10 +116,10 @@ func (e *Envoy) Collect() map[string]int64 {
 	return mx
 }
 
-func (e *Envoy) Cleanup() {
-	if e.prom == nil || e.prom.HTTPClient() == nil {
+func (c *Collector) Cleanup() {
+	if c.prom == nil || c.prom.HTTPClient() == nil {
 		return
 	}
 
-	e.prom.HTTPClient().CloseIdleConnections()
+	c.prom.HTTPClient().CloseIdleConnections()
 }
