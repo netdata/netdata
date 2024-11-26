@@ -115,8 +115,16 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                 buffer_json_member_add_time_t(wb, "to", now_s);
                 buffer_json_member_add_time_t(wb, "retention", retention);
 
-                duration_snprintf_hours(human_retention, sizeof(human_retention),
-                                         (int)duration_round_to_resolution(retention, 3600));
+                if(retention < 60)
+                    duration_snprintf_time_t(human_retention, sizeof(human_retention), retention);
+                else if(retention < 24 * 60 * 60) {
+                    int64_t rounded_retention_mins = duration_round_to_resolution(retention, 60);
+                    duration_snprintf_mins(human_retention, sizeof(human_retention), rounded_retention_mins);
+                }
+                else {
+                    int64_t rounded_retention_hours = duration_round_to_resolution(retention, 3600);
+                    duration_snprintf_hours(human_retention, sizeof(human_retention), rounded_retention_hours);
+                }
 
                 buffer_json_member_add_string(wb, "retention_human", human_retention);
 
