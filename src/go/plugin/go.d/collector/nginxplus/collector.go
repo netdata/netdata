@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *NginxPlus {
-	return &NginxPlus{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -48,7 +48,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type NginxPlus struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -75,26 +75,26 @@ type NginxPlus struct {
 	cache               *cache
 }
 
-func (n *NginxPlus) Configuration() any {
-	return n.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (n *NginxPlus) Init() error {
-	if n.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("config: 'url' can not be empty'")
 	}
 
-	client, err := web.NewHTTPClient(n.ClientConfig)
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
-	n.httpClient = client
+	c.httpClient = client
 
 	return nil
 }
 
-func (n *NginxPlus) Check() error {
-	mx, err := n.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -104,23 +104,23 @@ func (n *NginxPlus) Check() error {
 	return nil
 }
 
-func (n *NginxPlus) Charts() *module.Charts {
-	return n.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (n *NginxPlus) Collect() map[string]int64 {
-	mx, err := n.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 
 	if err != nil {
-		n.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (n *NginxPlus) Cleanup() {
-	if n.httpClient != nil {
-		n.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }

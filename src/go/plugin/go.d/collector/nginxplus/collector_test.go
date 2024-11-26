@@ -61,11 +61,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestNginxPlus_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &NginxPlus{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestNginxPlus_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -86,22 +86,22 @@ func TestNginxPlus_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			nginx := New()
-			nginx.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, nginx.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, nginx.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestNginxPlus_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (nginx *NginxPlus, cleanup func())
+		prepare  func(t *testing.T) (collr *Collector, cleanup func())
 	}{
 		"success when all requests OK": {
 			wantFail: false,
@@ -123,21 +123,21 @@ func TestNginxPlus_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			nginx, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, nginx.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, nginx.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestNginxPlus_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare         func(t *testing.T) (nginx *NginxPlus, cleanup func())
+		prepare         func(t *testing.T) (collr *Collector, cleanup func())
 		wantNumOfCharts int
 		wantMetrics     map[string]int64
 	}{
@@ -455,15 +455,15 @@ func TestNginxPlus_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			nginx, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := nginx.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {
-				assert.Equalf(t, test.wantNumOfCharts, len(*nginx.Charts()), "number of charts")
-				module.TestMetricsHasAllChartsDimsSkip(t, nginx.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
+				assert.Equalf(t, test.wantNumOfCharts, len(*collr.Charts()), "number of charts")
+				module.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
 					return chart.ID == uptimeChart.ID
 				})
 			}
@@ -471,7 +471,7 @@ func TestNginxPlus_Collect(t *testing.T) {
 	}
 }
 
-func caseAPI8AllRequestsOK(t *testing.T) (*NginxPlus, func()) {
+func caseAPI8AllRequestsOK(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -510,14 +510,14 @@ func caseAPI8AllRequestsOK(t *testing.T) (*NginxPlus, func()) {
 
 			}
 		}))
-	nginx := New()
-	nginx.URL = srv.URL
-	require.NoError(t, nginx.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return nginx, srv.Close
+	return collr, srv.Close
 }
 
-func caseAPI8AllRequestsExceptStreamOK(t *testing.T) (*NginxPlus, func()) {
+func caseAPI8AllRequestsExceptStreamOK(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -552,31 +552,31 @@ func caseAPI8AllRequestsExceptStreamOK(t *testing.T) (*NginxPlus, func()) {
 
 			}
 		}))
-	nginx := New()
-	nginx.URL = srv.URL
-	require.NoError(t, nginx.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return nginx, srv.Close
+	return collr, srv.Close
 }
 
-func caseInvalidDataResponse(t *testing.T) (*NginxPlus, func()) {
+func caseInvalidDataResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	nginx := New()
-	nginx.URL = srv.URL
-	require.NoError(t, nginx.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return nginx, srv.Close
+	return collr, srv.Close
 }
 
-func caseConnectionRefused(t *testing.T) (*NginxPlus, func()) {
+func caseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	nginx := New()
-	nginx.URL = "http://127.0.0.1:65001"
-	require.NoError(t, nginx.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	require.NoError(t, collr.Init())
 
-	return nginx, func() {}
+	return collr, func() {}
 }
