@@ -37,11 +37,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestAP_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &AP{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestAP_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -62,59 +62,59 @@ func TestAP_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pf := New()
-			pf.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, pf.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, pf.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestAP_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *AP
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *AP {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *AP {
-				ap := New()
-				ap.exec = prepareMockOk()
-				_ = ap.Check()
-				return ap
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOk()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *AP {
-				ap := New()
-				ap.exec = prepareMockOk()
-				_ = ap.Collect()
-				return ap
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOk()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			pf := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, pf.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestAP_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestAP_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockIwExec
 		wantFail    bool
@@ -143,19 +143,19 @@ func TestAP_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ap := New()
-			ap.exec = test.prepareMock()
+			collr := New()
+			collr.exec = test.prepareMock()
 
 			if test.wantFail {
-				assert.Error(t, ap.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, ap.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestAP_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockIwExec
 		wantMetrics map[string]int64
@@ -207,16 +207,16 @@ func TestAP_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ap := New()
-			ap.exec = test.prepareMock()
+			collr := New()
+			collr.exec = test.prepareMock()
 
-			mx := ap.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
-			assert.Equal(t, test.wantCharts, len(*ap.Charts()), "wantCharts")
+			assert.Equal(t, test.wantCharts, len(*collr.Charts()), "wantCharts")
 
-			module.TestMetricsHasAllChartsDims(t, ap.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }
