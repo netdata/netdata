@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *DockerEngine {
-	return &DockerEngine{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -45,7 +45,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type DockerEngine struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -55,26 +55,26 @@ type DockerEngine struct {
 	hasContainerStates bool
 }
 
-func (de *DockerEngine) Configuration() any {
-	return de.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (de *DockerEngine) Init() error {
-	if err := de.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prom, err := de.initPrometheusClient()
+	prom, err := c.initPrometheusClient()
 	if err != nil {
 		return fmt.Errorf("init prometheus client: %v", err)
 	}
-	de.prom = prom
+	c.prom = prom
 
 	return nil
 }
 
-func (de *DockerEngine) Check() error {
-	mx, err := de.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -85,29 +85,29 @@ func (de *DockerEngine) Check() error {
 	return nil
 }
 
-func (de *DockerEngine) Charts() *Charts {
+func (c *Collector) Charts() *Charts {
 	cs := charts.Copy()
-	if !de.hasContainerStates {
+	if !c.hasContainerStates {
 		if err := cs.Remove("engine_daemon_container_states_containers"); err != nil {
-			de.Warning(err)
+			c.Warning(err)
 		}
 	}
 
-	if !de.isSwarmManager {
+	if !c.isSwarmManager {
 		return cs
 	}
 
 	if err := cs.Add(*swarmManagerCharts.Copy()...); err != nil {
-		de.Warning(err)
+		c.Warning(err)
 	}
 
 	return cs
 }
 
-func (de *DockerEngine) Collect() map[string]int64 {
-	mx, err := de.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		de.Error(err)
+		c.Error(err)
 		return nil
 	}
 
@@ -117,8 +117,8 @@ func (de *DockerEngine) Collect() map[string]int64 {
 	return mx
 }
 
-func (de *DockerEngine) Cleanup() {
-	if de.prom != nil && de.prom.HTTPClient() != nil {
-		de.prom.HTTPClient().CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.prom != nil && c.prom.HTTPClient() != nil {
+		c.prom.HTTPClient().CloseIdleConnections()
 	}
 }

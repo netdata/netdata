@@ -39,15 +39,15 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestDockerEngine_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &DockerEngine{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestDockerEngine_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestDockerEngine_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -69,21 +69,21 @@ func TestDockerEngine_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dockerEngine := New()
-			dockerEngine.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, dockerEngine.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, dockerEngine.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestDockerEngine_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(*testing.T) (*DockerEngine, *httptest.Server)
+		prepare  func(*testing.T) (*Collector, *httptest.Server)
 		wantFail bool
 	}{
 		"v17.05.0-ce":        {prepare: prepareClientServerV17050CE},
@@ -97,21 +97,21 @@ func TestDockerEngine_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dockerEngine, srv := test.prepare(t)
+			collr, srv := test.prepare(t)
 			defer srv.Close()
 
 			if test.wantFail {
-				assert.Error(t, dockerEngine.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, dockerEngine.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestDockerEngine_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func(*testing.T) (*DockerEngine, *httptest.Server)
+		prepare       func(*testing.T) (*Collector, *httptest.Server)
 		wantNumCharts int
 	}{
 		"v17.05.0-ce":       {prepare: prepareClientServerV17050CE, wantNumCharts: len(charts) - 1}, // no container states chart
@@ -121,18 +121,18 @@ func TestDockerEngine_Charts(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dockerEngine, srv := test.prepare(t)
+			collr, srv := test.prepare(t)
 			defer srv.Close()
 
-			require.NoError(t, dockerEngine.Check())
-			assert.Len(t, *dockerEngine.Charts(), test.wantNumCharts)
+			require.NoError(t, collr.Check())
+			assert.Len(t, *collr.Charts(), test.wantNumCharts)
 		})
 	}
 }
 
-func TestDockerEngine_Collect_ReturnsNilOnErrors(t *testing.T) {
+func TestCollector_Collect_ReturnsNilOnErrors(t *testing.T) {
 	tests := map[string]struct {
-		prepare func(*testing.T) (*DockerEngine, *httptest.Server)
+		prepare func(*testing.T) (*Collector, *httptest.Server)
 	}{
 		"non docker engine":  {prepare: prepareClientServerNonDockerEngine},
 		"invalid data":       {prepare: prepareClientServerInvalidData},
@@ -142,17 +142,17 @@ func TestDockerEngine_Collect_ReturnsNilOnErrors(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dockerEngine, srv := test.prepare(t)
+			collr, srv := test.prepare(t)
 			defer srv.Close()
 
-			assert.Nil(t, dockerEngine.Collect())
+			assert.Nil(t, collr.Collect())
 		})
 	}
 }
 
-func TestDockerEngine_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(*testing.T) (*DockerEngine, *httptest.Server)
+		prepare  func(*testing.T) (*Collector, *httptest.Server)
 		expected map[string]int64
 	}{
 		"v17.05.0-ce": {
@@ -262,97 +262,97 @@ func TestDockerEngine_Collect(t *testing.T) {
 	}
 }
 
-func prepareClientServerV17050CE(t *testing.T) (*DockerEngine, *httptest.Server) {
+func prepareClientServerV17050CE(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataVer17050Metrics)
 		}))
 
-	dockerEngine := New()
-	dockerEngine.URL = srv.URL
-	require.NoError(t, dockerEngine.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return dockerEngine, srv
+	return collr, srv
 }
 
-func prepareClientServerV18093CE(t *testing.T) (*DockerEngine, *httptest.Server) {
+func prepareClientServerV18093CE(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataVer18093Metrics)
 		}))
 
-	dockerEngine := New()
-	dockerEngine.URL = srv.URL
-	require.NoError(t, dockerEngine.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return dockerEngine, srv
+	return collr, srv
 }
 
-func prepareClientServerV18093CESwarm(t *testing.T) (*DockerEngine, *httptest.Server) {
+func prepareClientServerV18093CESwarm(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataVer18093SwarmMetrics)
 		}))
 
-	dockerEngine := New()
-	dockerEngine.URL = srv.URL
-	require.NoError(t, dockerEngine.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return dockerEngine, srv
+	return collr, srv
 }
 
-func prepareClientServerNonDockerEngine(t *testing.T) (*DockerEngine, *httptest.Server) {
+func prepareClientServerNonDockerEngine(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataNonDockerEngineMetrics)
 		}))
 
-	dockerEngine := New()
-	dockerEngine.URL = srv.URL
-	require.NoError(t, dockerEngine.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return dockerEngine, srv
+	return collr, srv
 }
 
-func prepareClientServerInvalidData(t *testing.T) (*DockerEngine, *httptest.Server) {
+func prepareClientServerInvalidData(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
 
-	dockerEngine := New()
-	dockerEngine.URL = srv.URL
-	require.NoError(t, dockerEngine.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return dockerEngine, srv
+	return collr, srv
 }
 
-func prepareClientServer404(t *testing.T) (*DockerEngine, *httptest.Server) {
+func prepareClientServer404(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
 
-	dockerEngine := New()
-	dockerEngine.URL = srv.URL
-	require.NoError(t, dockerEngine.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return dockerEngine, srv
+	return collr, srv
 }
 
-func prepareClientServerConnectionRefused(t *testing.T) (*DockerEngine, *httptest.Server) {
+func prepareClientServerConnectionRefused(t *testing.T) (*Collector, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(nil)
 
-	dockerEngine := New()
-	dockerEngine.URL = "http://127.0.0.1:38001/metrics"
-	require.NoError(t, dockerEngine.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001/metrics"
+	require.NoError(t, collr.Init())
 
-	return dockerEngine, srv
+	return collr, srv
 }

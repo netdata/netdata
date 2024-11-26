@@ -142,6 +142,7 @@ var (
 
 func (c *Collector) addContainerCharts(name, image string) {
 	charts := containerChartsTmpl.Copy()
+
 	if !c.CollectContainerSize {
 		_ = charts.Remove(containerWritableLayerSizeChartTmpl.ID)
 	}
