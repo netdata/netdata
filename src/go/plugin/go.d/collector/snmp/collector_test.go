@@ -33,99 +33,99 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestSNMP_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &SNMP{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestSNMP_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
-		prepareSNMP func() *SNMP
+		prepareSNMP func() *Collector
 		wantFail    bool
 	}{
 		"fail with default config": {
 			wantFail: true,
-			prepareSNMP: func() *SNMP {
+			prepareSNMP: func() *Collector {
 				return New()
 			},
 		},
 		"fail when using SNMPv3 but 'user.name' not set": {
 			wantFail: true,
-			prepareSNMP: func() *SNMP {
-				snmp := New()
-				snmp.Config = prepareV3Config()
-				snmp.User.Name = ""
-				return snmp
+			prepareSNMP: func() *Collector {
+				collr := New()
+				collr.Config = prepareV3Config()
+				collr.User.Name = ""
+				return collr
 			},
 		},
 		"success when using SNMPv1 with valid config": {
 			wantFail: false,
-			prepareSNMP: func() *SNMP {
-				snmp := New()
-				snmp.Config = prepareV1Config()
-				return snmp
+			prepareSNMP: func() *Collector {
+				collr := New()
+				collr.Config = prepareV1Config()
+				return collr
 			},
 		},
 		"success when using SNMPv2 with valid config": {
 			wantFail: false,
-			prepareSNMP: func() *SNMP {
-				snmp := New()
-				snmp.Config = prepareV2Config()
-				return snmp
+			prepareSNMP: func() *Collector {
+				collr := New()
+				collr.Config = prepareV2Config()
+				return collr
 			},
 		},
 		"success when using SNMPv3 with valid config": {
 			wantFail: false,
-			prepareSNMP: func() *SNMP {
-				snmp := New()
-				snmp.Config = prepareV3Config()
-				return snmp
+			prepareSNMP: func() *Collector {
+				collr := New()
+				collr.Config = prepareV3Config()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			snmp := test.prepareSNMP()
+			collr := test.prepareSNMP()
 
 			if test.wantFail {
-				assert.Error(t, snmp.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, snmp.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestSNMP_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepareSNMP func(t *testing.T, m *snmpmock.MockHandler) *SNMP
+		prepareSNMP func(t *testing.T, m *snmpmock.MockHandler) *Collector
 	}{
 		"cleanup call if snmpClient initialized": {
-			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *SNMP {
-				snmp := New()
-				snmp.Config = prepareV2Config()
-				snmp.newSnmpClient = func() gosnmp.Handler { return m }
+			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
+				collr := New()
+				collr.Config = prepareV2Config()
+				collr.newSnmpClient = func() gosnmp.Handler { return m }
 				setMockClientInitExpect(m)
 
-				require.NoError(t, snmp.Init())
+				require.NoError(t, collr.Init())
 
 				m.EXPECT().Close().Times(1)
 
-				return snmp
+				return collr
 			},
 		},
 		"cleanup call does not panic if snmpClient not initialized": {
-			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *SNMP {
-				snmp := New()
-				snmp.Config = prepareV2Config()
-				snmp.newSnmpClient = func() gosnmp.Handler { return m }
+			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
+				collr := New()
+				collr.Config = prepareV2Config()
+				collr.newSnmpClient = func() gosnmp.Handler { return m }
 				setMockClientInitExpect(m)
 
-				require.NoError(t, snmp.Init())
+				require.NoError(t, collr.Init())
 
-				snmp.snmpClient = nil
+				collr.snmpClient = nil
 
-				return snmp
+				return collr
 			},
 		},
 	}
@@ -135,39 +135,39 @@ func TestSNMP_Cleanup(t *testing.T) {
 			mockSNMP, cleanup := mockInit(t)
 			defer cleanup()
 
-			snmp := test.prepareSNMP(t, mockSNMP)
+			collr := test.prepareSNMP(t, mockSNMP)
 
-			assert.NotPanics(t, snmp.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestSNMP_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	tests := map[string]struct {
-		prepareSNMP   func(t *testing.T, m *snmpmock.MockHandler) *SNMP
+		prepareSNMP   func(t *testing.T, m *snmpmock.MockHandler) *Collector
 		wantNumCharts int
 		doCollect     bool
 	}{
 		"if-mib, no custom": {
 			doCollect:     true,
 			wantNumCharts: len(netIfaceChartsTmpl)*4 + 1,
-			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *SNMP {
-				snmp := New()
-				snmp.Config = prepareV2Config()
+			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
+				collr := New()
+				collr.Config = prepareV2Config()
 				setMockClientSysExpect(m)
 				setMockClientIfMibExpect(m)
 
-				return snmp
+				return collr
 			},
 		},
 		"custom, no if-mib": {
 			wantNumCharts: 10,
-			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *SNMP {
-				snmp := New()
-				snmp.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 9)
-				snmp.collectIfMib = false
+			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
+				collr := New()
+				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 9)
+				collr.collectIfMib = false
 
-				return snmp
+				return collr
 			},
 		},
 	}
@@ -179,41 +179,41 @@ func TestSNMP_Charts(t *testing.T) {
 
 			setMockClientInitExpect(mockSNMP)
 
-			snmp := test.prepareSNMP(t, mockSNMP)
-			snmp.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+			collr := test.prepareSNMP(t, mockSNMP)
+			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
 
-			require.NoError(t, snmp.Init())
+			require.NoError(t, collr.Init())
 
 			if test.doCollect {
-				_ = snmp.Collect()
+				_ = collr.Collect()
 			}
 
-			assert.Equal(t, test.wantNumCharts, len(*snmp.Charts()))
+			assert.Equal(t, test.wantNumCharts, len(*collr.Charts()))
 		})
 	}
 }
 
-func TestSNMP_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail    bool
-		prepareSNMP func(m *snmpmock.MockHandler) *SNMP
+		prepareSNMP func(m *snmpmock.MockHandler) *Collector
 	}{
 		"success when collecting IF-MIB": {
 			wantFail: false,
-			prepareSNMP: func(m *snmpmock.MockHandler) *SNMP {
-				snmp := New()
-				snmp.Config = prepareV2Config()
+			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
+				collr := New()
+				collr.Config = prepareV2Config()
 				setMockClientIfMibExpect(m)
 
-				return snmp
+				return collr
 			},
 		},
 		"success only custom OIDs supported type": {
 			wantFail: false,
-			prepareSNMP: func(m *snmpmock.MockHandler) *SNMP {
-				snmp := New()
-				snmp.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
-				snmp.collectIfMib = false
+			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
+				collr := New()
+				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
+				collr.collectIfMib = false
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -228,19 +228,19 @@ func TestSNMP_Check(t *testing.T) {
 					},
 				}, nil).Times(1)
 
-				return snmp
+				return collr
 			},
 		},
 		"fail when snmp client Get fails": {
 			wantFail: true,
-			prepareSNMP: func(m *snmpmock.MockHandler) *SNMP {
-				snmp := New()
-				snmp.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
-				snmp.collectIfMib = false
+			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
+				collr := New()
+				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
+				collr.collectIfMib = false
 
 				m.EXPECT().Get(gomock.Any()).Return(nil, errors.New("mock Get() error")).Times(1)
 
-				return snmp
+				return collr
 			},
 		},
 	}
@@ -253,33 +253,33 @@ func TestSNMP_Check(t *testing.T) {
 			setMockClientInitExpect(mockSNMP)
 			setMockClientSysExpect(mockSNMP)
 
-			snmp := test.prepareSNMP(mockSNMP)
-			snmp.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+			collr := test.prepareSNMP(mockSNMP)
+			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
 
-			require.NoError(t, snmp.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, snmp.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, snmp.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestSNMP_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepareSNMP   func(m *snmpmock.MockHandler) *SNMP
+		prepareSNMP   func(m *snmpmock.MockHandler) *Collector
 		wantCollected map[string]int64
 	}{
 		"success only IF-MIB": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *SNMP {
-				snmp := New()
-				snmp.Config = prepareV2Config()
+			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
+				collr := New()
+				collr.Config = prepareV2Config()
 
 				setMockClientIfMibExpect(m)
 
-				return snmp
+				return collr
 			},
 			wantCollected: map[string]int64{
 				"net_iface_ether1_admin_status_down":                0,
@@ -374,10 +374,10 @@ func TestSNMP_Collect(t *testing.T) {
 			},
 		},
 		"success only custom OIDs supported type": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *SNMP {
-				snmp := New()
-				snmp.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
-				snmp.collectIfMib = false
+			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
+				collr := New()
+				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
+				collr.collectIfMib = false
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -392,7 +392,7 @@ func TestSNMP_Collect(t *testing.T) {
 					},
 				}, nil).Times(1)
 
-				return snmp
+				return collr
 			},
 			wantCollected: map[string]int64{
 				"1.3.6.1.2.1.2.2.1.10.0": 10,
@@ -407,10 +407,10 @@ func TestSNMP_Collect(t *testing.T) {
 			},
 		},
 		"success only custom OIDs supported and unsupported type": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *SNMP {
-				snmp := New()
-				snmp.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
-				snmp.collectIfMib = false
+			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
+				collr := New()
+				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
+				collr.collectIfMib = false
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -423,7 +423,7 @@ func TestSNMP_Collect(t *testing.T) {
 					},
 				}, nil).Times(1)
 
-				return snmp
+				return collr
 			},
 			wantCollected: map[string]int64{
 				"1.3.6.1.2.1.2.2.1.10.0": 10,
@@ -433,10 +433,10 @@ func TestSNMP_Collect(t *testing.T) {
 			},
 		},
 		"success only custom OIDs unsupported type": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *SNMP {
-				snmp := New()
-				snmp.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
-				snmp.collectIfMib = false
+			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
+				collr := New()
+				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
+				collr.collectIfMib = false
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -449,7 +449,7 @@ func TestSNMP_Collect(t *testing.T) {
 					},
 				}, nil).Times(1)
 
-				return snmp
+				return collr
 			},
 			wantCollected: map[string]int64{
 				"uptime": 60,
@@ -465,12 +465,12 @@ func TestSNMP_Collect(t *testing.T) {
 			setMockClientInitExpect(mockSNMP)
 			setMockClientSysExpect(mockSNMP)
 
-			snmp := test.prepareSNMP(mockSNMP)
-			snmp.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+			collr := test.prepareSNMP(mockSNMP)
+			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
 
-			require.NoError(t, snmp.Init())
+			require.NoError(t, collr.Init())
 
-			mx := snmp.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
 		})

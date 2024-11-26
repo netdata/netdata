@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *SNMP {
-	return &SNMP{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Community: "public",
 			Options: Options{
@@ -55,7 +55,7 @@ func New() *SNMP {
 	}
 }
 
-type SNMP struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -79,17 +79,17 @@ type SNMP struct {
 	customOids []string
 }
 
-func (s *SNMP) Configuration() any {
-	return s.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (s *SNMP) Init() error {
-	err := s.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation failed: %v", err)
 	}
 
-	snmpClient, err := s.initSNMPClient()
+	snmpClient, err := c.initSNMPClient()
 	if err != nil {
 		return fmt.Errorf("failed to initialize SNMP client: %v", err)
 	}
@@ -98,28 +98,28 @@ func (s *SNMP) Init() error {
 	if err != nil {
 		return fmt.Errorf("SNMP client connection failed: %v", err)
 	}
-	s.snmpClient = snmpClient
+	c.snmpClient = snmpClient
 
-	byName, byType, err := s.initNetIfaceFilters()
+	byName, byType, err := c.initNetIfaceFilters()
 	if err != nil {
 		return fmt.Errorf("failed to initialize network interface filters: %v", err)
 	}
-	s.netIfaceFilterByName = byName
-	s.netIfaceFilterByType = byType
+	c.netIfaceFilterByName = byName
+	c.netIfaceFilterByType = byType
 
-	charts, err := newUserInputCharts(s.ChartsInput)
+	charts, err := newUserInputCharts(c.ChartsInput)
 	if err != nil {
 		return fmt.Errorf("failed to create user charts: %v", err)
 	}
-	s.charts = charts
+	c.charts = charts
 
-	s.customOids = s.initOIDs()
+	c.customOids = c.initOIDs()
 
 	return nil
 }
 
-func (s *SNMP) Check() error {
-	mx, err := s.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -131,14 +131,14 @@ func (s *SNMP) Check() error {
 	return nil
 }
 
-func (s *SNMP) Charts() *module.Charts {
-	return s.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (s *SNMP) Collect() map[string]int64 {
-	mx, err := s.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		s.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -148,12 +148,12 @@ func (s *SNMP) Collect() map[string]int64 {
 	return mx
 }
 
-func (s *SNMP) Cleanup() {
-	if s.snmpClient != nil {
-		_ = s.snmpClient.Close()
+func (c *Collector) Cleanup() {
+	if c.snmpClient != nil {
+		_ = c.snmpClient.Close()
 	}
 }
 
-func (s *SNMP) VirtualNode() *vnodes.VirtualNode {
-	return s.vnode
+func (c *Collector) VirtualNode() *vnodes.VirtualNode {
+	return c.vnode
 }

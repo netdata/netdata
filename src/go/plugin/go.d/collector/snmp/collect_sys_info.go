@@ -29,8 +29,8 @@ type sysInfo struct {
 	organization string
 }
 
-func (s *SNMP) getSysInfo() (*sysInfo, error) {
-	pdus, err := s.snmpClient.WalkAll(rootOidMibSystem)
+func (c *Collector) getSysInfo() (*sysInfo, error) {
+	pdus, err := c.snmpClient.WalkAll(rootOidMibSystem)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (s *SNMP) getSysInfo() (*sysInfo, error) {
 			var sysObj string
 			if sysObj, err = pduToString(pdu); err == nil {
 				si.organization = entnum.LookupBySysObject(sysObj)
-				s.Debugf("device sysObject '%s', organization '%s'", sysObj, si.organization)
+				c.Debugf("device sysObject '%s', organization '%s'", sysObj, si.organization)
 			}
 		case oidSysContact:
 			si.contact, err = pduToString(pdu)
@@ -71,8 +71,8 @@ func (s *SNMP) getSysInfo() (*sysInfo, error) {
 	return si, nil
 }
 
-func (s *SNMP) collectSysUptime(mx map[string]int64) error {
-	resp, err := s.snmpClient.Get([]string{oidSysUptime})
+func (c *Collector) collectSysUptime(mx map[string]int64) error {
+	resp, err := c.snmpClient.Get([]string{oidSysUptime})
 	if err != nil {
 		return err
 	}
