@@ -22,8 +22,8 @@ func init() {
 	})
 }
 
-func New() *OpenVPNStatusLog {
-	return &OpenVPNStatusLog{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			LogPath: "/var/log/openvpn/status.log",
 		},
@@ -38,7 +38,7 @@ type Config struct {
 	PerUserStats matcher.SimpleExpr `yaml:"per_user_stats,omitempty" json:"per_user_stats"`
 }
 
-type OpenVPNStatusLog struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -48,28 +48,28 @@ type OpenVPNStatusLog struct {
 	collectedUsers map[string]bool
 }
 
-func (o *OpenVPNStatusLog) Configuration() any {
-	return o.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (o *OpenVPNStatusLog) Init() error {
-	if err := o.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("error on validating config: %v", err)
 	}
 
-	m, err := o.initPerUserStatsMatcher()
+	m, err := c.initPerUserStatsMatcher()
 	if err != nil {
 		return fmt.Errorf("error on creating 'per_user_stats' matcher: %v", err)
 	}
 	if m != nil {
-		o.perUserMatcher = m
+		c.perUserMatcher = m
 	}
 
 	return nil
 }
 
-func (o *OpenVPNStatusLog) Check() error {
-	mx, err := o.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -79,14 +79,14 @@ func (o *OpenVPNStatusLog) Check() error {
 	return nil
 }
 
-func (o *OpenVPNStatusLog) Charts() *module.Charts {
-	return o.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (o *OpenVPNStatusLog) Collect() map[string]int64 {
-	mx, err := o.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		o.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -95,4 +95,4 @@ func (o *OpenVPNStatusLog) Collect() map[string]int64 {
 	return mx
 }
 
-func (o *OpenVPNStatusLog) Cleanup() {}
+func (c *Collector) Cleanup() {}

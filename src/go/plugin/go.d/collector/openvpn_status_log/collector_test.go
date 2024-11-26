@@ -40,11 +40,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestOpenVPNStatusLog_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &OpenVPNStatusLog{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestOpenVPNStatusLog_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -62,21 +62,21 @@ func TestOpenVPNStatusLog_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ovpn := New()
-			ovpn.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, ovpn.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, ovpn.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestOpenVPNStatusLog_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *OpenVPNStatusLog
+		prepare  func() *Collector
 		wantFail bool
 	}{
 		"status version 1":                 {prepare: prepareCaseStatusVersion1},
@@ -91,22 +91,22 @@ func TestOpenVPNStatusLog_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ovpn := test.prepare()
+			collr := test.prepare()
 
-			require.NoError(t, ovpn.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, ovpn.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, ovpn.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestOpenVPNStatusLog_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() *OpenVPNStatusLog
+		prepare       func() *Collector
 		wantNumCharts int
 	}{
 		"status version 1 with user stats": {
@@ -129,20 +129,20 @@ func TestOpenVPNStatusLog_Charts(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ovpn := test.prepare()
+			collr := test.prepare()
 
-			require.NoError(t, ovpn.Init())
-			_ = ovpn.Check()
-			_ = ovpn.Collect()
+			require.NoError(t, collr.Init())
+			_ = collr.Check()
+			_ = collr.Collect()
 
-			assert.Equal(t, test.wantNumCharts, len(*ovpn.Charts()))
+			assert.Equal(t, test.wantNumCharts, len(*collr.Charts()))
 		})
 	}
 }
 
-func TestOpenVPNStatusLog_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *OpenVPNStatusLog
+		prepare  func() *Collector
 		expected map[string]int64
 	}{
 		"status version 1": {
@@ -255,12 +255,12 @@ func TestOpenVPNStatusLog_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ovpn := test.prepare()
+			collr := test.prepare()
 
-			require.NoError(t, ovpn.Init())
-			_ = ovpn.Check()
+			require.NoError(t, collr.Init())
+			_ = collr.Check()
 
-			collected := ovpn.Collect()
+			collected := collr.Collect()
 
 			copyConnTime(collected, test.expected)
 			assert.Equal(t, test.expected, collected)
@@ -268,85 +268,85 @@ func TestOpenVPNStatusLog_Collect(t *testing.T) {
 	}
 }
 
-func prepareCaseStatusVersion1() *OpenVPNStatusLog {
-	ovpn := New()
-	ovpn.LogPath = pathStatusVersion1
-	return ovpn
+func prepareCaseStatusVersion1() *Collector {
+	collr := New()
+	collr.LogPath = pathStatusVersion1
+	return collr
 }
 
-func prepareCaseStatusVersion1WithUserStats() *OpenVPNStatusLog {
-	ovpn := New()
-	ovpn.LogPath = pathStatusVersion1
-	ovpn.PerUserStats = matcher.SimpleExpr{
+func prepareCaseStatusVersion1WithUserStats() *Collector {
+	collr := New()
+	collr.LogPath = pathStatusVersion1
+	collr.PerUserStats = matcher.SimpleExpr{
 		Includes: []string{"* *"},
 	}
-	return ovpn
+	return collr
 }
 
-func prepareCaseStatusVersion1NoClients() *OpenVPNStatusLog {
-	ovpn := New()
-	ovpn.LogPath = pathStatusVersion1NoClients
-	return ovpn
+func prepareCaseStatusVersion1NoClients() *Collector {
+	collr := New()
+	collr.LogPath = pathStatusVersion1NoClients
+	return collr
 }
 
-func prepareCaseStatusVersion2() *OpenVPNStatusLog {
-	ovpn := New()
-	ovpn.LogPath = pathStatusVersion2
-	return ovpn
+func prepareCaseStatusVersion2() *Collector {
+	collr := New()
+	collr.LogPath = pathStatusVersion2
+	return collr
 }
 
-func prepareCaseStatusVersion2WithUserStats() *OpenVPNStatusLog {
-	ovpn := New()
-	ovpn.LogPath = pathStatusVersion2
-	ovpn.PerUserStats = matcher.SimpleExpr{
+func prepareCaseStatusVersion2WithUserStats() *Collector {
+	collr := New()
+	collr.LogPath = pathStatusVersion2
+	collr.PerUserStats = matcher.SimpleExpr{
 		Includes: []string{"* *"},
 	}
-	return ovpn
+	return collr
 }
 
-func prepareCaseStatusVersion2NoClients() *OpenVPNStatusLog {
-	ovpn := New()
-	ovpn.LogPath = pathStatusVersion2NoClients
-	return ovpn
+func prepareCaseStatusVersion2NoClients() *Collector {
+	collr := New()
+	collr.LogPath = pathStatusVersion2NoClients
+	return collr
 }
 
-func prepareCaseStatusVersion3() *OpenVPNStatusLog {
-	ovpn := New()
-	ovpn.LogPath = pathStatusVersion3
-	return ovpn
+func prepareCaseStatusVersion3() *Collector {
+	collr := New()
+	collr.LogPath = pathStatusVersion3
+	return collr
 }
 
-func prepareCaseStatusVersion3WithUserStats() *OpenVPNStatusLog {
-	ovpn := New()
-	ovpn.LogPath = pathStatusVersion3
-	ovpn.PerUserStats = matcher.SimpleExpr{
+func prepareCaseStatusVersion3WithUserStats() *Collector {
+	collr := New()
+	collr.LogPath = pathStatusVersion3
+	collr.PerUserStats = matcher.SimpleExpr{
 		Includes: []string{"* *"},
 	}
-	return ovpn
+	return collr
 }
 
-func prepareCaseStatusVersion3NoClients() *OpenVPNStatusLog {
-	ovpn := New()
-	ovpn.LogPath = pathStatusVersion3NoClients
-	return ovpn
+func prepareCaseStatusVersion3NoClients() *Collector {
+	collr := New()
+	collr.LogPath = pathStatusVersion3NoClients
+	return collr
 }
 
-func prepareCaseStatusStaticKey() *OpenVPNStatusLog {
-	ovpn := New()
-	ovpn.LogPath = pathStaticKey
-	return ovpn
+func prepareCaseStatusStaticKey() *Collector {
+	collr := New()
+	collr.LogPath = pathStaticKey
+	return collr
 }
 
-func prepareCaseEmptyFile() *OpenVPNStatusLog {
-	ovpn := New()
-	ovpn.LogPath = pathEmptyFile
-	return ovpn
+func prepareCaseEmptyFile() *Collector {
+	collr := New()
+	collr.LogPath = pathEmptyFile
+	return collr
 }
 
-func prepareCaseNonExistentFile() *OpenVPNStatusLog {
-	ovpn := New()
-	ovpn.LogPath = pathNonExistentFile
-	return ovpn
+func prepareCaseNonExistentFile() *Collector {
+	collr := New()
+	collr.LogPath = pathNonExistentFile
+	return collr
 }
 
 func copyConnTime(dst, src map[string]int64) {
