@@ -28,11 +28,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestNTPd_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &NTPd{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestNTPd_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -50,52 +50,52 @@ func TestNTPd_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			n := New()
-			n.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, n.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, n.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestNTPd_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.Equal(t, len(systemCharts), len(*New().Charts()))
 }
 
-func TestNTPd_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare   func(*NTPd)
+		prepare   func(*Collector)
 		wantClose bool
 	}{
 		"after New": {
 			wantClose: false,
-			prepare:   func(*NTPd) {},
+			prepare:   func(*Collector) {},
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(n *NTPd) { _ = n.Init() },
+			prepare:   func(n *Collector) { _ = n.Init() },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(n *NTPd) { _ = n.Init(); _ = n.Check() },
+			prepare:   func(n *Collector) { _ = n.Init(); _ = n.Check() },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(n *NTPd) { _ = n.Init(); n.Collect() },
+			prepare:   func(n *Collector) { _ = n.Init(); n.Collect() },
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			m := &mockClient{}
-			n := prepareNTPdWithMock(m, true)
-			test.prepare(n)
+			collr := prepareNTPdWithMock(m, true)
+			test.prepare(collr)
 
-			require.NotPanics(t, n.Cleanup)
+			require.NotPanics(t, collr.Cleanup)
 
 			if test.wantClose {
 				assert.True(t, m.closeCalled)
@@ -106,57 +106,57 @@ func TestNTPd_Cleanup(t *testing.T) {
 	}
 }
 
-func TestNTPd_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *NTPd
+		prepare  func() *Collector
 		wantFail bool
 	}{
 		"system: success, peers: success": {
 			wantFail: false,
-			prepare:  func() *NTPd { return prepareNTPdWithMock(&mockClient{}, true) },
+			prepare:  func() *Collector { return prepareNTPdWithMock(&mockClient{}, true) },
 		},
 		"system: success, list peers: fails": {
 			wantFail: false,
-			prepare:  func() *NTPd { return prepareNTPdWithMock(&mockClient{errOnPeerIDs: true}, true) },
+			prepare:  func() *Collector { return prepareNTPdWithMock(&mockClient{errOnPeerIDs: true}, true) },
 		},
 		"system: success, peers info: fails": {
 			wantFail: false,
-			prepare:  func() *NTPd { return prepareNTPdWithMock(&mockClient{errOnPeerInfo: true}, true) },
+			prepare:  func() *Collector { return prepareNTPdWithMock(&mockClient{errOnPeerInfo: true}, true) },
 		},
 		"system: fails": {
 			wantFail: true,
-			prepare:  func() *NTPd { return prepareNTPdWithMock(&mockClient{errOnSystemInfo: true}, true) },
+			prepare:  func() *Collector { return prepareNTPdWithMock(&mockClient{errOnSystemInfo: true}, true) },
 		},
 		"fail on creating client": {
 			wantFail: true,
-			prepare:  func() *NTPd { return prepareNTPdWithMock(nil, true) },
+			prepare:  func() *Collector { return prepareNTPdWithMock(nil, true) },
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			n := test.prepare()
+			collr := test.prepare()
 
-			require.NoError(t, n.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, n.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, n.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 
 }
 
-func TestNTPd_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare        func() *NTPd
+		prepare        func() *Collector
 		expected       map[string]int64
 		expectedCharts int
 	}{
 		"system: success, peers: success": {
-			prepare: func() *NTPd { return prepareNTPdWithMock(&mockClient{}, true) },
+			prepare: func() *Collector { return prepareNTPdWithMock(&mockClient{}, true) },
 			expected: map[string]int64{
 				"clk_jitter":                  626000,
 				"clk_wander":                  81000,
@@ -211,7 +211,7 @@ func TestNTPd_Collect(t *testing.T) {
 			expectedCharts: len(systemCharts) + len(peerChartsTmpl)*3,
 		},
 		"system: success, list peers: fails": {
-			prepare: func() *NTPd { return prepareNTPdWithMock(&mockClient{errOnPeerIDs: true}, true) },
+			prepare: func() *Collector { return prepareNTPdWithMock(&mockClient{errOnPeerIDs: true}, true) },
 			expected: map[string]int64{
 				"clk_jitter": 626000,
 				"clk_wander": 81000,
@@ -227,7 +227,7 @@ func TestNTPd_Collect(t *testing.T) {
 			expectedCharts: len(systemCharts),
 		},
 		"system: success, peers info: fails": {
-			prepare: func() *NTPd { return prepareNTPdWithMock(&mockClient{errOnPeerInfo: true}, true) },
+			prepare: func() *Collector { return prepareNTPdWithMock(&mockClient{errOnPeerInfo: true}, true) },
 			expected: map[string]int64{
 				"clk_jitter": 626000,
 				"clk_wander": 81000,
@@ -243,12 +243,12 @@ func TestNTPd_Collect(t *testing.T) {
 			expectedCharts: len(systemCharts),
 		},
 		"system: fails": {
-			prepare:        func() *NTPd { return prepareNTPdWithMock(&mockClient{errOnSystemInfo: true}, true) },
+			prepare:        func() *Collector { return prepareNTPdWithMock(&mockClient{errOnSystemInfo: true}, true) },
 			expected:       nil,
 			expectedCharts: len(systemCharts),
 		},
 		"fail on creating client": {
-			prepare:        func() *NTPd { return prepareNTPdWithMock(nil, true) },
+			prepare:        func() *Collector { return prepareNTPdWithMock(nil, true) },
 			expected:       nil,
 			expectedCharts: len(systemCharts),
 		},
@@ -256,28 +256,28 @@ func TestNTPd_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			n := test.prepare()
+			collr := test.prepare()
 
-			require.NoError(t, n.Init())
-			_ = n.Check()
+			require.NoError(t, collr.Init())
+			_ = collr.Check()
 
-			mx := n.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.expected, mx)
-			assert.Equal(t, test.expectedCharts, len(*n.Charts()))
+			assert.Equal(t, test.expectedCharts, len(*collr.Charts()))
 		})
 	}
 }
 
-func prepareNTPdWithMock(m *mockClient, collectPeers bool) *NTPd {
-	n := New()
-	n.CollectPeers = collectPeers
+func prepareNTPdWithMock(m *mockClient, collectPeers bool) *Collector {
+	collr := New()
+	collr.CollectPeers = collectPeers
 	if m == nil {
-		n.newClient = func(_ Config) (ntpConn, error) { return nil, errors.New("mock.newClient error") }
+		collr.newClient = func(_ Config) (ntpConn, error) { return nil, errors.New("mock.newClient error") }
 	} else {
-		n.newClient = func(_ Config) (ntpConn, error) { return m, nil }
+		collr.newClient = func(_ Config) (ntpConn, error) { return m, nil }
 	}
-	return n
+	return collr
 }
 
 type mockClient struct {

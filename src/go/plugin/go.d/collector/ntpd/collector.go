@@ -24,8 +24,8 @@ func init() {
 	})
 }
 
-func New() *NTPd {
-	return &NTPd{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address:      "127.0.0.1:123",
 			Timeout:      confopt.Duration(time.Second),
@@ -45,36 +45,28 @@ type Config struct {
 	CollectPeers bool             `yaml:"collect_peers" json:"collect_peers"`
 }
 
-type (
-	NTPd struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		client    ntpConn
-		newClient func(c Config) (ntpConn, error)
+	client    ntpConn
+	newClient func(c Config) (ntpConn, error)
 
-		findPeersTime    time.Time
-		findPeersEvery   time.Duration
-		peerAddr         map[string]bool
-		peerIDs          []uint16
-		peerIPAddrFilter iprange.Pool
-	}
-	ntpConn interface {
-		systemInfo() (map[string]string, error)
-		peerInfo(id uint16) (map[string]string, error)
-		peerIDs() ([]uint16, error)
-		close()
-	}
-)
-
-func (n *NTPd) Configuration() any {
-	return n.Config
+	findPeersTime    time.Time
+	findPeersEvery   time.Duration
+	peerAddr         map[string]bool
+	peerIDs          []uint16
+	peerIPAddrFilter iprange.Pool
 }
 
-func (n *NTPd) Init() error {
-	if n.Address == "" {
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	if c.Address == "" {
 		return errors.New("config: 'address' can not be empty")
 	}
 
@@ -84,13 +76,13 @@ func (n *NTPd) Init() error {
 		return fmt.Errorf("error on parsing ip range '%s': %v", txt, err)
 	}
 
-	n.peerIPAddrFilter = r
+	c.peerIPAddrFilter = r
 
 	return nil
 }
 
-func (n *NTPd) Check() error {
-	mx, err := n.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -100,14 +92,14 @@ func (n *NTPd) Check() error {
 	return nil
 }
 
-func (n *NTPd) Charts() *module.Charts {
-	return n.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (n *NTPd) Collect() map[string]int64 {
-	mx, err := n.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		n.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -116,9 +108,9 @@ func (n *NTPd) Collect() map[string]int64 {
 	return mx
 }
 
-func (n *NTPd) Cleanup() {
-	if n.client != nil {
-		n.client.close()
-		n.client = nil
+func (c *Collector) Cleanup() {
+	if c.client != nil {
+		c.client.close()
+		c.client = nil
 	}
 }
