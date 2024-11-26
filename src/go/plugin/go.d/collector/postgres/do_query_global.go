@@ -7,197 +7,197 @@ import (
 	"strconv"
 )
 
-func (p *Postgres) doQueryGlobalMetrics() error {
-	if err := p.doQueryConnectionsUsed(); err != nil {
+func (c *Collector) doQueryGlobalMetrics() error {
+	if err := c.doQueryConnectionsUsed(); err != nil {
 		return fmt.Errorf("querying server connections used error: %v", err)
 	}
-	if err := p.doQueryConnectionsState(); err != nil {
+	if err := c.doQueryConnectionsState(); err != nil {
 		return fmt.Errorf("querying server connections state error: %v", err)
 	}
-	if err := p.doQueryCheckpoints(); err != nil {
+	if err := c.doQueryCheckpoints(); err != nil {
 		return fmt.Errorf("querying database conflicts error: %v", err)
 	}
-	if err := p.doQueryUptime(); err != nil {
+	if err := c.doQueryUptime(); err != nil {
 		return fmt.Errorf("querying server uptime error: %v", err)
 	}
-	if err := p.doQueryTXIDWraparound(); err != nil {
+	if err := c.doQueryTXIDWraparound(); err != nil {
 		return fmt.Errorf("querying txid wraparound error: %v", err)
 	}
-	if err := p.doQueryWALWrites(); err != nil {
+	if err := c.doQueryWALWrites(); err != nil {
 		return fmt.Errorf("querying wal writes error: %v", err)
 	}
-	if err := p.doQueryCatalogRelations(); err != nil {
+	if err := c.doQueryCatalogRelations(); err != nil {
 		return fmt.Errorf("querying catalog relations error: %v", err)
 	}
-	if p.pgVersion >= pgVersion94 {
-		if err := p.doQueryAutovacuumWorkers(); err != nil {
+	if c.pgVersion >= pgVersion94 {
+		if err := c.doQueryAutovacuumWorkers(); err != nil {
 			return fmt.Errorf("querying autovacuum workers error: %v", err)
 		}
 	}
-	if p.pgVersion >= pgVersion10 {
-		if err := p.doQueryXactQueryRunningTime(); err != nil {
+	if c.pgVersion >= pgVersion10 {
+		if err := c.doQueryXactQueryRunningTime(); err != nil {
 			return fmt.Errorf("querying xact/query running time: %v", err)
 		}
 	}
 
-	if !p.isSuperUser() {
+	if !c.isSuperUser() {
 		return nil
 	}
 
-	if p.pgVersion >= pgVersion94 {
-		if err := p.doQueryWALFiles(); err != nil {
+	if c.pgVersion >= pgVersion94 {
+		if err := c.doQueryWALFiles(); err != nil {
 			return fmt.Errorf("querying wal files error: %v", err)
 		}
 	}
-	if err := p.doQueryWALArchiveFiles(); err != nil {
+	if err := c.doQueryWALArchiveFiles(); err != nil {
 		return fmt.Errorf("querying wal archive files error: %v", err)
 	}
 
 	return nil
 }
 
-func (p *Postgres) doQueryConnectionsUsed() error {
+func (c *Collector) doQueryConnectionsUsed() error {
 	q := queryServerCurrentConnectionsUsed()
 
 	var v string
-	if err := p.doQueryRow(q, &v); err != nil {
+	if err := c.doQueryRow(q, &v); err != nil {
 		return err
 	}
 
-	p.mx.connUsed = parseInt(v)
+	c.mx.connUsed = parseInt(v)
 
 	return nil
 }
 
-func (p *Postgres) doQueryConnectionsState() error {
+func (c *Collector) doQueryConnectionsState() error {
 	q := queryServerConnectionsState()
 
 	var state string
-	return p.doQuery(q, func(column, value string, rowEnd bool) {
+	return c.doQuery(q, func(column, value string, rowEnd bool) {
 		switch column {
 		case "state":
 			state = value
 		case "count":
 			switch state {
 			case "active":
-				p.mx.connStateActive = parseInt(value)
+				c.mx.connStateActive = parseInt(value)
 			case "idle":
-				p.mx.connStateIdle = parseInt(value)
+				c.mx.connStateIdle = parseInt(value)
 			case "idle in transaction":
-				p.mx.connStateIdleInTrans = parseInt(value)
+				c.mx.connStateIdleInTrans = parseInt(value)
 			case "idle in transaction (aborted)":
-				p.mx.connStateIdleInTransAborted = parseInt(value)
+				c.mx.connStateIdleInTransAborted = parseInt(value)
 			case "fastpath function call":
-				p.mx.connStateFastpathFunctionCall = parseInt(value)
+				c.mx.connStateFastpathFunctionCall = parseInt(value)
 			case "disabled":
-				p.mx.connStateDisabled = parseInt(value)
+				c.mx.connStateDisabled = parseInt(value)
 			}
 		}
 	})
 }
 
-func (p *Postgres) doQueryCheckpoints() error {
-	q := queryCheckpoints(p.pgVersion)
+func (c *Collector) doQueryCheckpoints() error {
+	q := queryCheckpoints(c.pgVersion)
 
-	return p.doQuery(q, func(column, value string, _ bool) {
+	return c.doQuery(q, func(column, value string, _ bool) {
 		switch column {
 		case "checkpoints_timed":
-			p.mx.checkpointsTimed = parseInt(value)
+			c.mx.checkpointsTimed = parseInt(value)
 		case "checkpoints_req":
-			p.mx.checkpointsReq = parseInt(value)
+			c.mx.checkpointsReq = parseInt(value)
 		case "checkpoint_write_time":
-			p.mx.checkpointWriteTime = parseInt(value)
+			c.mx.checkpointWriteTime = parseInt(value)
 		case "checkpoint_sync_time":
-			p.mx.checkpointSyncTime = parseInt(value)
+			c.mx.checkpointSyncTime = parseInt(value)
 		case "buffers_checkpoint_bytes":
-			p.mx.buffersCheckpoint = parseInt(value)
+			c.mx.buffersCheckpoint = parseInt(value)
 		case "buffers_clean_bytes":
-			p.mx.buffersClean = parseInt(value)
+			c.mx.buffersClean = parseInt(value)
 		case "maxwritten_clean":
-			p.mx.maxwrittenClean = parseInt(value)
+			c.mx.maxwrittenClean = parseInt(value)
 		case "buffers_backend_bytes":
-			p.mx.buffersBackend = parseInt(value)
+			c.mx.buffersBackend = parseInt(value)
 		case "buffers_backend_fsync":
-			p.mx.buffersBackendFsync = parseInt(value)
+			c.mx.buffersBackendFsync = parseInt(value)
 		case "buffers_alloc_bytes":
-			p.mx.buffersAlloc = parseInt(value)
+			c.mx.buffersAlloc = parseInt(value)
 		}
 	})
 }
 
-func (p *Postgres) doQueryUptime() error {
+func (c *Collector) doQueryUptime() error {
 	q := queryServerUptime()
 
 	var s string
-	if err := p.doQueryRow(q, &s); err != nil {
+	if err := c.doQueryRow(q, &s); err != nil {
 		return err
 	}
 
-	p.mx.uptime = parseFloat(s)
+	c.mx.uptime = parseFloat(s)
 
 	return nil
 }
 
-func (p *Postgres) doQueryTXIDWraparound() error {
+func (c *Collector) doQueryTXIDWraparound() error {
 	q := queryTXIDWraparound()
 
-	return p.doQuery(q, func(column, value string, _ bool) {
+	return c.doQuery(q, func(column, value string, _ bool) {
 		switch column {
 		case "oldest_current_xid":
-			p.mx.oldestXID = parseInt(value)
+			c.mx.oldestXID = parseInt(value)
 		case "percent_towards_wraparound":
-			p.mx.percentTowardsWraparound = parseInt(value)
+			c.mx.percentTowardsWraparound = parseInt(value)
 		case "percent_towards_emergency_autovacuum":
-			p.mx.percentTowardsEmergencyAutovacuum = parseInt(value)
+			c.mx.percentTowardsEmergencyAutovacuum = parseInt(value)
 		}
 	})
 }
 
-func (p *Postgres) doQueryWALWrites() error {
-	q := queryWALWrites(p.pgVersion)
+func (c *Collector) doQueryWALWrites() error {
+	q := queryWALWrites(c.pgVersion)
 
 	var v int64
-	if err := p.doQueryRow(q, &v); err != nil {
+	if err := c.doQueryRow(q, &v); err != nil {
 		return err
 	}
 
-	p.mx.walWrites = v
+	c.mx.walWrites = v
 
 	return nil
 }
 
-func (p *Postgres) doQueryWALFiles() error {
-	q := queryWALFiles(p.pgVersion)
+func (c *Collector) doQueryWALFiles() error {
+	q := queryWALFiles(c.pgVersion)
 
-	return p.doQuery(q, func(column, value string, _ bool) {
+	return c.doQuery(q, func(column, value string, _ bool) {
 		switch column {
 		case "wal_recycled_files":
-			p.mx.walRecycledFiles = parseInt(value)
+			c.mx.walRecycledFiles = parseInt(value)
 		case "wal_written_files":
-			p.mx.walWrittenFiles = parseInt(value)
+			c.mx.walWrittenFiles = parseInt(value)
 		}
 	})
 }
 
-func (p *Postgres) doQueryWALArchiveFiles() error {
-	q := queryWALArchiveFiles(p.pgVersion)
+func (c *Collector) doQueryWALArchiveFiles() error {
+	q := queryWALArchiveFiles(c.pgVersion)
 
-	return p.doQuery(q, func(column, value string, _ bool) {
+	return c.doQuery(q, func(column, value string, _ bool) {
 		switch column {
 		case "wal_archive_files_ready_count":
-			p.mx.walArchiveFilesReady = parseInt(value)
+			c.mx.walArchiveFilesReady = parseInt(value)
 		case "wal_archive_files_done_count":
-			p.mx.walArchiveFilesDone = parseInt(value)
+			c.mx.walArchiveFilesDone = parseInt(value)
 		}
 	})
 }
 
-func (p *Postgres) doQueryCatalogRelations() error {
+func (c *Collector) doQueryCatalogRelations() error {
 	q := queryCatalogRelations()
 
 	var kind string
 	var count, size int64
-	return p.doQuery(q, func(column, value string, rowEnd bool) {
+	return c.doQuery(q, func(column, value string, rowEnd bool) {
 		switch column {
 		case "relkind":
 			kind = value
@@ -212,73 +212,73 @@ func (p *Postgres) doQueryCatalogRelations() error {
 		// https://www.postgresql.org/docs/current/catalog-pg-class.html
 		switch kind {
 		case "r":
-			p.mx.relkindOrdinaryTable = count
-			p.mx.relkindOrdinaryTableSize = size
+			c.mx.relkindOrdinaryTable = count
+			c.mx.relkindOrdinaryTableSize = size
 		case "i":
-			p.mx.relkindIndex = count
-			p.mx.relkindIndexSize = size
+			c.mx.relkindIndex = count
+			c.mx.relkindIndexSize = size
 		case "S":
-			p.mx.relkindSequence = count
-			p.mx.relkindSequenceSize = size
+			c.mx.relkindSequence = count
+			c.mx.relkindSequenceSize = size
 		case "t":
-			p.mx.relkindTOASTTable = count
-			p.mx.relkindTOASTTableSize = size
+			c.mx.relkindTOASTTable = count
+			c.mx.relkindTOASTTableSize = size
 		case "v":
-			p.mx.relkindView = count
-			p.mx.relkindViewSize = size
+			c.mx.relkindView = count
+			c.mx.relkindViewSize = size
 		case "m":
-			p.mx.relkindMatView = count
-			p.mx.relkindMatViewSize = size
+			c.mx.relkindMatView = count
+			c.mx.relkindMatViewSize = size
 		case "c":
-			p.mx.relkindCompositeType = count
-			p.mx.relkindCompositeTypeSize = size
+			c.mx.relkindCompositeType = count
+			c.mx.relkindCompositeTypeSize = size
 		case "f":
-			p.mx.relkindForeignTable = count
-			p.mx.relkindForeignTableSize = size
+			c.mx.relkindForeignTable = count
+			c.mx.relkindForeignTableSize = size
 		case "p":
-			p.mx.relkindPartitionedTable = count
-			p.mx.relkindPartitionedTableSize = size
+			c.mx.relkindPartitionedTable = count
+			c.mx.relkindPartitionedTableSize = size
 		case "I":
-			p.mx.relkindPartitionedIndex = count
-			p.mx.relkindPartitionedIndexSize = size
+			c.mx.relkindPartitionedIndex = count
+			c.mx.relkindPartitionedIndexSize = size
 		}
 	})
 }
 
-func (p *Postgres) doQueryAutovacuumWorkers() error {
+func (c *Collector) doQueryAutovacuumWorkers() error {
 	q := queryAutovacuumWorkers()
 
-	return p.doQuery(q, func(column, value string, _ bool) {
+	return c.doQuery(q, func(column, value string, _ bool) {
 		switch column {
 		case "autovacuum_analyze":
-			p.mx.autovacuumWorkersAnalyze = parseInt(value)
+			c.mx.autovacuumWorkersAnalyze = parseInt(value)
 		case "autovacuum_vacuum_analyze":
-			p.mx.autovacuumWorkersVacuumAnalyze = parseInt(value)
+			c.mx.autovacuumWorkersVacuumAnalyze = parseInt(value)
 		case "autovacuum_vacuum":
-			p.mx.autovacuumWorkersVacuum = parseInt(value)
+			c.mx.autovacuumWorkersVacuum = parseInt(value)
 		case "autovacuum_vacuum_freeze":
-			p.mx.autovacuumWorkersVacuumFreeze = parseInt(value)
+			c.mx.autovacuumWorkersVacuumFreeze = parseInt(value)
 		case "autovacuum_brin_summarize":
-			p.mx.autovacuumWorkersBrinSummarize = parseInt(value)
+			c.mx.autovacuumWorkersBrinSummarize = parseInt(value)
 		}
 	})
 }
 
-func (p *Postgres) doQueryXactQueryRunningTime() error {
+func (c *Collector) doQueryXactQueryRunningTime() error {
 	q := queryXactQueryRunningTime()
 
 	var state string
-	return p.doQuery(q, func(column, value string, _ bool) {
+	return c.doQuery(q, func(column, value string, _ bool) {
 		switch column {
 		case "state":
 			state = value
 		case "xact_running_time":
 			v, _ := strconv.ParseFloat(value, 64)
-			p.mx.xactTimeHist.Observe(v)
+			c.mx.xactTimeHist.Observe(v)
 		case "query_running_time":
 			if state == "active" {
 				v, _ := strconv.ParseFloat(value, 64)
-				p.mx.queryTimeHist.Observe(v)
+				c.mx.queryTimeHist.Observe(v)
 			}
 		}
 	})

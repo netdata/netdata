@@ -30,8 +30,8 @@ func init() {
 	})
 }
 
-func New() *Postgres {
-	return &Postgres{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout:            confopt.Duration(time.Second * 2),
 			DSN:                "postgres://postgres:postgres@127.0.0.1:5432/postgres",
@@ -70,7 +70,7 @@ type Config struct {
 }
 
 type (
-	Postgres struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -99,30 +99,30 @@ type (
 	}
 )
 
-func (p *Postgres) Configuration() any {
-	return p.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (p *Postgres) Init() error {
-	err := p.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	sr, err := p.initDBSelector()
+	sr, err := c.initDBSelector()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
-	p.dbSr = sr
+	c.dbSr = sr
 
-	p.mx.xactTimeHist = metrix.NewHistogramWithRangeBuckets(p.XactTimeHistogram)
-	p.mx.queryTimeHist = metrix.NewHistogramWithRangeBuckets(p.QueryTimeHistogram)
+	c.mx.xactTimeHist = metrix.NewHistogramWithRangeBuckets(c.XactTimeHistogram)
+	c.mx.queryTimeHist = metrix.NewHistogramWithRangeBuckets(c.QueryTimeHistogram)
 
 	return nil
 }
 
-func (p *Postgres) Check() error {
-	mx, err := p.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -132,14 +132,14 @@ func (p *Postgres) Check() error {
 	return nil
 }
 
-func (p *Postgres) Charts() *module.Charts {
-	return p.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (p *Postgres) Collect() map[string]int64 {
-	mx, err := p.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -148,17 +148,17 @@ func (p *Postgres) Collect() map[string]int64 {
 	return mx
 }
 
-func (p *Postgres) Cleanup() {
-	if p.db == nil {
+func (c *Collector) Cleanup() {
+	if c.db == nil {
 		return
 	}
-	if err := p.db.Close(); err != nil {
-		p.Warningf("cleanup: error on closing the Postgres database [%s]: %v", p.DSN, err)
+	if err := c.db.Close(); err != nil {
+		c.Warningf("cleanup: error on closing the Postgres database [%s]: %v", c.DSN, err)
 	}
-	p.db = nil
+	c.db = nil
 
-	for dbname, conn := range p.dbConns {
-		delete(p.dbConns, dbname)
+	for dbname, conn := range c.dbConns {
+		delete(c.dbConns, dbname)
 		if conn.connStr != "" {
 			stdlib.UnregisterConnConfig(conn.connStr)
 		}

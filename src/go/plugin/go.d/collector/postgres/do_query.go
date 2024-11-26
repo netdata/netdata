@@ -7,26 +7,26 @@ import (
 	"database/sql"
 )
 
-func (p *Postgres) doQueryRow(query string, v any) error {
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
+func (c *Collector) doQueryRow(query string, v any) error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	return p.db.QueryRowContext(ctx, query).Scan(v)
+	return c.db.QueryRowContext(ctx, query).Scan(v)
 }
 
-func (p *Postgres) doDBQueryRow(db *sql.DB, query string, v any) error {
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
+func (c *Collector) doDBQueryRow(db *sql.DB, query string, v any) error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
 	return db.QueryRowContext(ctx, query).Scan(v)
 }
 
-func (p *Postgres) doQuery(query string, assign func(column, value string, rowEnd bool)) error {
-	return p.doDBQuery(p.db, query, assign)
+func (c *Collector) doQuery(query string, assign func(column, value string, rowEnd bool)) error {
+	return c.doDBQuery(c.db, query, assign)
 }
 
-func (p *Postgres) doDBQuery(db *sql.DB, query string, assign func(column, value string, rowEnd bool)) error {
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
+func (c *Collector) doDBQuery(db *sql.DB, query string, assign func(column, value string, rowEnd bool)) error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
 	rows, err := db.QueryContext(ctx, query)
