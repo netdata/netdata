@@ -28,25 +28,25 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestUpsd_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Upsd{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestUpsd_Cleanup(t *testing.T) {
-	upsd := New()
+func TestCollector_Cleanup(t *testing.T) {
+	upcollrd := New()
 
-	require.NotPanics(t, upsd.Cleanup)
+	require.NotPanics(t, upcollrd.Cleanup)
 
 	mock := prepareMockConnOK()
-	upsd.newUpsdConn = func(Config) upsdConn { return mock }
+	upcollrd.newUpsdConn = func(Config) upsdConn { return mock }
 
-	require.NoError(t, upsd.Init())
-	_ = upsd.Collect()
-	require.NotPanics(t, upsd.Cleanup)
+	require.NoError(t, upcollrd.Init())
+	_ = upcollrd.Collect()
+	require.NotPanics(t, upcollrd.Cleanup)
 	assert.True(t, mock.calledDisconnect)
 }
 
-func TestUpsd_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -63,21 +63,21 @@ func TestUpsd_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			upsd := New()
-			upsd.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, upsd.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, upsd.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestUpsd_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepareUpsd func() *Upsd
+		prepareUpsd func() *Collector
 		prepareMock func() *mockUpsdConn
 		wantFail    bool
 	}{
@@ -93,11 +93,11 @@ func TestUpsd_Check(t *testing.T) {
 		},
 		"error on authenticate()": {
 			wantFail: true,
-			prepareUpsd: func() *Upsd {
-				upsd := New()
-				upsd.Username = "user"
-				upsd.Password = "pass"
-				return upsd
+			prepareUpsd: func() *Collector {
+				collr := New()
+				collr.Username = "user"
+				collr.Password = "pass"
+				return collr
 			},
 			prepareMock: prepareMockConnErrOnAuthenticate,
 		},
@@ -110,29 +110,29 @@ func TestUpsd_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			upsd := test.prepareUpsd()
-			upsd.newUpsdConn = func(Config) upsdConn { return test.prepareMock() }
+			collr := test.prepareUpsd()
+			collr.newUpsdConn = func(Config) upsdConn { return test.prepareMock() }
 
-			require.NoError(t, upsd.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, upsd.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, upsd.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestUpsd_Charts(t *testing.T) {
-	upsd := New()
-	require.NoError(t, upsd.Init())
-	assert.NotNil(t, upsd.Charts())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestUpsd_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepareUpsd          func() *Upsd
+		prepareUpsd          func() *Collector
 		prepareMock          func() *mockUpsdConn
 		wantCollected        map[string]int64
 		wantCharts           int
@@ -210,11 +210,11 @@ func TestUpsd_Collect(t *testing.T) {
 			wantConnAuthenticate: false,
 		},
 		"error on authenticate()": {
-			prepareUpsd: func() *Upsd {
-				upsd := New()
-				upsd.Username = "user"
-				upsd.Password = "pass"
-				return upsd
+			prepareUpsd: func() *Collector {
+				collr := New()
+				collr.Username = "user"
+				collr.Password = "pass"
+				return collr
 			},
 			prepareMock:          prepareMockConnErrOnAuthenticate,
 			wantCollected:        nil,
@@ -245,18 +245,18 @@ func TestUpsd_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			upsd := test.prepareUpsd()
-			require.NoError(t, upsd.Init())
+			collr := test.prepareUpsd()
+			require.NoError(t, collr.Init())
 
 			mock := test.prepareMock()
-			upsd.newUpsdConn = func(Config) upsdConn { return mock }
+			collr.newUpsdConn = func(Config) upsdConn { return mock }
 
-			mx := upsd.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
-			assert.Equalf(t, test.wantCharts, len(*upsd.Charts()), "number of charts")
+			assert.Equalf(t, test.wantCharts, len(*collr.Charts()), "number of charts")
 			if len(test.wantCollected) > 0 {
-				ensureCollectedHasAllChartsDims(t, upsd, mx)
+				ensureCollectedHasAllChartsDims(t, collr, mx)
 			}
 			assert.Equalf(t, test.wantConnConnect, mock.calledConnect, "calledConnect")
 			assert.Equalf(t, test.wantConnDisconnect, mock.calledDisconnect, "calledDisconnect")
@@ -265,8 +265,8 @@ func TestUpsd_Collect(t *testing.T) {
 	}
 }
 
-func ensureCollectedHasAllChartsDims(t *testing.T, upsd *Upsd, mx map[string]int64) {
-	for _, chart := range *upsd.Charts() {
+func ensureCollectedHasAllChartsDims(t *testing.T, collr *Collector, mx map[string]int64) {
+	for _, chart := range *collr.Charts() {
 		if chart.Obsolete {
 			continue
 		}

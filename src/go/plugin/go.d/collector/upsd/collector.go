@@ -22,8 +22,8 @@ func init() {
 	})
 }
 
-func New() *Upsd {
-	return &Upsd{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:3493",
 			Timeout: confopt.Duration(time.Second * 2),
@@ -42,41 +42,32 @@ type Config struct {
 	Password    string           `yaml:"password,omitempty" json:"password"`
 }
 
-type (
-	Upsd struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		conn        upsdConn
-		newUpsdConn func(Config) upsdConn
+	conn        upsdConn
+	newUpsdConn func(Config) upsdConn
 
-		upsUnits map[string]bool
-	}
-
-	upsdConn interface {
-		connect() error
-		disconnect() error
-		authenticate(string, string) error
-		upsUnits() ([]upsUnit, error)
-	}
-)
-
-func (u *Upsd) Configuration() any {
-	return u.Config
+	upsUnits map[string]bool
 }
 
-func (u *Upsd) Init() error {
-	if u.Address == "" {
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	if c.Address == "" {
 		return errors.New("config: 'address' not set")
 	}
 
 	return nil
 }
 
-func (u *Upsd) Check() error {
-	mx, err := u.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -86,14 +77,14 @@ func (u *Upsd) Check() error {
 	return nil
 }
 
-func (u *Upsd) Charts() *module.Charts {
-	return u.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (u *Upsd) Collect() map[string]int64 {
-	mx, err := u.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		u.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -102,12 +93,12 @@ func (u *Upsd) Collect() map[string]int64 {
 	return mx
 }
 
-func (u *Upsd) Cleanup() {
-	if u.conn == nil {
+func (c *Collector) Cleanup() {
+	if c.conn == nil {
 		return
 	}
-	if err := u.conn.disconnect(); err != nil {
-		u.Warningf("error on disconnect: %v", err)
+	if err := c.conn.disconnect(); err != nil {
+		c.Warningf("error on disconnect: %v", err)
 	}
-	u.conn = nil
+	c.conn = nil
 }
