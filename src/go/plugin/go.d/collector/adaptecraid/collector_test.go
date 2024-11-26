@@ -39,11 +39,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestAdaptecRaid_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &AdaptecRaid{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestAdaptecRaid_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -56,58 +56,58 @@ func TestAdaptecRaid_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			adaptec := New()
+			collr := New()
 
 			if test.wantFail {
-				assert.Error(t, adaptec.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, adaptec.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestAdaptecRaid_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *AdaptecRaid
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *AdaptecRaid {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *AdaptecRaid {
-				adaptec := New()
-				adaptec.exec = prepareMockOkCurrent()
-				_ = adaptec.Check()
-				return adaptec
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOkCurrent()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *AdaptecRaid {
-				adaptec := New()
-				adaptec.exec = prepareMockOkCurrent()
-				_ = adaptec.Collect()
-				return adaptec
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOkCurrent()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			adaptec := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, adaptec.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestAdaptecRaid_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestAdaptecRaid_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockArcconfExec
 		wantFail    bool
@@ -136,20 +136,20 @@ func TestAdaptecRaid_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			adaptec := New()
+			collr := New()
 			mock := test.prepareMock()
-			adaptec.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, adaptec.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, adaptec.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestAdaptecRaid_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockArcconfExec
 		wantMetrics map[string]int64
@@ -214,14 +214,14 @@ func TestAdaptecRaid_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			adaptec := New()
+			collr := New()
 			mock := test.prepareMock()
-			adaptec.exec = mock
+			collr.exec = mock
 
-			mx := adaptec.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
-			assert.Len(t, *adaptec.Charts(), test.wantCharts)
+			assert.Len(t, *collr.Charts(), test.wantCharts)
 		})
 	}
 }

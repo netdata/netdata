@@ -25,8 +25,8 @@ type physicalDevice struct {
 	temperature   string
 }
 
-func (a *AdaptecRaid) collectPhysicalDevices(mx map[string]int64) error {
-	bs, err := a.exec.physicalDevicesInfo()
+func (c *Collector) collectPhysicalDevices(mx map[string]int64) error {
+	bs, err := c.exec.physicalDevicesInfo()
 	if err != nil {
 		return err
 	}
@@ -41,9 +41,9 @@ func (a *AdaptecRaid) collectPhysicalDevices(mx map[string]int64) error {
 	}
 
 	for _, pd := range devices {
-		if !a.pds[pd.number] {
-			a.pds[pd.number] = true
-			a.addPhysicalDeviceCharts(pd)
+		if !c.pds[pd.number] {
+			c.pds[pd.number] = true
+			c.addPhysicalDeviceCharts(pd)
 		}
 
 		px := fmt.Sprintf("pd_%s_", pd.number)

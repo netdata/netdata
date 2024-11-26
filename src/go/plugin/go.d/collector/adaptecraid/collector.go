@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *AdaptecRaid {
-	return &AdaptecRaid{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -44,40 +44,34 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type (
-	AdaptecRaid struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec arcconfCli
+	exec arcconfCli
 
-		lds map[string]bool
-		pds map[string]bool
-	}
-	arcconfCli interface {
-		logicalDevicesInfo() ([]byte, error)
-		physicalDevicesInfo() ([]byte, error)
-	}
-)
-
-func (a *AdaptecRaid) Configuration() any {
-	return a.Config
+	lds map[string]bool
+	pds map[string]bool
 }
 
-func (a *AdaptecRaid) Init() error {
-	arcconfExec, err := a.initArcconfCliExec()
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	arcconf, err := c.initArcconfCliExec()
 	if err != nil {
 		return fmt.Errorf("arcconf exec initialization: %v", err)
 	}
-	a.exec = arcconfExec
+	c.exec = arcconf
 
 	return nil
 }
 
-func (a *AdaptecRaid) Check() error {
-	mx, err := a.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -89,14 +83,14 @@ func (a *AdaptecRaid) Check() error {
 	return nil
 }
 
-func (a *AdaptecRaid) Charts() *module.Charts {
-	return a.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (a *AdaptecRaid) Collect() map[string]int64 {
-	mx, err := a.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		a.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -106,4 +100,4 @@ func (a *AdaptecRaid) Collect() map[string]int64 {
 	return mx
 }
 
-func (a *AdaptecRaid) Cleanup() {}
+func (c *Collector) Cleanup() {}

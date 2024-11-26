@@ -20,8 +20,8 @@ type logicalDevice struct {
 	failedStripes string
 }
 
-func (a *AdaptecRaid) collectLogicalDevices(mx map[string]int64) error {
-	bs, err := a.exec.logicalDevicesInfo()
+func (c *Collector) collectLogicalDevices(mx map[string]int64) error {
+	bs, err := c.exec.logicalDevicesInfo()
 	if err != nil {
 		return err
 	}
@@ -36,9 +36,9 @@ func (a *AdaptecRaid) collectLogicalDevices(mx map[string]int64) error {
 	}
 
 	for _, ld := range devices {
-		if !a.lds[ld.number] {
-			a.lds[ld.number] = true
-			a.addLogicalDeviceCharts(ld)
+		if !c.lds[ld.number] {
+			c.lds[ld.number] = true
+			c.addLogicalDeviceCharts(ld)
 		}
 
 		px := fmt.Sprintf("ld_%s_", ld.number)
