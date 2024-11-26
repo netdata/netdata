@@ -22,8 +22,8 @@ func init() {
 	})
 }
 
-func New() *Memcached {
-	return &Memcached{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:11211",
 			Timeout: confopt.Duration(time.Second * 1),
@@ -39,37 +39,30 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout" json:"timeout"`
 }
 
-type (
-	Memcached struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		newMemcachedConn func(Config) memcachedConn
-		conn             memcachedConn
-	}
-	memcachedConn interface {
-		connect() error
-		disconnect()
-		queryStats() ([]byte, error)
-	}
-)
-
-func (m *Memcached) Configuration() any {
-	return m.Config
+	newMemcachedConn func(Config) memcachedConn
+	conn             memcachedConn
 }
 
-func (m *Memcached) Init() error {
-	if m.Address == "" {
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	if c.Address == "" {
 		return errors.New("config: 'address' not set")
 	}
 
 	return nil
 }
 
-func (m *Memcached) Check() error {
-	mx, err := m.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -81,14 +74,14 @@ func (m *Memcached) Check() error {
 	return nil
 }
 
-func (m *Memcached) Charts() *module.Charts {
-	return m.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (m *Memcached) Collect() map[string]int64 {
-	mx, err := m.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		m.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -98,9 +91,9 @@ func (m *Memcached) Collect() map[string]int64 {
 	return mx
 }
 
-func (m *Memcached) Cleanup() {
-	if m.conn != nil {
-		m.conn.disconnect()
-		m.conn = nil
+func (c *Collector) Cleanup() {
+	if c.conn != nil {
+		c.conn.disconnect()
+		c.conn = nil
 	}
 }

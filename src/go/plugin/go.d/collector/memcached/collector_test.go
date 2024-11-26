@@ -31,11 +31,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestMemcached_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Memcached{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestMemcached_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -56,59 +56,59 @@ func TestMemcached_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mem := New()
-			mem.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, mem.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, mem.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestMemcached_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *Memcached
+		prepare func() *Collector
 	}{
 		"not initialized": {
-			prepare: func() *Memcached {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *Memcached {
-				mem := New()
-				mem.newMemcachedConn = func(config Config) memcachedConn { return prepareMockOk() }
-				_ = mem.Check()
-				return mem
+			prepare: func() *Collector {
+				collr := New()
+				collr.newMemcachedConn = func(config Config) memcachedConn { return prepareMockOk() }
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *Memcached {
-				mem := New()
-				mem.newMemcachedConn = func(config Config) memcachedConn { return prepareMockOk() }
-				_ = mem.Collect()
-				return mem
+			prepare: func() *Collector {
+				collr := New()
+				collr.newMemcachedConn = func(config Config) memcachedConn { return prepareMockOk() }
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mem := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, mem.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestMemcached_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestMemcached_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockMemcachedConn
 		wantFail    bool
@@ -133,20 +133,20 @@ func TestMemcached_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mem := New()
+			collr := New()
 			mock := test.prepareMock()
-			mem.newMemcachedConn = func(config Config) memcachedConn { return mock }
+			collr.newMemcachedConn = func(config Config) memcachedConn { return mock }
 
 			if test.wantFail {
-				assert.Error(t, mem.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, mem.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestMemcached_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock             func() *mockMemcachedConn
 		wantMetrics             map[string]int64
@@ -217,20 +217,20 @@ func TestMemcached_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			mem := New()
+			collr := New()
 			mock := test.prepareMock()
-			mem.newMemcachedConn = func(config Config) memcachedConn { return mock }
+			collr.newMemcachedConn = func(config Config) memcachedConn { return mock }
 
-			mx := mem.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, mem.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 
 			assert.Equal(t, test.disconnectBeforeCleanup, mock.disconnectCalled, "disconnect before cleanup")
-			mem.Cleanup()
+			collr.Cleanup()
 			assert.Equal(t, test.disconnectAfterCleanup, mock.disconnectCalled, "disconnect after cleanup")
 		})
 	}
