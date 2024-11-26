@@ -43,11 +43,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestElasticsearch_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Elasticsearch{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestElasticsearch_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -109,21 +109,21 @@ func TestElasticsearch_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			es := New()
-			es.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, es.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, es.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestElasticsearch_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(*testing.T) (es *Elasticsearch, cleanup func())
+		prepare  func(*testing.T) (collr *Collector, cleanup func())
 		wantFail bool
 	}{
 		"valid data":         {prepare: prepareElasticsearchValidData},
@@ -134,41 +134,41 @@ func TestElasticsearch_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			es, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, es.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, es.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestElasticsearch_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestElasticsearch_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestElasticsearch_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() *Elasticsearch
+		prepare       func() *Collector
 		wantCollected map[string]int64
 		wantCharts    int
 	}{
 		"v842: all nodes stats": {
-			prepare: func() *Elasticsearch {
-				es := New()
-				es.ClusterMode = true
-				es.DoNodeStats = true
-				es.DoClusterHealth = false
-				es.DoClusterStats = false
-				es.DoIndicesStats = false
-				return es
+			prepare: func() *Collector {
+				collr := New()
+				collr.ClusterMode = true
+				collr.DoNodeStats = true
+				collr.DoClusterHealth = false
+				collr.DoClusterStats = false
+				collr.DoIndicesStats = false
+				return collr
 			},
 			wantCharts: len(nodeChartsTmpl) * 3,
 			wantCollected: map[string]int64{
@@ -433,13 +433,13 @@ func TestElasticsearch_Collect(t *testing.T) {
 			},
 		},
 		"v842: local node stats": {
-			prepare: func() *Elasticsearch {
-				es := New()
-				es.DoNodeStats = true
-				es.DoClusterHealth = false
-				es.DoClusterStats = false
-				es.DoIndicesStats = false
-				return es
+			prepare: func() *Collector {
+				collr := New()
+				collr.DoNodeStats = true
+				collr.DoClusterHealth = false
+				collr.DoClusterStats = false
+				collr.DoIndicesStats = false
+				return collr
 			},
 			wantCharts: len(nodeChartsTmpl),
 			wantCollected: map[string]int64{
@@ -532,13 +532,13 @@ func TestElasticsearch_Collect(t *testing.T) {
 			},
 		},
 		"v842: only cluster_health": {
-			prepare: func() *Elasticsearch {
-				es := New()
-				es.DoNodeStats = false
-				es.DoClusterHealth = true
-				es.DoClusterStats = false
-				es.DoIndicesStats = false
-				return es
+			prepare: func() *Collector {
+				collr := New()
+				collr.DoNodeStats = false
+				collr.DoClusterHealth = true
+				collr.DoClusterStats = false
+				collr.DoIndicesStats = false
+				return collr
 			},
 			wantCharts: len(clusterHealthChartsTmpl),
 			wantCollected: map[string]int64{
@@ -559,13 +559,13 @@ func TestElasticsearch_Collect(t *testing.T) {
 			},
 		},
 		"v842: only cluster_stats": {
-			prepare: func() *Elasticsearch {
-				es := New()
-				es.DoNodeStats = false
-				es.DoClusterHealth = false
-				es.DoClusterStats = true
-				es.DoIndicesStats = false
-				return es
+			prepare: func() *Collector {
+				collr := New()
+				collr.DoNodeStats = false
+				collr.DoClusterHealth = false
+				collr.DoClusterStats = true
+				collr.DoIndicesStats = false
+				return collr
 			},
 			wantCharts: len(clusterStatsChartsTmpl),
 			wantCollected: map[string]int64{
@@ -594,13 +594,13 @@ func TestElasticsearch_Collect(t *testing.T) {
 			},
 		},
 		"v842: only indices_stats": {
-			prepare: func() *Elasticsearch {
-				es := New()
-				es.DoNodeStats = false
-				es.DoClusterHealth = false
-				es.DoClusterStats = false
-				es.DoIndicesStats = true
-				return es
+			prepare: func() *Collector {
+				collr := New()
+				collr.DoNodeStats = false
+				collr.DoClusterHealth = false
+				collr.DoClusterStats = false
+				collr.DoIndicesStats = true
+				return collr
 			},
 			wantCharts: len(nodeIndexChartsTmpl) * 3,
 			wantCollected: map[string]int64{
@@ -628,69 +628,69 @@ func TestElasticsearch_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			es, cleanup := prepareElasticsearch(t, test.prepare)
+			collr, cleanup := prepareElasticsearch(t, test.prepare)
 			defer cleanup()
 
 			var mx map[string]int64
 			for i := 0; i < 10; i++ {
-				mx = es.Collect()
+				mx = collr.Collect()
 			}
 
 			assert.Equal(t, test.wantCollected, mx)
-			assert.Len(t, *es.Charts(), test.wantCharts)
-			module.TestMetricsHasAllChartsDims(t, es.Charts(), mx)
+			assert.Len(t, *collr.Charts(), test.wantCharts)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }
 
-func prepareElasticsearch(t *testing.T, createES func() *Elasticsearch) (es *Elasticsearch, cleanup func()) {
+func prepareElasticsearch(t *testing.T, createES func() *Collector) (collr *Collector, cleanup func()) {
 	t.Helper()
 	srv := prepareElasticsearchEndpoint()
 
-	es = createES()
-	es.URL = srv.URL
-	require.NoError(t, es.Init())
+	collr = createES()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return es, srv.Close
+	return collr, srv.Close
 }
 
-func prepareElasticsearchValidData(t *testing.T) (es *Elasticsearch, cleanup func()) {
+func prepareElasticsearchValidData(t *testing.T) (es *Collector, cleanup func()) {
 	return prepareElasticsearch(t, New)
 }
 
-func prepareElasticsearchInvalidData(t *testing.T) (*Elasticsearch, func()) {
+func prepareElasticsearchInvalidData(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	es := New()
-	es.URL = srv.URL
-	require.NoError(t, es.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return es, srv.Close
+	return collr, srv.Close
 }
 
-func prepareElasticsearch404(t *testing.T) (*Elasticsearch, func()) {
+func prepareElasticsearch404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	es := New()
-	es.URL = srv.URL
-	require.NoError(t, es.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return es, srv.Close
+	return collr, srv.Close
 }
 
-func prepareElasticsearchConnectionRefused(t *testing.T) (*Elasticsearch, func()) {
+func prepareElasticsearchConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	es := New()
-	es.URL = "http://127.0.0.1:38001"
-	require.NoError(t, es.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001"
+	require.NoError(t, collr.Init())
 
-	return es, func() {}
+	return collr, func() {}
 }
 
 func prepareElasticsearchEndpoint() *httptest.Server {

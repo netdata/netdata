@@ -29,8 +29,8 @@ func init() {
 	})
 }
 
-func New() *Elasticsearch {
-	return &Elasticsearch{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -66,7 +66,7 @@ type Config struct {
 	DoIndicesStats  bool `yaml:"collect_indices_stats" json:"collect_indices_stats"`
 }
 
-type Elasticsearch struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -81,27 +81,27 @@ type Elasticsearch struct {
 	indices     map[string]bool
 }
 
-func (es *Elasticsearch) Configuration() any {
-	return es.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (es *Elasticsearch) Init() error {
-	err := es.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("check configuration: %v", err)
 	}
 
-	httpClient, err := es.initHTTPClient()
+	httpClient, err := c.initHTTPClient()
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
-	es.httpClient = httpClient
+	c.httpClient = httpClient
 
 	return nil
 }
 
-func (es *Elasticsearch) Check() error {
-	mx, err := es.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -112,14 +112,14 @@ func (es *Elasticsearch) Check() error {
 	return nil
 }
 
-func (es *Elasticsearch) Charts() *module.Charts {
-	return es.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (es *Elasticsearch) Collect() map[string]int64 {
-	mx, err := es.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		es.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -128,8 +128,8 @@ func (es *Elasticsearch) Collect() map[string]int64 {
 	return mx
 }
 
-func (es *Elasticsearch) Cleanup() {
-	if es.httpClient != nil {
-		es.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }
