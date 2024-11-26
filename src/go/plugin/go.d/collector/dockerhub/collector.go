@@ -27,8 +27,8 @@ func init() {
 	})
 }
 
-func New() *DockerHub {
-	return &DockerHub{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -48,33 +48,33 @@ type Config struct {
 	Repositories   []string `yaml:"repositories" json:"repositories"`
 }
 
-type DockerHub struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
 	client *apiClient
 }
 
-func (dh *DockerHub) Configuration() any {
-	return dh.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (dh *DockerHub) Init() error {
-	if err := dh.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	client, err := dh.initApiClient()
+	client, err := c.initApiClient()
 	if err != nil {
 		return fmt.Errorf("init api client: %v", err)
 	}
-	dh.client = client
+	c.client = client
 
 	return nil
 }
 
-func (dh *DockerHub) Check() error {
-	mx, err := dh.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -85,25 +85,25 @@ func (dh *DockerHub) Check() error {
 	return nil
 }
 
-func (dh *DockerHub) Charts() *Charts {
+func (c *Collector) Charts() *Charts {
 	cs := charts.Copy()
-	addReposToCharts(dh.Repositories, cs)
+	addReposToCharts(c.Repositories, cs)
 	return cs
 }
 
-func (dh *DockerHub) Collect() map[string]int64 {
-	mx, err := dh.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 
 	if err != nil {
-		dh.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (dh *DockerHub) Cleanup() {
-	if dh.client != nil && dh.client.httpClient != nil {
-		dh.client.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.client != nil && c.client.httpClient != nil {
+		c.client.httpClient.CloseIdleConnections()
 	}
 }

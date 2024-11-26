@@ -36,26 +36,26 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestDockerHub_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &DockerHub{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestDockerHub_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
+func TestCollector_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
 
-func TestDockerHub_Cleanup(t *testing.T) { New().Cleanup() }
+func TestCollector_Cleanup(t *testing.T) { New().Cleanup() }
 
-func TestDockerHub_Init(t *testing.T) {
-	job := New()
-	job.Repositories = []string{"name/repo"}
-	assert.NoError(t, job.Init())
-	assert.NotNil(t, job.client)
+func TestCollector_Init(t *testing.T) {
+	collr := New()
+	collr.Repositories = []string{"name/repo"}
+	assert.NoError(t, collr.Init())
+	assert.NotNil(t, collr.client)
 }
 
-func TestDockerHub_InitNG(t *testing.T) {
+func TestCollector_InitNG(t *testing.T) {
 	assert.Error(t, New().Init())
 }
 
-func TestDockerHub_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -70,22 +70,22 @@ func TestDockerHub_Check(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	job.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.NoError(t, job.Init())
-	assert.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	collr.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
+	require.NoError(t, collr.Init())
+	assert.NoError(t, collr.Check())
 }
 
-func TestDockerHub_CheckNG(t *testing.T) {
-	job := New()
-	job.URL = "http://127.0.0.1:38001/metrics"
-	job.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+func TestCollector_CheckNG(t *testing.T) {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001/metrics"
+	collr.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestDockerHub_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -100,11 +100,11 @@ func TestDockerHub_Collect(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	job.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	collr.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"star_count_user1/name1": 45,
@@ -119,7 +119,7 @@ func TestDockerHub_Collect(t *testing.T) {
 		"pull_sum":               55620576,
 	}
 
-	collected := job.Collect()
+	collected := collr.Collect()
 
 	for k := range collected {
 		if strings.HasPrefix(k, "last") {
@@ -129,7 +129,7 @@ func TestDockerHub_Collect(t *testing.T) {
 	assert.Equal(t, expected, collected)
 }
 
-func TestDockerHub_InvalidData(t *testing.T) {
+func TestCollector_InvalidData(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -137,14 +137,14 @@ func TestDockerHub_InvalidData(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	job.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	collr.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestDockerHub_404(t *testing.T) {
+func TestCollector_404(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -152,8 +152,8 @@ func TestDockerHub_404(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
