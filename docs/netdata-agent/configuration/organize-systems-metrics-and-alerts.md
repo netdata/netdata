@@ -87,8 +87,12 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config netdata.conf
 ```
 
-Create a new `[host labels]` section defining a new host label and its value for the system in question. Make sure not
-to violate any of the [host label naming rules](/docs/netdata-agent/configuration/common-configuration-changes.md#organize-nodes-with-host-labels).
+Create a new `[host labels]` section defining a new host label and its value for the system in question. Make sure not to violate any of the host label naming rules:
+
+* Names cannot start with `_`, but it can be present in other parts of the name.
+* Names only accept alphabet letters, numbers, dots, and dashes.
+
+The policy for values is more flexible, but you cannot use exclamation marks (`!`), whitespaces (` `), single quotes (`'`), double quotes (`"`), or asterisks (`*`), because they are used to compare label values in health alerts and templates.
 
 ```text
 [host labels]
@@ -138,10 +142,7 @@ Now, if you'd like to remind yourself of how much RAM a certain child node has, 
 `http://localhost:19999/host/CHILD_HOSTNAME/api/v1/info` and reference the automatically generated host labels from the
 child system. It's a vastly simplified way of accessing critical information about your infrastructure.
 
-> ⚠️ Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like
-> kernel and operating system versions, you should secure streaming connections with SSL. See the [streaming documentation](/src/streaming/README.md#securing-streaming-with-tlsssl) for details. You may also want to use
-> [access lists](/src/web/server/README.md#access-lists) or [expose the API only to LAN/localhost
-> connections](/docs/netdata-agent/securing-netdata-agents.md#expose-netdata-only-in-a-private-lan).
+> ⚠️ Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like kernel and operating system versions, you should secure streaming connections with SSL. See the [streaming documentation](/src/streaming/README.md#securing-streaming-with-tlsssl) for details. You may also want to use [access lists](/src/web/server/README.md#access-lists) or [expose the API only to LAN/localhost connections](/docs/netdata-agent/securing-netdata-agents.md#restrict-dashboard-access-to-private-lan).
 
 You can also use `_is_parent`, `_is_child`, and any other host labels in both health entities and metrics
 exporting. Speaking of which...

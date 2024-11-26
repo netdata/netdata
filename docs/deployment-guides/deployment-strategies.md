@@ -12,7 +12,7 @@ The sections below go into configuration examples about these deployment concept
 
 ### Stand-alone
 
-The stand-alone setup is configured out of the box with reasonable defaults, but please consult our [configuration documentation](/docs/netdata-agent/configuration/README.md) for details, including the overview of [common configuration changes](/docs/netdata-agent/configuration/common-configuration-changes.md).
+The stand-alone setup is configured out of the box with reasonable defaults, but please consult our [configuration documentation](/docs/netdata-agent/configuration/README.md) for more details.
 
 ### Parent – Child
 
