@@ -32,11 +32,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestPuppet_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Puppet{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestPuppet_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -57,26 +57,26 @@ func TestPuppet_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			puppet := New()
-			puppet.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, puppet.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, puppet.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestPuppet_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestPuppet_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (*Puppet, func())
+		prepare  func(t *testing.T) (*Collector, func())
 	}{
 		"success default config": {
 			wantFail: false,
@@ -98,21 +98,21 @@ func TestPuppet_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			puppet, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, puppet.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, puppet.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestPuppet_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func(t *testing.T) (*Puppet, func())
+		prepare     func(t *testing.T) (*Collector, func())
 		wantMetrics map[string]int64
 	}{
 		"success default config": {
@@ -145,21 +145,21 @@ func TestPuppet_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			puppet, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := puppet.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, puppet.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareCaseOkDefault(t *testing.T) (*Puppet, func()) {
+func prepareCaseOkDefault(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -175,14 +175,14 @@ func prepareCaseOkDefault(t *testing.T) (*Puppet, func()) {
 			}
 		}))
 
-	puppet := New()
-	puppet.URL = srv.URL
-	require.NoError(t, puppet.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return puppet, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseUnexpectedJsonResponse(t *testing.T) (*Puppet, func()) {
+func prepareCaseUnexpectedJsonResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	resp := `
 {
@@ -206,32 +206,32 @@ func prepareCaseUnexpectedJsonResponse(t *testing.T) (*Puppet, func()) {
 			_, _ = w.Write([]byte(resp))
 		}))
 
-	puppet := New()
-	puppet.URL = srv.URL
-	require.NoError(t, puppet.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return puppet, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseInvalidFormatResponse(t *testing.T) (*Puppet, func()) {
+func prepareCaseInvalidFormatResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
 
-	puppet := New()
-	puppet.URL = srv.URL
-	require.NoError(t, puppet.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return puppet, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseConnectionRefused(t *testing.T) (*Puppet, func()) {
+func prepareCaseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	puppet := New()
-	puppet.URL = "http://127.0.0.1:65001"
-	require.NoError(t, puppet.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	require.NoError(t, collr.Init())
 
-	return puppet, func() {}
+	return collr, func() {}
 }

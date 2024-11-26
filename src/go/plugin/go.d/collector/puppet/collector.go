@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Puppet {
-	return &Puppet{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -46,7 +46,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Puppet struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -55,29 +55,29 @@ type Puppet struct {
 	httpClient *http.Client
 }
 
-func (p *Puppet) Configuration() any {
-	return p.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (p *Puppet) Init() error {
-	if p.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(p.ClientConfig)
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("create http client: %v", err)
 	}
-	p.httpClient = client
+	c.httpClient = client
 
-	p.Debugf("using URL %s", p.URL)
-	p.Debugf("using timeout: %s", p.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (p *Puppet) Check() error {
-	mx, err := p.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -89,14 +89,14 @@ func (p *Puppet) Check() error {
 	return nil
 }
 
-func (p *Puppet) Charts() *module.Charts {
-	return p.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (p *Puppet) Collect() map[string]int64 {
-	mx, err := p.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -106,8 +106,8 @@ func (p *Puppet) Collect() map[string]int64 {
 	return mx
 }
 
-func (p *Puppet) Cleanup() {
-	if p.httpClient != nil {
-		p.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }
