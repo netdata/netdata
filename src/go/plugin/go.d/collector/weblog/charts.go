@@ -641,11 +641,11 @@ func newCustomTimeFieldHistChart(f customTimeField) (*Chart, error) {
 	return chart, nil
 }
 
-func (w *WebLog) createCharts(line *logLine) error {
+func (c *Collector) createCharts(line *logLine) error {
 	if line.empty() {
 		return errors.New("empty line")
 	}
-	w.charts = nil
+	c.charts = nil
 	// Following charts are created during runtime:
 	//   - reqBySSLProto, reqBySSLCipherSuite - it is likely line has no SSL stuff at this moment
 	charts := &Charts{
@@ -673,12 +673,12 @@ func (w *WebLog) createCharts(line *logLine) error {
 		}
 	}
 	if line.hasReqMethod() {
-		if err := addMethodCharts(charts, w.URLPatterns); err != nil {
+		if err := addMethodCharts(charts, c.URLPatterns); err != nil {
 			return err
 		}
 	}
 	if line.hasReqURL() {
-		if err := addURLCharts(charts, w.URLPatterns); err != nil {
+		if err := addURLCharts(charts, c.URLPatterns); err != nil {
 			return err
 		}
 	}
@@ -688,44 +688,44 @@ func (w *WebLog) createCharts(line *logLine) error {
 		}
 	}
 	if line.hasRespCode() {
-		if err := addRespCodesCharts(charts, w.GroupRespCodes); err != nil {
+		if err := addRespCodesCharts(charts, c.GroupRespCodes); err != nil {
 			return err
 		}
 	}
 	if line.hasReqSize() || line.hasRespSize() {
-		if err := addBandwidthCharts(charts, w.URLPatterns); err != nil {
+		if err := addBandwidthCharts(charts, c.URLPatterns); err != nil {
 			return err
 		}
 	}
 	if line.hasReqProcTime() {
-		if err := addReqProcTimeCharts(charts, w.Histogram, w.URLPatterns); err != nil {
+		if err := addReqProcTimeCharts(charts, c.Histogram, c.URLPatterns); err != nil {
 			return err
 		}
 	}
 	if line.hasUpsRespTime() {
-		if err := addUpstreamRespTimeCharts(charts, w.Histogram); err != nil {
+		if err := addUpstreamRespTimeCharts(charts, c.Histogram); err != nil {
 			return err
 		}
 	}
 	if line.hasCustomFields() {
-		if len(w.CustomFields) > 0 {
-			if err := addCustomFieldsCharts(charts, w.CustomFields); err != nil {
+		if len(c.CustomFields) > 0 {
+			if err := addCustomFieldsCharts(charts, c.CustomFields); err != nil {
 				return err
 			}
 		}
-		if len(w.CustomTimeFields) > 0 {
-			if err := addCustomTimeFieldsCharts(charts, w.CustomTimeFields); err != nil {
+		if len(c.CustomTimeFields) > 0 {
+			if err := addCustomTimeFieldsCharts(charts, c.CustomTimeFields); err != nil {
 				return err
 			}
 		}
-		if len(w.CustomNumericFields) > 0 {
-			if err := addCustomNumericFieldsCharts(charts, w.CustomNumericFields); err != nil {
+		if len(c.CustomNumericFields) > 0 {
+			if err := addCustomNumericFieldsCharts(charts, c.CustomNumericFields); err != nil {
 				return err
 			}
 		}
 	}
 
-	w.charts = charts
+	c.charts = charts
 
 	return nil
 }

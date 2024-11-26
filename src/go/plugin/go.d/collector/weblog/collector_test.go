@@ -44,93 +44,93 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestWebLog_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &WebLog{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestWebLog_Init(t *testing.T) {
-	weblog := New()
+func TestCollector_Init(t *testing.T) {
+	collr := New()
 
-	assert.NoError(t, weblog.Init())
+	assert.NoError(t, collr.Init())
 }
 
-func TestWebLog_Init_ErrorOnCreatingURLPatterns(t *testing.T) {
-	weblog := New()
-	weblog.URLPatterns = []userPattern{{Match: "* !*"}}
+func TestCollector_Init_ErrorOnCreatingURLPatterns(t *testing.T) {
+	collr := New()
+	collr.URLPatterns = []userPattern{{Match: "* !*"}}
 
-	assert.Error(t, weblog.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestWebLog_Init_ErrorOnCreatingCustomFields(t *testing.T) {
-	weblog := New()
-	weblog.CustomFields = []customField{{Patterns: []userPattern{{Name: "p1", Match: "* !*"}}}}
+func TestCollector_Init_ErrorOnCreatingCustomFields(t *testing.T) {
+	collr := New()
+	collr.CustomFields = []customField{{Patterns: []userPattern{{Name: "p1", Match: "* !*"}}}}
 
-	assert.Error(t, weblog.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestWebLog_Check(t *testing.T) {
-	weblog := New()
-	defer weblog.Cleanup()
-	weblog.Path = "testdata/common.log"
-	require.NoError(t, weblog.Init())
+func TestCollector_Check(t *testing.T) {
+	collr := New()
+	defer collr.Cleanup()
+	collr.Path = "testdata/common.log"
+	require.NoError(t, collr.Init())
 
-	assert.NoError(t, weblog.Check())
+	assert.NoError(t, collr.Check())
 }
 
-func TestWebLog_Check_ErrorOnCreatingLogReaderNoLogFile(t *testing.T) {
-	weblog := New()
-	defer weblog.Cleanup()
-	weblog.Path = "testdata/not_exists.log"
-	require.NoError(t, weblog.Init())
+func TestCollector_Check_ErrorOnCreatingLogReaderNoLogFile(t *testing.T) {
+	collr := New()
+	defer collr.Cleanup()
+	collr.Path = "testdata/not_exists.log"
+	require.NoError(t, collr.Init())
 
-	assert.Error(t, weblog.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestWebLog_Check_ErrorOnCreatingParserUnknownFormat(t *testing.T) {
-	weblog := New()
-	defer weblog.Cleanup()
-	weblog.Path = "testdata/custom.log"
-	require.NoError(t, weblog.Init())
+func TestCollector_Check_ErrorOnCreatingParserUnknownFormat(t *testing.T) {
+	collr := New()
+	defer collr.Cleanup()
+	collr.Path = "testdata/custom.log"
+	require.NoError(t, collr.Init())
 
-	assert.Error(t, weblog.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestWebLog_Check_ErrorOnCreatingParserEmptyLine(t *testing.T) {
-	weblog := New()
-	defer weblog.Cleanup()
-	weblog.Path = "testdata/custom.log"
-	weblog.ParserConfig.LogType = logs.TypeCSV
-	weblog.ParserConfig.CSV.Format = "$one $two"
-	require.NoError(t, weblog.Init())
+func TestCollector_Check_ErrorOnCreatingParserEmptyLine(t *testing.T) {
+	collr := New()
+	defer collr.Cleanup()
+	collr.Path = "testdata/custom.log"
+	collr.ParserConfig.LogType = logs.TypeCSV
+	collr.ParserConfig.CSV.Format = "$one $two"
+	require.NoError(t, collr.Init())
 
-	assert.Error(t, weblog.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestWebLog_Charts(t *testing.T) {
-	weblog := New()
-	defer weblog.Cleanup()
-	weblog.Path = "testdata/common.log"
-	require.NoError(t, weblog.Init())
-	require.NoError(t, weblog.Check())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	defer collr.Cleanup()
+	collr.Path = "testdata/common.log"
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
-	assert.NotNil(t, weblog.Charts())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestWebLog_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestWebLog_Collect(t *testing.T) {
-	weblog := prepareWebLogCollectFull(t)
+func TestCollector_Collect(t *testing.T) {
+	collr := prepareWebLogCollectFull(t)
 
-	//m := weblog.Collect()
+	//mx := collr.Collect()
 	//l := make([]string, 0)
-	//for k := range m {
+	//for k := range mx {
 	//	l = append(l, k)
 	//}
 	//sort.Strings(l)
 	//for _, value := range l {
-	//	fmt.Println(fmt.Sprintf("\"%s\": %d,", value, m[value]))
+	//	fmt.Println(fmt.Sprintf("\"%s\": %d,", value, mx[value]))
 	//}
 
 	expected := map[string]int64{
@@ -312,13 +312,13 @@ func TestWebLog_Collect(t *testing.T) {
 		"url_ptn_org_resp_code_401":                               9,
 	}
 
-	mx := weblog.Collect()
+	mx := collr.Collect()
 	assert.Equal(t, expected, mx)
-	testCharts(t, weblog, mx)
+	testCharts(t, collr, mx)
 }
 
-func TestWebLog_Collect_CommonLogFormat(t *testing.T) {
-	weblog := prepareWebLogCollectCommon(t)
+func TestCollector_Collect_CommonLogFormat(t *testing.T) {
+	collr := prepareWebLogCollectCommon(t)
 
 	expected := map[string]int64{
 		"bytes_received":                    0,
@@ -392,13 +392,13 @@ func TestWebLog_Collect_CommonLogFormat(t *testing.T) {
 		"upstream_resp_time_sum":            0,
 	}
 
-	mx := weblog.Collect()
+	mx := collr.Collect()
 	assert.Equal(t, expected, mx)
-	testCharts(t, weblog, mx)
+	testCharts(t, collr, mx)
 }
 
-func TestWebLog_Collect_CustomLogs(t *testing.T) {
-	weblog := prepareWebLogCollectCustom(t)
+func TestCollector_Collect_CustomLogs(t *testing.T) {
+	collr := prepareWebLogCollectCustom(t)
 
 	expected := map[string]int64{
 		"bytes_received":                    0,
@@ -462,13 +462,13 @@ func TestWebLog_Collect_CustomLogs(t *testing.T) {
 		"upstream_resp_time_sum":            0,
 	}
 
-	mx := weblog.Collect()
+	mx := collr.Collect()
 	assert.Equal(t, expected, mx)
-	testCharts(t, weblog, mx)
+	testCharts(t, collr, mx)
 }
 
-func TestWebLog_Collect_CustomTimeFieldsLogs(t *testing.T) {
-	weblog := prepareWebLogCollectCustomTimeFields(t)
+func TestCollector_Collect_CustomTimeFieldsLogs(t *testing.T) {
+	collr := prepareWebLogCollectCustomTimeFields(t)
 
 	expected := map[string]int64{
 		"bytes_received":                              0,
@@ -564,13 +564,13 @@ func TestWebLog_Collect_CustomTimeFieldsLogs(t *testing.T) {
 		"upstream_resp_time_sum":                      0,
 	}
 
-	mx := weblog.Collect()
+	mx := collr.Collect()
 	assert.Equal(t, expected, mx)
-	testCharts(t, weblog, mx)
+	testCharts(t, collr, mx)
 }
 
-func TestWebLog_Collect_CustomNumericFieldsLogs(t *testing.T) {
-	weblog := prepareWebLogCollectCustomNumericFields(t)
+func TestCollector_Collect_CustomNumericFieldsLogs(t *testing.T) {
+	collr := prepareWebLogCollectCustomNumericFields(t)
 
 	expected := map[string]int64{
 		"bytes_received": 0,
@@ -640,14 +640,14 @@ func TestWebLog_Collect_CustomNumericFieldsLogs(t *testing.T) {
 		"upstream_resp_time_sum":            0,
 	}
 
-	mx := weblog.Collect()
+	mx := collr.Collect()
 
 	assert.Equal(t, expected, mx)
-	testCharts(t, weblog, mx)
+	testCharts(t, collr, mx)
 }
 
-func TestWebLog_IISLogs(t *testing.T) {
-	weblog := prepareWebLogCollectIISFields(t)
+func TestCollector_IISLogs(t *testing.T) {
+	collr := prepareWebLogCollectIISFields(t)
 
 	expected := map[string]int64{
 		"bytes_received":                    0,
@@ -714,141 +714,141 @@ func TestWebLog_IISLogs(t *testing.T) {
 		"upstream_resp_time_sum":            0,
 	}
 
-	mx := weblog.Collect()
+	mx := collr.Collect()
 	assert.Equal(t, expected, mx)
 }
 
-func testCharts(t *testing.T, w *WebLog, mx map[string]int64) {
-	testVhostChart(t, w)
-	testPortChart(t, w)
-	testSchemeChart(t, w)
-	testClientCharts(t, w)
-	testHTTPMethodChart(t, w)
-	testURLPatternChart(t, w)
-	testHTTPVersionChart(t, w)
-	testRespCodeCharts(t, w)
-	testBandwidthChart(t, w)
-	testReqProcTimeCharts(t, w)
-	testUpsRespTimeCharts(t, w)
-	testSSLProtoChart(t, w)
-	testSSLCipherSuiteChart(t, w)
-	testURLPatternStatsCharts(t, w)
-	testCustomFieldCharts(t, w)
-	testCustomTimeFieldCharts(t, w)
-	testCustomNumericFieldCharts(t, w)
+func testCharts(t *testing.T, c *Collector, mx map[string]int64) {
+	testVhostChart(t, c)
+	testPortChart(t, c)
+	testSchemeChart(t, c)
+	testClientCharts(t, c)
+	testHTTPMethodChart(t, c)
+	testURLPatternChart(t, c)
+	testHTTPVersionChart(t, c)
+	testRespCodeCharts(t, c)
+	testBandwidthChart(t, c)
+	testReqProcTimeCharts(t, c)
+	testUpsRespTimeCharts(t, c)
+	testSSLProtoChart(t, c)
+	testSSLCipherSuiteChart(t, c)
+	testURLPatternStatsCharts(t, c)
+	testCustomFieldCharts(t, c)
+	testCustomTimeFieldCharts(t, c)
+	testCustomNumericFieldCharts(t, c)
 
-	module.TestMetricsHasAllChartsDims(t, w.Charts(), mx)
+	module.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
 }
 
-func testVhostChart(t *testing.T, w *WebLog) {
-	if len(w.mx.ReqVhost) == 0 {
-		assert.Falsef(t, w.Charts().Has(reqByVhost.ID), "chart '%s' is created", reqByVhost.ID)
+func testVhostChart(t *testing.T, c *Collector) {
+	if len(c.mx.ReqVhost) == 0 {
+		assert.Falsef(t, c.Charts().Has(reqByVhost.ID), "chart '%s' is created", reqByVhost.ID)
 		return
 	}
 
-	chart := w.Charts().Get(reqByVhost.ID)
+	chart := c.Charts().Get(reqByVhost.ID)
 	assert.NotNilf(t, chart, "chart '%s' is not created", reqByVhost.ID)
 	if chart == nil {
 		return
 	}
-	for v := range w.mx.ReqVhost {
+	for v := range c.mx.ReqVhost {
 		id := "req_vhost_" + v
 		assert.Truef(t, chart.HasDim(id), "chart '%s' has no dim for '%s' vhost, expected '%s'", chart.ID, v, id)
 	}
 }
 
-func testPortChart(t *testing.T, w *WebLog) {
-	if len(w.mx.ReqPort) == 0 {
-		assert.Falsef(t, w.Charts().Has(reqByPort.ID), "chart '%s' is created", reqByPort.ID)
+func testPortChart(t *testing.T, c *Collector) {
+	if len(c.mx.ReqPort) == 0 {
+		assert.Falsef(t, c.Charts().Has(reqByPort.ID), "chart '%s' is created", reqByPort.ID)
 		return
 	}
 
-	chart := w.Charts().Get(reqByPort.ID)
+	chart := c.Charts().Get(reqByPort.ID)
 	assert.NotNilf(t, chart, "chart '%s' is not created", reqByPort.ID)
 	if chart == nil {
 		return
 	}
-	for v := range w.mx.ReqPort {
+	for v := range c.mx.ReqPort {
 		id := "req_port_" + v
 		assert.Truef(t, chart.HasDim(id), "chart '%s' has no dim for '%s' port, expected '%s'", chart.ID, v, id)
 	}
 }
 
-func testSchemeChart(t *testing.T, w *WebLog) {
-	if w.mx.ReqHTTPScheme.Value() == 0 && w.mx.ReqHTTPSScheme.Value() == 0 {
-		assert.Falsef(t, w.Charts().Has(reqByScheme.ID), "chart '%s' is created", reqByScheme.ID)
+func testSchemeChart(t *testing.T, c *Collector) {
+	if c.mx.ReqHTTPScheme.Value() == 0 && c.mx.ReqHTTPSScheme.Value() == 0 {
+		assert.Falsef(t, c.Charts().Has(reqByScheme.ID), "chart '%s' is created", reqByScheme.ID)
 	} else {
-		assert.Truef(t, w.Charts().Has(reqByScheme.ID), "chart '%s' is not created", reqByScheme.ID)
+		assert.Truef(t, c.Charts().Has(reqByScheme.ID), "chart '%s' is not created", reqByScheme.ID)
 	}
 }
 
-func testClientCharts(t *testing.T, w *WebLog) {
-	if w.mx.ReqIPv4.Value() == 0 && w.mx.ReqIPv6.Value() == 0 {
-		assert.Falsef(t, w.Charts().Has(reqByIPProto.ID), "chart '%s' is created", reqByIPProto.ID)
+func testClientCharts(t *testing.T, c *Collector) {
+	if c.mx.ReqIPv4.Value() == 0 && c.mx.ReqIPv6.Value() == 0 {
+		assert.Falsef(t, c.Charts().Has(reqByIPProto.ID), "chart '%s' is created", reqByIPProto.ID)
 	} else {
-		assert.Truef(t, w.Charts().Has(reqByIPProto.ID), "chart '%s' is not created", reqByIPProto.ID)
+		assert.Truef(t, c.Charts().Has(reqByIPProto.ID), "chart '%s' is not created", reqByIPProto.ID)
 	}
 
-	if w.mx.UniqueIPv4.Value() == 0 && w.mx.UniqueIPv6.Value() == 0 {
-		assert.Falsef(t, w.Charts().Has(uniqIPsCurPoll.ID), "chart '%s' is created", uniqIPsCurPoll.ID)
+	if c.mx.UniqueIPv4.Value() == 0 && c.mx.UniqueIPv6.Value() == 0 {
+		assert.Falsef(t, c.Charts().Has(uniqIPsCurPoll.ID), "chart '%s' is created", uniqIPsCurPoll.ID)
 	} else {
-		assert.Truef(t, w.Charts().Has(uniqIPsCurPoll.ID), "chart '%s' is not created", uniqIPsCurPoll.ID)
+		assert.Truef(t, c.Charts().Has(uniqIPsCurPoll.ID), "chart '%s' is not created", uniqIPsCurPoll.ID)
 	}
 }
 
-func testHTTPMethodChart(t *testing.T, w *WebLog) {
-	if len(w.mx.ReqMethod) == 0 {
-		assert.Falsef(t, w.Charts().Has(reqByMethod.ID), "chart '%s' is created", reqByMethod.ID)
+func testHTTPMethodChart(t *testing.T, c *Collector) {
+	if len(c.mx.ReqMethod) == 0 {
+		assert.Falsef(t, c.Charts().Has(reqByMethod.ID), "chart '%s' is created", reqByMethod.ID)
 		return
 	}
 
-	chart := w.Charts().Get(reqByMethod.ID)
+	chart := c.Charts().Get(reqByMethod.ID)
 	assert.NotNilf(t, chart, "chart '%s' is not created", reqByMethod.ID)
 	if chart == nil {
 		return
 	}
-	for v := range w.mx.ReqMethod {
+	for v := range c.mx.ReqMethod {
 		id := "req_method_" + v
 		assert.Truef(t, chart.HasDim(id), "chart '%s' has no dim for '%s' method, expected '%s'", chart.ID, v, id)
 	}
 }
 
-func testURLPatternChart(t *testing.T, w *WebLog) {
-	if isEmptyCounterVec(w.mx.ReqURLPattern) {
-		assert.Falsef(t, w.Charts().Has(reqByURLPattern.ID), "chart '%s' is created", reqByURLPattern.ID)
+func testURLPatternChart(t *testing.T, c *Collector) {
+	if isEmptyCounterVec(c.mx.ReqURLPattern) {
+		assert.Falsef(t, c.Charts().Has(reqByURLPattern.ID), "chart '%s' is created", reqByURLPattern.ID)
 		return
 	}
 
-	chart := w.Charts().Get(reqByURLPattern.ID)
+	chart := c.Charts().Get(reqByURLPattern.ID)
 	assert.NotNilf(t, chart, "chart '%s' is not created", reqByURLPattern.ID)
 	if chart == nil {
 		return
 	}
-	for v := range w.mx.ReqURLPattern {
+	for v := range c.mx.ReqURLPattern {
 		id := "req_url_ptn_" + v
 		assert.True(t, chart.HasDim(id), "chart '%s' has no dim for '%s' pattern, expected '%s'", chart.ID, v, id)
 	}
 }
 
-func testHTTPVersionChart(t *testing.T, w *WebLog) {
-	if len(w.mx.ReqVersion) == 0 {
-		assert.Falsef(t, w.Charts().Has(reqByVersion.ID), "chart '%s' is created", reqByVersion.ID)
+func testHTTPVersionChart(t *testing.T, c *Collector) {
+	if len(c.mx.ReqVersion) == 0 {
+		assert.Falsef(t, c.Charts().Has(reqByVersion.ID), "chart '%s' is created", reqByVersion.ID)
 		return
 	}
 
-	chart := w.Charts().Get(reqByVersion.ID)
+	chart := c.Charts().Get(reqByVersion.ID)
 	assert.NotNilf(t, chart, "chart '%s' is not created", reqByVersion.ID)
 	if chart == nil {
 		return
 	}
-	for v := range w.mx.ReqVersion {
+	for v := range c.mx.ReqVersion {
 		id := "req_version_" + v
 		assert.Truef(t, chart.HasDim(id), "chart '%s' has no dim for '%s' version, expected '%s'", chart.ID, v, id)
 	}
 }
 
-func testRespCodeCharts(t *testing.T, w *WebLog) {
-	if isEmptyCounterVec(w.mx.RespCode) {
+func testRespCodeCharts(t *testing.T, c *Collector) {
+	if isEmptyCounterVec(c.mx.RespCode) {
 		for _, id := range []string{
 			respCodes.ID,
 			respCodes1xx.ID,
@@ -857,18 +857,18 @@ func testRespCodeCharts(t *testing.T, w *WebLog) {
 			respCodes4xx.ID,
 			respCodes5xx.ID,
 		} {
-			assert.Falsef(t, w.Charts().Has(id), "chart '%s' is created", id)
+			assert.Falsef(t, c.Charts().Has(id), "chart '%s' is created", id)
 		}
 		return
 	}
 
-	if !w.GroupRespCodes {
-		chart := w.Charts().Get(respCodes.ID)
+	if !c.GroupRespCodes {
+		chart := c.Charts().Get(respCodes.ID)
 		assert.NotNilf(t, chart, "chart '%s' is not created", respCodes.ID)
 		if chart == nil {
 			return
 		}
-		for v := range w.mx.RespCode {
+		for v := range c.mx.RespCode {
 			id := "resp_code_" + v
 			assert.Truef(t, chart.HasDim(id), "chart '%s' has no dim for '%s' code, expected '%s'", chart.ID, v, id)
 		}
@@ -876,7 +876,7 @@ func testRespCodeCharts(t *testing.T, w *WebLog) {
 	}
 
 	findCodes := func(class string) (codes []string) {
-		for v := range w.mx.RespCode {
+		for v := range c.mx.RespCode {
 			if v[:1] == class {
 				codes = append(codes, v)
 			}
@@ -896,7 +896,7 @@ func testRespCodeCharts(t *testing.T, w *WebLog) {
 		class := strconv.Itoa(i + 1)
 		codes := findCodes(class)
 		n += len(codes)
-		chart := w.Charts().Get(chartID)
+		chart := c.Charts().Get(chartID)
 		assert.NotNilf(t, chart, "chart '%s' is not created", chartID)
 		if chart == nil {
 			return
@@ -906,95 +906,95 @@ func testRespCodeCharts(t *testing.T, w *WebLog) {
 			assert.Truef(t, chart.HasDim(id), "chart '%s' has no dim for '%s' code, expected '%s'", chartID, v, id)
 		}
 	}
-	assert.Equal(t, len(w.mx.RespCode), n)
+	assert.Equal(t, len(c.mx.RespCode), n)
 }
 
-func testBandwidthChart(t *testing.T, w *WebLog) {
-	if w.mx.BytesSent.Value() == 0 && w.mx.BytesReceived.Value() == 0 {
-		assert.Falsef(t, w.Charts().Has(bandwidth.ID), "chart '%s' is created", bandwidth.ID)
+func testBandwidthChart(t *testing.T, c *Collector) {
+	if c.mx.BytesSent.Value() == 0 && c.mx.BytesReceived.Value() == 0 {
+		assert.Falsef(t, c.Charts().Has(bandwidth.ID), "chart '%s' is created", bandwidth.ID)
 	} else {
-		assert.Truef(t, w.Charts().Has(bandwidth.ID), "chart '%s' is not created", bandwidth.ID)
-	}
-}
-
-func testReqProcTimeCharts(t *testing.T, w *WebLog) {
-	if isEmptySummary(w.mx.ReqProcTime) {
-		assert.Falsef(t, w.Charts().Has(reqProcTime.ID), "chart '%s' is created", reqProcTime.ID)
-	} else {
-		assert.Truef(t, w.Charts().Has(reqProcTime.ID), "chart '%s' is not created", reqProcTime.ID)
-	}
-
-	if isEmptyHistogram(w.mx.ReqProcTimeHist) {
-		assert.Falsef(t, w.Charts().Has(reqProcTimeHist.ID), "chart '%s' is created", reqProcTimeHist.ID)
-	} else {
-		assert.Truef(t, w.Charts().Has(reqProcTimeHist.ID), "chart '%s' is not created", reqProcTimeHist.ID)
+		assert.Truef(t, c.Charts().Has(bandwidth.ID), "chart '%s' is not created", bandwidth.ID)
 	}
 }
 
-func testUpsRespTimeCharts(t *testing.T, w *WebLog) {
-	if isEmptySummary(w.mx.UpsRespTime) {
-		assert.Falsef(t, w.Charts().Has(upsRespTime.ID), "chart '%s' is created", upsRespTime.ID)
+func testReqProcTimeCharts(t *testing.T, c *Collector) {
+	if isEmptySummary(c.mx.ReqProcTime) {
+		assert.Falsef(t, c.Charts().Has(reqProcTime.ID), "chart '%s' is created", reqProcTime.ID)
 	} else {
-		assert.Truef(t, w.Charts().Has(upsRespTime.ID), "chart '%s' is not created", upsRespTime.ID)
+		assert.Truef(t, c.Charts().Has(reqProcTime.ID), "chart '%s' is not created", reqProcTime.ID)
 	}
 
-	if isEmptyHistogram(w.mx.UpsRespTimeHist) {
-		assert.Falsef(t, w.Charts().Has(upsRespTimeHist.ID), "chart '%s' is created", upsRespTimeHist.ID)
+	if isEmptyHistogram(c.mx.ReqProcTimeHist) {
+		assert.Falsef(t, c.Charts().Has(reqProcTimeHist.ID), "chart '%s' is created", reqProcTimeHist.ID)
 	} else {
-		assert.Truef(t, w.Charts().Has(upsRespTimeHist.ID), "chart '%s' is not created", upsRespTimeHist.ID)
+		assert.Truef(t, c.Charts().Has(reqProcTimeHist.ID), "chart '%s' is not created", reqProcTimeHist.ID)
 	}
 }
 
-func testSSLProtoChart(t *testing.T, w *WebLog) {
-	if len(w.mx.ReqSSLProto) == 0 {
-		assert.Falsef(t, w.Charts().Has(reqBySSLProto.ID), "chart '%s' is created", reqBySSLProto.ID)
+func testUpsRespTimeCharts(t *testing.T, c *Collector) {
+	if isEmptySummary(c.mx.UpsRespTime) {
+		assert.Falsef(t, c.Charts().Has(upsRespTime.ID), "chart '%s' is created", upsRespTime.ID)
+	} else {
+		assert.Truef(t, c.Charts().Has(upsRespTime.ID), "chart '%s' is not created", upsRespTime.ID)
+	}
+
+	if isEmptyHistogram(c.mx.UpsRespTimeHist) {
+		assert.Falsef(t, c.Charts().Has(upsRespTimeHist.ID), "chart '%s' is created", upsRespTimeHist.ID)
+	} else {
+		assert.Truef(t, c.Charts().Has(upsRespTimeHist.ID), "chart '%s' is not created", upsRespTimeHist.ID)
+	}
+}
+
+func testSSLProtoChart(t *testing.T, c *Collector) {
+	if len(c.mx.ReqSSLProto) == 0 {
+		assert.Falsef(t, c.Charts().Has(reqBySSLProto.ID), "chart '%s' is created", reqBySSLProto.ID)
 		return
 	}
 
-	chart := w.Charts().Get(reqBySSLProto.ID)
+	chart := c.Charts().Get(reqBySSLProto.ID)
 	assert.NotNilf(t, chart, "chart '%s' is not created", reqBySSLProto.ID)
 	if chart == nil {
 		return
 	}
-	for v := range w.mx.ReqSSLProto {
+	for v := range c.mx.ReqSSLProto {
 		id := "req_ssl_proto_" + v
 		assert.Truef(t, chart.HasDim(id), "chart '%s' has no dim for '%s' ssl proto, expected '%s'", chart.ID, v, id)
 	}
 }
 
-func testSSLCipherSuiteChart(t *testing.T, w *WebLog) {
-	if len(w.mx.ReqSSLCipherSuite) == 0 {
-		assert.Falsef(t, w.Charts().Has(reqBySSLCipherSuite.ID), "chart '%s' is created", reqBySSLCipherSuite.ID)
+func testSSLCipherSuiteChart(t *testing.T, c *Collector) {
+	if len(c.mx.ReqSSLCipherSuite) == 0 {
+		assert.Falsef(t, c.Charts().Has(reqBySSLCipherSuite.ID), "chart '%s' is created", reqBySSLCipherSuite.ID)
 		return
 	}
 
-	chart := w.Charts().Get(reqBySSLCipherSuite.ID)
+	chart := c.Charts().Get(reqBySSLCipherSuite.ID)
 	assert.NotNilf(t, chart, "chart '%s' is not created", reqBySSLCipherSuite.ID)
 	if chart == nil {
 		return
 	}
-	for v := range w.mx.ReqSSLCipherSuite {
+	for v := range c.mx.ReqSSLCipherSuite {
 		id := "req_ssl_cipher_suite_" + v
 		assert.Truef(t, chart.HasDim(id), "chart '%s' has no dim for '%s' ssl cipher suite, expected '%s'", chart.ID, v, id)
 	}
 }
 
-func testURLPatternStatsCharts(t *testing.T, w *WebLog) {
-	for _, p := range w.URLPatterns {
+func testURLPatternStatsCharts(t *testing.T, collr *Collector) {
+	for _, p := range collr.URLPatterns {
 		chartID := fmt.Sprintf(urlPatternRespCodes.ID, p.Name)
 
-		if isEmptyCounterVec(w.mx.RespCode) {
-			assert.Falsef(t, w.Charts().Has(chartID), "chart '%s' is created", chartID)
+		if isEmptyCounterVec(collr.mx.RespCode) {
+			assert.Falsef(t, collr.Charts().Has(chartID), "chart '%s' is created", chartID)
 			continue
 		}
 
-		chart := w.Charts().Get(chartID)
+		chart := collr.Charts().Get(chartID)
 		assert.NotNilf(t, chart, "chart '%s' is not created", chartID)
 		if chart == nil {
 			continue
 		}
 
-		stats, ok := w.mx.URLPatternStats[p.Name]
+		stats, ok := collr.mx.URLPatternStats[p.Name]
 		assert.Truef(t, ok, "url pattern '%s' has no metric in w.mx.URLPatternStats", p.Name)
 		if !ok {
 			continue
@@ -1005,20 +1005,20 @@ func testURLPatternStatsCharts(t *testing.T, w *WebLog) {
 		}
 	}
 
-	for _, p := range w.URLPatterns {
+	for _, p := range collr.URLPatterns {
 		id := fmt.Sprintf(urlPatternReqMethods.ID, p.Name)
-		if isEmptyCounterVec(w.mx.ReqMethod) {
-			assert.Falsef(t, w.Charts().Has(id), "chart '%s' is created", id)
+		if isEmptyCounterVec(collr.mx.ReqMethod) {
+			assert.Falsef(t, collr.Charts().Has(id), "chart '%s' is created", id)
 			continue
 		}
 
-		chart := w.Charts().Get(id)
+		chart := collr.Charts().Get(id)
 		assert.NotNilf(t, chart, "chart '%s' is not created", id)
 		if chart == nil {
 			continue
 		}
 
-		stats, ok := w.mx.URLPatternStats[p.Name]
+		stats, ok := collr.mx.URLPatternStats[p.Name]
 		assert.Truef(t, ok, "url pattern '%s' has no metric in w.mx.URLPatternStats", p.Name)
 		if !ok {
 			continue
@@ -1029,29 +1029,29 @@ func testURLPatternStatsCharts(t *testing.T, w *WebLog) {
 		}
 	}
 
-	for _, p := range w.URLPatterns {
+	for _, p := range collr.URLPatterns {
 		id := fmt.Sprintf(urlPatternBandwidth.ID, p.Name)
-		if w.mx.BytesSent.Value() == 0 && w.mx.BytesReceived.Value() == 0 {
-			assert.Falsef(t, w.Charts().Has(id), "chart '%s' is created", id)
+		if collr.mx.BytesSent.Value() == 0 && collr.mx.BytesReceived.Value() == 0 {
+			assert.Falsef(t, collr.Charts().Has(id), "chart '%s' is created", id)
 		} else {
-			assert.Truef(t, w.Charts().Has(id), "chart '%s' is not created", id)
+			assert.Truef(t, collr.Charts().Has(id), "chart '%s' is not created", id)
 		}
 	}
 
-	for _, p := range w.URLPatterns {
+	for _, p := range collr.URLPatterns {
 		id := fmt.Sprintf(urlPatternReqProcTime.ID, p.Name)
-		if isEmptySummary(w.mx.ReqProcTime) {
-			assert.Falsef(t, w.Charts().Has(id), "chart '%s' is created", id)
+		if isEmptySummary(collr.mx.ReqProcTime) {
+			assert.Falsef(t, collr.Charts().Has(id), "chart '%s' is created", id)
 		} else {
-			assert.Truef(t, w.Charts().Has(id), "chart '%s' is not created", id)
+			assert.Truef(t, collr.Charts().Has(id), "chart '%s' is not created", id)
 		}
 	}
 }
 
-func testCustomFieldCharts(t *testing.T, w *WebLog) {
-	for _, cf := range w.CustomFields {
+func testCustomFieldCharts(t *testing.T, c *Collector) {
+	for _, cf := range c.CustomFields {
 		id := fmt.Sprintf(reqByCustomFieldPattern.ID, cf.Name)
-		chart := w.Charts().Get(id)
+		chart := c.Charts().Get(id)
 		assert.NotNilf(t, chart, "chart '%s' is not created", id)
 		if chart == nil {
 			continue
@@ -1064,10 +1064,10 @@ func testCustomFieldCharts(t *testing.T, w *WebLog) {
 	}
 }
 
-func testCustomTimeFieldCharts(t *testing.T, w *WebLog) {
-	for _, cf := range w.CustomTimeFields {
+func testCustomTimeFieldCharts(t *testing.T, c *Collector) {
+	for _, cf := range c.CustomTimeFields {
 		id := fmt.Sprintf(reqByCustomTimeField.ID, cf.Name)
-		chart := w.Charts().Get(id)
+		chart := c.Charts().Get(id)
 		assert.NotNilf(t, chart, "chart '%s' is not created", id)
 		if chart == nil {
 			continue
@@ -1083,10 +1083,10 @@ func testCustomTimeFieldCharts(t *testing.T, w *WebLog) {
 	}
 }
 
-func testCustomNumericFieldCharts(t *testing.T, w *WebLog) {
-	for _, cf := range w.CustomNumericFields {
+func testCustomNumericFieldCharts(t *testing.T, c *Collector) {
+	for _, cf := range c.CustomNumericFields {
 		id := fmt.Sprintf(customNumericFieldSummaryChartTmpl.ID, cf.Name)
-		chart := w.Charts().Get(id)
+		chart := c.Charts().Get(id)
 		assert.NotNilf(t, chart, "chart '%s' is not created", id)
 		if chart == nil {
 			continue
@@ -1119,7 +1119,7 @@ func isEmptyCounterVec(cv metrix.CounterVec) bool {
 	return true
 }
 
-func prepareWebLogCollectFull(t *testing.T) *WebLog {
+func prepareWebLogCollectFull(t *testing.T) *Collector {
 	t.Helper()
 	format := strings.Join([]string{
 		"$host:$server_port",
@@ -1185,19 +1185,19 @@ func prepareWebLogCollectFull(t *testing.T) *WebLog {
 		Histogram:      metrix.DefBuckets,
 		GroupRespCodes: true,
 	}
-	weblog := New()
-	weblog.Config = cfg
-	require.NoError(t, weblog.Init())
-	require.NoError(t, weblog.Check())
-	defer weblog.Cleanup()
+	collr := New()
+	collr.Config = cfg
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
+	defer collr.Cleanup()
 
-	p, err := logs.NewCSVParser(weblog.ParserConfig.CSV, bytes.NewReader(dataFullLog))
+	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataFullLog))
 	require.NoError(t, err)
-	weblog.parser = p
-	return weblog
+	collr.parser = p
+	return collr
 }
 
-func prepareWebLogCollectCommon(t *testing.T) *WebLog {
+func prepareWebLogCollectCommon(t *testing.T) *Collector {
 	t.Helper()
 	format := strings.Join([]string{
 		"$remote_addr",
@@ -1228,19 +1228,19 @@ func prepareWebLogCollectCommon(t *testing.T) *WebLog {
 		GroupRespCodes: false,
 	}
 
-	weblog := New()
-	weblog.Config = cfg
-	require.NoError(t, weblog.Init())
-	require.NoError(t, weblog.Check())
-	defer weblog.Cleanup()
+	collr := New()
+	collr.Config = cfg
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
+	defer collr.Cleanup()
 
-	p, err := logs.NewCSVParser(weblog.ParserConfig.CSV, bytes.NewReader(dataCommonLog))
+	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataCommonLog))
 	require.NoError(t, err)
-	weblog.parser = p
-	return weblog
+	collr.parser = p
+	return collr
 }
 
-func prepareWebLogCollectCustom(t *testing.T) *WebLog {
+func prepareWebLogCollectCustom(t *testing.T) *Collector {
 	t.Helper()
 	format := strings.Join([]string{
 		"$side",
@@ -1280,19 +1280,19 @@ func prepareWebLogCollectCustom(t *testing.T) *WebLog {
 		Histogram:      nil,
 		GroupRespCodes: false,
 	}
-	weblog := New()
-	weblog.Config = cfg
-	require.NoError(t, weblog.Init())
-	require.NoError(t, weblog.Check())
-	defer weblog.Cleanup()
+	collr := New()
+	collr.Config = cfg
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
+	defer collr.Cleanup()
 
-	p, err := logs.NewCSVParser(weblog.ParserConfig.CSV, bytes.NewReader(dataCustomLog))
+	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataCustomLog))
 	require.NoError(t, err)
-	weblog.parser = p
-	return weblog
+	collr.parser = p
+	return collr
 }
 
-func prepareWebLogCollectCustomTimeFields(t *testing.T) *WebLog {
+func prepareWebLogCollectCustomTimeFields(t *testing.T) *Collector {
 	t.Helper()
 	format := strings.Join([]string{
 		"$time1",
@@ -1326,19 +1326,19 @@ func prepareWebLogCollectCustomTimeFields(t *testing.T) *WebLog {
 		Histogram:      nil,
 		GroupRespCodes: false,
 	}
-	weblog := New()
-	weblog.Config = cfg
-	require.NoError(t, weblog.Init())
-	require.NoError(t, weblog.Check())
-	defer weblog.Cleanup()
+	collr := New()
+	collr.Config = cfg
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
+	defer collr.Cleanup()
 
-	p, err := logs.NewCSVParser(weblog.ParserConfig.CSV, bytes.NewReader(dataCustomTimeFieldLog))
+	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataCustomTimeFieldLog))
 	require.NoError(t, err)
-	weblog.parser = p
-	return weblog
+	collr.parser = p
+	return collr
 }
 
-func prepareWebLogCollectCustomNumericFields(t *testing.T) *WebLog {
+func prepareWebLogCollectCustomNumericFields(t *testing.T) *Collector {
 	t.Helper()
 	format := strings.Join([]string{
 		"$numeric1",
@@ -1372,19 +1372,19 @@ func prepareWebLogCollectCustomNumericFields(t *testing.T) *WebLog {
 		Histogram:      nil,
 		GroupRespCodes: false,
 	}
-	weblog := New()
-	weblog.Config = cfg
-	require.NoError(t, weblog.Init())
-	require.NoError(t, weblog.Check())
-	defer weblog.Cleanup()
+	collr := New()
+	collr.Config = cfg
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
+	defer collr.Cleanup()
 
-	p, err := logs.NewCSVParser(weblog.ParserConfig.CSV, bytes.NewReader(dataCustomTimeFieldLog))
+	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataCustomTimeFieldLog))
 	require.NoError(t, err)
-	weblog.parser = p
-	return weblog
+	collr.parser = p
+	return collr
 }
 
-func prepareWebLogCollectIISFields(t *testing.T) *WebLog {
+func prepareWebLogCollectIISFields(t *testing.T) *Collector {
 	t.Helper()
 	format := strings.Join([]string{
 		"-",               // date
@@ -1422,16 +1422,16 @@ func prepareWebLogCollectIISFields(t *testing.T) *WebLog {
 		GroupRespCodes: false,
 	}
 
-	weblog := New()
-	weblog.Config = cfg
-	require.NoError(t, weblog.Init())
-	require.NoError(t, weblog.Check())
-	defer weblog.Cleanup()
+	collr := New()
+	collr.Config = cfg
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
+	defer collr.Cleanup()
 
-	p, err := logs.NewCSVParser(weblog.ParserConfig.CSV, bytes.NewReader(dataIISLog))
+	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataIISLog))
 	require.NoError(t, err)
-	weblog.parser = p
-	return weblog
+	collr.parser = p
+	return collr
 }
 
 // generateLogs is used to populate 'testdata/full.log'

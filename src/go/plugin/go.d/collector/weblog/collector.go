@@ -21,8 +21,8 @@ func init() {
 	})
 }
 
-func New() *WebLog {
-	return &WebLog{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			ExcludePath:    "*.gz",
 			GroupRespCodes: true,
@@ -78,7 +78,7 @@ type (
 	}
 )
 
-type WebLog struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -96,58 +96,58 @@ type WebLog struct {
 	mx *metricsData
 }
 
-func (w *WebLog) Configuration() any {
-	return w.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (w *WebLog) Init() error {
-	if err := w.createURLPatterns(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.createURLPatterns(); err != nil {
 		return fmt.Errorf("init failed: %v", err)
 	}
 
-	if err := w.createCustomFields(); err != nil {
+	if err := c.createCustomFields(); err != nil {
 		return fmt.Errorf("init failed: %v", err)
 	}
 
-	if err := w.createCustomTimeFields(); err != nil {
+	if err := c.createCustomTimeFields(); err != nil {
 		return fmt.Errorf("init failed: %v", err)
 	}
 
-	if err := w.createCustomNumericFields(); err != nil {
-		w.Errorf("init failed: %v", err)
+	if err := c.createCustomNumericFields(); err != nil {
+		c.Errorf("init failed: %v", err)
 	}
 
-	w.createLogLine()
-	w.mx = newMetricsData(w.Config)
+	c.createLogLine()
+	c.mx = newMetricsData(c.Config)
 
 	return nil
 }
 
-func (w *WebLog) Check() error {
+func (c *Collector) Check() error {
 	// Note: these inits are here to make auto-detection retry working
-	if err := w.createLogReader(); err != nil {
+	if err := c.createLogReader(); err != nil {
 		return fmt.Errorf("failed to create log reader: %v", err)
 	}
 
-	if err := w.createParser(); err != nil {
+	if err := c.createParser(); err != nil {
 		return fmt.Errorf("failed to create parser: %v", err)
 	}
 
-	if err := w.createCharts(w.line); err != nil {
+	if err := c.createCharts(c.line); err != nil {
 		return fmt.Errorf("failed to create charts: %v", err)
 	}
 
 	return nil
 }
 
-func (w *WebLog) Charts() *module.Charts {
-	return w.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (w *WebLog) Collect() map[string]int64 {
-	mx, err := w.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		w.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -156,8 +156,8 @@ func (w *WebLog) Collect() map[string]int64 {
 	return mx
 }
 
-func (w *WebLog) Cleanup() {
-	if w.file != nil {
-		_ = w.file.Close()
+func (c *Collector) Cleanup() {
+	if c.file != nil {
+		_ = c.file.Close()
 	}
 }
