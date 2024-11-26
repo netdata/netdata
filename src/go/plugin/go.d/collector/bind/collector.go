@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *Bind {
-	return &Bind{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -49,7 +49,7 @@ type Config struct {
 }
 
 type (
-	Bind struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -66,40 +66,40 @@ type (
 	}
 )
 
-func (b *Bind) Configuration() any {
-	return b.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (b *Bind) Init() error {
-	if err := b.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config verification: %v", err)
 	}
 
-	pvm, err := b.initPermitViewMatcher()
+	pvm, err := c.initPermitViewMatcher()
 	if err != nil {
 		return fmt.Errorf("init permit view matcher: %v", err)
 	}
 	if pvm != nil {
-		b.permitView = pvm
+		c.permitView = pvm
 	}
 
-	httpClient, err := web.NewHTTPClient(b.ClientConfig)
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("creating http client : %v", err)
 	}
-	b.httpClient = httpClient
+	c.httpClient = httpClient
 
-	bindClient, err := b.initBindApiClient(httpClient)
+	bindClient, err := c.initBindApiClient(httpClient)
 	if err != nil {
 		return fmt.Errorf("init bind api client: %v", err)
 	}
-	b.bindAPIClient = bindClient
+	c.bindAPIClient = bindClient
 
 	return nil
 }
 
-func (b *Bind) Check() error {
-	mx, err := b.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -110,23 +110,23 @@ func (b *Bind) Check() error {
 	return nil
 }
 
-func (b *Bind) Charts() *Charts {
-	return b.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (b *Bind) Collect() map[string]int64 {
-	mx, err := b.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 
 	if err != nil {
-		b.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (b *Bind) Cleanup() {
-	if b.httpClient != nil {
-		b.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }

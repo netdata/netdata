@@ -9,19 +9,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-func (b *Bind) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	s, err := b.serverStats()
+	s, err := c.serverStats()
 	if err != nil {
 		return nil, err
 	}
-	b.collectServerStats(mx, s)
+	c.collectServerStats(mx, s)
 
 	return mx, nil
 }
 
-func (b *Bind) collectServerStats(metrics map[string]int64, stats *serverStats) {
+func (c *Collector) collectServerStats(metrics map[string]int64, stats *serverStats) {
 	var chart *Chart
 
 	for k, v := range stats.NSStats {
@@ -63,11 +63,11 @@ func (b *Bind) collectServerStats(metrics map[string]int64, stats *serverStats) 
 			chartID = keyReceivedUpdates
 		}
 
-		if !b.charts.Has(chartID) {
-			_ = b.charts.Add(charts[chartID].Copy())
+		if !c.charts.Has(chartID) {
+			_ = c.charts.Add(charts[chartID].Copy())
 		}
 
-		chart = b.charts.Get(chartID)
+		chart = c.charts.Get(chartID)
 
 		if !chart.HasDim(k) {
 			_ = chart.AddDim(&Dim{ID: k, Name: dimName, Algo: algo})
@@ -91,11 +91,11 @@ func (b *Bind) collectServerStats(metrics map[string]int64, stats *serverStats) 
 			continue
 		}
 
-		if !b.charts.Has(v.chartID) {
-			_ = b.charts.Add(charts[v.chartID].Copy())
+		if !c.charts.Has(v.chartID) {
+			_ = c.charts.Add(charts[v.chartID].Copy())
 		}
 
-		chart = b.charts.Get(v.chartID)
+		chart = c.charts.Get(v.chartID)
 
 		for key, val := range v.item {
 			if !chart.HasDim(key) {
@@ -107,12 +107,12 @@ func (b *Bind) collectServerStats(metrics map[string]int64, stats *serverStats) 
 		}
 	}
 
-	if !(b.permitView != nil && len(stats.Views) > 0) {
+	if !(c.permitView != nil && len(stats.Views) > 0) {
 		return
 	}
 
 	for name, view := range stats.Views {
-		if !b.permitView.MatchString(name) {
+		if !c.permitView.MatchString(name) {
 			continue
 		}
 		r := view.Resolver
@@ -140,14 +140,14 @@ func (b *Bind) collectServerStats(metrics map[string]int64, stats *serverStats) 
 
 			chartID := fmt.Sprintf(chartKey, name)
 
-			if !b.charts.Has(chartID) {
+			if !c.charts.Has(chartID) {
 				chart = charts[chartKey].Copy()
 				chart.ID = chartID
 				chart.Fam = fmt.Sprintf(chart.Fam, name)
-				_ = b.charts.Add(chart)
+				_ = c.charts.Add(chart)
 			}
 
-			chart = b.charts.Get(chartID)
+			chart = c.charts.Get(chartID)
 			dimID := fmt.Sprintf("%s_%s", name, key)
 
 			if !chart.HasDim(dimID) {
@@ -161,14 +161,14 @@ func (b *Bind) collectServerStats(metrics map[string]int64, stats *serverStats) 
 		if len(r.QTypes) > 0 {
 			chartID := fmt.Sprintf(keyResolverInQTypes, name)
 
-			if !b.charts.Has(chartID) {
+			if !c.charts.Has(chartID) {
 				chart = charts[keyResolverInQTypes].Copy()
 				chart.ID = chartID
 				chart.Fam = fmt.Sprintf(chart.Fam, name)
-				_ = b.charts.Add(chart)
+				_ = c.charts.Add(chart)
 			}
 
-			chart = b.charts.Get(chartID)
+			chart = c.charts.Get(chartID)
 
 			for key, val := range r.QTypes {
 				dimID := fmt.Sprintf("%s_%s", name, key)
@@ -183,11 +183,11 @@ func (b *Bind) collectServerStats(metrics map[string]int64, stats *serverStats) 
 		if len(r.CacheStats) > 0 {
 			chartID := fmt.Sprintf(keyResolverCacheHits, name)
 
-			if !b.charts.Has(chartID) {
+			if !c.charts.Has(chartID) {
 				chart = charts[keyResolverCacheHits].Copy()
 				chart.ID = chartID
 				chart.Fam = fmt.Sprintf(chart.Fam, name)
-				_ = b.charts.Add(chart)
+				_ = c.charts.Add(chart)
 				for _, dim := range chart.Dims {
 					dim.ID = fmt.Sprintf(dim.ID, name)
 				}
