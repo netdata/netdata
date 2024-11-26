@@ -10,17 +10,17 @@ import (
 	"github.com/miekg/dns"
 )
 
-func (d *Dnsmasq) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := d.collectCacheStatistics(mx); err != nil {
+	if err := c.collectCacheStatistics(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (d *Dnsmasq) collectCacheStatistics(mx map[string]int64) error {
+func (c *Collector) collectCacheStatistics(mx map[string]int64) error {
 	/*
 		;; flags: qr aa rd ra; QUERY: 7, ANSWER: 7, AUTHORITY: 0, ADDITIONAL: 0
 
@@ -56,7 +56,7 @@ func (d *Dnsmasq) collectCacheStatistics(mx map[string]int64) error {
 	}
 
 	for _, q := range questions {
-		resp, err := d.query(q)
+		resp, err := c.query(q)
 		if err != nil {
 			return err
 		}
@@ -110,7 +110,7 @@ func (d *Dnsmasq) collectCacheStatistics(mx map[string]int64) error {
 	return nil
 }
 
-func (d *Dnsmasq) query(question string) (*dns.Msg, error) {
+func (c *Collector) query(question string) (*dns.Msg, error) {
 	msg := &dns.Msg{
 		MsgHdr: dns.MsgHdr{
 			Id:               dns.Id(),
@@ -121,18 +121,18 @@ func (d *Dnsmasq) query(question string) (*dns.Msg, error) {
 		},
 	}
 
-	r, _, err := d.dnsClient.Exchange(msg, d.Address)
+	r, _, err := c.dnsClient.Exchange(msg, c.Address)
 	if err != nil {
 		return nil, err
 	}
 
 	if r == nil {
-		return nil, fmt.Errorf("'%s' question '%s', returned an empty response", d.Address, question)
+		return nil, fmt.Errorf("'%s' question '%s', returned an empty response", c.Address, question)
 	}
 
 	if r.Rcode != dns.RcodeSuccess {
 		s := dns.RcodeToString[r.Rcode]
-		return nil, fmt.Errorf("'%s' question '%s' returned '%s' (%d) response code", d.Address, question, s, r.Rcode)
+		return nil, fmt.Errorf("'%s' question '%s' returned '%s' (%d) response code", c.Address, question, s, r.Rcode)
 	}
 
 	return r, nil

@@ -30,11 +30,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestDnsmasq_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Dnsmasq{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestDnsmasq_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -67,21 +67,21 @@ func TestDnsmasq_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ns := New()
-			ns.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, ns.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, ns.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestDnsmasq_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *Dnsmasq
+		prepare  func() *Collector
 		wantFail bool
 	}{
 		"success on valid response": {
@@ -99,31 +99,31 @@ func TestDnsmasq_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dnsmasq := test.prepare()
-			require.NoError(t, dnsmasq.Init())
+			collr := test.prepare()
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, dnsmasq.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, dnsmasq.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestDnsmasq_Charts(t *testing.T) {
-	dnsmasq := New()
-	require.NoError(t, dnsmasq.Init())
-	assert.NotNil(t, dnsmasq.Charts())
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestDnsmasq_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestDnsmasq_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() *Dnsmasq
+		prepare       func() *Collector
 		wantCollected map[string]int64
 	}{
 		"success on valid response": {
@@ -149,45 +149,45 @@ func TestDnsmasq_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dnsmasq := test.prepare()
-			require.NoError(t, dnsmasq.Init())
+			collr := test.prepare()
+			require.NoError(t, collr.Init())
 
-			mx := dnsmasq.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				module.TestMetricsHasAllChartsDims(t, dnsmasq.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareOKDnsmasq() *Dnsmasq {
-	dnsmasq := New()
-	dnsmasq.newDNSClient = func(network string, timeout time.Duration) dnsClient {
+func prepareOKDnsmasq() *Collector {
+	collr := New()
+	collr.newDNSClient = func(network string, timeout time.Duration) dnsClient {
 		return &mockDNSClient{}
 	}
-	return dnsmasq
+	return collr
 }
 
-func prepareErrorOnExchangeDnsmasq() *Dnsmasq {
-	dnsmasq := New()
-	dnsmasq.newDNSClient = func(network string, timeout time.Duration) dnsClient {
+func prepareErrorOnExchangeDnsmasq() *Collector {
+	collr := New()
+	collr.newDNSClient = func(network string, timeout time.Duration) dnsClient {
 		return &mockDNSClient{
 			errOnExchange: true,
 		}
 	}
-	return dnsmasq
+	return collr
 }
 
-func prepareRcodeServerFailureOnExchangeDnsmasq() *Dnsmasq {
-	dnsmasq := New()
-	dnsmasq.newDNSClient = func(network string, timeout time.Duration) dnsClient {
+func prepareRcodeServerFailureOnExchangeDnsmasq() *Collector {
+	collr := New()
+	collr.newDNSClient = func(network string, timeout time.Duration) dnsClient {
 		return &mockDNSClient{
 			rcodeServerFailureOnExchange: true,
 		}
 	}
-	return dnsmasq
+	return collr
 }
 
 type mockDNSClient struct {

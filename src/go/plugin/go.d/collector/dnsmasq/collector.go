@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Dnsmasq {
-	return &Dnsmasq{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Protocol: "udp",
 			Address:  "127.0.0.1:53",
@@ -50,7 +50,7 @@ type Config struct {
 }
 
 type (
-	Dnsmasq struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -64,33 +64,33 @@ type (
 	}
 )
 
-func (d *Dnsmasq) Configuration() any {
-	return d.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (d *Dnsmasq) Init() error {
-	err := d.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	client, err := d.initDNSClient()
+	client, err := c.initDNSClient()
 	if err != nil {
 		return fmt.Errorf("init DNS client: %v", err)
 	}
-	d.dnsClient = client
+	c.dnsClient = client
 
-	charts, err := d.initCharts()
+	charts, err := c.initCharts()
 	if err != nil {
 		return fmt.Errorf("init charts: %v", err)
 	}
-	d.charts = charts
+	c.charts = charts
 
 	return nil
 }
 
-func (d *Dnsmasq) Check() error {
-	mx, err := d.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -101,14 +101,14 @@ func (d *Dnsmasq) Check() error {
 	return nil
 }
 
-func (d *Dnsmasq) Charts() *module.Charts {
-	return d.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (d *Dnsmasq) Collect() map[string]int64 {
-	ms, err := d.collect()
+func (c *Collector) Collect() map[string]int64 {
+	ms, err := c.collect()
 	if err != nil {
-		d.Error(err)
+		c.Error(err)
 	}
 
 	if len(ms) == 0 {
@@ -117,4 +117,4 @@ func (d *Dnsmasq) Collect() map[string]int64 {
 	return ms
 }
 
-func (d *Dnsmasq) Cleanup() {}
+func (c *Collector) Cleanup() {}
