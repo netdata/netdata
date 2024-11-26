@@ -23,8 +23,8 @@ func init() {
 	})
 }
 
-func New() *HddTemp {
-	return &HddTemp{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:7634",
 			Timeout: confopt.Duration(time.Second * 1),
@@ -41,7 +41,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout" json:"timeout"`
 }
 
-type HddTemp struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -53,22 +53,22 @@ type HddTemp struct {
 	disksTemp map[string]bool
 }
 
-func (h *HddTemp) Configuration() any {
-	return h.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (h *HddTemp) Init() error {
-	if h.Address == "" {
+func (c *Collector) Init() error {
+	if c.Address == "" {
 		return fmt.Errorf("config: 'address' not set")
 	}
 
-	h.conn = newHddTempConn(h.Config)
+	c.conn = newHddTempConn(c.Config)
 
 	return nil
 }
 
-func (h *HddTemp) Check() error {
-	mx, err := h.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -78,14 +78,14 @@ func (h *HddTemp) Check() error {
 	return nil
 }
 
-func (h *HddTemp) Charts() *module.Charts {
-	return h.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (h *HddTemp) Collect() map[string]int64 {
-	mx, err := h.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		h.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -94,4 +94,4 @@ func (h *HddTemp) Collect() map[string]int64 {
 	return mx
 }
 
-func (h *HddTemp) Cleanup() {}
+func (c *Collector) Cleanup() {}

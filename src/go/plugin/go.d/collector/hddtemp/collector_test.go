@@ -33,11 +33,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestHddTemp_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &HddTemp{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestHddTemp_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -58,59 +58,59 @@ func TestHddTemp_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			hdd := New()
-			hdd.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, hdd.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, hdd.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestHddTemp_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *HddTemp
+		prepare func() *Collector
 	}{
 		"not initialized": {
-			prepare: func() *HddTemp {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *HddTemp {
-				hdd := New()
-				hdd.conn = prepareMockAllDisksOk()
-				_ = hdd.Check()
-				return hdd
+			prepare: func() *Collector {
+				collr := New()
+				collr.conn = prepareMockAllDisksOk()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *HddTemp {
-				hdd := New()
-				hdd.conn = prepareMockAllDisksOk()
-				_ = hdd.Collect()
-				return hdd
+			prepare: func() *Collector {
+				collr := New()
+				collr.conn = prepareMockAllDisksOk()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			hdd := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, hdd.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestHddTemp_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestHddTemp_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockHddTempConn
 		wantFail    bool
@@ -135,19 +135,19 @@ func TestHddTemp_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			hdd := New()
-			hdd.conn = test.prepareMock()
+			collr := New()
+			collr.conn = test.prepareMock()
 
 			if test.wantFail {
-				assert.Error(t, hdd.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, hdd.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestHddTemp_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock    func() *mockHddTempConn
 		wantMetrics    map[string]int64
@@ -226,16 +226,16 @@ func TestHddTemp_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			hdd := New()
-			hdd.conn = test.prepareMock()
+			collr := New()
+			collr.conn = test.prepareMock()
 
-			mx := hdd.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
-			assert.Len(t, *hdd.Charts(), test.wantCharts, "wantCharts")
+			assert.Len(t, *collr.Charts(), test.wantCharts, "wantCharts")
 
-			module.TestMetricsHasAllChartsDims(t, hdd.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }
