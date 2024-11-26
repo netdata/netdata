@@ -1,137 +1,74 @@
-# Netdata daemon
+# Daemon
 
-The Netdata daemon is practically a synonym for the Netdata Agent, as it controls its
-entire operation. We support various methods to
-[start, stop, or restart the daemon](/docs/netdata-agent/start-stop-restart.md).
+The Netdata Daemon, often referred to as the Netdata Agent, controls the entire operation of the monitoring system. This document provides an overview of command-line options, log files, debugging, and troubleshooting.
 
-This document provides some basic information on the command line options, log files, and how to debug and troubleshoot
+## Command-Line Options
 
-## Command line options
-
-Normally you don't need to supply any command line arguments to netdata.
-
-If you do though, they override the configuration equivalent options.
-
-To get a list of all command line parameters supported, run:
+You generally don't need to supply arguments when starting Netdata, but command-line options can override configuration file settings. To see all available options, run:
 
 ```sh
 netdata -h
 ```
 
-The program will print the supported command line parameters.
-
-The command line options of the Netdata 1.10.0 version are the following:
+Here are some commonly used options:
 
 ```sh
- ^
- |.-.   .-.   .-.   .-.   .  netdata                                         
- |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   
- +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
+-c filename              Configuration file to load.
+                          Default: /etc/netdata/netdata.conf
 
- Copyright (C) 2016-2022, Netdata, Inc. <info@netdata.cloud>
- Released under GNU General Public License v3 or later.
- All rights reserved.
+-D                       Do not fork. Run in the foreground.
+                          Default: run in the background
 
- Home Page  : https://netdata.cloud
- Source Code: https://github.com/netdata/netdata
- Docs       : https://learn.netdata.cloud
- Support    : https://github.com/netdata/netdata/issues
- License    : https://github.com/netdata/netdata/blob/master/LICENSE.md
+-d                       Fork. Run in the background.
+                          Default: run in the background
 
- Twitter    : https://twitter.com/netdatahq
- LinkedIn   : https://linkedin.com/company/netdata-cloud/
- Facebook   : https://facebook.com/linuxnetdata/
+-h                       Display this help message.
 
+-P filename              File to save a pid while running.
+                          Default: do not save pid to a file
 
- SYNOPSIS: netdata [options]
+-i IP                    The IP address to listen to.
+                          Default: all IP addresses IPv4 and IPv6
 
- Options:
+-p port                  API/Web port to use.
+                          Default: 19999
 
-  -c filename              Configuration file to load.
-                           Default: /etc/netdata/netdata.conf
+-s path                  Prefix for /proc and /sys (for containers).
+                          Default: no prefix
 
-  -D                       Do not fork. Run in the foreground.
-                           Default: run in the background
+-t seconds               The internal clock of netdata.
+                          Default: 1
 
-  -h                       Display this help message.
+-u username              Run as user.
+                          Default: netdata
 
-  -P filename              File to save a pid while running.
-                           Default: do not save pid to a file
+-v                       Print netdata version and exit.
 
-  -i IP                    The IP address to listen to.
-                           Default: all IP addresses IPv4 and IPv6
+-V                       Print netdata version and exit.
 
-  -p port                  API/Web port to use.
-                           Default: 19999
-
-  -s path                  Prefix for /proc and /sys (for containers).
-                           Default: no prefix
-
-  -t seconds               The internal clock of netdata.
-                           Default: 1
-
-  -u username              Run as user.
-                           Default: netdata
-
-  -v                       Print netdata version and exit.
-
-  -V                       Print netdata version and exit.
-
-  -W options               See Advanced options below.
-
-
- Advanced options:
-
-  -W stacksize=N           Set the stacksize (in bytes).
-
-  -W debug_flags=N         Set runtime tracing to debug.log.
-
-  -W unittest              Run internal unittests and exit.
-
-  -W createdataset=N       Create a DB engine dataset of N seconds and exit.
-
-  -W set section option value
-                           set netdata.conf option from the command line.
-
-  -W buildinfo             Print the version, the configure options, 
-                           a list of optional features, and whether they 
-                           are enabled or not.
-
-  -W buildinfojson         Print the version, the configure options, 
-                           a list of optional features, and whether they 
-                           are enabled or not, in JSON format.
-  
-  -W simple-pattern pattern string
-                           Check if string matches pattern and exit.
-
- Signals netdata handles:
-
-  - HUP                    Close and reopen log files.
-  - USR2                   Reload health configuration.
+-W options               See Advanced options below.
 ```
 
-You can send commands during runtime via [netdatacli](/src/cli/README.md).
+Refer to the output of `netdata -h` for a complete list of options.
 
 ## Log files
 
-Netdata uses 4 log files:
+Netdata, (hence the Daemon) uses 4 log files:
 
 1. `error.log`
 2. `collector.log`
 3. `access.log`
 4. `debug.log`
 
-Any of them can be disabled by setting it to `/dev/null` or `none` in `netdata.conf`. By default `error.log`,
-`collector.log`, and `access.log` are enabled. `debug.log` is only enabled if debugging/tracing is also enabled
-(Netdata needs to be compiled with debugging enabled).
+Any of them can be disabled by setting it to `/dev/null` or `none` in `netdata.conf`. By default `error.log`, `collector.log`, and `access.log` are enabled. `debug.log` is only enabled if debugging/tracing is also enabled (Netdata needs to be compiled with debugging enabled).
 
 Log files are stored in `/var/log/netdata/` by default.
 
 ### error.log
 
-The `error.log` is the `stderr` of the `netdata` daemon .
+The `error.log` is the `stderr` of the Daemon .
 
-For most Netdata programs (including standard external plugins shipped by netdata), the following lines may appear:
+For most of Netdata's component logs, the following lines may appear:
 
 |   tag   | description                                                                                                               |
 |:-------:|:--------------------------------------------------------------------------------------------------------------------------|
@@ -141,18 +78,15 @@ For most Netdata programs (including standard external plugins shipped by netdat
 
 The `FATAL` and `ERROR` messages will always appear in the logs, and `INFO`can be filtered using [severity level](/src/daemon/config/README.md#logs-section-options) option.
 
-So, when auto-detection of data collection fail, `ERROR` lines are logged and the relevant modules are disabled, but the
-program continues to run.
+So, when auto-detection of data collection fail, `ERROR` lines are logged and the relevant modules are disabled, but the program continues to run.
 
-When a Netdata program cannot run at all, a `FATAL` line is logged.
+When a component cannot run at all, a `FATAL` line is logged.
 
 ### collector.log
 
-The `collector.log` is the `stderr` of all [collectors](/src/collectors/COLLECTORS.md)
- run by `netdata`.
+The `collector.log` is the `stderr` of all [collectors](/src/collectors/COLLECTORS.md) run by `netdata`.
 
-So if any process, in the Netdata process tree, writes anything to its standard error,
-it will appear in `collector.log`.
+So if any process, in the Netdata process tree, writes anything to its standard error, it will appear in `collector.log`.
 
 Data stored inside this file follows pattern already described for `error.log`.
 
@@ -180,14 +114,9 @@ where:
 
 See [debugging](#debugging).
 
-## Netdata process scheduling policy
+## Process scheduling policy on Unix systems
 
-By default Netdata versions prior to 1.34.0 run with the `idle` process scheduling policy, so that it uses CPU
-resources, only when there is idle CPU to spare. On very busy servers (or weak servers), this can lead to gaps on
-the charts.
-
-Starting with version 1.34.0, Netdata instead uses the `batch` scheduling policy by default. This largely eliminates
-issues with gaps in charts on busy systems while still keeping the impact on the rest of the system low.
+Netdata uses the `batch` scheduling policy by default. This largely eliminates issues with gaps in charts on busy systems while still keeping the impact on the rest of the system low.
 
 You can set Netdata scheduling policy in `netdata.conf`, like this:
 
@@ -218,8 +147,7 @@ Once the policy is set to one of `rr` or `fifo`, the following will appear:
     process scheduling priority = 0
 ```
 
-These priorities are usually from 0 to 99. Higher numbers make the process more
-important.
+These priorities are usually from 0 to 99. Higher numbers make the process more important.
 
 ### nice level for policies `other` or `batch`
 
@@ -232,8 +160,7 @@ When the policy is set to `other`, `nice`, or `batch`, the following will appear
 
 ## Scheduling settings and systemd
 
-Netdata will not be able to set its scheduling policy and priority to more important values when it is started as the
-`netdata` user (systemd case).
+Netdata will not be able to set its scheduling policy and priority to more important values when it is started as the `netdata` user (systemd case).
 
 You can set these settings at `/etc/systemd/system/netdata.service`:
 
