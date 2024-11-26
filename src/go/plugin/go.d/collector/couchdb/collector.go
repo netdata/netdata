@@ -29,8 +29,8 @@ func init() {
 	})
 }
 
-func New() *CouchDB {
-	return &CouchDB{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -52,7 +52,7 @@ type Config struct {
 	Databases      string `yaml:"databases,omitempty" json:"databases"`
 }
 
-type CouchDB struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -63,39 +63,39 @@ type CouchDB struct {
 	databases []string
 }
 
-func (cdb *CouchDB) Configuration() any {
-	return cdb.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (cdb *CouchDB) Init() error {
-	err := cdb.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("check configuration: %v", err)
 	}
 
-	cdb.databases = strings.Fields(cdb.Config.Databases)
+	c.databases = strings.Fields(c.Config.Databases)
 
-	httpClient, err := cdb.initHTTPClient()
+	httpClient, err := c.initHTTPClient()
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
-	cdb.httpClient = httpClient
+	c.httpClient = httpClient
 
-	charts, err := cdb.initCharts()
+	charts, err := c.initCharts()
 	if err != nil {
 		return fmt.Errorf("init charts: %v", err)
 	}
-	cdb.charts = charts
+	c.charts = charts
 
 	return nil
 }
 
-func (cdb *CouchDB) Check() error {
-	if err := cdb.pingCouchDB(); err != nil {
+func (c *Collector) Check() error {
+	if err := c.pingCouchDB(); err != nil {
 		return err
 	}
 
-	mx, err := cdb.collect()
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -107,14 +107,14 @@ func (cdb *CouchDB) Check() error {
 	return nil
 }
 
-func (cdb *CouchDB) Charts() *Charts {
-	return cdb.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (cdb *CouchDB) Collect() map[string]int64 {
-	mx, err := cdb.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		cdb.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -123,9 +123,9 @@ func (cdb *CouchDB) Collect() map[string]int64 {
 	return mx
 }
 
-func (cdb *CouchDB) Cleanup() {
-	if cdb.httpClient == nil {
+func (c *Collector) Cleanup() {
+	if c.httpClient == nil {
 		return
 	}
-	cdb.httpClient.CloseIdleConnections()
+	c.httpClient.CloseIdleConnections()
 }

@@ -27,22 +27,22 @@ const (
 	httpStatusCodePrefixLen = len(httpStatusCodePrefix)
 )
 
-func (cdb *CouchDB) collect() (map[string]int64, error) {
-	ms := cdb.scrapeCouchDB()
+func (c *Collector) collect() (map[string]int64, error) {
+	ms := c.scrapeCouchDB()
 	if ms.empty() {
 		return nil, nil
 	}
 
 	collected := make(map[string]int64)
-	cdb.collectNodeStats(collected, ms)
-	cdb.collectSystemStats(collected, ms)
-	cdb.collectActiveTasks(collected, ms)
-	cdb.collectDBStats(collected, ms)
+	c.collectNodeStats(collected, ms)
+	c.collectSystemStats(collected, ms)
+	c.collectActiveTasks(collected, ms)
+	c.collectDBStats(collected, ms)
 
 	return collected, nil
 }
 
-func (cdb *CouchDB) collectNodeStats(collected map[string]int64, ms *cdbMetrics) {
+func (c *Collector) collectNodeStats(collected map[string]int64, ms *cdbMetrics) {
 	if !ms.hasNodeStats() {
 		return
 	}
@@ -56,7 +56,7 @@ func (cdb *CouchDB) collectNodeStats(collected map[string]int64, ms *cdbMetrics)
 	}
 }
 
-func (cdb *CouchDB) collectSystemStats(collected map[string]int64, ms *cdbMetrics) {
+func (c *Collector) collectSystemStats(collected map[string]int64, ms *cdbMetrics) {
 	if !ms.hasNodeSystem() {
 		return
 	}
@@ -68,7 +68,7 @@ func (cdb *CouchDB) collectSystemStats(collected map[string]int64, ms *cdbMetric
 	collected["peak_msg_queue"] = findMaxMQSize(ms.NodeSystem.MessageQueues)
 }
 
-func (cdb *CouchDB) collectActiveTasks(collected map[string]int64, ms *cdbMetrics) {
+func (c *Collector) collectActiveTasks(collected map[string]int64, ms *cdbMetrics) {
 	collected["active_tasks_indexer"] = 0
 	collected["active_tasks_database_compaction"] = 0
 	collected["active_tasks_replication"] = 0
@@ -83,83 +83,83 @@ func (cdb *CouchDB) collectActiveTasks(collected map[string]int64, ms *cdbMetric
 	}
 }
 
-func (cdb *CouchDB) collectDBStats(collected map[string]int64, ms *cdbMetrics) {
+func (c *Collector) collectDBStats(collected map[string]int64, ms *cdbMetrics) {
 	if !ms.hasDBStats() {
 		return
 	}
 
 	for _, dbStats := range ms.DBStats {
 		if dbStats.Error != "" {
-			cdb.Warning("database '", dbStats.Key, "' doesn't exist")
+			c.Warning("database '", dbStats.Key, "' doesn't exist")
 			continue
 		}
 		merge(collected, stm.ToMap(dbStats.Info), "db_"+dbStats.Key)
 	}
 }
 
-func (cdb *CouchDB) scrapeCouchDB() *cdbMetrics {
+func (c *Collector) scrapeCouchDB() *cdbMetrics {
 	ms := &cdbMetrics{}
 	wg := &sync.WaitGroup{}
 
 	wg.Add(1)
-	go func() { defer wg.Done(); cdb.scrapeNodeStats(ms) }()
+	go func() { defer wg.Done(); c.scrapeNodeStats(ms) }()
 
 	wg.Add(1)
-	go func() { defer wg.Done(); cdb.scrapeSystemStats(ms) }()
+	go func() { defer wg.Done(); c.scrapeSystemStats(ms) }()
 
 	wg.Add(1)
-	go func() { defer wg.Done(); cdb.scrapeActiveTasks(ms) }()
+	go func() { defer wg.Done(); c.scrapeActiveTasks(ms) }()
 
-	if len(cdb.databases) > 0 {
+	if len(c.databases) > 0 {
 		wg.Add(1)
-		go func() { defer wg.Done(); cdb.scrapeDBStats(ms) }()
+		go func() { defer wg.Done(); c.scrapeDBStats(ms) }()
 	}
 
 	wg.Wait()
 	return ms
 }
 
-func (cdb *CouchDB) scrapeNodeStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, fmt.Sprintf(urlPathOverviewStats, cdb.Config.Node))
+func (c *Collector) scrapeNodeStats(ms *cdbMetrics) {
+	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, fmt.Sprintf(urlPathOverviewStats, c.Config.Node))
 
 	var stats cdbNodeStats
 
-	if err := cdb.client().RequestJSON(req, &stats); err != nil {
-		cdb.Warning(err)
+	if err := c.client().RequestJSON(req, &stats); err != nil {
+		c.Warning(err)
 		return
 	}
 
 	ms.NodeStats = &stats
 }
 
-func (cdb *CouchDB) scrapeSystemStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, fmt.Sprintf(urlPathSystemStats, cdb.Config.Node))
+func (c *Collector) scrapeSystemStats(ms *cdbMetrics) {
+	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, fmt.Sprintf(urlPathSystemStats, c.Config.Node))
 
 	var stats cdbNodeSystem
 
-	if err := cdb.client().RequestJSON(req, &stats); err != nil {
-		cdb.Warning(err)
+	if err := c.client().RequestJSON(req, &stats); err != nil {
+		c.Warning(err)
 		return
 	}
 
 	ms.NodeSystem = &stats
 }
 
-func (cdb *CouchDB) scrapeActiveTasks(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, urlPathActiveTasks)
+func (c *Collector) scrapeActiveTasks(ms *cdbMetrics) {
+	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathActiveTasks)
 
 	var stats []cdbActiveTask
 
-	if err := cdb.client().RequestJSON(req, &stats); err != nil {
-		cdb.Warning(err)
+	if err := c.client().RequestJSON(req, &stats); err != nil {
+		c.Warning(err)
 		return
 	}
 
 	ms.ActiveTasks = stats
 }
 
-func (cdb *CouchDB) scrapeDBStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(cdb.RequestConfig, urlPathDatabases)
+func (c *Collector) scrapeDBStats(ms *cdbMetrics) {
+	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathDatabases)
 	req.Method = http.MethodPost
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
@@ -167,18 +167,18 @@ func (cdb *CouchDB) scrapeDBStats(ms *cdbMetrics) {
 	var q struct {
 		Keys []string `json:"keys"`
 	}
-	q.Keys = cdb.databases
+	q.Keys = c.databases
 	body, err := json.Marshal(q)
 	if err != nil {
-		cdb.Error(err)
+		c.Error(err)
 		return
 	}
 	req.Body = io.NopCloser(bytes.NewReader(body))
 
 	var stats []cdbDBStats
 
-	if err := cdb.client().RequestJSON(req, &stats); err != nil {
-		cdb.Warning(err)
+	if err := c.client().RequestJSON(req, &stats); err != nil {
+		c.Warning(err)
 		return
 	}
 
@@ -200,12 +200,12 @@ func findMaxMQSize(MessageQueues map[string]any) int64 {
 	return int64(maxSize)
 }
 
-func (cdb *CouchDB) pingCouchDB() error {
-	req, _ := web.NewHTTPRequest(cdb.RequestConfig)
+func (c *Collector) pingCouchDB() error {
+	req, _ := web.NewHTTPRequest(c.RequestConfig)
 
 	var info struct{ Couchdb string }
 
-	if err := cdb.client().RequestJSON(req, &info); err != nil {
+	if err := c.client().RequestJSON(req, &info); err != nil {
 		return err
 	}
 
@@ -216,8 +216,8 @@ func (cdb *CouchDB) pingCouchDB() error {
 	return nil
 }
 
-func (cdb *CouchDB) client() *web.Client {
-	return web.DoHTTP(cdb.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
+func (c *Collector) client() *web.Client {
+	return web.DoHTTP(c.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
 		var msg struct {
 			Error  string `json:"error"`
 			Reason string `json:"reason"`

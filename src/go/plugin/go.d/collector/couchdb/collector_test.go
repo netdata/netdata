@@ -41,11 +41,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestCouchDB_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &CouchDB{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestCouchDB_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config          Config
 		wantNumOfCharts int
@@ -80,22 +80,22 @@ func TestCouchDB_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			es := New()
-			es.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, es.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, es.Init())
-				assert.Equal(t, test.wantNumOfCharts, len(*es.Charts()))
+				assert.NoError(t, collr.Init())
+				assert.Equal(t, test.wantNumOfCharts, len(*collr.Charts()))
 			}
 		})
 	}
 }
 
-func TestCouchDB_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(*testing.T) (cdb *CouchDB, cleanup func())
+		prepare  func(*testing.T) (collr *Collector, cleanup func())
 		wantFail bool
 	}{
 		"valid data":         {prepare: prepareCouchDBValidData},
@@ -106,37 +106,37 @@ func TestCouchDB_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			cdb, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, cdb.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, cdb.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestCouchDB_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.Nil(t, New().Charts())
 }
 
-func TestCouchDB_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestCouchDB_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func() *CouchDB
+		prepare       func() *Collector
 		wantCollected map[string]int64
 		checkCharts   bool
 	}{
 		"all stats": {
-			prepare: func() *CouchDB {
-				cdb := New()
-				cdb.Config.Databases = "db1 db2"
-				return cdb
+			prepare: func() *Collector {
+				collr := New()
+				collr.Config.Databases = "db1 db2"
+				return collr
 			},
 			wantCollected: map[string]int64{
 
@@ -225,11 +225,11 @@ func TestCouchDB_Collect(t *testing.T) {
 			checkCharts: true,
 		},
 		"wrong node": {
-			prepare: func() *CouchDB {
-				cdb := New()
-				cdb.Config.Node = "bad_node@bad_host"
-				cdb.Config.Databases = "db1 db2"
-				return cdb
+			prepare: func() *Collector {
+				collr := New()
+				collr.Config.Node = "bad_node@bad_host"
+				collr.Config.Databases = "db1 db2"
+				return collr
 			},
 			wantCollected: map[string]int64{
 
@@ -259,10 +259,10 @@ func TestCouchDB_Collect(t *testing.T) {
 			checkCharts: false,
 		},
 		"wrong database": {
-			prepare: func() *CouchDB {
-				cdb := New()
-				cdb.Config.Databases = "bad_db db1 db2"
-				return cdb
+			prepare: func() *Collector {
+				collr := New()
+				collr.Config.Databases = "bad_db db1 db2"
+				return collr
 			},
 			wantCollected: map[string]int64{
 
@@ -354,70 +354,70 @@ func TestCouchDB_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			cdb, cleanup := prepareCouchDB(t, test.prepare)
+			collr, cleanup := prepareCouchDB(t, test.prepare)
 			defer cleanup()
 
 			var mx map[string]int64
 			for i := 0; i < 10; i++ {
-				mx = cdb.Collect()
+				mx = collr.Collect()
 			}
 
 			assert.Equal(t, test.wantCollected, mx)
 			if test.checkCharts {
-				module.TestMetricsHasAllChartsDims(t, cdb.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareCouchDB(t *testing.T, createCDB func() *CouchDB) (cdb *CouchDB, cleanup func()) {
+func prepareCouchDB(t *testing.T, createCDB func() *Collector) (collr *Collector, cleanup func()) {
 	t.Helper()
-	cdb = createCDB()
+	collr = createCDB()
 	srv := prepareCouchDBEndpoint()
-	cdb.URL = srv.URL
+	collr.URL = srv.URL
 
-	require.NoError(t, cdb.Init())
+	require.NoError(t, collr.Init())
 
-	return cdb, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCouchDBValidData(t *testing.T) (cdb *CouchDB, cleanup func()) {
+func prepareCouchDBValidData(t *testing.T) (collr *Collector, cleanup func()) {
 	return prepareCouchDB(t, New)
 }
 
-func prepareCouchDBInvalidData(t *testing.T) (*CouchDB, func()) {
+func prepareCouchDBInvalidData(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	cdb := New()
-	cdb.URL = srv.URL
-	require.NoError(t, cdb.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return cdb, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCouchDB404(t *testing.T) (*CouchDB, func()) {
+func prepareCouchDB404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	cdb := New()
-	cdb.URL = srv.URL
-	require.NoError(t, cdb.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return cdb, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCouchDBConnectionRefused(t *testing.T) (*CouchDB, func()) {
+func prepareCouchDBConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	cdb := New()
-	cdb.URL = "http://127.0.0.1:38001"
-	require.NoError(t, cdb.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001"
+	require.NoError(t, collr.Init())
 
-	return cdb, func() {}
+	return collr, func() {}
 }
 
 func prepareCouchDBEndpoint() *httptest.Server {
