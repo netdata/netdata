@@ -22,8 +22,8 @@ func init() {
 	})
 }
 
-func New() *SpigotMC {
-	return &SpigotMC{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:25575",
 			Timeout: confopt.Duration(time.Second * 1),
@@ -40,7 +40,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type SpigotMC struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -50,22 +50,22 @@ type SpigotMC struct {
 	conn    rconConn
 }
 
-func (s *SpigotMC) Configuration() any {
-	return s.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (s *SpigotMC) Init() error {
-	if s.Address == "" {
+func (c *Collector) Init() error {
+	if c.Address == "" {
 		return errors.New("config: 'address' required but not set")
 	}
-	if s.Password == "" {
+	if c.Password == "" {
 		return errors.New("config: 'password' required but not set")
 	}
 	return nil
 }
 
-func (s *SpigotMC) Check() error {
-	mx, err := s.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -77,14 +77,14 @@ func (s *SpigotMC) Check() error {
 	return nil
 }
 
-func (s *SpigotMC) Charts() *module.Charts {
-	return s.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (s *SpigotMC) Collect() map[string]int64 {
-	mx, err := s.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		s.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -94,11 +94,11 @@ func (s *SpigotMC) Collect() map[string]int64 {
 	return mx
 }
 
-func (s *SpigotMC) Cleanup() {
-	if s.conn != nil {
-		if err := s.conn.disconnect(); err != nil {
-			s.Warningf("error on disconnect: %s", err)
+func (c *Collector) Cleanup() {
+	if c.conn != nil {
+		if err := c.conn.disconnect(); err != nil {
+			c.Warningf("error on disconnect: %s", err)
 		}
-		s.conn = nil
+		c.conn = nil
 	}
 }

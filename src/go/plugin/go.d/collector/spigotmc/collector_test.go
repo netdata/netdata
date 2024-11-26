@@ -36,11 +36,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestSpigotMC_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &SpigotMC{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestSpigotMC_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -62,59 +62,59 @@ func TestSpigotMC_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			smc := New()
-			smc.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, smc.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, smc.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestSpigotMC_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *SpigotMC
+		prepare func() *Collector
 	}{
 		"not initialized": {
-			prepare: func() *SpigotMC {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *SpigotMC {
-				smc := New()
-				smc.newConn = func(config Config) rconConn { return prepareMockOk() }
-				_ = smc.Check()
-				return smc
+			prepare: func() *Collector {
+				collr := New()
+				collr.newConn = func(Config) rconConn { return prepareMockOk() }
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *SpigotMC {
-				smc := New()
-				smc.newConn = func(config Config) rconConn { return prepareMockOk() }
-				_ = smc.Collect()
-				return smc
+			prepare: func() *Collector {
+				collr := New()
+				collr.newConn = func(Config) rconConn { return prepareMockOk() }
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			smc := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, smc.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestSpigotMC_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestSpigotMC_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockRcon
 		wantFail    bool
@@ -139,20 +139,20 @@ func TestSpigotMC_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			smc := New()
+			collr := New()
 			mock := test.prepareMock()
-			smc.newConn = func(config Config) rconConn { return mock }
+			collr.newConn = func(Config) rconConn { return mock }
 
 			if test.wantFail {
-				assert.Error(t, smc.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, smc.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestSpigotMC_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock             func() *mockRcon
 		wantMetrics             map[string]int64
@@ -240,21 +240,21 @@ func TestSpigotMC_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			smc := New()
+			collr := New()
 			mock := test.prepareMock()
-			smc.newConn = func(config Config) rconConn { return mock }
+			collr.newConn = func(Config) rconConn { return mock }
 
-			mx := smc.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx, "want metrics")
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, smc.Charts(), mx)
-				assert.Equal(t, len(charts), len(*smc.Charts()), "want charts")
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				assert.Equal(t, len(charts), len(*collr.Charts()), "want charts")
 			}
 
 			assert.Equal(t, test.disconnectBeforeCleanup, mock.disconnectCalled, "disconnect before cleanup")
-			smc.Cleanup()
+			collr.Cleanup()
 			assert.Equal(t, test.disconnectAfterCleanup, mock.disconnectCalled, "disconnect after cleanup")
 		})
 	}
