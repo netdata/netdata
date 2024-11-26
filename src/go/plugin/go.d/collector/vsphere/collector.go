@@ -31,8 +31,8 @@ func init() {
 	})
 }
 
-func New() *VSphere {
-	return &VSphere{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				ClientConfig: web.ClientConfig{
@@ -60,7 +60,7 @@ type Config struct {
 }
 
 type (
-	VSphere struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -85,47 +85,47 @@ type (
 	}
 )
 
-func (vs *VSphere) Configuration() any {
-	return vs.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (vs *VSphere) Init() error {
-	if err := vs.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("error on validating config: %v", err)
 	}
 
-	vsClient, err := vs.initClient()
+	vsClient, err := c.initClient()
 	if err != nil {
 		return fmt.Errorf("error on creating vsphere client: %v", err)
 	}
 
-	if err := vs.initDiscoverer(vsClient); err != nil {
+	if err := c.initDiscoverer(vsClient); err != nil {
 		return fmt.Errorf("error on creating vsphere discoverer: %v", err)
 	}
 
-	vs.initScraper(vsClient)
+	c.initScraper(vsClient)
 
-	if err := vs.discoverOnce(); err != nil {
+	if err := c.discoverOnce(); err != nil {
 		return fmt.Errorf("error on discovering: %v", err)
 	}
 
-	vs.goDiscovery()
+	c.goDiscovery()
 
 	return nil
 }
 
-func (vs *VSphere) Check() error {
+func (c *Collector) Check() error {
 	return nil
 }
 
-func (vs *VSphere) Charts() *module.Charts {
-	return vs.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (vs *VSphere) Collect() map[string]int64 {
-	mx, err := vs.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		vs.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -134,9 +134,9 @@ func (vs *VSphere) Collect() map[string]int64 {
 	return mx
 }
 
-func (vs *VSphere) Cleanup() {
-	if vs.discoveryTask == nil {
+func (c *Collector) Cleanup() {
+	if c.discoveryTask == nil {
 		return
 	}
-	vs.discoveryTask.stop()
+	c.discoveryTask.stop()
 }
