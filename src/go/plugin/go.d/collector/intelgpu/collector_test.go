@@ -21,6 +21,7 @@ var (
 )
 
 func Test_testDataIsValid(t *testing.T) {
+
 	for name, data := range map[string][]byte{
 		"dataConfigJSON":      dataConfigJSON,
 		"dataConfigYAML":      dataConfigYAML,
@@ -30,39 +31,39 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestIntelGPU_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &IntelGPU{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestIntelGPU_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(igt *IntelGPU)
+		prepare  func(collr *Collector)
 		wantFail bool
 	}{
 		"fails if can't locate ndsudo": {
 			wantFail: true,
-			prepare: func(igt *IntelGPU) {
-				igt.ndsudoName += "!!!"
+			prepare: func(collr *Collector) {
+				collr.ndsudoName += "!!!"
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			igt := New()
+			collr := New()
 
-			test.prepare(igt)
+			test.prepare(collr)
 
 			if test.wantFail {
-				assert.Error(t, igt.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, igt.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestIntelGPU_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockIntelGpuTop
 		wantFail    bool
@@ -79,20 +80,20 @@ func TestIntelGPU_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			igt := New()
+			collr := New()
 			mock := test.prepareMock()
-			igt.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, igt.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, igt.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestIntelGPU_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockIntelGpuTop
 		wantMetrics map[string]int64
@@ -118,54 +119,54 @@ func TestIntelGPU_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			igt := New()
+			collr := New()
 			mock := test.prepareMock()
-			igt.exec = mock
+			collr.exec = mock
 
-			mx := igt.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {
-				assert.Len(t, *igt.Charts(), len(charts)+len(igt.engines))
+				assert.Len(t, *collr.Charts(), len(charts)+len(collr.engines))
 			}
 		})
 	}
 }
 
-func TestIntelGPU_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *IntelGPU
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *IntelGPU {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *IntelGPU {
-				igt := New()
-				igt.exec = prepareMockOK()
-				_ = igt.Check()
-				return igt
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOK()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *IntelGPU {
-				igt := New()
-				igt.exec = prepareMockOK()
-				_ = igt.Collect()
-				return igt
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOK()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			igt := test.prepare()
+			collr := test.prepare()
 
-			mock, ok := igt.exec.(*mockIntelGpuTop)
+			mock, ok := collr.exec.(*mockIntelGpuTop)
 
-			assert.NotPanics(t, igt.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 
 			if ok {
 				assert.True(t, mock.stopCalled)

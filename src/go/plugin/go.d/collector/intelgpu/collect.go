@@ -25,12 +25,12 @@ type (
 
 const precision = 100
 
-func (ig *IntelGPU) collect() (map[string]int64, error) {
-	if ig.exec == nil {
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.exec == nil {
 		return nil, errors.New("collector not initialized")
 	}
 
-	stats, err := ig.getGPUSummaryStats()
+	stats, err := c.getGPUSummaryStats()
 	if err != nil {
 		return nil, err
 	}
@@ -42,9 +42,9 @@ func (ig *IntelGPU) collect() (map[string]int64, error) {
 	mx["power_package"] = int64(stats.Power.Package * precision)
 
 	for name, es := range stats.Engines {
-		if !ig.engines[name] {
-			ig.addEngineCharts(name)
-			ig.engines[name] = true
+		if !c.engines[name] {
+			c.addEngineCharts(name)
+			c.engines[name] = true
 		}
 
 		key := fmt.Sprintf("engine_%s_busy", name)
@@ -53,8 +53,8 @@ func (ig *IntelGPU) collect() (map[string]int64, error) {
 
 	return mx, nil
 }
-func (ig *IntelGPU) getGPUSummaryStats() (*gpuSummaryStats, error) {
-	bs, err := ig.exec.queryGPUSummaryJson()
+func (c *Collector) getGPUSummaryStats() (*gpuSummaryStats, error) {
+	bs, err := c.exec.queryGPUSummaryJson()
 	if err != nil {
 		return nil, err
 	}

@@ -20,8 +20,8 @@ func init() {
 	})
 }
 
-func New() *IntelGPU {
-	return &IntelGPU{
+func New() *Collector {
+	return &Collector{
 		ndsudoName: "ndsudo",
 		charts:     charts.Copy(),
 		engines:    make(map[string]bool),
@@ -33,41 +33,36 @@ type Config struct {
 	Device      string `yaml:"device,omitempty" json:"device"`
 }
 
-type (
-	IntelGPU struct {
-		module.Base
-		Config `yaml:",inline" json:""`
+type Collector struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+	charts *module.Charts
 
-		exec       intelGpuTop
-		ndsudoName string
+	exec       intelGpuTop
+	ndsudoName string
 
-		engines map[string]bool
-	}
-	intelGpuTop interface {
-		queryGPUSummaryJson() ([]byte, error)
-		stop() error
-	}
-)
-
-func (ig *IntelGPU) Configuration() any {
-	return ig.Config
+	engines map[string]bool
 }
 
-func (ig *IntelGPU) Init() error {
-	topExec, err := ig.initIntelGPUTopExec()
+func (c *Collector) Configuration() any {
+	return c.Config
+}
+
+func (c *Collector) Init() error {
+	topExec, err := c.initIntelGPUTopExec()
+
 	if err != nil {
 		return fmt.Errorf("init intelgpu top exec: %v", err)
 	}
 
-	ig.exec = topExec
+	c.exec = topExec
 
 	return nil
 }
 
-func (ig *IntelGPU) Check() error {
-	mx, err := ig.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -79,14 +74,14 @@ func (ig *IntelGPU) Check() error {
 	return nil
 }
 
-func (ig *IntelGPU) Charts() *module.Charts {
-	return ig.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (ig *IntelGPU) Collect() map[string]int64 {
-	mx, err := ig.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		ig.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -96,11 +91,11 @@ func (ig *IntelGPU) Collect() map[string]int64 {
 	return mx
 }
 
-func (ig *IntelGPU) Cleanup() {
-	if ig.exec != nil {
-		if err := ig.exec.stop(); err != nil {
-			ig.Error(err)
+func (c *Collector) Cleanup() {
+	if c.exec != nil {
+		if err := c.exec.stop(); err != nil {
+			c.Error(err)
 		}
-		ig.exec = nil
+		c.exec = nil
 	}
 }
