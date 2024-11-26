@@ -10,7 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (cb *Couchbase) initCharts() (*Charts, error) {
+func (c *Collector) initCharts() (*Charts, error) {
 	var bucketCharts = module.Charts{
 		bucketQuotaPercentUsedChart.Copy(),
 		bucketOpsPerSecChart.Copy(),
@@ -24,15 +24,15 @@ func (cb *Couchbase) initCharts() (*Charts, error) {
 	return bucketCharts.Copy(), nil
 }
 
-func (cb *Couchbase) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(cb.ClientConfig)
+func (c *Collector) initHTTPClient() (*http.Client, error) {
+	return web.NewHTTPClient(c.ClientConfig)
 }
 
-func (cb *Couchbase) validateConfig() error {
-	if cb.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("URL not set")
 	}
-	if _, err := web.NewHTTPRequest(cb.RequestConfig); err != nil {
+	if _, err := web.NewHTTPRequest(c.RequestConfig); err != nil {
 		return err
 	}
 	return nil

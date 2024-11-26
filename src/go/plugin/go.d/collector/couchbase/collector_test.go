@@ -32,11 +32,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestCouchbase_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Couchbase{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestCouchbase_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -68,21 +68,21 @@ func TestCouchbase_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			cb := New()
-			cb.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, cb.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, cb.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestCouchbase_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(*testing.T) (cb *Couchbase, cleanup func())
+		prepare  func(*testing.T) (collr *Collector, cleanup func())
 		wantFail bool
 	}{
 		"success on valid response v6.6.0": {
@@ -104,21 +104,21 @@ func TestCouchbase_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			cb, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, cb.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, cb.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestCouchbase_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func(t *testing.T) (cb *Couchbase, cleanup func())
+		prepare       func(t *testing.T) (collr *Collector, cleanup func())
 		wantCollected map[string]int64
 	}{
 		"success on valid response v6.6.0": {
@@ -163,62 +163,62 @@ func TestCouchbase_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			cb, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := cb.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantCollected, mx)
-			module.TestMetricsHasAllChartsDims(t, cb.Charts(), mx)
+			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }
 
-func prepareCouchbaseV660(t *testing.T) (cb *Couchbase, cleanup func()) {
+func prepareCouchbaseV660(t *testing.T) (collr *Collector, cleanup func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataVer660BucketsBasicStats)
 		}))
 
-	cb = New()
-	cb.URL = srv.URL
-	require.NoError(t, cb.Init())
+	collr = New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return cb, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCouchbaseInvalidData(t *testing.T) (*Couchbase, func()) {
+func prepareCouchbaseInvalidData(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	cb := New()
-	cb.URL = srv.URL
-	require.NoError(t, cb.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return cb, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCouchbase404(t *testing.T) (*Couchbase, func()) {
+func prepareCouchbase404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	cb := New()
-	cb.URL = srv.URL
-	require.NoError(t, cb.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return cb, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCouchbaseConnectionRefused(t *testing.T) (*Couchbase, func()) {
+func prepareCouchbaseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	cb := New()
-	cb.URL = "http://127.0.0.1:38001"
-	require.NoError(t, cb.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001"
+	require.NoError(t, collr.Init())
 
-	return cb, func() {}
+	return collr, func() {}
 }

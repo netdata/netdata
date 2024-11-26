@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *Couchbase {
-	return &Couchbase{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -49,7 +49,7 @@ type Config struct {
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
-type Couchbase struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -59,33 +59,33 @@ type Couchbase struct {
 	collectedBuckets map[string]bool
 }
 
-func (cb *Couchbase) Configuration() any {
-	return cb.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (cb *Couchbase) Init() error {
-	err := cb.validateConfig()
+func (c *Collector) Init() error {
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("check configuration: %v", err)
 	}
 
-	httpClient, err := cb.initHTTPClient()
+	httpClient, err := c.initHTTPClient()
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
-	cb.httpClient = httpClient
+	c.httpClient = httpClient
 
-	charts, err := cb.initCharts()
+	charts, err := c.initCharts()
 	if err != nil {
 		return fmt.Errorf("init charts: %v", err)
 	}
-	cb.charts = charts
+	c.charts = charts
 
 	return nil
 }
 
-func (cb *Couchbase) Check() error {
-	mx, err := cb.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -96,14 +96,14 @@ func (cb *Couchbase) Check() error {
 	return nil
 }
 
-func (cb *Couchbase) Charts() *Charts {
-	return cb.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (cb *Couchbase) Collect() map[string]int64 {
-	mx, err := cb.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		cb.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -112,9 +112,9 @@ func (cb *Couchbase) Collect() map[string]int64 {
 	return mx
 }
 
-func (cb *Couchbase) Cleanup() {
-	if cb.httpClient == nil {
+func (c *Collector) Cleanup() {
+	if c.httpClient == nil {
 		return
 	}
-	cb.httpClient.CloseIdleConnections()
+	c.httpClient.CloseIdleConnections()
 }
