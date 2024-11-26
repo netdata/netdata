@@ -29,11 +29,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestOpenLDAP_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &OpenLDAP{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestOpenLDAP_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -54,59 +54,59 @@ func TestOpenLDAP_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			oldap := New()
-			oldap.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, oldap.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, oldap.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestOpenLDAP_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *OpenLDAP
+		prepare func() *Collector
 	}{
 		"not initialized": {
-			prepare: func() *OpenLDAP {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *OpenLDAP {
-				oldap := New()
-				oldap.newConn = func(Config) ldapConn { return prepareMockOk() }
-				_ = oldap.Check()
-				return oldap
+			prepare: func() *Collector {
+				collr := New()
+				collr.newConn = func(Config) ldapConn { return prepareMockOk() }
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *OpenLDAP {
-				oldap := New()
-				oldap.newConn = func(Config) ldapConn { return prepareMockOk() }
-				_ = oldap.Collect()
-				return oldap
+			prepare: func() *Collector {
+				collr := New()
+				collr.newConn = func(Config) ldapConn { return prepareMockOk() }
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			oldap := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, oldap.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestOpenLDAP_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestOpenLDAP_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockOpenLDAPConn
 		wantFail    bool
@@ -127,20 +127,20 @@ func TestOpenLDAP_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			oldap := New()
+			collr := New()
 			mock := test.prepareMock()
-			oldap.newConn = func(Config) ldapConn { return mock }
+			collr.newConn = func(Config) ldapConn { return mock }
 
 			if test.wantFail {
-				assert.Error(t, oldap.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, oldap.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestOpenLDAP_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock             func() *mockOpenLDAPConn
 		wantMetrics             map[string]int64
@@ -191,20 +191,20 @@ func TestOpenLDAP_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			oldap := New()
+			collr := New()
 			mock := test.prepareMock()
-			oldap.newConn = func(Config) ldapConn { return mock }
+			collr.newConn = func(Config) ldapConn { return mock }
 
-			mx := oldap.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, oldap.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 
 			assert.Equal(t, test.disconnectBeforeCleanup, mock.disconnectCalled, "disconnect before cleanup")
-			oldap.Cleanup()
+			collr.Cleanup()
 			assert.Equal(t, test.disconnectAfterCleanup, mock.disconnectCalled, "disconnect after cleanup")
 		})
 	}

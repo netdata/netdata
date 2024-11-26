@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *OpenLDAP {
-	return &OpenLDAP{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			URL:     "ldap://127.0.0.1:389",
 			Timeout: confopt.Duration(time.Second * 2),
@@ -49,7 +49,7 @@ type Config struct {
 	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 
-type OpenLDAP struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -59,23 +59,23 @@ type OpenLDAP struct {
 	newConn func(Config) ldapConn
 }
 
-func (l *OpenLDAP) Configuration() any {
-	return l.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (l *OpenLDAP) Init() error {
-	if l.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("empty LDAP server url")
 	}
-	if l.Username == "" {
+	if c.Username == "" {
 		return errors.New("empty LDAP username")
 	}
 
 	return nil
 }
 
-func (l *OpenLDAP) Check() error {
-	mx, err := l.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -87,14 +87,14 @@ func (l *OpenLDAP) Check() error {
 	return nil
 }
 
-func (l *OpenLDAP) Charts() *module.Charts {
-	return l.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (l *OpenLDAP) Collect() map[string]int64 {
-	mx, err := l.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		l.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -104,11 +104,11 @@ func (l *OpenLDAP) Collect() map[string]int64 {
 	return mx
 }
 
-func (l *OpenLDAP) Cleanup() {
-	if l.conn != nil {
-		if err := l.conn.disconnect(); err != nil {
-			l.Warningf("error disconnecting ldap client: %v", err)
+func (c *Collector) Cleanup() {
+	if c.conn != nil {
+		if err := c.conn.disconnect(); err != nil {
+			c.Warningf("error disconnecting ldap client: %v", err)
 		}
-		l.conn = nil
+		c.conn = nil
 	}
 }
