@@ -31,23 +31,23 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestFluentd_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Fluentd{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestFluentd_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	// OK
-	job := New()
-	assert.NoError(t, job.Init())
-	assert.NotNil(t, job.apiClient)
+	collr := New()
+	assert.NoError(t, collr.Init())
+	assert.NotNil(t, collr.apiClient)
 
 	//NG
-	job = New()
-	job.URL = ""
-	assert.Error(t, job.Init())
+	collr = New()
+	collr.URL = ""
+	assert.Error(t, collr.Init())
 }
 
-func TestFluentd_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataPluginsMetrics)
@@ -55,38 +55,38 @@ func TestFluentd_Check(t *testing.T) {
 	defer ts.Close()
 
 	// OK
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	// NG
-	job = New()
-	job.URL = "http://127.0.0.1:38001/api/plugins.json"
-	require.NoError(t, job.Init())
-	require.Error(t, job.Check())
+	collr = New()
+	collr.URL = "http://127.0.0.1:38001/api/plugins.json"
+	require.NoError(t, collr.Init())
+	require.Error(t, collr.Check())
 }
 
-func TestFluentd_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestFluentd_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestFluentd_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(dataPluginsMetrics)
 		}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
+	collr := New()
+	collr.URL = ts.URL
 
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"output_stdout_stdout_output_retry_count":         0,
@@ -94,34 +94,34 @@ func TestFluentd_Collect(t *testing.T) {
 		"output_td_tdlog_output_buffer_queue_length":      0,
 		"output_td_tdlog_output_buffer_total_queued_size": 0,
 	}
-	assert.Equal(t, expected, job.Collect())
-	assert.Len(t, job.charts.Get("retry_count").Dims, 2)
-	assert.Len(t, job.charts.Get("buffer_queue_length").Dims, 1)
-	assert.Len(t, job.charts.Get("buffer_total_queued_size").Dims, 1)
+	assert.Equal(t, expected, collr.Collect())
+	assert.Len(t, collr.charts.Get("retry_count").Dims, 2)
+	assert.Len(t, collr.charts.Get("buffer_queue_length").Dims, 1)
+	assert.Len(t, collr.charts.Get("buffer_total_queued_size").Dims, 1)
 }
 
-func TestFluentd_InvalidData(t *testing.T) {
+func TestCollector_InvalidData(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and goodbye"))
 		}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestFluentd_404(t *testing.T) {
+func TestCollector_404(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(404)
 		}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }

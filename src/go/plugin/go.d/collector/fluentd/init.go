@@ -9,27 +9,27 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (f *Fluentd) validateConfig() error {
-	if f.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
 
 	return nil
 }
 
-func (f *Fluentd) initPermitPluginMatcher() (matcher.Matcher, error) {
-	if f.PermitPlugin == "" {
+func (c *Collector) initPermitPluginMatcher() (matcher.Matcher, error) {
+	if c.PermitPlugin == "" {
 		return matcher.TRUE(), nil
 	}
 
-	return matcher.NewSimplePatternsMatcher(f.PermitPlugin)
+	return matcher.NewSimplePatternsMatcher(c.PermitPlugin)
 }
 
-func (f *Fluentd) initApiClient() (*apiClient, error) {
-	client, err := web.NewHTTPClient(f.ClientConfig)
+func (c *Collector) initApiClient() (*apiClient, error) {
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return newAPIClient(client, f.RequestConfig), nil
+	return newAPIClient(client, c.RequestConfig), nil
 }

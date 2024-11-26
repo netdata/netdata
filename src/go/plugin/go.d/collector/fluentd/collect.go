@@ -4,8 +4,8 @@ package fluentd
 
 import "fmt"
 
-func (f *Fluentd) collect() (map[string]int64, error) {
-	info, err := f.apiClient.getPluginsInfo()
+func (c *Collector) collect() (map[string]int64, error) {
+	info, err := c.apiClient.getPluginsInfo()
 	if err != nil {
 		return nil, err
 	}
@@ -18,8 +18,8 @@ func (f *Fluentd) collect() (map[string]int64, error) {
 			continue
 		}
 
-		if f.permitPlugin != nil && !f.permitPlugin.MatchString(p.ID) {
-			f.Debugf("plugin id: '%s', type: '%s', category: '%s' denied", p.ID, p.Type, p.Category)
+		if c.permitPlugin != nil && !c.permitPlugin.MatchString(p.ID) {
+			c.Debugf("plugin id: '%s', type: '%s', category: '%s' denied", p.ID, p.Type, p.Category)
 			continue
 		}
 
@@ -35,9 +35,9 @@ func (f *Fluentd) collect() (map[string]int64, error) {
 			mx[id+"_buffer_total_queued_size"] = *p.BufferTotalQueuedSize
 		}
 
-		if !f.activePlugins[id] {
-			f.activePlugins[id] = true
-			f.addPluginToCharts(p)
+		if !c.activePlugins[id] {
+			c.activePlugins[id] = true
+			c.addPluginToCharts(p)
 		}
 
 	}
@@ -45,21 +45,21 @@ func (f *Fluentd) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (f *Fluentd) addPluginToCharts(p pluginData) {
+func (c *Collector) addPluginToCharts(p pluginData) {
 	id := fmt.Sprintf("%s_%s_%s", p.ID, p.Type, p.Category)
 
 	if p.hasCategory() {
-		chart := f.charts.Get("retry_count")
+		chart := c.charts.Get("retry_count")
 		_ = chart.AddDim(&Dim{ID: id + "_retry_count", Name: p.ID})
 		chart.MarkNotCreated()
 	}
 	if p.hasBufferQueueLength() {
-		chart := f.charts.Get("buffer_queue_length")
+		chart := c.charts.Get("buffer_queue_length")
 		_ = chart.AddDim(&Dim{ID: id + "_buffer_queue_length", Name: p.ID})
 		chart.MarkNotCreated()
 	}
 	if p.hasBufferTotalQueuedSize() {
-		chart := f.charts.Get("buffer_total_queued_size")
+		chart := c.charts.Get("buffer_total_queued_size")
 		_ = chart.AddDim(&Dim{ID: id + "_buffer_total_queued_size", Name: p.ID})
 		chart.MarkNotCreated()
 	}

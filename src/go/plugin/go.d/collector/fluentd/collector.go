@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Fluentd {
-	return &Fluentd{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -47,7 +47,7 @@ type Config struct {
 	PermitPlugin   string `yaml:"permit_plugin_id,omitempty" json:"permit_plugin_id"`
 }
 
-type Fluentd struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -59,35 +59,35 @@ type Fluentd struct {
 	activePlugins map[string]bool
 }
 
-func (f *Fluentd) Configuration() any {
-	return f.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (f *Fluentd) Init() error {
-	if err := f.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("invalid config: %v", err)
 	}
 
-	pm, err := f.initPermitPluginMatcher()
+	pm, err := c.initPermitPluginMatcher()
 	if err != nil {
 		return fmt.Errorf("init permit_plugin_id: %v", err)
 	}
-	f.permitPlugin = pm
+	c.permitPlugin = pm
 
-	client, err := f.initApiClient()
+	client, err := c.initApiClient()
 	if err != nil {
 		return fmt.Errorf("init api client: %v", err)
 	}
-	f.apiClient = client
+	c.apiClient = client
 
-	f.Debugf("using URL %s", f.URL)
-	f.Debugf("using timeout: %s", f.Timeout.Duration())
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout.Duration())
 
 	return nil
 }
 
-func (f *Fluentd) Check() error {
-	mx, err := f.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -98,23 +98,23 @@ func (f *Fluentd) Check() error {
 	return nil
 }
 
-func (f *Fluentd) Charts() *Charts {
-	return f.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (f *Fluentd) Collect() map[string]int64 {
-	mx, err := f.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 
 	if err != nil {
-		f.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (f *Fluentd) Cleanup() {
-	if f.apiClient != nil && f.apiClient.httpClient != nil {
-		f.apiClient.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.apiClient != nil && c.apiClient.httpClient != nil {
+		c.apiClient.httpClient.CloseIdleConnections()
 	}
 }
