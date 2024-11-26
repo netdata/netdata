@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *DnsmasqDHCP {
-	return &DnsmasqDHCP{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			// debian defaults
 			LeasesPath: "/var/lib/misc/dnsmasq.leases",
@@ -48,7 +48,7 @@ type Config struct {
 	ConfDir     string `yaml:"conf_dir,omitempty" json:"conf_dir"`
 }
 
-type DnsmasqDHCP struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -64,23 +64,23 @@ type DnsmasqDHCP struct {
 	mx map[string]int64
 }
 
-func (d *DnsmasqDHCP) Configuration() any {
-	return d.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (d *DnsmasqDHCP) Init() error {
-	if err := d.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
-	if err := d.checkLeasesPath(); err != nil {
+	if err := c.checkLeasesPath(); err != nil {
 		return fmt.Errorf("leases path check: %v", err)
 	}
 
 	return nil
 }
 
-func (d *DnsmasqDHCP) Check() error {
-	mx, err := d.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -91,14 +91,14 @@ func (d *DnsmasqDHCP) Check() error {
 	return nil
 }
 
-func (d *DnsmasqDHCP) Charts() *module.Charts {
-	return d.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (d *DnsmasqDHCP) Collect() map[string]int64 {
-	mx, err := d.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		d.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -108,4 +108,4 @@ func (d *DnsmasqDHCP) Collect() map[string]int64 {
 	return mx
 }
 
-func (d *DnsmasqDHCP) Cleanup() {}
+func (c *Collector) Cleanup() {}

@@ -34,76 +34,76 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestDnsmasqDHCP_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &DnsmasqDHCP{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestDnsmasqDHCP_Init(t *testing.T) {
-	job := New()
-	job.LeasesPath = testLeasesPath
-	job.ConfPath = testConfPath
-	job.ConfDir = testConfDir
+func TestCollector_Init(t *testing.T) {
+	collr := New()
+	collr.LeasesPath = testLeasesPath
+	collr.ConfPath = testConfPath
+	collr.ConfDir = testConfDir
 
-	assert.NoError(t, job.Init())
+	assert.NoError(t, collr.Init())
 }
 
-func TestDnsmasqDHCP_InitEmptyLeasesPath(t *testing.T) {
-	job := New()
-	job.LeasesPath = ""
+func TestCollector_InitEmptyLeasesPath(t *testing.T) {
+	collr := New()
+	collr.LeasesPath = ""
 
-	assert.Error(t, job.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestDnsmasqDHCP_InitInvalidLeasesPath(t *testing.T) {
-	job := New()
-	job.LeasesPath = testLeasesPath
-	job.LeasesPath += "!"
+func TestCollector_InitInvalidLeasesPath(t *testing.T) {
+	collr := New()
+	collr.LeasesPath = testLeasesPath
+	collr.LeasesPath += "!"
 
-	assert.Error(t, job.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestDnsmasqDHCP_InitZeroDHCPRanges(t *testing.T) {
-	job := New()
-	job.LeasesPath = testLeasesPath
-	job.ConfPath = "testdata/dnsmasq3.conf"
-	job.ConfDir = ""
+func TestCollector_InitZeroDHCPRanges(t *testing.T) {
+	collr := New()
+	collr.LeasesPath = testLeasesPath
+	collr.ConfPath = "testdata/dnsmasq3.conf"
+	collr.ConfDir = ""
 
-	assert.NoError(t, job.Init())
+	assert.NoError(t, collr.Init())
 }
 
-func TestDnsmasqDHCP_Check(t *testing.T) {
-	job := New()
-	job.LeasesPath = testLeasesPath
-	job.ConfPath = testConfPath
-	job.ConfDir = testConfDir
+func TestCollector_Check(t *testing.T) {
+	collr := New()
+	collr.LeasesPath = testLeasesPath
+	collr.ConfPath = testConfPath
+	collr.ConfDir = testConfDir
 
-	require.NoError(t, job.Init())
-	assert.NoError(t, job.Check())
+	require.NoError(t, collr.Init())
+	assert.NoError(t, collr.Check())
 }
 
-func TestDnsmasqDHCP_Charts(t *testing.T) {
-	job := New()
-	job.LeasesPath = testLeasesPath
-	job.ConfPath = testConfPath
-	job.ConfDir = testConfDir
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
+	collr.LeasesPath = testLeasesPath
+	collr.ConfPath = testConfPath
+	collr.ConfDir = testConfDir
 
-	require.NoError(t, job.Init())
+	require.NoError(t, collr.Init())
 
-	assert.NotNil(t, job.Charts())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestDnsmasqDHCP_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestDnsmasqDHCP_Collect(t *testing.T) {
-	job := New()
-	job.LeasesPath = testLeasesPath
-	job.ConfPath = testConfPath
-	job.ConfDir = testConfDir
+func TestCollector_Collect(t *testing.T) {
+	collr := New()
+	collr.LeasesPath = testLeasesPath
+	collr.ConfPath = testConfPath
+	collr.ConfDir = testConfDir
 
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"dhcp_range_1230::1-1230::64_allocated_leases":              7,
@@ -134,23 +134,23 @@ func TestDnsmasqDHCP_Collect(t *testing.T) {
 		"ipv6_dhcp_ranges": 5,
 	}
 
-	assert.Equal(t, expected, job.Collect())
+	assert.Equal(t, expected, collr.Collect())
 }
 
-func TestDnsmasqDHCP_CollectFailedToOpenLeasesPath(t *testing.T) {
-	job := New()
-	job.LeasesPath = testLeasesPath
-	job.ConfPath = testConfPath
-	job.ConfDir = testConfDir
+func TestCollector_CollectFailedToOpenLeasesPath(t *testing.T) {
+	collr := New()
+	collr.LeasesPath = testLeasesPath
+	collr.ConfPath = testConfPath
+	collr.ConfDir = testConfDir
 
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
-	job.LeasesPath = ""
-	assert.Nil(t, job.Collect())
+	collr.LeasesPath = ""
+	assert.Nil(t, collr.Collect())
 }
 
-func TestDnsmasqDHCP_parseDHCPRangeValue(t *testing.T) {
+func TestCollector_parseDHCPRangeValue(t *testing.T) {
 	tests := map[string]struct {
 		input    string
 		wantFail bool
