@@ -715,7 +715,7 @@ static void stream_receiver_add(struct receiver_state *rpt) {
 
     spinlock_lock(&spinlock);
     if(!receiver_globals.cores) {
-        receiver_globals.cores = get_netdata_cpus() * 2 / 3;
+        receiver_globals.cores = get_netdata_cpus() - 1;
         if(receiver_globals.cores < 4)
             receiver_globals.cores = 4;
         else if(receiver_globals.cores > MAX_RECEIVERS)
