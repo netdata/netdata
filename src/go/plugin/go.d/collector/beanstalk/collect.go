@@ -10,30 +10,30 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 )
 
-func (b *Beanstalk) collect() (map[string]int64, error) {
-	if b.conn == nil {
-		conn, err := b.establishConn()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.conn == nil {
+		conn, err := c.establishConn()
 		if err != nil {
 			return nil, err
 		}
-		b.conn = conn
+		c.conn = conn
 	}
 
 	mx := make(map[string]int64)
 
-	if err := b.collectStats(mx); err != nil {
-		b.Cleanup()
+	if err := c.collectStats(mx); err != nil {
+		c.Cleanup()
 		return nil, err
 	}
-	if err := b.collectTubesStats(mx); err != nil {
+	if err := c.collectTubesStats(mx); err != nil {
 		return mx, err
 	}
 
 	return mx, nil
 }
 
-func (b *Beanstalk) collectStats(mx map[string]int64) error {
-	stats, err := b.conn.queryStats()
+func (c *Collector) collectStats(mx map[string]int64) error {
+	stats, err := c.conn.queryStats()
 	if err != nil {
 		return err
 	}
@@ -43,52 +43,52 @@ func (b *Beanstalk) collectStats(mx map[string]int64) error {
 	return nil
 }
 
-func (b *Beanstalk) collectTubesStats(mx map[string]int64) error {
+func (c *Collector) collectTubesStats(mx map[string]int64) error {
 	now := time.Now()
 
-	if now.Sub(b.lastDiscoverTubesTime) > b.discoverTubesEvery {
-		tubes, err := b.conn.queryListTubes()
+	if now.Sub(c.lastDiscoverTubesTime) > c.discoverTubesEvery {
+		tubes, err := c.conn.queryListTubes()
 		if err != nil {
 			return err
 		}
 
-		b.Debugf("discovered tubes (%d): %v", len(tubes), tubes)
-		v := slices.DeleteFunc(tubes, func(s string) bool { return !b.tubeSr.MatchString(s) })
+		c.Debugf("discovered tubes (%d): %v", len(tubes), tubes)
+		v := slices.DeleteFunc(tubes, func(s string) bool { return !c.tubeSr.MatchString(s) })
 		if len(tubes) != len(v) {
-			b.Debugf("discovered tubes after filtering (%d): %v", len(v), v)
+			c.Debugf("discovered tubes after filtering (%d): %v", len(v), v)
 		}
 
-		b.discoveredTubes = v
-		b.lastDiscoverTubesTime = now
+		c.discoveredTubes = v
+		c.lastDiscoverTubesTime = now
 	}
 
 	seen := make(map[string]bool)
 
-	for i, tube := range b.discoveredTubes {
+	for i, tube := range c.discoveredTubes {
 		if tube == "" {
 			continue
 		}
 
-		stats, err := b.conn.queryStatsTube(tube)
+		stats, err := c.conn.queryStatsTube(tube)
 		if err != nil {
 			return err
 		}
 
 		if stats == nil {
-			b.Infof("tube '%s' stats object not found (tube does not exist)", tube)
-			b.discoveredTubes[i] = ""
+			c.Infof("tube '%s' stats object not found (tube does not exist)", tube)
+			c.discoveredTubes[i] = ""
 			continue
 		}
 		if stats.Name == "" {
-			b.Debugf("tube '%s' stats object has an empty name, ignoring it", tube)
-			b.discoveredTubes[i] = ""
+			c.Debugf("tube '%s' stats object has an empty name, ignoring it", tube)
+			c.discoveredTubes[i] = ""
 			continue
 		}
 
 		seen[stats.Name] = true
-		if !b.seenTubes[stats.Name] {
-			b.seenTubes[stats.Name] = true
-			b.addTubeCharts(stats.Name)
+		if !c.seenTubes[stats.Name] {
+			c.seenTubes[stats.Name] = true
+			c.addTubeCharts(stats.Name)
 		}
 
 		px := fmt.Sprintf("tube_%s_", stats.Name)
@@ -97,18 +97,18 @@ func (b *Beanstalk) collectTubesStats(mx map[string]int64) error {
 		}
 	}
 
-	for tube := range b.seenTubes {
+	for tube := range c.seenTubes {
 		if !seen[tube] {
-			delete(b.seenTubes, tube)
-			b.removeTubeCharts(tube)
+			delete(c.seenTubes, tube)
+			c.removeTubeCharts(tube)
 		}
 	}
 
 	return nil
 }
 
-func (b *Beanstalk) establishConn() (beanstalkConn, error) {
-	conn := b.newConn(b.Config, b.Logger)
+func (c *Collector) establishConn() (beanstalkConn, error) {
+	conn := c.newConn(c.Config, c.Logger)
 
 	if err := conn.connect(); err != nil {
 		return nil, err

@@ -39,11 +39,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestBeanstalk_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Beanstalk{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestBeanstalk_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -64,25 +64,25 @@ func TestBeanstalk_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			beans := New()
-			beans.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, beans.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, beans.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestBeanstalk_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestBeanstalk_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() (*Beanstalk, *mockBeanstalkDaemon)
+		prepare  func() (*Collector, *mockBeanstalkDaemon)
 		wantFail bool
 	}{
 		"success on valid response": {
@@ -100,7 +100,7 @@ func TestBeanstalk_Check(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			beanstalk, daemon := test.prepare()
+			collr, daemon := test.prepare()
 
 			defer func() {
 				assert.NoError(t, daemon.Close(), "daemon.Close()")
@@ -112,31 +112,31 @@ func TestBeanstalk_Check(t *testing.T) {
 			select {
 			case <-daemon.started:
 			case <-time.After(time.Second * 3):
-				t.Errorf("mock beanstalk daemon start timed out")
+				t.Errorf("mock collr daemon start timed out")
 			}
 
-			require.NoError(t, beanstalk.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, beanstalk.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, beanstalk.Check())
+				assert.NoError(t, collr.Check())
 			}
 
-			beanstalk.Cleanup()
+			collr.Cleanup()
 
 			select {
 			case <-daemon.stopped:
 			case <-time.After(time.Second * 3):
-				t.Errorf("mock beanstalk daemon stop timed out")
+				t.Errorf("mock collr daemon stop timed out")
 			}
 		})
 	}
 }
 
-func TestBeanstalk_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func() (*Beanstalk, *mockBeanstalkDaemon)
+		prepare     func() (*Collector, *mockBeanstalkDaemon)
 		wantMetrics map[string]int64
 		wantCharts  int
 	}{
@@ -211,7 +211,7 @@ func TestBeanstalk_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			beanstalk, daemon := test.prepare()
+			collr, daemon := test.prepare()
 
 			defer func() {
 				assert.NoError(t, daemon.Close(), "daemon.Close()")
@@ -223,33 +223,33 @@ func TestBeanstalk_Collect(t *testing.T) {
 			select {
 			case <-daemon.started:
 			case <-time.After(time.Second * 3):
-				t.Errorf("mock beanstalk daemon start timed out")
+				t.Errorf("mock collr daemon start timed out")
 			}
 
-			require.NoError(t, beanstalk.Init())
+			require.NoError(t, collr.Init())
 
-			mx := beanstalk.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
-			assert.Equal(t, test.wantCharts, len(*beanstalk.Charts()), "want charts")
+			assert.Equal(t, test.wantCharts, len(*collr.Charts()), "want charts")
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, beanstalk.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 
-			beanstalk.Cleanup()
+			collr.Cleanup()
 
 			select {
 			case <-daemon.stopped:
 			case <-time.After(time.Second * 3):
-				t.Errorf("mock beanstalk daemon stop timed out")
+				t.Errorf("mock collr daemon stop timed out")
 			}
 		})
 	}
 }
 
-func prepareCaseOk() (*Beanstalk, *mockBeanstalkDaemon) {
+func prepareCaseOk() (*Collector, *mockBeanstalkDaemon) {
 	daemon := &mockBeanstalkDaemon{
 		addr:          "127.0.0.1:65001",
 		started:       make(chan struct{}),
@@ -259,13 +259,13 @@ func prepareCaseOk() (*Beanstalk, *mockBeanstalkDaemon) {
 		dataStatsTube: dataStatsTubeDefault,
 	}
 
-	beanstalk := New()
-	beanstalk.Address = daemon.addr
+	collr := New()
+	collr.Address = daemon.addr
 
-	return beanstalk, daemon
+	return collr, daemon
 }
 
-func prepareCaseUnexpectedResponse() (*Beanstalk, *mockBeanstalkDaemon) {
+func prepareCaseUnexpectedResponse() (*Collector, *mockBeanstalkDaemon) {
 	daemon := &mockBeanstalkDaemon{
 		addr:          "127.0.0.1:65001",
 		started:       make(chan struct{}),
@@ -275,13 +275,13 @@ func prepareCaseUnexpectedResponse() (*Beanstalk, *mockBeanstalkDaemon) {
 		dataStatsTube: []byte("INTERNAL_ERROR\n"),
 	}
 
-	beanstalk := New()
-	beanstalk.Address = daemon.addr
+	collr := New()
+	collr.Address = daemon.addr
 
-	return beanstalk, daemon
+	return collr, daemon
 }
 
-func prepareCaseConnectionRefused() (*Beanstalk, *mockBeanstalkDaemon) {
+func prepareCaseConnectionRefused() (*Collector, *mockBeanstalkDaemon) {
 	ch := make(chan struct{})
 	close(ch)
 	daemon := &mockBeanstalkDaemon{
@@ -291,10 +291,10 @@ func prepareCaseConnectionRefused() (*Beanstalk, *mockBeanstalkDaemon) {
 		stopped:   ch,
 	}
 
-	beanstalk := New()
-	beanstalk.Address = daemon.addr
+	collr := New()
+	collr.Address = daemon.addr
 
-	return beanstalk, daemon
+	return collr, daemon
 }
 
 type mockBeanstalkDaemon struct {

@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Beanstalk {
-	return &Beanstalk{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address:      "127.0.0.1:11300",
 			Timeout:      confopt.Duration(time.Second * 1),
@@ -48,7 +48,7 @@ type Config struct {
 	TubeSelector string           `yaml:"tube_selector,omitempty" json:"tube_selector"`
 }
 
-type Beanstalk struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -64,26 +64,26 @@ type Beanstalk struct {
 	seenTubes             map[string]bool
 }
 
-func (b *Beanstalk) Configuration() any {
-	return b.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (b *Beanstalk) Init() error {
-	if err := b.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	sr, err := b.initTubeSelector()
+	sr, err := c.initTubeSelector()
 	if err != nil {
 		return fmt.Errorf("failed to init tube selector: %v", err)
 	}
-	b.tubeSr = sr
+	c.tubeSr = sr
 
 	return nil
 }
 
-func (b *Beanstalk) Check() error {
-	mx, err := b.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -95,14 +95,14 @@ func (b *Beanstalk) Check() error {
 	return nil
 }
 
-func (b *Beanstalk) Charts() *module.Charts {
-	return b.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (b *Beanstalk) Collect() map[string]int64 {
-	mx, err := b.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		b.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -112,11 +112,11 @@ func (b *Beanstalk) Collect() map[string]int64 {
 	return mx
 }
 
-func (b *Beanstalk) Cleanup() {
-	if b.conn != nil {
-		if err := b.conn.disconnect(); err != nil {
-			b.Warningf("error on disconnect: %s", err)
+func (c *Collector) Cleanup() {
+	if c.conn != nil {
+		if err := c.conn.disconnect(); err != nil {
+			c.Warningf("error on disconnect: %s", err)
 		}
-		b.conn = nil
+		c.conn = nil
 	}
 }

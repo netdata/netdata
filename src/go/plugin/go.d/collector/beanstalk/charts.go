@@ -297,7 +297,7 @@ var (
 	}
 )
 
-func (b *Beanstalk) addTubeCharts(name string) {
+func (c *Collector) addTubeCharts(name string) {
 	charts := tubeChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -311,15 +311,15 @@ func (b *Beanstalk) addTubeCharts(name string) {
 		}
 	}
 
-	if err := b.Charts().Add(*charts...); err != nil {
-		b.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (b *Beanstalk) removeTubeCharts(name string) {
+func (c *Collector) removeTubeCharts(name string) {
 	px := fmt.Sprintf("tube_%s_", cleanTubeName(name))
 
-	for _, chart := range *b.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
