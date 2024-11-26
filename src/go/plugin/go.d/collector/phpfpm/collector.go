@@ -24,8 +24,8 @@ func init() {
 	})
 }
 
-func New() *Phpfpm {
-	return &Phpfpm{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -48,29 +48,29 @@ type Config struct {
 	FcgiPath       string `yaml:"fcgi_path,omitempty" json:"fcgi_path"`
 }
 
-type Phpfpm struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
 	client client
 }
 
-func (p *Phpfpm) Configuration() any {
-	return p.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (p *Phpfpm) Init() error {
-	c, err := p.initClient()
+func (c *Collector) Init() error {
+	cli, err := c.initClient()
 	if err != nil {
 		return fmt.Errorf("init client: %v", err)
 	}
-	p.client = c
+	c.client = cli
 
 	return nil
 }
 
-func (p *Phpfpm) Check() error {
-	mx, err := p.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -80,14 +80,14 @@ func (p *Phpfpm) Check() error {
 	return nil
 }
 
-func (p *Phpfpm) Charts() *Charts {
+func (c *Collector) Charts() *Charts {
 	return charts.Copy()
 }
 
-func (p *Phpfpm) Collect() map[string]int64 {
-	mx, err := p.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -96,4 +96,4 @@ func (p *Phpfpm) Collect() map[string]int64 {
 	return mx
 }
 
-func (p *Phpfpm) Cleanup() {}
+func (c *Collector) Cleanup() {}

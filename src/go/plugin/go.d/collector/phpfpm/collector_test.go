@@ -39,18 +39,18 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestPhpfpm_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Phpfpm{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestPhpfpm_Init(t *testing.T) {
-	job := New()
+func TestCollector_Init(t *testing.T) {
+	collr := New()
 
-	require.NoError(t, job.Init())
-	assert.NotNil(t, job.client)
+	require.NoError(t, collr.Init())
+	assert.NotNil(t, collr.client)
 }
 
-func TestPhpfpm_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -58,28 +58,28 @@ func TestPhpfpm_Check(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	assert.NoError(t, job.Check())
+	assert.NoError(t, collr.Check())
 }
 
-func TestPhpfpm_CheckReturnsFalseOnFailure(t *testing.T) {
-	job := New()
-	job.URL = "http://127.0.0.1:38001/us"
-	require.NoError(t, job.Init())
+func TestCollector_CheckReturnsFalseOnFailure(t *testing.T) {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001/us"
+	require.NoError(t, collr.Init())
 
-	assert.Error(t, job.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestPhpfpm_Charts(t *testing.T) {
-	job := New()
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
 
-	assert.NotNil(t, job.Charts())
+	assert.NotNil(t, collr.Charts())
 }
 
-func TestPhpfpm_CollectJSON(t *testing.T) {
+func TestCollector_CollectJSON(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -87,11 +87,11 @@ func TestPhpfpm_CollectJSON(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/?json"
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL + "/?json"
+	require.NoError(t, collr.Init())
 
-	got := job.Collect()
+	got := collr.Collect()
 
 	want := map[string]int64{
 		"active":    1,
@@ -104,7 +104,7 @@ func TestPhpfpm_CollectJSON(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func TestPhpfpm_CollectJSONFull(t *testing.T) {
+func TestCollector_CollectJSONFull(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -112,11 +112,11 @@ func TestPhpfpm_CollectJSONFull(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/?json"
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL + "/?json"
+	require.NoError(t, collr.Init())
 
-	got := job.Collect()
+	got := collr.Collect()
 
 	want := map[string]int64{
 		"active":    1,
@@ -138,7 +138,7 @@ func TestPhpfpm_CollectJSONFull(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func TestPhpfpm_CollectNoIdleProcessesJSONFull(t *testing.T) {
+func TestCollector_CollectNoIdleProcessesJSONFull(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -146,11 +146,11 @@ func TestPhpfpm_CollectNoIdleProcessesJSONFull(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/?json"
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL + "/?json"
+	require.NoError(t, collr.Init())
 
-	got := job.Collect()
+	got := collr.Collect()
 
 	want := map[string]int64{
 		"active":    1,
@@ -163,7 +163,7 @@ func TestPhpfpm_CollectNoIdleProcessesJSONFull(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func TestPhpfpm_CollectText(t *testing.T) {
+func TestCollector_CollectText(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -171,11 +171,11 @@ func TestPhpfpm_CollectText(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	got := job.Collect()
+	got := collr.Collect()
 
 	want := map[string]int64{
 		"active":    1,
@@ -188,7 +188,7 @@ func TestPhpfpm_CollectText(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func TestPhpfpm_CollectTextFull(t *testing.T) {
+func TestCollector_CollectTextFull(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -196,11 +196,11 @@ func TestPhpfpm_CollectTextFull(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	got := job.Collect()
+	got := collr.Collect()
 
 	want := map[string]int64{
 		"active":    1,
@@ -222,7 +222,7 @@ func TestPhpfpm_CollectTextFull(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func TestPhpfpm_CollectReturnsNothingWhenInvalidData(t *testing.T) {
+func TestCollector_CollectReturnsNothingWhenInvalidData(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -230,14 +230,14 @@ func TestPhpfpm_CollectReturnsNothingWhenInvalidData(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	assert.Len(t, job.Collect(), 0)
+	assert.Len(t, collr.Collect(), 0)
 }
 
-func TestPhpfpm_CollectReturnsNothingWhenEmptyData(t *testing.T) {
+func TestCollector_CollectReturnsNothingWhenEmptyData(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -245,14 +245,14 @@ func TestPhpfpm_CollectReturnsNothingWhenEmptyData(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	assert.Len(t, job.Collect(), 0)
+	assert.Len(t, collr.Collect(), 0)
 }
 
-func TestPhpfpm_CollectReturnsNothingWhenBadStatusCode(t *testing.T) {
+func TestCollector_CollectReturnsNothingWhenBadStatusCode(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -260,13 +260,13 @@ func TestPhpfpm_CollectReturnsNothingWhenBadStatusCode(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL
-	require.NoError(t, job.Init())
+	collr := New()
+	collr.URL = ts.URL
+	require.NoError(t, collr.Init())
 
-	assert.Len(t, job.Collect(), 0)
+	assert.Len(t, collr.Collect(), 0)
 }
 
-func TestPhpfpm_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
