@@ -28,8 +28,8 @@ func init() {
 	})
 }
 
-func New() *LVM {
-	return &LVM{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout: confopt.Duration(time.Second * 2),
 		},
@@ -43,7 +43,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type LVM struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -54,22 +54,22 @@ type LVM struct {
 	lvmThinPools map[string]bool
 }
 
-func (l *LVM) Configuration() any {
-	return l.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (l *LVM) Init() error {
-	lvmExec, err := l.initLVMCLIExec()
+func (c *Collector) Init() error {
+	lvmExec, err := c.initLVMCLIExec()
 	if err != nil {
 		return fmt.Errorf("init lvm exec: %v", err)
 	}
-	l.exec = lvmExec
+	c.exec = lvmExec
 
 	return nil
 }
 
-func (l *LVM) Check() error {
-	mx, err := l.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -81,14 +81,14 @@ func (l *LVM) Check() error {
 	return nil
 }
 
-func (l *LVM) Charts() *module.Charts {
-	return l.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (l *LVM) Collect() map[string]int64 {
-	mx, err := l.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		l.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -98,4 +98,4 @@ func (l *LVM) Collect() map[string]int64 {
 	return mx
 }
 
-func (l *LVM) Cleanup() {}
+func (c *Collector) Cleanup() {}

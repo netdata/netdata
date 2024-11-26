@@ -36,11 +36,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestLVM_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &LVM{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_Configuration(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestLVM_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -53,59 +53,59 @@ func TestLVM_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			lvm := New()
-			lvm.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, lvm.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, lvm.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestLVM_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare func() *LVM
+		prepare func() *Collector
 	}{
 		"not initialized exec": {
-			prepare: func() *LVM {
+			prepare: func() *Collector {
 				return New()
 			},
 		},
 		"after check": {
-			prepare: func() *LVM {
-				lvm := New()
-				lvm.exec = prepareMockOK()
-				_ = lvm.Check()
-				return lvm
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOK()
+				_ = collr.Check()
+				return collr
 			},
 		},
 		"after collect": {
-			prepare: func() *LVM {
-				lvm := New()
-				lvm.exec = prepareMockOK()
-				_ = lvm.Collect()
-				return lvm
+			prepare: func() *Collector {
+				collr := New()
+				collr.exec = prepareMockOK()
+				_ = collr.Collect()
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			lvm := test.prepare()
+			collr := test.prepare()
 
-			assert.NotPanics(t, lvm.Cleanup)
+			assert.NotPanics(t, collr.Cleanup)
 		})
 	}
 }
 
-func TestLVM_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestLVM_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockLvmCliExec
 		wantFail    bool
@@ -134,20 +134,20 @@ func TestLVM_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			lvm := New()
+			collr := New()
 			mock := test.prepareMock()
-			lvm.exec = mock
+			collr.exec = mock
 
 			if test.wantFail {
-				assert.Error(t, lvm.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, lvm.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestLVM_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock func() *mockLvmCliExec
 		wantMetrics map[string]int64
@@ -179,15 +179,15 @@ func TestLVM_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			lvm := New()
+			collr := New()
 			mock := test.prepareMock()
-			lvm.exec = mock
+			collr.exec = mock
 
-			mx := lvm.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {
-				assert.Len(t, *lvm.Charts(), len(lvThinPoolChartsTmpl)*len(lvm.lvmThinPools))
+				assert.Len(t, *collr.Charts(), len(lvThinPoolChartsTmpl)*len(collr.lvmThinPools))
 			}
 		})
 	}
