@@ -32,11 +32,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestRspamd_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Rspamd{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestRspamd_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -57,26 +57,26 @@ func TestRspamd_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rsp := New()
-			rsp.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, rsp.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, rsp.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestRspamd_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestRspamd_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (*Rspamd, func())
+		prepare  func(t *testing.T) (*Collector, func())
 	}{
 		"success on valid response": {
 			wantFail: false,
@@ -98,21 +98,21 @@ func TestRspamd_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rsp, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, rsp.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, rsp.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestRspamd_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func(t *testing.T) (*Rspamd, func())
+		prepare     func(t *testing.T) (*Collector, func())
 		wantMetrics map[string]int64
 	}{
 		"success on valid response": {
@@ -150,21 +150,21 @@ func TestRspamd_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rsp, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := rsp.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, rsp.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareCaseOk(t *testing.T) (*Rspamd, func()) {
+func prepareCaseOk(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -176,14 +176,14 @@ func prepareCaseOk(t *testing.T) (*Rspamd, func()) {
 			}
 		}))
 
-	rsp := New()
-	rsp.URL = srv.URL
-	require.NoError(t, rsp.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return rsp, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseUnexpectedJsonResponse(t *testing.T) (*Rspamd, func()) {
+func prepareCaseUnexpectedJsonResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	resp := `
 {
@@ -212,32 +212,32 @@ func prepareCaseUnexpectedJsonResponse(t *testing.T) (*Rspamd, func()) {
 			}
 		}))
 
-	rsp := New()
-	rsp.URL = srv.URL
-	require.NoError(t, rsp.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return rsp, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseInvalidFormatResponse(t *testing.T) (*Rspamd, func()) {
+func prepareCaseInvalidFormatResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
 
-	rsp := New()
-	rsp.URL = srv.URL
-	require.NoError(t, rsp.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return rsp, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseConnectionRefused(t *testing.T) (*Rspamd, func()) {
+func prepareCaseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	rsp := New()
-	rsp.URL = "http://127.0.0.1:65001/stat"
-	require.NoError(t, rsp.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001/stat"
+	require.NoError(t, collr.Init())
 
-	return rsp, func() {}
+	return collr, func() {}
 }
