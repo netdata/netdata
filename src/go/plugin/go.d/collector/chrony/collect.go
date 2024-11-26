@@ -24,7 +24,7 @@ const (
 	leapStatusUnsynchronised = 3
 )
 
-func (c *Chrony) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	if c.conn == nil {
 		client, err := c.newConn(c.Config)
 		if err != nil {
@@ -53,7 +53,7 @@ func (c *Chrony) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Chrony) collectTracking(mx map[string]int64) error {
+func (c *Collector) collectTracking(mx map[string]int64) error {
 	reply, err := c.conn.tracking()
 	if err != nil {
 		return fmt.Errorf("error on collecting tracking: %v", err)
@@ -82,7 +82,7 @@ func (c *Chrony) collectTracking(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Chrony) collectActivity(mx map[string]int64) error {
+func (c *Collector) collectActivity(mx map[string]int64) error {
 	reply, err := c.conn.activity()
 	if err != nil {
 		return fmt.Errorf("error on collecting activity: %v", err)
@@ -97,7 +97,7 @@ func (c *Chrony) collectActivity(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Chrony) collectServerStats(mx map[string]int64) error {
+func (c *Collector) collectServerStats(mx map[string]int64) error {
 	bs, err := c.exec.serverStats()
 	if err != nil {
 		return fmt.Errorf("error on collecting server stats: %v", err)

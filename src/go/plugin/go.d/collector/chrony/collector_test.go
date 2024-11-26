@@ -30,11 +30,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestChrony_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Chrony{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestChrony_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -52,94 +52,94 @@ func TestChrony_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			c := New()
-			c.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, c.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, c.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestChrony_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *Chrony
+		prepare  func() *Collector
 		wantFail bool
 	}{
 		"tracking: success, activity: success": {
 			wantFail: false,
-			prepare:  func() *Chrony { return prepareChronyWithMock(&mockClient{}) },
+			prepare:  func() *Collector { return prepareChronyWithMock(&mockClient{}) },
 		},
 		"tracking: success, activity: fail": {
 			wantFail: true,
-			prepare:  func() *Chrony { return prepareChronyWithMock(&mockClient{errOnActivity: true}) },
+			prepare:  func() *Collector { return prepareChronyWithMock(&mockClient{errOnActivity: true}) },
 		},
 		"tracking: fail, activity: success": {
 			wantFail: true,
-			prepare:  func() *Chrony { return prepareChronyWithMock(&mockClient{errOnTracking: true}) },
+			prepare:  func() *Collector { return prepareChronyWithMock(&mockClient{errOnTracking: true}) },
 		},
 		"tracking: fail, activity: fail": {
 			wantFail: true,
-			prepare:  func() *Chrony { return prepareChronyWithMock(&mockClient{errOnTracking: true}) },
+			prepare:  func() *Collector { return prepareChronyWithMock(&mockClient{errOnTracking: true}) },
 		},
 		"fail on creating client": {
 			wantFail: true,
-			prepare:  func() *Chrony { return prepareChronyWithMock(nil) },
+			prepare:  func() *Collector { return prepareChronyWithMock(nil) },
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			c := test.prepare()
+			collr := test.prepare()
 
-			require.NoError(t, c.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, c.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, c.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestChrony_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.Equal(t, len(charts), len(*New().Charts()))
 }
 
-func TestChrony_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	tests := map[string]struct {
-		prepare   func(c *Chrony)
+		prepare   func(c *Collector)
 		wantClose bool
 	}{
 		"after New": {
 			wantClose: false,
-			prepare:   func(c *Chrony) {},
+			prepare:   func(c *Collector) {},
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(c *Chrony) { _ = c.Init() },
+			prepare:   func(c *Collector) { _ = c.Init() },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(c *Chrony) { _ = c.Init(); _ = c.Check() },
+			prepare:   func(c *Collector) { _ = c.Init(); _ = c.Check() },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(c *Chrony) { _ = c.Init(); _ = c.Collect() },
+			prepare:   func(c *Collector) { _ = c.Init(); _ = c.Collect() },
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			m := &mockClient{}
-			c := prepareChronyWithMock(m)
-			test.prepare(c)
+			collr := prepareChronyWithMock(m)
+			test.prepare(collr)
 
-			require.NotPanics(t, c.Cleanup)
+			require.NotPanics(t, collr.Cleanup)
 
 			if test.wantClose {
 				assert.True(t, m.closeCalled)
@@ -150,13 +150,13 @@ func TestChrony_Cleanup(t *testing.T) {
 	}
 }
 
-func TestChrony_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() *Chrony
+		prepare  func() *Collector
 		expected map[string]int64
 	}{
 		"tracking: success, activity: success, serverstats: success": {
-			prepare: func() *Chrony { return prepareChronyWithMock(&mockClient{}) },
+			prepare: func() *Collector { return prepareChronyWithMock(&mockClient{}) },
 			expected: map[string]int64{
 				"burst_offline_sources":      3,
 				"burst_online_sources":       4,
@@ -185,7 +185,7 @@ func TestChrony_Collect(t *testing.T) {
 			},
 		},
 		"tracking: success, activity: fail": {
-			prepare: func() *Chrony { return prepareChronyWithMock(&mockClient{errOnActivity: true}) },
+			prepare: func() *Collector { return prepareChronyWithMock(&mockClient{errOnActivity: true}) },
 			expected: map[string]int64{
 				"current_correction":         154872,
 				"frequency":                  51051185607,
@@ -205,28 +205,28 @@ func TestChrony_Collect(t *testing.T) {
 			},
 		},
 		"tracking: fail, activity: success": {
-			prepare:  func() *Chrony { return prepareChronyWithMock(&mockClient{errOnTracking: true}) },
+			prepare:  func() *Collector { return prepareChronyWithMock(&mockClient{errOnTracking: true}) },
 			expected: nil,
 		},
 		"tracking: fail, activity: fail": {
-			prepare:  func() *Chrony { return prepareChronyWithMock(&mockClient{errOnTracking: true}) },
+			prepare:  func() *Collector { return prepareChronyWithMock(&mockClient{errOnTracking: true}) },
 			expected: nil,
 		},
 		"fail on creating client": {
-			prepare:  func() *Chrony { return prepareChronyWithMock(nil) },
+			prepare:  func() *Collector { return prepareChronyWithMock(nil) },
 			expected: nil,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			c := test.prepare()
+			collr := test.prepare()
 
-			require.NoError(t, c.Init())
-			c.exec = &mockChronyc{}
-			_ = c.Check()
+			require.NoError(t, collr.Init())
+			collr.exec = &mockChronyc{}
+			_ = collr.Check()
 
-			mx := c.Collect()
+			mx := collr.Collect()
 			copyRefMeasurementTime(mx, test.expected)
 
 			assert.Equal(t, test.expected, mx)
@@ -234,7 +234,7 @@ func TestChrony_Collect(t *testing.T) {
 	}
 }
 
-func prepareChronyWithMock(m *mockClient) *Chrony {
+func prepareChronyWithMock(m *mockClient) *Collector {
 	c := New()
 	if m == nil {
 		c.newConn = func(_ Config) (chronyConn, error) { return nil, errors.New("mock.newClient error") }

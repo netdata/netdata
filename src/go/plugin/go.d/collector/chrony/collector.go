@@ -24,8 +24,8 @@ func init() {
 	})
 }
 
-func New() *Chrony {
-	return &Chrony{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1:323",
 			Timeout: confopt.Duration(time.Second),
@@ -42,7 +42,7 @@ type Config struct {
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
-type Chrony struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -55,11 +55,11 @@ type Chrony struct {
 	newConn func(c Config) (chronyConn, error)
 }
 
-func (c *Chrony) Configuration() any {
+func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Chrony) Init() error {
+func (c *Collector) Init() error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
@@ -72,7 +72,7 @@ func (c *Chrony) Init() error {
 	return nil
 }
 
-func (c *Chrony) Check() error {
+func (c *Collector) Check() error {
 	mx, err := c.collect()
 	if err != nil {
 		return err
@@ -84,11 +84,11 @@ func (c *Chrony) Check() error {
 	return nil
 }
 
-func (c *Chrony) Charts() *module.Charts {
+func (c *Collector) Charts() *module.Charts {
 	return c.charts
 }
 
-func (c *Chrony) Collect() map[string]int64 {
+func (c *Collector) Collect() map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -100,7 +100,7 @@ func (c *Chrony) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *Chrony) Cleanup() {
+func (c *Collector) Cleanup() {
 	if c.conn != nil {
 		c.conn.close()
 		c.conn = nil

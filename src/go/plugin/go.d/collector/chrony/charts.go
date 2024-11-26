@@ -248,7 +248,7 @@ var (
 	}
 )
 
-func (c *Chrony) addServerStatsCharts() {
+func (c *Collector) addServerStatsCharts() {
 	if err := c.Charts().Add(*serverStatsCharts.Copy()...); err != nil {
 		c.Warning(err)
 	}
