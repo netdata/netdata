@@ -28,58 +28,58 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestFreeRADIUS_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &FreeRADIUS{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestFreeRADIUS_Init(t *testing.T) {
-	freeRADIUS := New()
+func TestCollector_Init(t *testing.T) {
+	collr := New()
 
-	assert.NoError(t, freeRADIUS.Init())
+	assert.NoError(t, collr.Init())
 }
 
-func TestFreeRADIUS_Init_ReturnsFalseIfAddressNotSet(t *testing.T) {
-	freeRADIUS := New()
-	freeRADIUS.Address = ""
+func TestCollector_Init_ReturnsFalseIfAddressNotSet(t *testing.T) {
+	collr := New()
+	collr.Address = ""
 
-	assert.Error(t, freeRADIUS.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestFreeRADIUS_Init_ReturnsFalseIfPortNotSet(t *testing.T) {
-	freeRADIUS := New()
-	freeRADIUS.Port = 0
+func TestCollector_Init_ReturnsFalseIfPortNotSet(t *testing.T) {
+	collr := New()
+	collr.Port = 0
 
-	assert.Error(t, freeRADIUS.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestFreeRADIUS_Init_ReturnsFalseIfSecretNotSet(t *testing.T) {
-	freeRADIUS := New()
-	freeRADIUS.Secret = ""
+func TestCollector_Init_ReturnsFalseIfSecretNotSet(t *testing.T) {
+	collr := New()
+	collr.Secret = ""
 
-	assert.Error(t, freeRADIUS.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestFreeRADIUS_Check(t *testing.T) {
-	freeRADIUS := New()
-	freeRADIUS.client = newOKMockClient()
+func TestCollector_Check(t *testing.T) {
+	collr := New()
+	collr.client = newOKMockClient()
 
-	assert.NoError(t, freeRADIUS.Check())
+	assert.NoError(t, collr.Check())
 }
 
-func TestFreeRADIUS_Check_ReturnsFalseIfClientStatusReturnsError(t *testing.T) {
-	freeRADIUS := New()
-	freeRADIUS.client = newErrorMockClient()
+func TestCollector_Check_ReturnsFalseIfClientStatusReturnsError(t *testing.T) {
+	collr := New()
+	collr.client = newErrorMockClient()
 
-	assert.Error(t, freeRADIUS.Check())
+	assert.Error(t, collr.Check())
 }
 
-func TestFreeRADIUS_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestFreeRADIUS_Collect(t *testing.T) {
-	freeRADIUS := New()
-	freeRADIUS.client = newOKMockClient()
+func TestCollector_Collect(t *testing.T) {
+	collr := New()
+	collr.client = newOKMockClient()
 
 	expected := map[string]int64{
 		"access-requests":               1,
@@ -117,20 +117,20 @@ func TestFreeRADIUS_Collect(t *testing.T) {
 		"proxy-acct-dropped-requests":   33,
 		"proxy-acct-unknown-types":      34,
 	}
-	mx := freeRADIUS.Collect()
+	mx := collr.Collect()
 
 	assert.Equal(t, expected, mx)
-	module.TestMetricsHasAllChartsDims(t, freeRADIUS.Charts(), mx)
+	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
-func TestFreeRADIUS_Collect_ReturnsNilIfClientStatusReturnsError(t *testing.T) {
-	freeRADIUS := New()
-	freeRADIUS.client = newErrorMockClient()
+func TestCollector_Collect_ReturnsNilIfClientStatusReturnsError(t *testing.T) {
+	collr := New()
+	collr.client = newErrorMockClient()
 
-	assert.Nil(t, freeRADIUS.Collect())
+	assert.Nil(t, collr.Collect())
 }
 
-func TestFreeRADIUS_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 

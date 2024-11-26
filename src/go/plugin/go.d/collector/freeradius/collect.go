@@ -6,8 +6,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 )
 
-func (f *FreeRADIUS) collect() (map[string]int64, error) {
-	status, err := f.client.Status()
+func (c *Collector) collect() (map[string]int64, error) {
+	status, err := c.client.Status()
 	if err != nil {
 		return nil, err
 	}

@@ -24,8 +24,8 @@ func init() {
 	})
 }
 
-func New() *FreeRADIUS {
-	return &FreeRADIUS{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Address: "127.0.0.1",
 			Port:    18121,
@@ -44,7 +44,7 @@ type Config struct {
 }
 
 type (
-	FreeRADIUS struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -55,27 +55,27 @@ type (
 	}
 )
 
-func (f *FreeRADIUS) Configuration() any {
-	return f.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (f *FreeRADIUS) Init() error {
-	if err := f.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	f.client = api.New(api.Config{
-		Address: f.Address,
-		Port:    f.Port,
-		Secret:  f.Secret,
-		Timeout: f.Timeout.Duration(),
+	c.client = api.New(api.Config{
+		Address: c.Address,
+		Port:    c.Port,
+		Secret:  c.Secret,
+		Timeout: c.Timeout.Duration(),
 	})
 
 	return nil
 }
 
-func (f *FreeRADIUS) Check() error {
-	mx, err := f.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -86,14 +86,14 @@ func (f *FreeRADIUS) Check() error {
 	return nil
 }
 
-func (f *FreeRADIUS) Charts() *Charts {
+func (c *Collector) Charts() *Charts {
 	return charts.Copy()
 }
 
-func (f *FreeRADIUS) Collect() map[string]int64 {
-	mx, err := f.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		f.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -102,4 +102,4 @@ func (f *FreeRADIUS) Collect() map[string]int64 {
 	return mx
 }
 
-func (f *FreeRADIUS) Cleanup() {}
+func (c *Collector) Cleanup() {}
