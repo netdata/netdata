@@ -185,6 +185,9 @@ struct dispatcher {
         size_t size;
         struct pollfd *pollfds;         // the array to pass to poll()
         struct sender_state **senders;  // the array of senders (may have nulls in it)
+
+        size_t bytes_sent;
+        size_t bytes_received;
     } run;
 };
 
@@ -622,6 +625,8 @@ static int set_pipe_size(int pipe_fd, int new_size) {
 }
 
 void stream_sender_dispatcher_check_all_nodes(struct dispatcher *dp) {
+    internal_fatal(dp->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
     usec_t now_ut = now_monotonic_usec();
     time_t now_s = (time_t)(now_ut / USEC_PER_SEC);
 
@@ -705,6 +710,119 @@ void stream_sender_dispatcher_check_all_nodes(struct dispatcher *dp) {
     worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
     worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO, buffer_ratio);
     worker_set_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, (NETDATA_DOUBLE)(dp->messages.processed));
+}
+
+void stream_sender_dispatcher_process_sender(struct dispatcher *dp, struct sender_state *s, short revents, size_t slot, time_t now_s) {
+    internal_fatal(dp->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+        ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+        ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+        ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+        ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
+        // we have errors on this socket
+
+        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_SOCKET_ERROR);
+
+        char *error = "unknown error";
+
+        if (revents & POLLERR)
+            error = "socket reports errors (POLLERR)";
+        else if (revents & POLLHUP)
+            error = "connection closed by remote end (POLLHUP)";
+        else if (revents & POLLNVAL)
+            error = "connection is invalid (POLLNVAL)";
+
+        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SOCKET_ERROR);
+
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM [dispatch%d] %s [send to %s]: %s restarting connection - %zu bytes transmitted.",
+               dp->id, rrdhost_hostname(s->host), s->connected_to, error, s->dispatcher.bytes_sent);
+
+        stream_sender_dispatcher_move_running_to_connector_or_remove(dp, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR, true);
+        return;
+    }
+
+    if(revents & POLLOUT) {
+        // we can send data on this socket
+
+        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_SOCKET_SEND);
+
+        bool disconnect = false;
+        sender_lock(s);
+        {
+            char *chunk;
+            size_t outstanding = cbuffer_next_unsafe(s->sbuf.cb, &chunk);
+            ssize_t bytes = nd_sock_send_nowait(&s->sock, chunk, outstanding);
+            if (likely(bytes > 0)) {
+                cbuffer_remove_unsafe(s->sbuf.cb, bytes);
+                stream_sender_update_dispatcher_sent_data_unsafe(s, bytes);
+                s->last_traffic_seen_t = now_s;
+                dp->run.bytes_sent += bytes;
+
+                if(!s->dispatcher.bytes_outstanding) {
+                    // we sent them all
+                    dp->run.pollfds[slot].events &= ~(POLLOUT);
+
+                    // recreate the circular buffer if we have to
+                    stream_sender_cbuffer_recreate_timed_unsafe(s, now_s, false);
+                }
+            }
+            else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
+                disconnect = true;
+        }
+        sender_unlock(s);
+
+        if(disconnect) {
+            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM [dispatch%d] %s [send to %s]: failed to send metrics - restarting connection - "
+                   "we have sent %zu bytes on this connection.",
+                   dp->id, rrdhost_hostname(s->host), s->connected_to, s->dispatcher.bytes_sent);
+            stream_sender_dispatcher_move_running_to_connector_or_remove(dp, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED, true);
+            return;
+        }
+    }
+
+    if(revents & POLLIN) {
+        // we can receive data from this socket
+
+        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_SOCKET_RECEIVE);
+        ssize_t bytes = nd_sock_revc_nowait(&s->sock, s->rbuf.b + s->rbuf.read_len, sizeof(s->rbuf.b) - s->rbuf.read_len - 1);
+        if (bytes > 0) {
+            s->rbuf.read_len += bytes;
+            s->last_traffic_seen_t = now_s;
+            dp->run.bytes_received += bytes;
+        }
+        else if (bytes == 0 || errno == ECONNRESET) {
+            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM [dispatch%d] %s [send to %s]: connection (fd %d) closed by far end.",
+                   dp->id, rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
+            stream_sender_dispatcher_move_running_to_connector_or_remove(dp, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_PARENT, true);
+            return;
+        }
+        else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
+            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM [dispatch%d] %s [send to %s]: error during receive (%zd, on fd %d) - restarting connection.",
+                   dp->id, rrdhost_hostname(s->host), s->connected_to, bytes, s->sock.fd);
+            stream_sender_dispatcher_move_running_to_connector_or_remove(dp, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, true);
+            return;
+        }
+    }
+
+    if(unlikely(s->rbuf.read_len)) {
+        worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_EXECUTE);
+        stream_sender_execute_commands(s);
+    }
 }
 
 void *stream_sender_dispacther_thread(void *ptr) {
@@ -821,131 +939,21 @@ void *stream_sender_dispacther_thread(void *ptr) {
         }
 
         size_t replay_entries = 0;
-        size_t bytes_received = 0;
-        size_t bytes_sent = 0;
+        dp->run.bytes_received = 0;
+        dp->run.bytes_sent = 0;
 
         for(size_t slot = 1; slot < dp->run.used ; slot++) {
             struct sender_state *s = dp->run.senders[slot];
             if(!s || !dp->run.pollfds[slot].revents)
                 continue;
 
-            short revents = dp->run.pollfds[slot].revents;
+            stream_sender_dispatcher_process_sender(dp, s, dp->run.pollfds[slot].revents, slot, now_s);
             dp->run.pollfds[slot].revents = 0; // reset revents for the next iteration
-
-            ND_LOG_STACK lgs[] = {
-                ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
-                ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
-                ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
-                ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
-                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
-                ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
-                ND_LOG_FIELD_END(),
-            };
-            ND_LOG_STACK_PUSH(lgs);
-
-            if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
-                // we have errors on this socket
-
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_SOCKET_ERROR);
-
-                char *error = "unknown error";
-
-                if (revents & POLLERR)
-                    error = "socket reports errors (POLLERR)";
-                else if (revents & POLLHUP)
-                    error = "connection closed by remote end (POLLHUP)";
-                else if (revents & POLLNVAL)
-                    error = "connection is invalid (POLLNVAL)";
-
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SOCKET_ERROR);
-
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM [dispatch%d] %s [send to %s]: %s restarting connection - %zu bytes transmitted.",
-                       dp->id, rrdhost_hostname(s->host), s->connected_to, error, s->dispatcher.bytes_sent);
-
-                stream_sender_dispatcher_move_running_to_connector_or_remove(dp, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR, true);
-                continue;
-            }
-
-            if(revents & POLLOUT) {
-                // we can send data on this socket
-
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_SOCKET_SEND);
-
-                bool disconnect = false;
-                sender_lock(s);
-                {
-                    char *chunk;
-                    size_t outstanding = cbuffer_next_unsafe(s->sbuf.cb, &chunk);
-                    ssize_t bytes = nd_sock_send_nowait(&s->sock, chunk, outstanding);
-                    if (likely(bytes > 0)) {
-                        cbuffer_remove_unsafe(s->sbuf.cb, bytes);
-                        stream_sender_update_dispatcher_sent_data_unsafe(s, bytes);
-                        s->last_traffic_seen_t = now_s;
-                        bytes_sent += bytes;
-
-                        if(!s->dispatcher.bytes_outstanding) {
-                            // we sent them all
-                            dp->run.pollfds[slot].events &= ~(POLLOUT);
-
-                            // recreate the circular buffer if we have to
-                            stream_sender_cbuffer_recreate_timed_unsafe(s, now_s, false);
-                        }
-                    }
-                    else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
-                        disconnect = true;
-                }
-                sender_unlock(s);
-
-                if(disconnect) {
-                    worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR);
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "STREAM [dispatch%d] %s [send to %s]: failed to send metrics - restarting connection - "
-                           "we have sent %zu bytes on this connection.",
-                           dp->id, rrdhost_hostname(s->host), s->connected_to, s->dispatcher.bytes_sent);
-                    stream_sender_dispatcher_move_running_to_connector_or_remove(dp, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED, true);
-                    continue;
-                }
-            }
-
-            if(revents & POLLIN) {
-                // we can receive data from this socket
-
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_SOCKET_RECEIVE);
-                ssize_t bytes = nd_sock_revc_nowait(&s->sock, s->rbuf.b + s->rbuf.read_len, sizeof(s->rbuf.b) - s->rbuf.read_len - 1);
-                if (bytes > 0) {
-                    s->rbuf.read_len += bytes;
-                    s->last_traffic_seen_t = now_s;
-                    bytes_received += bytes;
-                }
-                else if (bytes == 0 || errno == ECONNRESET) {
-                    worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED);
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "STREAM [dispatch%d] %s [send to %s]: connection (fd %d) closed by far end.",
-                           dp->id, rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
-                    stream_sender_dispatcher_move_running_to_connector_or_remove(dp, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_PARENT, true);
-                    continue;
-                }
-                else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
-                    worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR);
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "STREAM [dispatch%d] %s [send to %s]: error during receive (%zd, on fd %d) - restarting connection.",
-                           dp->id, rrdhost_hostname(s->host), s->connected_to, bytes, s->sock.fd);
-                    stream_sender_dispatcher_move_running_to_connector_or_remove(dp, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, true);
-                    continue;
-                }
-            }
-
-            if(unlikely(s->rbuf.read_len)) {
-                worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_EXECUTE);
-                stream_sender_execute_commands(s);
-            }
-
             replay_entries += dictionary_entries(s->replication.requests);
         }
 
-        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)bytes_received);
-        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT, (NETDATA_DOUBLE)bytes_sent);
+        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)dp->run.bytes_received);
+        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT, (NETDATA_DOUBLE)dp->run.bytes_sent);
         worker_set_metric(WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
     }
 
