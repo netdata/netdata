@@ -26,8 +26,8 @@ func init() {
 	})
 }
 
-func New() *Typesense {
-	return &Typesense{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -49,7 +49,7 @@ type Config struct {
 	APIKey         string `yaml:"api_key,omitempty" json:"api_key"`
 }
 
-type Typesense struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -61,33 +61,33 @@ type Typesense struct {
 	doStats bool
 }
 
-func (ts *Typesense) Configuration() any {
-	return ts.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (ts *Typesense) Init() error {
-	if ts.URL == "" {
+func (c *Collector) Init() error {
+	if c.URL == "" {
 		return errors.New("configL: url not configured")
 	}
 
-	httpClient, err := web.NewHTTPClient(ts.ClientConfig)
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init http client: %w", err)
 	}
 
-	ts.httpClient = httpClient
+	c.httpClient = httpClient
 
-	if ts.APIKey == "" {
-		ts.Warning("API key not set in configuration. Only health status will be collected.")
+	if c.APIKey == "" {
+		c.Warning("API key not set in configuration. Only health status will be collected.")
 	}
-	ts.Debugf("using URL %s", ts.URL)
-	ts.Debugf("using timeout: %s", ts.Timeout)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using timeout: %s", c.Timeout)
 
 	return nil
 }
 
-func (ts *Typesense) Check() error {
-	mx, err := ts.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -98,14 +98,14 @@ func (ts *Typesense) Check() error {
 	return nil
 }
 
-func (ts *Typesense) Charts() *module.Charts {
-	return ts.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (ts *Typesense) Collect() map[string]int64 {
-	mx, err := ts.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		ts.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -114,8 +114,8 @@ func (ts *Typesense) Collect() map[string]int64 {
 	return mx
 }
 
-func (ts *Typesense) Cleanup() {
-	if ts.httpClient != nil {
-		ts.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }

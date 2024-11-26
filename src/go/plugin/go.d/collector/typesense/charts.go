@@ -98,8 +98,8 @@ var (
 	}
 )
 
-func (ts *Typesense) addStatsCharts() {
-	if err := ts.charts.Add(*statsCharts.Copy()...); err != nil {
-		ts.Warningf("error adding stats charts: %v", err)
+func (c *Collector) addStatsCharts() {
+	if err := c.charts.Add(*statsCharts.Copy()...); err != nil {
+		c.Warningf("error adding stats charts: %v", err)
 	}
 }

@@ -38,28 +38,28 @@ type statsResponse struct {
 	WriteRequestsPerSecond      float64 `json:"write_requests_per_second" stm:"write_requests_per_second,1000,1"`
 }
 
-func (ts *Typesense) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := ts.collectHealth(mx); err != nil {
+	if err := c.collectHealth(mx); err != nil {
 		return nil, err
 	}
 
-	if err := ts.collectStats(mx); err != nil {
+	if err := c.collectStats(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (ts *Typesense) collectHealth(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(ts.RequestConfig, urlPathHealth)
+func (c *Collector) collectHealth(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathHealth)
 	if err != nil {
 		return fmt.Errorf("creating health request: %w", err)
 	}
 
 	var resp healthResponse
-	if err := ts.client().RequestJSON(req, &resp); err != nil {
+	if err := c.client().RequestJSON(req, &resp); err != nil {
 		return err
 	}
 
@@ -82,31 +82,31 @@ func (ts *Typesense) collectHealth(mx map[string]int64) error {
 	return nil
 }
 
-func (ts *Typesense) collectStats(mx map[string]int64) error {
-	if !ts.doStats || ts.APIKey == "" {
+func (c *Collector) collectStats(mx map[string]int64) error {
+	if !c.doStats || c.APIKey == "" {
 		return nil
 	}
 
-	req, err := web.NewHTTPRequestWithPath(ts.RequestConfig, urlPathStats)
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathStats)
 	if err != nil {
 		return fmt.Errorf("creating stats request: %w", err)
 	}
 
-	req.Header.Set("X-TYPESENSE-API-KEY", ts.APIKey)
+	req.Header.Set("X-TYPESENSE-API-KEY", c.APIKey)
 
 	var resp statsResponse
-	if err := ts.client().RequestJSON(req, &resp); err != nil {
+	if err := c.client().RequestJSON(req, &resp); err != nil {
 		if !strings.Contains(err.Error(), "code: 401") {
 			return err
 		}
 
-		ts.doStats = false
-		ts.Warning(err)
+		c.doStats = false
+		c.Warning(err)
 
 		return nil
 	}
 
-	ts.once.Do(ts.addStatsCharts)
+	c.once.Do(c.addStatsCharts)
 
 	for k, v := range stm.ToMap(resp) {
 		mx[k] = v
@@ -115,8 +115,8 @@ func (ts *Typesense) collectStats(mx map[string]int64) error {
 	return nil
 }
 
-func (ts *Typesense) client() *web.Client {
-	return web.DoHTTP(ts.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
+func (c *Collector) client() *web.Client {
+	return web.DoHTTP(c.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
 		// {"message": "Forbidden - a valid `x-typesense-api-key` header must be sent."}
 		var msg struct {
 			Msg string `json:"message"`

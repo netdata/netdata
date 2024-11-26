@@ -39,11 +39,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestTypesense_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Typesense{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestTypesense_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -64,22 +64,22 @@ func TestTypesense_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ts := New()
-			ts.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, ts.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, ts.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestTypesense_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (ts *Typesense, cleanup func())
+		prepare  func(t *testing.T) (collr *Collector, cleanup func())
 	}{
 		"success with valid API key": {
 			wantFail: false,
@@ -109,25 +109,25 @@ func TestTypesense_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ts, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, ts.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, ts.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestTypesense_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestTypesense_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare         func(t *testing.T) (ts *Typesense, cleanup func())
+		prepare         func(t *testing.T) (collr *Collector, cleanup func())
 		wantNumOfCharts int
 		wantMetrics     map[string]int64
 	}{
@@ -180,25 +180,25 @@ func TestTypesense_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ts, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			_ = ts.Check()
+			_ = collr.Check()
 
-			mx := ts.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				assert.Equal(t, test.wantNumOfCharts, len(*ts.Charts()), "want charts")
+				assert.Equal(t, test.wantNumOfCharts, len(*collr.Charts()), "want charts")
 
-				module.TestMetricsHasAllChartsDims(t, ts.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func caseOk(t *testing.T) (*Typesense, func()) {
+func caseOk(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -217,15 +217,15 @@ func caseOk(t *testing.T) (*Typesense, func()) {
 				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
-	ts := New()
-	ts.URL = srv.URL
-	ts.APIKey = testApiKey
-	require.NoError(t, ts.Init())
+	collr := New()
+	collr.URL = srv.URL
+	collr.APIKey = testApiKey
+	require.NoError(t, collr.Init())
 
-	return ts, srv.Close
+	return collr, srv.Close
 }
 
-func caseOkNoApiKey(t *testing.T) (*Typesense, func()) {
+func caseOkNoApiKey(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -244,15 +244,15 @@ func caseOkNoApiKey(t *testing.T) (*Typesense, func()) {
 				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
-	ts := New()
-	ts.URL = srv.URL
-	ts.APIKey = ""
-	require.NoError(t, ts.Init())
+	collr := New()
+	collr.URL = srv.URL
+	collr.APIKey = ""
+	require.NoError(t, collr.Init())
 
-	return ts, srv.Close
+	return collr, srv.Close
 }
 
-func caseUnexpectedJsonResponse(t *testing.T) (*Typesense, func()) {
+func caseUnexpectedJsonResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	resp := `
 {
@@ -275,44 +275,44 @@ func caseUnexpectedJsonResponse(t *testing.T) (*Typesense, func()) {
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(resp))
 		}))
-	ts := New()
-	ts.URL = srv.URL
-	require.NoError(t, ts.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ts, srv.Close
+	return collr, srv.Close
 }
 
-func caseInvalidDataResponse(t *testing.T) (*Typesense, func()) {
+func caseInvalidDataResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
-	ts := New()
-	ts.URL = srv.URL
-	require.NoError(t, ts.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ts, srv.Close
+	return collr, srv.Close
 }
 
-func caseConnectionRefused(t *testing.T) (*Typesense, func()) {
+func caseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	ts := New()
-	ts.URL = "http://127.0.0.1:65001"
-	require.NoError(t, ts.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001"
+	require.NoError(t, collr.Init())
 
-	return ts, func() {}
+	return collr, func() {}
 }
 
-func case404(t *testing.T) (*Typesense, func()) {
+func case404(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
-	ts := New()
-	ts.URL = srv.URL
-	require.NoError(t, ts.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return ts, srv.Close
+	return collr, srv.Close
 }
