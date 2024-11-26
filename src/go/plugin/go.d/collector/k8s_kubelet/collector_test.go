@@ -33,38 +33,38 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestKubelet_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Kubelet{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestKubelet_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestKubelet_Cleanup(t *testing.T) {
+func TestCollector_Cleanup(t *testing.T) {
 	New().Cleanup()
 }
 
-func TestKubelet_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	assert.NoError(t, New().Init())
 }
 
-func TestKubelet_Init_ReadServiceAccountToken(t *testing.T) {
-	job := New()
-	job.TokenPath = "testdata/token.txt"
+func TestCollector_Init_ReadServiceAccountToken(t *testing.T) {
+	collr := New()
+	collr.TokenPath = "testdata/token.txt"
 
-	assert.NoError(t, job.Init())
-	assert.Equal(t, "Bearer "+string(dataServiceAccountToken), job.RequestConfig.Headers["Authorization"])
+	assert.NoError(t, collr.Init())
+	assert.Equal(t, "Bearer "+string(dataServiceAccountToken), collr.RequestConfig.Headers["Authorization"])
 }
 
-func TestKubelet_InitErrorOnCreatingClientWrongTLSCA(t *testing.T) {
-	job := New()
-	job.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
+func TestCollector_InitErrorOnCreatingClientWrongTLSCA(t *testing.T) {
+	collr := New()
+	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, job.Init())
+	assert.Error(t, collr.Init())
 }
 
-func TestKubelet_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -72,20 +72,20 @@ func TestKubelet_Check(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/metrics"
-	require.NoError(t, job.Init())
-	assert.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/metrics"
+	require.NoError(t, collr.Init())
+	assert.NoError(t, collr.Check())
 }
 
-func TestKubelet_Check_ConnectionRefused(t *testing.T) {
-	job := New()
-	job.URL = "http://127.0.0.1:38001/metrics"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+func TestCollector_Check_ConnectionRefused(t *testing.T) {
+	collr := New()
+	collr.URL = "http://127.0.0.1:38001/metrics"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestKubelet_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -93,10 +93,10 @@ func TestKubelet_Collect(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/metrics"
-	require.NoError(t, job.Init())
-	require.NoError(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/metrics"
+	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Check())
 
 	expected := map[string]int64{
 		"apiserver_audit_requests_rejected_total":                                    0,
@@ -181,10 +181,10 @@ func TestKubelet_Collect(t *testing.T) {
 		"volume_manager_plugin_kubernetes.io/secret_state_desired":                   4,
 	}
 
-	assert.Equal(t, expected, job.Collect())
+	assert.Equal(t, expected, collr.Collect())
 }
 
-func TestKubelet_Collect_ReceiveInvalidResponse(t *testing.T) {
+func TestCollector_Collect_ReceiveInvalidResponse(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -192,13 +192,13 @@ func TestKubelet_Collect_ReceiveInvalidResponse(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/metrics"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/metrics"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }
 
-func TestKubelet_Collect_Receive404(t *testing.T) {
+func TestCollector_Collect_Receive404(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -206,8 +206,8 @@ func TestKubelet_Collect_Receive404(t *testing.T) {
 			}))
 	defer ts.Close()
 
-	job := New()
-	job.URL = ts.URL + "/metrics"
-	require.NoError(t, job.Init())
-	assert.Error(t, job.Check())
+	collr := New()
+	collr.URL = ts.URL + "/metrics"
+	require.NoError(t, collr.Init())
+	assert.Error(t, collr.Check())
 }

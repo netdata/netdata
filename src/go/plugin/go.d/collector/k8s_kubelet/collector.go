@@ -29,8 +29,8 @@ func init() {
 	})
 }
 
-func New() *Kubelet {
-	return &Kubelet{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
@@ -55,7 +55,7 @@ type Config struct {
 	TokenPath      string `yaml:"token_path,omitempty" json:"token_path"`
 }
 
-type Kubelet struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -66,30 +66,30 @@ type Kubelet struct {
 	collectedVMPlugins map[string]bool // volume_manager_total_volumes
 }
 
-func (k *Kubelet) Configuration() any {
-	return k.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (k *Kubelet) Init() error {
-	if err := k.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prom, err := k.initPrometheusClient()
+	prom, err := c.initPrometheusClient()
 	if err != nil {
 		return fmt.Errorf("init prometheus client: %v", err)
 	}
-	k.prom = prom
+	c.prom = prom
 
-	if tok := k.initAuthToken(); tok != "" {
-		k.RequestConfig.Headers["Authorization"] = "Bearer " + tok
+	if tok := c.initAuthToken(); tok != "" {
+		c.RequestConfig.Headers["Authorization"] = "Bearer " + tok
 	}
 
 	return nil
 }
 
-func (k *Kubelet) Check() error {
-	mx, err := k.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -99,23 +99,23 @@ func (k *Kubelet) Check() error {
 	return nil
 }
 
-func (k *Kubelet) Charts() *Charts {
-	return k.charts
+func (c *Collector) Charts() *Charts {
+	return c.charts
 }
 
-func (k *Kubelet) Collect() map[string]int64 {
-	mx, err := k.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 
 	if err != nil {
-		k.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (k *Kubelet) Cleanup() {
-	if k.prom != nil && k.prom.HTTPClient() != nil {
-		k.prom.HTTPClient().CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.prom != nil && c.prom.HTTPClient() != nil {
+		c.prom.HTTPClient().CloseIdleConnections()
 	}
 }
