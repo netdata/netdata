@@ -29,8 +29,8 @@ func init() {
 	})
 }
 
-func New() *HTTPCheck {
-	return &HTTPCheck{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
 				ClientConfig: web.ClientConfig{
@@ -60,7 +60,7 @@ type (
 	}
 )
 
-type HTTPCheck struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -76,51 +76,51 @@ type HTTPCheck struct {
 	metrics metrics
 }
 
-func (hc *HTTPCheck) Configuration() any {
-	return hc.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (hc *HTTPCheck) Init() error {
-	if err := hc.validateConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	hc.charts = hc.initCharts()
+	c.charts = c.initCharts()
 
-	httpClient, err := hc.initHTTPClient()
+	httpClient, err := c.initHTTPClient()
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
-	hc.httpClient = httpClient
+	c.httpClient = httpClient
 
-	re, err := hc.initResponseMatchRegexp()
+	re, err := c.initResponseMatchRegexp()
 	if err != nil {
 		return fmt.Errorf("init response match regexp: %v", err)
 	}
-	hc.reResponse = re
+	c.reResponse = re
 
-	hm, err := hc.initHeaderMatch()
+	hm, err := c.initHeaderMatch()
 	if err != nil {
 		return fmt.Errorf("init header match: %v", err)
 	}
-	hc.headerMatch = hm
+	c.headerMatch = hm
 
-	for _, v := range hc.AcceptedStatuses {
-		hc.acceptedStatuses[v] = true
+	for _, v := range c.AcceptedStatuses {
+		c.acceptedStatuses[v] = true
 	}
 
-	hc.Debugf("using URL %s", hc.URL)
-	hc.Debugf("using HTTP timeout %s", hc.Timeout.Duration())
-	hc.Debugf("using accepted HTTPConfig statuses %v", hc.AcceptedStatuses)
-	if hc.reResponse != nil {
-		hc.Debugf("using response match regexp %s", hc.reResponse)
+	c.Debugf("using URL %s", c.URL)
+	c.Debugf("using HTTP timeout %s", c.Timeout.Duration())
+	c.Debugf("using accepted HTTPConfig statuses %v", c.AcceptedStatuses)
+	if c.reResponse != nil {
+		c.Debugf("using response match regexp %s", c.reResponse)
 	}
 
 	return nil
 }
 
-func (hc *HTTPCheck) Check() error {
-	mx, err := hc.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -130,14 +130,14 @@ func (hc *HTTPCheck) Check() error {
 	return nil
 }
 
-func (hc *HTTPCheck) Charts() *module.Charts {
-	return hc.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (hc *HTTPCheck) Collect() map[string]int64 {
-	mx, err := hc.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		hc.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -146,8 +146,8 @@ func (hc *HTTPCheck) Collect() map[string]int64 {
 	return mx
 }
 
-func (hc *HTTPCheck) Cleanup() {
-	if hc.httpClient != nil {
-		hc.httpClient.CloseIdleConnections()
+func (c *Collector) Cleanup() {
+	if c.httpClient != nil {
+		c.httpClient.CloseIdleConnections()
 	}
 }

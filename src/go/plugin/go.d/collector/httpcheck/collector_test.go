@@ -31,11 +31,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestHTTPCheck_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &HTTPCheck{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestHTTPCheck_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -73,66 +73,66 @@ func TestHTTPCheck_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			httpCheck := New()
-			httpCheck.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, httpCheck.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, httpCheck.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestHTTPCheck_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	tests := map[string]struct {
-		prepare    func(t *testing.T) *HTTPCheck
+		prepare    func(t *testing.T) *Collector
 		wantCharts bool
 	}{
 		"no charts if not inited": {
 			wantCharts: false,
-			prepare: func(t *testing.T) *HTTPCheck {
+			prepare: func(t *testing.T) *Collector {
 				return New()
 			},
 		},
 		"charts if inited": {
 			wantCharts: true,
-			prepare: func(t *testing.T) *HTTPCheck {
-				httpCheck := New()
-				httpCheck.URL = "http://127.0.0.1:38001"
-				require.NoError(t, httpCheck.Init())
+			prepare: func(t *testing.T) *Collector {
+				collr := New()
+				collr.URL = "http://127.0.0.1:38001"
+				require.NoError(t, collr.Init())
 
-				return httpCheck
+				return collr
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			httpCheck := test.prepare(t)
+			collr := test.prepare(t)
 
 			if test.wantCharts {
-				assert.NotNil(t, httpCheck.Charts())
+				assert.NotNil(t, collr.Charts())
 			} else {
-				assert.Nil(t, httpCheck.Charts())
+				assert.Nil(t, collr.Charts())
 			}
 		})
 	}
 }
 
-func TestHTTPCheck_Cleanup(t *testing.T) {
-	httpCheck := New()
-	assert.NotPanics(t, httpCheck.Cleanup)
+func TestCollector_Cleanup(t *testing.T) {
+	collr := New()
+	assert.NotPanics(t, collr.Cleanup)
 
-	httpCheck.URL = "http://127.0.0.1:38001"
-	require.NoError(t, httpCheck.Init())
-	assert.NotPanics(t, httpCheck.Cleanup)
+	collr.URL = "http://127.0.0.1:38001"
+	require.NoError(t, collr.Init())
+	assert.NotPanics(t, collr.Cleanup)
 }
 
-func TestHTTPCheck_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() (httpCheck *HTTPCheck, cleanup func())
+		prepare  func() (collr *Collector, cleanup func())
 		wantFail bool
 	}{
 		"success case":       {wantFail: false, prepare: prepareSuccessCase},
@@ -147,25 +147,25 @@ func TestHTTPCheck_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			httpCheck, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, httpCheck.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, httpCheck.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, httpCheck.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 
 }
 
-func TestHTTPCheck_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func() (httpCheck *HTTPCheck, cleanup func())
-		update      func(check *HTTPCheck)
+		prepare     func() (collr *Collector, cleanup func())
+		update      func(check *Collector)
 		wantMetrics map[string]int64
 	}{
 		"success case": {
@@ -275,8 +275,8 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		},
 		"header match include no value success case": {
 			prepare: prepareSuccessCase,
-			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []headerMatchConfig{
+			update: func(collr *Collector) {
+				collr.HeaderMatch = []headerMatchConfig{
 					{Key: "header-key2"},
 				}
 			},
@@ -295,8 +295,8 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		},
 		"header match include with value success case": {
 			prepare: prepareSuccessCase,
-			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []headerMatchConfig{
+			update: func(collr *Collector) {
+				collr.HeaderMatch = []headerMatchConfig{
 					{Key: "header-key2", Value: "= header-value"},
 				}
 			},
@@ -315,8 +315,8 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		},
 		"header match include no value bad headers case": {
 			prepare: prepareSuccessCase,
-			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []headerMatchConfig{
+			update: func(collr *Collector) {
+				collr.HeaderMatch = []headerMatchConfig{
 					{Key: "header-key99"},
 				}
 			},
@@ -335,8 +335,8 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		},
 		"header match include with value bad headers case": {
 			prepare: prepareSuccessCase,
-			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []headerMatchConfig{
+			update: func(collr *Collector) {
+				collr.HeaderMatch = []headerMatchConfig{
 					{Key: "header-key2", Value: "= header-value99"},
 				}
 			},
@@ -355,8 +355,8 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		},
 		"header match exclude no value success case": {
 			prepare: prepareSuccessCase,
-			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []headerMatchConfig{
+			update: func(collr *Collector) {
+				collr.HeaderMatch = []headerMatchConfig{
 					{Exclude: true, Key: "header-key99"},
 				}
 			},
@@ -375,8 +375,8 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		},
 		"header match exclude with value success case": {
 			prepare: prepareSuccessCase,
-			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []headerMatchConfig{
+			update: func(collr *Collector) {
+				collr.HeaderMatch = []headerMatchConfig{
 					{Exclude: true, Key: "header-key2", Value: "= header-value99"},
 				}
 			},
@@ -395,8 +395,8 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		},
 		"header match exclude no value bad headers case": {
 			prepare: prepareSuccessCase,
-			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []headerMatchConfig{
+			update: func(collr *Collector) {
+				collr.HeaderMatch = []headerMatchConfig{
 					{Exclude: true, Key: "header-key2"},
 				}
 			},
@@ -415,8 +415,8 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		},
 		"header match exclude with value bad headers case": {
 			prepare: prepareSuccessCase,
-			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []headerMatchConfig{
+			update: func(collr *Collector) {
+				collr.HeaderMatch = []headerMatchConfig{
 					{Exclude: true, Key: "header-key2", Value: "= header-value"},
 				}
 			},
@@ -452,20 +452,20 @@ func TestHTTPCheck_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			httpCheck, cleanup := test.prepare()
+			collr, cleanup := test.prepare()
 			defer cleanup()
 
 			if test.update != nil {
-				test.update(httpCheck)
+				test.update(collr)
 			}
 
-			require.NoError(t, httpCheck.Init())
+			require.NoError(t, collr.Init())
 
 			var mx map[string]int64
 
 			for i := 0; i < 2; i++ {
-				mx = httpCheck.Collect()
-				time.Sleep(time.Duration(httpCheck.UpdateEvery) * time.Second)
+				mx = collr.Collect()
+				time.Sleep(time.Duration(collr.UpdateEvery) * time.Second)
 			}
 
 			copyResponseTime(test.wantMetrics, mx)
@@ -475,10 +475,10 @@ func TestHTTPCheck_Collect(t *testing.T) {
 	}
 }
 
-func prepareSuccessCase() (*HTTPCheck, func()) {
-	httpCheck := New()
-	httpCheck.UpdateEvery = 1
-	httpCheck.ResponseMatch = "match"
+func prepareSuccessCase() (*Collector, func()) {
+	collr := New()
+	collr.UpdateEvery = 1
+	collr.ResponseMatch = "match"
 
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -488,75 +488,75 @@ func prepareSuccessCase() (*HTTPCheck, func()) {
 			_, _ = w.Write([]byte("match"))
 		}))
 
-	httpCheck.URL = srv.URL
+	collr.URL = srv.URL
 
-	return httpCheck, srv.Close
+	return collr, srv.Close
 }
 
-func prepareTimeoutCase() (*HTTPCheck, func()) {
-	httpCheck := New()
-	httpCheck.UpdateEvery = 1
-	httpCheck.Timeout = confopt.Duration(time.Millisecond * 100)
+func prepareTimeoutCase() (*Collector, func()) {
+	collr := New()
+	collr.UpdateEvery = 1
+	collr.Timeout = confopt.Duration(time.Millisecond * 100)
 
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(httpCheck.Timeout.Duration() + time.Millisecond*100)
+			time.Sleep(collr.Timeout.Duration() + time.Millisecond*100)
 		}))
 
-	httpCheck.URL = srv.URL
+	collr.URL = srv.URL
 
-	return httpCheck, srv.Close
+	return collr, srv.Close
 }
 
-func prepareRedirectSuccessCase() (*HTTPCheck, func()) {
-	httpCheck := New()
-	httpCheck.UpdateEvery = 1
-	httpCheck.NotFollowRedirect = true
-	httpCheck.AcceptedStatuses = []int{301}
-
-	srv := httptest.NewServer(http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "https://example.com", http.StatusMovedPermanently)
-		}))
-
-	httpCheck.URL = srv.URL
-
-	return httpCheck, srv.Close
-}
-
-func prepareRedirectFailCase() (*HTTPCheck, func()) {
-	httpCheck := New()
-	httpCheck.UpdateEvery = 1
-	httpCheck.NotFollowRedirect = true
+func prepareRedirectSuccessCase() (*Collector, func()) {
+	collr := New()
+	collr.UpdateEvery = 1
+	collr.NotFollowRedirect = true
+	collr.AcceptedStatuses = []int{301}
 
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "https://example.com", http.StatusMovedPermanently)
 		}))
 
-	httpCheck.URL = srv.URL
+	collr.URL = srv.URL
 
-	return httpCheck, srv.Close
+	return collr, srv.Close
 }
 
-func prepareBadStatusCase() (*HTTPCheck, func()) {
-	httpCheck := New()
-	httpCheck.UpdateEvery = 1
+func prepareRedirectFailCase() (*Collector, func()) {
+	collr := New()
+	collr.UpdateEvery = 1
+	collr.NotFollowRedirect = true
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "https://example.com", http.StatusMovedPermanently)
+		}))
+
+	collr.URL = srv.URL
+
+	return collr, srv.Close
+}
+
+func prepareBadStatusCase() (*Collector, func()) {
+	collr := New()
+	collr.UpdateEvery = 1
 
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadGateway)
 		}))
 
-	httpCheck.URL = srv.URL
+	collr.URL = srv.URL
 
-	return httpCheck, srv.Close
+	return collr, srv.Close
 }
 
-func prepareBadContentCase() (*HTTPCheck, func()) {
-	httpCheck := New()
-	httpCheck.UpdateEvery = 1
-	httpCheck.ResponseMatch = "no match"
+func prepareBadContentCase() (*Collector, func()) {
+	collr := New()
+	collr.UpdateEvery = 1
+	collr.ResponseMatch = "no match"
 
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -564,23 +564,23 @@ func prepareBadContentCase() (*HTTPCheck, func()) {
 			_, _ = w.Write([]byte("hello and goodbye"))
 		}))
 
-	httpCheck.URL = srv.URL
+	collr.URL = srv.URL
 
-	return httpCheck, srv.Close
+	return collr, srv.Close
 }
 
-func prepareNoConnectionCase() (*HTTPCheck, func()) {
-	httpCheck := New()
-	httpCheck.UpdateEvery = 1
-	httpCheck.URL = "http://127.0.0.1:38001"
+func prepareNoConnectionCase() (*Collector, func()) {
+	collr := New()
+	collr.UpdateEvery = 1
+	collr.URL = "http://127.0.0.1:38001"
 
-	return httpCheck, func() {}
+	return collr, func() {}
 }
 
-func prepareCookieAuthCase() (*HTTPCheck, func()) {
-	httpCheck := New()
-	httpCheck.UpdateEvery = 1
-	httpCheck.CookieFile = "testdata/cookie.txt"
+func prepareCookieAuthCase() (*Collector, func()) {
+	collr := New()
+	collr.UpdateEvery = 1
+	collr.CookieFile = "testdata/cookie.txt"
 
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -591,9 +591,9 @@ func prepareCookieAuthCase() (*HTTPCheck, func()) {
 			}
 		}))
 
-	httpCheck.URL = srv.URL
+	collr.URL = srv.URL
 
-	return httpCheck, srv.Close
+	return collr, srv.Close
 }
 
 func copyResponseTime(dst, src map[string]int64) {
