@@ -43,10 +43,10 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestClickhouse_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &ClickHouse{}, dataConfigJSON, dataConfigYAML)
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestClickHouse_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -67,26 +67,26 @@ func TestClickHouse_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			click := New()
-			click.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, click.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, click.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestClickHouse_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestClickHouse_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func(t *testing.T) (*ClickHouse, func())
+		prepare  func(t *testing.T) (*Collector, func())
 	}{
 		"success on valid response": {
 			wantFail: false,
@@ -104,21 +104,21 @@ func TestClickHouse_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			click, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, click.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, click.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestClickHouse_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func(t *testing.T) (*ClickHouse, func())
+		prepare     func(t *testing.T) (*Collector, func())
 		wantMetrics map[string]int64
 	}{
 		"success on valid response": {
@@ -237,21 +237,21 @@ func TestClickHouse_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			click, cleanup := test.prepare(t)
+			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := click.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, click.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareCaseOk(t *testing.T) (*ClickHouse, func()) {
+func prepareCaseOk(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -273,32 +273,32 @@ func prepareCaseOk(t *testing.T) (*ClickHouse, func()) {
 			}
 		}))
 
-	click := New()
-	click.URL = srv.URL
-	require.NoError(t, click.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return click, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseUnexpectedResponse(t *testing.T) (*ClickHouse, func()) {
+func prepareCaseUnexpectedResponse(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("hello and\n goodbye"))
 		}))
 
-	click := New()
-	click.URL = srv.URL
-	require.NoError(t, click.Init())
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init())
 
-	return click, srv.Close
+	return collr, srv.Close
 }
 
-func prepareCaseConnectionRefused(t *testing.T) (*ClickHouse, func()) {
+func prepareCaseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
-	click := New()
-	click.URL = "http://127.0.0.1:65001/stat"
-	require.NoError(t, click.Init())
+	collr := New()
+	collr.URL = "http://127.0.0.1:65001/stat"
+	require.NoError(t, collr.Init())
 
-	return click, func() {}
+	return collr, func() {}
 }

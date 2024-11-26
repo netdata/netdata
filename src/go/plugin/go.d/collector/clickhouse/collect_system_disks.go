@@ -25,7 +25,7 @@ type diskStats struct {
 	freeBytes  int64
 }
 
-func (c *ClickHouse) collectSystemDisks(mx map[string]int64) error {
+func (c *Collector) collectSystemDisks(mx map[string]int64) error {
 	req, _ := web.NewHTTPRequest(c.RequestConfig)
 	req.URL.RawQuery = makeURLQuery(querySystemDisks)
 
