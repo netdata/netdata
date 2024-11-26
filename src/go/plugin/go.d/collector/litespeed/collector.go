@@ -25,8 +25,8 @@ func init() {
 	})
 }
 
-func New() *Litespeed {
-	return &Litespeed{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			//ReportsDir: "/tmp/lshttpd/",
 			ReportsDir: "/opt/litespeed",
@@ -41,7 +41,7 @@ type Config struct {
 	ReportsDir  string `yaml:"reports_dir" json:"reports_dir"`
 }
 
-type Litespeed struct {
+type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
@@ -50,19 +50,19 @@ type Litespeed struct {
 	charts *module.Charts
 }
 
-func (l *Litespeed) Configuration() any {
-	return l.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (l *Litespeed) Init() error {
-	if l.ReportsDir == "" {
+func (c *Collector) Init() error {
+	if c.ReportsDir == "" {
 		return errors.New("reports_dir is required")
 	}
 	return nil
 }
 
-func (l *Litespeed) Check() error {
-	mx, err := l.collect()
+func (c *Collector) Check() error {
+	mx, err := c.collect()
 	if err != nil {
 		return err
 	}
@@ -74,19 +74,19 @@ func (l *Litespeed) Check() error {
 	return nil
 }
 
-func (l *Litespeed) Charts() *module.Charts {
-	return l.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (l *Litespeed) Collect() map[string]int64 {
-	mx, err := l.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 
 	if err != nil {
-		l.Error(err)
+		c.Error(err)
 		return nil
 	}
 
 	return mx
 }
 
-func (l *Litespeed) Cleanup() {}
+func (c *Collector) Cleanup() {}

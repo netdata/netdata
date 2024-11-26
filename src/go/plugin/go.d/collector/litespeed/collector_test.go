@@ -28,11 +28,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestLitespeed_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Litespeed{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestLitespeed_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -51,25 +51,25 @@ func TestLitespeed_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			lite := New()
-			lite.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, lite.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, lite.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestLitespeed_Charts(t *testing.T) {
+func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, New().Charts())
 }
 
-func TestLitespeed_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepareLitespeed func() *Litespeed
+		prepareLitespeed func() *Collector
 		wantFail         bool
 	}{
 		"success": {
@@ -84,20 +84,20 @@ func TestLitespeed_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			lite := test.prepareLitespeed()
+			collr := test.prepareLitespeed()
 
 			if test.wantFail {
-				assert.Error(t, lite.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, lite.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestLitespeed_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepareLitespeed func() *Litespeed
+		prepareLitespeed func() *Collector
 		wantMetrics      map[string]int64
 	}{
 		"success": {
@@ -125,27 +125,27 @@ func TestLitespeed_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			lite := test.prepareLitespeed()
+			collr := test.prepareLitespeed()
 
-			mx := lite.Collect()
+			mx := collr.Collect()
 
 			assert.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, lite.Charts(), mx)
+				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
 }
 
-func prepareLitespeedOk() *Litespeed {
-	lite := New()
-	lite.ReportsDir = "testdata"
-	return lite
+func prepareLitespeedOk() *Collector {
+	collr := New()
+	collr.ReportsDir = "testdata"
+	return collr
 }
 
-func prepareLitespeedDirNotExist() *Litespeed {
-	lite := prepareLitespeedOk()
-	lite.ReportsDir += "!"
-	return lite
+func prepareLitespeedDirNotExist() *Collector {
+	collr := prepareLitespeedOk()
+	collr.ReportsDir += "!"
+	return collr
 }
