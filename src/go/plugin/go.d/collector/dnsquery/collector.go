@@ -27,8 +27,8 @@ func init() {
 	})
 }
 
-func New() *DNSQuery {
-	return &DNSQuery{
+func New() *Collector {
+	return &Collector{
 		Config: Config{
 			Timeout:     confopt.Duration(time.Second * 2),
 			Network:     "udp",
@@ -56,7 +56,7 @@ type Config struct {
 }
 
 type (
-	DNSQuery struct {
+	Collector struct {
 		module.Base
 		Config `yaml:",inline" json:""`
 
@@ -72,42 +72,42 @@ type (
 	}
 )
 
-func (d *DNSQuery) Configuration() any {
-	return d.Config
+func (c *Collector) Configuration() any {
+	return c.Config
 }
 
-func (d *DNSQuery) Init() error {
-	if err := d.verifyConfig(); err != nil {
+func (c *Collector) Init() error {
+	if err := c.verifyConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	rt, err := d.initRecordTypes()
+	rt, err := c.initRecordTypes()
 	if err != nil {
 		return fmt.Errorf("init record type: %v", err)
 	}
-	d.recordTypes = rt
+	c.recordTypes = rt
 
-	charts, err := d.initCharts()
+	charts, err := c.initCharts()
 	if err != nil {
 		return fmt.Errorf("init charts: %v", err)
 	}
-	d.charts = charts
+	c.charts = charts
 
 	return nil
 }
 
-func (d *DNSQuery) Check() error {
+func (c *Collector) Check() error {
 	return nil
 }
 
-func (d *DNSQuery) Charts() *module.Charts {
-	return d.charts
+func (c *Collector) Charts() *module.Charts {
+	return c.charts
 }
 
-func (d *DNSQuery) Collect() map[string]int64 {
-	mx, err := d.collect()
+func (c *Collector) Collect() map[string]int64 {
+	mx, err := c.collect()
 	if err != nil {
-		d.Error(err)
+		c.Error(err)
 	}
 
 	if len(mx) == 0 {
@@ -116,4 +116,4 @@ func (d *DNSQuery) Collect() map[string]int64 {
 	return mx
 }
 
-func (d *DNSQuery) Cleanup() {}
+func (c *Collector) Cleanup() {}

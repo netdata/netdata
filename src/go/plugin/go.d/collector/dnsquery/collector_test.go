@@ -30,11 +30,11 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestDNSQuery_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &DNSQuery{}, dataConfigJSON, dataConfigYAML)
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestDNSQuery_Init(t *testing.T) {
+func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
 		config   Config
@@ -113,22 +113,22 @@ func TestDNSQuery_Init(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dq := New()
-			dq.Config = test.config
+			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, dq.Init())
+				assert.Error(t, collr.Init())
 			} else {
-				assert.NoError(t, dq.Init())
+				assert.NoError(t, collr.Init())
 			}
 		})
 	}
 }
 
-func TestDNSQuery_Check(t *testing.T) {
+func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail bool
-		prepare  func() *DNSQuery
+		prepare  func() *Collector
 	}{
 		"success when DNS query successful": {
 			wantFail: false,
@@ -142,33 +142,33 @@ func TestDNSQuery_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dq := test.prepare()
+			collr := test.prepare()
 
-			require.NoError(t, dq.Init())
+			require.NoError(t, collr.Init())
 
 			if test.wantFail {
-				assert.Error(t, dq.Check())
+				assert.Error(t, collr.Check())
 			} else {
-				assert.NoError(t, dq.Check())
+				assert.NoError(t, collr.Check())
 			}
 		})
 	}
 }
 
-func TestDNSQuery_Charts(t *testing.T) {
-	dq := New()
+func TestCollector_Charts(t *testing.T) {
+	collr := New()
 
-	dq.Domains = []string{"google.com"}
-	dq.Servers = []string{"192.0.2.0", "192.0.2.1"}
-	require.NoError(t, dq.Init())
+	collr.Domains = []string{"google.com"}
+	collr.Servers = []string{"192.0.2.0", "192.0.2.1"}
+	require.NoError(t, collr.Init())
 
-	assert.NotNil(t, dq.Charts())
-	assert.Len(t, *dq.Charts(), len(dnsChartsTmpl)*len(dq.Servers))
+	assert.NotNil(t, collr.Charts())
+	assert.Len(t, *collr.Charts(), len(dnsChartsTmpl)*len(collr.Servers))
 }
 
-func TestDNSQuery_Collect(t *testing.T) {
+func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare     func() *DNSQuery
+		prepare     func() *Collector
 		wantMetrics map[string]int64
 	}{
 		"success when DNS query successful": {
@@ -199,35 +199,35 @@ func TestDNSQuery_Collect(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			dq := test.prepare()
+			collr := test.prepare()
 
-			require.NoError(t, dq.Init())
+			require.NoError(t, collr.Init())
 
-			mx := dq.Collect()
+			mx := collr.Collect()
 
 			require.Equal(t, test.wantMetrics, mx)
 		})
 	}
 }
 
-func caseDNSClientOK() *DNSQuery {
-	dq := New()
-	dq.Domains = []string{"example.com"}
-	dq.Servers = []string{"192.0.2.0", "192.0.2.1"}
-	dq.newDNSClient = func(_ string, _ time.Duration) dnsClient {
+func caseDNSClientOK() *Collector {
+	collr := New()
+	collr.Domains = []string{"example.com"}
+	collr.Servers = []string{"192.0.2.0", "192.0.2.1"}
+	collr.newDNSClient = func(_ string, _ time.Duration) dnsClient {
 		return mockDNSClient{errOnExchange: false}
 	}
-	return dq
+	return collr
 }
 
-func caseDNSClientErr() *DNSQuery {
-	dq := New()
-	dq.Domains = []string{"example.com"}
-	dq.Servers = []string{"192.0.2.0", "192.0.2.1"}
-	dq.newDNSClient = func(_ string, _ time.Duration) dnsClient {
+func caseDNSClientErr() *Collector {
+	collr := New()
+	collr.Domains = []string{"example.com"}
+	collr.Servers = []string{"192.0.2.0", "192.0.2.1"}
+	collr.newDNSClient = func(_ string, _ time.Duration) dnsClient {
 		return mockDNSClient{errOnExchange: true}
 	}
-	return dq
+	return collr
 }
 
 type mockDNSClient struct {
