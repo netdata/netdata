@@ -53,7 +53,7 @@ Refer to the output of `netdata -h` for a complete list of options.
 
 ## Log files
 
-Netdata, (hence the Daemon) uses 4 log files:
+Netdata (hence the Daemon) uses four log files:
 
 1. `error.log`
 2. `collector.log`
@@ -66,7 +66,7 @@ Log files are stored in `/var/log/netdata/` by default.
 
 ### error.log
 
-The `error.log` is the `stderr` of the Daemon .
+The `error.log` is the `stderr` of the Daemon.
 
 For most of Netdata's component logs, the following lines may appear:
 
@@ -78,9 +78,9 @@ For most of Netdata's component logs, the following lines may appear:
 
 The `FATAL` and `ERROR` messages will always appear in the logs, and `INFO`can be filtered using [severity level](/src/daemon/config/README.md#logs-section-options) option.
 
-So, when auto-detection of data collection fail, `ERROR` lines are logged and the relevant modules are disabled, but the program continues to run.
+So, when auto-detection of data collection fail, `ERROR` lines are logged, and the relevant modules are disabled, but the program continues to run.
 
-When a component cannot run at all, a `FATAL` line is logged.
+When a component can’t run at all, a `FATAL` line is logged.
 
 ### collector.log
 
@@ -104,10 +104,10 @@ where:
 - `SENT_BYTES` is the number of bytes sent to the client, without the HTTP response header.
 - `ALL_BYTES` is the number of bytes of the response, before compression.
 - `PERCENT_COMPRESSION` is the percentage of traffic saved due to compression.
-- `PREP_TIME` is the time in milliseconds needed to prepared the response.
-- `SENT_TIME` is the time in milliseconds needed to sent the response to the client.
+- `PREP_TIME` is the time in milliseconds needed to prepare the response.
+- `SENT_TIME` is the time in milliseconds needed to send the response to the client.
 - `TOTAL_TIME` is the total time the request was inside Netdata (from the first byte of the request to the last byte
-    of the response).
+  of the response).
 - `ACTION` can be `filecopy`, `options` (used in CORS), `data` (API call).
 
 ### debug.log
@@ -191,12 +191,12 @@ Now, tell Netdata to keep these settings, as set by systemd, by editing
     process scheduling policy = keep
 ```
 
-Using the above, whatever scheduling settings you have set at `netdata.service`
+Using the above, whatever scheduling settings you’ve set at `netdata.service`
 will be maintained by netdata.
 
 ### Example 1: Netdata with nice -1 on non-systemd systems
 
-On a system that is not based on systemd, to make Netdata run with nice level -1 (a little bit higher to the default for
+On a system not based on systemd, to make Netdata run with nice level -1 (a little bit higher to the default for
 all programs), edit `netdata.conf` and set:
 
 ```text
@@ -209,7 +209,7 @@ then [restart Netdata](/docs/netdata-agent/start-stop-restart.md):
 
 #### Example 2: Netdata with nice -1 on systemd systems
 
-On a system that is based on systemd, to make Netdata run with nice level -1 (a little bit higher to the default for all
+On a system based on systemd, to make Netdata run with nice level -1 (a little bit higher to the default for all
 programs), edit `netdata.conf` and set:
 
 ```text
@@ -249,24 +249,24 @@ Check this for example: A Netdata installation with default settings on Ubuntu
 ### Why does this happen?
 
 The system memory allocator allocates virtual memory arenas, per thread running. On Linux systems this defaults to 16MB
-per thread on 64 bit machines. So, if you get the difference between real and virtual memory and divide it by 16MB you
+per thread on 64-bit machines. So, if you get the difference between real and virtual memory and divide it by 16MB, you
 will roughly get the number of threads running.
 
 The system does this for speed. Having a separate memory arena for each thread, allows the threads to run in parallel in
-multi-core systems, without any locks between them.
+multicore systems, without any locks between them.
 
-This behavior is system specific. For example, the chart above when running
+This behavior is system-specific. For example, the chart above when running
 Netdata on Alpine Linux (that uses **musl** instead of **glibc**) is this:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/19013807/7cf5878e-87e4-11e6-9651-082e68701eab.png)
 
 ### Can we do anything to lower it?
 
-Since Netdata already uses minimal memory allocations while it runs (i.e. it adapts its memory on start, so that while
-repeatedly collects data it does not do memory allocations), it already instructs the system memory allocator to
+Since Netdata already uses minimal memory allocations, while it runs (i.e., it adapts its memory on start, so that while
+repeatedly collects data it doesn’t do memory allocations), it already instructs the system memory allocator to
 minimize the memory arenas for each thread. We have also added [2 configuration
 options](https://github.com/netdata/netdata/blob/5645b1ee35248d94e6931b64a8688f7f0d865ec6/src/main.c#L410-L418) to allow
-you tweak these settings: `glibc malloc arena max for plugins` and `glibc malloc arena max for netdata`.
+you to tweak these settings: `glibc malloc arena max for plugins` and `glibc malloc arena max for netdata`.
 
 However, even if we instructed the memory allocator to use just one arena, it
 seems it allocates an arena per thread.
@@ -280,7 +280,7 @@ No, it is not.
 
 Linux reserves real memory (physical RAM) in pages (on x86 machines pages are 4KB each). So even if the system memory
 allocator is allocating huge amounts of virtual memory, only the 4KB pages that are actually used are reserving physical
-RAM. The **real memory** chart on Netdata application section, shows the amount of physical memory these pages occupy(it
+RAM. The **real memory** chart on a Netdata application section, shows the amount of physical memory these pages occupy (it
 accounts the whole pages, even if parts of them are actually used).
 
 ## Debugging
@@ -290,15 +290,15 @@ When you compile Netdata with debugging:
 1. compiler optimizations for your CPU are disabled (Netdata will run somewhat slower)
 
 2. a lot of code is added all over netdata, to log debug messages to `/var/log/netdata/debug.log`. However, nothing is
-    printed by default. Netdata allows you to select which sections of Netdata you want to trace. Tracing is activated
-    via the config option `debug flags`. It accepts a hex number, to enable or disable specific sections. You can find
-    the options supported at [log.h](https://raw.githubusercontent.com/netdata/netdata/master/src/libnetdata/log/log.h).
-    They are the `D_*` defines. The value `0xffffffffffffffff` will enable all possible debug flags.
+   printed by default. Netdata allows you to select which sections of Netdata you want to trace. Tracing is activated
+   via the config option `debug flags`. It accepts a hex number to enable or disable specific sections. You can find
+   the options supported at [log.h](https://raw.githubusercontent.com/netdata/netdata/master/src/libnetdata/log/log.h).
+   They are the `D_*` defines. The value `0xffffffffffffffff` will enable all possible debug flags.
 
 Once Netdata is compiled with debugging and tracing is enabled for a few sections, the file `/var/log/netdata/debug.log`
 will contain the messages.
 
-> Do not forget to disable tracing (`debug flags = 0`) when you are done tracing. The file `debug.log` can grow too
+> Remember to disable tracing (`debug flags = 0`) when you’re done tracing. The file `debug.log` can grow too
 > fast.
 
 ### Compiling Netdata with debugging
@@ -318,27 +318,27 @@ section(s) you need to trace.
 
 ### Debugging crashes
 
-We have made the most to make Netdata crash free. If however, Netdata crashes on your system, it would be very helpful
-to provide stack traces of the crash. Without them, is will be almost impossible to find the issue (the code base is
+We have made the most to make Netdata crash free. If, however, Netdata crashes on your system, it would be very helpful
+to provide stack traces of the crash. Without them, it will be almost impossible to find the issue (the code base is
 quite large to find such an issue by just observing it).
 
 To provide stack traces, **you need to have Netdata compiled with debugging**. There is no need to enable any tracing
 (`debug flags`).
 
-Then you need to be in one of the following 2 cases:
+Then you need to be in one of the following two cases:
 
 1. Netdata crashes and you have a core dump
 
 2. you can reproduce the crash
 
-If you are not on these cases, you need to find a way to be (i.e. if your system does not produce core dumps, check your
+If you aren’t in these cases, you need to find a way to be (i.e., if your system doesn’t produce core dumps, check your
 distro documentation to enable them).
 
 ### Netdata crashes and you have a core dump
 
 > you need to have Netdata compiled with debugging info for this to work (check above)
 
-Run the following command and post the output on a github issue.
+Run the following command and post the output on a GitHub issue.
 
 ```sh
 gdb $(which netdata) /path/to/core/dump
@@ -354,5 +354,5 @@ Install the package `valgrind` and run:
 valgrind $(which netdata) -D
 ```
 
-Netdata will start and it will be a lot slower. Now reproduce the crash and `valgrind` will dump on your console the
-stack trace. Open a new github issue and post the output.
+Netdata will start, and it will be a lot slower. Now reproduce the crash and `valgrind` will dump on your console the
+stack trace. Open a new GitHub issue and post the output.
