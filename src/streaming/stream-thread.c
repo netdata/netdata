@@ -135,7 +135,7 @@ void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd *pfd)
 static void stream_thread_messages_resize_unsafe(struct stream_thread *sth) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
-    if(sth->nodes >= sth->messages.size) {
+    if(sth->nodes_count >= sth->messages.size) {
         size_t new_size = sth->messages.size ? sth->messages.size * 2 : 2;
         sth->messages.array = reallocz(sth->messages.array, new_size * sizeof(*sth->messages.array));
         sth->messages.copy = reallocz(sth->messages.copy, new_size * sizeof(*sth->messages.copy));
@@ -246,7 +246,7 @@ void *stream_thread(void *ptr) {
             // this detects unresponsive parents too (timeout)
             stream_sender_dispatcher_check_all_nodes(sth);
             worker_set_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, (NETDATA_DOUBLE)(sth->messages.processed));
-            worker_set_metric(WORKER_STREAM_METRIC_NODES, (NETDATA_DOUBLE)sth->nodes);
+            worker_set_metric(WORKER_STREAM_METRIC_NODES, (NETDATA_DOUBLE)sth->nodes_count);
             last_check_all_nodes_ut = now_ut;
         }
 
@@ -374,11 +374,25 @@ void *stream_thread(void *ptr) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static struct stream_thread *stream_thread_get(RRDHOST *host) {
+void stream_thread_node_running(RRDHOST *host) {
+    spinlock_lock(&stream_thread_globals.assign.spinlock);
+    host->stream.refcount++;
+    spinlock_unlock(&stream_thread_globals.assign.spinlock);
+}
+
+void stream_thread_node_stopped(RRDHOST *host) {
+    spinlock_lock(&stream_thread_globals.assign.spinlock);
+
+    if(--host->stream.refcount == 0)
+        host->stream.thread = NULL;
+
+    spinlock_unlock(&stream_thread_globals.assign.spinlock);
+}
+
+static struct stream_thread *stream_thread_get_unsafe(RRDHOST *host) {
     if(host->stream.thread)
         return host->stream.thread;
 
-    spinlock_lock(&stream_thread_globals.assign.spinlock);
     if(!stream_thread_globals.assign.cores) {
         stream_thread_globals.assign.cores = get_netdata_cpus() - 1;
         if(stream_thread_globals.assign.cores < 4)
@@ -388,26 +402,25 @@ static struct stream_thread *stream_thread_get(RRDHOST *host) {
     }
 
     size_t selected_thread_slot = 0;
-    size_t min_nodes = stream_thread_globals.threads[0].nodes;
+    size_t min_nodes = stream_thread_globals.threads[0].nodes_count;
     for(size_t i = 1; i < stream_thread_globals.assign.cores ; i++) {
-        if(stream_thread_globals.threads[i].nodes < min_nodes) {
+        if(stream_thread_globals.threads[i].nodes_count < min_nodes) {
             selected_thread_slot = i;
-            min_nodes = stream_thread_globals.threads[i].nodes;
+            min_nodes = stream_thread_globals.threads[i].nodes_count;
         }
     }
 
     host->stream.thread = &stream_thread_globals.threads[selected_thread_slot];
-    stream_thread_globals.threads[selected_thread_slot].nodes++;
-    spinlock_unlock(&stream_thread_globals.assign.spinlock);
+    host->stream.refcount = 0;
+    stream_thread_globals.threads[selected_thread_slot].nodes_count++;
 
     return host->stream.thread;
 }
 
 static struct stream_thread * stream_thread_assign_and_start(RRDHOST *host) {
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
-    spinlock_lock(&spinlock);
+    spinlock_lock(&stream_thread_globals.assign.spinlock);
 
-    struct stream_thread *sth = stream_thread_get(host);
+    struct stream_thread *sth = stream_thread_get_unsafe(host);
 
     if(!sth->thread) {
         sth->id = (sth - stream_thread_globals.threads); // find the slot number
@@ -430,7 +443,8 @@ static struct stream_thread * stream_thread_assign_and_start(RRDHOST *host) {
             nd_log_daemon(NDLP_ERR, "STREAM[%zu]: failed to create new thread for client.", sth->id);
     }
 
-    spinlock_unlock(&spinlock);
+    spinlock_unlock(&stream_thread_globals.assign.spinlock);
+
     return sth;
 }
 
@@ -442,17 +456,15 @@ void stream_sender_add_to_connector_queue(RRDHOST *host) {
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    // initialize first the dispatcher, to have its spinlocks and pipes initialized
-    // before the connector attempts to use them
-    stream_thread_assign_and_start(host);
-    stream_sender_connector_init(host->sender);
-
+    stream_connector_init(host->sender);
     rrdhost_stream_parent_ssl_init(host->sender);
-    stream_sender_connector_add_unlinked(host->sender);
+    stream_connector_add(host->sender);
 }
 
 void stream_receiver_add_to_queue(struct receiver_state *rpt) {
     struct stream_thread *sth = stream_thread_assign_and_start(rpt->host);
+
+    stream_thread_node_running(rpt->host);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM[%zu] [%s]: moving host to receiver queue...",
@@ -463,8 +475,10 @@ void stream_receiver_add_to_queue(struct receiver_state *rpt) {
     spinlock_unlock(&sth->queue.spinlock);
 }
 
-void stream_sender_dispatcher_add_to_queue(struct sender_state *s) {
+void stream_sender_add_to_queue(struct sender_state *s) {
     struct stream_thread *sth = stream_thread_assign_and_start(s->host);
+
+    stream_thread_node_running(s->host);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM[%zu] [%s]: moving host to dispatcher queue...",
@@ -476,7 +490,7 @@ void stream_sender_dispatcher_add_to_queue(struct sender_state *s) {
 }
 
 void stream_threads_cancel(void) {
-    stream_sender_connector_cancel_threads();
+    stream_connector_cancel_threads();
     for(size_t i = 0; i < STREAM_MAX_THREADS ;i++)
         nd_thread_signal_cancel(stream_thread_globals.threads[i].thread);
 }

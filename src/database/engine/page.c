@@ -836,7 +836,7 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
             return true;
         }
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
-            assert(pgdc->slots > pgdc->pgd->last_sn_count);
+            assert(pgdc->slots >= pgdc->pgd->last_sn_count);
             uint32_t flushed_sns_count = pgdc->slots - pgdc->pgd->last_sn_count;
 
             bool ok = false;

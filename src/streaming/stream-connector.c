@@ -171,7 +171,7 @@ static struct {
 };
 
 #define CONN_UPGRADE_VAL "upgrade"
-static int stream_sender_connect_upgrade_prelude(RRDHOST *host __maybe_unused, struct sender_state *s) {
+static int stream_connect_upgrade_prelude(RRDHOST *host __maybe_unused, struct sender_state *s) {
 
     char http[HTTP_HEADER_SIZE + 1];
     snprintfz(http, HTTP_HEADER_SIZE,
@@ -257,7 +257,8 @@ err_cleanup:
     return 1;
 }
 
-static bool stream_sender_connect_validate_first_response(RRDHOST *host, struct sender_state *s, char *http, size_t http_length) {
+static bool
+stream_connect_validate_first_response(RRDHOST *host, struct sender_state *s, char *http, size_t http_length) {
     int32_t version = STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE;
 
     int i;
@@ -308,7 +309,7 @@ static bool stream_sender_connect_validate_first_response(RRDHOST *host, struct 
     return false;
 }
 
-bool stream_sender_connect(struct sender_state *s, uint16_t default_port, time_t timeout) {
+bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeout) {
     worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
 
     RRDHOST *host = s->host;
@@ -440,7 +441,7 @@ bool stream_sender_connect(struct sender_state *s, uint16_t default_port, time_t
     http[eol] = 0x00;
     rrdpush_clean_encoded(&se);
 
-    if (s->parent_using_h2o && stream_sender_connect_upgrade_prelude(host, s)) {
+    if (s->parent_using_h2o && stream_connect_upgrade_prelude(host, s)) {
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_CANT_UPGRADE_CONNECTION),
             ND_LOG_FIELD_END(),
@@ -510,7 +511,7 @@ bool stream_sender_connect(struct sender_state *s, uint16_t default_port, time_t
                "STREAM %s [send to %s]: cannot enlarge the socket buffer.",
                rrdhost_hostname(host), s->connected_to);
 
-    if(!stream_sender_connect_validate_first_response(host, s, http, bytes)) {
+    if(!stream_connect_validate_first_response(host, s, http, bytes)) {
         nd_sock_close(&s->sock);
         return false;
     }
@@ -555,7 +556,11 @@ static struct {
     struct connector connectors[MAX_CONNECTORS];
 } connector_globals = { 0 };
 
-struct connector *stream_sender_connector(struct sender_state *s) {
+bool stream_connector_is_signaled_to_stop(struct sender_state *s) {
+    return __atomic_load_n(&s->exit.shutdown, __ATOMIC_RELAXED);
+}
+
+struct connector *stream_connector_get(struct sender_state *s) {
     sender_lock(s);
 
     if(s->connector.id < 0 || s->connector.id >= MAX_CONNECTORS) {
@@ -577,28 +582,28 @@ struct connector *stream_sender_connector(struct sender_state *s) {
         spinlock_unlock(&spinlock);
     }
 
-    struct connector *cr = &connector_globals.connectors[s->connector.id];
+    struct connector *sc = &connector_globals.connectors[s->connector.id];
     sender_unlock(s);
 
-    return cr;
+    return sc;
 }
 
-void stream_sender_connector_requeue(struct sender_state *s) {
-    struct connector *cr = stream_sender_connector(s);
+void stream_connector_requeue(struct sender_state *s) {
+    struct connector *sc = stream_connector_get(s);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM [connector] [%s]: adding host in connector queue...",
            rrdhost_hostname(s->host));
 
-    spinlock_lock(&cr->queue.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(cr->queue.ll, s, prev, next);
-    spinlock_unlock(&cr->queue.spinlock);
+    spinlock_lock(&sc->queue.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sc->queue.ll, s, prev, next);
+    spinlock_unlock(&sc->queue.spinlock);
 
     // signal the connector to catch the job
-    completion_mark_complete_a_job(&cr->completion);
+    completion_mark_complete_a_job(&sc->completion);
 }
 
-void stream_sender_connector_add_unlinked(struct sender_state *s) {
+void stream_connector_add(struct sender_state *s) {
     // multiple threads may come here - only one should be able to pass through
     sender_lock(s);
     if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->stream.snd.destination || !s->host->stream.snd.api_key) {
@@ -622,41 +627,23 @@ void stream_sender_connector_add_unlinked(struct sender_state *s) {
     s->parent_using_h2o = stream_send.parents.h2o;
 
     // do not call this with any locks held
-    stream_sender_connector_requeue(s);
+    stream_connector_requeue(s);
 }
 
-void stream_sender_connector_remove_unlinked(struct sender_state *s) {
+static void stream_connector_remove(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "STREAM [connector] [%s]: stopped streaming for host: %s",
+           "STREAM [connector] [%s]: stopped streaming connector for host: %s",
            rrdhost_hostname(s->host), stream_handshake_error_to_string(s->exit.reason));
 
-    struct connector *cr = stream_sender_connector(s);
-    __atomic_sub_fetch(&cr->nodes, 1, __ATOMIC_RELAXED);
+    struct connector *sc = stream_connector_get(s);
+    __atomic_sub_fetch(&sc->nodes, 1, __ATOMIC_RELAXED);
 
-    sender_lock(s);
-
-    __atomic_store_n(&s->exit.shutdown, false, __ATOMIC_RELAXED);
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-
-    s->last_state_since_t = now_realtime_sec();
-    stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, s->exit.reason, s->last_state_since_t);
-    s->connector.id = -1;
-
-    sender_unlock(s);
-
-    rrdhost_stream_parents_reset(s->host, STREAM_HANDSHAKE_EXITING);
-
-#ifdef NETDATA_LOG_STREAM_SENDER
-    if (s->stream_log_fp) {
-        fclose(s->stream_log_fp);
-        s->stream_log_fp = NULL;
-    }
-#endif
+    stream_sender_giveup(s);
 }
 
-static void *stream_sender_connector_thread(void *ptr) {
-    struct connector *cr = ptr;
-    cr->tid = gettid_cached();
+static void *stream_connector_thread(void *ptr) {
+    struct connector *sc = ptr;
+    sc->tid = gettid_cached();
 
     worker_register("STREAMCNT");
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_CONNECTING, "connect");
@@ -674,12 +661,12 @@ static void *stream_sender_connector_thread(void *ptr) {
 
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
         worker_is_idle();
-        job_id = completion_wait_for_a_job_with_timeout(&cr->completion, job_id, 1000);
+        job_id = completion_wait_for_a_job_with_timeout(&sc->completion, job_id, 1000);
         size_t nodes = 0, connected_nodes = 0, failed_nodes = 0, cancelled_nodes = 0;
 
-        spinlock_lock(&cr->queue.spinlock);
+        spinlock_lock(&sc->queue.spinlock);
         struct sender_state *next;
-        for(struct sender_state *s = cr->queue.ll; s ; s = next) {
+        for(struct sender_state *s = sc->queue.ll; s ; s = next) {
             next = s->next;
             nodes++;
 
@@ -690,37 +677,37 @@ static void *stream_sender_connector_thread(void *ptr) {
             };
             ND_LOG_STACK_PUSH(lgs);
 
-            if(stream_sender_is_signaled_to_stop(s)) {
+            if(stream_connector_is_signaled_to_stop(s)) {
                 cancelled_nodes++;
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(cr->queue.ll, s, prev, next);
-                stream_sender_connector_remove_unlinked(s);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sc->queue.ll, s, prev, next);
+                stream_connector_remove(s);
                 continue;
             }
 
-            spinlock_unlock(&cr->queue.spinlock);
+            spinlock_unlock(&sc->queue.spinlock);
             worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
-            bool move_to_dispatcher = stream_sender_connect(s, stream_send.parents.default_port, stream_send.parents.timeout_s);
-            spinlock_lock(&cr->queue.spinlock);
+            bool move_to_sender = stream_connect(s, stream_send.parents.default_port, stream_send.parents.timeout_s);
+            spinlock_lock(&sc->queue.spinlock);
 
-            if(move_to_dispatcher) {
+            if(move_to_sender) {
                 connected_nodes++;
                 stream_sender_on_connect(s);
 
                 worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTED);
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(cr->queue.ll, s, prev, next);
-                spinlock_unlock(&cr->queue.spinlock);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sc->queue.ll, s, prev, next);
+                spinlock_unlock(&sc->queue.spinlock);
 
                 // do not have the connector lock when calling this
-                stream_sender_dispatcher_add_to_queue(s);
+                stream_sender_add_to_queue(s);
 
-                spinlock_lock(&cr->queue.spinlock);
+                spinlock_lock(&sc->queue.spinlock);
             }
             else
                 failed_nodes++;
 
             worker_is_idle();
         }
-        spinlock_unlock(&cr->queue.spinlock);
+        spinlock_unlock(&sc->queue.spinlock);
 
         worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_QUEUED_NODES, (NETDATA_DOUBLE)nodes);
         worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_CONNECTED_NODES, (NETDATA_DOUBLE)connected_nodes);
@@ -731,36 +718,37 @@ static void *stream_sender_connector_thread(void *ptr) {
     return NULL;
 }
 
-bool stream_sender_connector_init(struct sender_state *s) {
+bool stream_connector_init(struct sender_state *s) {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
     if(!s) return false;
 
     spinlock_lock(&spinlock);
 
-    struct connector *cr = stream_sender_connector(s);
+    struct connector *sc = stream_connector_get(s);
 
-    if(!cr->thread) {
-        cr->id = (int8_t)(cr - connector_globals.connectors); // find the slot number
-        if(&connector_globals.connectors[cr->id] != cr)
+    if(!sc->thread) {
+        sc->id = (int8_t)(sc - connector_globals.connectors); // find the slot number
+        if(&connector_globals.connectors[sc->id] != sc)
             fatal("Connector ID and slot do not match!");
 
-        spinlock_init(&cr->queue.spinlock);
-        completion_init(&cr->completion);
+        spinlock_init(&sc->queue.spinlock);
+        completion_init(&sc->completion);
 
         char tag[NETDATA_THREAD_TAG_MAX + 1];
-        snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "-CN" "[%d]", cr->id);
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "-CN" "[%d]",
+            sc->id);
 
-        cr->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_sender_connector_thread, cr);
-        if (!cr->thread)
+        sc->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_connector_thread, sc);
+        if (!sc->thread)
             nd_log_daemon(NDLP_ERR, "STREAM connector: failed to create new thread for client.");
     }
 
     spinlock_unlock(&spinlock);
 
-    return cr->thread != NULL;
+    return sc->thread != NULL;
 }
 
-void stream_sender_connector_cancel_threads(void) {
+void stream_connector_cancel_threads(void) {
     for(int id = 0; id < MAX_CONNECTORS ; id++)
         nd_thread_signal_cancel(connector_globals.connectors[id].thread);
 }

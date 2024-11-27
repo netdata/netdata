@@ -87,7 +87,7 @@ struct stream_thread {
 
     pid_t tid;
     size_t id;
-    size_t nodes;
+    size_t nodes_count;
 
     struct {
         struct {
@@ -182,5 +182,8 @@ static inline bool rrdhost_is_this_a_stream_thread(RRDHOST *host) {
     pid_t tid = gettid_cached();
     return host->stream.rcv.status.tid == tid || host->stream.snd.status.tid == tid;
 }
+
+void stream_thread_node_running(RRDHOST *host);
+void stream_thread_node_stopped(RRDHOST *host);
 
 #endif //NETDATA_STREAM_THREAD_H

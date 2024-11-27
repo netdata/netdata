@@ -1449,7 +1449,7 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-path.h
         src/streaming/stream-capabilities.c
         src/streaming/stream-capabilities.h
-        src/streaming/sender-connector.c
+        src/streaming/stream-connector.c
         src/streaming/sender-internals.h
         src/streaming/sender-execute.c
         src/streaming/sender-commit.c

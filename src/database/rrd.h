@@ -1181,6 +1181,7 @@ struct rrdhost {
 
     struct {
         struct stream_thread *thread;
+        uint16_t refcount;
 
         // --- sender ---
 

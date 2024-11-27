@@ -102,10 +102,6 @@ static void stream_sender_on_disconnect(struct sender_state *s) {
     stream_path_parent_disconnected(s->host);
 }
 
-bool stream_sender_is_signaled_to_stop(struct sender_state *s) {
-    return __atomic_load_n(&s->exit.shutdown, __ATOMIC_RELAXED);
-}
-
 static bool stream_sender_log_capabilities(BUFFER *wb, void *ptr) {
     struct sender_state *state = ptr;
     if(!state)
@@ -410,6 +406,32 @@ void stream_sender_dispatcher_move_queue_to_running_unsafe(struct stream_thread 
     }
 }
 
+void stream_sender_giveup(struct sender_state *s) {
+    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+           "STREAM [connector] [%s]: streaming sender removed host: %s",
+           rrdhost_hostname(s->host), stream_handshake_error_to_string(s->exit.reason));
+
+    sender_lock(s);
+
+    __atomic_store_n(&s->exit.shutdown, false, __ATOMIC_RELAXED);
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+
+    s->last_state_since_t = now_realtime_sec();
+    stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, s->exit.reason, s->last_state_since_t);
+    s->connector.id = -1;
+
+    sender_unlock(s);
+
+    rrdhost_stream_parents_reset(s->host, STREAM_HANDSHAKE_EXITING);
+
+#ifdef NETDATA_LOG_STREAM_SENDER
+    if (s->stream_log_fp) {
+        fclose(s->stream_log_fp);
+        s->stream_log_fp = NULL;
+    }
+#endif
+}
+
 static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct stream_thread *sth, struct sender_state *s, size_t slot, STREAM_HANDSHAKE reason, bool reconnect) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
@@ -438,8 +460,6 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct 
                sth->id, rrdhost_hostname(s->host), slot, reconnect ? "true" : "false");
     }
 
-    bool should_remove = !reconnect || stream_sender_is_signaled_to_stop(s);
-
     // clear this flag asap, to stop other threads from pushing metrics for this node
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
 
@@ -465,10 +485,12 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct 
     stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, reason, now_realtime_sec());
     stream_sender_on_disconnect(s);
 
+    bool should_remove = !reconnect || stream_connector_is_signaled_to_stop(s);
+
     if (should_remove)
-        stream_sender_connector_remove_unlinked(s);
+        stream_sender_giveup(s);
     else
-        stream_sender_connector_requeue(s);
+        stream_connector_requeue(s);
 }
 
 void stream_sender_dispatcher_check_all_nodes(struct stream_thread *sth) {

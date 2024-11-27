@@ -174,7 +174,7 @@ void stream_sender_add_to_connector_queue(RRDHOST *host);
 void stream_sender_execute_commands_cleanup(struct sender_state *s);
 void stream_sender_execute_commands(struct sender_state *s);
 
-bool stream_sender_connect(struct sender_state *s, uint16_t default_port, time_t timeout);
+bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeout);
 
 bool stream_sender_is_host_stopped(struct sender_state *s);
 
@@ -182,15 +182,17 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_
 
 void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, STREAM_TRAFFIC_TYPE type, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
 
-void stream_sender_dispatcher_add_to_queue(struct sender_state *s);
+void stream_sender_add_to_queue(struct sender_state *s);
 
-bool stream_sender_connector_init(struct sender_state *s);
-void stream_sender_connector_cancel_threads(void);
-void stream_sender_connector_remove_unlinked(struct sender_state *s);
-void stream_sender_connector_add_unlinked(struct sender_state *s);
-void stream_sender_connector_requeue(struct sender_state *s);
+// stream connector
+bool stream_connector_init(struct sender_state *s);
+void stream_connector_cancel_threads(void);
+void stream_connector_add(struct sender_state *s);
+void stream_connector_requeue(struct sender_state *s);
+bool stream_connector_is_signaled_to_stop(struct sender_state *s);
 
-bool stream_sender_is_signaled_to_stop(struct sender_state *s);
 void stream_sender_on_connect(struct sender_state *s);
+
+void stream_sender_giveup(struct sender_state *s);
 
 #endif //NETDATA_SENDER_INTERNALS_H

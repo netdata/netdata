@@ -59,11 +59,11 @@ static RW_SPINLOCK blocked_parents_spinlock = NETDATA_RW_SPINLOCK_INITIALIZER;
 static void block_parent_for_all_nodes(STREAM_PARENT *d, time_t duration_s) {
     rw_spinlock_write_lock(&blocked_parents_spinlock);
 
-    struct blocked_parent *p = BLOCKED_PARENTS_Get(&blocked_parents_set, (Word_t)d->destination);
+    struct blocked_parent *p = BLOCKED_PARENTS_GET(&blocked_parents_set, (Word_t)d->destination);
     if(!p) {
         p = callocz(1, sizeof(*p));
         p->destination = string_dup(d->destination);
-        BLOCKED_PARENTS_Add(&blocked_parents_set, (Word_t)p->destination, p);
+        BLOCKED_PARENTS_SET(&blocked_parents_set, (Word_t)p->destination, p);
     }
     p->until = now_monotonic_usec() + duration_s * USEC_PER_SEC;
 
@@ -73,7 +73,7 @@ static void block_parent_for_all_nodes(STREAM_PARENT *d, time_t duration_s) {
 static bool is_a_blocked_parent(STREAM_PARENT *d) {
     rw_spinlock_read_lock(&blocked_parents_spinlock);
 
-    struct blocked_parent *p = BLOCKED_PARENTS_Get(&blocked_parents_set, (Word_t)d->destination);
+    struct blocked_parent *p = BLOCKED_PARENTS_GET(&blocked_parents_set, (Word_t)d->destination);
     bool ret = p && p->until > now_monotonic_usec();
 
     rw_spinlock_read_unlock(&blocked_parents_spinlock);
