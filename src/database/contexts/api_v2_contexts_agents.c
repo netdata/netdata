@@ -33,8 +33,10 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
         size_t collected_metrics = 0;
         size_t collected_instances = 0;
+        size_t collected_contexts = 0;
         size_t available_metrics = 0;
         size_t available_instances = 0;
+        size_t available_contexts = 0;
 
         buffer_json_member_add_object(wb, "nodes");
         {
@@ -43,15 +45,17 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             dfe_start_read(rrdhost_root_index, host) {
                 total++;
 
-                available_metrics += __atomic_load_n(&host->rrdctx.metrics, __ATOMIC_RELAXED);
-                available_instances += __atomic_load_n(&host->rrdctx.instances, __ATOMIC_RELAXED);
+                available_metrics += __atomic_load_n(&host->rrdctx.metrics_count, __ATOMIC_RELAXED);
+                available_instances += __atomic_load_n(&host->rrdctx.instances_count, __ATOMIC_RELAXED);
+                available_contexts += __atomic_load_n(&host->rrdctx.contexts_count, __ATOMIC_RELAXED);
 
                 if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED))
                     sending++;
 
                 if (rrdhost_is_online(host)) {
-                    collected_metrics += __atomic_load_n(&host->collected.metrics, __ATOMIC_RELAXED);
-                    collected_instances += __atomic_load_n(&host->collected.instances, __ATOMIC_RELAXED);
+                    collected_metrics += __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED);
+                    collected_instances += __atomic_load_n(&host->collected.instances_count, __ATOMIC_RELAXED);
+                    collected_contexts += __atomic_load_n(&host->collected.contexts_count, __ATOMIC_RELAXED);
 
                     if(host != localhost)
                         receiving++;
@@ -79,6 +83,13 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
         {
             buffer_json_member_add_uint64(wb, "collected", collected_instances);
             buffer_json_member_add_uint64(wb, "available", available_instances);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "contexts");
+        {
+            buffer_json_member_add_uint64(wb, "collected", collected_contexts);
+            buffer_json_member_add_uint64(wb, "available", available_contexts);
         }
         buffer_json_object_close(wb);
 
@@ -158,13 +169,11 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                     time_t space_retention = (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent);
                     time_t actual_retention = MIN(space_retention, time_retention ? time_retention : space_retention);
 
-                    if (time_retention) {
-                        duration_snprintf_hours(human_retention, sizeof(human_retention),
-                                                (int)duration_round_to_resolution(time_retention, 3600));
+                    duration_snprintf_hours(human_retention, sizeof(human_retention),
+                                            (int)duration_round_to_resolution(time_retention, 3600));
 
-                        buffer_json_member_add_time_t(wb, "requested_retention", time_retention);
-                        buffer_json_member_add_string(wb, "requested_retention_human", human_retention);
-                    }
+                    buffer_json_member_add_time_t(wb, "requested_retention", time_retention);
+                    buffer_json_member_add_string(wb, "requested_retention_human", human_retention);
 
                     duration_snprintf_hours(human_retention, sizeof(human_retention),
                                             (int)duration_round_to_resolution(actual_retention, 3600));

@@ -120,6 +120,7 @@ typedef struct {
         struct {
             size_t metrics; // currently collected
             size_t instances; // currently collected
+            size_t contexts; // currently collected
         } collected;
 
         struct {

@@ -1297,16 +1297,18 @@ struct rrdhost {
                                                     // this includes custom host variables
 
     struct {
-        uint32_t metrics;                           // atomic
-        uint32_t instances;                         // atomic
+        uint32_t metrics_count;                     // atomic
+        uint32_t instances_count;                   // atomic
+        uint32_t contexts_count;                    // atomic
     } collected;
 
     struct {
         DICTIONARY *contexts;
         DICTIONARY *hub_queue;
         DICTIONARY *pp_queue;
-        uint32_t metrics;                           // atomic
-        uint32_t instances;                         // atomic
+        uint32_t metrics_count;                     // atomic
+        uint32_t instances_count;                   // atomic
+        uint32_t contexts_count;                    // atomic
     } rrdctx;
 
     struct {

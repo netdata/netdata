@@ -166,9 +166,9 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     bool online = rrdhost_is_online(host);
 
     rrdhost_retention(host, now, online, &s->db.first_time_s, &s->db.last_time_s);
-    s->db.metrics = host->rrdctx.metrics;
-    s->db.instances = host->rrdctx.instances;
-    s->db.contexts = dictionary_entries(host->rrdctx.contexts);
+    s->db.metrics = __atomic_load_n(&host->rrdctx.metrics_count, __ATOMIC_RELAXED);
+    s->db.instances = __atomic_load_n(&host->rrdctx.instances_count, __ATOMIC_RELAXED);
+    s->db.contexts = __atomic_load_n(&host->rrdctx.contexts_count, __ATOMIC_RELAXED);
     if(!s->db.first_time_s || !s->db.last_time_s || !s->db.metrics || !s->db.instances || !s->db.contexts ||
         (flags & (RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
         s->db.status = RRDHOST_DB_STATUS_INITIALIZING;
@@ -222,8 +222,9 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
             s->ingest.status = RRDHOST_INGEST_STATUS_OFFLINE;
     }
 
-    s->ingest.collected.metrics = host->collected.metrics;
-    s->ingest.collected.instances = host->collected.instances;
+    s->ingest.collected.metrics = __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED);
+    s->ingest.collected.instances = __atomic_load_n(&host->collected.instances_count, __ATOMIC_RELAXED);
+    s->ingest.collected.contexts = __atomic_load_n(&host->collected.contexts_count, __ATOMIC_RELAXED);
 
     if(host == localhost)
         s->ingest.type = RRDHOST_INGEST_TYPE_LOCALHOST;

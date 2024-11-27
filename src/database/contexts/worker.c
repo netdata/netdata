@@ -288,7 +288,7 @@ bool rrdmetric_update_retention(RRDMETRIC *rm) {
     }
 
     if(unlikely(!rm->first_time_s && !rm->last_time_s))
-        rrd_flag_set_deleted(rm, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
+        rrdmetric_set_deleted(rm, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
 
     rrd_flag_set(rm, RRD_FLAG_LIVE_RETENTION);
 
@@ -472,11 +472,11 @@ static void rrdmetric_process_updates(RRDMETRIC *rm, bool force, RRD_FLAGS reaso
         worker_is_busy(WORKER_JOB_PP_METRIC);
 
     if(reason & RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD) {
-        rrd_flag_set_archived(rm);
+        rrdmetric_set_archived(rm);
         rrd_flag_set(rm, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD);
     }
     if(rrd_flag_is_deleted(rm) && (reason & RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION))
-        rrd_flag_set_archived(rm);
+        rrdmetric_set_archived(rm);
 
     rrdmetric_update_retention(rm);
 
@@ -515,7 +515,7 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
                         continue;
                     }
 
-                    if(!currently_collected && rrd_flag_check(rm, RRD_FLAG_COLLECTED) && rm->first_time_s)
+                    if(!currently_collected && rrd_flag_is_collected(rm) && rm->first_time_s)
                         currently_collected = true;
 
                     metrics_active++;
@@ -547,7 +547,7 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
             rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
         }
 
-        rrd_flag_set_deleted(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
+        rrdinstance_set_deleted(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
     }
     else {
         // we have active metrics...
@@ -567,7 +567,7 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
             }
 
             if(likely(live_retention))
-                rrd_flag_set_deleted(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
+                rrdinstance_set_deleted(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
         }
         else {
             rrd_flag_clear(ri, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
@@ -583,9 +583,9 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
             }
 
             if(likely(currently_collected))
-                rrd_flag_set_collected(ri);
+                rrdinstance_set_collected(ri);
             else
-                rrd_flag_set_archived(ri);
+                rrdinstance_set_archived(ri);
         }
     }
 
@@ -603,7 +603,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     size_t min_priority_not_collected = LONG_MAX;
     size_t min_priority = LONG_MAX;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t instances_active = 0, instances_deleted = 0, metrics = 0;
+    size_t instances_active = 0, instances_deleted = 0;
     bool live_retention = true, currently_collected = false, hidden = true;
     if(dictionary_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
@@ -643,10 +643,9 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                                    string2str(rc->units), string2str(ri->units));
 
                     instances_active++;
-                    metrics += dictionary_entries(ri->rrdmetrics);
 
                     if (ri->priority >= RRDCONTEXT_MINIMUM_ALLOWED_PRIORITY) {
-                        if(rrd_flag_check(ri, RRD_FLAG_COLLECTED)) {
+                        if(rrd_flag_is_collected(ri)) {
                             if(ri->priority < min_priority_collected)
                                 min_priority_collected = ri->priority;
                         }
@@ -663,8 +662,6 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                         max_last_time_t = ri->last_time_s;
                 }
         dfe_done(ri);
-
-        rc->stats.metrics = metrics;
 
         if(min_priority_collected != LONG_MAX)
             // use the collected priority
@@ -708,7 +705,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
             rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
         }
 
-        rrd_flag_set_deleted(rc, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
+        rrdcontext_set_deleted(rc, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
     }
     else {
         // we have some active instances...
@@ -727,7 +724,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                 rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T);
             }
 
-            rrd_flag_set_deleted(rc, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
+            rrdcontext_set_deleted(rc, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
         }
         else {
             rrd_flag_clear(rc, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
@@ -743,9 +740,9 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
             }
 
             if(likely(currently_collected))
-                rrd_flag_set_collected(rc);
+                rrdcontext_set_collected(rc);
             else
-                rrd_flag_set_archived(rc);
+                rrdcontext_set_archived(rc);
         }
 
         if (min_priority != LONG_MAX && rc->priority != min_priority) {
@@ -1084,8 +1081,6 @@ void *rrdcontext_main(void *ptr) {
 
     worker_register("RRDCONTEXT");
     worker_register_job_name(WORKER_JOB_HOSTS, "hosts");
-    worker_register_job_name(WORKER_JOB_HOSTS_CTX_METRICS, "ctx metrics");
-    worker_register_job_name(WORKER_JOB_HOSTS_RRD_METRICS, "rrd metrics");
     worker_register_job_name(WORKER_JOB_CHECK, "dedup checks");
     worker_register_job_name(WORKER_JOB_SEND, "sent contexts");
     worker_register_job_name(WORKER_JOB_DEQUEUE, "deduplicated contexts");
@@ -1102,9 +1097,6 @@ void *rrdcontext_main(void *ptr) {
 
     heartbeat_t hb;
     heartbeat_init(&hb, RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC);
-
-    size_t last_metrics_first_ut = now_realtime_usec();
-    usec_t last_metrics_ut = 0;
 
     while (service_running(SERVICE_CONTEXT)) {
         worker_is_idle();
@@ -1143,43 +1135,6 @@ void *rrdcontext_main(void *ptr) {
 
             if (host->rrdctx.contexts)
                 dictionary_garbage_collect(host->rrdctx.contexts);
-
-            // recalculate metrics every 33 seconds, but do it every second for the first 123 seconds
-            if(last_metrics_ut + 33 * USEC_PER_SEC > now_ut)
-                continue;
-
-            if(last_metrics_first_ut + 123 * USEC_PER_SEC < now_ut)
-                last_metrics_ut = now_ut;
-
-            worker_is_busy(WORKER_JOB_HOSTS_CTX_METRICS);
-
-            // calculate the number of available metrics and instances of the host
-            // FIXME: available metrics and instances should always be up to date (atomic +/-1)
-            RRDCONTEXT *rc;
-            uint32_t metrics = 0, instances = 0;
-            dfe_start_read(host->rrdctx.contexts, rc) {
-                metrics += rc->stats.metrics;
-                instances += dictionary_entries(rc->rrdinstances);
-            }
-            dfe_done(rc);
-            __atomic_store_n(&host->rrdctx.metrics, metrics, __ATOMIC_RELAXED);
-            __atomic_store_n(&host->rrdctx.instances, instances, __ATOMIC_RELAXED);
-
-            worker_is_busy(WORKER_JOB_HOSTS_RRD_METRICS);
-
-            // calculate the number of collected metrics and instances of the host
-            // FIXME: collected metrics and instances should always be up to date (atomic +/-1)
-            RRDSET *st;
-            metrics = instances = 0;
-            rrdset_foreach_read(st, host) {
-                if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_COLLECTION_FINISHED)) {
-                    instances++;
-                    metrics += dictionary_entries(st->rrddim_root_index);
-                }
-            }
-            rrdset_foreach_done(st);
-            __atomic_store_n(&host->collected.metrics, metrics, __ATOMIC_RELAXED);
-            __atomic_store_n(&host->collected.instances, instances, __ATOMIC_RELAXED);
         }
         dfe_done(host);
 

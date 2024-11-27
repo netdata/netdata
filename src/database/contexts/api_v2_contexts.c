@@ -220,8 +220,9 @@ static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *
         buffer_json_member_add_string(wb, "status", rrdhost_ingest_status_to_string(s->ingest.status));
         buffer_json_member_add_time_t(wb, "since", s->ingest.since);
         buffer_json_member_add_time_t(wb, "age", s->now - s->ingest.since);
-        buffer_json_member_add_uint64(wb, "instances", s->ingest.collected.instances);
         buffer_json_member_add_uint64(wb, "metrics", s->ingest.collected.metrics);
+        buffer_json_member_add_uint64(wb, "instances", s->ingest.collected.instances);
+        buffer_json_member_add_uint64(wb, "contexts", s->ingest.collected.contexts);
 
         if(s->ingest.type == RRDHOST_INGEST_TYPE_CHILD) {
             if(s->ingest.status == RRDHOST_INGEST_STATUS_OFFLINE)
@@ -449,8 +450,8 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
                     buffer_json_member_add_string(wb, "mode", rrd_memory_mode_name(s.db.mode));
                     buffer_json_member_add_time_t(wb, "first_time", s.db.first_time_s);
                     buffer_json_member_add_time_t(wb, "last_time", s.db.last_time_s);
-                    buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);
 
+                    buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);
                     buffer_json_member_add_uint64(wb, "instances", s.db.instances);
                     buffer_json_member_add_uint64(wb, "contexts", s.db.contexts);
                 }

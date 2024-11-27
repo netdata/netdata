@@ -90,6 +90,10 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
             buffer_json_add_array_item_string(wb, s.ingest.ssl ? "SSL" : "PLAIN"); // InSSL
             stream_capabilities_to_json_array(wb, s.ingest.capabilities, NULL); // InCapabilities
 
+            buffer_json_add_array_item_uint64(wb, s.ingest.collected.metrics); // CollectedMetrics
+            buffer_json_add_array_item_uint64(wb, s.ingest.collected.instances); // CollectedInstances
+            buffer_json_add_array_item_uint64(wb, s.ingest.collected.contexts); // CollectedContexts
+
             // streaming
             if(s.stream.since) {
                 buffer_json_add_array_item_uint64(wb, s.stream.since * MSEC_PER_SEC); // OutSince
@@ -315,6 +319,24 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "CollectedMetrics", "Time-series Metrics Currently Collected",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0, NULL, (double)max_db_metrics, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "CollectedInstances", "Instances Currently Collected",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0, NULL, (double)max_db_instances, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "CollectedContexts", "Contexts Currently Collected",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0, NULL, (double)max_db_contexts, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // --- streaming ---
 

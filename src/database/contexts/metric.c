@@ -52,7 +52,7 @@ inline time_t rrdmetric_acquired_first_entry(RRDMETRIC_ACQUIRED *rma) {
 inline time_t rrdmetric_acquired_last_entry(RRDMETRIC_ACQUIRED *rma) {
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
 
-    if(rrd_flag_check(rm, RRD_FLAG_COLLECTED))
+    if(rrd_flag_is_collected(rm))
         return 0;
 
     return rm->last_time_s;
@@ -83,6 +83,9 @@ static void rrdmetric_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     // remove flags that we need to figure out at runtime
     rm->flags = rm->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS; // no need for atomics
 
+    // update the count of metrics
+    __atomic_add_fetch(&rm->ri->rc->rrdhost->rrdctx.metrics_count, 1, __ATOMIC_RELAXED);
+
     // signal the react callback to do the job
     rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_NEW_OBJECT);
 }
@@ -93,6 +96,9 @@ static void rrdmetric_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
     RRDMETRIC *rm = value;
 
     internal_error(rm->rrddim, "RRDMETRIC: '%s' is freed but there is a RRDDIM linked to it.", string2str(rm->id));
+
+    // update the count of metrics
+    __atomic_sub_fetch(&rm->ri->rc->rrdhost->rrdctx.metrics_count, 1, __ATOMIC_RELAXED);
 
     // free the resources
     rrdmetric_free(rm);
@@ -181,7 +187,7 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
     rrd_flag_set(rm, rm_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS); // no needs for atomics on rm_new
 
     if(rrd_flag_is_collected(rm) && rrd_flag_is_archived(rm))
-        rrd_flag_set_collected(rm);
+        rrdmetric_set_collected(rm);
 
     if(rrd_flag_check(rm, RRD_FLAG_UPDATED))
         rrd_flag_set(rm, RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT);
@@ -221,7 +227,7 @@ void rrdmetrics_destroy_from_rrdinstance(RRDINSTANCE *ri) {
 // trigger post-processing of the rrdmetric, escalating changes to the rrdinstance it belongs
 static void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function) {
     if(unlikely(rrd_flag_is_collected(rm)) && (!rm->rrddim || rrd_flag_check(rm, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD)))
-        rrd_flag_set_archived(rm);
+        rrdmetric_set_archived(rm);
 
     if(rrd_flag_is_updated(rm) || !rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION)) {
         rrd_flag_set_updated(rm->ri, RRD_FLAG_UPDATE_REASON_TRIGGERED);
@@ -285,7 +291,7 @@ inline void rrdmetric_rrddim_is_freed(RRDDIM *rd) {
     if(unlikely(!rm)) return;
 
     if(unlikely(rrd_flag_is_collected(rm)))
-        rrd_flag_set_archived(rm);
+        rrdmetric_set_archived(rm);
 
     rm->rrddim = NULL;
     rrdmetric_trigger_updates(rm, __FUNCTION__ );
@@ -302,7 +308,7 @@ inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
 
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED|RRDDIM_FLAG_OBSOLETE))) {
         if(unlikely(rrd_flag_is_collected(rm)))
-            rrd_flag_set_archived(rm);
+            rrdmetric_set_archived(rm);
     }
 
     rrdmetric_trigger_updates(rm, __FUNCTION__ );
@@ -318,7 +324,7 @@ inline void rrdmetric_collected_rrddim(RRDDIM *rd) {
     if(unlikely(!rm)) return;
 
     if(unlikely(!rrd_flag_is_collected(rm)))
-        rrd_flag_set_collected(rm);
+        rrdmetric_set_collected(rm);
 
     // we use this variable to detect BEGIN/END without SET
     rm->ri->internal.collected_metrics_count++;
