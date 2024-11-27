@@ -1,6 +1,6 @@
 # Agent alert notifications
 
-This is a reference documentation for Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
+This is reference documentation for Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 The `script to execute on alarm` line in `netdata.conf` defines the external script that will be called once the alert is triggered.
 
@@ -10,10 +10,10 @@ The default script is `alarm-notify.sh`.
 >
 > This file mentions editing configuration files.  
 >
-> - To edit configuration files in a safe way, we provide the [`edit config` script](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config)located in your [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
+> - To edit configuration files safely, we provide the [`edit config` script](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config)located in your [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory) (typically is `/etc/netdata`) that creates the proper file and opens it in an editor automatically.  
 > Note that to run the script you need to be inside your Netdata config directory.
 >
-> - Please also note that after most configuration changes you will need to [restart the Agent](/docs/netdata-agent/start-stop-restart.md) for the changes to take effect.
+> - Please also note that after most configuration changes, you will need to [restart the Agent](/docs/netdata-agent/start-stop-restart.md) for the changes to take effect.
 >
 > It is recommended to use this way for configuring Netdata.
 
@@ -27,7 +27,7 @@ You can change the default script globally by editing `netdata.conf` and changin
 
 It uses **roles**. For example `sysadmin`, `webmaster`, `dba`, etc.
 
-Each alert is assigned to one or more roles, using the `to` line of the alert  configuration. For example, here is the alert configuration for `ram.conf` that defaults to the role `sysadmin`:
+Each alert is assigned to one or more roles, using the `to` line of the alert configuration. For example, here is the alert configuration for `ram.conf` that defaults to the role `sysadmin`:
 
 ```text
     alarm: ram_in_use
@@ -66,7 +66,7 @@ role_recipients_email[sysadmin]="someone@exaple.com someoneelse@example.com"
 
 Each role may have one or more destinations and one or more notification methods.
 
-So, for example the `sysadmin` role may send:
+So, for example, the `sysadmin` role may send:
 
 1. emails to admin1@example.com and admin2@example.com
 2. pushover.net notifications to USERTOKENS `A`, `B` and `C`.
@@ -80,7 +80,7 @@ You can edit `health_alarm_notify.conf` using the `edit-config` script to config
 
 - **Settings** per notification method:
 
-     All notification methods except email, require some configuration (i.e. API keys, tokens, destination rooms, channels, etc). Please check this section's content to find the configuration guides for your notification option of choice
+     All notification methods, except email, require some configuration (i.e., API keys, tokens, destination rooms, channels, etc.). Please check this section's content to find the configuration guides for your notification option of choice
 
 - **Recipients** per role per notification method
 
@@ -113,7 +113,7 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 /usr/libexec/netdata/plugins.d/alarm-notify.sh test "ROLE"
 ```
 
-If you are [running your own Registry](/src/registry/CONFIGURATION.md#run-your-own-registry), add `export NETDATA_REGISTRY_URL=[YOUR_URL]` before calling `alarm-notify.sh`.
+If you are [running your own Registry](/src/registry/CONFIGURATION.md#configure-a-custom-registry), add `export NETDATA_REGISTRY_URL=[YOUR_URL]` before calling `alarm-notify.sh`.
 
 > If you need to dig even deeper, you can trace the execution with `bash -x`. Note that in test mode, `alarm-notify.sh` calls itself with many more arguments. So first do:
 >
@@ -155,7 +155,7 @@ This works for all notification methods (including the default recipients).
 
 ### Proxy configuration
 
-If you need to send curl based notifications (pushover, pushbullet, slack, alerta,
+If you need to send curl-based notifications (pushover, pushbullet, slack, alerta,
 flock, discord, telegram) via a proxy, you should set these variables to your proxy address:
 
 ```text
@@ -184,7 +184,7 @@ You can configure netdata alerts to send dates in any format you want via editin
 This uses standard `date` command format strings. See `man date` for
 more info on what formats are supported.
 
-Note that this has to start with a '+', otherwise it won't work.
+Note that this has to start with a '+'; otherwise it won't work.
 
 - For ISO 8601 dates, use `+%FT%T%z`
 - For RFC 5322 dates, use `+%a, %d %b %Y %H:%M:%S %z`
