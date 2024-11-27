@@ -208,7 +208,37 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
-set(NEED_PROTOBUF True)
+cmake_dependent_option(ENABLE_MIMALLOC "Enable mimalloc allocator" ON
+        "CMAKE_MINOR_VERSION GREATER_EQUAL 18; CMAKE_SIZEOF_VOID_P EQUAL 8; NOT OS_FREEBSD; NOT OS_MACOS; NOT OS_WINDOWS; NOT ENABLE_ADDRESS_SANITIZER" OFF)
+
+if(ENABLE_MIMALLOC)
+        function(netdata_add_mimalloc)
+                set(MI_BUILD_STATIC ON CACHE INTERNAL "")
+                set(MI_BUILD_SHARED OFF CACHE INTERNAL "")
+                set(MI_BUILD_OBJECT OFF CACHE INTERNAL "")
+                set(MI_BUILD_TESTS OFF CACHE INTERNAL "")
+
+                include(FetchContent)
+                include(NetdataFetchContentExtra)
+
+                if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+                        FetchContent_Declare(mimalloc
+                                GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+                                GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f
+                                EXCLUDE_FROM_ALL
+                        )
+                else()
+                        FetchContent_Declare(mimalloc
+                                GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+                                GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f
+                        )
+                endif()
+
+                FetchContent_MakeAvailable_NoInstall(mimalloc)
+        endfunction()
+
+        netdata_add_mimalloc()
+endif()
 
 if(ENABLE_PLUGIN_GO)
     include(NetdataGoTools)
@@ -245,12 +275,10 @@ if(ENABLE_WEBRTC)
         FetchContent_MakeAvailable(libdatachannel)
 endif()
 
-if(NEED_PROTOBUF)
-        include(NetdataProtobuf)
+include(NetdataProtobuf)
 
-        if(ENABLE_BUNDLED_PROTOBUF)
-                netdata_bundle_protobuf()
-        endif()
+if(ENABLE_BUNDLED_PROTOBUF)
+        netdata_bundle_protobuf()
 endif()
 
 set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
@@ -590,13 +618,7 @@ else()
         pkg_check_modules(CRYPTO IMPORTED_TARGET REQUIRED libcrypto)
 endif()
 
-#
-# figure out if we need protoc/protobuf
-#
-
-if(NEED_PROTOBUF)
-        netdata_detect_protobuf()
-endif()
+netdata_detect_protobuf()
 
 #
 # source files
@@ -1822,6 +1844,7 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 # target_link_libraries(test Threads::Threads)
 
 target_link_libraries(libnetdata PUBLIC
+        "$<$<BOOL:${ENABLE_MIMALLOC}>:mimalloc-static>"
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
         "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid>"
@@ -2553,9 +2576,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
 )
 
-if(NEED_PROTOBUF)
-        netdata_add_protobuf(netdata)
-endif()
+netdata_add_protobuf(netdata)
 
 #
 # build systemd-cat-native
