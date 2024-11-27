@@ -118,6 +118,12 @@ typedef struct {
         STREAM_HANDSHAKE reason;
 
         struct {
+            size_t metrics; // currently collected
+            size_t instances; // currently collected
+            size_t contexts; // currently collected
+        } collected;
+
+        struct {
             bool in_progress;
             NETDATA_DOUBLE completion;
             size_t instances;

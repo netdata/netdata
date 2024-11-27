@@ -64,12 +64,12 @@ static void rrdcontext_insert_callback(const DICTIONARY_ITEM *item __maybe_unuse
         rc->last_time_s  = (time_t)rc->hub.last_time_s;
 
         if(rc->hub.deleted || !rc->hub.first_time_s)
-            rrd_flag_set_deleted(rc, RRD_FLAG_NONE);
+            rrdcontext_set_deleted(rc, RRD_FLAG_NONE);
         else {
             if (rc->last_time_s == 0)
-                rrd_flag_set_collected(rc);
+                rrdcontext_set_collected(rc);
             else
-                rrd_flag_set_archived(rc);
+                rrdcontext_set_archived(rc);
         }
 
         rc->flags |= RRD_FLAG_UPDATE_REASON_LOAD_SQL; // no need for atomics at constructor
@@ -82,6 +82,9 @@ static void rrdcontext_insert_callback(const DICTIONARY_ITEM *item __maybe_unuse
     rrdinstances_create_in_rrdcontext(rc);
     spinlock_init(&rc->spinlock);
 
+    // update the count of contexts
+    __atomic_add_fetch(&rc->rrdhost->rrdctx.contexts_count, 1, __ATOMIC_RELAXED);
+
     // signal the react callback to do the job
     rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_NEW_OBJECT);
 }
@@ -89,6 +92,9 @@ static void rrdcontext_insert_callback(const DICTIONARY_ITEM *item __maybe_unuse
 static void rrdcontext_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdhost __maybe_unused) {
 
     RRDCONTEXT *rc = (RRDCONTEXT *)value;
+
+    // update the count of contexts
+    __atomic_sub_fetch(&rc->rrdhost->rrdctx.contexts_count, 1, __ATOMIC_RELAXED);
 
     rrdinstances_destroy_from_rrdcontext(rc);
     rrdcontext_freez(rc);
@@ -199,7 +205,7 @@ static bool rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unu
     rrd_flag_set(rc, rc_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS); // no need for atomics on rc_new
 
     if(rrd_flag_is_collected(rc) && rrd_flag_is_archived(rc))
-        rrd_flag_set_collected(rc);
+        rrdcontext_set_collected(rc);
 
     if(rrd_flag_is_updated(rc))
         rrd_flag_set(rc, RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT);
