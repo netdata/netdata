@@ -75,10 +75,10 @@ const (
 	metricHypervVSwitchPurgedMACAddresses                    = "windows_hyperv_vswitch_purged_mac_addresses_total"
 )
 
-func (w *Windows) collectHyperv(mx map[string]int64, pms prometheus.Series) {
-	if !w.cache.collection[collectorHyperv] {
-		w.cache.collection[collectorHyperv] = true
-		w.addHypervCharts()
+func (c *Collector) collectHyperv(mx map[string]int64, pms prometheus.Series) {
+	if !c.cache.collection[collectorHyperv] {
+		c.cache.collection[collectorHyperv] = true
+		c.addHypervCharts()
 	}
 
 	for _, v := range []string{
@@ -108,13 +108,13 @@ func (w *Windows) collectHyperv(mx map[string]int64, pms prometheus.Series) {
 		}
 	}
 
-	w.collectHypervVM(mx, pms)
-	w.collectHypervVMDevices(mx, pms)
-	w.collectHypervVMInterface(mx, pms)
-	w.collectHypervVSwitch(mx, pms)
+	c.collectHypervVM(mx, pms)
+	c.collectHypervVMDevices(mx, pms)
+	c.collectHypervVMInterface(mx, pms)
+	c.collectHypervVSwitch(mx, pms)
 }
 
-func (w *Windows) collectHypervVM(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectHypervVM(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 	px := "hyperv_vm_"
 
@@ -150,20 +150,20 @@ func (w *Windows) collectHypervVM(mx map[string]int64, pms prometheus.Series) {
 	}
 
 	for v := range seen {
-		if !w.cache.hypervVMMem[v] {
-			w.cache.hypervVMMem[v] = true
-			w.addHypervVMCharts(v)
+		if !c.cache.hypervVMMem[v] {
+			c.cache.hypervVMMem[v] = true
+			c.addHypervVMCharts(v)
 		}
 	}
-	for v := range w.cache.hypervVMMem {
+	for v := range c.cache.hypervVMMem {
 		if !seen[v] {
-			delete(w.cache.hypervVMMem, v)
-			w.removeHypervVMCharts(v)
+			delete(c.cache.hypervVMMem, v)
+			c.removeHypervVMCharts(v)
 		}
 	}
 }
 
-func (w *Windows) collectHypervVMDevices(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectHypervVMDevices(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 	px := "hyperv_vm_device_"
 
@@ -184,20 +184,20 @@ func (w *Windows) collectHypervVMDevices(mx map[string]int64, pms prometheus.Ser
 	}
 
 	for v := range seen {
-		if !w.cache.hypervVMDevices[v] {
-			w.cache.hypervVMDevices[v] = true
-			w.addHypervVMDeviceCharts(v)
+		if !c.cache.hypervVMDevices[v] {
+			c.cache.hypervVMDevices[v] = true
+			c.addHypervVMDeviceCharts(v)
 		}
 	}
-	for v := range w.cache.hypervVMDevices {
+	for v := range c.cache.hypervVMDevices {
 		if !seen[v] {
-			delete(w.cache.hypervVMDevices, v)
-			w.removeHypervVMDeviceCharts(v)
+			delete(c.cache.hypervVMDevices, v)
+			c.removeHypervVMDeviceCharts(v)
 		}
 	}
 }
 
-func (w *Windows) collectHypervVMInterface(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectHypervVMInterface(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 	px := "hyperv_vm_interface_"
 
@@ -219,20 +219,20 @@ func (w *Windows) collectHypervVMInterface(mx map[string]int64, pms prometheus.S
 	}
 
 	for v := range seen {
-		if !w.cache.hypervVMInterfaces[v] {
-			w.cache.hypervVMInterfaces[v] = true
-			w.addHypervVMInterfaceCharts(v)
+		if !c.cache.hypervVMInterfaces[v] {
+			c.cache.hypervVMInterfaces[v] = true
+			c.addHypervVMInterfaceCharts(v)
 		}
 	}
-	for v := range w.cache.hypervVMInterfaces {
+	for v := range c.cache.hypervVMInterfaces {
 		if !seen[v] {
-			delete(w.cache.hypervVMInterfaces, v)
-			w.removeHypervVMInterfaceCharts(v)
+			delete(c.cache.hypervVMInterfaces, v)
+			c.removeHypervVMInterfaceCharts(v)
 		}
 	}
 }
 
-func (w *Windows) collectHypervVSwitch(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectHypervVSwitch(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 	px := "hyperv_vswitch_"
 
@@ -267,15 +267,15 @@ func (w *Windows) collectHypervVSwitch(mx map[string]int64, pms prometheus.Serie
 	}
 
 	for v := range seen {
-		if !w.cache.hypervVswitch[v] {
-			w.cache.hypervVswitch[v] = true
-			w.addHypervVSwitchCharts(v)
+		if !c.cache.hypervVswitch[v] {
+			c.cache.hypervVswitch[v] = true
+			c.addHypervVSwitchCharts(v)
 		}
 	}
-	for v := range w.cache.hypervVswitch {
+	for v := range c.cache.hypervVswitch {
 		if !seen[v] {
-			delete(w.cache.hypervVswitch, v)
-			w.removeHypervVSwitchCharts(v)
+			delete(c.cache.hypervVswitch, v)
+			c.removeHypervVSwitchCharts(v)
 		}
 	}
 }

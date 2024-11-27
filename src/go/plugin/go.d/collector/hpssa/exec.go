@@ -11,6 +11,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
+type ssacliBinary interface {
+	controllersInfo() ([]byte, error)
+}
+
 func newSsacliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *ssacliExec {
 	return &ssacliExec{
 		Logger:     log,

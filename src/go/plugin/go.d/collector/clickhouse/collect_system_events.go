@@ -17,7 +17,7 @@ FROM
     system.events FORMAT CSVWithNames
 `
 
-func (c *ClickHouse) collectSystemEvents(mx map[string]int64) error {
+func (c *Collector) collectSystemEvents(mx map[string]int64) error {
 	req, _ := web.NewHTTPRequest(c.RequestConfig)
 	req.URL.RawQuery = makeURLQuery(querySystemEvents)
 

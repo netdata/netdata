@@ -635,7 +635,7 @@ These steps will disable the anonymous telemetry for your Netdata installation.
 
 Please note, even with telemetry disabled, Netdata still requires a [Netdata Registry](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry) for alert notifications' Call To Action (CTA) functionality. When you click an alert notification, it redirects you to the Netdata Registry, which then directs your web browser to the specific Netdata Agent that issued the alert for further troubleshooting. The Netdata Registry learns the URLs of your Agents when you visit their dashboards.
 
-Any Netdata Agent can act as a Netdata Registry. Designate one Netdata Agent as your registry, and our global Netdata Registry will no longer be in use. For further information on this, please refer to [this guide](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry).
+Any Netdata Agent can act as a Netdata Registry. Designate one Netdata Agent as your Registry, read more [here](https://learn.netdata.cloud/docs/netdata-agent/configuration/registry).
 
 &nbsp;<br/>&nbsp;<br/>
 </details>

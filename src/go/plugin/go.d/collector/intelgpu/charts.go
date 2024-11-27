@@ -60,7 +60,7 @@ var intelGPUEngineBusyPercChartTmpl = module.Chart{
 	},
 }
 
-func (ig *IntelGPU) addEngineCharts(engine string) {
+func (c *Collector) addEngineCharts(engine string) {
 	chart := intelGPUEngineBusyPercChartTmpl.Copy()
 
 	s := strings.ToLower(engine)
@@ -75,8 +75,8 @@ func (ig *IntelGPU) addEngineCharts(engine string) {
 		dim.ID = fmt.Sprintf(dim.ID, engine)
 	}
 
-	if err := ig.Charts().Add(chart); err != nil {
-		ig.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }
 

@@ -10,8 +10,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (r *RiakKv) collect() (map[string]int64, error) {
-	stats, err := r.getStats()
+func (c *Collector) collect() (map[string]int64, error) {
+	stats, err := c.getStats()
 	if err != nil {
 		return nil, err
 	}
@@ -22,27 +22,27 @@ func (r *RiakKv) collect() (map[string]int64, error) {
 		return nil, errors.New("no stats")
 	}
 
-	r.once.Do(func() { r.adjustCharts(mx) })
+	c.once.Do(func() { c.adjustCharts(mx) })
 
 	return mx, nil
 }
 
-func (r *RiakKv) getStats() (*riakStats, error) {
-	req, err := web.NewHTTPRequest(r.RequestConfig)
+func (c *Collector) getStats() (*riakStats, error) {
+	req, err := web.NewHTTPRequest(c.RequestConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	var stats riakStats
-	if err := r.client().RequestJSON(req, &stats); err != nil {
+	if err := c.client().RequestJSON(req, &stats); err != nil {
 		return nil, err
 	}
 
 	return &stats, nil
 }
 
-func (r *RiakKv) client() *web.Client {
-	return web.DoHTTP(r.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
+func (c *Collector) client() *web.Client {
+	return web.DoHTTP(c.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
 		if resp.StatusCode == http.StatusNotFound {
 			return false, errors.New("riak_kv_stat is not enabled)")
 		}

@@ -14,13 +14,13 @@ import (
 // nil values will be ignored and not added to the map and thus metrics should not appear on the dashboard.
 // Because mongo reports a metric only after it first appears,some dims might take a while to appear.
 // For example, in order to report number of create commands, a document must be created first.
-func (m *Mongo) collectServerStatus(mx map[string]int64) error {
-	s, err := m.conn.serverStatus()
+func (c *Collector) collectServerStatus(mx map[string]int64) error {
+	s, err := c.conn.serverStatus()
 	if err != nil {
 		return fmt.Errorf("serverStatus command failed: %s", err)
 	}
 
-	m.addOptionalCharts(s)
+	c.addOptionalCharts(s)
 
 	for k, v := range stm.ToMap(s) {
 		mx[k] = v
@@ -40,12 +40,12 @@ func (m *Mongo) collectServerStatus(mx map[string]int64) error {
 	return nil
 }
 
-func (m *Mongo) addOptionalCharts(s *documentServerStatus) {
-	m.addOptionalChart(s.OpLatencies,
+func (c *Collector) addOptionalCharts(s *documentServerStatus) {
+	c.addOptionalChart(s.OpLatencies,
 		&chartOperationsRate,
 		&chartOperationsLatencyTime,
 	)
-	m.addOptionalChart(s.WiredTiger,
+	c.addOptionalChart(s.WiredTiger,
 		&chartWiredTigerConcurrentReadTransactionsUsage,
 		&chartWiredTigerConcurrentWriteTransactionsUsage,
 		&chartWiredTigerCacheUsage,
@@ -53,41 +53,41 @@ func (m *Mongo) addOptionalCharts(s *documentServerStatus) {
 		&chartWiredTigerCacheIORate,
 		&chartWiredTigerCacheEvictionsRate,
 	)
-	m.addOptionalChart(s.Tcmalloc,
+	c.addOptionalChart(s.Tcmalloc,
 		&chartMemoryTCMallocStatsChart,
 	)
-	m.addOptionalChart(s.GlobalLock,
+	c.addOptionalChart(s.GlobalLock,
 		&chartGlobalLockActiveClientsCount,
 		&chartGlobalLockCurrentQueueCount,
 	)
-	m.addOptionalChart(s.Network.NumSlowDNSOperations,
+	c.addOptionalChart(s.Network.NumSlowDNSOperations,
 		&chartNetworkSlowDNSResolutionsRate,
 	)
-	m.addOptionalChart(s.Network.NumSlowSSLOperations,
+	c.addOptionalChart(s.Network.NumSlowSSLOperations,
 		&chartNetworkSlowSSLHandshakesRate,
 	)
-	m.addOptionalChart(s.Metrics.Cursor.TotalOpened,
+	c.addOptionalChart(s.Metrics.Cursor.TotalOpened,
 		&chartCursorsOpenedRate,
 	)
-	m.addOptionalChart(s.Metrics.Cursor.TimedOut,
+	c.addOptionalChart(s.Metrics.Cursor.TimedOut,
 		&chartCursorsTimedOutRate,
 	)
-	m.addOptionalChart(s.Metrics.Cursor.Open.Total,
+	c.addOptionalChart(s.Metrics.Cursor.Open.Total,
 		&chartCursorsOpenCount,
 	)
-	m.addOptionalChart(s.Metrics.Cursor.Open.NoTimeout,
+	c.addOptionalChart(s.Metrics.Cursor.Open.NoTimeout,
 		&chartCursorsOpenNoTimeoutCount,
 	)
-	m.addOptionalChart(s.Metrics.Cursor.Lifespan,
+	c.addOptionalChart(s.Metrics.Cursor.Lifespan,
 		&chartCursorsByLifespanCount,
 	)
 
 	if s.Transactions != nil {
-		m.addOptionalChart(s.Transactions,
+		c.addOptionalChart(s.Transactions,
 			&chartTransactionsCount,
 			&chartTransactionsRate,
 		)
-		m.addOptionalChart(s.Transactions.CommitTypes,
+		c.addOptionalChart(s.Transactions.CommitTypes,
 			&chartTransactionsNoShardsCommitsRate,
 			&chartTransactionsNoShardsCommitsDurationTime,
 			&chartTransactionsSingleShardCommitsRate,
@@ -103,27 +103,27 @@ func (m *Mongo) addOptionalCharts(s *documentServerStatus) {
 		)
 	}
 	if s.Locks != nil {
-		m.addOptionalChart(s.Locks.Global, &chartGlobalLockAcquisitionsRate)
-		m.addOptionalChart(s.Locks.Database, &chartDatabaseLockAcquisitionsRate)
-		m.addOptionalChart(s.Locks.Collection, &chartCollectionLockAcquisitionsRate)
-		m.addOptionalChart(s.Locks.Mutex, &chartMutexLockAcquisitionsRate)
-		m.addOptionalChart(s.Locks.Metadata, &chartMetadataLockAcquisitionsRate)
-		m.addOptionalChart(s.Locks.Oplog, &chartOpLogLockAcquisitionsRate)
+		c.addOptionalChart(s.Locks.Global, &chartGlobalLockAcquisitionsRate)
+		c.addOptionalChart(s.Locks.Database, &chartDatabaseLockAcquisitionsRate)
+		c.addOptionalChart(s.Locks.Collection, &chartCollectionLockAcquisitionsRate)
+		c.addOptionalChart(s.Locks.Mutex, &chartMutexLockAcquisitionsRate)
+		c.addOptionalChart(s.Locks.Metadata, &chartMetadataLockAcquisitionsRate)
+		c.addOptionalChart(s.Locks.Oplog, &chartOpLogLockAcquisitionsRate)
 	}
 }
 
-func (m *Mongo) addOptionalChart(iface any, charts ...*module.Chart) {
+func (c *Collector) addOptionalChart(iface any, charts ...*module.Chart) {
 	if reflect.ValueOf(iface).IsNil() {
 		return
 	}
 	for _, chart := range charts {
-		if m.optionalCharts[chart.ID] {
+		if c.optionalCharts[chart.ID] {
 			continue
 		}
-		m.optionalCharts[chart.ID] = true
+		c.optionalCharts[chart.ID] = true
 
-		if err := m.charts.Add(chart.Copy()); err != nil {
-			m.Warning(err)
+		if err := c.charts.Add(chart.Copy()); err != nil {
+			c.Warning(err)
 		}
 	}
 }

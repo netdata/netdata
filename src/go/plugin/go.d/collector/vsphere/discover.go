@@ -2,30 +2,30 @@
 
 package vsphere
 
-func (vs *VSphere) goDiscovery() {
-	if vs.discoveryTask != nil {
-		vs.discoveryTask.stop()
+func (c *Collector) goDiscovery() {
+	if c.discoveryTask != nil {
+		c.discoveryTask.stop()
 	}
-	vs.Infof("starting discovery process, will do discovery every %s", vs.DiscoveryInterval)
+	c.Infof("starting discovery process, will do discovery every %s", c.DiscoveryInterval)
 
 	job := func() {
-		err := vs.discoverOnce()
+		err := c.discoverOnce()
 		if err != nil {
-			vs.Errorf("error on discovering : %v", err)
+			c.Errorf("error on discovering : %v", err)
 		}
 	}
-	vs.discoveryTask = newTask(job, vs.DiscoveryInterval.Duration())
+	c.discoveryTask = newTask(job, c.DiscoveryInterval.Duration())
 }
 
-func (vs *VSphere) discoverOnce() error {
-	res, err := vs.Discover()
+func (c *Collector) discoverOnce() error {
+	res, err := c.Discover()
 	if err != nil {
 		return err
 	}
 
-	vs.collectionLock.Lock()
-	vs.resources = res
-	vs.collectionLock.Unlock()
+	c.collectionLock.Lock()
+	c.resources = res
+	c.collectionLock.Unlock()
 
 	return nil
 }

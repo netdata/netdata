@@ -10,22 +10,22 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (d *DNSdist) validateConfig() error {
-	if d.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("URL not set")
 	}
 
-	if _, err := web.NewHTTPRequest(d.RequestConfig); err != nil {
+	if _, err := web.NewHTTPRequest(c.RequestConfig); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (d *DNSdist) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(d.ClientConfig)
+func (c *Collector) initHTTPClient() (*http.Client, error) {
+	return web.NewHTTPClient(c.ClientConfig)
 }
 
-func (d *DNSdist) initCharts() (*module.Charts, error) {
+func (c *Collector) initCharts() (*module.Charts, error) {
 	return charts.Copy(), nil
 }

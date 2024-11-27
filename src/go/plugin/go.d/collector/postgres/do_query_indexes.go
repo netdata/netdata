@@ -6,34 +6,34 @@ import (
 	"database/sql"
 )
 
-func (p *Postgres) doQueryIndexesMetrics() error {
-	if err := p.doQueryStatUserIndexes(); err != nil {
+func (c *Collector) doQueryIndexesMetrics() error {
+	if err := c.doQueryStatUserIndexes(); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (p *Postgres) doQueryStatUserIndexes() error {
-	if err := p.doDBQueryStatUserIndexes(p.db); err != nil {
-		p.Warning(err)
+func (c *Collector) doQueryStatUserIndexes() error {
+	if err := c.doDBQueryStatUserIndexes(c.db); err != nil {
+		c.Warning(err)
 	}
-	for _, conn := range p.dbConns {
+	for _, conn := range c.dbConns {
 		if conn.db == nil {
 			continue
 		}
-		if err := p.doDBQueryStatUserIndexes(conn.db); err != nil {
-			p.Warning(err)
+		if err := c.doDBQueryStatUserIndexes(conn.db); err != nil {
+			c.Warning(err)
 		}
 	}
 	return nil
 }
 
-func (p *Postgres) doDBQueryStatUserIndexes(db *sql.DB) error {
+func (c *Collector) doDBQueryStatUserIndexes(db *sql.DB) error {
 	q := queryStatUserIndexes()
 
 	var dbname, schema, table, name string
-	return p.doDBQuery(db, q, func(column, value string, _ bool) {
+	return c.doDBQuery(db, q, func(column, value string, _ bool) {
 		switch column {
 		case "datname":
 			dbname = value
@@ -43,17 +43,17 @@ func (p *Postgres) doDBQueryStatUserIndexes(db *sql.DB) error {
 			table = value
 		case "indexrelname":
 			name = removeSpaces(value)
-			p.getIndexMetrics(name, table, dbname, schema).updated = true
+			c.getIndexMetrics(name, table, dbname, schema).updated = true
 		case "parent_relname":
-			p.getIndexMetrics(name, table, dbname, schema).parentTable = value
+			c.getIndexMetrics(name, table, dbname, schema).parentTable = value
 		case "idx_scan":
-			p.getIndexMetrics(name, table, dbname, schema).idxScan = parseInt(value)
+			c.getIndexMetrics(name, table, dbname, schema).idxScan = parseInt(value)
 		case "idx_tup_read":
-			p.getIndexMetrics(name, table, dbname, schema).idxTupRead = parseInt(value)
+			c.getIndexMetrics(name, table, dbname, schema).idxTupRead = parseInt(value)
 		case "idx_tup_fetch":
-			p.getIndexMetrics(name, table, dbname, schema).idxTupFetch = parseInt(value)
+			c.getIndexMetrics(name, table, dbname, schema).idxTupFetch = parseInt(value)
 		case "size":
-			p.getIndexMetrics(name, table, dbname, schema).size = parseInt(value)
+			c.getIndexMetrics(name, table, dbname, schema).size = parseInt(value)
 		}
 	})
 }

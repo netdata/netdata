@@ -16,8 +16,8 @@ const (
 	precision = 1000
 )
 
-func (cb *Couchbase) collect() (map[string]int64, error) {
-	ms, err := cb.scrapeCouchbase()
+func (c *Collector) collect() (map[string]int64, error) {
+	ms, err := c.scrapeCouchbase()
 	if err != nil {
 		return nil, fmt.Errorf("error on scraping couchbase: %v", err)
 	}
@@ -26,17 +26,17 @@ func (cb *Couchbase) collect() (map[string]int64, error) {
 	}
 
 	collected := make(map[string]int64)
-	cb.collectBasicStats(collected, ms)
+	c.collectBasicStats(collected, ms)
 
 	return collected, nil
 }
 
-func (cb *Couchbase) collectBasicStats(collected map[string]int64, ms *cbMetrics) {
+func (c *Collector) collectBasicStats(collected map[string]int64, ms *cbMetrics) {
 	for _, b := range ms.BucketsBasicStats {
 
-		if !cb.collectedBuckets[b.Name] {
-			cb.collectedBuckets[b.Name] = true
-			cb.addBucketToCharts(b.Name)
+		if !c.collectedBuckets[b.Name] {
+			c.collectedBuckets[b.Name] = true
+			c.addBucketToCharts(b.Name)
 		}
 
 		bs := b.BasicStats
@@ -51,72 +51,72 @@ func (cb *Couchbase) collectBasicStats(collected map[string]int64, ms *cbMetrics
 	}
 }
 
-func (cb *Couchbase) addBucketToCharts(bucket string) {
-	cb.addDimToChart(bucketQuotaPercentUsedChart.ID, &module.Dim{
+func (c *Collector) addBucketToCharts(bucket string) {
+	c.addDimToChart(bucketQuotaPercentUsedChart.ID, &module.Dim{
 		ID:   indexDimID(bucket, "quota_percent_used"),
 		Name: bucket,
 		Div:  precision,
 	})
 
-	cb.addDimToChart(bucketOpsPerSecChart.ID, &module.Dim{
+	c.addDimToChart(bucketOpsPerSecChart.ID, &module.Dim{
 		ID:   indexDimID(bucket, "ops_per_sec"),
 		Name: bucket,
 		Div:  precision,
 	})
 
-	cb.addDimToChart(bucketDiskFetchesChart.ID, &module.Dim{
+	c.addDimToChart(bucketDiskFetchesChart.ID, &module.Dim{
 		ID:   indexDimID(bucket, "disk_fetches"),
 		Name: bucket,
 	})
 
-	cb.addDimToChart(bucketItemCountChart.ID, &module.Dim{
+	c.addDimToChart(bucketItemCountChart.ID, &module.Dim{
 		ID:   indexDimID(bucket, "item_count"),
 		Name: bucket,
 	})
 
-	cb.addDimToChart(bucketDiskUsedChart.ID, &module.Dim{
+	c.addDimToChart(bucketDiskUsedChart.ID, &module.Dim{
 		ID:   indexDimID(bucket, "disk_used"),
 		Name: bucket,
 	})
 
-	cb.addDimToChart(bucketDataUsedChart.ID, &module.Dim{
+	c.addDimToChart(bucketDataUsedChart.ID, &module.Dim{
 		ID:   indexDimID(bucket, "data_used"),
 		Name: bucket,
 	})
 
-	cb.addDimToChart(bucketMemUsedChart.ID, &module.Dim{
+	c.addDimToChart(bucketMemUsedChart.ID, &module.Dim{
 		ID:   indexDimID(bucket, "mem_used"),
 		Name: bucket,
 	})
 
-	cb.addDimToChart(bucketVBActiveNumNonResidentChart.ID, &module.Dim{
+	c.addDimToChart(bucketVBActiveNumNonResidentChart.ID, &module.Dim{
 		ID:   indexDimID(bucket, "vb_active_num_non_resident"),
 		Name: bucket,
 	})
 }
 
-func (cb *Couchbase) addDimToChart(chartID string, dim *module.Dim) {
-	chart := cb.Charts().Get(chartID)
+func (c *Collector) addDimToChart(chartID string, dim *module.Dim) {
+	chart := c.Charts().Get(chartID)
 	if chart == nil {
-		cb.Warningf("error on adding '%s' dimension: can not find '%s' chart", dim.ID, chartID)
+		c.Warningf("error on adding '%s' dimension: can not find '%s' chart", dim.ID, chartID)
 		return
 	}
 	if err := chart.AddDim(dim); err != nil {
-		cb.Warning(err)
+		c.Warning(err)
 		return
 	}
 	chart.MarkNotCreated()
 }
 
-func (cb *Couchbase) scrapeCouchbase() (*cbMetrics, error) {
-	req, err := web.NewHTTPRequestWithPath(cb.RequestConfig, urlPathBucketsStats)
+func (c *Collector) scrapeCouchbase() (*cbMetrics, error) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathBucketsStats)
 	if err != nil {
 		return nil, err
 	}
 	req.URL.RawQuery = url.Values{"skipMap": []string{"true"}}.Encode()
 
 	ms := &cbMetrics{}
-	if err := web.DoHTTP(cb.httpClient).RequestJSON(req, &ms.BucketsBasicStats); err != nil {
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &ms.BucketsBasicStats); err != nil {
 		return nil, err
 	}
 

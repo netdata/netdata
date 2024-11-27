@@ -8,7 +8,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (c *Ceph) collectPools(mx map[string]int64) error {
+func (c *Collector) collectPools(mx map[string]int64) error {
 	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiPool)
 	if err != nil {
 		return err

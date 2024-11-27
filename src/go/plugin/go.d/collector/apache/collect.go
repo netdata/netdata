@@ -13,24 +13,24 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (a *Apache) collect() (map[string]int64, error) {
-	status, err := a.scrapeStatus()
+func (c *Collector) collect() (map[string]int64, error) {
+	status, err := c.scrapeStatus()
 	if err != nil {
 		return nil, err
 	}
 
 	mx := stm.ToMap(status)
 	if len(mx) == 0 {
-		return nil, fmt.Errorf("nothing was collected from %s", a.URL)
+		return nil, fmt.Errorf("nothing was collected from %s", c.URL)
 	}
 
-	a.once.Do(func() { a.charts = newCharts(status) })
+	c.once.Do(func() { c.charts = newCharts(status) })
 
 	return mx, nil
 }
 
-func (a *Apache) scrapeStatus() (*serverStatus, error) {
-	req, err := web.NewHTTPRequest(a.RequestConfig)
+func (c *Collector) scrapeStatus() (*serverStatus, error) {
+	req, err := web.NewHTTPRequest(c.RequestConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (a *Apache) scrapeStatus() (*serverStatus, error) {
 	var stats *serverStatus
 	var perr error
 
-	if err := web.DoHTTP(a.httpClient).Request(req, func(body io.Reader) error {
+	if err := web.DoHTTP(c.httpClient).Request(req, func(body io.Reader) error {
 		if stats, perr = parseResponse(body); perr != nil {
 			return perr
 		}

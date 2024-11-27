@@ -16,6 +16,11 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+type smartctlCli interface {
+	scan(open bool) (*gjson.Result, error)
+	deviceInfo(deviceName, deviceType, powerMode string) (*gjson.Result, error)
+}
+
 func newSmartctlCliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *smartctlCliExec {
 	return &smartctlCliExec{
 		Logger:     log,

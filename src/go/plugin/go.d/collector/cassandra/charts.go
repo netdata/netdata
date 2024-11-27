@@ -442,7 +442,7 @@ var (
 	}
 )
 
-func (c *Cassandra) addThreadPoolCharts(pool *threadPoolMetrics) {
+func (c *Collector) addThreadPoolCharts(pool *threadPoolMetrics) {
 	charts := chartsTmplThreadPool.Copy()
 
 	for _, chart := range *charts {

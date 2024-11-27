@@ -8,21 +8,21 @@ import (
 
 const queryShowUserStatistics = "SHOW USER_STATISTICS;"
 
-func (m *MySQL) collectUserStatistics(mx map[string]int64) error {
+func (c *Collector) collectUserStatistics(mx map[string]int64) error {
 	// https://mariadb.com/kb/en/user-statistics/
 	// https://mariadb.com/kb/en/information-schema-user_statistics-table/
 	q := queryShowUserStatistics
-	m.Debugf("executing query: '%s'", q)
+	c.Debugf("executing query: '%s'", q)
 
 	var user, prefix string
-	_, err := m.collectQuery(q, func(column, value string, _ bool) {
+	_, err := c.collectQuery(q, func(column, value string, _ bool) {
 		switch column {
 		case "User":
 			user = value
 			prefix = "userstats_" + user + "_"
-			if !m.collectedUsers[user] {
-				m.collectedUsers[user] = true
-				m.addUserStatisticsCharts(user)
+			if !c.collectedUsers[user] {
+				c.collectedUsers[user] = true
+				c.addUserStatisticsCharts(user)
 			}
 		case "Cpu_time":
 			mx[strings.ToLower(prefix+column)] = int64(parseFloat(value) * 1000)

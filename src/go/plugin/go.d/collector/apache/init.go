@@ -10,16 +10,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (a *Apache) validateConfig() error {
-	if a.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
-	if !strings.HasSuffix(a.URL, "?auto") {
+	if !strings.HasSuffix(c.URL, "?auto") {
 		return errors.New("invalid URL, should ends in '?auto'")
 	}
 	return nil
 }
 
-func (a *Apache) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(a.ClientConfig)
+func (c *Collector) initHTTPClient() (*http.Client, error) {
+	return web.NewHTTPClient(c.ClientConfig)
 }

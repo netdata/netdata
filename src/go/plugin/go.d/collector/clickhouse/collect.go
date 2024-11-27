@@ -15,7 +15,7 @@ import (
 
 const precision = 1000
 
-func (c *ClickHouse) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
 	if err := c.collectSystemEvents(mx); err != nil {
@@ -40,7 +40,7 @@ func (c *ClickHouse) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *ClickHouse) doHTTP(req *http.Request, assign func(column, value string, lineEnd bool)) error {
+func (c *Collector) doHTTP(req *http.Request, assign func(column, value string, lineEnd bool)) error {
 	return web.DoHTTP(c.httpClient).Request(req, func(body io.Reader) error {
 		return readCSVResponseData(body, assign)
 	})

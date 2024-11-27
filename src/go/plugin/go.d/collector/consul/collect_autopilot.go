@@ -26,7 +26,7 @@ type autopilotHealth struct {
 	}
 }
 
-func (c *Consul) collectAutopilotHealth(mx map[string]int64) error {
+func (c *Collector) collectAutopilotHealth(mx map[string]int64) error {
 	req, err := c.createRequest(urlPathOperationAutopilotHealth)
 	if err != nil {
 		return err

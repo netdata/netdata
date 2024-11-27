@@ -7,33 +7,33 @@ import (
 	"sync"
 )
 
-func (p *Ping) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mu := &sync.Mutex{}
 	mx := make(map[string]int64)
 	var wg sync.WaitGroup
 
-	for _, v := range p.Hosts {
+	for _, v := range c.Hosts {
 		wg.Add(1)
-		go func(v string) { defer wg.Done(); p.pingHost(v, mx, mu) }(v)
+		go func(v string) { defer wg.Done(); c.pingHost(v, mx, mu) }(v)
 	}
 	wg.Wait()
 
 	return mx, nil
 }
 
-func (p *Ping) pingHost(host string, mx map[string]int64, mu *sync.Mutex) {
-	stats, err := p.prober.ping(host)
+func (c *Collector) pingHost(host string, mx map[string]int64, mu *sync.Mutex) {
+	stats, err := c.prober.ping(host)
 	if err != nil {
-		p.Error(err)
+		c.Error(err)
 		return
 	}
 
 	mu.Lock()
 	defer mu.Unlock()
 
-	if !p.hosts[host] {
-		p.hosts[host] = true
-		p.addHostCharts(host)
+	if !c.hosts[host] {
+		c.hosts[host] = true
+		c.addHostCharts(host)
 	}
 
 	px := fmt.Sprintf("host_%s_", host)

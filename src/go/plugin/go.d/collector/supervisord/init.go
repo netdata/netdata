@@ -10,19 +10,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (s *Supervisord) verifyConfig() error {
-	if s.URL == "" {
+func (c *Collector) verifyConfig() error {
+	if c.URL == "" {
 		return errors.New("'url' not set")
 	}
 	return nil
 }
 
-func (s *Supervisord) initSupervisorClient() (supervisorClient, error) {
-	u, err := url.Parse(s.URL)
+func (c *Collector) initSupervisorClient() (supervisorClient, error) {
+	u, err := url.Parse(c.URL)
 	if err != nil {
-		return nil, fmt.Errorf("parse 'url': %v (%s)", err, s.URL)
+		return nil, fmt.Errorf("parse 'url': %v (%s)", err, c.URL)
 	}
-	httpClient, err := web.NewHTTPClient(s.ClientConfig)
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %v", err)
 	}

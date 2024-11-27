@@ -30,7 +30,7 @@ type dmCacheDevice struct {
 	dirtyBlocks           int64
 }
 
-func (c *DmCache) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	bs, err := c.exec.cacheStatus()
 	if err != nil {
 		return nil, err
@@ -45,7 +45,7 @@ func (c *DmCache) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *DmCache) collectCacheStatus(mx map[string]int64, data []byte) error {
+func (c *Collector) collectCacheStatus(mx map[string]int64, data []byte) error {
 	var devices []*dmCacheDevice
 
 	sc := bufio.NewScanner(bytes.NewReader(data))

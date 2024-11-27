@@ -53,7 +53,7 @@ var (
 	}
 )
 
-func (m *Monit) addServiceCheckCharts(svc statusServiceCheck, srv *statusServer) {
+func (c *Collector) addServiceCheckCharts(svc statusServiceCheck, srv *statusServer) {
 	charts := serviceCheckChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -68,16 +68,16 @@ func (m *Monit) addServiceCheckCharts(svc statusServiceCheck, srv *statusServer)
 		}
 	}
 
-	if err := m.Charts().Add(*charts...); err != nil {
-		m.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *Monit) removeServiceCharts(svc statusServiceCheck) {
+func (c *Collector) removeServiceCharts(svc statusServiceCheck) {
 	px := fmt.Sprintf("service_check_type_%s_name_%s_", svc.svcType(), svc.Name)
 	px = cleanChartId(px)
 
-	for _, chart := range *m.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

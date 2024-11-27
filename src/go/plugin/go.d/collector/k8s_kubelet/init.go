@@ -10,26 +10,26 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (k *Kubelet) validateConfig() error {
-	if k.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
 	return nil
 }
 
-func (k *Kubelet) initAuthToken() string {
-	bs, err := os.ReadFile(k.TokenPath)
+func (c *Collector) initAuthToken() string {
+	bs, err := os.ReadFile(c.TokenPath)
 	if err != nil {
-		k.Warningf("error on reading service account token from '%s': %v", k.TokenPath, err)
+		c.Warningf("error on reading service account token from '%s': %v", c.TokenPath, err)
 	}
 	return string(bs)
 }
 
-func (k *Kubelet) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(k.ClientConfig)
+func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return prometheus.New(httpClient, k.RequestConfig), nil
+	return prometheus.New(httpClient, c.RequestConfig), nil
 }

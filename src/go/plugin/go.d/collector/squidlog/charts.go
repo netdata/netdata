@@ -253,7 +253,7 @@ var (
 	}
 )
 
-func (s *SquidLog) createCharts(line *logLine) error {
+func (c *Collector) createCharts(line *logLine) error {
 	if line.empty() {
 		return errors.New("empty line")
 	}
@@ -306,7 +306,7 @@ func (s *SquidLog) createCharts(line *logLine) error {
 			return err
 		}
 	}
-	s.charts = charts
+	c.charts = charts
 	return nil
 }
 

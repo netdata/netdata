@@ -13,6 +13,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
+type dmsetupCli interface {
+	cacheStatus() ([]byte, error)
+}
+
 func newDmsetupExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *dmsetupExec {
 	return &dmsetupExec{
 		Logger:     log,

@@ -11,9 +11,9 @@ import (
 
 const precision = 1000
 
-func (o *OracleDB) collect() (map[string]int64, error) {
-	if o.db == nil {
-		if err := o.openConnection(); err != nil {
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.db == nil {
+		if err := c.openConnection(); err != nil {
 			return nil, fmt.Errorf("failed to open connection: %v", err)
 		}
 	}
@@ -22,27 +22,27 @@ func (o *OracleDB) collect() (map[string]int64, error) {
 
 	// TODO: https://www.oracle.com/technical-resources/articles/schumacher-analysis.html
 
-	if err := o.collectSysMetrics(mx); err != nil {
+	if err := c.collectSysMetrics(mx); err != nil {
 		return nil, fmt.Errorf("failed to collect system metrics: %v", err)
 	}
-	if err := o.collectSysStat(mx); err != nil {
+	if err := c.collectSysStat(mx); err != nil {
 		return nil, fmt.Errorf("failed to collect activities: %v", err)
 	}
-	if err := o.collectWaitClass(mx); err != nil {
+	if err := c.collectWaitClass(mx); err != nil {
 		return nil, fmt.Errorf("failed to collect wait time: %v", err)
 	}
-	if err := o.collectTablespace(mx); err != nil {
+	if err := c.collectTablespace(mx); err != nil {
 		return nil, fmt.Errorf("failed to collect tablespace: %v", err)
 	}
 
 	return mx, nil
 }
 
-func (o *OracleDB) doQuery(query string, assign func(column, value string, lineEnd bool) error) error {
-	ctx, cancel := context.WithTimeout(context.Background(), o.Timeout.Duration())
+func (c *Collector) doQuery(query string, assign func(column, value string, lineEnd bool) error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	rows, err := o.db.QueryContext(ctx, query)
+	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		return err
 	}
@@ -69,15 +69,15 @@ func (o *OracleDB) doQuery(query string, assign func(column, value string, lineE
 	return rows.Err()
 }
 
-func (o *OracleDB) openConnection() error {
-	db, err := sql.Open("oracle", o.DSN)
+func (c *Collector) openConnection() error {
+	db, err := sql.Open("oracle", c.DSN)
 	if err != nil {
 		return fmt.Errorf("error on sql open: %v", err)
 	}
 
 	db.SetConnMaxLifetime(10 * time.Minute)
 
-	ctx, cancel := context.WithTimeout(context.Background(), o.Timeout.Duration())
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
@@ -85,7 +85,7 @@ func (o *OracleDB) openConnection() error {
 		return fmt.Errorf("error on pinging: %v", err)
 	}
 
-	o.db = db
+	c.db = db
 
 	return nil
 }

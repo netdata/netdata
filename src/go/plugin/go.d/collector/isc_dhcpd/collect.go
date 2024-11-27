@@ -23,33 +23,33 @@ In order to process both DHCPv4 and DHCPv6 messages you will need to run two sep
 Each of these instances will need its own lease file.
 */
 
-func (d *DHCPd) collect() (map[string]int64, error) {
-	fi, err := os.Stat(d.LeasesPath)
+func (c *Collector) collect() (map[string]int64, error) {
+	fi, err := os.Stat(c.LeasesPath)
 	if err != nil {
 		return nil, err
 	}
 
-	if d.leasesModTime.Equal(fi.ModTime()) {
-		d.Debugf("leases file is not modified, returning cached metrics ('%s')", d.LeasesPath)
-		return d.collected, nil
+	if c.leasesModTime.Equal(fi.ModTime()) {
+		c.Debugf("leases file is not modified, returning cached metrics ('%s')", c.LeasesPath)
+		return c.collected, nil
 	}
 
-	d.leasesModTime = fi.ModTime()
+	c.leasesModTime = fi.ModTime()
 
-	leases, err := parseDHCPdLeasesFile(d.LeasesPath)
+	leases, err := parseDHCPdLeasesFile(c.LeasesPath)
 	if err != nil {
 		return nil, err
 	}
 
 	activeLeases := removeInactiveLeases(leases)
-	d.Debugf("found total/active %d/%d leases ('%s')", len(leases), len(activeLeases), d.LeasesPath)
+	c.Debugf("found total/active %d/%d leases ('%s')", len(leases), len(activeLeases), c.LeasesPath)
 
-	for _, pool := range d.pools {
-		collectPool(d.collected, pool, activeLeases)
+	for _, pool := range c.pools {
+		collectPool(c.collected, pool, activeLeases)
 	}
-	d.collected["active_leases_total"] = int64(len(activeLeases))
+	c.collected["active_leases_total"] = int64(len(activeLeases))
 
-	return d.collected, nil
+	return c.collected, nil
 }
 
 const precision = 100

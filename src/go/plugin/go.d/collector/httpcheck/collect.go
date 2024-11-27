@@ -24,49 +24,49 @@ const (
 	codeNoConnection
 )
 
-func (hc *HTTPCheck) collect() (map[string]int64, error) {
-	req, err := web.NewHTTPRequest(hc.RequestConfig)
+func (c *Collector) collect() (map[string]int64, error) {
+	req, err := web.NewHTTPRequest(c.RequestConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating HTTP requests to %s : %v", hc.RequestConfig.URL, err)
+		return nil, fmt.Errorf("error on creating HTTP requests to %s : %v", c.RequestConfig.URL, err)
 	}
 
-	if hc.CookieFile != "" {
-		if err := hc.readCookieFile(); err != nil {
-			return nil, fmt.Errorf("error on reading cookie file '%s': %v", hc.CookieFile, err)
+	if c.CookieFile != "" {
+		if err := c.readCookieFile(); err != nil {
+			return nil, fmt.Errorf("error on reading cookie file '%s': %v", c.CookieFile, err)
 		}
 	}
 
 	start := time.Now()
-	resp, err := hc.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	dur := time.Since(start)
 
 	defer web.CloseBody(resp)
 
 	var mx metrics
 
-	if hc.isError(err, resp) {
-		hc.Debug(err)
-		hc.collectErrResponse(&mx, err)
+	if c.isError(err, resp) {
+		c.Debug(err)
+		c.collectErrResponse(&mx, err)
 	} else {
 		mx.ResponseTime = durationToMs(dur)
-		hc.collectOKResponse(&mx, resp)
+		c.collectOKResponse(&mx, resp)
 	}
 
-	if hc.metrics.Status != mx.Status {
-		mx.InState = hc.UpdateEvery
+	if c.metrics.Status != mx.Status {
+		mx.InState = c.UpdateEvery
 	} else {
-		mx.InState = hc.metrics.InState + hc.UpdateEvery
+		mx.InState = c.metrics.InState + c.UpdateEvery
 	}
-	hc.metrics = mx
+	c.metrics = mx
 
 	return stm.ToMap(mx), nil
 }
 
-func (hc *HTTPCheck) isError(err error, resp *http.Response) bool {
-	return err != nil && !(errors.Is(err, web.ErrRedirectAttempted) && hc.acceptedStatuses[resp.StatusCode])
+func (c *Collector) isError(err error, resp *http.Response) bool {
+	return err != nil && !(errors.Is(err, web.ErrRedirectAttempted) && c.acceptedStatuses[resp.StatusCode])
 }
 
-func (hc *HTTPCheck) collectErrResponse(mx *metrics, err error) {
+func (c *Collector) collectErrResponse(mx *metrics, err error) {
 	switch code := decodeReqError(err); code {
 	case codeNoConnection:
 		mx.Status.NoConnection = true
@@ -79,10 +79,10 @@ func (hc *HTTPCheck) collectErrResponse(mx *metrics, err error) {
 	}
 }
 
-func (hc *HTTPCheck) collectOKResponse(mx *metrics, resp *http.Response) {
-	hc.Debugf("endpoint '%s' returned %d (%s) HTTP status code", hc.URL, resp.StatusCode, resp.Status)
+func (c *Collector) collectOKResponse(mx *metrics, resp *http.Response) {
+	c.Debugf("endpoint '%s' returned %d (%s) HTTP status code", c.URL, resp.StatusCode, resp.Status)
 
-	if !hc.acceptedStatuses[resp.StatusCode] {
+	if !c.acceptedStatuses[resp.StatusCode] {
 		mx.Status.BadStatusCode = true
 		return
 	}
@@ -90,19 +90,19 @@ func (hc *HTTPCheck) collectOKResponse(mx *metrics, resp *http.Response) {
 	bs, err := io.ReadAll(resp.Body)
 	// golang net/http closes body on redirect
 	if err != nil && !errors.Is(err, io.EOF) && !strings.Contains(err.Error(), "read on closed response body") {
-		hc.Warningf("error on reading body : %v", err)
+		c.Warningf("error on reading body : %v", err)
 		mx.Status.BadContent = true
 		return
 	}
 
 	mx.ResponseLength = len(bs)
 
-	if hc.reResponse != nil && !hc.reResponse.Match(bs) {
+	if c.reResponse != nil && !c.reResponse.Match(bs) {
 		mx.Status.BadContent = true
 		return
 	}
 
-	if ok := hc.checkHeader(resp); !ok {
+	if ok := c.checkHeader(resp); !ok {
 		mx.Status.BadHeader = true
 		return
 	}
@@ -110,8 +110,8 @@ func (hc *HTTPCheck) collectOKResponse(mx *metrics, resp *http.Response) {
 	mx.Status.Success = true
 }
 
-func (hc *HTTPCheck) checkHeader(resp *http.Response) bool {
-	for _, m := range hc.headerMatch {
+func (c *Collector) checkHeader(resp *http.Response) bool {
+	for _, m := range c.headerMatch {
 		value := resp.Header.Get(m.key)
 
 		var ok bool
@@ -125,7 +125,7 @@ func (hc *HTTPCheck) checkHeader(resp *http.Response) bool {
 		}
 
 		if !ok {
-			hc.Debugf("header match: bad header: exlude '%v' key '%s' value '%s'", m.exclude, m.key, value)
+			c.Debugf("header match: bad header: exlude '%v' key '%s' value '%s'", m.exclude, m.key, value)
 			return false
 		}
 	}
@@ -148,30 +148,30 @@ func decodeReqError(err error) reqErrCode {
 	return codeNoConnection
 }
 
-func (hc *HTTPCheck) readCookieFile() error {
-	if hc.CookieFile == "" {
+func (c *Collector) readCookieFile() error {
+	if c.CookieFile == "" {
 		return nil
 	}
 
-	fi, err := os.Stat(hc.CookieFile)
+	fi, err := os.Stat(c.CookieFile)
 	if err != nil {
 		return err
 	}
 
-	if hc.cookieFileModTime.Equal(fi.ModTime()) {
-		hc.Debugf("cookie file '%s' modification time has not changed, using previously read data", hc.CookieFile)
+	if c.cookieFileModTime.Equal(fi.ModTime()) {
+		c.Debugf("cookie file '%s' modification time has not changed, using previously read data", c.CookieFile)
 		return nil
 	}
 
-	hc.Debugf("reading cookie file '%s'", hc.CookieFile)
+	c.Debugf("reading cookie file '%s'", c.CookieFile)
 
-	jar, err := loadCookieJar(hc.CookieFile)
+	jar, err := loadCookieJar(c.CookieFile)
 	if err != nil {
 		return err
 	}
 
-	hc.httpClient.Jar = jar
-	hc.cookieFileModTime = fi.ModTime()
+	c.httpClient.Jar = jar
+	c.cookieFileModTime = fi.ModTime()
 
 	return nil
 }

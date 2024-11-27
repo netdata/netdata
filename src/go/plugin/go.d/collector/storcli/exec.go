@@ -13,6 +13,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
+type storCli interface {
+	controllersInfo() ([]byte, error)
+	drivesInfo() ([]byte, error)
+}
+
 func newStorCliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *storCliExec {
 	return &storCliExec{
 		Logger:     log,

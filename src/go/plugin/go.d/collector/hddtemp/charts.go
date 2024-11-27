@@ -46,15 +46,15 @@ var (
 	}
 )
 
-func (h *HddTemp) addDiskTempSensorStatusChart(id string, disk diskStats) {
-	h.addDiskChart(id, disk, diskTemperatureSensorChartsTmpl.Copy())
+func (c *Collector) addDiskTempSensorStatusChart(id string, disk diskStats) {
+	c.addDiskChart(id, disk, diskTemperatureSensorChartsTmpl.Copy())
 }
 
-func (h *HddTemp) addDiskTempChart(id string, disk diskStats) {
-	h.addDiskChart(id, disk, diskTemperatureChartsTmpl.Copy())
+func (c *Collector) addDiskTempChart(id string, disk diskStats) {
+	c.addDiskChart(id, disk, diskTemperatureChartsTmpl.Copy())
 }
 
-func (h *HddTemp) addDiskChart(id string, disk diskStats, chart *module.Chart) {
+func (c *Collector) addDiskChart(id string, disk diskStats, chart *module.Chart) {
 	chart.ID = fmt.Sprintf(chart.ID, strings.ToLower(id))
 	chart.Labels = []module.Label{
 		{Key: "disk_id", Value: id},
@@ -64,7 +64,7 @@ func (h *HddTemp) addDiskChart(id string, disk diskStats, chart *module.Chart) {
 		dim.ID = fmt.Sprintf(dim.ID, id)
 	}
 
-	if err := h.Charts().Add(chart); err != nil {
-		h.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }

@@ -13,36 +13,36 @@ const (
 	precision = 1000000
 )
 
-func (n *NTPd) collect() (map[string]int64, error) {
-	if n.client == nil {
-		client, err := n.newClient(n.Config)
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.client == nil {
+		client, err := c.newClient(c.Config)
 		if err != nil {
 			return nil, fmt.Errorf("creating NTP client: %v", err)
 		}
-		n.client = client
+		c.client = client
 	}
 
 	mx := make(map[string]int64)
 
-	if err := n.collectInfo(mx); err != nil {
+	if err := c.collectInfo(mx); err != nil {
 		return nil, err
 	}
 
-	if n.CollectPeers {
-		if now := time.Now(); now.Sub(n.findPeersTime) > n.findPeersEvery {
-			n.findPeersTime = now
-			if err := n.findPeers(); err != nil {
-				n.Warning(err)
+	if c.CollectPeers {
+		if now := time.Now(); now.Sub(c.findPeersTime) > c.findPeersEvery {
+			c.findPeersTime = now
+			if err := c.findPeers(); err != nil {
+				c.Warning(err)
 			}
 		}
-		n.collectPeersInfo(mx)
+		c.collectPeersInfo(mx)
 	}
 
 	return mx, nil
 }
 
-func (n *NTPd) collectInfo(mx map[string]int64) error {
-	info, err := n.client.systemInfo()
+func (c *Collector) collectInfo(mx map[string]int64) error {
+	info, err := c.client.systemInfo()
 	if err != nil {
 		return fmt.Errorf("error on querying system info: %v", err)
 	}
@@ -69,11 +69,11 @@ func (n *NTPd) collectInfo(mx map[string]int64) error {
 	return nil
 }
 
-func (n *NTPd) collectPeersInfo(mx map[string]int64) {
-	for _, id := range n.peerIDs {
-		info, err := n.client.peerInfo(id)
+func (c *Collector) collectPeersInfo(mx map[string]int64) {
+	for _, id := range c.peerIDs {
+		info, err := c.client.peerInfo(id)
 		if err != nil {
-			n.Warningf("error on querying NTP peer info id='%d': %v", id, err)
+			c.Warningf("error on querying NTP peer info id='%d': %v", id, err)
 			continue
 		}
 
@@ -106,47 +106,47 @@ func (n *NTPd) collectPeersInfo(mx map[string]int64) {
 	}
 }
 
-func (n *NTPd) findPeers() error {
-	n.peerIDs = n.peerIDs[:0]
+func (c *Collector) findPeers() error {
+	c.peerIDs = c.peerIDs[:0]
 
-	n.Debug("querying NTP peers")
-	peers, err := n.client.peerIDs()
+	c.Debug("querying NTP peers")
+	peers, err := c.client.peerIDs()
 	if err != nil {
 		return fmt.Errorf("querying NTP peers: %v", err)
 	}
 
-	n.Debugf("found %d NTP peers (ids: %v)", len(peers), peers)
+	c.Debugf("found %d NTP peers (ids: %v)", len(peers), peers)
 	seen := make(map[string]bool)
 
 	for _, id := range peers {
-		info, err := n.client.peerInfo(id)
+		info, err := c.client.peerInfo(id)
 		if err != nil {
-			n.Debugf("error on querying NTP peer info id='%d': %v", id, err)
+			c.Debugf("error on querying NTP peer info id='%d': %v", id, err)
 			continue
 		}
 
 		addr, ok := info["srcadr"]
-		if ip := net.ParseIP(addr); !ok || ip == nil || n.peerIPAddrFilter.Contains(ip) {
-			n.Debugf("skipping NTP peer id='%d', srcadr='%s'", id, addr)
+		if ip := net.ParseIP(addr); !ok || ip == nil || c.peerIPAddrFilter.Contains(ip) {
+			c.Debugf("skipping NTP peer id='%d', srcadr='%s'", id, addr)
 			continue
 		}
 
 		seen[addr] = true
 
-		if !n.peerAddr[addr] {
-			n.peerAddr[addr] = true
-			n.Debugf("new NTP peer id='%d', srcadr='%s': creating charts", id, addr)
-			n.addPeerCharts(addr)
+		if !c.peerAddr[addr] {
+			c.peerAddr[addr] = true
+			c.Debugf("new NTP peer id='%d', srcadr='%s': creating charts", id, addr)
+			c.addPeerCharts(addr)
 		}
 
-		n.peerIDs = append(n.peerIDs, id)
+		c.peerIDs = append(c.peerIDs, id)
 	}
 
-	for addr := range n.peerAddr {
+	for addr := range c.peerAddr {
 		if !seen[addr] {
-			delete(n.peerAddr, addr)
-			n.Debugf("stale NTP peer srcadr='%s': removing charts", addr)
-			n.removePeerCharts(addr)
+			delete(c.peerAddr, addr)
+			c.Debugf("stale NTP peer srcadr='%s': removing charts", addr)
+			c.removePeerCharts(addr)
 		}
 	}
 

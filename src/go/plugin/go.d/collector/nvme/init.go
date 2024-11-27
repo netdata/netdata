@@ -12,7 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
-func (n *NVMe) initNVMeCLIExec() (nvmeCLI, error) {
+func (c *Collector) initNVMeCLIExec() (nvmeCli, error) {
 	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
 
 	if _, err := os.Stat(ndsudoPath); err != nil {
@@ -21,7 +21,7 @@ func (n *NVMe) initNVMeCLIExec() (nvmeCLI, error) {
 
 	nvmeExec := &nvmeCLIExec{
 		ndsudoPath: ndsudoPath,
-		timeout:    n.Timeout.Duration(),
+		timeout:    c.Timeout.Duration(),
 	}
 
 	return nvmeExec, nil

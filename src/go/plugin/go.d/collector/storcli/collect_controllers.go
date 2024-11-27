@@ -49,15 +49,15 @@ type (
 	}
 )
 
-func (s *StorCli) collectMegaraidControllersInfo(mx map[string]int64, resp *controllersInfoResponse) error {
+func (c *Collector) collectMegaraidControllersInfo(mx map[string]int64, resp *controllersInfoResponse) error {
 	for _, v := range resp.Controllers {
 		cntrl := v.ResponseData
 
 		cntrlNum := strconv.Itoa(cntrl.Basics.Controller)
 
-		if !s.controllers[cntrlNum] {
-			s.controllers[cntrlNum] = true
-			s.addControllerCharts(cntrl)
+		if !c.controllers[cntrlNum] {
+			c.controllers[cntrlNum] = true
+			c.addControllerCharts(cntrl)
 		}
 
 		px := fmt.Sprintf("cntrl_%s_", cntrlNum)
@@ -93,9 +93,9 @@ func (s *StorCli) collectMegaraidControllersInfo(mx map[string]int64, resp *cont
 
 		for i, bbu := range cntrl.BBUInfo {
 			bbuNum := strconv.Itoa(i)
-			if k := cntrlNum + bbuNum; !s.bbu[k] {
-				s.bbu[k] = true
-				s.addBBUCharts(cntrlNum, bbuNum, bbu.Model)
+			if k := cntrlNum + bbuNum; !c.bbu[k] {
+				c.bbu[k] = true
+				c.addBBUCharts(cntrlNum, bbuNum, bbu.Model)
 			}
 
 			px := fmt.Sprintf("bbu_%s_cntrl_%s_", bbuNum, cntrlNum)
@@ -109,15 +109,15 @@ func (s *StorCli) collectMegaraidControllersInfo(mx map[string]int64, resp *cont
 	return nil
 }
 
-func (s *StorCli) collectMpt3sasControllersInfo(mx map[string]int64, resp *controllersInfoResponse) error {
+func (c *Collector) collectMpt3sasControllersInfo(mx map[string]int64, resp *controllersInfoResponse) error {
 	for _, v := range resp.Controllers {
 		cntrl := v.ResponseData
 
 		cntrlNum := strconv.Itoa(cntrl.Basics.Controller)
 
-		if !s.controllers[cntrlNum] {
-			s.controllers[cntrlNum] = true
-			s.addControllerCharts(cntrl)
+		if !c.controllers[cntrlNum] {
+			c.controllers[cntrlNum] = true
+			c.addControllerCharts(cntrl)
 		}
 
 		px := fmt.Sprintf("cntrl_%s_", cntrlNum)
@@ -140,8 +140,8 @@ func (s *StorCli) collectMpt3sasControllersInfo(mx map[string]int64, resp *contr
 	return nil
 }
 
-func (s *StorCli) queryControllersInfo() (*controllersInfoResponse, error) {
-	bs, err := s.exec.controllersInfo()
+func (c *Collector) queryControllersInfo() (*controllersInfoResponse, error) {
+	bs, err := c.exec.controllersInfo()
 	if err != nil {
 		return nil, err
 	}

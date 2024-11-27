@@ -8,17 +8,17 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
-func (p *Postgres) validateConfig() error {
-	if p.DSN == "" {
+func (c *Collector) validateConfig() error {
+	if c.DSN == "" {
 		return errors.New("DSN not set")
 	}
 	return nil
 }
 
-func (p *Postgres) initDBSelector() (matcher.Matcher, error) {
-	if p.DBSelector == "" {
+func (c *Collector) initDBSelector() (matcher.Matcher, error) {
+	if c.DBSelector == "" {
 		return nil, nil
 	}
 
-	return matcher.NewSimplePatternsMatcher(p.DBSelector)
+	return matcher.NewSimplePatternsMatcher(c.DBSelector)
 }

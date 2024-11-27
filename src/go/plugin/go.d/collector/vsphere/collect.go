@@ -16,54 +16,54 @@ import (
 // ManagedEntityStatus
 var overallStatuses = []string{"green", "red", "yellow", "gray"}
 
-func (vs *VSphere) collect() (map[string]int64, error) {
-	vs.collectionLock.Lock()
-	defer vs.collectionLock.Unlock()
+func (c *Collector) collect() (map[string]int64, error) {
+	c.collectionLock.Lock()
+	defer c.collectionLock.Unlock()
 
-	vs.Debug("starting collection process")
+	c.Debug("starting collection process")
 	t := time.Now()
 	mx := make(map[string]int64)
 
-	err := vs.collectHosts(mx)
+	err := c.collectHosts(mx)
 	if err != nil {
 		return nil, err
 	}
 
-	err = vs.collectVMs(mx)
+	err = c.collectVMs(mx)
 	if err != nil {
 		return nil, err
 	}
 
-	vs.updateCharts()
+	c.updateCharts()
 
-	vs.Debugf("metrics collected, process took %s", time.Since(t))
+	c.Debugf("metrics collected, process took %s", time.Since(t))
 
 	return mx, nil
 }
 
-func (vs *VSphere) collectHosts(mx map[string]int64) error {
-	if len(vs.resources.Hosts) == 0 {
+func (c *Collector) collectHosts(mx map[string]int64) error {
+	if len(c.resources.Hosts) == 0 {
 		return nil
 	}
 	// NOTE: returns unsorted if at least one types.PerfMetricId Instance is not ""
-	metrics := vs.ScrapeHosts(vs.resources.Hosts)
+	metrics := c.ScrapeHosts(c.resources.Hosts)
 	if len(metrics) == 0 {
 		return errors.New("failed to scrape hosts metrics")
 	}
 
-	vs.collectHostsMetrics(mx, metrics)
+	c.collectHostsMetrics(mx, metrics)
 
 	return nil
 }
 
-func (vs *VSphere) collectHostsMetrics(mx map[string]int64, metrics []performance.EntityMetric) {
-	for k := range vs.discoveredHosts {
-		vs.discoveredHosts[k]++
+func (c *Collector) collectHostsMetrics(mx map[string]int64, metrics []performance.EntityMetric) {
+	for k := range c.discoveredHosts {
+		c.discoveredHosts[k]++
 	}
 
 	for _, metric := range metrics {
-		if host := vs.resources.Hosts.Get(metric.Entity.Value); host != nil {
-			vs.discoveredHosts[host.ID] = 0
+		if host := c.resources.Hosts.Get(metric.Entity.Value); host != nil {
+			c.discoveredHosts[host.ID] = 0
 			writeHostMetrics(mx, host, metric.Value)
 		}
 	}
@@ -83,30 +83,30 @@ func writeHostMetrics(mx map[string]int64, host *rs.Host, metrics []performance.
 	}
 }
 
-func (vs *VSphere) collectVMs(mx map[string]int64) error {
-	if len(vs.resources.VMs) == 0 {
+func (c *Collector) collectVMs(mx map[string]int64) error {
+	if len(c.resources.VMs) == 0 {
 		return nil
 	}
 	// NOTE: returns unsorted if at least one types.PerfMetricId Instance is not ""
-	ems := vs.ScrapeVMs(vs.resources.VMs)
+	ems := c.ScrapeVMs(c.resources.VMs)
 	if len(ems) == 0 {
 		return errors.New("failed to scrape vms metrics")
 	}
 
-	vs.collectVMsMetrics(mx, ems)
+	c.collectVMsMetrics(mx, ems)
 
 	return nil
 }
 
-func (vs *VSphere) collectVMsMetrics(mx map[string]int64, metrics []performance.EntityMetric) {
-	for id := range vs.discoveredVMs {
-		vs.discoveredVMs[id]++
+func (c *Collector) collectVMsMetrics(mx map[string]int64, metrics []performance.EntityMetric) {
+	for id := range c.discoveredVMs {
+		c.discoveredVMs[id]++
 	}
 
 	for _, metric := range metrics {
-		if vm := vs.resources.VMs.Get(metric.Entity.Value); vm != nil {
+		if vm := c.resources.VMs.Get(metric.Entity.Value); vm != nil {
 			writeVMMetrics(mx, vm, metric.Value)
-			vs.discoveredVMs[vm.ID] = 0
+			c.discoveredVMs[vm.ID] = 0
 		}
 	}
 }

@@ -15,25 +15,25 @@ import (
 // Server state: https://www.envoyproxy.io/docs/envoy/latest/api-v3/admin/v3/server_info.proto#enum-admin-v3-serverinfo-state
 // Listener stats: https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/stats
 
-func (e *Envoy) collect() (map[string]int64, error) {
-	mfs, err := e.prom.Scrape()
+func (c *Collector) collect() (map[string]int64, error) {
+	mfs, err := c.prom.Scrape()
 	if err != nil {
 		return nil, err
 	}
 
 	mx := make(map[string]int64)
 
-	e.collectServerStats(mx, mfs)
-	e.collectClusterManagerStats(mx, mfs)
-	e.collectClusterUpstreamStats(mx, mfs)
-	e.collectListenerManagerStats(mx, mfs)
-	e.collectListenerAdminDownstreamStats(mx, mfs)
-	e.collectListenerDownstreamStats(mx, mfs)
+	c.collectServerStats(mx, mfs)
+	c.collectClusterManagerStats(mx, mfs)
+	c.collectClusterUpstreamStats(mx, mfs)
+	c.collectListenerManagerStats(mx, mfs)
+	c.collectListenerAdminDownstreamStats(mx, mfs)
+	c.collectListenerDownstreamStats(mx, mfs)
 
 	return mx, nil
 }
 
-func (e *Envoy) collectServerStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectServerStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
 	seen := make(map[string]bool)
 	for _, n := range []string{
 		"envoy_server_uptime",
@@ -43,21 +43,21 @@ func (e *Envoy) collectServerStats(mx map[string]int64, mfs prometheus.MetricFam
 		"envoy_server_parent_connections",
 		"envoy_server_total_connections",
 	} {
-		e.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
-			id := e.joinLabels(m.Labels())
+		c.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
+			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
-			if !e.servers[id] {
-				e.servers[id] = true
-				e.addServerCharts(id, m.Labels())
+			if !c.servers[id] {
+				c.servers[id] = true
+				c.addServerCharts(id, m.Labels())
 			}
 
 			mx[join(name, id)] += int64(m.Gauge().Value())
 		})
 	}
 
-	e.collectGauge(mfs, "envoy_server_state", func(name string, m prometheus.Metric) {
-		id := e.joinLabels(m.Labels())
+	c.collectGauge(mfs, "envoy_server_state", func(name string, m prometheus.Metric) {
+		id := c.joinLabels(m.Labels())
 		for _, v := range []string{"live", "draining", "pre_initializing", "initializing"} {
 			mx[join(name, v, id)] = 0
 		}
@@ -74,15 +74,15 @@ func (e *Envoy) collectServerStats(mx map[string]int64, mfs prometheus.MetricFam
 		}
 	})
 
-	for id := range e.servers {
+	for id := range c.servers {
 		if id != "" && !seen[id] {
-			delete(e.servers, id)
-			e.removeCharts(id)
+			delete(c.servers, id)
+			c.removeCharts(id)
 		}
 	}
 }
 
-func (e *Envoy) collectClusterManagerStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectClusterManagerStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
 	seen := make(map[string]bool)
 	for _, n := range []string{
 		"envoy_cluster_manager_cluster_added",
@@ -93,13 +93,13 @@ func (e *Envoy) collectClusterManagerStats(mx map[string]int64, mfs prometheus.M
 		"envoy_cluster_manager_update_merge_cancelled",
 		"envoy_cluster_manager_update_out_of_merge_window",
 	} {
-		e.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
-			id := e.joinLabels(m.Labels())
+		c.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
+			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
-			if !e.clusterMgrs[id] {
-				e.clusterMgrs[id] = true
-				e.addClusterManagerCharts(id, m.Labels())
+			if !c.clusterMgrs[id] {
+				c.clusterMgrs[id] = true
+				c.addClusterManagerCharts(id, m.Labels())
 			}
 
 			mx[join(name, id)] += int64(m.Counter().Value())
@@ -110,21 +110,21 @@ func (e *Envoy) collectClusterManagerStats(mx map[string]int64, mfs prometheus.M
 		"envoy_cluster_manager_active_clusters",
 		"envoy_cluster_manager_warming_clusters",
 	} {
-		e.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
-			id := e.joinLabels(m.Labels())
+		c.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
+			id := c.joinLabels(m.Labels())
 			mx[join(name, id)] += int64(m.Gauge().Value())
 		})
 	}
 
-	for id := range e.clusterMgrs {
+	for id := range c.clusterMgrs {
 		if id != "" && !seen[id] {
-			delete(e.clusterMgrs, id)
-			e.removeCharts(id)
+			delete(c.clusterMgrs, id)
+			c.removeCharts(id)
 		}
 	}
 }
 
-func (e *Envoy) collectListenerAdminDownstreamStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectListenerAdminDownstreamStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
 	seen := make(map[string]bool)
 	for _, n := range []string{
 		"envoy_listener_admin_downstream_cx_total",
@@ -137,13 +137,13 @@ func (e *Envoy) collectListenerAdminDownstreamStats(mx map[string]int64, mfs pro
 		"envoy_listener_admin_downstream_listener_filter_remote_close",
 		"envoy_listener_admin_downstream_listener_filter_error",
 	} {
-		e.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
-			id := e.joinLabels(m.Labels())
+		c.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
+			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
-			if !e.listenerAdminDownstream[id] {
-				e.listenerAdminDownstream[id] = true
-				e.addListenerAdminDownstreamCharts(id, m.Labels())
+			if !c.listenerAdminDownstream[id] {
+				c.listenerAdminDownstream[id] = true
+				c.addListenerAdminDownstreamCharts(id, m.Labels())
 			}
 
 			mx[join(name, id)] += int64(m.Counter().Value())
@@ -153,28 +153,28 @@ func (e *Envoy) collectListenerAdminDownstreamStats(mx map[string]int64, mfs pro
 		"envoy_listener_admin_downstream_cx_active",
 		"envoy_listener_admin_downstream_pre_cx_active",
 	} {
-		e.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
-			id := e.joinLabels(m.Labels())
+		c.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
+			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
-			if !e.listenerAdminDownstream[id] {
-				e.listenerAdminDownstream[id] = true
-				e.addListenerAdminDownstreamCharts(id, m.Labels())
+			if !c.listenerAdminDownstream[id] {
+				c.listenerAdminDownstream[id] = true
+				c.addListenerAdminDownstreamCharts(id, m.Labels())
 			}
 
 			mx[join(name, id)] += int64(m.Gauge().Value())
 		})
 	}
 
-	for id := range e.listenerAdminDownstream {
+	for id := range c.listenerAdminDownstream {
 		if id != "" && !seen[id] {
-			delete(e.listenerAdminDownstream, id)
-			e.removeCharts(id)
+			delete(c.listenerAdminDownstream, id)
+			c.removeCharts(id)
 		}
 	}
 }
 
-func (e *Envoy) collectListenerDownstreamStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectListenerDownstreamStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
 	seen := make(map[string]bool)
 	for _, n := range []string{
 		"envoy_listener_downstream_cx_total",
@@ -187,13 +187,13 @@ func (e *Envoy) collectListenerDownstreamStats(mx map[string]int64, mfs promethe
 		"envoy_listener_downstream_listener_filter_remote_close",
 		"envoy_listener_downstream_listener_filter_error",
 	} {
-		e.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
-			id := e.joinLabels(m.Labels())
+		c.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
+			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
-			if !e.listenerDownstream[id] {
-				e.listenerDownstream[id] = true
-				e.addListenerDownstreamCharts(id, m.Labels())
+			if !c.listenerDownstream[id] {
+				c.listenerDownstream[id] = true
+				c.addListenerDownstreamCharts(id, m.Labels())
 			}
 
 			mx[join(name, id)] += int64(m.Counter().Value())
@@ -203,28 +203,28 @@ func (e *Envoy) collectListenerDownstreamStats(mx map[string]int64, mfs promethe
 		"envoy_listener_downstream_cx_active",
 		"envoy_listener_downstream_pre_cx_active",
 	} {
-		e.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
-			id := e.joinLabels(m.Labels())
+		c.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
+			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
-			if !e.listenerDownstream[id] {
-				e.listenerDownstream[id] = true
-				e.addListenerDownstreamCharts(id, m.Labels())
+			if !c.listenerDownstream[id] {
+				c.listenerDownstream[id] = true
+				c.addListenerDownstreamCharts(id, m.Labels())
 			}
 
 			mx[join(name, id)] += int64(m.Gauge().Value())
 		})
 	}
 
-	for id := range e.listenerDownstream {
+	for id := range c.listenerDownstream {
 		if id != "" && !seen[id] {
-			delete(e.listenerDownstream, id)
-			e.removeCharts(id)
+			delete(c.listenerDownstream, id)
+			c.removeCharts(id)
 		}
 	}
 }
 
-func (e *Envoy) collectClusterUpstreamStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectClusterUpstreamStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
 	seen := make(map[string]bool)
 	for _, n := range []string{
 		"envoy_cluster_upstream_cx_total",
@@ -264,13 +264,13 @@ func (e *Envoy) collectClusterUpstreamStats(mx map[string]int64, mfs prometheus.
 		"envoy_cluster_update_empty",
 		"envoy_cluster_update_no_rebuild",
 	} {
-		e.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
-			id := e.joinLabels(m.Labels())
+		c.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
+			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
-			if !e.clusterUpstream[id] {
-				e.clusterUpstream[id] = true
-				e.addClusterUpstreamCharts(id, m.Labels())
+			if !c.clusterUpstream[id] {
+				c.clusterUpstream[id] = true
+				c.addClusterUpstreamCharts(id, m.Labels())
 			}
 
 			mx[join(name, id)] += int64(m.Counter().Value())
@@ -287,28 +287,28 @@ func (e *Envoy) collectClusterUpstreamStats(mx map[string]int64, mfs prometheus.
 		"envoy_cluster_membership_degraded",
 		"envoy_cluster_membership_excluded",
 	} {
-		e.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
-			id := e.joinLabels(m.Labels())
+		c.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
+			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
-			if !e.clusterUpstream[id] {
-				e.clusterUpstream[id] = true
-				e.addClusterUpstreamCharts(id, m.Labels())
+			if !c.clusterUpstream[id] {
+				c.clusterUpstream[id] = true
+				c.addClusterUpstreamCharts(id, m.Labels())
 			}
 
 			mx[join(name, id)] += int64(m.Gauge().Value())
 		})
 	}
 
-	for id := range e.clusterUpstream {
+	for id := range c.clusterUpstream {
 		if id != "" && !seen[id] {
-			delete(e.clusterUpstream, id)
-			e.removeCharts(id)
+			delete(c.clusterUpstream, id)
+			c.removeCharts(id)
 		}
 	}
 }
 
-func (e *Envoy) collectListenerManagerStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectListenerManagerStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
 	seen := make(map[string]bool)
 	for _, n := range []string{
 		"envoy_listener_manager_listener_added",
@@ -319,13 +319,13 @@ func (e *Envoy) collectListenerManagerStats(mx map[string]int64, mfs prometheus.
 		"envoy_listener_manager_listener_create_failure",
 		"envoy_listener_manager_listener_in_place_updated",
 	} {
-		e.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
-			id := e.joinLabels(m.Labels())
+		c.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
+			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
-			if !e.listenerMgrs[id] {
-				e.listenerMgrs[id] = true
-				e.addListenerManagerCharts(id, m.Labels())
+			if !c.listenerMgrs[id] {
+				c.listenerMgrs[id] = true
+				c.addListenerManagerCharts(id, m.Labels())
 			}
 
 			mx[join(name, id)] += int64(m.Counter().Value())
@@ -337,28 +337,28 @@ func (e *Envoy) collectListenerManagerStats(mx map[string]int64, mfs prometheus.
 		"envoy_listener_manager_total_listeners_active",
 		"envoy_listener_manager_total_listeners_draining",
 	} {
-		e.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
-			id := e.joinLabels(m.Labels())
+		c.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
+			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
-			if !e.listenerMgrs[id] {
-				e.listenerMgrs[id] = true
-				e.addListenerManagerCharts(id, m.Labels())
+			if !c.listenerMgrs[id] {
+				c.listenerMgrs[id] = true
+				c.addListenerManagerCharts(id, m.Labels())
 			}
 
 			mx[join(name, id)] += int64(m.Gauge().Value())
 		})
 	}
 
-	for id := range e.listenerMgrs {
+	for id := range c.listenerMgrs {
 		if id != "" && !seen[id] {
-			delete(e.listenerMgrs, id)
-			e.removeCharts(id)
+			delete(c.listenerMgrs, id)
+			c.removeCharts(id)
 		}
 	}
 }
 
-func (e *Envoy) collectGauge(mfs prometheus.MetricFamilies, metric string, process func(name string, m prometheus.Metric)) {
+func (c *Collector) collectGauge(mfs prometheus.MetricFamilies, metric string, process func(name string, m prometheus.Metric)) {
 	if mf := mfs.GetGauge(metric); mf != nil {
 		for _, m := range mf.Metrics() {
 			process(mf.Name(), m)
@@ -366,7 +366,7 @@ func (e *Envoy) collectGauge(mfs prometheus.MetricFamilies, metric string, proce
 	}
 }
 
-func (e *Envoy) collectCounter(mfs prometheus.MetricFamilies, metric string, process func(name string, m prometheus.Metric)) {
+func (c *Collector) collectCounter(mfs prometheus.MetricFamilies, metric string, process func(name string, m prometheus.Metric)) {
 	if mf := mfs.GetCounter(metric); mf != nil {
 		for _, m := range mf.Metrics() {
 			process(mf.Name(), m)
@@ -374,7 +374,7 @@ func (e *Envoy) collectCounter(mfs prometheus.MetricFamilies, metric string, pro
 	}
 }
 
-func (e *Envoy) joinLabels(labels labels.Labels) string {
+func (c *Collector) joinLabels(labels labels.Labels) string {
 	var buf strings.Builder
 	first := true
 	for _, lbl := range labels {

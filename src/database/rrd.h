@@ -323,7 +323,6 @@ struct rrddim {
 
     int32_t multiplier;                             // the multiplier of the collected values
     int32_t divisor;                                // the divider of the collected values
-    int32_t dimension_id;                           // Dimension id
 
     // ------------------------------------------------------------------------
     // operational state members
@@ -1175,14 +1174,6 @@ struct rrdhost {
     int32_t rrd_update_every;                       // the update frequency of the host
     int32_t rrd_history_entries;                    // the number of history entries for the host's charts
 
-    struct {
-        uint32_t dimension_count;                   // Dimension count for this host
-        uint32_t currently_collected;               // Currectly collected metrics cache
-        time_t cache_timestamp;
-        Pvoid_t JudyL;                              // Store metrics collected -- link to rrddim
-        SPINLOCK spinlock;
-    } accounting;
-
     RRD_MEMORY_MODE rrd_memory_mode;                // the configured memory more for the charts of this host
                                                     // the actual per tier is at .db[tier].mode
 
@@ -1306,11 +1297,18 @@ struct rrdhost {
                                                     // this includes custom host variables
 
     struct {
+        uint32_t metrics_count;                     // atomic
+        uint32_t instances_count;                   // atomic
+        uint32_t contexts_count;                    // atomic
+    } collected;
+
+    struct {
         DICTIONARY *contexts;
         DICTIONARY *hub_queue;
         DICTIONARY *pp_queue;
-        uint32_t metrics;
-        uint32_t instances;
+        uint32_t metrics_count;                     // atomic
+        uint32_t instances_count;                   // atomic
+        uint32_t contexts_count;                    // atomic
     } rrdctx;
 
     struct {

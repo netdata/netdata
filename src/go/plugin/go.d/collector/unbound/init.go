@@ -12,82 +12,82 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
 )
 
-func (u *Unbound) initConfig() (enabled bool) {
-	if u.ConfPath == "" {
-		u.Info("'conf_path' not set, skipping parameters auto detection")
+func (c *Collector) initConfig() (enabled bool) {
+	if c.ConfPath == "" {
+		c.Info("'conf_path' not set, skipping parameters auto detection")
 		return true
 	}
 
-	u.Infof("reading '%s'", u.ConfPath)
-	cfg, err := config.Parse(u.ConfPath)
+	c.Infof("reading '%s'", c.ConfPath)
+	cfg, err := config.Parse(c.ConfPath)
 	if err != nil {
-		u.Warningf("%v, skipping parameters auto detection", err)
+		c.Warningf("%v, skipping parameters auto detection", err)
 		return true
 	}
 
 	if cfg.Empty() {
-		u.Debug("empty configuration")
+		c.Debug("empty configuration")
 		return true
 	}
 
 	if enabled, ok := cfg.ControlEnabled(); ok && !enabled {
-		u.Info("remote control is disabled in the configuration file")
+		c.Info("remote control is disabled in the configuration file")
 		return false
 	}
 
-	u.applyConfig(cfg)
+	c.applyConfig(cfg)
 	return true
 }
 
-func (u *Unbound) applyConfig(cfg *config.UnboundConfig) {
-	u.Infof("applying configuration: %s", cfg)
-	if cumulative, ok := cfg.Cumulative(); ok && cumulative != u.Cumulative {
-		u.Debugf("changing 'cumulative_stats': %v => %v", u.Cumulative, cumulative)
-		u.Cumulative = cumulative
+func (c *Collector) applyConfig(cfg *config.UnboundConfig) {
+	c.Infof("applying configuration: %s", cfg)
+	if cumulative, ok := cfg.Cumulative(); ok && cumulative != c.Cumulative {
+		c.Debugf("changing 'cumulative_stats': %v => %v", c.Cumulative, cumulative)
+		c.Cumulative = cumulative
 	}
-	if useCert, ok := cfg.ControlUseCert(); ok && useCert != u.UseTLS {
-		u.Debugf("changing 'use_tls': %v => %v", u.UseTLS, useCert)
-		u.UseTLS = useCert
+	if useCert, ok := cfg.ControlUseCert(); ok && useCert != c.UseTLS {
+		c.Debugf("changing 'use_tls': %v => %v", c.UseTLS, useCert)
+		c.UseTLS = useCert
 	}
-	if keyFile, ok := cfg.ControlKeyFile(); ok && keyFile != u.TLSKey {
-		u.Debugf("changing 'tls_key': '%s' => '%s'", u.TLSKey, keyFile)
-		u.TLSKey = keyFile
+	if keyFile, ok := cfg.ControlKeyFile(); ok && keyFile != c.TLSKey {
+		c.Debugf("changing 'tls_key': '%s' => '%s'", c.TLSKey, keyFile)
+		c.TLSKey = keyFile
 	}
-	if certFile, ok := cfg.ControlCertFile(); ok && certFile != u.TLSCert {
-		u.Debugf("changing 'tls_cert': '%s' => '%s'", u.TLSCert, certFile)
-		u.TLSCert = certFile
+	if certFile, ok := cfg.ControlCertFile(); ok && certFile != c.TLSCert {
+		c.Debugf("changing 'tls_cert': '%s' => '%s'", c.TLSCert, certFile)
+		c.TLSCert = certFile
 	}
-	if iface, ok := cfg.ControlInterface(); ok && adjustControlInterface(iface) != u.Address {
+	if iface, ok := cfg.ControlInterface(); ok && adjustControlInterface(iface) != c.Address {
 		address := adjustControlInterface(iface)
-		u.Debugf("changing 'address': '%s' => '%s'", u.Address, address)
-		u.Address = address
+		c.Debugf("changing 'address': '%s' => '%s'", c.Address, address)
+		c.Address = address
 	}
-	if port, ok := cfg.ControlPort(); ok && !socket.IsUnixSocket(u.Address) {
-		if host, curPort, err := net.SplitHostPort(u.Address); err == nil && curPort != port {
+	if port, ok := cfg.ControlPort(); ok && !socket.IsUnixSocket(c.Address) {
+		if host, curPort, err := net.SplitHostPort(c.Address); err == nil && curPort != port {
 			address := net.JoinHostPort(host, port)
-			u.Debugf("changing 'address': '%s' => '%s'", u.Address, address)
-			u.Address = address
+			c.Debugf("changing 'address': '%s' => '%s'", c.Address, address)
+			c.Address = address
 		}
 	}
 }
 
-func (u *Unbound) initClient() (err error) {
+func (c *Collector) initClient() (err error) {
 	var tlsCfg *tls.Config
-	useTLS := !socket.IsUnixSocket(u.Address) && u.UseTLS
+	useTLS := !socket.IsUnixSocket(c.Address) && c.UseTLS
 
-	if useTLS && (u.TLSConfig.TLSCert == "" || u.TLSConfig.TLSKey == "") {
+	if useTLS && (c.TLSConfig.TLSCert == "" || c.TLSConfig.TLSKey == "") {
 		return errors.New("'tls_cert' or 'tls_key' is missing")
 	}
 
 	if useTLS {
-		if tlsCfg, err = tlscfg.NewTLSConfig(u.TLSConfig); err != nil {
+		if tlsCfg, err = tlscfg.NewTLSConfig(c.TLSConfig); err != nil {
 			return err
 		}
 	}
 
-	u.client = socket.New(socket.Config{
-		Address: u.Address,
-		Timeout: u.Timeout.Duration(),
+	c.client = socket.New(socket.Config{
+		Address: c.Address,
+		Timeout: c.Timeout.Duration(),
 		TLSConf: tlsCfg,
 	})
 	return nil

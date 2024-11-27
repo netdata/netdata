@@ -10,24 +10,24 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (cdb *CouchDB) validateConfig() error {
-	if cdb.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("URL not set")
 	}
-	if cdb.Node == "" {
+	if c.Node == "" {
 		return errors.New("'node' not set")
 	}
-	if _, err := web.NewHTTPRequest(cdb.RequestConfig); err != nil {
+	if _, err := web.NewHTTPRequest(c.RequestConfig); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (cdb *CouchDB) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(cdb.ClientConfig)
+func (c *Collector) initHTTPClient() (*http.Client, error) {
+	return web.NewHTTPClient(c.ClientConfig)
 }
 
-func (cdb *CouchDB) initCharts() (*Charts, error) {
+func (c *Collector) initCharts() (*Charts, error) {
 	charts := module.Charts{}
 
 	if err := charts.Add(*dbActivityCharts.Copy()...); err != nil {
@@ -39,7 +39,7 @@ func (cdb *CouchDB) initCharts() (*Charts, error) {
 	if err := charts.Add(*serverOperationsCharts.Copy()...); err != nil {
 		return nil, err
 	}
-	if len(cdb.databases) != 0 {
+	if len(c.databases) != 0 {
 		dbCharts := dbSpecificCharts.Copy()
 
 		if err := charts.Add(*dbCharts...); err != nil {
@@ -47,7 +47,7 @@ func (cdb *CouchDB) initCharts() (*Charts, error) {
 		}
 
 		for _, chart := range *dbCharts {
-			for _, db := range cdb.databases {
+			for _, db := range c.databases {
 				if err := chart.AddDim(&module.Dim{ID: "db_" + db + "_" + chart.ID, Name: db}); err != nil {
 					return nil, err
 				}

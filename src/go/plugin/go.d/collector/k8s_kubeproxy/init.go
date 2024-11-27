@@ -9,18 +9,18 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (kp *KubeProxy) validateConfig() error {
-	if kp.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
 	return nil
 }
 
-func (kp *KubeProxy) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(kp.ClientConfig)
+func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return prometheus.New(httpClient, kp.RequestConfig), nil
+	return prometheus.New(httpClient, c.RequestConfig), nil
 }

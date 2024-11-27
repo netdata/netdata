@@ -11,27 +11,27 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
-func (b *Bind) validateConfig() error {
-	if b.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
 	return nil
 }
 
-func (b *Bind) initPermitViewMatcher() (matcher.Matcher, error) {
-	if b.PermitView == "" {
+func (c *Collector) initPermitViewMatcher() (matcher.Matcher, error) {
+	if c.PermitView == "" {
 		return nil, nil
 	}
-	return matcher.NewSimplePatternsMatcher(b.PermitView)
+	return matcher.NewSimplePatternsMatcher(c.PermitView)
 }
 
-func (b *Bind) initBindApiClient(httpClient *http.Client) (bindAPIClient, error) {
+func (c *Collector) initBindApiClient(httpClient *http.Client) (bindAPIClient, error) {
 	switch {
-	case strings.HasSuffix(b.URL, "/xml/v3"): // BIND 9.9+
-		return newXML3Client(httpClient, b.RequestConfig), nil
-	case strings.HasSuffix(b.URL, "/json/v1"): // BIND 9.10+
-		return newJSONClient(httpClient, b.RequestConfig), nil
+	case strings.HasSuffix(c.URL, "/xml/v3"): // BIND 9.9+
+		return newXML3Client(httpClient, c.RequestConfig), nil
+	case strings.HasSuffix(c.URL, "/json/v1"): // BIND 9.10+
+		return newJSONClient(httpClient, c.RequestConfig), nil
 	default:
-		return nil, fmt.Errorf("URL %s is wrong, supported endpoints: `/xml/v3`, `/json/v1`", b.URL)
+		return nil, fmt.Errorf("URL %s is wrong, supported endpoints: `/xml/v3`, `/json/v1`", c.URL)
 	}
 }

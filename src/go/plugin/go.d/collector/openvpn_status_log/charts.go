@@ -58,7 +58,7 @@ var userCharts = module.Charts{
 	},
 }
 
-func (o *OpenVPNStatusLog) addUserCharts(userName string) error {
+func (c *Collector) addUserCharts(userName string) error {
 	cs := userCharts.Copy()
 
 	for _, chart := range *cs {
@@ -68,5 +68,5 @@ func (o *OpenVPNStatusLog) addUserCharts(userName string) error {
 		}
 		chart.MarkNotCreated()
 	}
-	return o.charts.Add(*cs...)
+	return c.charts.Add(*cs...)
 }

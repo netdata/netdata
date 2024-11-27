@@ -12,35 +12,35 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
 )
 
-func (v *VerneMQ) collect() (map[string]int64, error) {
-	mfs, err := v.prom.Scrape()
+func (c *Collector) collect() (map[string]int64, error) {
+	mfs, err := c.prom.Scrape()
 	if err != nil {
 		return nil, err
 	}
 
-	if !v.namespace.found {
-		name, err := v.getMetricNamespace(mfs)
+	if !c.namespace.found {
+		name, err := c.getMetricNamespace(mfs)
 		if err != nil {
 			return nil, err
 		}
-		v.namespace.found = true
-		v.namespace.name = name
+		c.namespace.found = true
+		c.namespace.name = name
 	}
 
 	mx := make(map[string]int64)
 
-	v.collectMetrics(mx, mfs)
+	c.collectMetrics(mx, mfs)
 
 	return mx, nil
 }
 
-func (v *VerneMQ) collectMetrics(mx map[string]int64, mfs prometheus.MetricFamilies) {
-	nodes := v.getNodesStats(mfs)
+func (c *Collector) collectMetrics(mx map[string]int64, mfs prometheus.MetricFamilies) {
+	nodes := c.getNodesStats(mfs)
 
 	for node, st := range nodes {
-		if !v.seenNodes[node] {
-			v.seenNodes[node] = true
-			v.addNodeCharts(node, st)
+		if !c.seenNodes[node] {
+			c.seenNodes[node] = true
+			c.addNodeCharts(node, st)
 		}
 
 		st.stats["open_sockets"] = st.stats[metricSocketOpen] - st.stats[metricSocketClose]
@@ -62,20 +62,20 @@ func (v *VerneMQ) collectMetrics(mx map[string]int64, mfs prometheus.MetricFamil
 		}
 	}
 
-	for node := range v.seenNodes {
+	for node := range c.seenNodes {
 		if _, ok := nodes[node]; !ok {
-			delete(v.seenNodes, node)
-			v.removeNodeCharts(node)
+			delete(c.seenNodes, node)
+			c.removeNodeCharts(node)
 		}
 	}
 
 }
 
-func (v *VerneMQ) getNodesStats(mfs prometheus.MetricFamilies) map[string]*nodeStats {
+func (c *Collector) getNodesStats(mfs prometheus.MetricFamilies) map[string]*nodeStats {
 	nodes := make(map[string]*nodeStats)
 
 	for _, mf := range mfs {
-		name, _ := strings.CutPrefix(mf.Name(), v.namespace.name+"_")
+		name, _ := strings.CutPrefix(mf.Name(), c.namespace.name+"_")
 		if isSchedulerUtilizationMetric(name) {
 			continue
 		}
@@ -134,7 +134,7 @@ func (v *VerneMQ) getNodesStats(mfs prometheus.MetricFamilies) map[string]*nodeS
 	return nodes
 }
 
-func (v *VerneMQ) getMetricNamespace(mfs prometheus.MetricFamilies) (string, error) {
+func (c *Collector) getMetricNamespace(mfs prometheus.MetricFamilies) (string, error) {
 	want := metricPUBLISHError
 	for _, mf := range mfs {
 		if strings.HasSuffix(mf.Name(), want) {

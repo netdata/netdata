@@ -6,16 +6,16 @@ import (
 	"github.com/gosnmp/gosnmp"
 )
 
-func (s *SNMP) collectOIDs(mx map[string]int64) error {
-	for i, end := 0, 0; i < len(s.customOids); i += s.Options.MaxOIDs {
-		if end = i + s.Options.MaxOIDs; end > len(s.customOids) {
-			end = len(s.customOids)
+func (c *Collector) collectOIDs(mx map[string]int64) error {
+	for i, end := 0, 0; i < len(c.customOids); i += c.Options.MaxOIDs {
+		if end = i + c.Options.MaxOIDs; end > len(c.customOids) {
+			end = len(c.customOids)
 		}
 
-		oids := s.customOids[i:end]
-		resp, err := s.snmpClient.Get(oids)
+		oids := c.customOids[i:end]
+		resp, err := c.snmpClient.Get(oids)
 		if err != nil {
-			s.Errorf("cannot get SNMP data: %v", err)
+			c.Errorf("cannot get SNMP data: %v", err)
 			return err
 		}
 
@@ -36,7 +36,7 @@ func (s *SNMP) collectOIDs(mx map[string]int64) error {
 				gosnmp.Integer:
 				mx[oid] = gosnmp.ToBigInt(v.Value).Int64()
 			default:
-				s.Debugf("skipping OID '%s' (unsupported type '%s')", oid, v.Type)
+				c.Debugf("skipping OID '%s' (unsupported type '%s')", oid, v.Type)
 			}
 		}
 	}

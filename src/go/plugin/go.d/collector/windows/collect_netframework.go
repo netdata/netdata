@@ -17,7 +17,7 @@ const (
 	metricNetFrameworkCLRExceptionsThrowCatchDepthTotal = "windows_netframework_clrexceptions_throw_to_catch_depth_total"
 )
 
-func (w *Windows) collectNetFrameworkCLRExceptions(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectNetFrameworkCLRExceptions(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 
 	for _, pm := range pms.FindByName(metricNetFrameworkCLRExceptionsThrownTotal) {
@@ -49,16 +49,16 @@ func (w *Windows) collectNetFrameworkCLRExceptions(mx map[string]int64, pms prom
 	}
 
 	for proc := range seen {
-		if !w.cache.netFrameworkCLRExceptions[proc] {
-			w.cache.netFrameworkCLRExceptions[proc] = true
-			w.addProcessNetFrameworkExceptionsCharts(proc)
+		if !c.cache.netFrameworkCLRExceptions[proc] {
+			c.cache.netFrameworkCLRExceptions[proc] = true
+			c.addProcessNetFrameworkExceptionsCharts(proc)
 		}
 	}
 
-	for proc := range w.cache.netFrameworkCLRExceptions {
+	for proc := range c.cache.netFrameworkCLRExceptions {
 		if !seen[proc] {
-			delete(w.cache.netFrameworkCLRExceptions, proc)
-			w.removeProcessFromNetFrameworkExceptionsCharts(proc)
+			delete(c.cache.netFrameworkCLRExceptions, proc)
+			c.removeProcessFromNetFrameworkExceptionsCharts(proc)
 		}
 	}
 }
@@ -69,7 +69,7 @@ const (
 	metricNetFrameworkCLRInteropStubsCreatedTotal        = "windows_netframework_clrinterop_interop_stubs_created_total"
 )
 
-func (w *Windows) collectNetFrameworkCLRInterop(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectNetFrameworkCLRInterop(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 
 	for _, pm := range pms.FindByName(metricNetFrameworkCLRInteropComCallableWrappersTotal) {
@@ -94,16 +94,16 @@ func (w *Windows) collectNetFrameworkCLRInterop(mx map[string]int64, pms prometh
 	}
 
 	for proc := range seen {
-		if !w.cache.netFrameworkCLRInterops[proc] {
-			w.cache.netFrameworkCLRInterops[proc] = true
-			w.addProcessNetFrameworkInteropCharts(proc)
+		if !c.cache.netFrameworkCLRInterops[proc] {
+			c.cache.netFrameworkCLRInterops[proc] = true
+			c.addProcessNetFrameworkInteropCharts(proc)
 		}
 	}
 
-	for proc := range w.cache.netFrameworkCLRInterops {
+	for proc := range c.cache.netFrameworkCLRInterops {
 		if !seen[proc] {
-			delete(w.cache.netFrameworkCLRInterops, proc)
-			w.removeProcessNetFrameworkInteropCharts(proc)
+			delete(c.cache.netFrameworkCLRInterops, proc)
+			c.removeProcessNetFrameworkInteropCharts(proc)
 		}
 	}
 }
@@ -115,7 +115,7 @@ const (
 	metricNetFrameworkCLRJITILBytesTotal          = "windows_netframework_clrjit_jit_il_bytes_total"
 )
 
-func (w *Windows) collectNetFrameworkCLRJIT(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectNetFrameworkCLRJIT(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 
 	for _, pm := range pms.FindByName(metricNetFrameworkCLRJITMethodsTotal) {
@@ -147,16 +147,16 @@ func (w *Windows) collectNetFrameworkCLRJIT(mx map[string]int64, pms prometheus.
 	}
 
 	for proc := range seen {
-		if !w.cache.netFrameworkCLRJIT[proc] {
-			w.cache.netFrameworkCLRJIT[proc] = true
-			w.addProcessNetFrameworkJITCharts(proc)
+		if !c.cache.netFrameworkCLRJIT[proc] {
+			c.cache.netFrameworkCLRJIT[proc] = true
+			c.addProcessNetFrameworkJITCharts(proc)
 		}
 	}
 
-	for proc := range w.cache.netFrameworkCLRJIT {
+	for proc := range c.cache.netFrameworkCLRJIT {
 		if !seen[proc] {
-			delete(w.cache.netFrameworkCLRJIT, proc)
-			w.removeProcessNetFrameworkJITCharts(proc)
+			delete(c.cache.netFrameworkCLRJIT, proc)
+			c.removeProcessNetFrameworkJITCharts(proc)
 		}
 	}
 }
@@ -170,7 +170,7 @@ const (
 	metricNetFrameworkCLRLoadingClassLoadFailuresTotal = "windows_netframework_clrloading_class_load_failures_total"
 )
 
-func (w *Windows) collectNetFrameworkCLRLoading(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectNetFrameworkCLRLoading(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 
 	for _, pm := range pms.FindByName(metricNetFrameworkCLRLoadingLoaderHeapSizeBytes) {
@@ -216,16 +216,16 @@ func (w *Windows) collectNetFrameworkCLRLoading(mx map[string]int64, pms prometh
 	}
 
 	for proc := range seen {
-		if !w.cache.netFrameworkCLRLoading[proc] {
-			w.cache.netFrameworkCLRLoading[proc] = true
-			w.addProcessNetFrameworkLoadingCharts(proc)
+		if !c.cache.netFrameworkCLRLoading[proc] {
+			c.cache.netFrameworkCLRLoading[proc] = true
+			c.addProcessNetFrameworkLoadingCharts(proc)
 		}
 	}
 
-	for proc := range w.cache.netFrameworkCLRLoading {
+	for proc := range c.cache.netFrameworkCLRLoading {
 		if !seen[proc] {
-			delete(w.cache.netFrameworkCLRLoading, proc)
-			w.removeProcessNetFrameworkLoadingCharts(proc)
+			delete(c.cache.netFrameworkCLRLoading, proc)
+			c.removeProcessNetFrameworkLoadingCharts(proc)
 		}
 	}
 }
@@ -238,7 +238,7 @@ const (
 	metricNetFrameworkCLRLocksAndThreadsContentionsTotal       = "windows_netframework_clrlocksandthreads_contentions_total"
 )
 
-func (w *Windows) collectNetFrameworkCLRLocksAndThreads(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectNetFrameworkCLRLocksAndThreads(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 
 	for _, pm := range pms.FindByName(metricNetFrameworkCLRLocksAndThreadsQueueLengthTotal) {
@@ -277,16 +277,16 @@ func (w *Windows) collectNetFrameworkCLRLocksAndThreads(mx map[string]int64, pms
 	}
 
 	for proc := range seen {
-		if !w.cache.netFrameworkCLRLocksThreads[proc] {
-			w.cache.netFrameworkCLRLocksThreads[proc] = true
-			w.addProcessNetFrameworkLocksAndThreadsCharts(proc)
+		if !c.cache.netFrameworkCLRLocksThreads[proc] {
+			c.cache.netFrameworkCLRLocksThreads[proc] = true
+			c.addProcessNetFrameworkLocksAndThreadsCharts(proc)
 		}
 	}
 
-	for proc := range w.cache.netFrameworkCLRLocksThreads {
+	for proc := range c.cache.netFrameworkCLRLocksThreads {
 		if !seen[proc] {
-			delete(w.cache.netFrameworkCLRLocksThreads, proc)
-			w.removeProcessNetFrameworkLocksAndThreadsCharts(proc)
+			delete(c.cache.netFrameworkCLRLocksThreads, proc)
+			c.removeProcessNetFrameworkLocksAndThreadsCharts(proc)
 		}
 	}
 }
@@ -306,7 +306,7 @@ const (
 	metricNetFrameworkCLRMemoryGCTimePercent         = "windows_netframework_clrmemory_gc_time_percent"
 )
 
-func (w *Windows) collectNetFrameworkCLRMemory(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectNetFrameworkCLRMemory(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 
 	for _, pm := range pms.FindByName(metricNetFrameworkCLRMemoryAllocatedBytesTotal) {
@@ -394,16 +394,16 @@ func (w *Windows) collectNetFrameworkCLRMemory(mx map[string]int64, pms promethe
 	}
 
 	for proc := range seen {
-		if !w.cache.netFrameworkCLRMemory[proc] {
-			w.cache.netFrameworkCLRMemory[proc] = true
-			w.addProcessNetFrameworkMemoryCharts(proc)
+		if !c.cache.netFrameworkCLRMemory[proc] {
+			c.cache.netFrameworkCLRMemory[proc] = true
+			c.addProcessNetFrameworkMemoryCharts(proc)
 		}
 	}
 
-	for proc := range w.cache.netFrameworkCLRMemory {
+	for proc := range c.cache.netFrameworkCLRMemory {
 		if !seen[proc] {
-			delete(w.cache.netFrameworkCLRMemory, proc)
-			w.removeProcessNetFrameworkMemoryCharts(proc)
+			delete(c.cache.netFrameworkCLRMemory, proc)
+			c.removeProcessNetFrameworkMemoryCharts(proc)
 		}
 	}
 }
@@ -417,7 +417,7 @@ const (
 	metricNetFrameworkCLRRemotingRemoteCallsTotal          = "windows_netframework_clrremoting_remote_calls_total"
 )
 
-func (w *Windows) collectNetFrameworkCLRRemoting(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectNetFrameworkCLRRemoting(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 
 	for _, pm := range pms.FindByName(metricNetFrameworkCLRRemotingChannelsTotal) {
@@ -463,16 +463,16 @@ func (w *Windows) collectNetFrameworkCLRRemoting(mx map[string]int64, pms promet
 	}
 
 	for proc := range seen {
-		if !w.cache.netFrameworkCLRRemoting[proc] {
-			w.cache.netFrameworkCLRRemoting[proc] = true
-			w.addProcessNetFrameworkRemotingCharts(proc)
+		if !c.cache.netFrameworkCLRRemoting[proc] {
+			c.cache.netFrameworkCLRRemoting[proc] = true
+			c.addProcessNetFrameworkRemotingCharts(proc)
 		}
 	}
 
-	for proc := range w.cache.netFrameworkCLRRemoting {
+	for proc := range c.cache.netFrameworkCLRRemoting {
 		if !seen[proc] {
-			delete(w.cache.netFrameworkCLRRemoting, proc)
-			w.removeProcessNetFrameworkRemotingCharts(proc)
+			delete(c.cache.netFrameworkCLRRemoting, proc)
+			c.removeProcessNetFrameworkRemotingCharts(proc)
 		}
 	}
 }
@@ -484,7 +484,7 @@ const (
 	metricNetFrameworkCLRSecurityRuntimeChecksTotal  = "windows_netframework_clrsecurity_runtime_checks_total"
 )
 
-func (w *Windows) collectNetFrameworkCLRSecurity(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectNetFrameworkCLRSecurity(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 
 	for _, pm := range pms.FindByName(metricNetFrameworkCLRSecurityLinkTimeChecksTotal) {
@@ -516,16 +516,16 @@ func (w *Windows) collectNetFrameworkCLRSecurity(mx map[string]int64, pms promet
 	}
 
 	for proc := range seen {
-		if !w.cache.netFrameworkCLRSecurity[proc] {
-			w.cache.netFrameworkCLRSecurity[proc] = true
-			w.addProcessNetFrameworkSecurityCharts(proc)
+		if !c.cache.netFrameworkCLRSecurity[proc] {
+			c.cache.netFrameworkCLRSecurity[proc] = true
+			c.addProcessNetFrameworkSecurityCharts(proc)
 		}
 	}
 
-	for proc := range w.cache.netFrameworkCLRSecurity {
+	for proc := range c.cache.netFrameworkCLRSecurity {
 		if !seen[proc] {
-			delete(w.cache.netFrameworkCLRSecurity, proc)
-			w.removeProcessNetFrameworkSecurityCharts(proc)
+			delete(c.cache.netFrameworkCLRSecurity, proc)
+			c.removeProcessNetFrameworkSecurityCharts(proc)
 		}
 	}
 }

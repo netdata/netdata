@@ -37,14 +37,14 @@ const (
 	collectorHyperv                         = "hyperv"
 )
 
-func (w *Windows) collect() (map[string]int64, error) {
-	pms, err := w.prom.ScrapeSeries()
+func (c *Collector) collect() (map[string]int64, error) {
+	pms, err := c.prom.ScrapeSeries()
 	if err != nil {
 		return nil, err
 	}
 
 	mx := make(map[string]int64)
-	w.collectMetrics(mx, pms)
+	c.collectMetrics(mx, pms)
 
 	if hasKey(mx, "os_visible_memory_bytes", "memory_available_bytes") {
 		mx["memory_used_bytes"] = 0 +
@@ -81,8 +81,8 @@ func (w *Windows) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (w *Windows) collectMetrics(mx map[string]int64, pms prometheus.Series) {
-	w.collectCollector(mx, pms)
+func (c *Collector) collectMetrics(mx map[string]int64, pms prometheus.Series) {
+	c.collectCollector(mx, pms)
 	for _, pm := range pms.FindByName(metricCollectorSuccess) {
 		if pm.Value == 0 {
 			continue
@@ -90,57 +90,57 @@ func (w *Windows) collectMetrics(mx map[string]int64, pms prometheus.Series) {
 
 		switch pm.Labels.Get("collector") {
 		case collectorCPU:
-			w.collectCPU(mx, pms)
+			c.collectCPU(mx, pms)
 		case collectorMemory:
-			w.collectMemory(mx, pms)
+			c.collectMemory(mx, pms)
 		case collectorNet:
-			w.collectNet(mx, pms)
+			c.collectNet(mx, pms)
 		case collectorLogicalDisk:
-			w.collectLogicalDisk(mx, pms)
+			c.collectLogicalDisk(mx, pms)
 		case collectorOS:
-			w.collectOS(mx, pms)
+			c.collectOS(mx, pms)
 		case collectorSystem:
-			w.collectSystem(mx, pms)
+			c.collectSystem(mx, pms)
 		case collectorLogon:
-			w.collectLogon(mx, pms)
+			c.collectLogon(mx, pms)
 		case collectorThermalZone:
-			w.collectThermalzone(mx, pms)
+			c.collectThermalzone(mx, pms)
 		case collectorTCP:
-			w.collectTCP(mx, pms)
+			c.collectTCP(mx, pms)
 		case collectorProcess:
-			w.collectProcess(mx, pms)
+			c.collectProcess(mx, pms)
 		case collectorService:
-			w.collectService(mx, pms)
+			c.collectService(mx, pms)
 		case collectorIIS:
-			w.collectIIS(mx, pms)
+			c.collectIIS(mx, pms)
 		case collectorMSSQL:
-			w.collectMSSQL(mx, pms)
+			c.collectMSSQL(mx, pms)
 		case collectorAD:
-			w.collectAD(mx, pms)
+			c.collectAD(mx, pms)
 		case collectorADCS:
-			w.collectADCS(mx, pms)
+			c.collectADCS(mx, pms)
 		case collectorADFS:
-			w.collectADFS(mx, pms)
+			c.collectADFS(mx, pms)
 		case collectorNetFrameworkCLRExceptions:
-			w.collectNetFrameworkCLRExceptions(mx, pms)
+			c.collectNetFrameworkCLRExceptions(mx, pms)
 		case collectorNetFrameworkCLRInterop:
-			w.collectNetFrameworkCLRInterop(mx, pms)
+			c.collectNetFrameworkCLRInterop(mx, pms)
 		case collectorNetFrameworkCLRJIT:
-			w.collectNetFrameworkCLRJIT(mx, pms)
+			c.collectNetFrameworkCLRJIT(mx, pms)
 		case collectorNetFrameworkCLRLoading:
-			w.collectNetFrameworkCLRLoading(mx, pms)
+			c.collectNetFrameworkCLRLoading(mx, pms)
 		case collectorNetFrameworkCLRLocksAndThreads:
-			w.collectNetFrameworkCLRLocksAndThreads(mx, pms)
+			c.collectNetFrameworkCLRLocksAndThreads(mx, pms)
 		case collectorNetFrameworkCLRMemory:
-			w.collectNetFrameworkCLRMemory(mx, pms)
+			c.collectNetFrameworkCLRMemory(mx, pms)
 		case collectorNetFrameworkCLRRemoting:
-			w.collectNetFrameworkCLRRemoting(mx, pms)
+			c.collectNetFrameworkCLRRemoting(mx, pms)
 		case collectorNetFrameworkCLRSecurity:
-			w.collectNetFrameworkCLRSecurity(mx, pms)
+			c.collectNetFrameworkCLRSecurity(mx, pms)
 		case collectorExchange:
-			w.collectExchange(mx, pms)
+			c.collectExchange(mx, pms)
 		case collectorHyperv:
-			w.collectHyperv(mx, pms)
+			c.collectHyperv(mx, pms)
 		}
 	}
 }

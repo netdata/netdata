@@ -6,13 +6,13 @@ import (
 	"errors"
 )
 
-func (x *X509Check) validateConfig() error {
-	if x.Source == "" {
+func (c *Collector) validateConfig() error {
+	if c.Source == "" {
 		return errors.New("source is not set")
 	}
 	return nil
 }
 
-func (x *X509Check) initProvider() (provider, error) {
-	return newProvider(x.Config)
+func (c *Collector) initProvider() (provider, error) {
+	return newProvider(c.Config)
 }

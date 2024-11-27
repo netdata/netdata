@@ -10,20 +10,20 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (ns *AuthoritativeNS) validateConfig() error {
-	if ns.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("URL not set")
 	}
-	if _, err := web.NewHTTPRequest(ns.RequestConfig); err != nil {
+	if _, err := web.NewHTTPRequest(c.RequestConfig); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (ns *AuthoritativeNS) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(ns.ClientConfig)
+func (c *Collector) initHTTPClient() (*http.Client, error) {
+	return web.NewHTTPClient(c.ClientConfig)
 }
 
-func (ns *AuthoritativeNS) initCharts() (*module.Charts, error) {
+func (c *Collector) initCharts() (*module.Charts, error) {
 	return charts.Copy(), nil
 }

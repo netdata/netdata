@@ -202,7 +202,7 @@ func TestWebLog_guessCSVParser(t *testing.T) {
 	}
 }
 
-func prepareWebLog() *WebLog {
+func prepareWebLog() *Collector {
 	cfg := logs.ParserConfig{
 		LogType: typeAuto,
 		CSV: logs.CSVConfig{
@@ -215,7 +215,7 @@ func prepareWebLog() *WebLog {
 		},
 	}
 
-	return &WebLog{
+	return &Collector{
 		Config: Config{
 			GroupRespCodes: false,
 			ParserConfig:   cfg,

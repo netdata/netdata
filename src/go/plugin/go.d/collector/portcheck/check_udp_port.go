@@ -26,15 +26,15 @@ type udpPort struct {
 	err error
 }
 
-func (pc *PortCheck) checkUDPPort(port *udpPort) {
+func (c *Collector) checkUDPPort(port *udpPort) {
 	port.err = nil
 
-	timeout := time.Duration(max(float64(100*time.Millisecond), float64(pc.Timeout.Duration())*0.7))
-	addr := pc.address(port.number)
+	timeout := time.Duration(max(float64(100*time.Millisecond), float64(c.Timeout.Duration())*0.7))
+	addr := c.address(port.number)
 
-	open, err := pc.scanUDP(addr, timeout)
+	open, err := c.scanUDP(addr, timeout)
 	if err != nil {
-		pc.Warningf("UDP port check failed for '%s': %v", addr, err)
+		c.Warningf("UDP port check failed for '%s': %v", addr, err)
 		port.err = err
 		return
 	}
@@ -44,10 +44,10 @@ func (pc *PortCheck) checkUDPPort(port *udpPort) {
 		state = udpPortCheckStateClosed
 	}
 
-	pc.setUDPPortCheckState(port, state)
+	c.setUDPPortCheckState(port, state)
 }
 
-func (pc *PortCheck) setUDPPortCheckState(port *udpPort, state string) {
+func (c *Collector) setUDPPortCheckState(port *udpPort, state string) {
 	if port.status != state {
 		port.status = state
 		port.statusChangeTs = time.Now()

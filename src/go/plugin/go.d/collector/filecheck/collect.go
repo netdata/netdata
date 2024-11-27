@@ -8,11 +8,11 @@ import (
 	"os"
 )
 
-func (f *Filecheck) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	f.collectFiles(mx)
-	f.collectDirs(mx)
+	c.collectFiles(mx)
+	c.collectDirs(mx)
 
 	return mx, nil
 }

@@ -9,22 +9,22 @@ import (
 	"strings"
 )
 
-func (v *Varnish) collect() (map[string]int64, error) {
-	bs, err := v.exec.statistics()
+func (c *Collector) collect() (map[string]int64, error) {
+	bs, err := c.exec.statistics()
 	if err != nil {
 		return nil, err
 	}
 
 	mx := make(map[string]int64)
 
-	if err := v.collectStatistics(mx, bs); err != nil {
+	if err := c.collectStatistics(mx, bs); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (v *Varnish) collectStatistics(mx map[string]int64, bs []byte) error {
+func (c *Collector) collectStatistics(mx map[string]int64, bs []byte) error {
 	seenBackends, seenStorages := make(map[string]bool), make(map[string]bool)
 
 	sc := bufio.NewScanner(bytes.NewReader(bs))
@@ -37,7 +37,7 @@ func (v *Varnish) collectStatistics(mx map[string]int64, bs []byte) error {
 
 		parts := strings.Fields(line)
 		if len(parts) < 4 {
-			v.Debugf("invalid line format: '%s'. Expected at least 4 fields, skipping line.", line)
+			c.Debugf("invalid line format: '%s'. Expected at least 4 fields, skipping line.", line)
 			continue
 		}
 
@@ -46,12 +46,12 @@ func (v *Varnish) collectStatistics(mx map[string]int64, bs []byte) error {
 
 		category, metric, ok := strings.Cut(fullMetric, ".")
 		if !ok {
-			v.Debugf("invalid metric format: '%s'. Expected 'category.metric', skipping metric.", fullMetric)
+			c.Debugf("invalid metric format: '%s'. Expected 'category.metric', skipping metric.", fullMetric)
 			continue
 		}
 		value, err := strconv.ParseInt(valueStr, 10, 64)
 		if err != nil {
-			v.Debugf("failed to parse metric '%s' value '%s': %v, skipping metric", fullMetric, valueStr, err)
+			c.Debugf("failed to parse metric '%s' value '%s': %v, skipping metric", fullMetric, valueStr, err)
 			continue
 		}
 
@@ -67,7 +67,7 @@ func (v *Varnish) collectStatistics(mx map[string]int64, bs []byte) error {
 		case "SMA", "SMF", "MSE":
 			storage, sMetric, ok := strings.Cut(metric, ".")
 			if !ok {
-				v.Debugf("invalid metric format: '%s'. Expected 'type.storage.metric', skipping metric.", fullMetric)
+				c.Debugf("invalid metric format: '%s'. Expected 'type.storage.metric', skipping metric.", fullMetric)
 				continue
 			}
 
@@ -81,7 +81,7 @@ func (v *Varnish) collectStatistics(mx map[string]int64, bs []byte) error {
 			// Varnish 4.0.x is not supported (values are 'VBE.default(127.0.0.1,,81).happy')
 			parts := strings.Split(metric, ".")
 			if len(parts) != 3 {
-				v.Debugf("invalid metric format: '%s'. Expected 'VBE.vcl.backend.metric', skipping metric.", fullMetric)
+				c.Debugf("invalid metric format: '%s'. Expected 'VBE.vcl.backend.metric', skipping metric.", fullMetric)
 				continue
 			}
 
@@ -99,28 +99,28 @@ func (v *Varnish) collectStatistics(mx map[string]int64, bs []byte) error {
 	}
 
 	for name := range seenStorages {
-		if !v.seenStorages[name] {
-			v.seenStorages[name] = true
-			v.addStorageCharts(name)
+		if !c.seenStorages[name] {
+			c.seenStorages[name] = true
+			c.addStorageCharts(name)
 		}
 	}
-	for name := range v.seenStorages {
+	for name := range c.seenStorages {
 		if !seenStorages[name] {
-			delete(v.seenStorages, name)
-			v.removeBackendCharts(name)
+			delete(c.seenStorages, name)
+			c.removeBackendCharts(name)
 		}
 	}
 
 	for fullName := range seenBackends {
-		if !v.seenBackends[fullName] {
-			v.seenBackends[fullName] = true
-			v.addBackendCharts(fullName)
+		if !c.seenBackends[fullName] {
+			c.seenBackends[fullName] = true
+			c.addBackendCharts(fullName)
 		}
 	}
-	for fullName := range v.seenBackends {
+	for fullName := range c.seenBackends {
 		if !seenBackends[fullName] {
-			delete(v.seenBackends, fullName)
-			v.removeBackendCharts(fullName)
+			delete(c.seenBackends, fullName)
+			c.removeBackendCharts(fullName)
 		}
 	}
 

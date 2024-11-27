@@ -24,7 +24,7 @@ const (
 	metricADCSSignedCertTimestampListProcessingTime = "windows_adcs_signed_certificate_timestamp_list_processing_time_seconds"
 )
 
-func (w *Windows) collectADCS(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectADCS(mx map[string]int64, pms prometheus.Series) {
 	pms = pms.FindByNames(
 		metricADCSRequestsTotal,
 		metricADCSFailedRequestsTotal,
@@ -56,15 +56,15 @@ func (w *Windows) collectADCS(mx map[string]int64, pms prometheus.Series) {
 	}
 
 	for template := range seen {
-		if !w.cache.adcs[template] {
-			w.cache.adcs[template] = true
-			w.addCertificateTemplateCharts(template)
+		if !c.cache.adcs[template] {
+			c.cache.adcs[template] = true
+			c.addCertificateTemplateCharts(template)
 		}
 	}
-	for template := range w.cache.adcs {
+	for template := range c.cache.adcs {
 		if !seen[template] {
-			delete(w.cache.adcs, template)
-			w.removeCertificateTemplateCharts(template)
+			delete(c.cache.adcs, template)
+			c.removeCertificateTemplateCharts(template)
 		}
 	}
 }

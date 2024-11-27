@@ -19,10 +19,10 @@ const (
 	metricProcessCPUHandles      = "windows_process_handles"
 )
 
-func (w *Windows) collectProcess(mx map[string]int64, pms prometheus.Series) {
-	if !w.cache.collection[collectorProcess] {
-		w.cache.collection[collectorProcess] = true
-		w.addProcessesCharts()
+func (c *Collector) collectProcess(mx map[string]int64, pms prometheus.Series) {
+	if !c.cache.collection[collectorProcess] {
+		c.cache.collection[collectorProcess] = true
+		c.addProcessesCharts()
 	}
 
 	seen := make(map[string]bool)
@@ -77,15 +77,15 @@ func (w *Windows) collectProcess(mx map[string]int64, pms prometheus.Series) {
 	}
 
 	for proc := range seen {
-		if !w.cache.processes[proc] {
-			w.cache.processes[proc] = true
-			w.addProcessToCharts(proc)
+		if !c.cache.processes[proc] {
+			c.cache.processes[proc] = true
+			c.addProcessToCharts(proc)
 		}
 	}
-	for proc := range w.cache.processes {
+	for proc := range c.cache.processes {
 		if !seen[proc] {
-			delete(w.cache.processes, proc)
-			w.removeProcessFromCharts(proc)
+			delete(c.cache.processes, proc)
+			c.removeProcessFromCharts(proc)
 		}
 	}
 }

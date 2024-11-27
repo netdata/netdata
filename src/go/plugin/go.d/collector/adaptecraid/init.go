@@ -12,14 +12,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
-func (a *AdaptecRaid) initArcconfCliExec() (arcconfCli, error) {
+func (c *Collector) initArcconfCliExec() (arcconfCli, error) {
 	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
 
 	if _, err := os.Stat(ndsudoPath); err != nil {
 		return nil, fmt.Errorf("ndsudo executable not found: %v", err)
 	}
 
-	arcconfExec := newArcconfCliExec(ndsudoPath, a.Timeout.Duration(), a.Logger)
+	arcconfExec := newArcconfCliExec(ndsudoPath, c.Timeout.Duration(), c.Logger)
 
 	return arcconfExec, nil
 }

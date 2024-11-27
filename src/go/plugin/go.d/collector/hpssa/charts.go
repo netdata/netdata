@@ -189,7 +189,7 @@ var (
 	}
 )
 
-func (h *Hpssa) updateCharts(controllers map[string]*hpssaController) {
+func (c *Collector) updateCharts(controllers map[string]*hpssaController) {
 	seenControllers := make(map[string]bool)
 	seenArrays := make(map[string]bool)
 	seenLDrives := make(map[string]bool)
@@ -198,75 +198,75 @@ func (h *Hpssa) updateCharts(controllers map[string]*hpssaController) {
 	for _, cntrl := range controllers {
 		key := cntrl.uniqueKey()
 		seenControllers[key] = true
-		if _, ok := h.seenControllers[key]; !ok {
-			h.seenControllers[key] = cntrl
-			h.addControllerCharts(cntrl)
+		if _, ok := c.seenControllers[key]; !ok {
+			c.seenControllers[key] = cntrl
+			c.addControllerCharts(cntrl)
 		}
 
 		for _, pd := range cntrl.unassignedDrives {
 			key := pd.uniqueKey()
 			seenPDrives[key] = true
-			if _, ok := h.seenPDrives[key]; !ok {
-				h.seenPDrives[key] = pd
-				h.addPhysicalDriveCharts(pd)
+			if _, ok := c.seenPDrives[key]; !ok {
+				c.seenPDrives[key] = pd
+				c.addPhysicalDriveCharts(pd)
 			}
 		}
 
 		for _, arr := range cntrl.arrays {
 			key := arr.uniqueKey()
 			seenArrays[key] = true
-			if _, ok := h.seenArrays[key]; !ok {
-				h.seenArrays[key] = arr
-				h.addArrayCharts(arr)
+			if _, ok := c.seenArrays[key]; !ok {
+				c.seenArrays[key] = arr
+				c.addArrayCharts(arr)
 			}
 
 			for _, ld := range arr.logicalDrives {
 				key := ld.uniqueKey()
 				seenLDrives[key] = true
-				if _, ok := h.seenLDrives[key]; !ok {
-					h.seenLDrives[key] = ld
-					h.addLogicalDriveCharts(ld)
+				if _, ok := c.seenLDrives[key]; !ok {
+					c.seenLDrives[key] = ld
+					c.addLogicalDriveCharts(ld)
 				}
 
 				for _, pd := range ld.physicalDrives {
 					key := pd.uniqueKey()
 					seenPDrives[key] = true
-					if _, ok := h.seenPDrives[key]; !ok {
-						h.seenPDrives[key] = pd
-						h.addPhysicalDriveCharts(pd)
+					if _, ok := c.seenPDrives[key]; !ok {
+						c.seenPDrives[key] = pd
+						c.addPhysicalDriveCharts(pd)
 					}
 				}
 			}
 		}
 	}
 
-	for k, cntrl := range h.seenControllers {
+	for k, cntrl := range c.seenControllers {
 		if !seenControllers[k] {
-			delete(h.seenControllers, k)
-			h.removeControllerCharts(cntrl)
+			delete(c.seenControllers, k)
+			c.removeControllerCharts(cntrl)
 		}
 	}
-	for k, arr := range h.seenArrays {
+	for k, arr := range c.seenArrays {
 		if !seenArrays[k] {
-			delete(h.seenArrays, k)
-			h.removeArrayCharts(arr)
+			delete(c.seenArrays, k)
+			c.removeArrayCharts(arr)
 		}
 	}
-	for k, ld := range h.seenLDrives {
+	for k, ld := range c.seenLDrives {
 		if !seenLDrives[k] {
-			delete(h.seenLDrives, k)
-			h.removeLogicalDriveCharts(ld)
+			delete(c.seenLDrives, k)
+			c.removeLogicalDriveCharts(ld)
 		}
 	}
-	for k, pd := range h.seenPDrives {
+	for k, pd := range c.seenPDrives {
 		if !seenPDrives[k] {
-			delete(h.seenPDrives, k)
-			h.removePhysicalDriveCharts(pd)
+			delete(c.seenPDrives, k)
+			c.removePhysicalDriveCharts(pd)
 		}
 	}
 }
 
-func (h *Hpssa) addControllerCharts(cntrl *hpssaController) {
+func (c *Collector) addControllerCharts(cntrl *hpssaController) {
 	charts := controllerChartsTmpl.Copy()
 
 	if cntrl.controllerTemperatureC == "" {
@@ -296,17 +296,17 @@ func (h *Hpssa) addControllerCharts(cntrl *hpssaController) {
 		}
 	}
 
-	if err := h.Charts().Add(*charts...); err != nil {
-		h.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (h *Hpssa) removeControllerCharts(cntrl *hpssaController) {
+func (c *Collector) removeControllerCharts(cntrl *hpssaController) {
 	px := fmt.Sprintf("cntrl_%s_slot_%s_", strings.ToLower(cntrl.model), cntrl.slot)
-	h.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (h *Hpssa) addArrayCharts(arr *hpssaArray) {
+func (c *Collector) addArrayCharts(arr *hpssaArray) {
 	charts := arrayChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -322,17 +322,17 @@ func (h *Hpssa) addArrayCharts(arr *hpssaArray) {
 		}
 	}
 
-	if err := h.Charts().Add(*charts...); err != nil {
-		h.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (h *Hpssa) removeArrayCharts(arr *hpssaArray) {
+func (c *Collector) removeArrayCharts(arr *hpssaArray) {
 	px := fmt.Sprintf("array_%s_cntrl_%s_slot_%s_", arr.id, strings.ToLower(arr.cntrl.model), arr.cntrl.slot)
-	h.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (h *Hpssa) addLogicalDriveCharts(ld *hpssaLogicalDrive) {
+func (c *Collector) addLogicalDriveCharts(ld *hpssaLogicalDrive) {
 	charts := logicalDriveChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -349,17 +349,17 @@ func (h *Hpssa) addLogicalDriveCharts(ld *hpssaLogicalDrive) {
 		}
 	}
 
-	if err := h.Charts().Add(*charts...); err != nil {
-		h.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (h *Hpssa) removeLogicalDriveCharts(ld *hpssaLogicalDrive) {
+func (c *Collector) removeLogicalDriveCharts(ld *hpssaLogicalDrive) {
 	px := fmt.Sprintf("ld_%s_array_%s_cntrl_%s_slot_%s_", ld.id, ld.arr.id, strings.ToLower(ld.cntrl.model), ld.cntrl.slot)
-	h.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (h *Hpssa) addPhysicalDriveCharts(pd *hpssaPhysicalDrive) {
+func (c *Collector) addPhysicalDriveCharts(pd *hpssaPhysicalDrive) {
 	charts := physicalDriveChartsTmpl.Copy()
 
 	if pd.currentTemperatureC == "" {
@@ -382,19 +382,19 @@ func (h *Hpssa) addPhysicalDriveCharts(pd *hpssaPhysicalDrive) {
 		}
 	}
 
-	if err := h.Charts().Add(*charts...); err != nil {
-		h.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (h *Hpssa) removePhysicalDriveCharts(pd *hpssaPhysicalDrive) {
+func (c *Collector) removePhysicalDriveCharts(pd *hpssaPhysicalDrive) {
 	px := fmt.Sprintf("pd_%s_ld_%s_array_%s_cntrl_%s_slot_%s_",
 		pd.location, pd.ldId(), pd.arrId(), strings.ToLower(pd.cntrl.model), pd.cntrl.slot)
-	h.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (h *Hpssa) removeCharts(prefix string) {
-	for _, chart := range *h.Charts() {
+func (c *Collector) removeCharts(prefix string) {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

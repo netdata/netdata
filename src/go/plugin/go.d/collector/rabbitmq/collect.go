@@ -11,49 +11,49 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (r *RabbitMQ) collect() (map[string]int64, error) {
-	if r.clusterName == "" {
-		id, name, err := r.getClusterMeta()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.clusterName == "" {
+		id, name, err := c.getClusterMeta()
 		if err != nil {
 			return nil, err
 		}
-		r.clusterId = id
-		r.clusterName = name
+		c.clusterId = id
+		c.clusterName = name
 	}
 
-	r.cache.resetSeen()
+	c.cache.resetSeen()
 
 	mx := make(map[string]int64)
 
-	if err := r.collectOverview(mx); err != nil {
+	if err := c.collectOverview(mx); err != nil {
 		return nil, err
 	}
-	if err := r.collectNodes(mx); err != nil {
+	if err := c.collectNodes(mx); err != nil {
 		return mx, err
 	}
-	if err := r.collectVhosts(mx); err != nil {
+	if err := c.collectVhosts(mx); err != nil {
 		return mx, err
 	}
-	if r.CollectQueues {
-		if err := r.collectQueues(mx); err != nil {
+	if c.CollectQueues {
+		if err := c.collectQueues(mx); err != nil {
 			return mx, err
 		}
 	}
 
-	r.updateCharts()
+	c.updateCharts()
 
 	return mx, nil
 }
 
-func (r *RabbitMQ) getClusterMeta() (id string, name string, err error) {
-	req, err := web.NewHTTPRequestWithPath(r.RequestConfig, urlPathAPIDefinitions)
+func (c *Collector) getClusterMeta() (id string, name string, err error) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPIDefinitions)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create definitions request: %w", err)
 	}
 
 	var resp apiDefinitionsResp
 
-	if err := r.webClient().RequestJSON(req, &resp); err != nil {
+	if err := c.webClient().RequestJSON(req, &resp); err != nil {
 		return "", "", err
 	}
 
@@ -77,8 +77,8 @@ func (r *RabbitMQ) getClusterMeta() (id string, name string, err error) {
 	return id, name, nil
 }
 
-func (r *RabbitMQ) webClient() *web.Client {
-	return web.DoHTTP(r.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
+func (c *Collector) webClient() *web.Client {
+	return web.DoHTTP(c.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
 		var msg struct {
 			Error  string `json:"error"`
 			Reason string `json:"reason"`

@@ -7,31 +7,31 @@ import (
 	"net"
 )
 
-func (b *Boinc) collect() (map[string]int64, error) {
-	if b.conn == nil {
-		conn, err := b.establishConn()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.conn == nil {
+		conn, err := c.establishConn()
 		if err != nil {
 			return nil, err
 		}
-		b.conn = conn
+		c.conn = conn
 	}
 
-	results, err := b.conn.getResults()
+	results, err := c.conn.getResults()
 	if err != nil {
-		b.Cleanup()
+		c.Cleanup()
 		return nil, err
 	}
 
 	mx := make(map[string]int64)
 
-	if err := b.collectResults(mx, results); err != nil {
+	if err := c.collectResults(mx, results); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (b *Boinc) collectResults(mx map[string]int64, results []boincReplyResult) error {
+func (c *Collector) collectResults(mx map[string]int64, results []boincReplyResult) error {
 	mx["total"] = int64(len(results))
 	mx["active"] = 0
 
@@ -57,14 +57,14 @@ func (b *Boinc) collectResults(mx map[string]int64, results []boincReplyResult) 
 	return nil
 }
 
-func (b *Boinc) establishConn() (boincConn, error) {
-	conn := b.newConn(b.Config, b.Logger)
+func (c *Collector) establishConn() (boincConn, error) {
+	conn := c.newConn(c.Config, c.Logger)
 
 	if err := conn.connect(); err != nil {
 		return nil, fmt.Errorf("failed to establish connection: %w", err)
 	}
 
-	if host, _, err := net.SplitHostPort(b.Address); err == nil {
+	if host, _, err := net.SplitHostPort(c.Address); err == nil {
 		// for the commands we use, authentication is only required for remote connections
 		ip := net.ParseIP(host)
 		if host == "localhost" || (ip != nil && ip.IsLoopback()) {

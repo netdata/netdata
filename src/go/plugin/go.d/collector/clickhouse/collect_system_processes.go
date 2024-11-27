@@ -15,7 +15,7 @@ FROM
     system.processes FORMAT CSVWithNames
 `
 
-func (c *ClickHouse) collectLongestRunningQueryTime(mx map[string]int64) error {
+func (c *Collector) collectLongestRunningQueryTime(mx map[string]int64) error {
 	req, _ := web.NewHTTPRequest(c.RequestConfig)
 	req.URL.RawQuery = makeURLQuery(queryLongestQueryTime)
 

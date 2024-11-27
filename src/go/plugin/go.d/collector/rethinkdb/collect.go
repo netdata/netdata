@@ -27,26 +27,26 @@ type (
 	}
 )
 
-func (r *Rethinkdb) collect() (map[string]int64, error) {
-	if r.rdb == nil {
-		conn, err := r.newConn(r.Config)
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.rdb == nil {
+		conn, err := c.newConn(c.Config)
 		if err != nil {
 			return nil, err
 		}
-		r.rdb = conn
+		c.rdb = conn
 	}
 
 	mx := make(map[string]int64)
 
-	if err := r.collectStats(mx); err != nil {
+	if err := c.collectStats(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (r *Rethinkdb) collectStats(mx map[string]int64) error {
-	resp, err := r.rdb.stats()
+func (c *Collector) collectStats(mx map[string]int64) error {
+	resp, err := c.rdb.stats()
 	if err != nil {
 		return err
 	}
@@ -89,9 +89,9 @@ func (r *Rethinkdb) collectStats(mx map[string]int64) error {
 
 		seen[srvUUID] = true
 
-		if !r.seenServers[srvUUID] {
-			r.seenServers[srvUUID] = true
-			r.addServerCharts(srvUUID, srv.Server)
+		if !c.seenServers[srvUUID] {
+			c.seenServers[srvUUID] = true
+			c.addServerCharts(srvUUID, srv.Server)
 		}
 
 		px := fmt.Sprintf("server_%s_", srv.ID[1]) // uuid
@@ -112,10 +112,10 @@ func (r *Rethinkdb) collectStats(mx map[string]int64) error {
 		}
 	}
 
-	for k := range r.seenServers {
+	for k := range c.seenServers {
 		if !seen[k] {
-			delete(r.seenServers, k)
-			r.removeServerCharts(k)
+			delete(c.seenServers, k)
+			c.removeServerCharts(k)
 		}
 	}
 

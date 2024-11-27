@@ -9,27 +9,27 @@ import (
 	"time"
 )
 
-func (f *Filecheck) collectDirs(mx map[string]int64) {
+func (c *Collector) collectDirs(mx map[string]int64) {
 	now := time.Now()
 
-	if f.isTimeToDiscoverDirs(now) {
-		f.lastDiscDirsTime = now
-		f.curDirs = f.discoveryDirs()
+	if c.isTimeToDiscoverDirs(now) {
+		c.lastDiscDirsTime = now
+		c.curDirs = c.discoveryDirs()
 	}
 
 	var infos []*statInfo
 
-	for _, dir := range f.curDirs {
+	for _, dir := range c.curDirs {
 		si := getStatInfo(dir)
 		infos = append(infos, si)
 
-		f.collectDir(mx, si, now)
+		c.collectDir(mx, si, now)
 	}
 
-	f.updateDirCharts(infos)
+	c.updateDirCharts(infos)
 }
 
-func (f *Filecheck) collectDir(mx map[string]int64, si *statInfo, now time.Time) {
+func (c *Collector) collectDir(mx map[string]int64, si *statInfo, now time.Time) {
 	px := fmt.Sprintf("dir_%s_", si.path)
 
 	mx[px+"existence_status_exist"] = 0
@@ -49,21 +49,21 @@ func (f *Filecheck) collectDir(mx map[string]int64, si *statInfo, now time.Time)
 	if v, err := calcFilesInDir(si.path); err == nil {
 		mx[px+"files_count"] = v
 	}
-	if f.Dirs.CollectDirSize {
+	if c.Dirs.CollectDirSize {
 		if v, err := calcDirSize(si.path); err == nil {
 			mx[px+"size_bytes"] = v
 		}
 	}
 }
 
-func (f *Filecheck) discoveryDirs() (dirs []string) {
-	return discoverFilesOrDirs(f.Dirs.Include, func(v string, fi os.FileInfo) bool {
-		return fi.IsDir() && !f.dirsFilter.MatchString(v)
+func (c *Collector) discoveryDirs() (dirs []string) {
+	return discoverFilesOrDirs(c.Dirs.Include, func(v string, fi os.FileInfo) bool {
+		return fi.IsDir() && !c.dirsFilter.MatchString(v)
 	})
 }
 
-func (f *Filecheck) isTimeToDiscoverDirs(now time.Time) bool {
-	return now.After(f.lastDiscDirsTime.Add(f.DiscoveryEvery.Duration()))
+func (c *Collector) isTimeToDiscoverDirs(now time.Time) bool {
+	return now.After(c.lastDiscDirsTime.Add(c.DiscoveryEvery.Duration()))
 }
 
 func calcFilesInDir(dirPath string) (int64, error) {

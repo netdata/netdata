@@ -32,28 +32,28 @@ func isTraefikMetrics(pms prometheus.Series) bool {
 	return false
 }
 
-func (t *Traefik) collect() (map[string]int64, error) {
-	pms, err := t.prom.ScrapeSeries()
+func (c *Collector) collect() (map[string]int64, error) {
+	pms, err := c.prom.ScrapeSeries()
 	if err != nil {
 		return nil, err
 	}
 
-	if t.checkMetrics && !isTraefikMetrics(pms) {
+	if c.checkMetrics && !isTraefikMetrics(pms) {
 		return nil, errors.New("unexpected metrics (not Traefik)")
 	}
-	t.checkMetrics = false
+	c.checkMetrics = false
 
 	mx := make(map[string]int64)
 
-	t.collectEntrypointRequestsTotal(mx, pms)
-	t.collectEntrypointRequestDuration(mx, pms)
-	t.collectEntrypointOpenConnections(mx, pms)
-	t.updateCodeClassMetrics(mx)
+	c.collectEntrypointRequestsTotal(mx, pms)
+	c.collectEntrypointRequestDuration(mx, pms)
+	c.collectEntrypointOpenConnections(mx, pms)
+	c.updateCodeClassMetrics(mx)
 
 	return mx, nil
 }
 
-func (t *Traefik) collectEntrypointRequestsTotal(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectEntrypointRequestsTotal(mx map[string]int64, pms prometheus.Series) {
 	if pms = pms.FindByName(metricEntrypointRequestsTotal); pms.Len() == 0 {
 		return
 	}
@@ -71,18 +71,18 @@ func (t *Traefik) collectEntrypointRequestsTotal(mx map[string]int64, pms promet
 		mx[key] += int64(pm.Value)
 
 		id := ep + "_" + proto
-		ce := t.cacheGetOrPutEntrypoint(id)
+		ce := c.cacheGetOrPutEntrypoint(id)
 		if ce.requests == nil {
 			chart := newChartEntrypointRequests(ep, proto)
 			ce.requests = chart
-			if err := t.Charts().Add(chart); err != nil {
-				t.Warning(err)
+			if err := c.Charts().Add(chart); err != nil {
+				c.Warning(err)
 			}
 		}
 	}
 }
 
-func (t *Traefik) collectEntrypointRequestDuration(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectEntrypointRequestDuration(mx map[string]int64, pms prometheus.Series) {
 	if pms = pms.FindByNames(
 		metricEntrypointRequestDurationSecondsCount,
 		metricEntrypointRequestDurationSecondsSum,
@@ -100,7 +100,7 @@ func (t *Traefik) collectEntrypointRequestDuration(mx map[string]int64, pms prom
 		}
 
 		id := ep + "_" + proto
-		ce := t.cacheGetOrPutEntrypoint(id)
+		ce := c.cacheGetOrPutEntrypoint(id)
 		v := ce.reqDurData[codeClass]
 		if pm.Name() == metricEntrypointRequestDurationSecondsSum {
 			v.cur.secs += pm.Value
@@ -110,12 +110,12 @@ func (t *Traefik) collectEntrypointRequestDuration(mx map[string]int64, pms prom
 		ce.reqDurData[codeClass] = v
 	}
 
-	for id, ce := range t.cache.entrypoints {
+	for id, ce := range c.cache.entrypoints {
 		if ce.reqDur == nil {
 			chart := newChartEntrypointRequestDuration(ce.name, ce.proto)
 			ce.reqDur = chart
-			if err := t.Charts().Add(chart); err != nil {
-				t.Warning(err)
+			if err := c.Charts().Add(chart); err != nil {
+				c.Warning(err)
 			}
 		}
 		for codeClass, v := range ce.reqDurData {
@@ -134,7 +134,7 @@ func (t *Traefik) collectEntrypointRequestDuration(mx map[string]int64, pms prom
 	}
 }
 
-func (t *Traefik) collectEntrypointOpenConnections(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectEntrypointOpenConnections(mx map[string]int64, pms prometheus.Series) {
 	if pms = pms.FindByName(metricEntrypointOpenConnections); pms.Len() == 0 {
 		return
 	}
@@ -151,12 +151,12 @@ func (t *Traefik) collectEntrypointOpenConnections(mx map[string]int64, pms prom
 		mx[key] += int64(pm.Value)
 
 		id := ep + "_" + proto
-		ce := t.cacheGetOrPutEntrypoint(id)
+		ce := c.cacheGetOrPutEntrypoint(id)
 		if ce.openConn == nil {
 			chart := newChartEntrypointOpenConnections(ep, proto)
 			ce.openConn = chart
-			if err := t.Charts().Add(chart); err != nil {
-				t.Warning(err)
+			if err := c.Charts().Add(chart); err != nil {
+				c.Warning(err)
 			}
 		}
 
@@ -164,7 +164,7 @@ func (t *Traefik) collectEntrypointOpenConnections(mx map[string]int64, pms prom
 			ce.openConnMethods[method] = true
 			dim := &module.Dim{ID: key, Name: method}
 			if err := ce.openConn.AddDim(dim); err != nil {
-				t.Warning(err)
+				c.Warning(err)
 			}
 			ce.openConn.MarkNotCreated()
 		}
@@ -173,8 +173,8 @@ func (t *Traefik) collectEntrypointOpenConnections(mx map[string]int64, pms prom
 
 var httpRespCodeClasses = []string{"1xx", "2xx", "3xx", "4xx", "5xx"}
 
-func (t *Traefik) updateCodeClassMetrics(mx map[string]int64) {
-	for id, ce := range t.cache.entrypoints {
+func (c *Collector) updateCodeClassMetrics(mx map[string]int64) {
+	for id, ce := range c.cache.entrypoints {
 		if ce.requests != nil {
 			for _, c := range httpRespCodeClasses {
 				key := prefixEntrypointRequests + id + "_" + c
@@ -197,18 +197,18 @@ func getCodeClass(code string) string {
 	return string(code[0]) + "xx"
 }
 
-func (t *Traefik) cacheGetOrPutEntrypoint(id string) *cacheEntrypoint {
-	if _, ok := t.cache.entrypoints[id]; !ok {
+func (c *Collector) cacheGetOrPutEntrypoint(id string) *cacheEntrypoint {
+	if _, ok := c.cache.entrypoints[id]; !ok {
 		name, proto := id, id
 		if idx := strings.LastIndexByte(id, '_'); idx != -1 {
 			name, proto = id[:idx], id[idx+1:]
 		}
-		t.cache.entrypoints[id] = &cacheEntrypoint{
+		c.cache.entrypoints[id] = &cacheEntrypoint{
 			name:            name,
 			proto:           proto,
 			reqDurData:      make(map[string]cacheEntrypointReqDur),
 			openConnMethods: make(map[string]bool),
 		}
 	}
-	return t.cache.entrypoints[id]
+	return c.cache.entrypoints[id]
 }

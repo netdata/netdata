@@ -8,8 +8,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 )
 
-func (p *Phpfpm) collect() (map[string]int64, error) {
-	st, err := p.client.getStatus()
+func (c *Collector) collect() (map[string]int64, error) {
+	st, err := c.client.getStatus()
 	if err != nil {
 		return nil, err
 	}

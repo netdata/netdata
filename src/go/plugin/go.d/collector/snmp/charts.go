@@ -156,14 +156,14 @@ var (
 	}
 )
 
-func (s *SNMP) addNetIfaceCharts(iface *netInterface) {
+func (c *Collector) addNetIfaceCharts(iface *netInterface) {
 	charts := netIfaceChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanIfaceName(iface.ifName))
 		chart.Labels = []module.Label{
-			{Key: "vendor", Value: s.sysInfo.organization},
-			{Key: "sysName", Value: s.sysInfo.name},
+			{Key: "vendor", Value: c.sysInfo.organization},
+			{Key: "sysName", Value: c.sysInfo.name},
 			{Key: "ifDescr", Value: iface.ifDescr},
 			{Key: "ifName", Value: iface.ifName},
 			{Key: "ifType", Value: ifTypeMapping[iface.ifType]},
@@ -173,14 +173,14 @@ func (s *SNMP) addNetIfaceCharts(iface *netInterface) {
 		}
 	}
 
-	if err := s.Charts().Add(*charts...); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (s *SNMP) removeNetIfaceCharts(iface *netInterface) {
+func (c *Collector) removeNetIfaceCharts(iface *netInterface) {
 	px := fmt.Sprintf("snmp_device_net_iface_%s_", cleanIfaceName(iface.ifName))
-	for _, chart := range *s.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
@@ -188,14 +188,14 @@ func (s *SNMP) removeNetIfaceCharts(iface *netInterface) {
 	}
 }
 
-func (s *SNMP) addSysUptimeChart() {
+func (c *Collector) addSysUptimeChart() {
 	chart := uptimeChart.Copy()
 	chart.Labels = []module.Label{
-		{Key: "vendor", Value: s.sysInfo.organization},
-		{Key: "sysName", Value: s.sysInfo.name},
+		{Key: "vendor", Value: c.sysInfo.organization},
+		{Key: "sysName", Value: c.sysInfo.name},
 	}
-	if err := s.Charts().Add(chart); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }
 

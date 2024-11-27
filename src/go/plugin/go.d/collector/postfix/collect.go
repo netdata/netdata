@@ -16,8 +16,8 @@ type postqueueStats struct {
 	requests  int64
 }
 
-func (p *Postfix) collect() (map[string]int64, error) {
-	bs, err := p.exec.list()
+func (c *Collector) collect() (map[string]int64, error) {
+	bs, err := c.exec.list()
 	if err != nil {
 		return nil, err
 	}

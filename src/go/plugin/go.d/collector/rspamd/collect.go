@@ -35,8 +35,8 @@ type rspamdStats struct {
 	FuzzyHashes        map[string]int64 `json:"fuzzy_hashes"`
 }
 
-func (r *Rspamd) collect() (map[string]int64, error) {
-	stats, err := r.queryRspamdStats()
+func (c *Collector) collect() (map[string]int64, error) {
+	stats, err := c.queryRspamdStats()
 	if err != nil {
 		return nil, err
 	}
@@ -46,14 +46,14 @@ func (r *Rspamd) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (r *Rspamd) queryRspamdStats() (*rspamdStats, error) {
-	req, err := web.NewHTTPRequestWithPath(r.RequestConfig, "/stat")
+func (c *Collector) queryRspamdStats() (*rspamdStats, error) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, "/stat")
 	if err != nil {
 		return nil, err
 	}
 
 	var stats rspamdStats
-	if err := web.DoHTTP(r.httpClient).RequestJSON(req, &stats); err != nil {
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &stats); err != nil {
 		return nil, err
 	}
 

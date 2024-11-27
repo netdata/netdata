@@ -16,9 +16,9 @@ You can find all these settings, with their default values, by accessing the URL
 6. `[sqlite]` to [configure](#sqlite-section-options) the [Netdata Daemon's](/src/daemon/README.md) SQLite settings.
 7. `[ml]` to configure settings for [Machine Learning](/src/ml/README.md).
 8. `[health]` to [configure](#health-section-options) general settings for [health monitoring](/src/health/README.md).
-9. `[web]` to [configure the Web Server](/src/web/server/README.md).
-10. `[registry]` for the [Netdata registry](/src/registry/README.md).
-11. `[global statistics]` for the [Netdata registry](/src/registry/README.md).
+9. `[web]` to [configure the web Werver](/src/web/server/README.md).
+10. `[registry]` for the [Netdata Registry](/src/registry/README.md).
+11. `[global statistics]` for the [Netdata Registry](/src/registry/README.md).
 12. `[statsd]` for the general settings of the [stats.d.plugin](/src/collectors/statsd.plugin/README.md).
 13. `[plugins]` to [configure](#plugins-section-options) which [Collectors](/src/collectors/README.md) to use and PATH settings.
 14. `[plugin:NAME]` sections for each [Collector of every Plugin](#per-plugin-configuration).

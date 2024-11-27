@@ -11,48 +11,48 @@ import (
 
 const discoveryEvery = 5
 
-func (s *ScaleIO) collect() (map[string]int64, error) {
-	s.runs += 1
-	if !s.lastDiscoveryOK || s.runs%discoveryEvery == 0 {
-		if err := s.discovery(); err != nil {
+func (c *Collector) collect() (map[string]int64, error) {
+	c.runs += 1
+	if !c.lastDiscoveryOK || c.runs%discoveryEvery == 0 {
+		if err := c.discovery(); err != nil {
 			return nil, err
 		}
 	}
 
-	stats, err := s.client.SelectedStatistics(query)
+	stats, err := c.client.SelectedStatistics(query)
 	if err != nil {
 		return nil, err
 	}
 
 	mx := metrics{
-		System:      s.collectSystem(stats.System),
-		StoragePool: s.collectStoragePool(stats.StoragePool),
-		Sdc:         s.collectSdc(stats.Sdc),
+		System:      c.collectSystem(stats.System),
+		StoragePool: c.collectStoragePool(stats.StoragePool),
+		Sdc:         c.collectSdc(stats.Sdc),
 	}
 
-	s.updateCharts()
+	c.updateCharts()
 	return stm.ToMap(mx), nil
 }
 
-func (s *ScaleIO) discovery() error {
+func (c *Collector) discovery() error {
 	start := time.Now()
-	s.Debugf("starting discovery")
-	ins, err := s.client.Instances()
+	c.Debugf("starting discovery")
+	ins, err := c.client.Instances()
 	if err != nil {
-		s.lastDiscoveryOK = false
+		c.lastDiscoveryOK = false
 		return err
 	}
-	s.Debugf("discovering: discovered %d storage pools, %d sdcs, it took %s",
+	c.Debugf("discovering: discovered %d storage pools, %d sdcs, it took %s",
 		len(ins.StoragePoolList), len(ins.SdcList), time.Since(start))
 
-	s.discovered.pool = make(map[string]client.StoragePool, len(ins.StoragePoolList))
+	c.discovered.pool = make(map[string]client.StoragePool, len(ins.StoragePoolList))
 	for _, pool := range ins.StoragePoolList {
-		s.discovered.pool[pool.ID] = pool
+		c.discovered.pool[pool.ID] = pool
 	}
-	s.discovered.sdc = make(map[string]client.Sdc, len(ins.SdcList))
+	c.discovered.sdc = make(map[string]client.Sdc, len(ins.SdcList))
 	for _, sdc := range ins.SdcList {
-		s.discovered.sdc[sdc.ID] = sdc
+		c.discovered.sdc[sdc.ID] = sdc
 	}
-	s.lastDiscoveryOK = true
+	c.lastDiscoveryOK = true
 	return nil
 }

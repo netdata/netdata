@@ -12,6 +12,7 @@ When the context is clear, we can omit the "Netdata" prefix for brevity.
 | **Cloud**              | The centralized platform for managing and visualizing Netdata metrics    |
 | **Daemon**             | The main Netdata process                                                 |
 | **Collector(s)**       | The various collectors of Netdata                                        |
+| **Registry**           | The default Netdata Registry, or any Agent acting as one                 |
 
 ## Database
 

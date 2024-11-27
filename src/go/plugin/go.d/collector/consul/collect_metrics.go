@@ -12,7 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
 )
 
-func (c *Consul) collectMetricsPrometheus(mx map[string]int64) error {
+func (c *Collector) collectMetricsPrometheus(mx map[string]int64) error {
 	mfs, err := c.prom.Scrape()
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func (c *Consul) collectMetricsPrometheus(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Consul) isLeader(mfs prometheus.MetricFamilies) (bool, bool) {
+func (c *Collector) isLeader(mfs prometheus.MetricFamilies) (bool, bool) {
 	var mf *prometheus.MetricFamily
 	for _, v := range []string{"server_isLeader_isLeader", "server_isLeader"} {
 		if mf = mfs.GetGauge(c.promMetricNameWithHostname(v)); mf != nil {
@@ -103,7 +103,7 @@ func (c *Consul) isLeader(mfs prometheus.MetricFamilies) (bool, bool) {
 	return mf.Metrics()[0].Gauge().Value() == 1, true
 }
 
-func (c *Consul) collectGauge(mx map[string]int64, mfs prometheus.MetricFamilies, name string, mul float64, aliases ...string) {
+func (c *Collector) collectGauge(mx map[string]int64, mfs prometheus.MetricFamilies, name string, mul float64, aliases ...string) {
 	var mf *prometheus.MetricFamily
 	for _, v := range append(aliases, name) {
 		if mf = mfs.GetGauge(c.promMetricNameWithHostname(v)); mf != nil {
@@ -125,7 +125,7 @@ func (c *Consul) collectGauge(mx map[string]int64, mfs prometheus.MetricFamilies
 	}
 }
 
-func (c *Consul) collectGaugeBool(mx map[string]int64, mfs prometheus.MetricFamilies, name string, aliases ...string) {
+func (c *Collector) collectGaugeBool(mx map[string]int64, mfs prometheus.MetricFamilies, name string, aliases ...string) {
 	var mf *prometheus.MetricFamily
 	for _, v := range append(aliases, name) {
 		if mf = mfs.GetGauge(c.promMetricNameWithHostname(v)); mf != nil {
@@ -148,7 +148,7 @@ func (c *Consul) collectGaugeBool(mx map[string]int64, mfs prometheus.MetricFami
 	}
 }
 
-func (c *Consul) collectCounter(mx map[string]int64, mfs prometheus.MetricFamilies, name string, mul float64) {
+func (c *Collector) collectCounter(mx map[string]int64, mfs prometheus.MetricFamilies, name string, mul float64) {
 	mf := mfs.GetCounter(c.promMetricName(name))
 	if mf == nil {
 		return
@@ -161,7 +161,7 @@ func (c *Consul) collectCounter(mx map[string]int64, mfs prometheus.MetricFamili
 	}
 }
 
-func (c *Consul) collectSummary(mx map[string]int64, mfs prometheus.MetricFamilies, name string) {
+func (c *Collector) collectSummary(mx map[string]int64, mfs prometheus.MetricFamilies, name string) {
 	mf := mfs.GetSummary(c.promMetricName(name))
 	if mf == nil {
 		return
@@ -185,7 +185,7 @@ func (c *Consul) collectSummary(mx map[string]int64, mfs prometheus.MetricFamili
 	mx[name+"_count"] = int64(m.Summary().Count())
 }
 
-func (c *Consul) promMetricName(name string) string {
+func (c *Collector) promMetricName(name string) string {
 	px := c.cfg.DebugConfig.Telemetry.MetricsPrefix
 	return px + "_" + name
 }
@@ -194,7 +194,7 @@ var forbiddenCharsReplacer = strings.NewReplacer(" ", "_", ".", "_", "=", "_", "
 
 // controlled by 'disable_hostname'
 // https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-disable_hostname
-func (c *Consul) promMetricNameWithHostname(name string) string {
+func (c *Collector) promMetricNameWithHostname(name string) string {
 	px := c.cfg.DebugConfig.Telemetry.MetricsPrefix
 	node := forbiddenCharsReplacer.Replace(c.cfg.Config.NodeName)
 

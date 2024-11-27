@@ -803,31 +803,31 @@ var (
 	}
 )
 
-func (e *Envoy) addServerCharts(id string, labels labels.Labels) {
-	e.addCharts(serverChartsTmpl.Copy(), id, labels)
+func (c *Collector) addServerCharts(id string, labels labels.Labels) {
+	c.addCharts(serverChartsTmpl.Copy(), id, labels)
 }
 
-func (e *Envoy) addClusterManagerCharts(id string, labels labels.Labels) {
-	e.addCharts(clusterManagerChartsTmpl.Copy(), id, labels)
+func (c *Collector) addClusterManagerCharts(id string, labels labels.Labels) {
+	c.addCharts(clusterManagerChartsTmpl.Copy(), id, labels)
 }
 
-func (e *Envoy) addClusterUpstreamCharts(id string, labels labels.Labels) {
-	e.addCharts(clusterUpstreamChartsTmpl.Copy(), id, labels)
+func (c *Collector) addClusterUpstreamCharts(id string, labels labels.Labels) {
+	c.addCharts(clusterUpstreamChartsTmpl.Copy(), id, labels)
 }
 
-func (e *Envoy) addListenerManagerCharts(id string, labels labels.Labels) {
-	e.addCharts(listenerManagerChartsTmpl.Copy(), id, labels)
+func (c *Collector) addListenerManagerCharts(id string, labels labels.Labels) {
+	c.addCharts(listenerManagerChartsTmpl.Copy(), id, labels)
 }
 
-func (e *Envoy) addListenerAdminDownstreamCharts(id string, labels labels.Labels) {
-	e.addCharts(listenerAdminDownstreamChartsTmpl.Copy(), id, labels)
+func (c *Collector) addListenerAdminDownstreamCharts(id string, labels labels.Labels) {
+	c.addCharts(listenerAdminDownstreamChartsTmpl.Copy(), id, labels)
 }
 
-func (e *Envoy) addListenerDownstreamCharts(id string, labels labels.Labels) {
-	e.addCharts(listenerDownstreamChartsTmpl.Copy(), id, labels)
+func (c *Collector) addListenerDownstreamCharts(id string, labels labels.Labels) {
+	c.addCharts(listenerDownstreamChartsTmpl.Copy(), id, labels)
 }
 
-func (e *Envoy) addCharts(charts *module.Charts, id string, labels labels.Labels) {
+func (c *Collector) addCharts(charts *module.Charts, id string, labels labels.Labels) {
 	charts = charts.Copy()
 
 	for _, chart := range *charts {
@@ -848,18 +848,18 @@ func (e *Envoy) addCharts(charts *module.Charts, id string, labels labels.Labels
 		}
 	}
 
-	if err := e.Charts().Add(*charts...); err != nil {
-		e.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (e *Envoy) removeCharts(id string) {
+func (c *Collector) removeCharts(id string) {
 	if id == "" {
 		return
 	}
 
 	id = dotReplacer.Replace(id)
-	for _, chart := range *e.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasSuffix(chart.ID, id) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

@@ -17,7 +17,7 @@ FROM
     system.metrics FORMAT CSVWithNames
 `
 
-func (c *ClickHouse) collectSystemMetrics(mx map[string]int64) error {
+func (c *Collector) collectSystemMetrics(mx map[string]int64) error {
 	req, _ := web.NewHTTPRequest(c.RequestConfig)
 	req.URL.RawQuery = makeURLQuery(querySystemMetrics)
 

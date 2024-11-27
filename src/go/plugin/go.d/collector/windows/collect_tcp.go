@@ -15,10 +15,10 @@ const (
 	metricTCPConnectionSegmentsSent          = "windows_tcp_segments_sent_total"
 )
 
-func (w *Windows) collectTCP(mx map[string]int64, pms prometheus.Series) {
-	if !w.cache.collection[collectorTCP] {
-		w.cache.collection[collectorTCP] = true
-		w.addTCPCharts()
+func (c *Collector) collectTCP(mx map[string]int64, pms prometheus.Series) {
+	if !c.cache.collection[collectorTCP] {
+		c.cache.collection[collectorTCP] = true
+		c.addTCPCharts()
 	}
 
 	px := "tcp_"

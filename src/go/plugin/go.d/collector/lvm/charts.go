@@ -47,7 +47,7 @@ var (
 	}
 )
 
-func (l *LVM) addLVMThinPoolCharts(lvName, vgName string) {
+func (c *Collector) addLVMThinPoolCharts(lvName, vgName string) {
 	charts := lvThinPoolChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -62,7 +62,7 @@ func (l *LVM) addLVMThinPoolCharts(lvName, vgName string) {
 		}
 	}
 
-	if err := l.Charts().Add(*charts...); err != nil {
-		l.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }

@@ -12,14 +12,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
-func (m *MegaCli) initMegaCliExec() (megaCli, error) {
+func (c *Collector) initMegaCliExec() (megaCli, error) {
 	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
 
 	if _, err := os.Stat(ndsudoPath); err != nil {
 		return nil, fmt.Errorf("ndsudo executable not found: %v", err)
 	}
 
-	megaExec := newMegaCliExec(ndsudoPath, m.Timeout.Duration(), m.Logger)
+	megaExec := newMegaCliExec(ndsudoPath, c.Timeout.Duration(), c.Logger)
 
 	return megaExec, nil
 }
