@@ -34,7 +34,6 @@ struct receiver_state {
     struct buffered_reader reader;
 
     struct {
-        size_t id;
         // The parser pointer is safe to read and use, only when having the host receiver lock.
         // Without this lock, the data pointed by the pointer may vanish randomly.
         // Also, since the receiver sets it when it starts, it should be read with
@@ -50,6 +49,9 @@ struct receiver_state {
             char buf[COMPRESSION_MAX_CHUNK * 2];
             struct decompressor_state decompressor;
         } compressed;
+
+        size_t slot;
+        struct pollfd *pfd;
     } receiver;
 
     struct {

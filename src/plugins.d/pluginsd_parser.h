@@ -5,10 +5,10 @@
 
 #include "daemon/common.h"
 
-#define WORKER_PARSER_FIRST_JOB 3
+#define WORKER_PARSER_FIRST_JOB 34
 
-// this has to be in-sync with the same at receiver.c
-#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
+// this has to be in-sync with the same at stream-thread.c
+#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 9)
 
 // this controls the max response size of a function
 #define PLUGINSD_MAX_DEFERRED_SIZE (100 * 1024 * 1024)

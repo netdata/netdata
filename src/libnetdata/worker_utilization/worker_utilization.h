@@ -5,7 +5,7 @@
 
 // workers interfaces
 
-#define WORKER_UTILIZATION_MAX_JOB_TYPES 50
+#define WORKER_UTILIZATION_MAX_JOB_TYPES 80
 
 typedef enum __attribute__((packed)) {
     WORKER_METRIC_EMPTY = 0,
@@ -22,9 +22,15 @@ void worker_register_job_name(size_t job_id, const char *name);
 void worker_register_job_custom_metric(size_t job_id, const char *name, const char *units, WORKER_METRIC_TYPE type);
 void worker_unregister(void);
 
-void worker_is_idle(void);
-void worker_is_busy(size_t job_id);
-void worker_set_metric(size_t job_id, NETDATA_DOUBLE value);
+void worker_is_idle___enabled(void);
+void worker_is_busy___enabled(size_t job_id);
+void worker_set_metric___enabled(size_t job_id, NETDATA_DOUBLE value);
+
+struct worker;
+extern __thread struct worker *worker;
+#define worker_is_idle() { if(unlikely(worker)) worker_is_idle___enabled(); }
+#define worker_is_busy(id) { if(unlikely(worker)) worker_is_busy___enabled(id); }
+#define worker_set_metric(id, value) { if(unlikely(worker)) worker_set_metric___enabled(id, value); }
 
 // statistics interface
 

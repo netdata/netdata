@@ -31,7 +31,7 @@ void sender_thread_buffer_free(void);
 void *localhost_sender_start(void *ptr);
 void rrdhost_sender_start(struct rrdhost *host);
 void rrdhost_sender_signal_to_stop_and_wait(struct rrdhost *host, STREAM_HANDSHAKE reason, bool wait);
-void stream_sender_cancel_threads(void);
+void stream_threads_cancel(void);
 
 // managing host sender structures
 void rrdhost_sender_structures_init(struct rrdhost *host);

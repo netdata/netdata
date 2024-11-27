@@ -62,7 +62,7 @@ static struct workers_globals {
     .worknames_JudyHS = NULL,                   // the worknames index
 };
 
-static __thread struct worker *worker = NULL; // the current thread worker
+__thread struct worker *worker = NULL; // the current thread worker
 
 static inline usec_t worker_now_monotonic_usec(void) {
 #ifdef NETDATA_WITHOUT_WORKERS_LATENCY
@@ -197,14 +197,14 @@ static inline void worker_is_idle_with_time(usec_t now) {
         worker->last_action_timestamp = now;
 }
 
-void worker_is_idle(void) {
-    if(unlikely(!worker || worker->last_action != WORKER_BUSY)) return;
+void worker_is_idle___enabled(void) {
+    if(unlikely(worker->last_action != WORKER_BUSY)) return;
 
     worker_is_idle_with_time(worker_now_monotonic_usec());
 }
 
-void worker_is_busy(size_t job_id) {
-    if(unlikely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
+void worker_is_busy___enabled(size_t job_id) {
+    if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         return;
 
     usec_t now = worker_now_monotonic_usec();
@@ -222,9 +222,7 @@ void worker_is_busy(size_t job_id) {
     worker->last_action = WORKER_BUSY;
 }
 
-void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
-    if(unlikely(!worker)) return;
-
+void worker_set_metric___enabled(size_t job_id, NETDATA_DOUBLE value) {
     if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         return;
 

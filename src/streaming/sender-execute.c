@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "sender-internals.h"
+#include "stream-thread.h"
 
 struct inflight_stream_function {
     struct sender_state *sender;
@@ -52,7 +52,7 @@ static void stream_execute_function_progress_callback(void *data, size_t done, s
 }
 
 static void execute_commands_function(struct sender_state *s, const char *command, const char *transaction, const char *timeout_s, const char *function, BUFFER *payload, const char *access, const char *source) {
-    worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST);
+    worker_is_busy(WORKER_SENDER_JOB_EXECUTE_FUNCTION);
     nd_log(NDLS_ACCESS, NDLP_INFO, NULL);
 
     if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
@@ -216,7 +216,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
             s->defer.action_data = dfd;
         }
         else if(command && strcmp(command, PLUGINSD_CALL_FUNCTION_CANCEL) == 0) {
-            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST);
+            worker_is_busy(WORKER_SENDER_JOB_EXECUTE_FUNCTION);
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
             char *transaction = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
@@ -224,7 +224,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
                 rrd_function_cancel(transaction);
         }
         else if(command && strcmp(command, PLUGINSD_CALL_FUNCTION_PROGRESS) == 0) {
-            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST);
+            worker_is_busy(WORKER_SENDER_JOB_EXECUTE_FUNCTION);
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
             char *transaction = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
@@ -232,7 +232,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
                 rrd_function_progress(transaction);
         }
         else if (command && strcmp(command, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
-            worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_REPLAY_REQUEST);
+            worker_is_busy(WORKER_SENDER_JOB_EXECUTE_REPLAY);
 
             // do not log replication commands received - way too many!
             // nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
@@ -261,9 +261,12 @@ void stream_sender_execute_commands(struct sender_state *s) {
             }
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_NODE_ID) == 0) {
+            worker_is_busy(WORKER_SENDER_JOB_EXECUTE_META);
             rrdpush_sender_get_node_and_claim_id_from_parent(s);
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_JSON) == 0) {
+            worker_is_busy(WORKER_SENDER_JOB_EXECUTE_META);
+
             char *keyword = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
 
             s->defer.end_keyword = PLUGINSD_KEYWORD_JSON_END;

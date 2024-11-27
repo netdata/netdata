@@ -1463,6 +1463,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/sender-api.c
         src/streaming/receiver-internals.h
         src/streaming/receiver-api.c
+        src/streaming/stream-thread.c
+        src/streaming/stream-thread.h
 )
 
 set(WEB_PLUGIN_FILES

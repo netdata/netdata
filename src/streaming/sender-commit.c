@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "sender-internals.h"
+#include "stream-thread.h"
 
 #define SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
 
@@ -65,7 +65,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     // copy the sequence number of sender buffer recreates, while having our lock
     sender_thread_buffer_sender_recreates = s->sbuf.recreates;
 
-    if (s->dispatcher.msg.dispatcher_run_slot == 0 || s->dispatcher.msg.session == 0) {
+    if (!s->thread.msg.session) {
         // the dispatcher is not there anymore - ignore these data
         sender_unlock(s);
         sender_thread_buffer_free(); // free the thread data
@@ -112,6 +112,8 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
     if (s->compressor.initialized) {
         // compressed traffic
+        if(rrdhost_is_this_a_stream_thread(s->host))
+            worker_is_busy(WORKER_STREAM_JOB_COMPRESS);
 
         while (src_len) {
             size_t size_to_compress = src_len;
@@ -182,11 +184,11 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     }
 
     // update s->dispatcher entries
-    bool enable_sending = s->dispatcher.bytes_outstanding == 0;
+    bool enable_sending = s->thread.bytes_outstanding == 0;
     stream_sender_update_dispatcher_added_data_unsafe(s, type, total_compressed_len, total_uncompressed_len);
 
     if (enable_sending)
-        msg = s->dispatcher.msg;
+        msg = s->thread.msg;
 
     sender_unlock(s);
 
@@ -201,7 +203,7 @@ overflow_with_lock: {
         size_t buffer_size = s->sbuf.cb->size;
         size_t buffer_max_size = s->sbuf.cb->max_size;
         size_t buffer_available = cbuffer_available_size_unsafe(s->sbuf.cb);
-        msg = s->dispatcher.msg;
+        msg = s->thread.msg;
         sender_unlock(s);
         msg.op = SENDER_MSG_RECONNECT_OVERFLOW;
         stream_sender_send_msg_to_dispatcher(s, msg);
@@ -215,7 +217,7 @@ overflow_with_lock: {
 
 compression_failed_with_lock: {
         rrdpush_compression_deactivate(s);
-        msg = s->dispatcher.msg;
+        msg = s->thread.msg;
         sender_unlock(s);
         msg.op = SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION;
         stream_sender_send_msg_to_dispatcher(s, msg);

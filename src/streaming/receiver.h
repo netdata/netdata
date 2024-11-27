@@ -11,7 +11,6 @@ uint32_t stream_currently_connected_receivers(void);
 
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string, void *h2o_ctx);
 
-void stream_receiver_cancel_threads(void);
 bool receiver_has_capability(RRDHOST *host, STREAM_CAPABILITIES caps);
 
 void receiver_state_free(struct receiver_state *rpt);

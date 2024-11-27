@@ -19,45 +19,6 @@
 #define WORKER_SENDER_CONNECTOR_JOB_FAILED_NODES                        7
 #define WORKER_SENDER_CONNECTOR_JOB_CANCELLED_NODES                     8
 
-// dispatcher thread
-#define WORKER_SENDER_DISPATCHER_JOB_LIST                               0
-#define WORKER_SENDER_DISPATCHER_JOB_DEQUEUE                            1
-#define WORKER_SENDER_DISPATCHER_JOB_PREP                               2
-#define WORKER_SENDER_DISPATCHER_JOB_POLL_ERROR                         3
-#define WORKER_SENDER_DISPATCHER_JOB_PIPE_READ                          4
-#define WORKER_SENDER_DISPATCHER_JOB_SOCKET_RECEIVE                     5
-#define WORKER_SENDER_DISPATCHER_JOB_SOCKET_SEND                        6
-#define WORKER_SENDER_DISPATCHER_JOB_SOCKET_ERROR                       7
-#define WORKER_SENDER_DISPATCHER_JOB_EXECUTE                            8
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_OVERFLOW                9
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_TIMEOUT                 10
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SOCKET_ERROR            11
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED           12
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR           13
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR              14
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_COMPRESSION_ERROR       15
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVER_LEFT           16
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_HOST_CLEANUP            17
-
-// dispatcher execute requests
-#define WORKER_SENDER_DISPATCHER_JOB_REPLAY_REQUEST                     18
-#define WORKER_SENDER_DISPATCHER_JOB_FUNCTION_REQUEST                   19
-
-// dispatcher metrics
-#define WORKER_SENDER_DISPATCHER_JOB_NODES                              20
-#define WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO                       21
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED                     22
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT                         23
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED                   24
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED                 25
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO            26
-#define WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE                   27
-#define WORKER_SENDER_DISPATHCER_JOB_MESSAGES                           28
-
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 29
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 25
-#endif
-
 #define CONNECTED_TO_SIZE 100
 
 #define CBUFFER_INITIAL_SIZE (16 * 1024)
@@ -80,9 +41,9 @@ typedef enum __attribute__((packed)) {
 } SENDER_OP;
 
 struct sender_op {
-    uint32_t dispatcher_run_slot;       // the run slot of the dispatcher this message refers to
+    int32_t thread_slot;                // the dispatcher id this message refers to
+    int32_t snd_run_slot;               // the run slot of the dispatcher this message refers to
     uint32_t session;                   // random number used to verify that the message the dispatcher receives is for this sender
-    int8_t dispatcher_id;               // the dispatcher id this message refers to
     SENDER_OP op;                       // the actual message to be delivered
     struct sender_state *sender;
 };
@@ -98,7 +59,6 @@ struct sender_state {
     ND_SOCK sock;
 
     struct {
-        int8_t id;              // the dispatcher id - protected by sender_lock()
         struct sender_op msg;   // the template for sending a message to the dispatcher - protected by sender_lock()
 
         // this is a property of stream_sender_send_msg_to_dispatcher()
@@ -120,10 +80,13 @@ struct sender_state {
         size_t sends;
         size_t bytes_sent;
         size_t bytes_sent_by_type[STREAM_TRAFFIC_TYPE_MAX];
-    } dispatcher;
+
+        int32_t slot;
+        struct pollfd *pfd;
+    } thread;
 
     struct {
-        int8_t id;          // the connector id - protected by sender_lock()
+        int8_t id;                              // the connector id - protected by sender_lock()
     } connector;
 
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
@@ -206,7 +169,7 @@ struct sender_state {
 #define rrdpush_sender_pending_replication_requests_minus_one(sender) __atomic_sub_fetch(&((sender)->replication.atomic.pending_requests), 1, __ATOMIC_RELAXED)
 #define rrdpush_sender_pending_replication_requests_zero(sender) __atomic_store_n(&((sender)->replication.atomic.pending_requests), 0, __ATOMIC_RELAXED)
 
-void stream_sender_start_host_routing(RRDHOST *host);
+void stream_sender_add_to_connector_queue(RRDHOST *host);
 
 void stream_sender_execute_commands_cleanup(struct sender_state *s);
 void stream_sender_execute_commands(struct sender_state *s);

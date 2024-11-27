@@ -1137,6 +1137,8 @@ struct rrdhost_system_info {
 
 struct rrdhost_system_info *rrdhost_labels_to_system_info(RRDLABELS *labels);
 
+struct stream_thread;
+
 struct rrdhost {
     char machine_guid[GUID_LEN + 1];                // the unique ID of this host
 
@@ -1178,6 +1180,7 @@ struct rrdhost {
     // streaming and replication, configuration and status
 
     struct {
+        struct stream_thread *thread;
 
         // --- sender ---
 
@@ -1196,6 +1199,8 @@ struct rrdhost {
             } pluginsd_chart_slots;
 
             struct {
+                pid_t tid;
+
                 time_t last_connected;              // last time child connected (stored in db)
                 uint32_t connections;               // the number of times this sender has connected
 
@@ -1220,6 +1225,8 @@ struct rrdhost {
             } pluginsd_chart_slots;
 
             struct {
+                pid_t tid;
+
                 time_t last_connected;              // the time the last sender was connected
                 time_t last_disconnected;           // the time the last sender was disconnected
                 time_t last_chart;                  // the time of the last CHART streaming command

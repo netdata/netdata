@@ -21,7 +21,7 @@ void rrdhost_sender_structures_init(struct rrdhost *host) {
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
 
     host->sender->connector.id = -1;
-    host->sender->dispatcher.id = -1;
+    host->sender->thread.slot = -1;
     host->sender->host = host;
     host->sender->sbuf.cb = cbuffer_new(CBUFFER_INITIAL_SIZE, CBUFFER_INITIAL_MAX_SIZE, &netdata_buffers_statistics.cbuffers_streaming);
     host->sender->capabilities = stream_our_capabilities(host, true);
@@ -61,7 +61,7 @@ void rrdhost_sender_start(struct rrdhost *host) {
                    "Host '%s' does not have streaming enabled, but %s() was called",
                    rrdhost_hostname(host), __FUNCTION__);
 
-    stream_sender_start_host_routing(host);
+    stream_sender_add_to_connector_queue(host);
 }
 
 void *localhost_sender_start(void *ptr __maybe_unused) {
@@ -83,7 +83,7 @@ void rrdhost_sender_signal_to_stop_and_wait(struct rrdhost *host, STREAM_HANDSHA
         host->sender->exit.reason = reason;
     }
 
-    struct sender_op msg = host->sender->dispatcher.msg;
+    struct sender_op msg = host->sender->thread.msg;
     sender_unlock(host->sender);
 
     if(reason == STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT)
