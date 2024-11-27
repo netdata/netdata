@@ -209,7 +209,7 @@ cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead 
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
 cmake_dependent_option(ENABLE_MIMALLOC "Enable mimalloc allocator" ON
-        "CMAKE_SIZEOF_VOID_P EQUAL 8; NOT APPLE; NOT ANDROID; NOT OPENBSD; NOT ENABLE_ADDRESS_SANITIZER" OFF)
+        "CMAKE_MINOR_VERSION GREATER_EQUAL 18; CMAKE_SIZEOF_VOID_P EQUAL 8; NOT OS_FREEBSD; NOT OS_MACOS; NOT OS_WINDOWS; NOT ENABLE_ADDRESS_SANITIZER" OFF)
 
 if(ENABLE_MIMALLOC)
         function(netdata_add_mimalloc)
@@ -221,11 +221,19 @@ if(ENABLE_MIMALLOC)
                 include(FetchContent)
                 include(NetdataFetchContentExtra)
 
-                FetchContent_Declare(
-                        mimalloc
-                        GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
-                        GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f # v2.1.7
-                )
+                if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+                        FetchContent_Declare(mimalloc
+                                GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+                                GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f
+                                EXCLUDE_FROM_ALL
+                        )
+                else()
+                        FetchContent_Declare(mimalloc
+                                GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+                                GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f
+                        )
+                endif()
+
                 FetchContent_MakeAvailable_NoInstall(mimalloc)
         endfunction()
 
