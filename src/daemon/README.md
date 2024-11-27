@@ -34,7 +34,9 @@ For details about Netdata's logging system and configuration, see [Netdata Loggi
 
 Netdata uses the `batch` scheduling policy by default, which helps eliminate gaps in charts on busy systems while maintaining low system impact.
 
-### Systemd
+
+<details>
+<summary>Change (Systemd)</summary>
 
 When Netdata runs under systemd as the `netdata` user, it can’t directly modify its scheduling policy and priority. Instead, configure these settings through systemd.
 
@@ -71,7 +73,11 @@ When Netdata runs under systemd as the `netdata` user, it can’t directly modif
 
 4. [Restart](/docs/netdata-agent/start-stop-restart.md) netdata service.
 
-### Non-Systemd
+</details>
+
+
+<details>
+<summary>Change (Non-Systemd)</summary>
 
 To modify the scheduling policy, [edit](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) `netdata.conf`:
 
@@ -93,7 +99,7 @@ To modify the scheduling policy, [edit](/docs/netdata-agent/configuration/README
 
 For additional details about process scheduling, see [man sched](https://man7.org/linux/man-pages/man7/sched.7.html).
 
-#### FIFO and RR Priority
+**FIFO and RR Priority**:
 
 When using `fifo` or `rr` policies, you can set the process priority in `netdata.conf`:
 
@@ -104,7 +110,7 @@ When using `fifo` or `rr` policies, you can set the process priority in `netdata
 
 Priority values range from 0 to 99, with higher values indicating higher process importance.
 
-#### Nice Level
+**Nice Level**
 
 For `other`, `nice`, or `batch` policies, you can adjust the nice level:
 
@@ -114,6 +120,8 @@ For `other`, `nice`, or `batch` policies, you can adjust the nice level:
 ```
 
 The nice level ranges from -20 (the highest priority) to 19 (the lowest priority). A higher value means the process is "nicer" to other processes by using fewer CPU resources.
+
+</details>
 
 ## Debugging
 
