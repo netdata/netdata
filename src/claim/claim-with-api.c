@@ -240,15 +240,21 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 
     // Proxy configuration
     if (proxy) {
-        if (!*proxy || strcmp(proxy, "none") == 0)
+        if (!*proxy || strcmp(proxy, "none") == 0) {
             // disable proxy configuration in libcurl
             curl_easy_setopt(curl, CURLOPT_PROXY, "");
+            proxy = "none";
+        }
 
-        else if (strcmp(proxy, "env") != 0)
+        else if (strcmp(proxy, "env") != 0) {
             // set the custom proxy for libcurl
             curl_easy_setopt(curl, CURLOPT_PROXY, proxy);
+        }
 
-        // otherwise, libcurl will use its own proxy environment variables
+        else {
+            // otherwise, libcurl will use its own proxy environment variables
+            proxy = "env";
+        }
     }
 
     // Insecure option
@@ -264,7 +270,8 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     // execute the request
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        claim_agent_failure_reason_set("Request failed with error: %s", curl_easy_strerror(res));
+        claim_agent_failure_reason_set("Request failed with error: %s (proxy is set to '%s')",
+                                       curl_easy_strerror(res), proxy);
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
         *can_retry = true;
@@ -392,7 +399,7 @@ bool claim_agent_from_environment(void) {
 
     const char *proxy = getenv("NETDATA_CLAIM_PROXY");
     if(!proxy || !*proxy)
-        proxy = "";
+        proxy = "env";
 
     bool insecure = CONFIG_BOOLEAN_NO;
     const char *from_env = getenv("NETDATA_EXTRA_CLAIM_OPTS");
@@ -418,7 +425,7 @@ bool claim_agent_from_claim_conf(void) {
         const char *url = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
         const char *token = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "token", "");
         const char *rooms = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "rooms", "");
-        const char *proxy = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "proxy", "");
+        const char *proxy = appconfig_get(&claim_config, CONFIG_SECTION_GLOBAL, "proxy", "env");
         bool insecure = appconfig_get_boolean(&claim_config, CONFIG_SECTION_GLOBAL, "insecure", CONFIG_BOOLEAN_NO);
 
         if(token && *token && url && *url)
