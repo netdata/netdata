@@ -630,11 +630,17 @@ static void *stream_receive_thread(void *ptr) {
 
                 bool node_removed = false;
                 while(!node_removed && !nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING) && !receiver_should_stop(rpt)) {
+                    // feed the decompressor with the new data we just read
                     decompressor_status_t feed = receiver_feed_decompressor(rpt);
+
                     if(likely(feed == DECOMPRESS_OK)) {
                         while (!node_removed) {
+                            // feed our uncompressed data buffer with new data
                             decompressor_status_t rc = receiver_get_decompressed(rpt);
+
                             if (likely(rc == DECOMPRESS_OK)) {
+                                // loop through all the complete lines found in the uncompressed buffer
+
                                 while (buffered_reader_next_line(&rpt->reader, rpt->receiver.buffer)) {
                                     if (unlikely(parser_action(parser, rpt->receiver.buffer->buffer))) {
                                         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
