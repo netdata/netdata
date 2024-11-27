@@ -85,7 +85,7 @@ var (
 	}
 )
 
-func (a *AdaptecRaid) addLogicalDeviceCharts(ld *logicalDevice) {
+func (c *Collector) addLogicalDeviceCharts(ld *logicalDevice) {
 	charts := ldChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -100,12 +100,12 @@ func (a *AdaptecRaid) addLogicalDeviceCharts(ld *logicalDevice) {
 		}
 	}
 
-	if err := a.Charts().Add(*charts...); err != nil {
-		a.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (a *AdaptecRaid) addPhysicalDeviceCharts(pd *physicalDevice) {
+func (c *Collector) addPhysicalDeviceCharts(pd *physicalDevice) {
 	charts := pdChartsTmpl.Copy()
 
 	if _, err := strconv.ParseInt(pd.temperature, 10, 64); err != nil {
@@ -125,7 +125,7 @@ func (a *AdaptecRaid) addPhysicalDeviceCharts(pd *physicalDevice) {
 		}
 	}
 
-	if err := a.Charts().Add(*charts...); err != nil {
-		a.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
-func (c *DmCache) initDmsetupCLI() (dmsetupCLI, error) {
+func (c *Collector) initDmsetupCLI() (dmsetupCli, error) {
 	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
 	if _, err := os.Stat(ndsudoPath); err != nil {
 		return nil, fmt.Errorf("ndsudo executable not found: %v", err)

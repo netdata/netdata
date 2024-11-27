@@ -31,7 +31,12 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
         buffer_json_cloud_status(wb, now_s);
 
-        size_t currently_collected_metrics = 0;
+        size_t collected_metrics = 0;
+        size_t collected_instances = 0;
+        size_t collected_contexts = 0;
+        size_t available_metrics = 0;
+        size_t available_instances = 0;
+        size_t available_contexts = 0;
 
         buffer_json_member_add_object(wb, "nodes");
         {
@@ -40,16 +45,23 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             dfe_start_read(rrdhost_root_index, host) {
                 total++;
 
+                available_metrics += __atomic_load_n(&host->rrdctx.metrics_count, __ATOMIC_RELAXED);
+                available_instances += __atomic_load_n(&host->rrdctx.instances_count, __ATOMIC_RELAXED);
+                available_contexts += __atomic_load_n(&host->rrdctx.contexts_count, __ATOMIC_RELAXED);
+
                 if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED))
                     sending++;
 
-                if(host != localhost) {
-                    if (rrdhost_is_online(host))
+                if (rrdhost_is_online(host)) {
+                    collected_metrics += __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED);
+                    collected_instances += __atomic_load_n(&host->collected.instances_count, __ATOMIC_RELAXED);
+                    collected_contexts += __atomic_load_n(&host->collected.contexts_count, __ATOMIC_RELAXED);
+
+                    if(host != localhost)
                         receiving++;
-                    else
-                        archived++;
                 }
-                currently_collected_metrics += host->accounting.currently_collected;
+                else
+                    archived++;
             }
             dfe_done(host);
 
@@ -59,6 +71,27 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             buffer_json_member_add_uint64(wb, "archived", archived);
         }
         buffer_json_object_close(wb); // nodes
+
+        buffer_json_member_add_object(wb, "metrics");
+        {
+            buffer_json_member_add_uint64(wb, "collected", collected_metrics);
+            buffer_json_member_add_uint64(wb, "available", available_metrics);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "instances");
+        {
+            buffer_json_member_add_uint64(wb, "collected", collected_instances);
+            buffer_json_member_add_uint64(wb, "available", available_instances);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "contexts");
+        {
+            buffer_json_member_add_uint64(wb, "collected", collected_contexts);
+            buffer_json_member_add_uint64(wb, "available", available_contexts);
+        }
+        buffer_json_object_close(wb);
 
         agent_capabilities_to_json(wb, localhost, "capabilities");
 
@@ -108,15 +141,23 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                 buffer_json_member_add_double(wb, "disk_percent", percent);
             }
 
-            if(first_time_s) {
+            if(first_time_s < now_s) {
                 time_t retention = now_s - first_time_s;
 
                 buffer_json_member_add_time_t(wb, "from", first_time_s);
                 buffer_json_member_add_time_t(wb, "to", now_s);
                 buffer_json_member_add_time_t(wb, "retention", retention);
 
-                duration_snprintf_hours(human_retention, sizeof(human_retention),
-                                         (int)duration_round_to_resolution(retention, 3600));
+                if(retention < 60)
+                    duration_snprintf_time_t(human_retention, sizeof(human_retention), retention);
+                else if(retention < 24 * 60 * 60) {
+                    int64_t rounded_retention_mins = duration_round_to_resolution(retention, 60);
+                    duration_snprintf_mins(human_retention, sizeof(human_retention), rounded_retention_mins);
+                }
+                else {
+                    int64_t rounded_retention_hours = duration_round_to_resolution(retention, 3600);
+                    duration_snprintf_hours(human_retention, sizeof(human_retention), rounded_retention_hours);
+                }
 
                 buffer_json_member_add_string(wb, "retention_human", human_retention);
 
@@ -128,13 +169,11 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                     time_t space_retention = (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent);
                     time_t actual_retention = MIN(space_retention, time_retention ? time_retention : space_retention);
 
-                    if (time_retention) {
-                        duration_snprintf_hours(human_retention, sizeof(human_retention),
-                                                (int)duration_round_to_resolution(time_retention, 3600));
+                    duration_snprintf_hours(human_retention, sizeof(human_retention),
+                                            (int)duration_round_to_resolution(time_retention, 3600));
 
-                        buffer_json_member_add_time_t(wb, "requested_retention", time_retention);
-                        buffer_json_member_add_string(wb, "requested_retention_human", human_retention);
-                    }
+                    buffer_json_member_add_time_t(wb, "requested_retention", time_retention);
+                    buffer_json_member_add_string(wb, "requested_retention_human", human_retention);
 
                     duration_snprintf_hours(human_retention, sizeof(human_retention),
                                             (int)duration_round_to_resolution(actual_retention, 3600));
@@ -143,10 +182,6 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                     buffer_json_member_add_string(wb, "expected_retention_human", human_retention);
                 }
             }
-
-            if(currently_collected_metrics)
-                buffer_json_member_add_uint64(wb, "currently_collected_metrics", currently_collected_metrics);
-
             buffer_json_object_close(wb);
         }
         buffer_json_array_close(wb); // db_size

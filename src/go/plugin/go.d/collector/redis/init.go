@@ -11,20 +11,20 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func (r *Redis) validateConfig() error {
-	if r.Address == "" {
+func (c *Collector) validateConfig() error {
+	if c.Address == "" {
 		return errors.New("'address' not set")
 	}
 	return nil
 }
 
-func (r *Redis) initRedisClient() (*redis.Client, error) {
-	opts, err := redis.ParseURL(r.Address)
+func (c *Collector) initRedisClient() (*redis.Client, error) {
+	opts, err := redis.ParseURL(c.Address)
 	if err != nil {
 		return nil, err
 	}
 
-	tlsConfig, err := tlscfg.NewTLSConfig(r.TLSConfig)
+	tlsConfig, err := tlscfg.NewTLSConfig(c.TLSConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -33,22 +33,22 @@ func (r *Redis) initRedisClient() (*redis.Client, error) {
 		tlsConfig.ServerName = opts.TLSConfig.ServerName
 	}
 
-	if opts.Username == "" && r.Username != "" {
-		opts.Username = r.Username
+	if opts.Username == "" && c.Username != "" {
+		opts.Username = c.Username
 	}
-	if opts.Password == "" && r.Password != "" {
-		opts.Password = r.Password
+	if opts.Password == "" && c.Password != "" {
+		opts.Password = c.Password
 	}
 
 	opts.PoolSize = 1
 	opts.TLSConfig = tlsConfig
-	opts.DialTimeout = r.Timeout.Duration()
-	opts.ReadTimeout = r.Timeout.Duration()
-	opts.WriteTimeout = r.Timeout.Duration()
+	opts.DialTimeout = c.Timeout.Duration()
+	opts.ReadTimeout = c.Timeout.Duration()
+	opts.WriteTimeout = c.Timeout.Duration()
 
 	return redis.NewClient(opts), nil
 }
 
-func (r *Redis) initCharts() (*module.Charts, error) {
+func (c *Collector) initCharts() (*module.Charts, error) {
 	return redisCharts.Copy(), nil
 }

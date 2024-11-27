@@ -13,6 +13,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
+type arcconfCli interface {
+	logicalDevicesInfo() ([]byte, error)
+	physicalDevicesInfo() ([]byte, error)
+}
+
 func newArcconfCliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *arcconfCliExec {
 	return &arcconfCliExec{
 		Logger:     log,

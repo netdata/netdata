@@ -16,13 +16,13 @@ type diskStats struct {
 	unit        string
 }
 
-func (h *HddTemp) collect() (map[string]int64, error) {
-	msg, err := h.conn.queryHddTemp()
+func (c *Collector) collect() (map[string]int64, error) {
+	msg, err := c.conn.queryHddTemp()
 	if err != nil {
 		return nil, err
 	}
 
-	h.Debugf("hddtemp daemon response: %s", msg)
+	c.Debugf("hddtemp daemon response: %s", msg)
 
 	disks, err := parseHddTempMessage(msg)
 	if err != nil {
@@ -34,13 +34,13 @@ func (h *HddTemp) collect() (map[string]int64, error) {
 	for _, disk := range disks {
 		id := getDiskID(disk)
 		if id == "" {
-			h.Debugf("can not extract disk id from '%s'", disk.devPath)
+			c.Debugf("can not extract disk id from '%s'", disk.devPath)
 			continue
 		}
 
-		if !h.disks[id] {
-			h.disks[id] = true
-			h.addDiskTempSensorStatusChart(id, disk)
+		if !c.disks[id] {
+			c.disks[id] = true
+			c.addDiskTempSensorStatusChart(id, disk)
 		}
 
 		px := fmt.Sprintf("disk_%s_", id)
@@ -61,9 +61,9 @@ func (h *HddTemp) collect() (map[string]int64, error) {
 			mx[px+"temp_sensor_status_err"] = 1
 		default:
 			if v, ok := getTemperature(disk); ok {
-				if !h.disksTemp[id] {
-					h.disksTemp[id] = true
-					h.addDiskTempChart(id, disk)
+				if !c.disksTemp[id] {
+					c.disksTemp[id] = true
+					c.addDiskTempChart(id, disk)
 				}
 				mx[px+"temp_sensor_status_ok"] = 1
 				mx[px+"temperature"] = v

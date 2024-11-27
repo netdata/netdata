@@ -9,33 +9,33 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-func (m *Mongo) collectDbStats(mx map[string]int64) error {
-	if m.dbSelector == nil {
-		m.Debug("'database' selector not set, skip collecting database statistics")
+func (c *Collector) collectDbStats(mx map[string]int64) error {
+	if c.dbSelector == nil {
+		c.Debug("'database' selector not set, skip collecting database statistics")
 		return nil
 	}
 
-	allDBs, err := m.conn.listDatabaseNames()
+	allDBs, err := c.conn.listDatabaseNames()
 	if err != nil {
 		return fmt.Errorf("cannot get database names: %v", err)
 	}
 
-	m.Debugf("all databases on the server: '%v'", allDBs)
+	c.Debugf("all databases on the server: '%v'", allDBs)
 
 	var dbs []string
 	for _, db := range allDBs {
-		if m.dbSelector.MatchString(db) {
+		if c.dbSelector.MatchString(db) {
 			dbs = append(dbs, db)
 		}
 	}
 
 	if len(allDBs) != len(dbs) {
-		m.Debugf("databases remaining after filtering: %v", dbs)
+		c.Debugf("databases remaining after filtering: %v", dbs)
 	}
 
 	seen := make(map[string]bool)
 	for _, db := range dbs {
-		s, err := m.conn.dbStats(db)
+		s, err := c.conn.dbStats(db)
 		if err != nil {
 			return fmt.Errorf("dbStats command failed: %v", err)
 		}
@@ -52,25 +52,25 @@ func (m *Mongo) collectDbStats(mx map[string]int64) error {
 	}
 
 	for db := range seen {
-		if !m.databases[db] {
-			m.databases[db] = true
-			m.Debugf("new database '%s': creating charts", db)
-			m.addDatabaseCharts(db)
+		if !c.databases[db] {
+			c.databases[db] = true
+			c.Debugf("new database '%s': creating charts", db)
+			c.addDatabaseCharts(db)
 		}
 	}
 
-	for db := range m.databases {
+	for db := range c.databases {
 		if !seen[db] {
-			delete(m.databases, db)
-			m.Debugf("stale database '%s': removing charts", db)
-			m.removeDatabaseCharts(db)
+			delete(c.databases, db)
+			c.Debugf("stale database '%s': removing charts", db)
+			c.removeDatabaseCharts(db)
 		}
 	}
 
 	return nil
 }
 
-func (m *Mongo) addDatabaseCharts(name string) {
+func (c *Collector) addDatabaseCharts(name string) {
 	charts := chartsTmplDatabase.Copy()
 
 	for _, chart := range *charts {
@@ -83,15 +83,15 @@ func (m *Mongo) addDatabaseCharts(name string) {
 		}
 	}
 
-	if err := m.Charts().Add(*charts...); err != nil {
-		m.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *Mongo) removeDatabaseCharts(name string) {
+func (c *Collector) removeDatabaseCharts(name string) {
 	px := fmt.Sprintf("%s%s_", chartPxDatabase, name)
 
-	for _, chart := range *m.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

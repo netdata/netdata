@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- docs\(systemd-journal.plugin\): correct full-text search [\#19093](https://github.com/netdata/netdata/pull/19093) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#19088](https://github.com/netdata/netdata/pull/19088) ([netdatabot](https://github.com/netdatabot))
 - docs: fix go.d modules rename leftovers [\#19087](https://github.com/netdata/netdata/pull/19087) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#19086](https://github.com/netdata/netdata/pull/19086) ([netdatabot](https://github.com/netdatabot))
@@ -440,9 +441,6 @@
 - Regenerate integrations.js [\#18543](https://github.com/netdata/netdata/pull/18543) ([netdatabot](https://github.com/netdatabot))
 - go.d typesense: fix name in meta [\#18542](https://github.com/netdata/netdata/pull/18542) ([ilyam8](https://github.com/ilyam8))
 - Misc code cleanup [\#18540](https://github.com/netdata/netdata/pull/18540) ([stelfrag](https://github.com/stelfrag))
-- go.d add typesense collector [\#18538](https://github.com/netdata/netdata/pull/18538) ([ilyam8](https://github.com/ilyam8))
-- add typesense to apps\_groups.conf [\#18537](https://github.com/netdata/netdata/pull/18537) ([ilyam8](https://github.com/ilyam8))
-- Fetch metadata by hash for DEB repos. [\#18536](https://github.com/netdata/netdata/pull/18536) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

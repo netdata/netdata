@@ -16,20 +16,20 @@ import (
 
 const precision = 100
 
-func (l *Litespeed) collect() (map[string]int64, error) {
-	if l.checkDir {
-		_, err := os.Stat(l.ReportsDir)
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.checkDir {
+		_, err := os.Stat(c.ReportsDir)
 		if err != nil {
 			return nil, err
 		}
-		l.checkDir = false
+		c.checkDir = false
 	}
-	reports, err := filepath.Glob(filepath.Join(l.ReportsDir, ".rtreport*"))
+	reports, err := filepath.Glob(filepath.Join(c.ReportsDir, ".rtreport*"))
 	if err != nil {
 		return nil, err
 	}
 
-	l.Debugf("found %d reports: %v", len(reports), reports)
+	c.Debugf("found %d reports: %v", len(reports), reports)
 
 	if len(reports) == 0 {
 		return nil, errors.New("no reports found")
@@ -38,7 +38,7 @@ func (l *Litespeed) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
 	for _, report := range reports {
-		if err := l.collectReport(mx, report); err != nil {
+		if err := c.collectReport(mx, report); err != nil {
 			return nil, err
 		}
 	}
@@ -46,7 +46,7 @@ func (l *Litespeed) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (l *Litespeed) collectReport(mx map[string]int64, filename string) error {
+func (c *Collector) collectReport(mx map[string]int64, filename string) error {
 	bs, err := os.ReadFile(filename)
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func (l *Litespeed) collectReport(mx map[string]int64, filename string) error {
 		for _, part := range parts {
 			i := strings.IndexByte(part, ':')
 			if i == -1 {
-				l.Debugf("Skipping metric '%s': missing colon separator", part)
+				c.Debugf("Skipping metric '%s': missing colon separator", part)
 				continue
 			}
 
@@ -82,7 +82,7 @@ func (l *Litespeed) collectReport(mx map[string]int64, filename string) error {
 
 			val, err := strconv.ParseFloat(sVal, 64)
 			if err != nil {
-				l.Debugf("Skipping metric '%s': invalid value", part)
+				c.Debugf("Skipping metric '%s': invalid value", part)
 				continue
 			}
 

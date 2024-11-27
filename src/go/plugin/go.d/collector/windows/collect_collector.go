@@ -11,7 +11,7 @@ const (
 	metricCollectorSuccess  = "windows_exporter_collector_success"
 )
 
-func (w *Windows) collectCollector(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectCollector(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 	px := "collector_"
 	for _, pm := range pms.FindByName(metricCollectorDuration) {
@@ -32,15 +32,15 @@ func (w *Windows) collectCollector(mx map[string]int64, pms prometheus.Series) {
 	}
 
 	for name := range seen {
-		if !w.cache.collectors[name] {
-			w.cache.collectors[name] = true
-			w.addCollectorCharts(name)
+		if !c.cache.collectors[name] {
+			c.cache.collectors[name] = true
+			c.addCollectorCharts(name)
 		}
 	}
-	for name := range w.cache.collectors {
+	for name := range c.cache.collectors {
 		if !seen[name] {
-			delete(w.cache.collectors, name)
-			w.removeCollectorCharts(name)
+			delete(c.cache.collectors, name)
+			c.removeCollectorCharts(name)
 		}
 	}
 }

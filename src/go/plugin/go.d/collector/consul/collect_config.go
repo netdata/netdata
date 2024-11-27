@@ -45,7 +45,7 @@ type consulConfig struct {
 	}
 }
 
-func (c *Consul) collectConfiguration() error {
+func (c *Collector) collectConfiguration() error {
 	req, err := c.createRequest(urlPathAgentSelf)
 	if err != nil {
 		return err

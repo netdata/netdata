@@ -16,42 +16,42 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-func (w *WebLog) logPanicStackIfAny() {
+func (c *Collector) logPanicStackIfAny() {
 	err := recover()
 	if err == nil {
 		return
 	}
-	w.Errorf("[ERROR] %s\n", err)
+	c.Errorf("[ERROR] %s\n", err)
 	for depth := 0; ; depth++ {
 		_, file, line, ok := runtime.Caller(depth)
 		if !ok {
 			break
 		}
-		w.Errorf("======> %d: %v:%d", depth, file, line)
+		c.Errorf("======> %d: %v:%d", depth, file, line)
 	}
 	panic(err)
 }
 
-func (w *WebLog) collect() (map[string]int64, error) {
-	defer w.logPanicStackIfAny()
-	w.mx.reset()
+func (c *Collector) collect() (map[string]int64, error) {
+	defer c.logPanicStackIfAny()
+	c.mx.reset()
 
 	var mx map[string]int64
 
-	n, err := w.collectLogLines()
+	n, err := c.collectLogLines()
 
 	if n > 0 || err == nil {
-		mx = stm.ToMap(w.mx)
+		mx = stm.ToMap(c.mx)
 	}
 	return mx, err
 }
 
-func (w *WebLog) collectLogLines() (int, error) {
+func (c *Collector) collectLogLines() (int, error) {
 	logOnce := true
 	var n int
 	for {
-		w.line.reset()
-		err := w.parser.ReadLine(w.line)
+		c.line.reset()
+		err := c.parser.ReadLine(c.line)
 		if err != nil {
 			if err == io.EOF {
 				return n, nil
@@ -61,278 +61,278 @@ func (w *WebLog) collectLogLines() (int, error) {
 			}
 			n++
 			if logOnce {
-				w.Infof("unmatched line: %v (parser: %s)", err, w.parser.Info())
+				c.Infof("unmatched line: %v (parser: %s)", err, c.parser.Info())
 				logOnce = false
 			}
-			w.collectUnmatched()
+			c.collectUnmatched()
 			continue
 		}
 		n++
-		if w.line.empty() {
-			w.collectUnmatched()
+		if c.line.empty() {
+			c.collectUnmatched()
 		} else {
-			w.collectLogLine()
+			c.collectLogLine()
 		}
 	}
 }
 
-func (w *WebLog) collectLogLine() {
+func (c *Collector) collectLogLine() {
 	// https://github.com/netdata/netdata/issues/17716
-	if w.line.hasReqProcTime() && w.line.respCode == http.StatusSwitchingProtocols {
-		w.line.reqProcTime = emptyNumber
+	if c.line.hasReqProcTime() && c.line.respCode == http.StatusSwitchingProtocols {
+		c.line.reqProcTime = emptyNumber
 	}
-	w.mx.Requests.Inc()
-	w.collectVhost()
-	w.collectPort()
-	w.collectReqScheme()
-	w.collectReqClient()
-	w.collectReqMethod()
-	w.collectReqURL()
-	w.collectReqProto()
-	w.collectRespCode()
-	w.collectReqSize()
-	w.collectRespSize()
-	w.collectReqProcTime()
-	w.collectUpsRespTime()
-	w.collectSSLProto()
-	w.collectSSLCipherSuite()
-	w.collectCustomFields()
+	c.mx.Requests.Inc()
+	c.collectVhost()
+	c.collectPort()
+	c.collectReqScheme()
+	c.collectReqClient()
+	c.collectReqMethod()
+	c.collectReqURL()
+	c.collectReqProto()
+	c.collectRespCode()
+	c.collectReqSize()
+	c.collectRespSize()
+	c.collectReqProcTime()
+	c.collectUpsRespTime()
+	c.collectSSLProto()
+	c.collectSSLCipherSuite()
+	c.collectCustomFields()
 }
 
-func (w *WebLog) collectUnmatched() {
-	w.mx.Requests.Inc()
-	w.mx.ReqUnmatched.Inc()
+func (c *Collector) collectUnmatched() {
+	c.mx.Requests.Inc()
+	c.mx.ReqUnmatched.Inc()
 }
 
-func (w *WebLog) collectVhost() {
-	if !w.line.hasVhost() {
+func (c *Collector) collectVhost() {
+	if !c.line.hasVhost() {
 		return
 	}
-	c, ok := w.mx.ReqVhost.GetP(w.line.vhost)
+	cntr, ok := c.mx.ReqVhost.GetP(c.line.vhost)
 	if !ok {
-		w.addDimToVhostChart(w.line.vhost)
+		c.addDimToVhostChart(c.line.vhost)
 	}
-	c.Inc()
+	cntr.Inc()
 }
 
-func (w *WebLog) collectPort() {
-	if !w.line.hasPort() {
+func (c *Collector) collectPort() {
+	if !c.line.hasPort() {
 		return
 	}
-	c, ok := w.mx.ReqPort.GetP(w.line.port)
+	cntr, ok := c.mx.ReqPort.GetP(c.line.port)
 	if !ok {
-		w.addDimToPortChart(w.line.port)
+		c.addDimToPortChart(c.line.port)
 	}
-	c.Inc()
+	cntr.Inc()
 }
 
-func (w *WebLog) collectReqClient() {
-	if !w.line.hasReqClient() {
+func (c *Collector) collectReqClient() {
+	if !c.line.hasReqClient() {
 		return
 	}
-	if strings.ContainsRune(w.line.reqClient, ':') {
-		w.mx.ReqIPv6.Inc()
-		w.mx.UniqueIPv6.Insert(w.line.reqClient)
+	if strings.ContainsRune(c.line.reqClient, ':') {
+		c.mx.ReqIPv6.Inc()
+		c.mx.UniqueIPv6.Insert(c.line.reqClient)
 		return
 	}
 	// NOTE: count hostname as IPv4 address
-	w.mx.ReqIPv4.Inc()
-	w.mx.UniqueIPv4.Insert(w.line.reqClient)
+	c.mx.ReqIPv4.Inc()
+	c.mx.UniqueIPv4.Insert(c.line.reqClient)
 }
 
-func (w *WebLog) collectReqScheme() {
-	if !w.line.hasReqScheme() {
+func (c *Collector) collectReqScheme() {
+	if !c.line.hasReqScheme() {
 		return
 	}
-	if w.line.reqScheme == "https" {
-		w.mx.ReqHTTPSScheme.Inc()
+	if c.line.reqScheme == "https" {
+		c.mx.ReqHTTPSScheme.Inc()
 	} else {
-		w.mx.ReqHTTPScheme.Inc()
+		c.mx.ReqHTTPScheme.Inc()
 	}
 }
 
-func (w *WebLog) collectReqMethod() {
-	if !w.line.hasReqMethod() {
+func (c *Collector) collectReqMethod() {
+	if !c.line.hasReqMethod() {
 		return
 	}
-	c, ok := w.mx.ReqMethod.GetP(w.line.reqMethod)
+	cntr, ok := c.mx.ReqMethod.GetP(c.line.reqMethod)
 	if !ok {
-		w.addDimToReqMethodChart(w.line.reqMethod)
+		c.addDimToReqMethodChart(c.line.reqMethod)
 	}
-	c.Inc()
+	cntr.Inc()
 }
 
-func (w *WebLog) collectReqURL() {
-	if !w.line.hasReqURL() {
+func (c *Collector) collectReqURL() {
+	if !c.line.hasReqURL() {
 		return
 	}
-	for _, p := range w.urlPatterns {
-		if !p.MatchString(w.line.reqURL) {
+	for _, p := range c.urlPatterns {
+		if !p.MatchString(c.line.reqURL) {
 			continue
 		}
-		c, _ := w.mx.ReqURLPattern.GetP(p.name)
-		c.Inc()
+		cntr, _ := c.mx.ReqURLPattern.GetP(p.name)
+		cntr.Inc()
 
-		w.collectURLPatternStats(p.name)
+		c.collectURLPatternStats(p.name)
 		return
 	}
 }
 
-func (w *WebLog) collectReqProto() {
-	if !w.line.hasReqProto() {
+func (c *Collector) collectReqProto() {
+	if !c.line.hasReqProto() {
 		return
 	}
-	c, ok := w.mx.ReqVersion.GetP(w.line.reqProto)
+	cntr, ok := c.mx.ReqVersion.GetP(c.line.reqProto)
 	if !ok {
-		w.addDimToReqVersionChart(w.line.reqProto)
+		c.addDimToReqVersionChart(c.line.reqProto)
 	}
-	c.Inc()
+	cntr.Inc()
 }
 
-func (w *WebLog) collectRespCode() {
-	if !w.line.hasRespCode() {
+func (c *Collector) collectRespCode() {
+	if !c.line.hasRespCode() {
 		return
 	}
 
-	code := w.line.respCode
+	code := c.line.respCode
 	switch {
 	case code >= 100 && code < 300, code == 304, code == 401:
-		w.mx.ReqSuccess.Inc()
+		c.mx.ReqSuccess.Inc()
 	case code >= 300 && code < 400:
-		w.mx.ReqRedirect.Inc()
+		c.mx.ReqRedirect.Inc()
 	case code >= 400 && code < 500:
-		w.mx.ReqBad.Inc()
+		c.mx.ReqBad.Inc()
 	case code >= 500 && code < 600:
-		w.mx.ReqError.Inc()
+		c.mx.ReqError.Inc()
 	}
 
 	switch code / 100 {
 	case 1:
-		w.mx.Resp1xx.Inc()
+		c.mx.Resp1xx.Inc()
 	case 2:
-		w.mx.Resp2xx.Inc()
+		c.mx.Resp2xx.Inc()
 	case 3:
-		w.mx.Resp3xx.Inc()
+		c.mx.Resp3xx.Inc()
 	case 4:
-		w.mx.Resp4xx.Inc()
+		c.mx.Resp4xx.Inc()
 	case 5:
-		w.mx.Resp5xx.Inc()
+		c.mx.Resp5xx.Inc()
 	}
 
 	codeStr := strconv.Itoa(code)
-	c, ok := w.mx.RespCode.GetP(codeStr)
+	cntr, ok := c.mx.RespCode.GetP(codeStr)
 	if !ok {
-		w.addDimToRespCodesChart(codeStr)
+		c.addDimToRespCodesChart(codeStr)
 	}
-	c.Inc()
+	cntr.Inc()
 }
 
-func (w *WebLog) collectReqSize() {
-	if !w.line.hasReqSize() {
+func (c *Collector) collectReqSize() {
+	if !c.line.hasReqSize() {
 		return
 	}
-	w.mx.BytesReceived.Add(float64(w.line.reqSize))
+	c.mx.BytesReceived.Add(float64(c.line.reqSize))
 }
 
-func (w *WebLog) collectRespSize() {
-	if !w.line.hasRespSize() {
+func (c *Collector) collectRespSize() {
+	if !c.line.hasRespSize() {
 		return
 	}
-	w.mx.BytesSent.Add(float64(w.line.respSize))
+	c.mx.BytesSent.Add(float64(c.line.respSize))
 }
 
-func (w *WebLog) collectReqProcTime() {
-	if !w.line.hasReqProcTime() {
+func (c *Collector) collectReqProcTime() {
+	if !c.line.hasReqProcTime() {
 		return
 	}
-	w.mx.ReqProcTime.Observe(w.line.reqProcTime)
-	if w.mx.ReqProcTimeHist == nil {
+	c.mx.ReqProcTime.Observe(c.line.reqProcTime)
+	if c.mx.ReqProcTimeHist == nil {
 		return
 	}
-	w.mx.ReqProcTimeHist.Observe(w.line.reqProcTime)
+	c.mx.ReqProcTimeHist.Observe(c.line.reqProcTime)
 }
 
-func (w *WebLog) collectUpsRespTime() {
-	if !w.line.hasUpsRespTime() {
+func (c *Collector) collectUpsRespTime() {
+	if !c.line.hasUpsRespTime() {
 		return
 	}
-	w.mx.UpsRespTime.Observe(w.line.upsRespTime)
-	if w.mx.UpsRespTimeHist == nil {
+	c.mx.UpsRespTime.Observe(c.line.upsRespTime)
+	if c.mx.UpsRespTimeHist == nil {
 		return
 	}
-	w.mx.UpsRespTimeHist.Observe(w.line.upsRespTime)
+	c.mx.UpsRespTimeHist.Observe(c.line.upsRespTime)
 }
 
-func (w *WebLog) collectSSLProto() {
-	if !w.line.hasSSLProto() {
+func (c *Collector) collectSSLProto() {
+	if !c.line.hasSSLProto() {
 		return
 	}
-	c, ok := w.mx.ReqSSLProto.GetP(w.line.sslProto)
+	cntr, ok := c.mx.ReqSSLProto.GetP(c.line.sslProto)
 	if !ok {
-		w.addDimToSSLProtoChart(w.line.sslProto)
+		c.addDimToSSLProtoChart(c.line.sslProto)
 	}
-	c.Inc()
+	cntr.Inc()
 }
 
-func (w *WebLog) collectSSLCipherSuite() {
-	if !w.line.hasSSLCipherSuite() {
+func (c *Collector) collectSSLCipherSuite() {
+	if !c.line.hasSSLCipherSuite() {
 		return
 	}
-	c, ok := w.mx.ReqSSLCipherSuite.GetP(w.line.sslCipherSuite)
+	cntr, ok := c.mx.ReqSSLCipherSuite.GetP(c.line.sslCipherSuite)
 	if !ok {
-		w.addDimToSSLCipherSuiteChart(w.line.sslCipherSuite)
+		c.addDimToSSLCipherSuiteChart(c.line.sslCipherSuite)
 	}
-	c.Inc()
+	cntr.Inc()
 }
 
-func (w *WebLog) collectURLPatternStats(name string) {
-	v, ok := w.mx.URLPatternStats[name]
+func (c *Collector) collectURLPatternStats(name string) {
+	v, ok := c.mx.URLPatternStats[name]
 	if !ok {
 		return
 	}
-	if w.line.hasRespCode() {
-		status := strconv.Itoa(w.line.respCode)
-		c, ok := v.RespCode.GetP(status)
+	if c.line.hasRespCode() {
+		status := strconv.Itoa(c.line.respCode)
+		cntr, ok := v.RespCode.GetP(status)
 		if !ok {
-			w.addDimToURLPatternRespCodesChart(name, status)
+			c.addDimToURLPatternRespCodesChart(name, status)
 		}
-		c.Inc()
+		cntr.Inc()
 	}
 
-	if w.line.hasReqMethod() {
-		c, ok := v.ReqMethod.GetP(w.line.reqMethod)
+	if c.line.hasReqMethod() {
+		cntr, ok := v.ReqMethod.GetP(c.line.reqMethod)
 		if !ok {
-			w.addDimToURLPatternReqMethodsChart(name, w.line.reqMethod)
+			c.addDimToURLPatternReqMethodsChart(name, c.line.reqMethod)
 		}
-		c.Inc()
+		cntr.Inc()
 	}
 
-	if w.line.hasReqSize() {
-		v.BytesReceived.Add(float64(w.line.reqSize))
+	if c.line.hasReqSize() {
+		v.BytesReceived.Add(float64(c.line.reqSize))
 	}
 
-	if w.line.hasRespSize() {
-		v.BytesSent.Add(float64(w.line.respSize))
+	if c.line.hasRespSize() {
+		v.BytesSent.Add(float64(c.line.respSize))
 	}
-	if w.line.hasReqProcTime() {
-		v.ReqProcTime.Observe(w.line.reqProcTime)
+	if c.line.hasReqProcTime() {
+		v.ReqProcTime.Observe(c.line.reqProcTime)
 	}
 }
 
-func (w *WebLog) collectCustomFields() {
-	if !w.line.hasCustomFields() {
+func (c *Collector) collectCustomFields() {
+	if !c.line.hasCustomFields() {
 		return
 	}
 
-	for _, cv := range w.line.custom.values {
+	for _, cv := range c.line.custom.values {
 		_, _ = cv.name, cv.value
 
-		if patterns, ok := w.customFields[cv.name]; ok {
+		if patterns, ok := c.customFields[cv.name]; ok {
 			for _, pattern := range patterns {
 				if !pattern.MatchString(cv.value) {
 					continue
 				}
-				v, ok := w.mx.ReqCustomField[cv.name]
+				v, ok := c.mx.ReqCustomField[cv.name]
 				if !ok {
 					break
 				}
@@ -340,8 +340,8 @@ func (w *WebLog) collectCustomFields() {
 				c.Inc()
 				break
 			}
-		} else if histogram, ok := w.customTimeFields[cv.name]; ok {
-			v, ok := w.mx.ReqCustomTimeField[cv.name]
+		} else if histogram, ok := c.customTimeFields[cv.name]; ok {
+			v, ok := c.mx.ReqCustomTimeField[cv.name]
 			if !ok {
 				continue
 			}
@@ -353,8 +353,8 @@ func (w *WebLog) collectCustomFields() {
 			if histogram != nil {
 				v.TimeHist.Observe(ctf * timeMultiplier(cv.value))
 			}
-		} else if w.customNumericFields[cv.name] {
-			m, ok := w.mx.ReqCustomNumericField[cv.name]
+		} else if c.customNumericFields[cv.name] {
+			m, ok := c.mx.ReqCustomNumericField[cv.name]
 			if !ok {
 				continue
 			}
@@ -368,10 +368,10 @@ func (w *WebLog) collectCustomFields() {
 	}
 }
 
-func (w *WebLog) addDimToVhostChart(vhost string) {
-	chart := w.Charts().Get(reqByVhost.ID)
+func (c *Collector) addDimToVhostChart(vhost string) {
+	chart := c.Charts().Get(reqByVhost.ID)
 	if chart == nil {
-		w.Warningf("add dimension: no '%s' chart", reqByVhost.ID)
+		c.Warningf("add dimension: no '%s' chart", reqByVhost.ID)
 		return
 	}
 	dim := &Dim{
@@ -380,16 +380,16 @@ func (w *WebLog) addDimToVhostChart(vhost string) {
 		Algo: module.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		w.Warning(err)
+		c.Warning(err)
 		return
 	}
 	chart.MarkNotCreated()
 }
 
-func (w *WebLog) addDimToPortChart(port string) {
-	chart := w.Charts().Get(reqByPort.ID)
+func (c *Collector) addDimToPortChart(port string) {
+	chart := c.Charts().Get(reqByPort.ID)
 	if chart == nil {
-		w.Warningf("add dimension: no '%s' chart", reqByPort.ID)
+		c.Warningf("add dimension: no '%s' chart", reqByPort.ID)
 		return
 	}
 	dim := &Dim{
@@ -398,16 +398,16 @@ func (w *WebLog) addDimToPortChart(port string) {
 		Algo: module.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		w.Warning(err)
+		c.Warning(err)
 		return
 	}
 	chart.MarkNotCreated()
 }
 
-func (w *WebLog) addDimToReqMethodChart(method string) {
-	chart := w.Charts().Get(reqByMethod.ID)
+func (c *Collector) addDimToReqMethodChart(method string) {
+	chart := c.Charts().Get(reqByMethod.ID)
 	if chart == nil {
-		w.Warningf("add dimension: no '%s' chart", reqByMethod.ID)
+		c.Warningf("add dimension: no '%s' chart", reqByMethod.ID)
 		return
 	}
 	dim := &Dim{
@@ -416,16 +416,16 @@ func (w *WebLog) addDimToReqMethodChart(method string) {
 		Algo: module.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		w.Warning(err)
+		c.Warning(err)
 		return
 	}
 	chart.MarkNotCreated()
 }
 
-func (w *WebLog) addDimToReqVersionChart(version string) {
-	chart := w.Charts().Get(reqByVersion.ID)
+func (c *Collector) addDimToReqVersionChart(version string) {
+	chart := c.Charts().Get(reqByVersion.ID)
 	if chart == nil {
-		w.Warningf("add dimension: no '%s' chart", reqByVersion.ID)
+		c.Warningf("add dimension: no '%s' chart", reqByVersion.ID)
 		return
 	}
 	dim := &Dim{
@@ -434,18 +434,18 @@ func (w *WebLog) addDimToReqVersionChart(version string) {
 		Algo: module.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		w.Warning(err)
+		c.Warning(err)
 		return
 	}
 	chart.MarkNotCreated()
 }
 
-func (w *WebLog) addDimToSSLProtoChart(proto string) {
-	chart := w.Charts().Get(reqBySSLProto.ID)
+func (c *Collector) addDimToSSLProtoChart(proto string) {
+	chart := c.Charts().Get(reqBySSLProto.ID)
 	if chart == nil {
 		chart = reqBySSLProto.Copy()
-		if err := w.Charts().Add(chart); err != nil {
-			w.Warning(err)
+		if err := c.Charts().Add(chart); err != nil {
+			c.Warning(err)
 			return
 		}
 	}
@@ -455,18 +455,18 @@ func (w *WebLog) addDimToSSLProtoChart(proto string) {
 		Algo: module.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		w.Warning(err)
+		c.Warning(err)
 		return
 	}
 	chart.MarkNotCreated()
 }
 
-func (w *WebLog) addDimToSSLCipherSuiteChart(cipher string) {
-	chart := w.Charts().Get(reqBySSLCipherSuite.ID)
+func (c *Collector) addDimToSSLCipherSuiteChart(cipher string) {
+	chart := c.Charts().Get(reqBySSLCipherSuite.ID)
 	if chart == nil {
 		chart = reqBySSLCipherSuite.Copy()
-		if err := w.Charts().Add(chart); err != nil {
-			w.Warning(err)
+		if err := c.Charts().Add(chart); err != nil {
+			c.Warning(err)
 			return
 		}
 	}
@@ -476,16 +476,16 @@ func (w *WebLog) addDimToSSLCipherSuiteChart(cipher string) {
 		Algo: module.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		w.Warning(err)
+		c.Warning(err)
 		return
 	}
 	chart.MarkNotCreated()
 }
 
-func (w *WebLog) addDimToRespCodesChart(code string) {
-	chart := w.findRespCodesChart(code)
+func (c *Collector) addDimToRespCodesChart(code string) {
+	chart := c.findRespCodesChart(code)
 	if chart == nil {
-		w.Warning("add dimension: cant find resp codes chart")
+		c.Warning("add dimension: cant find resp codes chart")
 		return
 	}
 	dim := &Dim{
@@ -494,17 +494,17 @@ func (w *WebLog) addDimToRespCodesChart(code string) {
 		Algo: module.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		w.Warning(err)
+		c.Warning(err)
 		return
 	}
 	chart.MarkNotCreated()
 }
 
-func (w *WebLog) addDimToURLPatternRespCodesChart(name, code string) {
+func (c *Collector) addDimToURLPatternRespCodesChart(name, code string) {
 	id := fmt.Sprintf(urlPatternRespCodes.ID, name)
-	chart := w.Charts().Get(id)
+	chart := c.Charts().Get(id)
 	if chart == nil {
-		w.Warningf("add dimension: no '%s' chart", id)
+		c.Warningf("add dimension: no '%s' chart", id)
 		return
 	}
 	dim := &Dim{
@@ -514,17 +514,17 @@ func (w *WebLog) addDimToURLPatternRespCodesChart(name, code string) {
 	}
 
 	if err := chart.AddDim(dim); err != nil {
-		w.Warning(err)
+		c.Warning(err)
 		return
 	}
 	chart.MarkNotCreated()
 }
 
-func (w *WebLog) addDimToURLPatternReqMethodsChart(name, method string) {
+func (c *Collector) addDimToURLPatternReqMethodsChart(name, method string) {
 	id := fmt.Sprintf(urlPatternReqMethods.ID, name)
-	chart := w.Charts().Get(id)
+	chart := c.Charts().Get(id)
 	if chart == nil {
-		w.Warningf("add dimension: no '%s' chart", id)
+		c.Warningf("add dimension: no '%s' chart", id)
 		return
 	}
 	dim := &Dim{
@@ -534,15 +534,15 @@ func (w *WebLog) addDimToURLPatternReqMethodsChart(name, method string) {
 	}
 
 	if err := chart.AddDim(dim); err != nil {
-		w.Warning(err)
+		c.Warning(err)
 		return
 	}
 	chart.MarkNotCreated()
 }
 
-func (w *WebLog) findRespCodesChart(code string) *Chart {
-	if !w.GroupRespCodes {
-		return w.Charts().Get(respCodes.ID)
+func (c *Collector) findRespCodesChart(code string) *Chart {
+	if !c.GroupRespCodes {
+		return c.Charts().Get(respCodes.ID)
 	}
 
 	var id string
@@ -560,5 +560,5 @@ func (w *WebLog) findRespCodesChart(code string) *Chart {
 	default:
 		return nil
 	}
-	return w.Charts().Get(id)
+	return c.Charts().Get(id)
 }

@@ -8,20 +8,20 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (dh *DockerHub) validateConfig() error {
-	if dh.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
-	if len(dh.Repositories) == 0 {
+	if len(c.Repositories) == 0 {
 		return errors.New("repositories not set")
 	}
 	return nil
 }
 
-func (dh *DockerHub) initApiClient() (*apiClient, error) {
-	client, err := web.NewHTTPClient(dh.ClientConfig)
+func (c *Collector) initApiClient() (*apiClient, error) {
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
-	return newAPIClient(client, dh.RequestConfig), nil
+	return newAPIClient(client, c.RequestConfig), nil
 }

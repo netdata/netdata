@@ -6,31 +6,31 @@ import (
 	"github.com/go-ldap/ldap/v3"
 )
 
-func (l *OpenLDAP) collect() (map[string]int64, error) {
-	if l.conn == nil {
-		conn, err := l.establishConn()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.conn == nil {
+		conn, err := c.establishConn()
 		if err != nil {
 			return nil, err
 		}
-		l.conn = conn
+		c.conn = conn
 	}
 
 	mx := make(map[string]int64)
 
-	if err := l.collectMonitorCounters(mx); err != nil {
-		l.Cleanup()
+	if err := c.collectMonitorCounters(mx); err != nil {
+		c.Cleanup()
 		return nil, err
 	}
-	if err := l.collectOperations(mx); err != nil {
-		l.Cleanup()
+	if err := c.collectOperations(mx); err != nil {
+		c.Cleanup()
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (l *OpenLDAP) doSearchRequest(req *ldap.SearchRequest, fn func(*ldap.Entry)) error {
-	resp, err := l.conn.search(req)
+func (c *Collector) doSearchRequest(req *ldap.SearchRequest, fn func(*ldap.Entry)) error {
+	resp, err := c.conn.search(req)
 	if err != nil {
 		return err
 	}
@@ -44,8 +44,8 @@ func (l *OpenLDAP) doSearchRequest(req *ldap.SearchRequest, fn func(*ldap.Entry)
 	return nil
 }
 
-func (l *OpenLDAP) establishConn() (ldapConn, error) {
-	conn := l.newConn(l.Config)
+func (c *Collector) establishConn() (ldapConn, error) {
+	conn := c.newConn(c.Config)
 
 	if err := conn.connect(); err != nil {
 		return nil, err

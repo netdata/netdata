@@ -173,7 +173,7 @@ var (
 	}
 )
 
-func (s *StorCli) addControllerCharts(cntrl controllerInfo) {
+func (c *Collector) addControllerCharts(cntrl controllerInfo) {
 	var charts *module.Charts
 
 	switch cntrl.Version.DriverName {
@@ -202,12 +202,12 @@ func (s *StorCli) addControllerCharts(cntrl controllerInfo) {
 		}
 	}
 
-	if err := s.Charts().Add(*charts...); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (s *StorCli) addPhysDriveCharts(cntrlNum int, di *driveInfo, ds *driveState, da *driveAttrs) {
+func (c *Collector) addPhysDriveCharts(cntrlNum int, di *driveInfo, ds *driveState, da *driveAttrs) {
 	charts := physDriveChartsTmpl.Copy()
 
 	if _, ok := parseInt(getTemperature(ds.DriveTemperature)); !ok {
@@ -234,12 +234,12 @@ func (s *StorCli) addPhysDriveCharts(cntrlNum int, di *driveInfo, ds *driveState
 		}
 	}
 
-	if err := s.Charts().Add(*charts...); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (s *StorCli) addBBUCharts(cntrlNum, bbuNum, model string) {
+func (c *Collector) addBBUCharts(cntrlNum, bbuNum, model string) {
 	charts := bbuChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -254,7 +254,7 @@ func (s *StorCli) addBBUCharts(cntrlNum, bbuNum, model string) {
 		}
 	}
 
-	if err := s.Charts().Add(*charts...); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }

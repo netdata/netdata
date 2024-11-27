@@ -756,43 +756,43 @@ var (
 	}
 )
 
-func (es *Elasticsearch) addClusterStatsCharts() {
+func (c *Collector) addClusterStatsCharts() {
 	charts := clusterStatsChartsTmpl.Copy()
 
 	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, es.clusterName)
+		chart.ID = fmt.Sprintf(chart.ID, c.clusterName)
 		chart.Labels = []module.Label{
-			{Key: "cluster_name", Value: es.clusterName},
+			{Key: "cluster_name", Value: c.clusterName},
 		}
 	}
 
-	if err := es.charts.Add(*charts...); err != nil {
-		es.Warning(err)
+	if err := c.charts.Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (es *Elasticsearch) addClusterHealthCharts() {
+func (c *Collector) addClusterHealthCharts() {
 	charts := clusterHealthChartsTmpl.Copy()
 
 	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, es.clusterName)
+		chart.ID = fmt.Sprintf(chart.ID, c.clusterName)
 		chart.Labels = []module.Label{
-			{Key: "cluster_name", Value: es.clusterName},
+			{Key: "cluster_name", Value: c.clusterName},
 		}
 	}
 
-	if err := es.charts.Add(*charts...); err != nil {
-		es.Warning(err)
+	if err := c.charts.Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (es *Elasticsearch) addNodeCharts(nodeID string, node *esNodeStats) {
+func (c *Collector) addNodeCharts(nodeID string, node *esNodeStats) {
 	charts := nodeChartsTmpl.Copy()
 
 	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, nodeID, es.clusterName)
+		chart.ID = fmt.Sprintf(chart.ID, nodeID, c.clusterName)
 		chart.Labels = []module.Label{
-			{Key: "cluster_name", Value: es.clusterName},
+			{Key: "cluster_name", Value: c.clusterName},
 			{Key: "node_name", Value: node.Name},
 			{Key: "host", Value: node.Host},
 		}
@@ -801,23 +801,23 @@ func (es *Elasticsearch) addNodeCharts(nodeID string, node *esNodeStats) {
 		}
 	}
 
-	if err := es.Charts().Add(*charts...); err != nil {
-		es.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (es *Elasticsearch) removeNodeCharts(nodeID string) {
-	px := fmt.Sprintf("node_%s_cluster_%s_", nodeID, es.clusterName)
-	es.removeCharts(px)
+func (c *Collector) removeNodeCharts(nodeID string) {
+	px := fmt.Sprintf("node_%s_cluster_%s_", nodeID, c.clusterName)
+	c.removeCharts(px)
 }
 
-func (es *Elasticsearch) addIndexCharts(index string) {
+func (c *Collector) addIndexCharts(index string) {
 	charts := nodeIndexChartsTmpl.Copy()
 
 	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, index, es.clusterName)
+		chart.ID = fmt.Sprintf(chart.ID, index, c.clusterName)
 		chart.Labels = []module.Label{
-			{Key: "cluster_name", Value: es.clusterName},
+			{Key: "cluster_name", Value: c.clusterName},
 			{Key: "index", Value: index},
 		}
 		for _, dim := range chart.Dims {
@@ -825,18 +825,18 @@ func (es *Elasticsearch) addIndexCharts(index string) {
 		}
 	}
 
-	if err := es.Charts().Add(*charts...); err != nil {
-		es.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (es *Elasticsearch) removeIndexCharts(index string) {
-	px := fmt.Sprintf("node_index_%s_cluster_%s_", index, es.clusterName)
-	es.removeCharts(px)
+func (c *Collector) removeIndexCharts(index string) {
+	px := fmt.Sprintf("node_index_%s_cluster_%s_", index, c.clusterName)
+	c.removeCharts(px)
 }
 
-func (es *Elasticsearch) removeCharts(prefix string) {
-	for _, chart := range *es.Charts() {
+func (c *Collector) removeCharts(prefix string) {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

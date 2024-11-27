@@ -21,11 +21,11 @@ type vdevEntry struct {
 	level int
 }
 
-func (z *ZFSPool) collectZpoolListVdev(mx map[string]int64) error {
+func (c *Collector) collectZpoolListVdev(mx map[string]int64) error {
 	seen := make(map[string]bool)
 
-	for pool := range z.seenZpools {
-		bs, err := z.exec.listWithVdev(pool)
+	for pool := range c.seenZpools {
+		bs, err := c.exec.listWithVdev(pool)
 		if err != nil {
 			return err
 		}
@@ -41,9 +41,9 @@ func (z *ZFSPool) collectZpoolListVdev(mx map[string]int64) error {
 			}
 
 			seen[vdev.vdev] = true
-			if !z.seenVdevs[vdev.vdev] {
-				z.seenVdevs[vdev.vdev] = true
-				z.addVdevCharts(pool, vdev.vdev)
+			if !c.seenVdevs[vdev.vdev] {
+				c.seenVdevs[vdev.vdev] = true
+				c.addVdevCharts(pool, vdev.vdev)
 			}
 
 			px := fmt.Sprintf("vdev_%s_", vdev.vdev)
@@ -55,10 +55,10 @@ func (z *ZFSPool) collectZpoolListVdev(mx map[string]int64) error {
 		}
 	}
 
-	for name := range z.seenVdevs {
+	for name := range c.seenVdevs {
 		if !seen[name] {
-			z.removeVdevCharts(name)
-			delete(z.seenVdevs, name)
+			c.removeVdevCharts(name)
+			delete(c.seenVdevs, name)
 		}
 	}
 

@@ -14,6 +14,11 @@ import (
 	"github.com/mattn/go-xmlrpc"
 )
 
+type supervisorClient interface {
+	getAllProcessInfo() ([]processStatus, error)
+	closeIdleConnections()
+}
+
 type supervisorRPCClient struct {
 	client *xmlrpc.Client
 }

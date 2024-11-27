@@ -10,14 +10,14 @@ import (
 
 const queryShowGlobalStatus = "SHOW GLOBAL STATUS;"
 
-func (m *MySQL) collectGlobalStatus(mx map[string]int64) error {
+func (c *Collector) collectGlobalStatus(mx map[string]int64) error {
 	// MariaDB: https://mariadb.com/kb/en/server-status-variables/
 	// MySQL: https://dev.mysql.com/doc/refman/8.0/en/server-status-variable-reference.html
 	q := queryShowGlobalStatus
-	m.Debugf("executing query: '%s'", q)
+	c.Debugf("executing query: '%s'", q)
 
 	var name string
-	_, err := m.collectQuery(q, func(column, value string, _ bool) {
+	_, err := c.collectQuery(q, func(column, value string, _ bool) {
 		switch column {
 		case "Variable_name":
 			name = value

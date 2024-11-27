@@ -33,7 +33,7 @@ type tableStats struct {
 	rows     int64
 }
 
-func (c *ClickHouse) collectSystemParts(mx map[string]int64) error {
+func (c *Collector) collectSystemParts(mx map[string]int64) error {
 	req, _ := web.NewHTTPRequest(c.RequestConfig)
 	req.URL.RawQuery = makeURLQuery(querySystemParts)
 

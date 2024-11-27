@@ -13,10 +13,10 @@ const (
 	metricSysThreads      = "windows_system_threads"
 )
 
-func (w *Windows) collectSystem(mx map[string]int64, pms prometheus.Series) {
-	if !w.cache.collection[collectorSystem] {
-		w.cache.collection[collectorSystem] = true
-		w.addSystemCharts()
+func (c *Collector) collectSystem(mx map[string]int64, pms prometheus.Series) {
+	if !c.cache.collection[collectorSystem] {
+		c.cache.collection[collectorSystem] = true
+		c.addSystemCharts()
 	}
 
 	px := "system_"

@@ -4,30 +4,30 @@ package mongo
 
 import "fmt"
 
-func (m *Mongo) collect() (map[string]int64, error) {
-	if err := m.conn.initClient(m.URI, m.Timeout.Duration()); err != nil {
+func (c *Collector) collect() (map[string]int64, error) {
+	if err := c.conn.initClient(c.URI, c.Timeout.Duration()); err != nil {
 		return nil, fmt.Errorf("init mongo conn: %v", err)
 	}
 
 	mx := make(map[string]int64)
 
-	if err := m.collectServerStatus(mx); err != nil {
+	if err := c.collectServerStatus(mx); err != nil {
 		return nil, fmt.Errorf("couldn't collect server status metrics: %v", err)
 	}
 
-	if err := m.collectDbStats(mx); err != nil {
+	if err := c.collectDbStats(mx); err != nil {
 		return mx, fmt.Errorf("couldn't collect dbstats metrics: %v", err)
 	}
 
-	if m.conn.isReplicaSet() {
-		if err := m.collectReplSetStatus(mx); err != nil {
+	if c.conn.isReplicaSet() {
+		if err := c.collectReplSetStatus(mx); err != nil {
 			return mx, fmt.Errorf("couldn't collect documentReplSetStatus metrics: %v", err)
 		}
 	}
 
-	if m.conn.isMongos() {
-		m.addShardingChartsOnce.Do(m.addShardingCharts)
-		if err := m.collectSharding(mx); err != nil {
+	if c.conn.isMongos() {
+		c.addShardingChartsOnce.Do(c.addShardingCharts)
+		if err := c.collectSharding(mx); err != nil {
 			return mx, fmt.Errorf("couldn't collect sharding metrics: %v", err)
 		}
 	}

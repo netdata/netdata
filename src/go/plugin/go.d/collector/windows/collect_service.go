@@ -13,7 +13,7 @@ const (
 	metricServiceStatus = "windows_service_status"
 )
 
-func (w *Windows) collectService(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectService(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 	px := "service_"
 	for _, pm := range pms.FindByName(metricServiceState) {
@@ -38,15 +38,15 @@ func (w *Windows) collectService(mx map[string]int64, pms prometheus.Series) {
 	}
 
 	for svc := range seen {
-		if !w.cache.services[svc] {
-			w.cache.services[svc] = true
-			w.addServiceCharts(svc)
+		if !c.cache.services[svc] {
+			c.cache.services[svc] = true
+			c.addServiceCharts(svc)
 		}
 	}
-	for svc := range w.cache.services {
+	for svc := range c.cache.services {
 		if !seen[svc] {
-			delete(w.cache.services, svc)
-			w.removeServiceCharts(svc)
+			delete(c.cache.services, svc)
+			c.removeServiceCharts(svc)
 		}
 	}
 }

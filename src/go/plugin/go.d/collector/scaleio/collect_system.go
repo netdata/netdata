@@ -4,7 +4,7 @@ package scaleio
 
 import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/scaleio/client"
 
-func (s *ScaleIO) collectSystem(ss client.SystemStatistics) systemMetrics {
+func (c *Collector) collectSystem(ss client.SystemStatistics) systemMetrics {
 	var sm systemMetrics
 	collectSystemCapacity(&sm, ss)
 	collectSystemWorkload(&sm, ss)

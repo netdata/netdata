@@ -10,31 +10,31 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (cd *CoreDNS) validateConfig() error {
-	if cd.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
 	return nil
 }
 
-func (cd *CoreDNS) initPerServerMatcher() (matcher.Matcher, error) {
-	if cd.PerServerStats.Empty() {
+func (c *Collector) initPerServerMatcher() (matcher.Matcher, error) {
+	if c.PerServerStats.Empty() {
 		return nil, nil
 	}
-	return cd.PerServerStats.Parse()
+	return c.PerServerStats.Parse()
 }
 
-func (cd *CoreDNS) initPerZoneMatcher() (matcher.Matcher, error) {
-	if cd.PerZoneStats.Empty() {
+func (c *Collector) initPerZoneMatcher() (matcher.Matcher, error) {
+	if c.PerZoneStats.Empty() {
 		return nil, nil
 	}
-	return cd.PerZoneStats.Parse()
+	return c.PerZoneStats.Parse()
 }
 
-func (cd *CoreDNS) initPrometheusClient() (prometheus.Prometheus, error) {
-	client, err := web.NewHTTPClient(cd.ClientConfig)
+func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
-	return prometheus.New(client, cd.RequestConfig), nil
+	return prometheus.New(client, c.RequestConfig), nil
 }

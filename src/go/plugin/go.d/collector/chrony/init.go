@@ -12,14 +12,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
-func (c *Chrony) validateConfig() error {
+func (c *Collector) validateConfig() error {
 	if c.Address == "" {
 		return errors.New("empty 'address'")
 	}
 	return nil
 }
 
-func (c *Chrony) initChronycBinary() (chronyBinary, error) {
+func (c *Collector) initChronycBinary() (chronyBinary, error) {
 	host, _, err := net.SplitHostPort(c.Address)
 	if err != nil {
 		return nil, err

@@ -11,27 +11,27 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
 )
 
-func (z *Zookeeper) verifyConfig() error {
-	if z.Address == "" {
+func (c *Collector) verifyConfig() error {
+	if c.Address == "" {
 		return errors.New("address not set")
 	}
 	return nil
 }
 
-func (z *Zookeeper) initZookeeperFetcher() (fetcher, error) {
+func (c *Collector) initZookeeperFetcher() (fetcher, error) {
 	var tlsConf *tls.Config
 	var err error
 
-	if z.UseTLS {
-		tlsConf, err = tlscfg.NewTLSConfig(z.TLSConfig)
+	if c.UseTLS {
+		tlsConf, err = tlscfg.NewTLSConfig(c.TLSConfig)
 		if err != nil {
 			return nil, fmt.Errorf("creating tls config : %v", err)
 		}
 	}
 
 	sock := socket.New(socket.Config{
-		Address: z.Address,
-		Timeout: z.Timeout.Duration(),
+		Address: c.Address,
+		Timeout: c.Timeout.Duration(),
 		TLSConf: tlsConf,
 	})
 

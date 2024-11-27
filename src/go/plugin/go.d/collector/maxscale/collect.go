@@ -18,31 +18,31 @@ const (
 	urlPathServers         = "/servers"
 )
 
-func (m *MaxScale) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := m.collectMaxScaleGlobal(mx); err != nil {
+	if err := c.collectMaxScaleGlobal(mx); err != nil {
 		return nil, err
 	}
-	if err := m.collectMaxScaleThreads(mx); err != nil {
+	if err := c.collectMaxScaleThreads(mx); err != nil {
 		return nil, err
 	}
-	if err := m.collectServers(mx); err != nil {
+	if err := c.collectServers(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (m *MaxScale) collectMaxScaleGlobal(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(m.RequestConfig, urlPathMaxscale)
+func (c *Collector) collectMaxScaleGlobal(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathMaxscale)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %v", err)
 	}
 
 	var resp maxscaleGlobalResponse
 
-	if err := web.DoHTTP(m.httpClient).RequestJSON(req, &resp); err != nil {
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
 		return err
 	}
 
@@ -55,15 +55,15 @@ func (m *MaxScale) collectMaxScaleGlobal(mx map[string]int64) error {
 	return nil
 }
 
-func (m *MaxScale) collectMaxScaleThreads(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(m.RequestConfig, urlPathMaxscaleThreads)
+func (c *Collector) collectMaxScaleThreads(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathMaxscaleThreads)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %v", err)
 	}
 
 	var resp maxscaleThreadsResponse
 
-	if err := web.DoHTTP(m.httpClient).RequestJSON(req, &resp); err != nil {
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
 		return err
 	}
 
@@ -91,15 +91,15 @@ func (m *MaxScale) collectMaxScaleThreads(mx map[string]int64) error {
 	return nil
 }
 
-func (m *MaxScale) collectServers(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(m.RequestConfig, urlPathServers)
+func (c *Collector) collectServers(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathServers)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %v", err)
 	}
 
 	var resp serversResponse
 
-	if err := web.DoHTTP(m.httpClient).RequestJSON(req, &resp); err != nil {
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
 		return err
 	}
 
@@ -112,10 +112,10 @@ func (m *MaxScale) collectServers(mx map[string]int64) error {
 
 		seen[r.ID] = true
 
-		if !m.seenServers[r.ID] {
-			m.seenServers[r.ID] = true
+		if !c.seenServers[r.ID] {
+			c.seenServers[r.ID] = true
 			addr := net.JoinHostPort(r.Attrs.Params.Address, strconv.Itoa(int(r.Attrs.Params.Port)))
-			m.addServerCharts(r.ID, addr)
+			c.addServerCharts(r.ID, addr)
 		}
 
 		px := fmt.Sprintf("server_%s_", r.ID)
@@ -130,10 +130,10 @@ func (m *MaxScale) collectServers(mx map[string]int64) error {
 		}
 	}
 
-	for id := range m.seenServers {
+	for id := range c.seenServers {
 		if !seen[id] {
-			delete(m.seenServers, id)
-			m.removeServerCharts(id)
+			delete(c.seenServers, id)
+			c.removeServerCharts(id)
 		}
 	}
 

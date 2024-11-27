@@ -14,20 +14,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (ks *KubeState) getKubeClusterID() string {
-	ns, err := ks.client.CoreV1().Namespaces().Get(ks.ctx, "kube-system", metav1.GetOptions{})
+func (c *Collector) getKubeClusterID() string {
+	ns, err := c.client.CoreV1().Namespaces().Get(c.ctx, "kube-system", metav1.GetOptions{})
 	if err != nil {
-		ks.Warningf("error on getting 'kube-system' namespace UID: %v", err)
+		c.Warningf("error on getting 'kube-system' namespace UID: %v", err)
 		return ""
 	}
 	return string(ns.UID)
 }
 
-func (ks *KubeState) getKubeClusterName() string {
+func (c *Collector) getKubeClusterName() string {
 	client := &http.Client{Timeout: time.Second}
 	n, err := getGKEKubeClusterName(client)
 	if err != nil {
-		ks.Debugf("error on getting GKE cluster name: %v", err)
+		c.Debugf("error on getting GKE cluster name: %v", err)
 	}
 	return n
 }

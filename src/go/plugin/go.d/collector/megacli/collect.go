@@ -9,13 +9,13 @@ import (
 	"strings"
 )
 
-func (m *MegaCli) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := m.collectPhysDrives(mx); err != nil {
+	if err := c.collectPhysDrives(mx); err != nil {
 		return nil, err
 	}
-	if err := m.collectBBU(mx); err != nil {
+	if err := c.collectBBU(mx); err != nil {
 		return nil, err
 	}
 

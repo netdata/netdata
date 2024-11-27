@@ -39,19 +39,19 @@ ORDER BY
   time;`
 )
 
-func (m *MySQL) collectProcessListStatistics(mx map[string]int64) error {
+func (c *Collector) collectProcessListStatistics(mx map[string]int64) error {
 	var q string
 	mysqlMinVer := semver.Version{Major: 8, Minor: 0, Patch: 22}
-	if !m.isMariaDB && m.version.GTE(mysqlMinVer) && m.varPerformanceSchema == "ON" {
+	if !c.isMariaDB && c.version.GTE(mysqlMinVer) && c.varPerformanceSchema == "ON" {
 		q = queryShowProcessListPS
 	} else {
 		q = queryShowProcessList
 	}
-	m.Debugf("executing query: '%s'", q)
+	c.Debugf("executing query: '%s'", q)
 
 	var maxTime int64 // slowest query milliseconds in process list
 
-	duration, err := m.collectQuery(q, func(column, value string, _ bool) {
+	duration, err := c.collectQuery(q, func(column, value string, _ bool) {
 		switch column {
 		case "time":
 			maxTime = parseInt(value)

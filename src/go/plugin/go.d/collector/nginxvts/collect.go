@@ -7,30 +7,30 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (vts *NginxVTS) collect() (map[string]int64, error) {
-	ms, err := vts.scapeVTS()
+func (c *Collector) collect() (map[string]int64, error) {
+	ms, err := c.scapeVTS()
 	if err != nil {
 		return nil, nil
 	}
 
 	collected := make(map[string]any)
-	vts.collectMain(collected, ms)
-	vts.collectSharedZones(collected, ms)
-	vts.collectServerZones(collected, ms)
+	c.collectMain(collected, ms)
+	c.collectSharedZones(collected, ms)
+	c.collectServerZones(collected, ms)
 
 	return stm.ToMap(collected), nil
 }
 
-func (vts *NginxVTS) collectMain(collected map[string]any, ms *vtsMetrics) {
+func (c *Collector) collectMain(collected map[string]any, ms *vtsMetrics) {
 	collected["uptime"] = (ms.NowMsec - ms.LoadMsec) / 1000
 	collected["connections"] = ms.Connections
 }
 
-func (vts *NginxVTS) collectSharedZones(collected map[string]any, ms *vtsMetrics) {
+func (c *Collector) collectSharedZones(collected map[string]any, ms *vtsMetrics) {
 	collected["sharedzones"] = ms.SharedZones
 }
 
-func (vts *NginxVTS) collectServerZones(collected map[string]any, ms *vtsMetrics) {
+func (c *Collector) collectServerZones(collected map[string]any, ms *vtsMetrics) {
 	if !ms.hasServerZones() {
 		return
 	}
@@ -39,12 +39,12 @@ func (vts *NginxVTS) collectServerZones(collected map[string]any, ms *vtsMetrics
 	collected["total"] = ms.ServerZones["*"]
 }
 
-func (vts *NginxVTS) scapeVTS() (*vtsMetrics, error) {
-	req, _ := web.NewHTTPRequest(vts.RequestConfig)
+func (c *Collector) scapeVTS() (*vtsMetrics, error) {
+	req, _ := web.NewHTTPRequest(c.RequestConfig)
 
 	var total vtsMetrics
-	if err := web.DoHTTP(vts.httpClient).RequestJSON(req, &total); err != nil {
-		vts.Warning(err)
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &total); err != nil {
+		c.Warning(err)
 		return nil, err
 	}
 

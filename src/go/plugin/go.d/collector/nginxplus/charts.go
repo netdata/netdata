@@ -756,7 +756,7 @@ var (
 	}
 )
 
-func (n *NginxPlus) addHTTPCacheCharts(name string) {
+func (c *Collector) addHTTPCacheCharts(name string) {
 	charts := httpCacheChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -769,17 +769,17 @@ func (n *NginxPlus) addHTTPCacheCharts(name string) {
 		}
 	}
 
-	if err := n.Charts().Add(*charts...); err != nil {
-		n.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (n *NginxPlus) removeHTTPCacheCharts(name string) {
+func (c *Collector) removeHTTPCacheCharts(name string) {
 	px := fmt.Sprintf("http_cache_%s_", name)
-	n.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (n *NginxPlus) addHTTPServerZoneCharts(zone string) {
+func (c *Collector) addHTTPServerZoneCharts(zone string) {
 	charts := httpServerZoneChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -792,17 +792,17 @@ func (n *NginxPlus) addHTTPServerZoneCharts(zone string) {
 		}
 	}
 
-	if err := n.Charts().Add(*charts...); err != nil {
-		n.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (n *NginxPlus) removeHTTPServerZoneCharts(zone string) {
+func (c *Collector) removeHTTPServerZoneCharts(zone string) {
 	px := fmt.Sprintf("http_server_zone_%s_", zone)
-	n.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (n *NginxPlus) addHTTPLocationZoneCharts(zone string) {
+func (c *Collector) addHTTPLocationZoneCharts(zone string) {
 	charts := httpLocationZoneChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -815,17 +815,17 @@ func (n *NginxPlus) addHTTPLocationZoneCharts(zone string) {
 		}
 	}
 
-	if err := n.Charts().Add(*charts...); err != nil {
-		n.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (n *NginxPlus) removeHTTPLocationZoneCharts(zone string) {
+func (c *Collector) removeHTTPLocationZoneCharts(zone string) {
 	px := fmt.Sprintf("http_location_zone_%s_", zone)
-	n.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (n *NginxPlus) addHTTPUpstreamCharts(name, zone string) {
+func (c *Collector) addHTTPUpstreamCharts(name, zone string) {
 	charts := httpUpstreamChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -839,17 +839,17 @@ func (n *NginxPlus) addHTTPUpstreamCharts(name, zone string) {
 		}
 	}
 
-	if err := n.Charts().Add(*charts...); err != nil {
-		n.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (n *NginxPlus) removeHTTPUpstreamCharts(name, zone string) {
+func (c *Collector) removeHTTPUpstreamCharts(name, zone string) {
 	px := fmt.Sprintf("http_upstream_%s_zone_%s", name, zone)
-	n.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (n *NginxPlus) addHTTPUpstreamServerCharts(name, serverAddr, serverName, zone string) {
+func (c *Collector) addHTTPUpstreamServerCharts(name, serverAddr, serverName, zone string) {
 	charts := httpUpstreamServerChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -865,17 +865,17 @@ func (n *NginxPlus) addHTTPUpstreamServerCharts(name, serverAddr, serverName, zo
 		}
 	}
 
-	if err := n.Charts().Add(*charts...); err != nil {
-		n.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (n *NginxPlus) removeHTTPUpstreamServerCharts(name, serverAddr, zone string) {
+func (c *Collector) removeHTTPUpstreamServerCharts(name, serverAddr, zone string) {
 	px := fmt.Sprintf("http_upstream_%s_server_%s_zone_%s_", name, zone, serverAddr)
-	n.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (n *NginxPlus) addStreamServerZoneCharts(zone string) {
+func (c *Collector) addStreamServerZoneCharts(zone string) {
 	charts := streamServerZoneChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -888,17 +888,17 @@ func (n *NginxPlus) addStreamServerZoneCharts(zone string) {
 		}
 	}
 
-	if err := n.Charts().Add(*charts...); err != nil {
-		n.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (n *NginxPlus) removeStreamServerZoneCharts(zone string) {
+func (c *Collector) removeStreamServerZoneCharts(zone string) {
 	px := fmt.Sprintf("stream_server_zone_%s_", zone)
-	n.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (n *NginxPlus) addStreamUpstreamCharts(zone, name string) {
+func (c *Collector) addStreamUpstreamCharts(zone, name string) {
 	charts := streamUpstreamChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -912,17 +912,17 @@ func (n *NginxPlus) addStreamUpstreamCharts(zone, name string) {
 		}
 	}
 
-	if err := n.Charts().Add(*charts...); err != nil {
-		n.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (n *NginxPlus) removeStreamUpstreamCharts(name, zone string) {
+func (c *Collector) removeStreamUpstreamCharts(name, zone string) {
 	px := fmt.Sprintf("stream_upstream_%s_zone_%s_", name, zone)
-	n.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (n *NginxPlus) addStreamUpstreamServerCharts(name, serverAddr, serverName, zone string) {
+func (c *Collector) addStreamUpstreamServerCharts(name, serverAddr, serverName, zone string) {
 	charts := streamUpstreamServerChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -938,17 +938,17 @@ func (n *NginxPlus) addStreamUpstreamServerCharts(name, serverAddr, serverName, 
 		}
 	}
 
-	if err := n.Charts().Add(*charts...); err != nil {
-		n.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (n *NginxPlus) removeStreamUpstreamServerCharts(name, serverAddr, zone string) {
+func (c *Collector) removeStreamUpstreamServerCharts(name, serverAddr, zone string) {
 	px := fmt.Sprintf("stream_upstream_%s_server_%s_zone_%s", name, serverAddr, zone)
-	n.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (n *NginxPlus) addResolverZoneCharts(zone string) {
+func (c *Collector) addResolverZoneCharts(zone string) {
 	charts := resolverZoneChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -961,18 +961,18 @@ func (n *NginxPlus) addResolverZoneCharts(zone string) {
 		}
 	}
 
-	if err := n.Charts().Add(*charts...); err != nil {
-		n.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (n *NginxPlus) removeResolverZoneCharts(zone string) {
+func (c *Collector) removeResolverZoneCharts(zone string) {
 	px := fmt.Sprintf("resolver_zone_%s_", zone)
-	n.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (n *NginxPlus) removeCharts(prefix string) {
-	for _, chart := range *n.Charts() {
+func (c *Collector) removeCharts(prefix string) {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

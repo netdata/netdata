@@ -1099,26 +1099,26 @@ var (
 	}
 )
 
-func (v *VerneMQ) addNodeCharts(node string, nst *nodeStats) {
-	if err := v.Charts().Add(*newNodeCharts(node)...); err != nil {
-		v.Warningf("error on adding node '%s' charts: %v", node, err)
+func (c *Collector) addNodeCharts(node string, nst *nodeStats) {
+	if err := c.Charts().Add(*newNodeCharts(node)...); err != nil {
+		c.Warningf("error on adding node '%s' charts: %v", node, err)
 	}
 	if len(nst.mqtt4) > 0 {
-		if err := v.Charts().Add(*newNodeMqttCharts(node, "4")...); err != nil {
-			v.Warningf("error on adding node '%s' mqtt v4 charts: %v", node, err)
+		if err := c.Charts().Add(*newNodeMqttCharts(node, "4")...); err != nil {
+			c.Warningf("error on adding node '%s' mqtt v4 charts: %v", node, err)
 		}
 	}
 	if len(nst.mqtt5) > 0 {
-		if err := v.Charts().Add(*newNodeMqttCharts(node, "5")...); err != nil {
-			v.Warningf("error on adding node '%s' mqtt 5 charts: %v", node, err)
+		if err := c.Charts().Add(*newNodeMqttCharts(node, "5")...); err != nil {
+			c.Warningf("error on adding node '%s' mqtt 5 charts: %v", node, err)
 		}
 	}
 }
 
-func (v *VerneMQ) removeNodeCharts(node string) {
+func (c *Collector) removeNodeCharts(node string) {
 	px := cleanChartID(fmt.Sprintf("node_%s_", node))
 
-	for _, chart := range *v.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

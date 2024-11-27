@@ -6,14 +6,14 @@ import (
 	"errors"
 )
 
-func (f *FreeRADIUS) validateConfig() error {
-	if f.Address == "" {
+func (c *Collector) validateConfig() error {
+	if c.Address == "" {
 		return errors.New("address not set")
 	}
-	if f.Port == 0 {
+	if c.Port == 0 {
 		return errors.New("port not set")
 	}
-	if f.Secret == "" {
+	if c.Secret == "" {
 		return errors.New("secret not set")
 	}
 	return nil

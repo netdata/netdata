@@ -9,15 +9,15 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (r *RabbitMQ) collectOverview(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(r.RequestConfig, urlPathAPIOverview)
+func (c *Collector) collectOverview(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPIOverview)
 	if err != nil {
 		return fmt.Errorf("failed to create overview stats request: %w", err)
 	}
 
 	var resp apiOverviewResp
 
-	if err := r.webClient().RequestJSON(req, &resp); err != nil {
+	if err := c.webClient().RequestJSON(req, &resp); err != nil {
 		return err
 	}
 

@@ -388,44 +388,44 @@ var (
 
 const failedUpdatesLimit = 10
 
-func (vs *VSphere) updateCharts() {
-	for id, fails := range vs.discoveredHosts {
+func (c *Collector) updateCharts() {
+	for id, fails := range c.discoveredHosts {
 		if fails >= failedUpdatesLimit {
-			vs.removeFromCharts(id)
-			delete(vs.charted, id)
-			delete(vs.discoveredHosts, id)
+			c.removeFromCharts(id)
+			delete(c.charted, id)
+			delete(c.discoveredHosts, id)
 			continue
 		}
 
-		host := vs.resources.Hosts.Get(id)
-		if host == nil || vs.charted[id] || fails != 0 {
+		host := c.resources.Hosts.Get(id)
+		if host == nil || c.charted[id] || fails != 0 {
 			continue
 		}
 
-		vs.charted[id] = true
+		c.charted[id] = true
 		charts := newHostCharts(host)
-		if err := vs.Charts().Add(*charts...); err != nil {
-			vs.Error(err)
+		if err := c.Charts().Add(*charts...); err != nil {
+			c.Error(err)
 		}
 	}
 
-	for id, fails := range vs.discoveredVMs {
+	for id, fails := range c.discoveredVMs {
 		if fails >= failedUpdatesLimit {
-			vs.removeFromCharts(id)
-			delete(vs.charted, id)
-			delete(vs.discoveredVMs, id)
+			c.removeFromCharts(id)
+			delete(c.charted, id)
+			delete(c.discoveredVMs, id)
 			continue
 		}
 
-		vm := vs.resources.VMs.Get(id)
-		if vm == nil || vs.charted[id] || fails != 0 {
+		vm := c.resources.VMs.Get(id)
+		if vm == nil || c.charted[id] || fails != 0 {
 			continue
 		}
 
-		vs.charted[id] = true
+		c.charted[id] = true
 		charts := newVMCHarts(vm)
-		if err := vs.Charts().Add(*charts...); err != nil {
-			vs.Error(err)
+		if err := c.Charts().Add(*charts...); err != nil {
+			c.Error(err)
 		}
 	}
 }
@@ -482,8 +482,8 @@ func getHostClusterName(host *rs.Host) string {
 	return host.Hier.Cluster.Name
 }
 
-func (vs *VSphere) removeFromCharts(prefix string) {
-	for _, c := range *vs.Charts() {
+func (c *Collector) removeFromCharts(prefix string) {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()

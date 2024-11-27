@@ -8,42 +8,42 @@ import (
 	"strings"
 )
 
-func (u *Upsd) collect() (map[string]int64, error) {
-	if u.conn == nil {
-		conn, err := u.establishConnection()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.conn == nil {
+		conn, err := c.establishConnection()
 		if err != nil {
 			return nil, err
 		}
-		u.conn = conn
+		c.conn = conn
 	}
 
-	upsUnits, err := u.conn.upsUnits()
+	upsUnits, err := c.conn.upsUnits()
 	if err != nil {
 		if !errors.Is(err, errUpsdCommand) {
-			_ = u.conn.disconnect()
-			u.conn = nil
+			_ = c.conn.disconnect()
+			c.conn = nil
 		}
 		return nil, err
 	}
 
-	u.Debugf("found %d UPS units", len(upsUnits))
+	c.Debugf("found %d UPS units", len(upsUnits))
 
 	mx := make(map[string]int64)
 
-	u.collectUPSUnits(mx, upsUnits)
+	c.collectUPSUnits(mx, upsUnits)
 
 	return mx, nil
 }
 
-func (u *Upsd) establishConnection() (upsdConn, error) {
-	conn := u.newUpsdConn(u.Config)
+func (c *Collector) establishConnection() (upsdConn, error) {
+	conn := c.newUpsdConn(c.Config)
 
 	if err := conn.connect(); err != nil {
 		return nil, err
 	}
 
-	if u.Username != "" && u.Password != "" {
-		if err := conn.authenticate(u.Username, u.Password); err != nil {
+	if c.Username != "" && c.Password != "" {
+		if err := conn.authenticate(c.Username, c.Password); err != nil {
 			_ = conn.disconnect()
 			return nil, err
 		}
@@ -52,16 +52,16 @@ func (u *Upsd) establishConnection() (upsdConn, error) {
 	return conn, nil
 }
 
-func (u *Upsd) collectUPSUnits(mx map[string]int64, upsUnits []upsUnit) {
+func (c *Collector) collectUPSUnits(mx map[string]int64, upsUnits []upsUnit) {
 	seen := make(map[string]bool)
 
 	for _, ups := range upsUnits {
 		seen[ups.name] = true
-		u.Debugf("collecting metrics UPS '%s'", ups.name)
+		c.Debugf("collecting metrics UPS '%s'", ups.name)
 
-		if !u.upsUnits[ups.name] {
-			u.upsUnits[ups.name] = true
-			u.addUPSCharts(ups)
+		if !c.upsUnits[ups.name] {
+			c.upsUnits[ups.name] = true
+			c.addUPSCharts(ups)
 		}
 
 		writeVar(mx, ups, varBatteryCharge)
@@ -90,10 +90,10 @@ func (u *Upsd) collectUPSUnits(mx map[string]int64, upsUnits []upsUnit) {
 		writeUpsStatus(mx, ups)
 	}
 
-	for name := range u.upsUnits {
+	for name := range c.upsUnits {
 		if !seen[name] {
-			delete(u.upsUnits, name)
-			u.removeUPSCharts(name)
+			delete(c.upsUnits, name)
+			c.removeUPSCharts(name)
 		}
 	}
 }

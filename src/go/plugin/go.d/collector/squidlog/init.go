@@ -9,26 +9,26 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
 )
 
-func (s *SquidLog) createLogReader() error {
-	s.Cleanup()
-	s.Debug("starting log reader creating")
+func (c *Collector) createLogReader() error {
+	c.Cleanup()
+	c.Debug("starting log reader creating")
 
-	reader, err := logs.Open(s.Path, s.ExcludePath, s.Logger)
+	reader, err := logs.Open(c.Path, c.ExcludePath, c.Logger)
 	if err != nil {
 		return fmt.Errorf("creating log reader: %v", err)
 	}
 
-	s.Debugf("created log reader, current file '%s'", reader.CurrentFilename())
-	s.file = reader
+	c.Debugf("created log reader, current file '%s'", reader.CurrentFilename())
+	c.file = reader
 	return nil
 }
 
-func (s *SquidLog) createParser() error {
-	s.Debug("starting parser creating")
+func (c *Collector) createParser() error {
+	c.Debug("starting parser creating")
 
 	const readLastLinesNum = 100
 
-	lines, err := logs.ReadLastLines(s.file.CurrentFilename(), readLastLinesNum)
+	lines, err := logs.ReadLastLines(c.file.CurrentFilename(), readLastLinesNum)
 	if err != nil {
 		return fmt.Errorf("failed to read last lines: %v", err)
 	}
@@ -39,23 +39,23 @@ func (s *SquidLog) createParser() error {
 			continue
 		}
 
-		s.Debugf("last line: '%s'", line)
+		c.Debugf("last line: '%s'", line)
 
-		s.parser, err = logs.NewParser(s.ParserConfig, s.file)
+		c.parser, err = logs.NewParser(c.ParserConfig, c.file)
 		if err != nil {
-			s.Debugf("failed to create parser from line: %v", err)
+			c.Debugf("failed to create parser from line: %v", err)
 			continue
 		}
 
-		s.line.reset()
+		c.line.reset()
 
-		if err = s.parser.Parse([]byte(line), s.line); err != nil {
-			s.Debugf("failed to parse line: %v", err)
+		if err = c.parser.Parse([]byte(line), c.line); err != nil {
+			c.Debugf("failed to parse line: %v", err)
 			continue
 		}
 
-		if err = s.line.verify(); err != nil {
-			s.Debugf("failed to verify line: %v", err)
+		if err = c.line.verify(); err != nil {
+			c.Debugf("failed to verify line: %v", err)
 			continue
 		}
 
@@ -64,7 +64,7 @@ func (s *SquidLog) createParser() error {
 	}
 
 	if !found {
-		return fmt.Errorf("failed to create log parser (file '%s')", s.file.CurrentFilename())
+		return fmt.Errorf("failed to create log parser (file '%s')", c.file.CurrentFilename())
 	}
 
 	return nil

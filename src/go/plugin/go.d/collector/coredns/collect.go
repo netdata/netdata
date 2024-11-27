@@ -48,8 +48,8 @@ type requestMetricsNames struct {
 	responseRcodeCountTotal string
 }
 
-func (cd *CoreDNS) collect() (map[string]int64, error) {
-	raw, err := cd.prom.ScrapeSeries()
+func (c *Collector) collect() (map[string]int64, error) {
+	raw, err := c.prom.ScrapeSeries()
 
 	if err != nil {
 		return nil, err
@@ -59,81 +59,81 @@ func (cd *CoreDNS) collect() (map[string]int64, error) {
 
 	// some metric names are different depending on the version
 	// update them once
-	if !cd.skipVersionCheck {
-		cd.updateVersionDependentMetrics(raw)
-		cd.skipVersionCheck = true
+	if !c.skipVersionCheck {
+		c.updateVersionDependentMetrics(raw)
+		c.skipVersionCheck = true
 	}
 
 	//we can only get these metrics if we know the server version
-	if cd.version == nil {
+	if c.version == nil {
 		return nil, errors.New("unable to determine server version")
 	}
 
-	cd.collectPanic(mx, raw)
-	cd.collectSummaryRequests(mx, raw)
-	cd.collectSummaryRequestsPerType(mx, raw)
-	cd.collectSummaryResponsesPerRcode(mx, raw)
+	c.collectPanic(mx, raw)
+	c.collectSummaryRequests(mx, raw)
+	c.collectSummaryRequestsPerType(mx, raw)
+	c.collectSummaryResponsesPerRcode(mx, raw)
 
-	if cd.perServerMatcher != nil {
-		cd.collectPerServerRequests(mx, raw)
-		//cd.collectPerServerRequestsDuration(mx, raw)
-		cd.collectPerServerRequestPerType(mx, raw)
-		cd.collectPerServerResponsePerRcode(mx, raw)
+	if c.perServerMatcher != nil {
+		c.collectPerServerRequests(mx, raw)
+		//c.collectPerServerRequestsDuration(mx, raw)
+		c.collectPerServerRequestPerType(mx, raw)
+		c.collectPerServerResponsePerRcode(mx, raw)
 	}
 
-	if cd.perZoneMatcher != nil {
-		cd.collectPerZoneRequests(mx, raw)
-		//cd.collectPerZoneRequestsDuration(mx, raw)
-		cd.collectPerZoneRequestsPerType(mx, raw)
-		cd.collectPerZoneResponsesPerRcode(mx, raw)
+	if c.perZoneMatcher != nil {
+		c.collectPerZoneRequests(mx, raw)
+		//c.collectPerZoneRequestsDuration(mx, raw)
+		c.collectPerZoneRequestsPerType(mx, raw)
+		c.collectPerZoneResponsesPerRcode(mx, raw)
 	}
 
 	return stm.ToMap(mx), nil
 }
 
-func (cd *CoreDNS) updateVersionDependentMetrics(raw prometheus.Series) {
-	version := cd.parseVersion(raw)
+func (c *Collector) updateVersionDependentMetrics(raw prometheus.Series) {
+	version := c.parseVersion(raw)
 	if version == nil {
 		return
 	}
-	cd.version = version
-	if cd.version.LTE(version169) {
-		cd.metricNames.panicCountTotal = metricPanicCountTotal169orOlder
-		cd.metricNames.requestCountTotal = metricRequestCountTotal169orOlder
-		cd.metricNames.requestTypeCountTotal = metricRequestTypeCountTotal169orOlder
-		cd.metricNames.responseRcodeCountTotal = metricResponseRcodeCountTotal169orOlder
+	c.version = version
+	if c.version.LTE(version169) {
+		c.metricNames.panicCountTotal = metricPanicCountTotal169orOlder
+		c.metricNames.requestCountTotal = metricRequestCountTotal169orOlder
+		c.metricNames.requestTypeCountTotal = metricRequestTypeCountTotal169orOlder
+		c.metricNames.responseRcodeCountTotal = metricResponseRcodeCountTotal169orOlder
 	} else {
-		cd.metricNames.panicCountTotal = metricPanicCountTotal170orNewer
-		cd.metricNames.requestCountTotal = metricRequestCountTotal170orNewer
-		cd.metricNames.requestTypeCountTotal = metricRequestTypeCountTotal170orNewer
-		cd.metricNames.responseRcodeCountTotal = metricResponseRcodeCountTotal170orNewer
+		c.metricNames.panicCountTotal = metricPanicCountTotal170orNewer
+		c.metricNames.requestCountTotal = metricRequestCountTotal170orNewer
+		c.metricNames.requestTypeCountTotal = metricRequestTypeCountTotal170orNewer
+		c.metricNames.responseRcodeCountTotal = metricResponseRcodeCountTotal170orNewer
 	}
 }
 
-func (cd *CoreDNS) parseVersion(raw prometheus.Series) *semver.Version {
+func (c *Collector) parseVersion(raw prometheus.Series) *semver.Version {
 	var versionStr string
 	for _, metric := range raw.FindByName("coredns_build_info") {
 		versionStr = metric.Labels.Get("version")
 	}
 	if versionStr == "" {
-		cd.Error("cannot find version string in metrics")
+		c.Error("cannot find version string in metrics")
 		return nil
 	}
 
 	version, err := semver.Make(versionStr)
 	if err != nil {
-		cd.Errorf("failed to find server version: %v", err)
+		c.Errorf("failed to find server version: %v", err)
 		return nil
 	}
 	return &version
 }
 
-func (cd *CoreDNS) collectPanic(mx *metrics, raw prometheus.Series) {
-	mx.Panic.Set(raw.FindByName(cd.metricNames.panicCountTotal).Max())
+func (c *Collector) collectPanic(mx *metrics, raw prometheus.Series) {
+	mx.Panic.Set(raw.FindByName(c.metricNames.panicCountTotal).Max())
 }
 
-func (cd *CoreDNS) collectSummaryRequests(mx *metrics, raw prometheus.Series) {
-	for _, metric := range raw.FindByName(cd.metricNames.requestCountTotal) {
+func (c *Collector) collectSummaryRequests(mx *metrics, raw prometheus.Series) {
+	for _, metric := range raw.FindByName(c.metricNames.requestCountTotal) {
 		var (
 			family = metric.Labels.Get("family")
 			proto  = metric.Labels.Get("proto")
@@ -162,7 +162,7 @@ func (cd *CoreDNS) collectSummaryRequests(mx *metrics, raw prometheus.Series) {
 	}
 }
 
-//func (cd *CoreDNS) collectSummaryRequestsDuration(mx *metrics, raw prometheus.Series) {
+//func (cd *Collector) collectSummaryRequestsDuration(mx *metrics, raw prometheus.Series) {
 //	for _, metric := range raw.FindByName(metricRequestDurationSecondsBucket) {
 //		var (
 //			server = metric.Labels.Get("server")
@@ -180,8 +180,8 @@ func (cd *CoreDNS) collectSummaryRequests(mx *metrics, raw prometheus.Series) {
 //	processRequestDuration(&mx.Summary.RequestConfig)
 //}
 
-func (cd *CoreDNS) collectSummaryRequestsPerType(mx *metrics, raw prometheus.Series) {
-	for _, metric := range raw.FindByName(cd.metricNames.requestTypeCountTotal) {
+func (c *Collector) collectSummaryRequestsPerType(mx *metrics, raw prometheus.Series) {
+	for _, metric := range raw.FindByName(c.metricNames.requestTypeCountTotal) {
 		var (
 			server = metric.Labels.Get("server")
 			typ    = metric.Labels.Get("type")
@@ -197,8 +197,8 @@ func (cd *CoreDNS) collectSummaryRequestsPerType(mx *metrics, raw prometheus.Ser
 	}
 }
 
-func (cd *CoreDNS) collectSummaryResponsesPerRcode(mx *metrics, raw prometheus.Series) {
-	for _, metric := range raw.FindByName(cd.metricNames.responseRcodeCountTotal) {
+func (c *Collector) collectSummaryResponsesPerRcode(mx *metrics, raw prometheus.Series) {
+	for _, metric := range raw.FindByName(c.metricNames.responseRcodeCountTotal) {
 		var (
 			rcode  = metric.Labels.Get("rcode")
 			server = metric.Labels.Get("server")
@@ -216,8 +216,8 @@ func (cd *CoreDNS) collectSummaryResponsesPerRcode(mx *metrics, raw prometheus.S
 
 // Per Server
 
-func (cd *CoreDNS) collectPerServerRequests(mx *metrics, raw prometheus.Series) {
-	for _, metric := range raw.FindByName(cd.metricNames.requestCountTotal) {
+func (c *Collector) collectPerServerRequests(mx *metrics, raw prometheus.Series) {
+	for _, metric := range raw.FindByName(c.metricNames.requestCountTotal) {
 		var (
 			family = metric.Labels.Get("family")
 			proto  = metric.Labels.Get("proto")
@@ -230,7 +230,7 @@ func (cd *CoreDNS) collectPerServerRequests(mx *metrics, raw prometheus.Series) 
 			continue
 		}
 
-		if !cd.perServerMatcher.MatchString(server) {
+		if !c.perServerMatcher.MatchString(server) {
 			continue
 		}
 
@@ -238,9 +238,9 @@ func (cd *CoreDNS) collectPerServerRequests(mx *metrics, raw prometheus.Series) 
 			server = emptyServerReplaceName
 		}
 
-		if !cd.collectedServers[server] {
-			cd.addNewServerCharts(server)
-			cd.collectedServers[server] = true
+		if !c.collectedServers[server] {
+			c.addNewServerCharts(server)
+			c.collectedServers[server] = true
 		}
 
 		if _, ok := mx.PerServer[server]; !ok {
@@ -261,7 +261,7 @@ func (cd *CoreDNS) collectPerServerRequests(mx *metrics, raw prometheus.Series) 
 	}
 }
 
-//func (cd *CoreDNS) collectPerServerRequestsDuration(mx *metrics, raw prometheus.Series) {
+//func (cd *Collector) collectPerServerRequestsDuration(mx *metrics, raw prometheus.Series) {
 //	for _, metric := range raw.FindByName(metricRequestDurationSecondsBucket) {
 //		var (
 //			server = metric.Labels.Get("server")
@@ -298,8 +298,8 @@ func (cd *CoreDNS) collectPerServerRequests(mx *metrics, raw prometheus.Series) 
 //	}
 //}
 
-func (cd *CoreDNS) collectPerServerRequestPerType(mx *metrics, raw prometheus.Series) {
-	for _, metric := range raw.FindByName(cd.metricNames.requestTypeCountTotal) {
+func (c *Collector) collectPerServerRequestPerType(mx *metrics, raw prometheus.Series) {
+	for _, metric := range raw.FindByName(c.metricNames.requestTypeCountTotal) {
 		var (
 			server = metric.Labels.Get("server")
 			typ    = metric.Labels.Get("type")
@@ -311,7 +311,7 @@ func (cd *CoreDNS) collectPerServerRequestPerType(mx *metrics, raw prometheus.Se
 			continue
 		}
 
-		if !cd.perServerMatcher.MatchString(server) {
+		if !c.perServerMatcher.MatchString(server) {
 			continue
 		}
 
@@ -319,9 +319,9 @@ func (cd *CoreDNS) collectPerServerRequestPerType(mx *metrics, raw prometheus.Se
 			server = emptyServerReplaceName
 		}
 
-		if !cd.collectedServers[server] {
-			cd.addNewServerCharts(server)
-			cd.collectedServers[server] = true
+		if !c.collectedServers[server] {
+			c.addNewServerCharts(server)
+			c.collectedServers[server] = true
 		}
 
 		if _, ok := mx.PerServer[server]; !ok {
@@ -332,8 +332,8 @@ func (cd *CoreDNS) collectPerServerRequestPerType(mx *metrics, raw prometheus.Se
 	}
 }
 
-func (cd *CoreDNS) collectPerServerResponsePerRcode(mx *metrics, raw prometheus.Series) {
-	for _, metric := range raw.FindByName(cd.metricNames.responseRcodeCountTotal) {
+func (c *Collector) collectPerServerResponsePerRcode(mx *metrics, raw prometheus.Series) {
+	for _, metric := range raw.FindByName(c.metricNames.responseRcodeCountTotal) {
 		var (
 			rcode  = metric.Labels.Get("rcode")
 			server = metric.Labels.Get("server")
@@ -345,7 +345,7 @@ func (cd *CoreDNS) collectPerServerResponsePerRcode(mx *metrics, raw prometheus.
 			continue
 		}
 
-		if !cd.perServerMatcher.MatchString(server) {
+		if !c.perServerMatcher.MatchString(server) {
 			continue
 		}
 
@@ -353,9 +353,9 @@ func (cd *CoreDNS) collectPerServerResponsePerRcode(mx *metrics, raw prometheus.
 			server = emptyServerReplaceName
 		}
 
-		if !cd.collectedServers[server] {
-			cd.addNewServerCharts(server)
-			cd.collectedServers[server] = true
+		if !c.collectedServers[server] {
+			c.addNewServerCharts(server)
+			c.collectedServers[server] = true
 		}
 
 		if _, ok := mx.PerServer[server]; !ok {
@@ -368,8 +368,8 @@ func (cd *CoreDNS) collectPerServerResponsePerRcode(mx *metrics, raw prometheus.
 
 // Per Zone
 
-func (cd *CoreDNS) collectPerZoneRequests(mx *metrics, raw prometheus.Series) {
-	for _, metric := range raw.FindByName(cd.metricNames.requestCountTotal) {
+func (c *Collector) collectPerZoneRequests(mx *metrics, raw prometheus.Series) {
+	for _, metric := range raw.FindByName(c.metricNames.requestCountTotal) {
 		var (
 			family = metric.Labels.Get("family")
 			proto  = metric.Labels.Get("proto")
@@ -381,7 +381,7 @@ func (cd *CoreDNS) collectPerZoneRequests(mx *metrics, raw prometheus.Series) {
 			continue
 		}
 
-		if !cd.perZoneMatcher.MatchString(zone) {
+		if !c.perZoneMatcher.MatchString(zone) {
 			continue
 		}
 
@@ -389,9 +389,9 @@ func (cd *CoreDNS) collectPerZoneRequests(mx *metrics, raw prometheus.Series) {
 			zone = rootZoneReplaceName
 		}
 
-		if !cd.collectedZones[zone] {
-			cd.addNewZoneCharts(zone)
-			cd.collectedZones[zone] = true
+		if !c.collectedZones[zone] {
+			c.addNewZoneCharts(zone)
+			c.collectedZones[zone] = true
 		}
 
 		if _, ok := mx.PerZone[zone]; !ok {
@@ -405,7 +405,7 @@ func (cd *CoreDNS) collectPerZoneRequests(mx *metrics, raw prometheus.Series) {
 	}
 }
 
-//func (cd *CoreDNS) collectPerZoneRequestsDuration(mx *metrics, raw prometheus.Series) {
+//func (cd *Collector) collectPerZoneRequestsDuration(mx *metrics, raw prometheus.Series) {
 //	for _, metric := range raw.FindByName(metricRequestDurationSecondsBucket) {
 //		var (
 //			zone  = metric.Labels.Get("zone")
@@ -441,8 +441,8 @@ func (cd *CoreDNS) collectPerZoneRequests(mx *metrics, raw prometheus.Series) {
 //	}
 //}
 
-func (cd *CoreDNS) collectPerZoneRequestsPerType(mx *metrics, raw prometheus.Series) {
-	for _, metric := range raw.FindByName(cd.metricNames.requestTypeCountTotal) {
+func (c *Collector) collectPerZoneRequestsPerType(mx *metrics, raw prometheus.Series) {
+	for _, metric := range raw.FindByName(c.metricNames.requestTypeCountTotal) {
 		var (
 			typ   = metric.Labels.Get("type")
 			zone  = metric.Labels.Get("zone")
@@ -453,7 +453,7 @@ func (cd *CoreDNS) collectPerZoneRequestsPerType(mx *metrics, raw prometheus.Ser
 			continue
 		}
 
-		if !cd.perZoneMatcher.MatchString(zone) {
+		if !c.perZoneMatcher.MatchString(zone) {
 			continue
 		}
 
@@ -461,9 +461,9 @@ func (cd *CoreDNS) collectPerZoneRequestsPerType(mx *metrics, raw prometheus.Ser
 			zone = rootZoneReplaceName
 		}
 
-		if !cd.collectedZones[zone] {
-			cd.addNewZoneCharts(zone)
-			cd.collectedZones[zone] = true
+		if !c.collectedZones[zone] {
+			c.addNewZoneCharts(zone)
+			c.collectedZones[zone] = true
 		}
 
 		if _, ok := mx.PerZone[zone]; !ok {
@@ -474,8 +474,8 @@ func (cd *CoreDNS) collectPerZoneRequestsPerType(mx *metrics, raw prometheus.Ser
 	}
 }
 
-func (cd *CoreDNS) collectPerZoneResponsesPerRcode(mx *metrics, raw prometheus.Series) {
-	for _, metric := range raw.FindByName(cd.metricNames.responseRcodeCountTotal) {
+func (c *Collector) collectPerZoneResponsesPerRcode(mx *metrics, raw prometheus.Series) {
+	for _, metric := range raw.FindByName(c.metricNames.responseRcodeCountTotal) {
 		var (
 			rcode = metric.Labels.Get("rcode")
 			zone  = metric.Labels.Get("zone")
@@ -486,7 +486,7 @@ func (cd *CoreDNS) collectPerZoneResponsesPerRcode(mx *metrics, raw prometheus.S
 			continue
 		}
 
-		if !cd.perZoneMatcher.MatchString(zone) {
+		if !c.perZoneMatcher.MatchString(zone) {
 			continue
 		}
 
@@ -494,9 +494,9 @@ func (cd *CoreDNS) collectPerZoneResponsesPerRcode(mx *metrics, raw prometheus.S
 			zone = rootZoneReplaceName
 		}
 
-		if !cd.collectedZones[zone] {
-			cd.addNewZoneCharts(zone)
-			cd.collectedZones[zone] = true
+		if !c.collectedZones[zone] {
+			c.addNewZoneCharts(zone)
+			c.collectedZones[zone] = true
 		}
 
 		if _, ok := mx.PerZone[zone]; !ok {
@@ -684,7 +684,7 @@ func setResponsePerRcode(mx *response, value float64, rcode string) {
 
 // ---
 
-func (cd *CoreDNS) addNewServerCharts(name string) {
+func (c *Collector) addNewServerCharts(name string) {
 	charts := serverCharts.Copy()
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, "server", name)
@@ -695,10 +695,10 @@ func (cd *CoreDNS) addNewServerCharts(name string) {
 			dim.ID = fmt.Sprintf(dim.ID, name)
 		}
 	}
-	_ = cd.charts.Add(*charts...)
+	_ = c.charts.Add(*charts...)
 }
 
-func (cd *CoreDNS) addNewZoneCharts(name string) {
+func (c *Collector) addNewZoneCharts(name string) {
 	charts := zoneCharts.Copy()
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, "zone", name)
@@ -710,5 +710,5 @@ func (cd *CoreDNS) addNewZoneCharts(name string) {
 			dim.ID = fmt.Sprintf(dim.ID, name)
 		}
 	}
-	_ = cd.charts.Add(*charts...)
+	_ = c.charts.Add(*charts...)
 }

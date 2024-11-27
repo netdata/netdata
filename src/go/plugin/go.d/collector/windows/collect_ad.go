@@ -29,10 +29,10 @@ const (
 	metricADNameCacheHitsTotal                        = "windows_ad_name_cache_hits_total"
 )
 
-func (w *Windows) collectAD(mx map[string]int64, pms prometheus.Series) {
-	if !w.cache.collection[collectorAD] {
-		w.cache.collection[collectorAD] = true
-		w.addADCharts()
+func (c *Collector) collectAD(mx map[string]int64, pms prometheus.Series) {
+	if !c.cache.collection[collectorAD] {
+		c.cache.collection[collectorAD] = true
+		c.addADCharts()
 	}
 
 	if pm := pms.FindByName(metricADATQAverageRequestLatency); pm.Len() > 0 {

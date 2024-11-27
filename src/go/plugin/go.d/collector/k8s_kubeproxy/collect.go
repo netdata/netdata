@@ -11,8 +11,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 )
 
-func (kp *KubeProxy) collect() (map[string]int64, error) {
-	raw, err := kp.prom.ScrapeSeries()
+func (c *Collector) collect() (map[string]int64, error) {
+	raw, err := c.prom.ScrapeSeries()
 
 	if err != nil {
 		return nil, err
@@ -20,20 +20,20 @@ func (kp *KubeProxy) collect() (map[string]int64, error) {
 
 	mx := newMetrics()
 
-	kp.collectSyncProxyRules(raw, mx)
-	kp.collectRESTClientHTTPRequests(raw, mx)
-	kp.collectHTTPRequestDuration(raw, mx)
+	c.collectSyncProxyRules(raw, mx)
+	c.collectRESTClientHTTPRequests(raw, mx)
+	c.collectHTTPRequestDuration(raw, mx)
 
 	return stm.ToMap(mx), nil
 }
 
-func (kp *KubeProxy) collectSyncProxyRules(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectSyncProxyRules(raw prometheus.Series, mx *metrics) {
 	m := raw.FindByName("kubeproxy_sync_proxy_rules_latency_microseconds_count")
 	mx.SyncProxyRules.Count.Set(m.Max())
-	kp.collectSyncProxyRulesLatency(raw, mx)
+	c.collectSyncProxyRulesLatency(raw, mx)
 }
 
-func (kp *KubeProxy) collectSyncProxyRulesLatency(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectSyncProxyRulesLatency(raw prometheus.Series, mx *metrics) {
 	metricName := "kubeproxy_sync_proxy_rules_latency_microseconds_bucket"
 	latency := &mx.SyncProxyRules.Latency
 
@@ -93,9 +93,9 @@ func (kp *KubeProxy) collectSyncProxyRulesLatency(raw prometheus.Series, mx *met
 	latency.LE2000.Sub(latency.LE1000.Value())
 }
 
-func (kp *KubeProxy) collectRESTClientHTTPRequests(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectRESTClientHTTPRequests(raw prometheus.Series, mx *metrics) {
 	metricName := "rest_client_requests_total"
-	chart := kp.charts.Get("rest_client_requests_by_code")
+	chart := c.charts.Get("rest_client_requests_by_code")
 
 	for _, metric := range raw.FindByName(metricName) {
 		code := metric.Labels.Get("code")
@@ -110,7 +110,7 @@ func (kp *KubeProxy) collectRESTClientHTTPRequests(raw prometheus.Series, mx *me
 		mx.RESTClient.Requests.ByStatusCode[code] = mtx.Gauge(metric.Value)
 	}
 
-	chart = kp.charts.Get("rest_client_requests_by_method")
+	chart = c.charts.Get("rest_client_requests_by_method")
 
 	for _, metric := range raw.FindByName(metricName) {
 		method := metric.Labels.Get("method")
@@ -126,7 +126,7 @@ func (kp *KubeProxy) collectRESTClientHTTPRequests(raw prometheus.Series, mx *me
 	}
 }
 
-func (kp *KubeProxy) collectHTTPRequestDuration(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectHTTPRequestDuration(raw prometheus.Series, mx *metrics) {
 	// Summary
 	for _, metric := range raw.FindByName("http_request_duration_microseconds") {
 		if math.IsNaN(metric.Value) {

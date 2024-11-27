@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-func (c *Ceph) validateConfig() error {
+func (c *Collector) validateConfig() error {
 	if c.URL == "" {
 		return fmt.Errorf("URL is required but not set")
 	}

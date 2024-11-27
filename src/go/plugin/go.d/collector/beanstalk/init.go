@@ -8,19 +8,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
-func (b *Beanstalk) validateConfig() error {
-	if b.Address == "" {
+func (c *Collector) validateConfig() error {
+	if c.Address == "" {
 		return errors.New("beanstalk address is required")
 	}
 	return nil
 }
 
-func (b *Beanstalk) initTubeSelector() (matcher.Matcher, error) {
-	if b.TubeSelector == "" {
+func (c *Collector) initTubeSelector() (matcher.Matcher, error) {
+	if c.TubeSelector == "" {
 		return matcher.TRUE(), nil
 	}
 
-	m, err := matcher.NewSimplePatternsMatcher(b.TubeSelector)
+	m, err := matcher.NewSimplePatternsMatcher(c.TubeSelector)
 	if err != nil {
 		return nil, err
 	}

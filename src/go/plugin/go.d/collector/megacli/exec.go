@@ -13,6 +13,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
+type megaCli interface {
+	physDrivesInfo() ([]byte, error)
+	bbuInfo() ([]byte, error)
+}
+
 func newMegaCliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *megaCliExec {
 	return &megaCliExec{
 		Logger:     log,

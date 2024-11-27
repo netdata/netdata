@@ -4,25 +4,25 @@ package postgres
 
 import "database/sql"
 
-func (p *Postgres) doQueryBloat() error {
-	if err := p.doDBQueryBloat(p.db); err != nil {
-		p.Warning(err)
+func (c *Collector) doQueryBloat() error {
+	if err := c.doDBQueryBloat(c.db); err != nil {
+		c.Warning(err)
 	}
-	for _, conn := range p.dbConns {
+	for _, conn := range c.dbConns {
 		if conn.db == nil {
 			continue
 		}
-		if err := p.doDBQueryBloat(conn.db); err != nil {
-			p.Warning(err)
+		if err := c.doDBQueryBloat(conn.db); err != nil {
+			c.Warning(err)
 		}
 	}
 	return nil
 }
 
-func (p *Postgres) doDBQueryBloat(db *sql.DB) error {
+func (c *Collector) doDBQueryBloat(db *sql.DB) error {
 	q := queryBloat()
 
-	for _, m := range p.mx.tables {
+	for _, m := range c.mx.tables {
 		if m.bloatSize != nil {
 			m.bloatSize = newInt(0)
 		}
@@ -30,7 +30,7 @@ func (p *Postgres) doDBQueryBloat(db *sql.DB) error {
 			m.bloatSizePerc = newInt(0)
 		}
 	}
-	for _, m := range p.mx.indexes {
+	for _, m := range c.mx.indexes {
 		if m.bloatSize != nil {
 			m.bloatSize = newInt(0)
 		}
@@ -41,7 +41,7 @@ func (p *Postgres) doDBQueryBloat(db *sql.DB) error {
 
 	var dbname, schema, table, iname string
 	var tableWasted, idxWasted int64
-	return p.doDBQuery(db, q, func(column, value string, rowEnd bool) {
+	return c.doDBQuery(db, q, func(column, value string, rowEnd bool) {
 		switch column {
 		case "db":
 			dbname = value
@@ -59,13 +59,13 @@ func (p *Postgres) doDBQueryBloat(db *sql.DB) error {
 		if !rowEnd {
 			return
 		}
-		if p.hasTableMetrics(table, dbname, schema) {
-			v := p.getTableMetrics(table, dbname, schema)
+		if c.hasTableMetrics(table, dbname, schema) {
+			v := c.getTableMetrics(table, dbname, schema)
 			v.bloatSize = newInt(tableWasted)
 			v.bloatSizePerc = newInt(calcPercentage(tableWasted, v.totalSize))
 		}
-		if iname != "?" && p.hasIndexMetrics(iname, table, dbname, schema) {
-			v := p.getIndexMetrics(iname, table, dbname, schema)
+		if iname != "?" && c.hasIndexMetrics(iname, table, dbname, schema) {
+			v := c.getIndexMetrics(iname, table, dbname, schema)
 			v.bloatSize = newInt(idxWasted)
 			v.bloatSizePerc = newInt(calcPercentage(idxWasted, v.size))
 		}

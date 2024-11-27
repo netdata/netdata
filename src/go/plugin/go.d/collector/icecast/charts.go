@@ -32,7 +32,7 @@ var (
 	}
 )
 
-func (ic *Icecast) addSourceCharts(name string) {
+func (c *Collector) addSourceCharts(name string) {
 	chart := sourceListenersChartTmpl.Copy()
 
 	chart.ID = fmt.Sprintf(chart.ID, cleanSource(name))
@@ -43,15 +43,15 @@ func (ic *Icecast) addSourceCharts(name string) {
 		dim.ID = fmt.Sprintf(dim.ID, name)
 	}
 
-	if err := ic.Charts().Add(chart); err != nil {
-		ic.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 
 }
 
-func (ic *Icecast) removeSourceCharts(name string) {
+func (c *Collector) removeSourceCharts(name string) {
 	px := fmt.Sprintf("icecast_%s_", cleanSource(name))
-	for _, chart := range *ic.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

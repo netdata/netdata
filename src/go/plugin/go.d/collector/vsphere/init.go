@@ -10,44 +10,44 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/scrape"
 )
 
-func (vs *VSphere) validateConfig() error {
+func (c *Collector) validateConfig() error {
 	const minRecommendedUpdateEvery = 20
 
-	if vs.URL == "" {
+	if c.URL == "" {
 		return errors.New("URL is not set")
 	}
-	if vs.Username == "" || vs.Password == "" {
+	if c.Username == "" || c.Password == "" {
 		return errors.New("username or password not set")
 	}
-	if vs.UpdateEvery < minRecommendedUpdateEvery {
-		vs.Warningf("update_every is to low, minimum recommended is %d", minRecommendedUpdateEvery)
+	if c.UpdateEvery < minRecommendedUpdateEvery {
+		c.Warningf("update_every is to low, minimum recommended is %d", minRecommendedUpdateEvery)
 	}
 	return nil
 }
 
-func (vs *VSphere) initClient() (*client.Client, error) {
+func (c *Collector) initClient() (*client.Client, error) {
 	config := client.Config{
-		URL:       vs.URL,
-		User:      vs.Username,
-		Password:  vs.Password,
-		Timeout:   vs.Timeout.Duration(),
-		TLSConfig: vs.ClientConfig.TLSConfig,
+		URL:       c.URL,
+		User:      c.Username,
+		Password:  c.Password,
+		Timeout:   c.Timeout.Duration(),
+		TLSConfig: c.ClientConfig.TLSConfig,
 	}
 	return client.New(config)
 }
 
-func (vs *VSphere) initDiscoverer(c *client.Client) error {
-	d := discover.New(c)
-	d.Logger = vs.Logger
+func (c *Collector) initDiscoverer(cli *client.Client) error {
+	d := discover.New(cli)
+	d.Logger = c.Logger
 
-	hm, err := vs.HostsInclude.Parse()
+	hm, err := c.HostsInclude.Parse()
 	if err != nil {
 		return err
 	}
 	if hm != nil {
 		d.HostMatcher = hm
 	}
-	vmm, err := vs.VMsInclude.Parse()
+	vmm, err := c.VMsInclude.Parse()
 	if err != nil {
 		return err
 	}
@@ -55,12 +55,12 @@ func (vs *VSphere) initDiscoverer(c *client.Client) error {
 		d.VMMatcher = vmm
 	}
 
-	vs.discoverer = d
+	c.discoverer = d
 	return nil
 }
 
-func (vs *VSphere) initScraper(c *client.Client) {
-	ms := scrape.New(c)
-	ms.Logger = vs.Logger
-	vs.scraper = ms
+func (c *Collector) initScraper(cli *client.Client) {
+	ms := scrape.New(cli)
+	ms.Logger = c.Logger
+	c.scraper = ms
 }

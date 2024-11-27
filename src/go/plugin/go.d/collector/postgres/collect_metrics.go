@@ -4,83 +4,83 @@ package postgres
 
 import "fmt"
 
-func (p *Postgres) collectMetrics(mx map[string]int64) {
-	mx["server_connections_used"] = p.mx.connUsed
-	if p.mx.maxConnections > 0 {
-		mx["server_connections_available"] = p.mx.maxConnections - p.mx.connUsed
-		mx["server_connections_utilization"] = calcPercentage(p.mx.connUsed, p.mx.maxConnections)
+func (c *Collector) collectMetrics(mx map[string]int64) {
+	mx["server_connections_used"] = c.mx.connUsed
+	if c.mx.maxConnections > 0 {
+		mx["server_connections_available"] = c.mx.maxConnections - c.mx.connUsed
+		mx["server_connections_utilization"] = calcPercentage(c.mx.connUsed, c.mx.maxConnections)
 	}
-	p.mx.xactTimeHist.WriteTo(mx, "transaction_running_time_hist", 1, 1)
-	p.mx.queryTimeHist.WriteTo(mx, "query_running_time_hist", 1, 1)
-	mx["server_uptime"] = p.mx.uptime
-	mx["server_connections_state_active"] = p.mx.connStateActive
-	mx["server_connections_state_idle"] = p.mx.connStateIdle
-	mx["server_connections_state_idle_in_transaction"] = p.mx.connStateIdleInTrans
-	mx["server_connections_state_idle_in_transaction_aborted"] = p.mx.connStateIdleInTransAborted
-	mx["server_connections_state_fastpath_function_call"] = p.mx.connStateFastpathFunctionCall
-	mx["server_connections_state_disabled"] = p.mx.connStateDisabled
-	mx["checkpoints_timed"] = p.mx.checkpointsTimed
-	mx["checkpoints_req"] = p.mx.checkpointsReq
-	mx["checkpoint_write_time"] = p.mx.checkpointWriteTime
-	mx["checkpoint_sync_time"] = p.mx.checkpointSyncTime
-	mx["buffers_checkpoint"] = p.mx.buffersCheckpoint
-	mx["buffers_clean"] = p.mx.buffersClean
-	mx["maxwritten_clean"] = p.mx.maxwrittenClean
-	mx["buffers_backend"] = p.mx.buffersBackend
-	mx["buffers_backend_fsync"] = p.mx.buffersBackendFsync
-	mx["buffers_alloc"] = p.mx.buffersAlloc
-	mx["oldest_current_xid"] = p.mx.oldestXID
-	mx["percent_towards_wraparound"] = p.mx.percentTowardsWraparound
-	mx["percent_towards_emergency_autovacuum"] = p.mx.percentTowardsEmergencyAutovacuum
-	mx["wal_writes"] = p.mx.walWrites
-	mx["wal_recycled_files"] = p.mx.walRecycledFiles
-	mx["wal_written_files"] = p.mx.walWrittenFiles
-	mx["wal_archive_files_ready_count"] = p.mx.walArchiveFilesReady
-	mx["wal_archive_files_done_count"] = p.mx.walArchiveFilesDone
-	mx["catalog_relkind_r_count"] = p.mx.relkindOrdinaryTable
-	mx["catalog_relkind_i_count"] = p.mx.relkindIndex
-	mx["catalog_relkind_S_count"] = p.mx.relkindSequence
-	mx["catalog_relkind_t_count"] = p.mx.relkindTOASTTable
-	mx["catalog_relkind_v_count"] = p.mx.relkindView
-	mx["catalog_relkind_m_count"] = p.mx.relkindMatView
-	mx["catalog_relkind_c_count"] = p.mx.relkindCompositeType
-	mx["catalog_relkind_f_count"] = p.mx.relkindForeignTable
-	mx["catalog_relkind_p_count"] = p.mx.relkindPartitionedTable
-	mx["catalog_relkind_I_count"] = p.mx.relkindPartitionedIndex
-	mx["catalog_relkind_r_size"] = p.mx.relkindOrdinaryTableSize
-	mx["catalog_relkind_i_size"] = p.mx.relkindIndexSize
-	mx["catalog_relkind_S_size"] = p.mx.relkindSequenceSize
-	mx["catalog_relkind_t_size"] = p.mx.relkindTOASTTableSize
-	mx["catalog_relkind_v_size"] = p.mx.relkindViewSize
-	mx["catalog_relkind_m_size"] = p.mx.relkindMatViewSize
-	mx["catalog_relkind_c_size"] = p.mx.relkindCompositeTypeSize
-	mx["catalog_relkind_f_size"] = p.mx.relkindForeignTableSize
-	mx["catalog_relkind_p_size"] = p.mx.relkindPartitionedTableSize
-	mx["catalog_relkind_I_size"] = p.mx.relkindPartitionedIndexSize
-	mx["autovacuum_analyze"] = p.mx.autovacuumWorkersAnalyze
-	mx["autovacuum_vacuum_analyze"] = p.mx.autovacuumWorkersVacuumAnalyze
-	mx["autovacuum_vacuum"] = p.mx.autovacuumWorkersVacuum
-	mx["autovacuum_vacuum_freeze"] = p.mx.autovacuumWorkersVacuumFreeze
-	mx["autovacuum_brin_summarize"] = p.mx.autovacuumWorkersBrinSummarize
+	c.mx.xactTimeHist.WriteTo(mx, "transaction_running_time_hist", 1, 1)
+	c.mx.queryTimeHist.WriteTo(mx, "query_running_time_hist", 1, 1)
+	mx["server_uptime"] = c.mx.uptime
+	mx["server_connections_state_active"] = c.mx.connStateActive
+	mx["server_connections_state_idle"] = c.mx.connStateIdle
+	mx["server_connections_state_idle_in_transaction"] = c.mx.connStateIdleInTrans
+	mx["server_connections_state_idle_in_transaction_aborted"] = c.mx.connStateIdleInTransAborted
+	mx["server_connections_state_fastpath_function_call"] = c.mx.connStateFastpathFunctionCall
+	mx["server_connections_state_disabled"] = c.mx.connStateDisabled
+	mx["checkpoints_timed"] = c.mx.checkpointsTimed
+	mx["checkpoints_req"] = c.mx.checkpointsReq
+	mx["checkpoint_write_time"] = c.mx.checkpointWriteTime
+	mx["checkpoint_sync_time"] = c.mx.checkpointSyncTime
+	mx["buffers_checkpoint"] = c.mx.buffersCheckpoint
+	mx["buffers_clean"] = c.mx.buffersClean
+	mx["maxwritten_clean"] = c.mx.maxwrittenClean
+	mx["buffers_backend"] = c.mx.buffersBackend
+	mx["buffers_backend_fsync"] = c.mx.buffersBackendFsync
+	mx["buffers_alloc"] = c.mx.buffersAlloc
+	mx["oldest_current_xid"] = c.mx.oldestXID
+	mx["percent_towards_wraparound"] = c.mx.percentTowardsWraparound
+	mx["percent_towards_emergency_autovacuum"] = c.mx.percentTowardsEmergencyAutovacuum
+	mx["wal_writes"] = c.mx.walWrites
+	mx["wal_recycled_files"] = c.mx.walRecycledFiles
+	mx["wal_written_files"] = c.mx.walWrittenFiles
+	mx["wal_archive_files_ready_count"] = c.mx.walArchiveFilesReady
+	mx["wal_archive_files_done_count"] = c.mx.walArchiveFilesDone
+	mx["catalog_relkind_r_count"] = c.mx.relkindOrdinaryTable
+	mx["catalog_relkind_i_count"] = c.mx.relkindIndex
+	mx["catalog_relkind_S_count"] = c.mx.relkindSequence
+	mx["catalog_relkind_t_count"] = c.mx.relkindTOASTTable
+	mx["catalog_relkind_v_count"] = c.mx.relkindView
+	mx["catalog_relkind_m_count"] = c.mx.relkindMatView
+	mx["catalog_relkind_c_count"] = c.mx.relkindCompositeType
+	mx["catalog_relkind_f_count"] = c.mx.relkindForeignTable
+	mx["catalog_relkind_p_count"] = c.mx.relkindPartitionedTable
+	mx["catalog_relkind_I_count"] = c.mx.relkindPartitionedIndex
+	mx["catalog_relkind_r_size"] = c.mx.relkindOrdinaryTableSize
+	mx["catalog_relkind_i_size"] = c.mx.relkindIndexSize
+	mx["catalog_relkind_S_size"] = c.mx.relkindSequenceSize
+	mx["catalog_relkind_t_size"] = c.mx.relkindTOASTTableSize
+	mx["catalog_relkind_v_size"] = c.mx.relkindViewSize
+	mx["catalog_relkind_m_size"] = c.mx.relkindMatViewSize
+	mx["catalog_relkind_c_size"] = c.mx.relkindCompositeTypeSize
+	mx["catalog_relkind_f_size"] = c.mx.relkindForeignTableSize
+	mx["catalog_relkind_p_size"] = c.mx.relkindPartitionedTableSize
+	mx["catalog_relkind_I_size"] = c.mx.relkindPartitionedIndexSize
+	mx["autovacuum_analyze"] = c.mx.autovacuumWorkersAnalyze
+	mx["autovacuum_vacuum_analyze"] = c.mx.autovacuumWorkersVacuumAnalyze
+	mx["autovacuum_vacuum"] = c.mx.autovacuumWorkersVacuum
+	mx["autovacuum_vacuum_freeze"] = c.mx.autovacuumWorkersVacuumFreeze
+	mx["autovacuum_brin_summarize"] = c.mx.autovacuumWorkersBrinSummarize
 
 	var locksHeld int64
-	for name, m := range p.mx.dbs {
+	for name, m := range c.mx.dbs {
 		if !m.updated {
-			delete(p.mx.dbs, name)
-			p.removeDatabaseCharts(m)
+			delete(c.mx.dbs, name)
+			c.removeDatabaseCharts(m)
 			continue
 		}
 		if !m.hasCharts {
 			m.hasCharts = true
-			p.addNewDatabaseCharts(m)
-			if p.isPGInRecovery() {
-				p.addDBConflictsCharts(m)
+			c.addNewDatabaseCharts(m)
+			if c.isPGInRecovery() {
+				c.addDBConflictsCharts(m)
 			}
 		}
 		px := "db_" + m.name + "_"
 		mx[px+"numbackends"] = m.numBackends
 		if m.datConnLimit <= 0 {
-			mx[px+"numbackends_utilization"] = calcPercentage(m.numBackends, p.mx.maxConnections)
+			mx[px+"numbackends_utilization"] = calcPercentage(m.numBackends, c.mx.maxConnections)
 		} else {
 			mx[px+"numbackends_utilization"] = calcPercentage(m.numBackends, m.datConnLimit)
 		}
@@ -130,50 +130,50 @@ func (p *Postgres) collectMetrics(mx map[string]int64) {
 			m.shareLockHeld + m.shareRowExclusiveLockHeld +
 			m.exclusiveLockHeld + m.accessExclusiveLockHeld
 	}
-	mx["databases_count"] = int64(len(p.mx.dbs))
-	mx["locks_utilization"] = calcPercentage(locksHeld, p.mx.maxLocksHeld)
+	mx["databases_count"] = int64(len(c.mx.dbs))
+	mx["locks_utilization"] = calcPercentage(locksHeld, c.mx.maxLocksHeld)
 
-	for name, m := range p.mx.tables {
+	for name, m := range c.mx.tables {
 		if !m.updated {
-			delete(p.mx.tables, name)
-			p.removeTableCharts(m)
+			delete(c.mx.tables, name)
+			c.removeTableCharts(m)
 			continue
 		}
 		if !m.hasCharts {
 			m.hasCharts = true
-			p.addNewTableCharts(m)
+			c.addNewTableCharts(m)
 		}
 		if !m.hasLastAutoVacuumChart && m.lastAutoVacuumAgo > 0 {
 			m.hasLastAutoVacuumChart = true
-			p.addTableLastAutoVacuumAgoChart(m)
+			c.addTableLastAutoVacuumAgoChart(m)
 		}
 		if !m.hasLastVacuumChart && m.lastVacuumAgo > 0 {
 			m.hasLastVacuumChart = true
-			p.addTableLastVacuumAgoChart(m)
+			c.addTableLastVacuumAgoChart(m)
 		}
 		if !m.hasLastAutoAnalyzeChart && m.lastAutoAnalyzeAgo > 0 {
 			m.hasLastAutoAnalyzeChart = true
-			p.addTableLastAutoAnalyzeAgoChart(m)
+			c.addTableLastAutoAnalyzeAgoChart(m)
 		}
 		if !m.hasLastAnalyzeChart && m.lastAnalyzeAgo > 0 {
 			m.hasLastAnalyzeChart = true
-			p.addTableLastAnalyzeAgoChart(m)
+			c.addTableLastAnalyzeAgoChart(m)
 		}
 		if !m.hasTableIOCharts && m.heapBlksRead.last != -1 {
 			m.hasTableIOCharts = true
-			p.addTableIOChartsCharts(m)
+			c.addTableIOChartsCharts(m)
 		}
 		if !m.hasTableIdxIOCharts && m.idxBlksRead.last != -1 {
 			m.hasTableIdxIOCharts = true
-			p.addTableIndexIOCharts(m)
+			c.addTableIndexIOCharts(m)
 		}
 		if !m.hasTableTOASTIOCharts && m.toastBlksRead.last != -1 {
 			m.hasTableTOASTIOCharts = true
-			p.addTableTOASTIOCharts(m)
+			c.addTableTOASTIOCharts(m)
 		}
 		if !m.hasTableTOASTIdxIOCharts && m.tidxBlksRead.last != -1 {
 			m.hasTableTOASTIdxIOCharts = true
-			p.addTableTOASTIndexIOCharts(m)
+			c.addTableTOASTIndexIOCharts(m)
 		}
 
 		px := fmt.Sprintf("table_%s_db_%s_schema_%s_", m.name, m.db, m.schema)
@@ -234,15 +234,15 @@ func (p *Postgres) collectMetrics(mx map[string]int64) {
 		m.tidxBlksHit.prev, m.tidxBlksRead.prev = m.tidxBlksHit.last, m.tidxBlksRead.last
 	}
 
-	for name, m := range p.mx.indexes {
+	for name, m := range c.mx.indexes {
 		if !m.updated {
-			delete(p.mx.indexes, name)
-			p.removeIndexCharts(m)
+			delete(c.mx.indexes, name)
+			c.removeIndexCharts(m)
 			continue
 		}
 		if !m.hasCharts {
 			m.hasCharts = true
-			p.addNewIndexCharts(m)
+			c.addNewIndexCharts(m)
 		}
 
 		px := fmt.Sprintf("index_%s_table_%s_db_%s_schema_%s_", m.name, m.table, m.db, m.schema)
@@ -258,15 +258,15 @@ func (p *Postgres) collectMetrics(mx map[string]int64) {
 		}
 	}
 
-	for name, m := range p.mx.replApps {
+	for name, m := range c.mx.replApps {
 		if !m.updated {
-			delete(p.mx.replApps, name)
-			p.removeReplicationStandbyAppCharts(name)
+			delete(c.mx.replApps, name)
+			c.removeReplicationStandbyAppCharts(name)
 			continue
 		}
 		if !m.hasCharts {
 			m.hasCharts = true
-			p.addNewReplicationStandbyAppCharts(name)
+			c.addNewReplicationStandbyAppCharts(name)
 		}
 		px := "repl_standby_app_" + m.name + "_wal_"
 		mx[px+"sent_lag_size"] = m.walSentDelta
@@ -278,15 +278,15 @@ func (p *Postgres) collectMetrics(mx map[string]int64) {
 		mx[px+"replay_lag_time"] = m.walReplayLag
 	}
 
-	for name, m := range p.mx.replSlots {
+	for name, m := range c.mx.replSlots {
 		if !m.updated {
-			delete(p.mx.replSlots, name)
-			p.removeReplicationSlotCharts(name)
+			delete(c.mx.replSlots, name)
+			c.removeReplicationSlotCharts(name)
 			continue
 		}
 		if !m.hasCharts {
 			m.hasCharts = true
-			p.addNewReplicationSlotCharts(name)
+			c.addNewReplicationSlotCharts(name)
 		}
 		px := "repl_slot_" + m.name + "_"
 		mx[px+"replslot_wal_keep"] = m.walKeep
@@ -294,15 +294,15 @@ func (p *Postgres) collectMetrics(mx map[string]int64) {
 	}
 }
 
-func (p *Postgres) resetMetrics() {
-	p.mx.srvMetrics = srvMetrics{
-		xactTimeHist:   p.mx.xactTimeHist,
-		queryTimeHist:  p.mx.queryTimeHist,
-		maxConnections: p.mx.maxConnections,
-		maxLocksHeld:   p.mx.maxLocksHeld,
+func (c *Collector) resetMetrics() {
+	c.mx.srvMetrics = srvMetrics{
+		xactTimeHist:   c.mx.xactTimeHist,
+		queryTimeHist:  c.mx.queryTimeHist,
+		maxConnections: c.mx.maxConnections,
+		maxLocksHeld:   c.mx.maxLocksHeld,
 	}
-	for name, m := range p.mx.dbs {
-		p.mx.dbs[name] = &dbMetrics{
+	for name, m := range c.mx.dbs {
+		c.mx.dbs[name] = &dbMetrics{
 			name:        m.name,
 			hasCharts:   m.hasCharts,
 			blksRead:    incDelta{prev: m.blksRead.prev},
@@ -311,8 +311,8 @@ func (p *Postgres) resetMetrics() {
 			tupFetched:  incDelta{prev: m.tupFetched.prev},
 		}
 	}
-	for name, m := range p.mx.tables {
-		p.mx.tables[name] = &tableMetrics{
+	for name, m := range c.mx.tables {
+		c.mx.tables[name] = &tableMetrics{
 			db:                       m.db,
 			schema:                   m.schema,
 			name:                     m.name,
@@ -340,8 +340,8 @@ func (p *Postgres) resetMetrics() {
 			nullColumns:              m.nullColumns,
 		}
 	}
-	for name, m := range p.mx.indexes {
-		p.mx.indexes[name] = &indexMetrics{
+	for name, m := range c.mx.indexes {
+		c.mx.indexes[name] = &indexMetrics{
 			name:          m.name,
 			db:            m.db,
 			schema:        m.schema,
@@ -352,14 +352,14 @@ func (p *Postgres) resetMetrics() {
 			bloatSizePerc: m.bloatSizePerc,
 		}
 	}
-	for name, m := range p.mx.replApps {
-		p.mx.replApps[name] = &replStandbyAppMetrics{
+	for name, m := range c.mx.replApps {
+		c.mx.replApps[name] = &replStandbyAppMetrics{
 			name:      m.name,
 			hasCharts: m.hasCharts,
 		}
 	}
-	for name, m := range p.mx.replSlots {
-		p.mx.replSlots[name] = &replSlotMetrics{
+	for name, m := range c.mx.replSlots {
+		c.mx.replSlots[name] = &replSlotMetrics{
 			name:      m.name,
 			hasCharts: m.hasCharts,
 		}

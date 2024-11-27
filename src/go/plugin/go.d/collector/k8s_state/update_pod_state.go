@@ -8,9 +8,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func (ks *KubeState) updatePodState(r resource) {
+func (c *Collector) updatePodState(r resource) {
 	if r.value() == nil {
-		if ps, ok := ks.state.pods[r.source()]; ok {
+		if ps, ok := c.state.pods[r.source()]; ok {
 			ps.deleted = true
 		}
 		return
@@ -18,14 +18,14 @@ func (ks *KubeState) updatePodState(r resource) {
 
 	pod, err := toPod(r)
 	if err != nil {
-		ks.Warning(err)
+		c.Warning(err)
 		return
 	}
 
-	ps, ok := ks.state.pods[r.source()]
+	ps, ok := c.state.pods[r.source()]
 	if !ok {
 		ps = newPodState()
-		ks.state.pods[r.source()] = ps
+		c.state.pods[r.source()] = ps
 	}
 
 	if !ok {

@@ -27,7 +27,7 @@ const (
 	metricIISNotFoundErrorsTotal           = "windows_iis_not_found_errors_total"
 )
 
-func (w *Windows) collectIIS(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectIIS(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 	px := "iis_website_"
 	for _, pm := range pms.FindByName(metricIISCurrentAnonymousUsers) {
@@ -122,15 +122,15 @@ func (w *Windows) collectIIS(mx map[string]int64, pms prometheus.Series) {
 	}
 
 	for site := range seen {
-		if !w.cache.iis[site] {
-			w.cache.iis[site] = true
-			w.addIISWebsiteCharts(site)
+		if !c.cache.iis[site] {
+			c.cache.iis[site] = true
+			c.addIISWebsiteCharts(site)
 		}
 	}
-	for site := range w.cache.iis {
+	for site := range c.cache.iis {
 		if !seen[site] {
-			delete(w.cache.iis, site)
-			w.removeIIWebsiteSCharts(site)
+			delete(c.cache.iis, site)
+			c.removeIIWebsiteSCharts(site)
 		}
 	}
 }

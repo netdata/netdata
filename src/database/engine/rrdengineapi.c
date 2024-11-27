@@ -1125,6 +1125,9 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     ctx->loading.populate_mrg.array = NULL;
     ctx->loading.populate_mrg.size = 0;
 
+    if(__atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED) == LONG_MAX)
+        __atomic_store_n(&ctx->atomic.first_time_s, now_realtime_sec(), __ATOMIC_RELAXED);
+
     netdata_log_info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
 }
 

@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-func (o *OpenVPNStatusLog) collect() (map[string]int64, error) {
-	clients, err := parse(o.LogPath)
+func (c *Collector) collect() (map[string]int64, error) {
+	clients, err := parse(c.LogPath)
 	if err != nil {
 		return nil, err
 	}
@@ -16,8 +16,8 @@ func (o *OpenVPNStatusLog) collect() (map[string]int64, error) {
 
 	collectTotalStats(mx, clients)
 
-	if o.perUserMatcher != nil && numOfClients(clients) > 0 {
-		o.collectUsers(mx, clients)
+	if c.perUserMatcher != nil && numOfClients(clients) > 0 {
+		c.collectUsers(mx, clients)
 	}
 
 	return mx, nil
@@ -34,18 +34,18 @@ func collectTotalStats(mx map[string]int64, clients []clientInfo) {
 	mx["bytes_out"] = out
 }
 
-func (o *OpenVPNStatusLog) collectUsers(mx map[string]int64, clients []clientInfo) {
+func (c *Collector) collectUsers(mx map[string]int64, clients []clientInfo) {
 	now := time.Now().Unix()
 
 	for _, user := range clients {
 		name := user.commonName
-		if !o.perUserMatcher.MatchString(name) {
+		if !c.perUserMatcher.MatchString(name) {
 			continue
 		}
-		if !o.collectedUsers[name] {
-			o.collectedUsers[name] = true
-			if err := o.addUserCharts(name); err != nil {
-				o.Warning(err)
+		if !c.collectedUsers[name] {
+			c.collectedUsers[name] = true
+			if err := c.addUserCharts(name); err != nil {
+				c.Warning(err)
 			}
 		}
 		mx[name+"_bytes_in"] = user.bytesReceived

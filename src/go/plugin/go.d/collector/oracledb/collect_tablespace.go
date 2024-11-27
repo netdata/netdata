@@ -31,9 +31,9 @@ GROUP BY
     f.tablespace_name, f.autoextensible
 `
 
-func (o *OracleDB) collectTablespace(mx map[string]int64) error {
+func (c *Collector) collectTablespace(mx map[string]int64) error {
 	q := queryTablespace
-	o.Debugf("executing query: %s", q)
+	c.Debugf("executing query: %s", q)
 
 	var ts struct {
 		name       string
@@ -45,7 +45,7 @@ func (o *OracleDB) collectTablespace(mx map[string]int64) error {
 
 	seen := make(map[string]bool)
 
-	err := o.doQuery(q, func(column, value string, lineEnd bool) error {
+	err := c.doQuery(q, func(column, value string, lineEnd bool) error {
 		var err error
 
 		switch column {
@@ -90,15 +90,15 @@ func (o *OracleDB) collectTablespace(mx map[string]int64) error {
 	}
 
 	for name := range seen {
-		if !o.seenTablespaces[name] {
-			o.seenTablespaces[name] = true
-			o.addTablespaceCharts(name)
+		if !c.seenTablespaces[name] {
+			c.seenTablespaces[name] = true
+			c.addTablespaceCharts(name)
 		}
 	}
-	for name := range o.seenTablespaces {
+	for name := range c.seenTablespaces {
 		if !seen[name] {
-			delete(o.seenTablespaces, name)
-			o.removeTablespaceChart(name)
+			delete(c.seenTablespaces, name)
+			c.removeTablespaceChart(name)
 		}
 	}
 

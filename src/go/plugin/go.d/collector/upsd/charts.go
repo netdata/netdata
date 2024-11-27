@@ -329,7 +329,7 @@ var (
 	}
 )
 
-func (u *Upsd) addUPSCharts(ups upsUnit) {
+func (c *Collector) addUPSCharts(ups upsUnit) {
 	charts := upsChartsTmpl.Copy()
 
 	var removed []string
@@ -359,7 +359,7 @@ func (u *Upsd) addUPSCharts(ups upsUnit) {
 		}
 	}
 
-	u.Debugf("UPS '%s' no metrics: %v", ups.name, removed)
+	c.Debugf("UPS '%s' no metrics: %v", ups.name, removed)
 
 	name := cleanUpsName(ups.name)
 	for _, chart := range *charts {
@@ -377,14 +377,14 @@ func (u *Upsd) addUPSCharts(ups upsUnit) {
 		}
 	}
 
-	if err := u.Charts().Add(*charts...); err != nil {
-		u.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (u *Upsd) removeUPSCharts(name string) {
+func (c *Collector) removeUPSCharts(name string) {
 	name = cleanUpsName(name)
-	for _, chart := range *u.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, name) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

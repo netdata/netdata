@@ -6,24 +6,24 @@ import (
 	"errors"
 )
 
-func (m *Mongo) verifyConfig() error {
-	if m.URI == "" {
+func (c *Collector) verifyConfig() error {
+	if c.URI == "" {
 		return errors.New("connection URI is empty")
 	}
 
 	return nil
 }
 
-func (m *Mongo) initDatabaseSelector() error {
-	if m.Databases.Empty() {
+func (c *Collector) initDatabaseSelector() error {
+	if c.Databases.Empty() {
 		return nil
 	}
 
-	sr, err := m.Databases.Parse()
+	sr, err := c.Databases.Parse()
 	if err != nil {
 		return err
 	}
-	m.dbSelector = sr
+	c.dbSelector = sr
 
 	return nil
 }

@@ -38,8 +38,8 @@ var adapterStates = []string{
 	"failed",
 }
 
-func (m *MegaCli) collectPhysDrives(mx map[string]int64) error {
-	bs, err := m.exec.physDrivesInfo()
+func (c *Collector) collectPhysDrives(mx map[string]int64) error {
+	bs, err := c.exec.physDrivesInfo()
 	if err != nil {
 		return err
 	}
@@ -55,9 +55,9 @@ func (m *MegaCli) collectPhysDrives(mx map[string]int64) error {
 	var drives int
 
 	for _, ad := range adapters {
-		if !m.adapters[ad.number] {
-			m.adapters[ad.number] = true
-			m.addAdapterCharts(ad)
+		if !c.adapters[ad.number] {
+			c.adapters[ad.number] = true
+			c.addAdapterCharts(ad)
 		}
 
 		px := fmt.Sprintf("adapter_%s_health_state_", ad.number)
@@ -68,9 +68,9 @@ func (m *MegaCli) collectPhysDrives(mx map[string]int64) error {
 		mx[px+st] = 1
 
 		for _, pd := range ad.physDrives {
-			if !m.adapters[pd.wwn] {
-				m.adapters[pd.wwn] = true
-				m.addPhysDriveCharts(pd)
+			if !c.adapters[pd.wwn] {
+				c.adapters[pd.wwn] = true
+				c.addPhysDriveCharts(pd)
 			}
 			drives++
 
@@ -81,7 +81,7 @@ func (m *MegaCli) collectPhysDrives(mx map[string]int64) error {
 		}
 	}
 
-	m.Debugf("found %d adapters, %d physical drives", len(m.adapters), drives)
+	c.Debugf("found %d adapters, %d physical drives", len(c.adapters), drives)
 
 	return nil
 }
