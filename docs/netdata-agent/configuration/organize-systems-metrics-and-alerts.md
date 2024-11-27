@@ -19,7 +19,7 @@ in all the UI, dashboards, tabs, filters, etc. For example, you can create a vir
 and monitor them as discrete entities. Virtual nodes can help you simplify your infrastructure monitoring and focus on the
 individual node that matters.
 
-To define your windows server as a virtual node you need to:
+To define your Windows server as a Virtual Node, you need to:
 
 * Define virtual nodes in `/etc/netdata/vnodes/vnodes.conf`
 
@@ -28,7 +28,7 @@ To define your windows server as a virtual node you need to:
       guid: <value>
     ```
 
-  Just remember to use a valid guid (On Linux you can use `uuidgen` command to generate one, on Windows just use the `[guid]::NewGuid()` command in PowerShell)
+  Remember to use a valid guid (On Linux you can use `uuidgen` command to generate one, on Windows use the `[guid]::NewGuid()` command in PowerShell)
 
 * Add the vnode config to the data collection job. e.g., in `go.d/windows.conf`:
 
@@ -61,12 +61,12 @@ They capture the following:
 * Kernel version
 * Operating system name and version
 * CPU architecture, system cores, CPU frequency, RAM, and disk space
-* Whether Netdata is running inside of a container, and if so, the OS and hardware details about the container's host
+* Whether Netdata is running inside a container, and if so, the OS and hardware details about the container's host
 * Whether Netdata is running inside K8s node
 * What virtualization layer the system runs on top of, if any
 * Whether the system is a streaming parent or child
 
-If you want to organize your systems without manually creating host labels, try the automatic labels in some of the
+If you want to organize your systems without manually creating host labels, try the automatic labels in some
 features below. You can see them under `http://HOST-IP:19999/api/v1/info`, beginning with an underscore `_`.
 
 ```json
@@ -89,10 +89,10 @@ sudo ./edit-config netdata.conf
 
 Create a new `[host labels]` section defining a new host label and its value for the system in question. Make sure not to violate any of the host label naming rules:
 
-* Names cannot start with `_`, but it can be present in other parts of the name.
+* Names can’t start with `_`, but it can be present in other parts of the name.
 * Names only accept alphabet letters, numbers, dots, and dashes.
 
-The policy for values is more flexible, but you cannot use exclamation marks (`!`), whitespaces (` `), single quotes (`'`), double quotes (`"`), or asterisks (`*`), because they are used to compare label values in health alerts and templates.
+The policy for values is more flexible, but you can’t use exclamation marks (`!`), whitespaces (` `), single quotes (`'`), double quotes (`"`), or asterisks (`*`), because they’re used to compare label values in health alerts and templates.
 
 ```text
 [host labels]
@@ -229,7 +229,7 @@ more about exporting, read the [documentation](/src/exporting/README.md).
 The Netdata aggregate charts allow you to filter and group metrics based on label name-value pairs.
 
 All go.d plugin collectors support the specification of labels at the "collection job" level. Some collectors come without of the box
-labels (e.g. generic Prometheus collector, Kubernetes, Docker and more). But you can also add your own custom labels by configuring
+labels (e.g., generic Prometheus collector, Kubernetes, Docker and more). But you can also add your own custom labels by configuring
 the data collection jobs.
 
 For example, suppose we have a single Netdata Agent, collecting data from two remote Apache web servers, located in different data centers.
