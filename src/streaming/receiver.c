@@ -494,11 +494,14 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
            , rpt->client_port ? rpt->client_port : "-"
            , why ? why : "");
 
-    stream_receiver_on_disconnect(sth, rpt);
     stream_thread_pollfd_release(sth, rpt->receiver.pfd);
     rpt->receiver.slot = -1;
     rpt->receiver.pfd = NULL;
     rpt->host->stream.rcv.status.tid = 0;
+
+    stream_receiver_on_disconnect(sth, rpt);
+    // DO NOT USE rpt after this point
+
     sth->rcv.run.receivers[slot] = NULL;
     if (slot == sth->rcv.run.used - 1)
         sth->rcv.run.used--;
