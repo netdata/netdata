@@ -374,14 +374,16 @@ void *stream_thread(void *ptr) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-void stream_thread_node_running(RRDHOST *host) {
+void stream_thread_node_queued(RRDHOST *host) {
     spinlock_lock(&stream_thread_globals.assign.spinlock);
     host->stream.refcount++;
+    internal_fatal(host->stream.refcount > 2, "invalid stream refcount %u (while adding node)", host->stream.refcount);
     spinlock_unlock(&stream_thread_globals.assign.spinlock);
 }
 
-void stream_thread_node_stopped(RRDHOST *host) {
+void stream_thread_node_removed(RRDHOST *host) {
     spinlock_lock(&stream_thread_globals.assign.spinlock);
+    internal_fatal(!host->stream.refcount, "invalid stream refcount %u (while stopping node)", host->stream.refcount);
 
     if(--host->stream.refcount == 0)
         host->stream.thread = NULL;
@@ -464,7 +466,7 @@ void stream_sender_add_to_connector_queue(RRDHOST *host) {
 void stream_receiver_add_to_queue(struct receiver_state *rpt) {
     struct stream_thread *sth = stream_thread_assign_and_start(rpt->host);
 
-    stream_thread_node_running(rpt->host);
+    stream_thread_node_queued(rpt->host);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM[%zu] [%s]: moving host to receiver queue...",
@@ -478,7 +480,7 @@ void stream_receiver_add_to_queue(struct receiver_state *rpt) {
 void stream_sender_add_to_queue(struct sender_state *s) {
     struct stream_thread *sth = stream_thread_assign_and_start(s->host);
 
-    stream_thread_node_running(s->host);
+    stream_thread_node_queued(s->host);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM[%zu] [%s]: moving host to dispatcher queue...",

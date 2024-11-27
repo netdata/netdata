@@ -183,7 +183,7 @@ static inline bool rrdhost_is_this_a_stream_thread(RRDHOST *host) {
     return host->stream.rcv.status.tid == tid || host->stream.snd.status.tid == tid;
 }
 
-void stream_thread_node_running(RRDHOST *host);
-void stream_thread_node_stopped(RRDHOST *host);
+void stream_thread_node_queued(RRDHOST *host);
+void stream_thread_node_removed(RRDHOST *host);
 
 #endif //NETDATA_STREAM_THREAD_H

@@ -487,6 +487,8 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct 
 
     bool should_remove = !reconnect || stream_connector_is_signaled_to_stop(s);
 
+    stream_thread_node_removed(s->host);
+
     if (should_remove)
         stream_sender_giveup(s);
     else
