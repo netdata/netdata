@@ -221,11 +221,19 @@ if(ENABLE_MIMALLOC)
                 include(FetchContent)
                 include(NetdataFetchContentExtra)
 
-                FetchContent_Declare(
-                        mimalloc
-                        GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
-                        GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f # v2.1.7
-                )
+                if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+                        FetchContent_Declare(mimalloc
+                                GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+                                GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f
+                                EXCLUDE_FROM_ALL
+                        )
+                else()
+                        FetchContent_Declare(mimalloc
+                                GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+                                GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f
+                        )
+                endif()
+
                 FetchContent_MakeAvailable_NoInstall(mimalloc)
         endfunction()
 
