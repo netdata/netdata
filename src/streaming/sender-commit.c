@@ -146,14 +146,8 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
                 rrdpush_compression_initialize(s);
                 dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
-                if (!dst_len) {
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
-                        "STREAM %s [send to %s]: COMPRESSION failed again. Deactivating compression",
-                        rrdhost_hostname(s->host), s->connected_to);
-
-                    rrdpush_compression_deactivate(s);
+                if (!dst_len)
                     goto compression_failed_with_lock;
-                }
             }
 
             rrdpush_signature_t signature = rrdpush_compress_encode_signature(dst_len);
@@ -165,16 +159,14 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
                 fatal(
                     "RRDPUSH COMPRESSION: invalid signature, original payload %zu bytes, "
                     "compressed payload length %zu bytes, but signature says payload is %zu bytes",
-                    size_to_compress,
-                    dst_len,
-                    decoded_dst_len);
+                    size_to_compress, dst_len, decoded_dst_len);
 #endif
+
+            total_compressed_len += dst_len + sizeof(signature);
 
             if (cbuffer_add_unsafe(s->sbuf.cb, (const char *)&signature, sizeof(signature)) ||
                 cbuffer_add_unsafe(s->sbuf.cb, dst, dst_len))
                 goto overflow_with_lock;
-
-            total_compressed_len += dst_len + sizeof(signature);
 
             src = src + size_to_compress;
             src_len -= size_to_compress;
@@ -183,10 +175,10 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     else {
         // uncompressed traffic
 
+        total_compressed_len = src_len;
+
         if (cbuffer_add_unsafe(s->sbuf.cb, src, src_len))
             goto overflow_with_lock;
-
-        total_compressed_len = total_uncompressed_len;
     }
 
     // update s->dispatcher entries
@@ -205,17 +197,30 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
     return;
 
-overflow_with_lock:
-    msg = s->dispatcher.msg;
-    sender_unlock(s);
-    msg.op = SENDER_MSG_RECONNECT_OVERFLOW;
-    stream_sender_send_msg_to_dispatcher(s, msg);
-    return;
+overflow_with_lock: {
+        size_t buffer_size = s->sbuf.cb->size;
+        size_t buffer_max_size = s->sbuf.cb->max_size;
+        size_t buffer_available = cbuffer_available_size_unsafe(s->sbuf.cb);
+        msg = s->dispatcher.msg;
+        sender_unlock(s);
+        msg.op = SENDER_MSG_RECONNECT_OVERFLOW;
+        stream_sender_send_msg_to_dispatcher(s, msg);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM %s [send to %s]: buffer overflow while adding %zu bytes (buffer size %zu, max size %zu, available %zu). "
+               "Restarting connection.",
+               rrdhost_hostname(s->host), s->connected_to,
+               total_compressed_len, buffer_size, buffer_max_size, buffer_available);
+        return;
+    }
 
-compression_failed_with_lock:
-    msg = s->dispatcher.msg;
-    sender_unlock(s);
-    msg.op = SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION;
-    stream_sender_send_msg_to_dispatcher(s, msg);
-    return;
+compression_failed_with_lock: {
+        rrdpush_compression_deactivate(s);
+        msg = s->dispatcher.msg;
+        sender_unlock(s);
+        msg.op = SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION;
+        stream_sender_send_msg_to_dispatcher(s, msg);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM %s [send to %s]: COMPRESSION failed (twice). Deactivating compression and restarting connection.",
+               rrdhost_hostname(s->host), s->connected_to);
+    }
 }

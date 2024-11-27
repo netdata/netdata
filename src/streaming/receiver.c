@@ -111,7 +111,7 @@ static inline STREAM_HANDSHAKE read_stream_error_to_reason(int code) {
     switch(code) {
         case 0:
             // asked to read zero bytes
-            return STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER;
+            return STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_READ_BUFFER;
 
         case -1:
             // EOF

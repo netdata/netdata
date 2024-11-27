@@ -310,16 +310,26 @@ static void stream_sender_dispatcher_handle_op(struct dispatcher *dp, struct sen
         if(msg->op & SENDER_MSG_RECONNECT_OVERFLOW) {
             worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_OVERFLOW);
             errno_clear();
+            sender_lock(s);
+            size_t buffer_size = s->sbuf.cb->size;
+            size_t buffer_max_size = s->sbuf.cb->max_size;
+            size_t buffer_available = cbuffer_available_size_unsafe(s->sbuf.cb);
+            sender_unlock(s);
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM [dispatch%d] %s [send to %s]: buffer full (allocated %zu bytes) after sending %zu bytes. "
+                   "STREAM [dispatch%d] %s [send to %s]: send buffer is full (buffer size %zu, max %zu, available %zu). "
                    "Restarting connection.",
-                   dp->id, rrdhost_hostname(s->host), s->connected_to, s->sbuf.cb->size, s->dispatcher.bytes_sent);
+                   dp->id, rrdhost_hostname(s->host), s->connected_to,
+                   buffer_size, buffer_max_size, buffer_available);
 
-            stream_sender_dispatcher_move_running_to_connector_or_remove(dp, s, msg->dispatcher_run_slot, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER, true);
+            stream_sender_dispatcher_move_running_to_connector_or_remove(
+                dp, s, msg->dispatcher_run_slot,
+                STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_SEND_BUFFER, true);
         }
         else if(msg->op & SENDER_MSG_STOP_RECEIVER_LEFT) {
             worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVER_LEFT);
-            stream_sender_dispatcher_move_running_to_connector_or_remove(dp, s, msg->dispatcher_run_slot, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
+            stream_sender_dispatcher_move_running_to_connector_or_remove(
+                dp, s, msg->dispatcher_run_slot,
+                STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
             return;
         }
         else if(msg->op & SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION) {
@@ -329,11 +339,15 @@ static void stream_sender_dispatcher_handle_op(struct dispatcher *dp, struct sen
                    "STREAM [dispatch%d] %s [send to %s]: restarting connection without compression.",
                    dp->id, rrdhost_hostname(s->host), s->connected_to);
 
-            stream_sender_dispatcher_move_running_to_connector_or_remove(dp, s, msg->dispatcher_run_slot, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_READ_BUFFER, true);
+            stream_sender_dispatcher_move_running_to_connector_or_remove(
+                dp, s, msg->dispatcher_run_slot,
+                STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_READ_BUFFER, true);
         }
         else if(msg->op & SENDER_MSG_STOP_HOST_CLEANUP) {
             worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_HOST_CLEANUP);
-            stream_sender_dispatcher_move_running_to_connector_or_remove(dp, s, msg->dispatcher_run_slot, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, false);
+            stream_sender_dispatcher_move_running_to_connector_or_remove(
+                dp, s, msg->dispatcher_run_slot,
+                STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, false);
             return;
         }
         else
