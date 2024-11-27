@@ -114,9 +114,8 @@ and they group the values every `group points`.
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=des&after=-60&label=des&value_color=blue) applies Holt-Winters double exponential smoothing
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=incremental_sum&after=-60&label=incremental_sum&value_color=red) finds the difference of the last vs the first value
 
-The examples shown above show live information from the `received` traffic on the `eth0` interface of the global Netdata registry. 
-Inspect any of the badges to see the parameters provided. You can directly issue the request to the registry server's API yourself, e.g. by 
-passing the following to get the value shown on the badge for the sum of the values within the period:
+The examples shown above show live information from the `received` traffic on the `eth0` interface of the global Netdata Registry.
+Inspect any of the badges to see the parameters provided. You can directly issue the request to the Registry server's API yourself, e.g. by passing the following to get the value shown on the badge for the sum of the values within the period:
 
 ```
 https://registry.my-netdata.io/api/v1/data?chart=net.eth0&options=unaligned&dimensions=received&group=sum&units=kilobits&after=-60&label=sum&points=1
