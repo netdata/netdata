@@ -10,6 +10,7 @@ When the context is clear, we can omit the "Netdata" prefix for brevity.
 |------------------------|--------------------------------------------------------------------------|
 | **Agent** (**Agents**) | The core monitoring software that collects, processes and stores metrics |
 | **Cloud**              | The centralized platform for managing and visualizing Netdata metrics    |
+| **Registry**           |                                                                          |
 
 ## Database
 

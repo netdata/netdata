@@ -113,7 +113,7 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 /usr/libexec/netdata/plugins.d/alarm-notify.sh test "ROLE"
 ```
 
-If you are [running your own registry](/src/registry/README.md#run-your-own-registry), add `export NETDATA_REGISTRY_URL=[YOUR_URL]` before calling `alarm-notify.sh`.
+If you are [running your own Registry](/src/registry/CONFIGURATION.md#run-your-own-registry), add `export NETDATA_REGISTRY_URL=[YOUR_URL]` before calling `alarm-notify.sh`.
 
 > If you need to dig even deeper, you can trace the execution with `bash -x`. Note that in test mode, `alarm-notify.sh` calls itself with many more arguments. So first do:
 >
@@ -167,10 +167,10 @@ export https_proxy="http://10.0.0.1:3128/"
 
 Images in notifications need to be downloaded from an Internet facing site.
 
-To allow notification providers to fetch the icons/images, by default we set the URL of the global public netdata registry.
+To allow notification providers to fetch the icons/images, by default we set the URL of the global public Netdata Registry.
 
 If you have an Internet facing netdata (or you have copied the images/ folder
-of netdata to your web server), set its URL here, to fetch the notification
+of Netdata to your web server), set its URL here, to fetch the notification
 images from it.
 
 ```text
