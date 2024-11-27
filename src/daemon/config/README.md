@@ -1,31 +1,31 @@
 # Daemon Configuration Reference
 
-The daemon configuration file is read from /INSTALL_PREFIX/netdata/netdata.conf.
+The Netdata daemon's main configuration file is located at `/INSTALL_PREFIX/netdata/netdata.conf`. While Netdata works effectively with default settings, this file allows you to fine-tune its behavior.
 
-This config file **is not needed by default**. Netdata works fine out of the box without it. But it does allow you to adapt the general behavior of Netdata, in great detail.
+You can view your current configuration, including default values, at `http://IP:19999/netdata.conf`. Access to this URL is [restricted to local IPs by default](/src/web/server/README.md#access-lists).
 
-You can find all these settings, with their default values, by accessing the URL `https://netdata.server.hostname:19999/netdata.conf`. HTTP access to this file is limited by default to local IPs, via the [web server access lists](/src/web/server/README.md#access-lists).
+The configuration file uses an INI-style format with `[SECTION]` headers:
 
-`netdata.conf` has sections stated with `[SECTION]`. You will see the following sections:
-
-1. `[global]` to [configure](#global-section-options) the [Netdata daemon](/src/daemon/README.md).
-2. `[db]` to [configure](#db-section-options) the [Database](/src/database/README.md) of Netdata.
-3. `[directories]` to [configure](#directories-section-options) the directories used by Netdata.
-4. `[logs]` to [configure](#logs-section-options) the Netdata logging.
-5. `[environment variables]` to [configure](#environment-variables-section-options) the environment variables used by Netdata.
-6. `[sqlite]` to [configure](#sqlite-section-options) the [Netdata Daemon's](/src/daemon/README.md) SQLite settings.
-7. `[ml]` to configure settings for [Machine Learning](/src/ml/README.md).
-8. `[health]` to [configure](#health-section-options) general settings for [health monitoring](/src/health/README.md).
-9. `[web]` to [configure the Web Server](/src/web/server/README.md).
-10. `[registry]` for the [Netdata Registry](/src/registry/README.md).
-11. `[global statistics]` for the [Netdata Registry](/src/registry/README.md).
-12. `[statsd]` for the general settings of the [stats.d.plugin](/src/collectors/statsd.plugin/README.md).
-13. `[plugins]` to [configure](#plugins-section-options) which [Collectors](/src/collectors/README.md) to use and PATH settings.
-14. `[plugin:NAME]` sections for each [Collector of every Plugin](#per-plugin-configuration).
+| Section                                                           | Controls                                                 |
+|-------------------------------------------------------------------|----------------------------------------------------------|
+| [[global]](#global-section-options)                               | [Daemon](/src/daemon/README.md)                          |
+| [[db]](#db-section-options)                                       | [Database](/src/database/README.md)                      |
+| [[directories]](#directories-section-options)                     | Directories used by Netdata                              |
+| [[logs]](#logs-section-options)                                   | Logging                                                  |
+| [[environment variables]](#environment-variables-section-options) | Environment variables                                    |
+| [[sqlite]](#sqlite-section-options)                               | SQLite                                                   |
+| `[ml]`                                                            | [Machine Learning](/src/ml/README.md)                    |
+| [[health]](#health-section-options)                               | [Health monitoring](/src/health/README.md)               |
+| `[web]`                                                           | [Web Server](/src/web/server/README.md)                  |
+| `[registry]`                                                      | [Registry](/src/registry/README.md)                      |
+| `[global statistics]`                                             | Internal monitoring                                      |
+| `[statsd]`                                                        | [StatsD plugin](/src/collectors/statsd.plugin/README.md) |
+| [`[plugins]`](#plugins-section-options)                           | Data collection Plugins (Collectors)                     |
+| [[plugin:NAME]](#per-plugin-configuration)                        | Individual [Plugins](#per-plugin-configuration)          |
 
 > **Note**
 >
-> The configuration file is a `name = value` dictionary. Netdata will not complain if you set options unknown to it. When you check the running configuration by accessing the URL `/netdata.conf` on your Netdata server, Netdata will add a comment on settings it does not currently use.
+> The configuration uses a simple `name = value` format. Netdata tolerates unknown options, marking them with comments when viewing the running configuration through `/netdata.conf`.
 
 ## Applying changes
 
@@ -37,10 +37,10 @@ After `netdata.conf` has been modified, Netdata needs to be [restarted](/docs/ne
 
 |              setting               |    default    | info                                                                                                                                                                                                                                         |
 |:----------------------------------:|:-------------:|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|     process scheduling policy      |    `keep`     | See [Netdata process scheduling policy](/src/daemon/README.md#process-scheduling-policy-on-unix-systems)                                                                                                                                     |
+|     process scheduling policy      |    `keep`     | See [Netdata process scheduling policy](/src/daemon/README.md#process-scheduling-policy-unix-only)                                                                                                                                           |
 |             OOM score              |      `0`      |                                                                                                                                                                                                                                              |
-| glibc malloc arena max for plugins |      `1`      | See [Virtual memory](/src/daemon/README.md#virtual-memory).                                                                                                                                                                                  |
-| glibc malloc arena max for Netdata |      `1`      | See [Virtual memory](/src/daemon/README.md#virtual-memory).                                                                                                                                                                                  |
+| glibc malloc arena max for plugins |      `1`      |                                                                                                                                                                                                                                              |
+| glibc malloc arena max for Netdata |      `1`      |                                                                                                                                                                                                                                              |
 |              hostname              | auto-detected | The hostname of the computer running Netdata.                                                                                                                                                                                                |
 |         host access prefix         |     empty     | This is used in Docker environments where /proc, /sys, etc have to be accessed via another path. You may also have to set SYS_PTRACE capability on the docker for this work. Check [issue 43](https://github.com/netdata/netdata/issues/43). |
 |              timezone              | auto-detected | The timezone retrieved from the environment variable                                                                                                                                                                                         |
@@ -76,7 +76,7 @@ After `netdata.conf` has been modified, Netdata needs to be [restarted](/docs/ne
 |:-------------------:|:------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 |       config        |                           `/etc/netdata`                           | The directory configuration files are kept.                                                                                                                                        |
 |    stock config     |                     `/usr/lib/netdata/conf.d`                      |                                                                                                                                                                                    |
-|         log         |                         `/var/log/netdata`                         | The directory in which the [log files](/src/daemon/README.md#log-files) are kept.                                                                                                  |
+|         log         |                         `/var/log/netdata`                         | The directory in which the [log files](/src/daemon/README.md#logging) are kept.                                                                                                    |
 |         web         |                      `/usr/share/netdata/web`                      | The directory the web static files are kept.                                                                                                                                       |
 |        cache        |                        `/var/cache/netdata`                        | The directory the memory database will be stored if and when Netdata exits. Netdata will re-read the database when it will start again, to continue from the same point.           |
 |         lib         |                         `/var/lib/netdata`                         | Contains the Alert log and the Netdata instance GUID.                                                                                                                              |
@@ -161,7 +161,7 @@ Additionally, there will be the following options:
 
 ### `registry` section options
 
-To understand what this section is and how it should be configured, please refer to the [registry documentation](/src/registry/README.md).
+To understand what this section is and how it should be configured, refer to the [registry documentation](/src/registry/README.md).
 
 ## Per-plugin configuration
 
@@ -171,7 +171,7 @@ The configuration options for plugins appear in sections following the pattern `
 
 Most internal plugins will provide additional options. Check [Internal Plugins](/src/collectors/README.md) for more information.
 
-Please note that by default, Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero, they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard when refreshed. Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics
+Note that by default, Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero, they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard when refreshed. Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics
 for all internal Netdata plugins.
 
 ### External plugins
