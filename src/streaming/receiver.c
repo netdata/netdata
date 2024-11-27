@@ -628,19 +628,18 @@ static void *stream_receive_thread(void *ptr) {
                     continue;
                 }
 
-                bool node_broken = false;
-                while(!node_broken && !nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING) && !receiver_should_stop(rpt)) {
+                bool node_removed = false;
+                while(!node_removed && !nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING) && !receiver_should_stop(rpt)) {
                     decompressor_status_t feed = receiver_feed_decompressor(rpt);
                     if(likely(feed == DECOMPRESS_OK)) {
-                        while (!node_broken) {
+                        while (!node_removed) {
                             decompressor_status_t rc = receiver_get_decompressed(rpt);
                             if (likely(rc == DECOMPRESS_OK)) {
                                 while (buffered_reader_next_line(&rpt->reader, rpt->receiver.buffer)) {
                                     if (unlikely(parser_action(parser, rpt->receiver.buffer->buffer))) {
-
                                         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
                                         stream_receiver_remove(rr, rpt, slot, "parser failed");
-                                        node_broken = true;
+                                        node_removed = true;
                                         break;
                                     }
 
@@ -654,7 +653,7 @@ static void *stream_receive_thread(void *ptr) {
                             else {
                                 receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
                                 stream_receiver_remove(rr, rpt, slot, "decompressor failed");
-                                node_broken = true;
+                                node_removed = true;
                                 break;
                             }
                         }
@@ -664,12 +663,12 @@ static void *stream_receive_thread(void *ptr) {
                     else {
                         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
                         stream_receiver_remove(rr, rpt, slot, "compressed data invalid");
-                        node_broken = true;
+                        node_removed = true;
                         break;
                     }
                 }
 
-                if(receiver_should_stop(rpt)) {
+                if(!node_removed && receiver_should_stop(rpt)) {
                     receiver_set_exit_reason(rpt, rpt->exit.reason, false);
                     stream_receiver_remove(rr, rpt, slot, "received stop signal");
                     continue;
