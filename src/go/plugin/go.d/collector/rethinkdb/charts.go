@@ -159,7 +159,7 @@ var (
 	}
 )
 
-func (r *Rethinkdb) addServerCharts(srvUUID, srvName string) {
+func (c *Collector) addServerCharts(srvUUID, srvName string) {
 	charts := serverChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -173,14 +173,14 @@ func (r *Rethinkdb) addServerCharts(srvUUID, srvName string) {
 		}
 	}
 
-	if err := r.Charts().Add(*charts...); err != nil {
-		r.Warningf("failed to add chart for '%s' server: %v", srvName, err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add chart for '%s' server: %v", srvName, err)
 	}
 }
 
-func (r *Rethinkdb) removeServerCharts(srvUUID string) {
+func (c *Collector) removeServerCharts(srvUUID string) {
 	px := fmt.Sprintf("server_%s_", srvUUID)
-	for _, chart := range *r.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

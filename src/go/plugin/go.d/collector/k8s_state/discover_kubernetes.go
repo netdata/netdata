@@ -19,6 +19,12 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
+type discoverer interface {
+	run(ctx context.Context, in chan<- resource)
+	ready() bool
+	stopped() bool
+}
+
 func newKubeDiscovery(client kubernetes.Interface, l *logger.Logger) *kubeDiscovery {
 	return &kubeDiscovery{
 		client:  client,

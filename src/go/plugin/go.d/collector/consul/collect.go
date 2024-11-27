@@ -14,7 +14,7 @@ const (
 	precision = 1000
 )
 
-func (c *Consul) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	if c.cfg == nil {
 		if err := c.collectConfiguration(); err != nil {
 			return nil, err
@@ -51,29 +51,29 @@ func (c *Consul) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Consul) isTelemetryPrometheusEnabled() bool {
+func (c *Collector) isTelemetryPrometheusEnabled() bool {
 	return c.cfg.DebugConfig.Telemetry.PrometheusOpts.Expiration != "0s"
 }
 
-func (c *Consul) isCloudManaged() bool {
+func (c *Collector) isCloudManaged() bool {
 	return c.cfg.DebugConfig.Cloud.ClientSecret != "" || c.cfg.DebugConfig.Cloud.ResourceID != ""
 }
 
-func (c *Consul) hasLicense() bool {
+func (c *Collector) hasLicense() bool {
 	return c.cfg.Stats.License.ID != ""
 }
 
-func (c *Consul) isServer() bool {
+func (c *Collector) isServer() bool {
 	return c.cfg.Config.Server
 }
 
-func (c *Consul) client(statusCodes ...int) *web.Client {
+func (c *Collector) client(statusCodes ...int) *web.Client {
 	return web.DoHTTP(c.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
 		return slices.Contains(statusCodes, resp.StatusCode), nil
 	})
 }
 
-func (c *Consul) createRequest(urlPath string) (*http.Request, error) {
+func (c *Collector) createRequest(urlPath string) (*http.Request, error) {
 	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create '%s' request: %w", urlPath, err)

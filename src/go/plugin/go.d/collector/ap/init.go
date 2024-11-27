@@ -11,15 +11,15 @@ import (
 	"strings"
 )
 
-func (a *AP) validateConfig() error {
-	if a.BinaryPath == "" {
+func (c *Collector) validateConfig() error {
+	if c.BinaryPath == "" {
 		return errors.New("no iw binary path specified")
 	}
 	return nil
 }
 
-func (a *AP) initIwExec() (iwBinary, error) {
-	binPath := a.BinaryPath
+func (c *Collector) initIwExec() (iwBinary, error) {
+	binPath := c.BinaryPath
 
 	if !strings.HasPrefix(binPath, "/") {
 		path, err := exec.LookPath(binPath)
@@ -33,7 +33,7 @@ func (a *AP) initIwExec() (iwBinary, error) {
 		return nil, err
 	}
 
-	iw := newIwExec(binPath, a.Timeout.Duration())
+	iw := newIwExec(binPath, c.Timeout.Duration())
 
 	return iw, nil
 }

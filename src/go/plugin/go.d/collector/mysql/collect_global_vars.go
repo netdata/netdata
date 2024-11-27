@@ -13,29 +13,29 @@ WHERE
   OR Variable_name LIKE 'performance_schema';`
 )
 
-func (m *MySQL) collectGlobalVariables() error {
+func (c *Collector) collectGlobalVariables() error {
 	// MariaDB: https://mariadb.com/kb/en/server-system-variables/
 	// MySQL: https://dev.mysql.com/doc/refman/8.0/en/server-system-variable-reference.html
 	q := queryShowGlobalVariables
-	m.Debugf("executing query: '%s'", q)
+	c.Debugf("executing query: '%s'", q)
 
 	var name string
-	_, err := m.collectQuery(q, func(column, value string, _ bool) {
+	_, err := c.collectQuery(q, func(column, value string, _ bool) {
 		switch column {
 		case "Variable_name":
 			name = value
 		case "Value":
 			switch name {
 			case "disabled_storage_engines":
-				m.varDisabledStorageEngine = value
+				c.varDisabledStorageEngine = value
 			case "log_bin":
-				m.varLogBin = value
+				c.varLogBin = value
 			case "max_connections":
-				m.varMaxConns = parseInt(value)
+				c.varMaxConns = parseInt(value)
 			case "performance_schema":
-				m.varPerformanceSchema = value
+				c.varPerformanceSchema = value
 			case "table_open_cache":
-				m.varTableOpenCache = parseInt(value)
+				c.varTableOpenCache = parseInt(value)
 			}
 		}
 	})

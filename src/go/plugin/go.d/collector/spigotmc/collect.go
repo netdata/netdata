@@ -18,36 +18,36 @@ var (
 	reCleanResp = regexp.MustCompile(`§.`)
 )
 
-func (s *SpigotMC) collect() (map[string]int64, error) {
-	if s.conn == nil {
-		conn, err := s.establishConn()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.conn == nil {
+		conn, err := c.establishConn()
 		if err != nil {
 			return nil, err
 		}
-		s.conn = conn
+		c.conn = conn
 	}
 
 	mx := make(map[string]int64)
 
-	if err := s.collectTPS(mx); err != nil {
-		s.Cleanup()
+	if err := c.collectTPS(mx); err != nil {
+		c.Cleanup()
 		return nil, fmt.Errorf("failed to collect '%s': %v", cmdTPS, err)
 	}
-	if err := s.collectList(mx); err != nil {
-		s.Cleanup()
+	if err := c.collectList(mx); err != nil {
+		c.Cleanup()
 		return nil, fmt.Errorf("failed to collect '%s': %v", cmdList, err)
 	}
 
 	return mx, nil
 }
 
-func (s *SpigotMC) collectTPS(mx map[string]int64) error {
-	resp, err := s.conn.queryTps()
+func (c *Collector) collectTPS(mx map[string]int64) error {
+	resp, err := c.conn.queryTps()
 	if err != nil {
 		return err
 	}
 
-	s.Debugf("cmd '%s' response: %s", cmdTPS, resp)
+	c.Debugf("cmd '%s' response: %s", cmdTPS, resp)
 
 	if err := parseResponse(resp, reTPS, func(s string, f float64) {
 		switch {
@@ -64,12 +64,12 @@ func (s *SpigotMC) collectTPS(mx map[string]int64) error {
 	return nil
 }
 
-func (s *SpigotMC) collectList(mx map[string]int64) error {
-	resp, err := s.conn.queryList()
+func (c *Collector) collectList(mx map[string]int64) error {
+	resp, err := c.conn.queryList()
 	if err != nil {
 		return err
 	}
-	s.Debugf("cmd '%s' response: %s", cmdList, resp)
+	c.Debugf("cmd '%s' response: %s", cmdList, resp)
 
 	var players int64
 	if err := parseResponse(resp, reList, func(s string, f float64) {
@@ -115,8 +115,8 @@ func parseResponse(resp string, re *regexp.Regexp, fn func(string, float64)) err
 	return nil
 }
 
-func (s *SpigotMC) establishConn() (rconConn, error) {
-	conn := s.newConn(s.Config)
+func (c *Collector) establishConn() (rconConn, error) {
+	conn := c.newConn(c.Config)
 
 	if err := conn.connect(); err != nil {
 		return nil, err

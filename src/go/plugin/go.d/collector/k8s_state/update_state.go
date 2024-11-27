@@ -2,20 +2,20 @@
 
 package k8s_state
 
-func (ks *KubeState) runUpdateState(in <-chan resource) {
+func (c *Collector) runUpdateState(in <-chan resource) {
 	for {
 		select {
-		case <-ks.ctx.Done():
+		case <-c.ctx.Done():
 			return
 		case r := <-in:
-			ks.state.Lock()
+			c.state.Lock()
 			switch r.kind() {
 			case kubeResourceNode:
-				ks.updateNodeState(r)
+				c.updateNodeState(r)
 			case kubeResourcePod:
-				ks.updatePodState(r)
+				c.updatePodState(r)
 			}
-			ks.state.Unlock()
+			c.state.Unlock()
 		}
 	}
 }

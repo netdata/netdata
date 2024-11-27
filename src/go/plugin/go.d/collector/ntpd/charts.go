@@ -316,7 +316,7 @@ var (
 	}
 )
 
-func (n *NTPd) addPeerCharts(addr string) {
+func (c *Collector) addPeerCharts(addr string) {
 	charts := peerChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -329,15 +329,15 @@ func (n *NTPd) addPeerCharts(addr string) {
 		}
 	}
 
-	if err := n.Charts().Add(*charts...); err != nil {
-		n.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (n *NTPd) removePeerCharts(addr string) {
+func (c *Collector) removePeerCharts(addr string) {
 	px := fmt.Sprintf("peer_%s", strings.ReplaceAll(addr, ".", "_"))
 
-	for _, chart := range *n.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

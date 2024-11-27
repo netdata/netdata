@@ -19,7 +19,7 @@ const (
 	metricLDWriteLatencyTotal = "windows_logical_disk_write_latency_seconds_total"
 )
 
-func (w *Windows) collectLogicalDisk(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectLogicalDisk(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 	px := "logical_disk_"
 	for _, pm := range pms.FindByName(metricLDReadBytesTotal) {
@@ -80,16 +80,16 @@ func (w *Windows) collectLogicalDisk(mx map[string]int64, pms prometheus.Series)
 	}
 
 	for disk := range seen {
-		if !w.cache.volumes[disk] {
-			w.cache.volumes[disk] = true
-			w.addDiskCharts(disk)
+		if !c.cache.volumes[disk] {
+			c.cache.volumes[disk] = true
+			c.addDiskCharts(disk)
 		}
 		mx[px+disk+"_used_space"] = mx[px+disk+"_total_space"] - mx[px+disk+"_free_space"]
 	}
-	for disk := range w.cache.volumes {
+	for disk := range c.cache.volumes {
 		if !seen[disk] {
-			delete(w.cache.volumes, disk)
-			w.removeDiskCharts(disk)
+			delete(c.cache.volumes, disk)
+			c.removeDiskCharts(disk)
 		}
 	}
 }

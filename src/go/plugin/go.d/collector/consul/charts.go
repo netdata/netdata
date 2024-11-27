@@ -557,7 +557,7 @@ var (
 	}
 )
 
-func (c *Consul) addGlobalCharts() {
+func (c *Collector) addGlobalCharts() {
 	if !c.isTelemetryPrometheusEnabled() {
 		return
 	}
@@ -602,7 +602,7 @@ func (c *Consul) addGlobalCharts() {
 	}
 }
 
-func (c *Consul) addServerAutopilotHealthCharts() {
+func (c *Collector) addServerAutopilotHealthCharts() {
 	charts := serverAutopilotHealthCharts.Copy()
 
 	for _, chart := range *charts {
@@ -644,7 +644,7 @@ func newNodeHealthCheckChart(check *agentCheck) *module.Chart {
 	return chart
 }
 
-func (c *Consul) addHealthCheckCharts(check *agentCheck) {
+func (c *Collector) addHealthCheckCharts(check *agentCheck) {
 	var chart *module.Chart
 
 	if check.ServiceName != "" {
@@ -663,7 +663,7 @@ func (c *Consul) addHealthCheckCharts(check *agentCheck) {
 	}
 }
 
-func (c *Consul) removeHealthCheckCharts(checkID string) {
+func (c *Collector) removeHealthCheckCharts(checkID string) {
 	id := fmt.Sprintf("health_check_%s_status", checkID)
 
 	chart := c.Charts().Get(id)
@@ -676,7 +676,7 @@ func (c *Consul) removeHealthCheckCharts(checkID string) {
 	chart.MarkNotCreated()
 }
 
-func (c *Consul) addLeaderCharts() {
+func (c *Collector) addLeaderCharts() {
 	charts := serverLeaderCharts.Copy()
 
 	for _, chart := range *charts {
@@ -691,7 +691,7 @@ func (c *Consul) addLeaderCharts() {
 	}
 }
 
-func (c *Consul) removeLeaderCharts() {
+func (c *Collector) removeLeaderCharts() {
 	s := make(map[string]bool)
 	for _, v := range serverLeaderCharts {
 		s[v.ID] = true
@@ -705,7 +705,7 @@ func (c *Consul) removeLeaderCharts() {
 	}
 }
 
-func (c *Consul) addFollowerCharts() {
+func (c *Collector) addFollowerCharts() {
 	charts := serverFollowerCharts.Copy()
 	if c.isCloudManaged() {
 		// 'autopilot_server_lastContact_leader' comes from 'operator/autopilot/health' which is disabled
@@ -724,7 +724,7 @@ func (c *Consul) addFollowerCharts() {
 	}
 }
 
-func (c *Consul) removeFollowerCharts() {
+func (c *Collector) removeFollowerCharts() {
 	s := make(map[string]bool)
 	for _, v := range serverFollowerCharts {
 		s[v.ID] = true

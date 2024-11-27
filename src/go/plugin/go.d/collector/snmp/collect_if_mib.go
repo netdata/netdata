@@ -19,44 +19,44 @@ const (
 	rootOidIfMibIfXTable = "1.3.6.1.2.1.31.1.1"
 )
 
-func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
-	if s.checkMaxReps {
-		ok, err := s.adjustMaxRepetitions()
+func (c *Collector) collectNetworkInterfaces(mx map[string]int64) error {
+	if c.checkMaxReps {
+		ok, err := c.adjustMaxRepetitions()
 		if err != nil {
 			return err
 		}
 
-		s.checkMaxReps = false
+		c.checkMaxReps = false
 
 		if !ok {
-			s.collectIfMib = false
+			c.collectIfMib = false
 
-			if len(s.customOids) == 0 {
+			if len(c.customOids) == 0 {
 				return errors.New("no IF-MIB data returned")
 			}
 
-			s.Warning("no IF-MIB data returned")
+			c.Warning("no IF-MIB data returned")
 			return nil
 		}
 	}
 
-	ifMibTable, err := s.walkAll(rootOidIfMibIfTable)
+	ifMibTable, err := c.walkAll(rootOidIfMibIfTable)
 	if err != nil {
 		return err
 	}
 
-	ifMibXTable, err := s.walkAll(rootOidIfMibIfXTable)
+	ifMibXTable, err := c.walkAll(rootOidIfMibIfXTable)
 	if err != nil {
 		return err
 	}
 
 	if len(ifMibTable) == 0 && len(ifMibXTable) == 0 {
-		s.Warning("no IF-MIB data returned")
-		s.collectIfMib = false
+		c.Warning("no IF-MIB data returned")
+		c.collectIfMib = false
 		return nil
 	}
 
-	for _, i := range s.netInterfaces {
+	for _, i := range c.netInterfaces {
 		i.updated = false
 	}
 
@@ -73,7 +73,7 @@ func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
 		idx := pdu.Name[i+1:]
 		oid := strings.TrimPrefix(pdu.Name[:i], ".")
 
-		iface, ok := s.netInterfaces[idx]
+		iface, ok := c.netInterfaces[idx]
 		if !ok {
 			iface = &netInterface{idx: idx}
 		}
@@ -153,30 +153,30 @@ func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
 			return fmt.Errorf("OID '%s': %v", pdu.Name, err)
 		}
 
-		s.netInterfaces[idx] = iface
+		c.netInterfaces[idx] = iface
 		iface.updated = true
 	}
 
-	for _, iface := range s.netInterfaces {
+	for _, iface := range c.netInterfaces {
 		if iface.ifName == "" {
 			continue
 		}
 
 		typeStr := ifTypeMapping[iface.ifType]
-		if s.netIfaceFilterByName.MatchString(iface.ifName) || s.netIfaceFilterByType.MatchString(typeStr) {
+		if c.netIfaceFilterByName.MatchString(iface.ifName) || c.netIfaceFilterByType.MatchString(typeStr) {
 			continue
 		}
 
 		if !iface.updated {
-			delete(s.netInterfaces, iface.idx)
+			delete(c.netInterfaces, iface.idx)
 			if iface.hasCharts {
-				s.removeNetIfaceCharts(iface)
+				c.removeNetIfaceCharts(iface)
 			}
 			continue
 		}
 		if !iface.hasCharts {
 			iface.hasCharts = true
-			s.addNetIfaceCharts(iface)
+			c.addNetIfaceCharts(iface)
 		}
 
 		px := fmt.Sprintf("net_iface_%s_", iface.ifName)
@@ -205,32 +205,32 @@ func (s *SNMP) collectNetworkInterfaces(mx map[string]int64) error {
 	}
 
 	if logger.Level.Enabled(slog.LevelDebug) {
-		ifaces := make([]*netInterface, 0, len(s.netInterfaces))
-		for _, nif := range s.netInterfaces {
+		ifaces := make([]*netInterface, 0, len(c.netInterfaces))
+		for _, nif := range c.netInterfaces {
 			ifaces = append(ifaces, nif)
 		}
 		sort.Slice(ifaces, func(i, j int) bool { return ifaces[i].ifIndex < ifaces[j].ifIndex })
 		for _, iface := range ifaces {
-			s.Debugf("found %s", iface)
+			c.Debugf("found %s", iface)
 		}
 	}
 
 	return nil
 }
 
-func (s *SNMP) adjustMaxRepetitions() (bool, error) {
-	orig := s.Config.Options.MaxRepetitions
-	maxReps := s.Config.Options.MaxRepetitions
+func (c *Collector) adjustMaxRepetitions() (bool, error) {
+	orig := c.Config.Options.MaxRepetitions
+	maxReps := c.Config.Options.MaxRepetitions
 
 	for {
-		v, err := s.walkAll(oidIfIndex)
+		v, err := c.walkAll(oidIfIndex)
 		if err != nil {
 			return false, err
 		}
 
 		if len(v) > 0 {
 			if orig != maxReps {
-				s.Infof("changed 'max_repetitions' %d => %d", orig, maxReps)
+				c.Infof("changed 'max_repetitions' %d => %d", orig, maxReps)
 			}
 			return true, nil
 		}
@@ -245,7 +245,7 @@ func (s *SNMP) adjustMaxRepetitions() (bool, error) {
 			return false, nil
 		}
 
-		s.Debugf("no IF-MIB data returned, trying to decrese 'max_repetitions' to %d", maxReps)
-		s.snmpClient.SetMaxRepetitions(uint32(maxReps))
+		c.Debugf("no IF-MIB data returned, trying to decrese 'max_repetitions' to %d", maxReps)
+		c.snmpClient.SetMaxRepetitions(uint32(maxReps))
 	}
 }

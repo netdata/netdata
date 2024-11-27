@@ -17,25 +17,25 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/iprange"
 )
 
-func (d *DnsmasqDHCP) parseDnsmasqDHCPConfiguration() ([]iprange.Range, []net.IP) {
-	configs := findConfigurationFiles(d.ConfPath, d.ConfDir)
+func (c *Collector) parseDnsmasqDHCPConfiguration() ([]iprange.Range, []net.IP) {
+	configs := findConfigurationFiles(c.ConfPath, c.ConfDir)
 
-	dhcpRanges := d.getDHCPRanges(configs)
-	dhcpHosts := d.getDHCPHosts(configs)
+	dhcpRanges := c.getDHCPRanges(configs)
+	dhcpHosts := c.getDHCPHosts(configs)
 
 	return dhcpRanges, dhcpHosts
 }
 
-func (d *DnsmasqDHCP) getDHCPRanges(configs []*configFile) []iprange.Range {
+func (c *Collector) getDHCPRanges(configs []*configFile) []iprange.Range {
 	var dhcpRanges []iprange.Range
 	var parsed string
 	seen := make(map[string]bool)
 
 	for _, conf := range configs {
-		d.Debugf("looking in '%s'", conf.path)
+		c.Debugf("looking in '%s'", conf.path)
 
 		for _, value := range conf.get("dhcp-range") {
-			d.Debugf("found dhcp-range '%s'", value)
+			c.Debugf("found dhcp-range '%s'", value)
 			if parsed = parseDHCPRangeValue(value); parsed == "" || seen[parsed] {
 				continue
 			}
@@ -43,11 +43,11 @@ func (d *DnsmasqDHCP) getDHCPRanges(configs []*configFile) []iprange.Range {
 
 			r, err := iprange.ParseRange(parsed)
 			if r == nil || err != nil {
-				d.Warningf("error on parsing dhcp-range '%s', skipping it", parsed)
+				c.Warningf("error on parsing dhcp-range '%s', skipping it", parsed)
 				continue
 			}
 
-			d.Debugf("adding dhcp-range '%s'", parsed)
+			c.Debugf("adding dhcp-range '%s'", parsed)
 			dhcpRanges = append(dhcpRanges, r)
 		}
 	}
@@ -58,16 +58,16 @@ func (d *DnsmasqDHCP) getDHCPRanges(configs []*configFile) []iprange.Range {
 	return dhcpRanges
 }
 
-func (d *DnsmasqDHCP) getDHCPHosts(configs []*configFile) []net.IP {
+func (c *Collector) getDHCPHosts(configs []*configFile) []net.IP {
 	var dhcpHosts []net.IP
 	seen := make(map[string]bool)
 	var parsed string
 
 	for _, conf := range configs {
-		d.Debugf("looking in '%s'", conf.path)
+		c.Debugf("looking in '%s'", conf.path)
 
 		for _, value := range conf.get("dhcp-host") {
-			d.Debugf("found dhcp-host '%s'", value)
+			c.Debugf("found dhcp-host '%s'", value)
 			if parsed = parseDHCPHostValue(value); parsed == "" || seen[parsed] {
 				continue
 			}
@@ -75,11 +75,11 @@ func (d *DnsmasqDHCP) getDHCPHosts(configs []*configFile) []net.IP {
 
 			v := net.ParseIP(parsed)
 			if v == nil {
-				d.Warningf("error on parsing dhcp-host '%s', skipping it", parsed)
+				c.Warningf("error on parsing dhcp-host '%s', skipping it", parsed)
 				continue
 			}
 
-			d.Debugf("adding dhcp-host '%s'", parsed)
+			c.Debugf("adding dhcp-host '%s'", parsed)
 			dhcpHosts = append(dhcpHosts, v)
 		}
 	}

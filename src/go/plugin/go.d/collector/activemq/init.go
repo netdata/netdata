@@ -8,26 +8,26 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
-func (a *ActiveMQ) validateConfig() error {
-	if a.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
-	if a.Webadmin == "" {
+	if c.Webadmin == "" {
 		return errors.New("webadmin root path set")
 	}
 	return nil
 }
 
-func (a *ActiveMQ) initQueuesFiler() (matcher.Matcher, error) {
-	if a.QueuesFilter == "" {
+func (c *Collector) initQueuesFiler() (matcher.Matcher, error) {
+	if c.QueuesFilter == "" {
 		return matcher.TRUE(), nil
 	}
-	return matcher.NewSimplePatternsMatcher(a.QueuesFilter)
+	return matcher.NewSimplePatternsMatcher(c.QueuesFilter)
 }
 
-func (a *ActiveMQ) initTopicsFilter() (matcher.Matcher, error) {
-	if a.TopicsFilter == "" {
+func (c *Collector) initTopicsFilter() (matcher.Matcher, error) {
+	if c.TopicsFilter == "" {
 		return matcher.TRUE(), nil
 	}
-	return matcher.NewSimplePatternsMatcher(a.TopicsFilter)
+	return matcher.NewSimplePatternsMatcher(c.TopicsFilter)
 }

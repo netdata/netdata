@@ -13,6 +13,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
+type zpoolCli interface {
+	list() ([]byte, error)
+	listWithVdev(pool string) ([]byte, error)
+}
+
 func newZpoolCLIExec(binPath string, timeout time.Duration) *zpoolCLIExec {
 	return &zpoolCLIExec{
 		binPath: binPath,

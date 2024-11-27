@@ -58,28 +58,28 @@ var (
 	}
 )
 
-func (ks *KubeState) collect() (map[string]int64, error) {
-	if ks.discoverer == nil {
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.discoverer == nil {
 		return nil, errors.New("nil discoverer")
 	}
 
-	ks.once.Do(func() {
-		ks.startTime = time.Now()
+	c.once.Do(func() {
+		c.startTime = time.Now()
 		in := make(chan resource)
 
-		ks.wg.Add(1)
-		go func() { defer ks.wg.Done(); ks.runUpdateState(in) }()
+		c.wg.Add(1)
+		go func() { defer c.wg.Done(); c.runUpdateState(in) }()
 
-		ks.wg.Add(1)
-		go func() { defer ks.wg.Done(); ks.discoverer.run(ks.ctx, in) }()
+		c.wg.Add(1)
+		go func() { defer c.wg.Done(); c.discoverer.run(c.ctx, in) }()
 
-		ks.kubeClusterID = ks.getKubeClusterID()
-		ks.kubeClusterName = ks.getKubeClusterName()
+		c.kubeClusterID = c.getKubeClusterID()
+		c.kubeClusterName = c.getKubeClusterName()
 
-		if chart := ks.Charts().Get(discoveryStatusChart.ID); chart != nil {
+		if chart := c.Charts().Get(discoveryStatusChart.ID); chart != nil {
 			chart.Labels = []module.Label{
-				{Key: labelKeyClusterID, Value: ks.kubeClusterID, Source: module.LabelSourceK8s},
-				{Key: labelKeyClusterName, Value: ks.kubeClusterName, Source: module.LabelSourceK8s},
+				{Key: labelKeyClusterID, Value: c.kubeClusterID, Source: module.LabelSourceK8s},
+				{Key: labelKeyClusterName, Value: c.kubeClusterName, Source: module.LabelSourceK8s},
 			}
 		}
 	})
@@ -89,29 +89,29 @@ func (ks *KubeState) collect() (map[string]int64, error) {
 		"discovery_pod_discoverer_state":  1,
 	}
 
-	if !ks.discoverer.ready() || time.Since(ks.startTime) < ks.initDelay {
+	if !c.discoverer.ready() || time.Since(c.startTime) < c.initDelay {
 		return mx, nil
 	}
 
-	ks.state.Lock()
-	defer ks.state.Unlock()
+	c.state.Lock()
+	defer c.state.Unlock()
 
-	ks.collectKubeState(mx)
+	c.collectKubeState(mx)
 
 	return mx, nil
 }
 
-func (ks *KubeState) collectKubeState(mx map[string]int64) {
-	for _, ns := range ks.state.nodes {
+func (c *Collector) collectKubeState(mx map[string]int64) {
+	for _, ns := range c.state.nodes {
 		ns.resetStats()
 	}
-	ks.collectPodsState(mx)
-	ks.collectNodesState(mx)
+	c.collectPodsState(mx)
+	c.collectNodesState(mx)
 }
 
-func (ks *KubeState) collectPodsState(mx map[string]int64) {
+func (c *Collector) collectPodsState(mx map[string]int64) {
 	now := time.Now()
-	for _, ps := range ks.state.pods {
+	for _, ps := range c.state.pods {
 		// Skip cronjobs (each of them is a unique container because the name contains hash)
 		// to avoid overwhelming Netdata with high cardinality metrics.
 		// Related issue https://github.com/netdata/netdata/issues/16412
@@ -120,21 +120,21 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 		}
 
 		if ps.deleted {
-			delete(ks.state.pods, podSource(ps.namespace, ps.name))
-			ks.removePodCharts(ps)
+			delete(c.state.pods, podSource(ps.namespace, ps.name))
+			c.removePodCharts(ps)
 			continue
 		}
 
 		if ps.new {
 			ps.new = false
-			ks.addPodCharts(ps)
+			c.addPodCharts(ps)
 			ps.unscheduled = ps.nodeName == ""
 		} else if ps.unscheduled && ps.nodeName != "" {
 			ps.unscheduled = false
-			ks.updatePodChartsNodeLabel(ps)
+			c.updatePodChartsNodeLabel(ps)
 		}
 
-		ns := ks.state.nodes[nodeSource(ps.nodeName)]
+		ns := c.state.nodes[nodeSource(ps.nodeName)]
 		if ns != nil {
 			ns.stats.pods++
 			ns.stats.reqCPU += ps.reqCPU
@@ -213,7 +213,7 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 		for _, cs := range ps.containers {
 			if cs.new {
 				cs.new = false
-				ks.addContainerCharts(ps, cs)
+				c.addContainerCharts(ps, cs)
 			}
 			mx[px+"containers_state_running"] += metrix.Bool(cs.stateRunning)
 			mx[px+"containers_state_waiting"] += metrix.Bool(cs.stateWaiting)
@@ -249,17 +249,17 @@ func (ks *KubeState) collectPodsState(mx map[string]int64) {
 	}
 }
 
-func (ks *KubeState) collectNodesState(mx map[string]int64) {
+func (c *Collector) collectNodesState(mx map[string]int64) {
 	now := time.Now()
-	for _, ns := range ks.state.nodes {
+	for _, ns := range c.state.nodes {
 		if ns.deleted {
-			delete(ks.state.nodes, nodeSource(ns.name))
-			ks.removeNodeCharts(ns)
+			delete(c.state.nodes, nodeSource(ns.name))
+			c.removeNodeCharts(ns)
 			continue
 		}
 		if ns.new {
 			ns.new = false
-			ks.addNodeCharts(ns)
+			c.addNodeCharts(ns)
 		}
 
 		px := fmt.Sprintf("node_%s_", ns.id())

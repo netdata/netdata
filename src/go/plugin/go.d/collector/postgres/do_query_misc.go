@@ -9,55 +9,55 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
-func (p *Postgres) doQueryServerVersion() (int, error) {
+func (c *Collector) doQueryServerVersion() (int, error) {
 	q := queryServerVersion()
 
 	var s string
-	if err := p.doQueryRow(q, &s); err != nil {
+	if err := c.doQueryRow(q, &s); err != nil {
 		return 0, err
 	}
 
 	return strconv.Atoi(s)
 }
 
-func (p *Postgres) doQueryIsSuperUser() (bool, error) {
+func (c *Collector) doQueryIsSuperUser() (bool, error) {
 	q := queryIsSuperUser()
 
 	var v bool
-	if err := p.doQueryRow(q, &v); err != nil {
+	if err := c.doQueryRow(q, &v); err != nil {
 		return false, err
 	}
 
 	return v, nil
 }
 
-func (p *Postgres) doQueryPGIsInRecovery() (bool, error) {
+func (c *Collector) doQueryPGIsInRecovery() (bool, error) {
 	q := queryPGIsInRecovery()
 
 	var v bool
-	if err := p.doQueryRow(q, &v); err != nil {
+	if err := c.doQueryRow(q, &v); err != nil {
 		return false, err
 	}
 
 	return v, nil
 }
 
-func (p *Postgres) doQuerySettingsMaxConnections() (int64, error) {
+func (c *Collector) doQuerySettingsMaxConnections() (int64, error) {
 	q := querySettingsMaxConnections()
 
 	var s string
-	if err := p.doQueryRow(q, &s); err != nil {
+	if err := c.doQueryRow(q, &s); err != nil {
 		return 0, err
 	}
 
 	return strconv.ParseInt(s, 10, 64)
 }
 
-func (p *Postgres) doQuerySettingsMaxLocksHeld() (int64, error) {
+func (c *Collector) doQuerySettingsMaxLocksHeld() (int64, error) {
 	q := querySettingsMaxLocksHeld()
 
 	var s string
-	if err := p.doQueryRow(q, &s); err != nil {
+	if err := c.doQueryRow(q, &s); err != nil {
 		return 0, err
 	}
 
@@ -66,12 +66,12 @@ func (p *Postgres) doQuerySettingsMaxLocksHeld() (int64, error) {
 
 const connErrMax = 3
 
-func (p *Postgres) doQueryQueryableDatabases() error {
+func (c *Collector) doQueryQueryableDatabases() error {
 	q := queryQueryableDatabaseList()
 
 	var dbs []string
-	err := p.doQuery(q, func(_, value string, _ bool) {
-		if p.dbSr != nil && p.dbSr.MatchString(value) {
+	err := c.doQuery(q, func(_, value string, _ bool) {
+		if c.dbSr != nil && c.dbSr.MatchString(value) {
 			dbs = append(dbs, value)
 		}
 	})
@@ -84,44 +84,44 @@ func (p *Postgres) doQueryQueryableDatabases() error {
 	for _, dbname := range dbs {
 		seen[dbname] = true
 
-		conn, ok := p.dbConns[dbname]
+		conn, ok := c.dbConns[dbname]
 		if !ok {
 			conn = &dbConn{}
-			p.dbConns[dbname] = conn
+			c.dbConns[dbname] = conn
 		}
 
 		if conn.db != nil || conn.connErrors >= connErrMax {
 			continue
 		}
 
-		db, connStr, err := p.openSecondaryConnection(dbname)
+		db, connStr, err := c.openSecondaryConnection(dbname)
 		if err != nil {
-			p.Warning(err)
+			c.Warning(err)
 			conn.connErrors++
 			continue
 		}
 
-		tables, err := p.doDBQueryUserTablesCount(db)
+		tables, err := c.doDBQueryUserTablesCount(db)
 		if err != nil {
-			p.Warning(err)
-			conn.connErrors++
-			_ = db.Close()
-			stdlib.UnregisterConnConfig(connStr)
-			continue
-		}
-
-		indexes, err := p.doDBQueryUserIndexesCount(db)
-		if err != nil {
-			p.Warning(err)
+			c.Warning(err)
 			conn.connErrors++
 			_ = db.Close()
 			stdlib.UnregisterConnConfig(connStr)
 			continue
 		}
 
-		if (p.MaxDBTables != 0 && tables > p.MaxDBTables) || (p.MaxDBIndexes != 0 && indexes > p.MaxDBIndexes) {
-			p.Warningf("database '%s' has too many user tables(%d/%d)/indexes(%d/%d), skipping it",
-				dbname, tables, p.MaxDBTables, indexes, p.MaxDBIndexes)
+		indexes, err := c.doDBQueryUserIndexesCount(db)
+		if err != nil {
+			c.Warning(err)
+			conn.connErrors++
+			_ = db.Close()
+			stdlib.UnregisterConnConfig(connStr)
+			continue
+		}
+
+		if (c.MaxDBTables != 0 && tables > c.MaxDBTables) || (c.MaxDBIndexes != 0 && indexes > c.MaxDBIndexes) {
+			c.Warningf("database '%s' has too many user tables(%d/%d)/indexes(%d/%d), skipping it",
+				dbname, tables, c.MaxDBTables, indexes, c.MaxDBIndexes)
 			conn.connErrors = connErrMax
 			_ = db.Close()
 			stdlib.UnregisterConnConfig(connStr)
@@ -131,11 +131,11 @@ func (p *Postgres) doQueryQueryableDatabases() error {
 		conn.db, conn.connStr = db, connStr
 	}
 
-	for dbname, conn := range p.dbConns {
+	for dbname, conn := range c.dbConns {
 		if seen[dbname] {
 			continue
 		}
-		delete(p.dbConns, dbname)
+		delete(c.dbConns, dbname)
 		if conn.connStr != "" {
 			stdlib.UnregisterConnConfig(conn.connStr)
 		}
@@ -147,22 +147,22 @@ func (p *Postgres) doQueryQueryableDatabases() error {
 	return nil
 }
 
-func (p *Postgres) doDBQueryUserTablesCount(db *sql.DB) (int64, error) {
+func (c *Collector) doDBQueryUserTablesCount(db *sql.DB) (int64, error) {
 	q := queryUserTablesCount()
 
 	var v string
-	if err := p.doDBQueryRow(db, q, &v); err != nil {
+	if err := c.doDBQueryRow(db, q, &v); err != nil {
 		return 0, err
 	}
 
 	return parseInt(v), nil
 }
 
-func (p *Postgres) doDBQueryUserIndexesCount(db *sql.DB) (int64, error) {
+func (c *Collector) doDBQueryUserIndexesCount(db *sql.DB) (int64, error) {
 	q := queryUserIndexesCount()
 
 	var v string
-	if err := p.doDBQueryRow(db, q, &v); err != nil {
+	if err := c.doDBQueryRow(db, q, &v); err != nil {
 		return 0, err
 	}
 

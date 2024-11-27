@@ -10,26 +10,26 @@ import (
 	"strings"
 )
 
-func (s *Samba) collect() (map[string]int64, error) {
-	bs, err := s.exec.profile()
+func (c *Collector) collect() (map[string]int64, error) {
+	bs, err := c.exec.profile()
 	if err != nil {
 		return nil, err
 	}
 
 	mx := make(map[string]int64)
 
-	if err := s.collectSmbStatusProfile(mx, bs); err != nil {
+	if err := c.collectSmbStatusProfile(mx, bs); err != nil {
 		return nil, err
 	}
 
-	s.once.Do(func() {
-		s.addCharts(mx)
+	c.once.Do(func() {
+		c.addCharts(mx)
 	})
 
 	return mx, nil
 }
 
-func (s *Samba) collectSmbStatusProfile(mx map[string]int64, profileData []byte) error {
+func (c *Collector) collectSmbStatusProfile(mx map[string]int64, profileData []byte) error {
 	sc := bufio.NewScanner(bytes.NewReader(profileData))
 
 	for sc.Scan() {
@@ -44,7 +44,7 @@ func (s *Samba) collectSmbStatusProfile(mx map[string]int64, profileData []byte)
 
 		key, value, ok := strings.Cut(line, ":")
 		if !ok {
-			s.Debugf("failed to parse line: '%s'", line)
+			c.Debugf("failed to parse line: '%s'", line)
 			continue
 		}
 
@@ -56,7 +56,7 @@ func (s *Samba) collectSmbStatusProfile(mx map[string]int64, profileData []byte)
 
 		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			s.Debugf("failed to parse value in '%s': %v", line, err)
+			c.Debugf("failed to parse value in '%s': %v", line, err)
 			continue
 		}
 

@@ -12,18 +12,18 @@ const (
 	urlPathServerStats = "/status-json.xsl" // https://icecast.org/docs/icecast-trunk/server_stats/
 )
 
-func (ic *Icecast) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := ic.collectServerStats(mx); err != nil {
+	if err := c.collectServerStats(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (ic *Icecast) collectServerStats(mx map[string]int64) error {
-	stats, err := ic.queryServerStats()
+func (c *Collector) collectServerStats(mx map[string]int64) error {
+	stats, err := c.queryServerStats()
 	if err != nil {
 		return err
 	}
@@ -44,9 +44,9 @@ func (ic *Icecast) collectServerStats(mx map[string]int64) error {
 
 		seen[name] = true
 
-		if !ic.seenSources[name] {
-			ic.seenSources[name] = true
-			ic.addSourceCharts(name)
+		if !c.seenSources[name] {
+			c.seenSources[name] = true
+			c.addSourceCharts(name)
 		}
 
 		px := fmt.Sprintf("source_%s_", name)
@@ -54,24 +54,24 @@ func (ic *Icecast) collectServerStats(mx map[string]int64) error {
 		mx[px+"listeners"] = src.Listeners
 	}
 
-	for name := range ic.seenSources {
+	for name := range c.seenSources {
 		if !seen[name] {
-			delete(ic.seenSources, name)
-			ic.removeSourceCharts(name)
+			delete(c.seenSources, name)
+			c.removeSourceCharts(name)
 		}
 	}
 
 	return nil
 }
 
-func (ic *Icecast) queryServerStats() (*serverStats, error) {
-	req, err := web.NewHTTPRequestWithPath(ic.RequestConfig, urlPathServerStats)
+func (c *Collector) queryServerStats() (*serverStats, error) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathServerStats)
 	if err != nil {
 		return nil, err
 	}
 
 	var stats serverStats
-	if err := web.DoHTTP(ic.httpClient).RequestJSON(req, &stats); err != nil {
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &stats); err != nil {
 		return nil, err
 	}
 

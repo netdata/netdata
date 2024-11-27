@@ -21,7 +21,7 @@ where
     OR metric LIKE 'ReplicasMaxAbsoluteDelay' FORMAT CSVWithNames
 `
 
-func (c *ClickHouse) collectSystemAsyncMetrics(mx map[string]int64) error {
+func (c *Collector) collectSystemAsyncMetrics(mx map[string]int64) error {
 	req, _ := web.NewHTTPRequest(c.RequestConfig)
 	req.URL.RawQuery = makeURLQuery(querySystemAsyncMetrics)
 

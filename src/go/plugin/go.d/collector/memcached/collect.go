@@ -41,32 +41,32 @@ var statsMetrics = map[string]bool{
 	"touch_misses":         true,
 }
 
-func (m *Memcached) collect() (map[string]int64, error) {
-	if m.conn == nil {
-		conn, err := m.establishConn()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.conn == nil {
+		conn, err := c.establishConn()
 		if err != nil {
 			return nil, err
 		}
-		m.conn = conn
+		c.conn = conn
 	}
 
-	stats, err := m.conn.queryStats()
+	stats, err := c.conn.queryStats()
 	if err != nil {
-		m.conn.disconnect()
-		m.conn = nil
+		c.conn.disconnect()
+		c.conn = nil
 		return nil, err
 	}
 
 	mx := make(map[string]int64)
 
-	if err := m.collectStats(mx, stats); err != nil {
+	if err := c.collectStats(mx, stats); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (m *Memcached) collectStats(mx map[string]int64, stats []byte) error {
+func (c *Collector) collectStats(mx map[string]int64, stats []byte) error {
 	if len(stats) == 0 {
 		return errors.New("empty stats response")
 	}
@@ -101,8 +101,8 @@ func (m *Memcached) collectStats(mx map[string]int64, stats []byte) error {
 	return nil
 }
 
-func (m *Memcached) establishConn() (memcachedConn, error) {
-	conn := m.newMemcachedConn(m.Config)
+func (c *Collector) establishConn() (memcachedConn, error) {
+	conn := c.newMemcachedConn(c.Config)
 
 	if err := conn.connect(); err != nil {
 		return nil, err

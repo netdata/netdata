@@ -13,35 +13,35 @@ import (
 	"github.com/gosnmp/gosnmp"
 )
 
-func (s *SNMP) collect() (map[string]int64, error) {
-	if s.sysInfo == nil {
-		si, err := s.getSysInfo()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.sysInfo == nil {
+		si, err := c.getSysInfo()
 		if err != nil {
 			return nil, err
 		}
 
-		s.sysInfo = si
-		s.addSysUptimeChart()
+		c.sysInfo = si
+		c.addSysUptimeChart()
 
-		if s.CreateVnode {
-			s.vnode = s.setupVnode(si)
+		if c.CreateVnode {
+			c.vnode = c.setupVnode(si)
 		}
 	}
 
 	mx := make(map[string]int64)
 
-	if err := s.collectSysUptime(mx); err != nil {
+	if err := c.collectSysUptime(mx); err != nil {
 		return nil, err
 	}
 
-	if s.collectIfMib {
-		if err := s.collectNetworkInterfaces(mx); err != nil {
+	if c.collectIfMib {
+		if err := c.collectNetworkInterfaces(mx); err != nil {
 			return nil, err
 		}
 	}
 
-	if len(s.customOids) > 0 {
-		if err := s.collectOIDs(mx); err != nil {
+	if len(c.customOids) > 0 {
+		if err := c.collectOIDs(mx); err != nil {
 			return nil, err
 		}
 	}
@@ -49,26 +49,26 @@ func (s *SNMP) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (s *SNMP) walkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {
-	if s.snmpClient.Version() == gosnmp.Version1 {
-		return s.snmpClient.WalkAll(rootOid)
+func (c *Collector) walkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {
+	if c.snmpClient.Version() == gosnmp.Version1 {
+		return c.snmpClient.WalkAll(rootOid)
 	}
-	return s.snmpClient.BulkWalkAll(rootOid)
+	return c.snmpClient.BulkWalkAll(rootOid)
 }
 
-func (s *SNMP) setupVnode(si *sysInfo) *vnodes.VirtualNode {
-	if s.Vnode.GUID == "" {
-		s.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(s.Hostname)).String()
+func (c *Collector) setupVnode(si *sysInfo) *vnodes.VirtualNode {
+	if c.Vnode.GUID == "" {
+		c.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(c.Hostname)).String()
 	}
 
-	hostnames := []string{s.Vnode.Hostname, si.name, "snmp-device"}
+	hostnames := []string{c.Vnode.Hostname, si.name, "snmp-device"}
 	i := slices.IndexFunc(hostnames, func(s string) bool { return s != "" })
 
-	s.Vnode.Hostname = fmt.Sprintf("%s(%s)", hostnames[i], s.Hostname)
+	c.Vnode.Hostname = fmt.Sprintf("%s(%s)", hostnames[i], c.Hostname)
 
 	labels := make(map[string]string)
 
-	for k, v := range s.Vnode.Labels {
+	for k, v := range c.Vnode.Labels {
 		labels[k] = v
 	}
 	if si.descr != "" {
@@ -84,8 +84,8 @@ func (s *SNMP) setupVnode(si *sysInfo) *vnodes.VirtualNode {
 	labels["vendor"] = si.organization
 
 	return &vnodes.VirtualNode{
-		GUID:     s.Vnode.GUID,
-		Hostname: s.Vnode.Hostname,
+		GUID:     c.Vnode.GUID,
+		Hostname: c.Vnode.Hostname,
 		Labels:   labels,
 	}
 }

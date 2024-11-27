@@ -9,21 +9,21 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-func (d *Dnsmasq) validateConfig() error {
-	if d.Address == "" {
+func (c *Collector) validateConfig() error {
+	if c.Address == "" {
 		return errors.New("'address' parameter not set")
 	}
-	if !isProtocolValid(d.Protocol) {
-		return fmt.Errorf("'protocol' (%s) is not valid, expected one of %v", d.Protocol, validProtocols)
+	if !isProtocolValid(c.Protocol) {
+		return fmt.Errorf("'protocol' (%s) is not valid, expected one of %v", c.Protocol, validProtocols)
 	}
 	return nil
 }
 
-func (d *Dnsmasq) initDNSClient() (dnsClient, error) {
-	return d.newDNSClient(d.Protocol, d.Timeout.Duration()), nil
+func (c *Collector) initDNSClient() (dnsClient, error) {
+	return c.newDNSClient(c.Protocol, c.Timeout.Duration()), nil
 }
 
-func (d *Dnsmasq) initCharts() (*module.Charts, error) {
+func (c *Collector) initCharts() (*module.Charts, error) {
 	return cacheCharts.Copy(), nil
 }
 

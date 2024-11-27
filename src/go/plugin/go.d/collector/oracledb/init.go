@@ -10,15 +10,15 @@ import (
 	goora "github.com/sijms/go-ora/v2"
 )
 
-func (o *OracleDB) validateDSN() (string, error) {
-	if o.DSN == "" {
+func (c *Collector) validateDSN() (string, error) {
+	if c.DSN == "" {
 		return "", errors.New("dsn required but not set")
 	}
-	if _, err := goora.ParseConfig(o.DSN); err != nil {
+	if _, err := goora.ParseConfig(c.DSN); err != nil {
 		return "", err
 	}
 
-	u, err := url.Parse(o.DSN)
+	u, err := url.Parse(c.DSN)
 	if err != nil {
 		return "", err
 	}

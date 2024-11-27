@@ -1172,68 +1172,68 @@ var (
 	}
 )
 
-func (m *MySQL) addSlaveReplicationConnCharts(conn string) {
+func (c *Collector) addSlaveReplicationConnCharts(conn string) {
 	var charts *module.Charts
 	if conn == "" {
 		charts = chartsSlaveReplication.Copy()
 	} else {
 		charts = newSlaveReplConnCharts(conn)
 	}
-	if err := m.Charts().Add(*charts...); err != nil {
-		m.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *MySQL) addUserStatisticsCharts(user string) {
-	if m.isPercona {
-		if err := m.Charts().Add(*newPerconaUserStatisticsCharts(user)...); err != nil {
-			m.Warning(err)
+func (c *Collector) addUserStatisticsCharts(user string) {
+	if c.isPercona {
+		if err := c.Charts().Add(*newPerconaUserStatisticsCharts(user)...); err != nil {
+			c.Warning(err)
 		}
 	} else {
-		if err := m.Charts().Add(*newMariaDBUserStatisticsCharts(user)...); err != nil {
-			m.Warning(err)
+		if err := c.Charts().Add(*newMariaDBUserStatisticsCharts(user)...); err != nil {
+			c.Warning(err)
 		}
 	}
 }
 
-func (m *MySQL) addInnoDBOSLogCharts() {
-	if err := m.Charts().Add(*chartsInnoDBOSLog.Copy()...); err != nil {
-		m.Warning(err)
+func (c *Collector) addInnoDBOSLogCharts() {
+	if err := c.Charts().Add(*chartsInnoDBOSLog.Copy()...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *MySQL) addMyISAMCharts() {
-	if err := m.Charts().Add(*chartsMyISAM.Copy()...); err != nil {
-		m.Warning(err)
+func (c *Collector) addMyISAMCharts() {
+	if err := c.Charts().Add(*chartsMyISAM.Copy()...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *MySQL) addBinlogCharts() {
-	if err := m.Charts().Add(*chartsBinlog.Copy()...); err != nil {
-		m.Warning(err)
+func (c *Collector) addBinlogCharts() {
+	if err := c.Charts().Add(*chartsBinlog.Copy()...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *MySQL) addInnodbDeadlocksChart() {
-	if err := m.Charts().Add(chartInnoDBDeadlocks.Copy()); err != nil {
-		m.Warning(err)
+func (c *Collector) addInnodbDeadlocksChart() {
+	if err := c.Charts().Add(chartInnoDBDeadlocks.Copy()); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *MySQL) addQCacheCharts() {
-	if err := m.Charts().Add(*chartsQCache.Copy()...); err != nil {
-		m.Warning(err)
+func (c *Collector) addQCacheCharts() {
+	if err := c.Charts().Add(*chartsQCache.Copy()...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *MySQL) addGaleraCharts() {
-	if err := m.Charts().Add(*chartsGalera.Copy()...); err != nil {
-		m.Warning(err)
+func (c *Collector) addGaleraCharts() {
+	if err := c.Charts().Add(*chartsGalera.Copy()...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *MySQL) addTableOpenCacheOverflowChart() {
-	if err := m.Charts().Add(chartTableOpenCacheOverflows.Copy()); err != nil {
-		m.Warning(err)
+func (c *Collector) addTableOpenCacheOverflowChart() {
+	if err := c.Charts().Add(chartTableOpenCacheOverflows.Copy()); err != nil {
+		c.Warning(err)
 	}
 }

@@ -10,21 +10,21 @@ import (
 
 type dialTCPFunc func(network, address string, timeout time.Duration) (net.Conn, error)
 
-func (pc *PortCheck) validateConfig() error {
-	if pc.Host == "" {
+func (c *Collector) validateConfig() error {
+	if c.Host == "" {
 		return errors.New("missing required parameter: 'host' must be specified")
 	}
-	if len(pc.Ports) == 0 && len(pc.UDPPorts) == 0 {
+	if len(c.Ports) == 0 && len(c.UDPPorts) == 0 {
 		return errors.New("missing required parameters: at least one of 'ports' (TCP) or 'udp_ports' (UDP) must be specified")
 	}
 	return nil
 }
 
-func (pc *PortCheck) initPorts() (tcpPorts []*tcpPort, udpPorts []*udpPort) {
-	for _, p := range pc.Ports {
+func (c *Collector) initPorts() (tcpPorts []*tcpPort, udpPorts []*udpPort) {
+	for _, p := range c.Ports {
 		tcpPorts = append(tcpPorts, &tcpPort{number: p})
 	}
-	for _, p := range pc.UDPPorts {
+	for _, p := range c.UDPPorts {
 		udpPorts = append(udpPorts, &udpPort{number: p})
 	}
 

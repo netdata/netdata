@@ -10,14 +10,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
-func (e *Exim) initEximExec() (eximBinary, error) {
+func (c *Collector) initEximExec() (eximBinary, error) {
 	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
 	if _, err := os.Stat(ndsudoPath); err != nil {
 		return nil, fmt.Errorf("ndsudo executable not found: %v", err)
 
 	}
 
-	exim := newEximExec(ndsudoPath, e.Timeout.Duration(), e.Logger)
+	exim := newEximExec(ndsudoPath, c.Timeout.Duration(), c.Logger)
 
 	return exim, nil
 }

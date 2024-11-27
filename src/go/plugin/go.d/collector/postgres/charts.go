@@ -124,11 +124,11 @@ var walFilesCharts = module.Charts{
 	walArchivingFilesCountChart.Copy(),
 }
 
-func (p *Postgres) addWALFilesCharts() {
+func (c *Collector) addWALFilesCharts() {
 	charts := walFilesCharts.Copy()
 
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
@@ -465,33 +465,33 @@ func newRunningTimeHistogramChart(tmpl module.Chart, prefix string, buckets []fl
 	return chart, nil
 }
 
-func (p *Postgres) addTransactionsRunTimeHistogramChart() {
+func (c *Collector) addTransactionsRunTimeHistogramChart() {
 	chart, err := newRunningTimeHistogramChart(
 		transactionsDurationChartTmpl,
 		"transaction_running_time",
-		p.XactTimeHistogram,
+		c.XactTimeHistogram,
 	)
 	if err != nil {
-		p.Warning(err)
+		c.Warning(err)
 		return
 	}
-	if err := p.Charts().Add(chart); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) addQueriesRunTimeHistogramChart() {
+func (c *Collector) addQueriesRunTimeHistogramChart() {
 	chart, err := newRunningTimeHistogramChart(
 		queriesDurationChartTmpl,
 		"query_running_time",
-		p.QueryTimeHistogram,
+		c.QueryTimeHistogram,
 	)
 	if err != nil {
-		p.Warning(err)
+		c.Warning(err)
 		return
 	}
-	if err := p.Charts().Add(chart); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }
 
@@ -543,16 +543,16 @@ func newReplicationStandbyAppCharts(app string) *module.Charts {
 	return charts
 }
 
-func (p *Postgres) addNewReplicationStandbyAppCharts(app string) {
+func (c *Collector) addNewReplicationStandbyAppCharts(app string) {
 	charts := newReplicationStandbyAppCharts(app)
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) removeReplicationStandbyAppCharts(app string) {
+func (c *Collector) removeReplicationStandbyAppCharts(app string) {
 	prefix := fmt.Sprintf("replication_standby_app_%s_", app)
-	for _, c := range *p.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()
@@ -592,16 +592,16 @@ func newReplicationSlotCharts(slot string) *module.Charts {
 	return charts
 }
 
-func (p *Postgres) addNewReplicationSlotCharts(slot string) {
+func (c *Collector) addNewReplicationSlotCharts(slot string) {
 	charts := newReplicationSlotCharts(slot)
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) removeReplicationSlotCharts(slot string) {
+func (c *Collector) removeReplicationSlotCharts(slot string) {
 	prefix := fmt.Sprintf("replication_slot_%s_", slot)
-	for _, c := range *p.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()
@@ -844,15 +844,15 @@ var (
 	}
 )
 
-func (p *Postgres) addDBConflictsCharts(db *dbMetrics) {
+func (c *Collector) addDBConflictsCharts(db *dbMetrics) {
 	tmpl := module.Charts{
 		dbConflictsRateChartTmpl.Copy(),
 		dbConflictsReasonRateChartTmpl.Copy(),
 	}
 	charts := newDatabaseCharts(tmpl.Copy(), db)
 
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
@@ -870,21 +870,21 @@ func newDatabaseCharts(tmpl *module.Charts, db *dbMetrics) *module.Charts {
 	return charts
 }
 
-func (p *Postgres) addNewDatabaseCharts(db *dbMetrics) {
+func (c *Collector) addNewDatabaseCharts(db *dbMetrics) {
 	charts := newDatabaseCharts(dbChartsTmpl.Copy(), db)
 
 	if db.size == nil {
 		_ = charts.Remove(fmt.Sprintf(dbSizeChartTmpl.ID, db.name))
 	}
 
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) removeDatabaseCharts(db *dbMetrics) {
+func (c *Collector) removeDatabaseCharts(db *dbMetrics) {
 	prefix := fmt.Sprintf("db_%s_", db.name)
-	for _, c := range *p.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()
@@ -1209,92 +1209,92 @@ func newTableChart(chart *module.Chart, tbl *tableMetrics) *module.Chart {
 	return chart
 }
 
-func (p *Postgres) addNewTableCharts(tbl *tableMetrics) {
+func (c *Collector) addNewTableCharts(tbl *tableMetrics) {
 	charts := newTableCharts(tbl)
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) addTableLastAutoVacuumAgoChart(tbl *tableMetrics) {
+func (c *Collector) addTableLastAutoVacuumAgoChart(tbl *tableMetrics) {
 	chart := newTableChart(tableAutoVacuumSinceTimeChartTmpl.Copy(), tbl)
 
-	if err := p.Charts().Add(chart); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) addTableLastVacuumAgoChart(tbl *tableMetrics) {
+func (c *Collector) addTableLastVacuumAgoChart(tbl *tableMetrics) {
 	chart := newTableChart(tableVacuumSinceTimeChartTmpl.Copy(), tbl)
 
-	if err := p.Charts().Add(chart); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) addTableLastAutoAnalyzeAgoChart(tbl *tableMetrics) {
+func (c *Collector) addTableLastAutoAnalyzeAgoChart(tbl *tableMetrics) {
 	chart := newTableChart(tableAutoAnalyzeSinceTimeChartTmpl.Copy(), tbl)
 
-	if err := p.Charts().Add(chart); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) addTableLastAnalyzeAgoChart(tbl *tableMetrics) {
+func (c *Collector) addTableLastAnalyzeAgoChart(tbl *tableMetrics) {
 	chart := newTableChart(tableAnalyzeSinceTimeChartTmpl.Copy(), tbl)
 
-	if err := p.Charts().Add(chart); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) addTableIOChartsCharts(tbl *tableMetrics) {
+func (c *Collector) addTableIOChartsCharts(tbl *tableMetrics) {
 	charts := module.Charts{
 		newTableChart(tableCacheIORatioChartTmpl.Copy(), tbl),
 		newTableChart(tableIORateChartTmpl.Copy(), tbl),
 	}
 
-	if err := p.Charts().Add(charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) addTableIndexIOCharts(tbl *tableMetrics) {
+func (c *Collector) addTableIndexIOCharts(tbl *tableMetrics) {
 	charts := module.Charts{
 		newTableChart(tableIndexCacheIORatioChartTmpl.Copy(), tbl),
 		newTableChart(tableIndexIORateChartTmpl.Copy(), tbl),
 	}
 
-	if err := p.Charts().Add(charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) addTableTOASTIOCharts(tbl *tableMetrics) {
+func (c *Collector) addTableTOASTIOCharts(tbl *tableMetrics) {
 	charts := module.Charts{
 		newTableChart(tableTOASCacheIORatioChartTmpl.Copy(), tbl),
 		newTableChart(tableTOASTIORateChartTmpl.Copy(), tbl),
 	}
 
-	if err := p.Charts().Add(charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) addTableTOASTIndexIOCharts(tbl *tableMetrics) {
+func (c *Collector) addTableTOASTIndexIOCharts(tbl *tableMetrics) {
 	charts := module.Charts{
 		newTableChart(tableTOASTIndexCacheIORatioChartTmpl.Copy(), tbl),
 		newTableChart(tableTOASTIndexIORateChartTmpl.Copy(), tbl),
 	}
 
-	if err := p.Charts().Add(charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) removeTableCharts(tbl *tableMetrics) {
+func (c *Collector) removeTableCharts(tbl *tableMetrics) {
 	prefix := fmt.Sprintf("table_%s_db_%s_schema_%s", tbl.name, tbl.db, tbl.schema)
-	for _, c := range *p.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()
@@ -1359,7 +1359,7 @@ var (
 	}
 )
 
-func (p *Postgres) addNewIndexCharts(idx *indexMetrics) {
+func (c *Collector) addNewIndexCharts(idx *indexMetrics) {
 	charts := indexChartsTmpl.Copy()
 
 	if idx.bloatSize == nil {
@@ -1384,14 +1384,14 @@ func (p *Postgres) addNewIndexCharts(idx *indexMetrics) {
 		}
 	}
 
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Postgres) removeIndexCharts(idx *indexMetrics) {
+func (c *Collector) removeIndexCharts(idx *indexMetrics) {
 	prefix := fmt.Sprintf("index_%s_table_%s_db_%s_schema_%s", idx.name, idx.table, idx.db, idx.schema)
-	for _, c := range *p.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()

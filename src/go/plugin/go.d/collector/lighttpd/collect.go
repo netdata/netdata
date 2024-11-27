@@ -10,8 +10,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (l *Lighttpd) collect() (map[string]int64, error) {
-	req, err := web.NewHTTPRequest(l.RequestConfig)
+func (c *Collector) collect() (map[string]int64, error) {
+	req, err := web.NewHTTPRequest(c.RequestConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}
@@ -19,7 +19,7 @@ func (l *Lighttpd) collect() (map[string]int64, error) {
 	var status *serverStatus
 	var perr error
 
-	if err := web.DoHTTP(l.httpClient).Request(req, func(body io.Reader) error {
+	if err := web.DoHTTP(c.httpClient).Request(req, func(body io.Reader) error {
 		if status, perr = parseResponse(body); perr != nil {
 			return perr
 		}

@@ -7,15 +7,15 @@ import (
 	"time"
 )
 
-func (dh *DockerHub) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	var (
-		reposNum = len(dh.Repositories)
+		reposNum = len(c.Repositories)
 		ch       = make(chan *repository, reposNum)
 		mx       = make(map[string]int64)
 	)
 
-	for _, name := range dh.Repositories {
-		go dh.collectRepo(name, ch)
+	for _, name := range c.Repositories {
+		go c.collectRepo(name, ch)
 	}
 
 	var (
@@ -29,7 +29,7 @@ func (dh *DockerHub) collect() (map[string]int64, error) {
 			continue
 		}
 		if err := parseRepoTo(repo, mx); err != nil {
-			dh.Errorf("error on parsing %s/%s : %v", repo.User, repo.Name, err)
+			c.Errorf("error on parsing %s/%s : %v", repo.User, repo.Name, err)
 			continue
 		}
 		pullSum += repo.PullCount
@@ -44,10 +44,10 @@ func (dh *DockerHub) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (dh *DockerHub) collectRepo(repoName string, ch chan *repository) {
-	repo, err := dh.client.getRepository(repoName)
+func (c *Collector) collectRepo(repoName string, ch chan *repository) {
+	repo, err := c.client.getRepository(repoName)
 	if err != nil {
-		dh.Error(err)
+		c.Error(err)
 	}
 	ch <- repo
 }

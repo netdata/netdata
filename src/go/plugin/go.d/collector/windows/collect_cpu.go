@@ -13,10 +13,10 @@ const (
 	metricCPUCStateTotal     = "windows_cpu_cstate_seconds_total"
 )
 
-func (w *Windows) collectCPU(mx map[string]int64, pms prometheus.Series) {
-	if !w.cache.collection[collectorCPU] {
-		w.cache.collection[collectorCPU] = true
-		w.addCPUCharts()
+func (c *Collector) collectCPU(mx map[string]int64, pms prometheus.Series) {
+	if !c.cache.collection[collectorCPU] {
+		c.cache.collection[collectorCPU] = true
+		c.addCPUCharts()
 	}
 
 	seen := make(map[string]bool)
@@ -64,15 +64,15 @@ func (w *Windows) collectCPU(mx map[string]int64, pms prometheus.Series) {
 	}
 
 	for core := range seen {
-		if !w.cache.cores[core] {
-			w.cache.cores[core] = true
-			w.addCPUCoreCharts(core)
+		if !c.cache.cores[core] {
+			c.cache.cores[core] = true
+			c.addCPUCoreCharts(core)
 		}
 	}
-	for core := range w.cache.cores {
+	for core := range c.cache.cores {
 		if !seen[core] {
-			delete(w.cache.cores, core)
-			w.removeCPUCoreCharts(core)
+			delete(c.cache.cores, core)
+			c.removeCPUCoreCharts(core)
 		}
 	}
 }

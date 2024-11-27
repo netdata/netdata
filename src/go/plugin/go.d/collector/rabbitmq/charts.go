@@ -430,83 +430,83 @@ var (
 	}
 )
 
-func (r *RabbitMQ) updateCharts() {
-	if !r.cache.overview.hasCharts {
-		r.cache.overview.hasCharts = true
-		r.addOverviewCharts()
+func (c *Collector) updateCharts() {
+	if !c.cache.overview.hasCharts {
+		c.cache.overview.hasCharts = true
+		c.addOverviewCharts()
 	}
 
-	maps.DeleteFunc(r.cache.nodes, func(_ string, node *nodeCacheItem) bool {
+	maps.DeleteFunc(c.cache.nodes, func(_ string, node *nodeCacheItem) bool {
 		if !node.seen {
-			r.removeNodeCharts(node)
+			c.removeNodeCharts(node)
 			return true
 		}
 		if !node.hasCharts {
 			node.hasCharts = true
-			r.addNodeCharts(node)
+			c.addNodeCharts(node)
 		}
 		maps.DeleteFunc(node.peers, func(_ string, peer *peerCacheItem) bool {
 			if !peer.seen {
-				r.removeNodeClusterPeerCharts(peer)
+				c.removeNodeClusterPeerCharts(peer)
 				return true
 			}
 			if !peer.hasCharts {
 				peer.hasCharts = true
-				r.addNodeClusterPeerCharts(peer)
+				c.addNodeClusterPeerCharts(peer)
 			}
 			return false
 		})
 		return false
 	})
 
-	maps.DeleteFunc(r.cache.vhosts, func(_ string, vhost *vhostCacheItem) bool {
+	maps.DeleteFunc(c.cache.vhosts, func(_ string, vhost *vhostCacheItem) bool {
 		if !vhost.seen {
-			r.removeVhostCharts(vhost)
+			c.removeVhostCharts(vhost)
 			return true
 		}
 		if !vhost.hasCharts {
 			vhost.hasCharts = true
-			r.addVhostCharts(vhost)
+			c.addVhostCharts(vhost)
 		}
 		return false
 	})
 
-	maps.DeleteFunc(r.cache.queues, func(_ string, queue *queueCacheItem) bool {
+	maps.DeleteFunc(c.cache.queues, func(_ string, queue *queueCacheItem) bool {
 		if !queue.seen {
-			r.removeQueueCharts(queue)
+			c.removeQueueCharts(queue)
 			return true
 		}
 		if !queue.hasCharts {
 			queue.hasCharts = true
-			r.addQueueCharts(queue)
+			c.addQueueCharts(queue)
 		}
 		return false
 	})
 }
 
-func (r *RabbitMQ) addOverviewCharts() {
+func (c *Collector) addOverviewCharts() {
 	charts := overviewCharts.Copy()
 
 	for _, chart := range *charts {
 		chart.Labels = []module.Label{
-			{Key: "cluster_id", Value: r.clusterId},
-			{Key: "cluster_name", Value: r.clusterName},
+			{Key: "cluster_id", Value: c.clusterId},
+			{Key: "cluster_name", Value: c.clusterName},
 		}
 	}
 
-	if err := r.Charts().Add(*charts...); err != nil {
-		r.Warningf("failed to add overview charts: %v", err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add overview charts: %v", err)
 	}
 }
 
-func (r *RabbitMQ) addNodeCharts(node *nodeCacheItem) {
+func (c *Collector) addNodeCharts(node *nodeCacheItem) {
 	charts := nodeChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = cleanChartId(fmt.Sprintf(chart.ID, node.name))
 		chart.Labels = []module.Label{
-			{Key: "cluster_id", Value: r.clusterId},
-			{Key: "cluster_name", Value: r.clusterName},
+			{Key: "cluster_id", Value: c.clusterId},
+			{Key: "cluster_name", Value: c.clusterName},
 			{Key: "node", Value: node.name},
 		}
 		for _, dim := range chart.Dims {
@@ -514,24 +514,24 @@ func (r *RabbitMQ) addNodeCharts(node *nodeCacheItem) {
 		}
 	}
 
-	if err := r.Charts().Add(*charts...); err != nil {
-		r.Warningf("failed to add node charts: %v", err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add node charts: %v", err)
 	}
 }
 
-func (r *RabbitMQ) removeNodeCharts(node *nodeCacheItem) {
+func (c *Collector) removeNodeCharts(node *nodeCacheItem) {
 	px := fmt.Sprintf("node_%s_", node.name)
-	r.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (r *RabbitMQ) addNodeClusterPeerCharts(peer *peerCacheItem) {
+func (c *Collector) addNodeClusterPeerCharts(peer *peerCacheItem) {
 	charts := nodeClusterPeerChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = cleanChartId(fmt.Sprintf(chart.ID, peer.node, peer.name))
 		chart.Labels = []module.Label{
-			{Key: "cluster_id", Value: r.clusterId},
-			{Key: "cluster_name", Value: r.clusterName},
+			{Key: "cluster_id", Value: c.clusterId},
+			{Key: "cluster_name", Value: c.clusterName},
 			{Key: "node", Value: peer.node},
 			{Key: "peer", Value: peer.name},
 		}
@@ -540,25 +540,25 @@ func (r *RabbitMQ) addNodeClusterPeerCharts(peer *peerCacheItem) {
 		}
 	}
 
-	if err := r.Charts().Add(*charts...); err != nil {
-		r.Warningf("failed to add node cluster peer charts: %v", err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add node cluster peer charts: %v", err)
 	}
 
 }
 
-func (r *RabbitMQ) removeNodeClusterPeerCharts(peer *peerCacheItem) {
+func (c *Collector) removeNodeClusterPeerCharts(peer *peerCacheItem) {
 	px := fmt.Sprintf("node_%s_peer_%s_", peer.node, peer.name)
-	r.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (r *RabbitMQ) addVhostCharts(vhost *vhostCacheItem) {
+func (c *Collector) addVhostCharts(vhost *vhostCacheItem) {
 	charts := vhostChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = cleanChartId(fmt.Sprintf(chart.ID, vhost.name))
 		chart.Labels = []module.Label{
-			{Key: "cluster_id", Value: r.clusterId},
-			{Key: "cluster_name", Value: r.clusterName},
+			{Key: "cluster_id", Value: c.clusterId},
+			{Key: "cluster_name", Value: c.clusterName},
 			{Key: "vhost", Value: vhost.name},
 		}
 		for _, dim := range chart.Dims {
@@ -566,25 +566,25 @@ func (r *RabbitMQ) addVhostCharts(vhost *vhostCacheItem) {
 		}
 	}
 
-	if err := r.Charts().Add(*charts...); err != nil {
-		r.Warningf("failed to add vhost charts: %v", err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add vhost charts: %v", err)
 	}
 }
 
-func (r *RabbitMQ) removeVhostCharts(vhost *vhostCacheItem) {
+func (c *Collector) removeVhostCharts(vhost *vhostCacheItem) {
 	px := fmt.Sprintf("vhost_%s_", vhost.name)
-	r.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (r *RabbitMQ) addQueueCharts(q *queueCacheItem) {
+func (c *Collector) addQueueCharts(q *queueCacheItem) {
 	charts := queueChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, q.name, q.vhost, q.node)
 		chart.ID = cleanChartId(chart.ID)
 		chart.Labels = []module.Label{
-			{Key: "cluster_id", Value: r.clusterId},
-			{Key: "cluster_name", Value: r.clusterName},
+			{Key: "cluster_id", Value: c.clusterId},
+			{Key: "cluster_name", Value: c.clusterName},
 			{Key: "node", Value: q.node},
 			{Key: "queue", Value: q.name},
 			{Key: "vhost", Value: q.vhost},
@@ -595,19 +595,19 @@ func (r *RabbitMQ) addQueueCharts(q *queueCacheItem) {
 		}
 	}
 
-	if err := r.Charts().Add(*charts...); err != nil {
-		r.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (r *RabbitMQ) removeQueueCharts(q *queueCacheItem) {
+func (c *Collector) removeQueueCharts(q *queueCacheItem) {
 	px := fmt.Sprintf("queue_%s_vhost_%s_node_%s_", q.name, q.vhost, q.node)
-	r.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (r *RabbitMQ) removeCharts(prefix string) {
+func (c *Collector) removeCharts(prefix string) {
 	prefix = cleanChartId(prefix)
-	for _, chart := range *r.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

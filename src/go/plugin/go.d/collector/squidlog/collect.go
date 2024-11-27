@@ -14,41 +14,41 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-func (s *SquidLog) logPanicStackIfAny() {
+func (c *Collector) logPanicStackIfAny() {
 	err := recover()
 	if err == nil {
 		return
 	}
-	s.Errorf("[ERROR] %s\n", err)
+	c.Errorf("[ERROR] %s\n", err)
 	for depth := 0; ; depth++ {
 		_, file, line, ok := runtime.Caller(depth)
 		if !ok {
 			break
 		}
-		s.Errorf("======> %d: %v:%d", depth, file, line)
+		c.Errorf("======> %d: %v:%d", depth, file, line)
 	}
 	panic(err)
 }
 
-func (s *SquidLog) collect() (map[string]int64, error) {
-	defer s.logPanicStackIfAny()
-	s.mx.reset()
+func (c *Collector) collect() (map[string]int64, error) {
+	defer c.logPanicStackIfAny()
+	c.mx.reset()
 
 	var mx map[string]int64
 
-	n, err := s.collectLogLines()
+	n, err := c.collectLogLines()
 
 	if n > 0 || err == nil {
-		mx = stm.ToMap(s.mx)
+		mx = stm.ToMap(c.mx)
 	}
 	return mx, err
 }
 
-func (s *SquidLog) collectLogLines() (int, error) {
+func (c *Collector) collectLogLines() (int, error) {
 	var n int
 	for {
-		s.line.reset()
-		err := s.parser.ReadLine(s.line)
+		c.line.reset()
+		err := c.parser.ReadLine(c.line)
 		if err != nil {
 			if err == io.EOF {
 				return n, nil
@@ -57,296 +57,296 @@ func (s *SquidLog) collectLogLines() (int, error) {
 				return n, err
 			}
 			n++
-			s.collectUnmatched()
+			c.collectUnmatched()
 			continue
 		}
 		n++
-		if s.line.empty() {
-			s.collectUnmatched()
+		if c.line.empty() {
+			c.collectUnmatched()
 		} else {
-			s.collectLogLine()
+			c.collectLogLine()
 		}
 	}
 }
 
-func (s *SquidLog) collectLogLine() {
-	s.mx.Requests.Inc()
-	s.collectRespTime()
-	s.collectClientAddress()
-	s.collectCacheCode()
-	s.collectHTTPCode()
-	s.collectRespSize()
-	s.collectReqMethod()
-	s.collectHierCode()
-	s.collectServerAddress()
-	s.collectMimeType()
+func (c *Collector) collectLogLine() {
+	c.mx.Requests.Inc()
+	c.collectRespTime()
+	c.collectClientAddress()
+	c.collectCacheCode()
+	c.collectHTTPCode()
+	c.collectRespSize()
+	c.collectReqMethod()
+	c.collectHierCode()
+	c.collectServerAddress()
+	c.collectMimeType()
 }
 
-func (s *SquidLog) collectUnmatched() {
-	s.mx.Requests.Inc()
-	s.mx.Unmatched.Inc()
+func (c *Collector) collectUnmatched() {
+	c.mx.Requests.Inc()
+	c.mx.Unmatched.Inc()
 }
 
-func (s *SquidLog) collectRespTime() {
-	if !s.line.hasRespTime() {
+func (c *Collector) collectRespTime() {
+	if !c.line.hasRespTime() {
 		return
 	}
-	s.mx.RespTime.Observe(float64(s.line.respTime))
+	c.mx.RespTime.Observe(float64(c.line.respTime))
 }
 
-func (s *SquidLog) collectClientAddress() {
-	if !s.line.hasClientAddress() {
+func (c *Collector) collectClientAddress() {
+	if !c.line.hasClientAddress() {
 		return
 	}
-	s.mx.UniqueClients.Insert(s.line.clientAddr)
+	c.mx.UniqueClients.Insert(c.line.clientAddr)
 }
 
-func (s *SquidLog) collectCacheCode() {
-	if !s.line.hasCacheCode() {
+func (c *Collector) collectCacheCode() {
+	if !c.line.hasCacheCode() {
 		return
 	}
 
-	c, ok := s.mx.CacheCode.GetP(s.line.cacheCode)
+	cntr, ok := c.mx.CacheCode.GetP(c.line.cacheCode)
 	if !ok {
-		s.addDimToCacheCodeChart(s.line.cacheCode)
+		c.addDimToCacheCodeChart(c.line.cacheCode)
 	}
-	c.Inc()
+	cntr.Inc()
 
-	tags := strings.Split(s.line.cacheCode, "_")
+	tags := strings.Split(c.line.cacheCode, "_")
 	for _, tag := range tags {
-		s.collectCacheCodeTag(tag)
+		c.collectCacheCodeTag(tag)
 	}
 }
 
-func (s *SquidLog) collectHTTPCode() {
-	if !s.line.hasHTTPCode() {
+func (c *Collector) collectHTTPCode() {
+	if !c.line.hasHTTPCode() {
 		return
 	}
 
-	code := s.line.httpCode
+	code := c.line.httpCode
 	switch {
 	case code >= 100 && code < 300, code == 0, code == 304, code == 401:
-		s.mx.ReqSuccess.Inc()
+		c.mx.ReqSuccess.Inc()
 	case code >= 300 && code < 400:
-		s.mx.ReqRedirect.Inc()
+		c.mx.ReqRedirect.Inc()
 	case code >= 400 && code < 500:
-		s.mx.ReqBad.Inc()
+		c.mx.ReqBad.Inc()
 	case code >= 500 && code <= 603:
-		s.mx.ReqError.Inc()
+		c.mx.ReqError.Inc()
 	}
 
 	switch code / 100 {
 	case 0:
-		s.mx.HTTPResp0xx.Inc()
+		c.mx.HTTPResp0xx.Inc()
 	case 1:
-		s.mx.HTTPResp1xx.Inc()
+		c.mx.HTTPResp1xx.Inc()
 	case 2:
-		s.mx.HTTPResp2xx.Inc()
+		c.mx.HTTPResp2xx.Inc()
 	case 3:
-		s.mx.HTTPResp3xx.Inc()
+		c.mx.HTTPResp3xx.Inc()
 	case 4:
-		s.mx.HTTPResp4xx.Inc()
+		c.mx.HTTPResp4xx.Inc()
 	case 5:
-		s.mx.HTTPResp5xx.Inc()
+		c.mx.HTTPResp5xx.Inc()
 	case 6:
-		s.mx.HTTPResp6xx.Inc()
+		c.mx.HTTPResp6xx.Inc()
 	}
 
 	codeStr := strconv.Itoa(code)
-	c, ok := s.mx.HTTPRespCode.GetP(codeStr)
+	cntr, ok := c.mx.HTTPRespCode.GetP(codeStr)
 	if !ok {
-		s.addDimToHTTPRespCodesChart(codeStr)
+		c.addDimToHTTPRespCodesChart(codeStr)
 	}
-	c.Inc()
+	cntr.Inc()
 }
 
-func (s *SquidLog) collectRespSize() {
-	if !s.line.hasRespSize() {
+func (c *Collector) collectRespSize() {
+	if !c.line.hasRespSize() {
 		return
 	}
-	s.mx.BytesSent.Add(float64(s.line.respSize))
+	c.mx.BytesSent.Add(float64(c.line.respSize))
 }
 
-func (s *SquidLog) collectReqMethod() {
-	if !s.line.hasReqMethod() {
+func (c *Collector) collectReqMethod() {
+	if !c.line.hasReqMethod() {
 		return
 	}
-	c, ok := s.mx.ReqMethod.GetP(s.line.reqMethod)
+	cntr, ok := c.mx.ReqMethod.GetP(c.line.reqMethod)
 	if !ok {
-		s.addDimToReqMethodChart(s.line.reqMethod)
+		c.addDimToReqMethodChart(c.line.reqMethod)
 	}
-	c.Inc()
+	cntr.Inc()
 }
 
-func (s *SquidLog) collectHierCode() {
-	if !s.line.hasHierCode() {
+func (c *Collector) collectHierCode() {
+	if !c.line.hasHierCode() {
 		return
 	}
-	c, ok := s.mx.HierCode.GetP(s.line.hierCode)
+	cntr, ok := c.mx.HierCode.GetP(c.line.hierCode)
 	if !ok {
-		s.addDimToHierCodeChart(s.line.hierCode)
+		c.addDimToHierCodeChart(c.line.hierCode)
 	}
-	c.Inc()
+	cntr.Inc()
 }
 
-func (s *SquidLog) collectServerAddress() {
-	if !s.line.hasServerAddress() {
+func (c *Collector) collectServerAddress() {
+	if !c.line.hasServerAddress() {
 		return
 	}
-	c, ok := s.mx.Server.GetP(s.line.serverAddr)
+	cntr, ok := c.mx.Server.GetP(c.line.serverAddr)
 	if !ok {
-		s.addDimToServerAddressChart(s.line.serverAddr)
+		c.addDimToServerAddressChart(c.line.serverAddr)
 	}
-	c.Inc()
+	cntr.Inc()
 }
 
-func (s *SquidLog) collectMimeType() {
-	if !s.line.hasMimeType() {
+func (c *Collector) collectMimeType() {
+	if !c.line.hasMimeType() {
 		return
 	}
-	c, ok := s.mx.MimeType.GetP(s.line.mimeType)
+	cntr, ok := c.mx.MimeType.GetP(c.line.mimeType)
 	if !ok {
-		s.addDimToMimeTypeChart(s.line.mimeType)
+		c.addDimToMimeTypeChart(c.line.mimeType)
 	}
-	c.Inc()
+	cntr.Inc()
 }
 
-func (s *SquidLog) collectCacheCodeTag(tag string) {
+func (c *Collector) collectCacheCodeTag(tag string) {
 	// https://wiki.squid-cache.org/SquidFaq/SquidLogs#Squid_result_codes
 	switch tag {
 	default:
 	case "TCP", "UDP", "NONE":
-		c, ok := s.mx.CacheCodeTransportTag.GetP(tag)
+		cntr, ok := c.mx.CacheCodeTransportTag.GetP(tag)
 		if !ok {
-			s.addDimToCacheCodeTransportTagChart(tag)
+			c.addDimToCacheCodeTransportTagChart(tag)
 		}
-		c.Inc()
+		cntr.Inc()
 	case "CF", "CLIENT", "IMS", "ASYNC", "SWAPFAIL", "REFRESH", "SHARED", "REPLY":
-		c, ok := s.mx.CacheCodeHandlingTag.GetP(tag)
+		cntr, ok := c.mx.CacheCodeHandlingTag.GetP(tag)
 		if !ok {
-			s.addDimToCacheCodeHandlingTagChart(tag)
+			c.addDimToCacheCodeHandlingTagChart(tag)
 		}
-		c.Inc()
+		cntr.Inc()
 	case "NEGATIVE", "STALE", "OFFLINE", "INVALID", "FAIL", "MODIFIED", "UNMODIFIED", "REDIRECT":
-		c, ok := s.mx.CacheCodeObjectTag.GetP(tag)
+		cntr, ok := c.mx.CacheCodeObjectTag.GetP(tag)
 		if !ok {
-			s.addDimToCacheCodeObjectTagChart(tag)
+			c.addDimToCacheCodeObjectTagChart(tag)
 		}
-		c.Inc()
+		cntr.Inc()
 	case "HIT", "MEM", "MISS", "DENIED", "NOFETCH", "TUNNEL":
-		c, ok := s.mx.CacheCodeLoadSourceTag.GetP(tag)
+		cntr, ok := c.mx.CacheCodeLoadSourceTag.GetP(tag)
 		if !ok {
-			s.addDimToCacheCodeLoadSourceTagChart(tag)
+			c.addDimToCacheCodeLoadSourceTagChart(tag)
 		}
-		c.Inc()
+		cntr.Inc()
 	case "ABORTED", "TIMEOUT", "IGNORED":
-		c, ok := s.mx.CacheCodeErrorTag.GetP(tag)
+		cntr, ok := c.mx.CacheCodeErrorTag.GetP(tag)
 		if !ok {
-			s.addDimToCacheCodeErrorTagChart(tag)
+			c.addDimToCacheCodeErrorTagChart(tag)
 		}
-		c.Inc()
+		cntr.Inc()
 	}
 }
 
-func (s *SquidLog) addDimToCacheCodeChart(code string) {
+func (c *Collector) addDimToCacheCodeChart(code string) {
 	chartID := cacheCodeChart.ID
 	dimID := pxCacheCode + code
-	s.addDimToChart(chartID, dimID, code)
+	c.addDimToChart(chartID, dimID, code)
 }
 
-func (s *SquidLog) addDimToCacheCodeTransportTagChart(tag string) {
+func (c *Collector) addDimToCacheCodeTransportTagChart(tag string) {
 	chartID := cacheCodeTransportTagChart.ID
 	dimID := pxTransportTag + tag
-	s.addDimToChart(chartID, dimID, tag)
+	c.addDimToChart(chartID, dimID, tag)
 }
 
-func (s *SquidLog) addDimToCacheCodeHandlingTagChart(tag string) {
+func (c *Collector) addDimToCacheCodeHandlingTagChart(tag string) {
 	chartID := cacheCodeHandlingTagChart.ID
 	dimID := pxHandlingTag + tag
-	s.addDimToChart(chartID, dimID, tag)
+	c.addDimToChart(chartID, dimID, tag)
 }
 
-func (s *SquidLog) addDimToCacheCodeObjectTagChart(tag string) {
+func (c *Collector) addDimToCacheCodeObjectTagChart(tag string) {
 	chartID := cacheCodeObjectTagChart.ID
 	dimID := pxObjectTag + tag
-	s.addDimToChart(chartID, dimID, tag)
+	c.addDimToChart(chartID, dimID, tag)
 }
 
-func (s *SquidLog) addDimToCacheCodeLoadSourceTagChart(tag string) {
+func (c *Collector) addDimToCacheCodeLoadSourceTagChart(tag string) {
 	chartID := cacheCodeLoadSourceTagChart.ID
 	dimID := pxSourceTag + tag
-	s.addDimToChart(chartID, dimID, tag)
+	c.addDimToChart(chartID, dimID, tag)
 }
 
-func (s *SquidLog) addDimToCacheCodeErrorTagChart(tag string) {
+func (c *Collector) addDimToCacheCodeErrorTagChart(tag string) {
 	chartID := cacheCodeErrorTagChart.ID
 	dimID := pxErrorTag + tag
-	s.addDimToChart(chartID, dimID, tag)
+	c.addDimToChart(chartID, dimID, tag)
 }
 
-func (s *SquidLog) addDimToHTTPRespCodesChart(tag string) {
+func (c *Collector) addDimToHTTPRespCodesChart(tag string) {
 	chartID := httpRespCodesChart.ID
 	dimID := pxHTTPCode + tag
-	s.addDimToChart(chartID, dimID, tag)
+	c.addDimToChart(chartID, dimID, tag)
 }
 
-func (s *SquidLog) addDimToReqMethodChart(method string) {
+func (c *Collector) addDimToReqMethodChart(method string) {
 	chartID := reqMethodChart.ID
 	dimID := pxReqMethod + method
-	s.addDimToChart(chartID, dimID, method)
+	c.addDimToChart(chartID, dimID, method)
 }
 
-func (s *SquidLog) addDimToHierCodeChart(code string) {
+func (c *Collector) addDimToHierCodeChart(code string) {
 	chartID := hierCodeChart.ID
 	dimID := pxHierCode + code
 	dimName := code[5:] // remove "HIER_"
-	s.addDimToChart(chartID, dimID, dimName)
+	c.addDimToChart(chartID, dimID, dimName)
 }
 
-func (s *SquidLog) addDimToServerAddressChart(address string) {
+func (c *Collector) addDimToServerAddressChart(address string) {
 	chartID := serverAddrChart.ID
 	dimID := pxSrvAddr + address
-	s.addDimToChartOrCreateIfNotExist(chartID, dimID, address)
+	c.addDimToChartOrCreateIfNotExist(chartID, dimID, address)
 }
 
-func (s *SquidLog) addDimToMimeTypeChart(mimeType string) {
+func (c *Collector) addDimToMimeTypeChart(mimeType string) {
 	chartID := mimeTypeChart.ID
 	dimID := pxMimeType + mimeType
-	s.addDimToChartOrCreateIfNotExist(chartID, dimID, mimeType)
+	c.addDimToChartOrCreateIfNotExist(chartID, dimID, mimeType)
 }
 
-func (s *SquidLog) addDimToChart(chartID, dimID, dimName string) {
-	chart := s.Charts().Get(chartID)
+func (c *Collector) addDimToChart(chartID, dimID, dimName string) {
+	chart := c.Charts().Get(chartID)
 	if chart == nil {
-		s.Warningf("add '%s' dim: couldn't find '%s' chart in charts", dimID, chartID)
+		c.Warningf("add '%s' dim: couldn't find '%s' chart in charts", dimID, chartID)
 		return
 	}
 
 	dim := &Dim{ID: dimID, Name: dimName, Algo: module.Incremental}
 
 	if err := chart.AddDim(dim); err != nil {
-		s.Warningf("add '%s' dim: %v", dimID, err)
+		c.Warningf("add '%s' dim: %v", dimID, err)
 		return
 	}
 	chart.MarkNotCreated()
 }
 
-func (s *SquidLog) addDimToChartOrCreateIfNotExist(chartID, dimID, dimName string) {
-	if s.Charts().Has(chartID) {
-		s.addDimToChart(chartID, dimID, dimName)
+func (c *Collector) addDimToChartOrCreateIfNotExist(chartID, dimID, dimName string) {
+	if c.Charts().Has(chartID) {
+		c.addDimToChart(chartID, dimID, dimName)
 		return
 	}
 
 	chart := newChartByID(chartID)
 	if chart == nil {
-		s.Warningf("add '%s' dim: couldn't create '%s' chart", dimID, chartID)
+		c.Warningf("add '%s' dim: couldn't create '%s' chart", dimID, chartID)
 		return
 	}
-	if err := s.Charts().Add(chart); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 		return
 	}
-	s.addDimToChart(chartID, dimID, dimName)
+	c.addDimToChart(chartID, dimID, dimName)
 }
 
 func newChartByID(chartID string) *Chart {

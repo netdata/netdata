@@ -151,16 +151,16 @@ var (
 	}
 )
 
-func (p *Pihole) addChartDNSQueriesType() {
+func (c *Collector) addChartDNSQueriesType() {
 	chart := chartDNSQueriesTypes.Copy()
-	if err := p.Charts().Add(chart); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Pihole) addChartDNSQueriesForwardedDestinations() {
+func (c *Collector) addChartDNSQueriesForwardedDestinations() {
 	chart := chartDNSQueriesForwardedDestination.Copy()
-	if err := p.Charts().Add(chart); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }

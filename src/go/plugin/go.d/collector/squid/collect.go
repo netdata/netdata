@@ -30,23 +30,23 @@ var statsCounters = map[string]bool{
 	"client_http.hit_kbytes_out": true,
 }
 
-func (s *Squid) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := s.collectCounters(mx); err != nil {
+	if err := c.collectCounters(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (s *Squid) collectCounters(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(s.RequestConfig, urlPathServerStats)
+func (c *Collector) collectCounters(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathServerStats)
 	if err != nil {
 		return fmt.Errorf("failed to create '%s' request: %w", urlPathServerStats, err)
 	}
 
-	return web.DoHTTP(s.httpClient).Request(req, func(body io.Reader) error {
+	return web.DoHTTP(c.httpClient).Request(req, func(body io.Reader) error {
 		sc := bufio.NewScanner(body)
 
 		for sc.Scan() {
@@ -63,7 +63,7 @@ func (s *Squid) collectCounters(mx map[string]int64) error {
 
 			v, err := strconv.ParseInt(value, 10, 64)
 			if err != nil {
-				s.Debugf("failed to parse key %s value %s: %v", key, value, err)
+				c.Debugf("failed to parse key %s value %s: %v", key, value, err)
 				continue
 			}
 

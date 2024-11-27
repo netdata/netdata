@@ -15,7 +15,7 @@ const (
 
 var nameReplacer = strings.NewReplacer(".", "_", " ", "")
 
-func (a *ActiveMQ) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	metrics := make(map[string]int64)
 
 	var (
@@ -24,23 +24,23 @@ func (a *ActiveMQ) collect() (map[string]int64, error) {
 		err    error
 	)
 
-	if queues, err = a.apiClient.getQueues(); err != nil {
+	if queues, err = c.apiClient.getQueues(); err != nil {
 		return nil, err
 	}
 
-	if topics, err = a.apiClient.getTopics(); err != nil {
+	if topics, err = c.apiClient.getTopics(); err != nil {
 		return nil, err
 	}
 
-	a.processQueues(queues, metrics)
-	a.processTopics(topics, metrics)
+	c.processQueues(queues, metrics)
+	c.processTopics(topics, metrics)
 
 	return metrics, nil
 }
 
-func (a *ActiveMQ) processQueues(queues *queues, metrics map[string]int64) {
+func (c *Collector) processQueues(queues *queues, metrics map[string]int64) {
 	var (
-		count   = len(a.activeQueues)
+		count   = len(c.activeQueues)
 		updated = make(map[string]bool)
 		unp     int
 	)
@@ -50,18 +50,18 @@ func (a *ActiveMQ) processQueues(queues *queues, metrics map[string]int64) {
 			continue
 		}
 
-		if !a.activeQueues[q.Name] {
-			if a.MaxQueues != 0 && count > a.MaxQueues {
+		if !c.activeQueues[q.Name] {
+			if c.MaxQueues != 0 && count > c.MaxQueues {
 				unp++
 				continue
 			}
 
-			if !a.filterQueues(q.Name) {
+			if !c.filterQueues(q.Name) {
 				continue
 			}
 
-			a.activeQueues[q.Name] = true
-			a.addQueueTopicCharts(q.Name, keyQueues)
+			c.activeQueues[q.Name] = true
+			c.addQueueTopicCharts(q.Name, keyQueues)
 		}
 
 		rname := nameReplacer.Replace(q.Name)
@@ -74,21 +74,21 @@ func (a *ActiveMQ) processQueues(queues *queues, metrics map[string]int64) {
 		updated[q.Name] = true
 	}
 
-	for name := range a.activeQueues {
+	for name := range c.activeQueues {
 		if !updated[name] {
-			delete(a.activeQueues, name)
-			a.removeQueueTopicCharts(name, keyQueues)
+			delete(c.activeQueues, name)
+			c.removeQueueTopicCharts(name, keyQueues)
 		}
 	}
 
 	if unp > 0 {
-		a.Debugf("%d queues were unprocessed due to max_queues limit (%d)", unp, a.MaxQueues)
+		c.Debugf("%d queues were unprocessed due to max_queues limit (%d)", unp, c.MaxQueues)
 	}
 }
 
-func (a *ActiveMQ) processTopics(topics *topics, metrics map[string]int64) {
+func (c *Collector) processTopics(topics *topics, metrics map[string]int64) {
 	var (
-		count   = len(a.activeTopics)
+		count   = len(c.activeTopics)
 		updated = make(map[string]bool)
 		unp     int
 	)
@@ -98,18 +98,18 @@ func (a *ActiveMQ) processTopics(topics *topics, metrics map[string]int64) {
 			continue
 		}
 
-		if !a.activeTopics[t.Name] {
-			if a.MaxTopics != 0 && count > a.MaxTopics {
+		if !c.activeTopics[t.Name] {
+			if c.MaxTopics != 0 && count > c.MaxTopics {
 				unp++
 				continue
 			}
 
-			if !a.filterTopics(t.Name) {
+			if !c.filterTopics(t.Name) {
 				continue
 			}
 
-			a.activeTopics[t.Name] = true
-			a.addQueueTopicCharts(t.Name, keyTopics)
+			c.activeTopics[t.Name] = true
+			c.addQueueTopicCharts(t.Name, keyTopics)
 		}
 
 		rname := nameReplacer.Replace(t.Name)
@@ -122,34 +122,34 @@ func (a *ActiveMQ) processTopics(topics *topics, metrics map[string]int64) {
 		updated[t.Name] = true
 	}
 
-	for name := range a.activeTopics {
+	for name := range c.activeTopics {
 		if !updated[name] {
 			// TODO: delete after timeout?
-			delete(a.activeTopics, name)
-			a.removeQueueTopicCharts(name, keyTopics)
+			delete(c.activeTopics, name)
+			c.removeQueueTopicCharts(name, keyTopics)
 		}
 	}
 
 	if unp > 0 {
-		a.Debugf("%d topics were unprocessed due to max_topics limit (%d)", unp, a.MaxTopics)
+		c.Debugf("%d topics were unprocessed due to max_topics limit (%d)", unp, c.MaxTopics)
 	}
 }
 
-func (a *ActiveMQ) filterQueues(line string) bool {
-	if a.queuesFilter == nil {
+func (c *Collector) filterQueues(line string) bool {
+	if c.queuesFilter == nil {
 		return true
 	}
-	return a.queuesFilter.MatchString(line)
+	return c.queuesFilter.MatchString(line)
 }
 
-func (a *ActiveMQ) filterTopics(line string) bool {
-	if a.topicsFilter == nil {
+func (c *Collector) filterTopics(line string) bool {
+	if c.topicsFilter == nil {
 		return true
 	}
-	return a.topicsFilter.MatchString(line)
+	return c.topicsFilter.MatchString(line)
 }
 
-func (a *ActiveMQ) addQueueTopicCharts(name, typ string) {
+func (c *Collector) addQueueTopicCharts(name, typ string) {
 	rname := nameReplacer.Replace(name)
 
 	charts := charts.Copy()
@@ -164,22 +164,22 @@ func (a *ActiveMQ) addQueueTopicCharts(name, typ string) {
 		}
 	}
 
-	_ = a.charts.Add(*charts...)
+	_ = c.charts.Add(*charts...)
 
 }
 
-func (a *ActiveMQ) removeQueueTopicCharts(name, typ string) {
+func (c *Collector) removeQueueTopicCharts(name, typ string) {
 	rname := nameReplacer.Replace(name)
 
-	chart := a.charts.Get(fmt.Sprintf("%s_%s_messages", typ, rname))
+	chart := c.charts.Get(fmt.Sprintf("%s_%s_messages", typ, rname))
 	chart.MarkRemove()
 	chart.MarkNotCreated()
 
-	chart = a.charts.Get(fmt.Sprintf("%s_%s_unprocessed_messages", typ, rname))
+	chart = c.charts.Get(fmt.Sprintf("%s_%s_unprocessed_messages", typ, rname))
 	chart.MarkRemove()
 	chart.MarkNotCreated()
 
-	chart = a.charts.Get(fmt.Sprintf("%s_%s_consumers", typ, rname))
+	chart = c.charts.Get(fmt.Sprintf("%s_%s_consumers", typ, rname))
 	chart.MarkRemove()
 	chart.MarkNotCreated()
 }

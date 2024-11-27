@@ -11,33 +11,33 @@ import (
 	"strings"
 )
 
-func (g *Gearman) collect() (map[string]int64, error) {
-	if g.conn == nil {
-		conn, err := g.establishConn()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.conn == nil {
+		conn, err := c.establishConn()
 		if err != nil {
 			return nil, err
 		}
-		g.conn = conn
+		c.conn = conn
 	}
 
-	status, err := g.conn.queryStatus()
+	status, err := c.conn.queryStatus()
 	if err != nil {
-		g.Cleanup()
+		c.Cleanup()
 		return nil, fmt.Errorf("couldn't query status: %v", err)
 	}
 
-	prioStatus, err := g.conn.queryPriorityStatus()
+	prioStatus, err := c.conn.queryPriorityStatus()
 	if err != nil {
-		g.Cleanup()
+		c.Cleanup()
 		return nil, fmt.Errorf("couldn't query priority status: %v", err)
 	}
 
 	mx := make(map[string]int64)
 
-	if err := g.collectStatus(mx, status); err != nil {
+	if err := c.collectStatus(mx, status); err != nil {
 		return nil, fmt.Errorf("couldn't collect status: %v", err)
 	}
-	if err := g.collectPriorityStatus(mx, prioStatus); err != nil {
+	if err := c.collectPriorityStatus(mx, prioStatus); err != nil {
 		return nil, fmt.Errorf("couldn't collect priority status: %v", err)
 	}
 
@@ -45,7 +45,7 @@ func (g *Gearman) collect() (map[string]int64, error) {
 
 }
 
-func (g *Gearman) collectStatus(mx map[string]int64, statusData []byte) error {
+func (c *Collector) collectStatus(mx map[string]int64, statusData []byte) error {
 	/*
 		Same output as the "gearadmin --status" command:
 
@@ -120,22 +120,22 @@ func (g *Gearman) collectStatus(mx map[string]int64, statusData []byte) error {
 	}
 
 	for name := range seen {
-		if !g.seenTasks[name] {
-			g.seenTasks[name] = true
-			g.addFunctionStatusCharts(name)
+		if !c.seenTasks[name] {
+			c.seenTasks[name] = true
+			c.addFunctionStatusCharts(name)
 		}
 	}
-	for name := range g.seenTasks {
+	for name := range c.seenTasks {
 		if !seen[name] {
-			delete(g.seenTasks, name)
-			g.removeFunctionStatusCharts(name)
+			delete(c.seenTasks, name)
+			c.removeFunctionStatusCharts(name)
 		}
 	}
 
 	return nil
 }
 
-func (g *Gearman) collectPriorityStatus(mx map[string]int64, prioStatusData []byte) error {
+func (c *Collector) collectPriorityStatus(mx map[string]int64, prioStatusData []byte) error {
 	/*
 		Same output as the "gearadmin --priority-status" command:
 
@@ -195,23 +195,23 @@ func (g *Gearman) collectPriorityStatus(mx map[string]int64, prioStatusData []by
 	}
 
 	for name := range seen {
-		if !g.seenPriorityTasks[name] {
-			g.seenPriorityTasks[name] = true
-			g.addFunctionPriorityStatusCharts(name)
+		if !c.seenPriorityTasks[name] {
+			c.seenPriorityTasks[name] = true
+			c.addFunctionPriorityStatusCharts(name)
 		}
 	}
-	for name := range g.seenPriorityTasks {
+	for name := range c.seenPriorityTasks {
 		if !seen[name] {
-			delete(g.seenPriorityTasks, name)
-			g.removeFunctionPriorityStatusCharts(name)
+			delete(c.seenPriorityTasks, name)
+			c.removeFunctionPriorityStatusCharts(name)
 		}
 	}
 
 	return nil
 }
 
-func (g *Gearman) establishConn() (gearmanConn, error) {
-	conn := g.newConn(g.Config)
+func (c *Collector) establishConn() (gearmanConn, error) {
+	conn := c.newConn(c.Config)
 
 	if err := conn.connect(); err != nil {
 		return nil, err

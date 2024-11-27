@@ -12,22 +12,22 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
-func (nv *NvidiaSmi) collect() (map[string]int64, error) {
-	if nv.exec == nil {
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.exec == nil {
 		return nil, errors.New("nvidia-smi exec is not initialized")
 	}
 
 	mx := make(map[string]int64)
 
-	if err := nv.collectGPUInfo(mx); err != nil {
+	if err := c.collectGPUInfo(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (nv *NvidiaSmi) collectGPUInfo(mx map[string]int64) error {
-	bs, err := nv.exec.queryGPUInfo()
+func (c *Collector) collectGPUInfo(mx map[string]int64) error {
+	bs, err := c.exec.queryGPUInfo()
 	if err != nil {
 		return fmt.Errorf("error on quering XML GPU info: %v", err)
 	}
@@ -49,9 +49,9 @@ func (nv *NvidiaSmi) collectGPUInfo(mx map[string]int64) error {
 
 		seenGPU[px] = true
 
-		if !nv.gpus[px] {
-			nv.gpus[px] = true
-			nv.addGpuCharts(gpu, i)
+		if !c.gpus[px] {
+			c.gpus[px] = true
+			c.addGpuCharts(gpu, i)
 		}
 
 		addMetric(mx, px+"pcie_bandwidth_usage_rx", gpu.PCI.RxUtil, 1024) // KB => bytes
@@ -103,9 +103,9 @@ func (nv *NvidiaSmi) collectGPUInfo(mx map[string]int64) error {
 
 			seenMIG[px] = true
 
-			if !nv.migs[px] {
-				nv.migs[px] = true
-				nv.addMIGDeviceCharts(gpu, mig)
+			if !c.migs[px] {
+				c.migs[px] = true
+				c.addMIGDeviceCharts(gpu, mig)
 			}
 
 			addMetric(mx, px+"ecc_error_sram_uncorrectable", mig.ECCErrorCount.VolatileCount.SRAMUncorrectable, 0)
@@ -117,17 +117,17 @@ func (nv *NvidiaSmi) collectGPUInfo(mx map[string]int64) error {
 		}
 	}
 
-	for px := range nv.gpus {
+	for px := range c.gpus {
 		if !seenGPU[px] {
-			delete(nv.gpus, px)
-			nv.removeCharts(px)
+			delete(c.gpus, px)
+			c.removeCharts(px)
 		}
 	}
 
-	for px := range nv.migs {
+	for px := range c.migs {
 		if !seenMIG[px] {
-			delete(nv.migs, px)
-			nv.removeCharts(px)
+			delete(c.migs, px)
+			c.removeCharts(px)
 		}
 	}
 

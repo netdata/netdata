@@ -425,41 +425,41 @@ func newSdcCharts(sdc client.Sdc) *Charts {
 }
 
 // TODO: remove stale charts?
-func (s *ScaleIO) updateCharts() {
-	s.updateStoragePoolCharts()
-	s.updateSdcCharts()
+func (c *Collector) updateCharts() {
+	c.updateStoragePoolCharts()
+	c.updateSdcCharts()
 }
 
-func (s *ScaleIO) updateStoragePoolCharts() {
-	for _, pool := range s.discovered.pool {
-		if s.charted[pool.ID] {
+func (c *Collector) updateStoragePoolCharts() {
+	for _, pool := range c.discovered.pool {
+		if c.charted[pool.ID] {
 			continue
 		}
-		s.charted[pool.ID] = true
-		s.addStoragePoolCharts(pool)
+		c.charted[pool.ID] = true
+		c.addStoragePoolCharts(pool)
 	}
 }
 
-func (s *ScaleIO) updateSdcCharts() {
-	for _, sdc := range s.discovered.sdc {
-		if s.charted[sdc.ID] {
+func (c *Collector) updateSdcCharts() {
+	for _, sdc := range c.discovered.sdc {
+		if c.charted[sdc.ID] {
 			continue
 		}
-		s.charted[sdc.ID] = true
-		s.addSdcCharts(sdc)
+		c.charted[sdc.ID] = true
+		c.addSdcCharts(sdc)
 	}
 }
 
-func (s *ScaleIO) addStoragePoolCharts(pool client.StoragePool) {
+func (c *Collector) addStoragePoolCharts(pool client.StoragePool) {
 	charts := newStoragePoolCharts(pool)
-	if err := s.Charts().Add(*charts...); err != nil {
-		s.Warningf("couldn't add charts for storage pool '%s(%s)': %v", pool.ID, pool.Name, err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("couldn't add charts for storage pool '%s(%s)': %v", pool.ID, pool.Name, err)
 	}
 }
 
-func (s *ScaleIO) addSdcCharts(sdc client.Sdc) {
+func (c *Collector) addSdcCharts(sdc client.Sdc) {
 	charts := newSdcCharts(sdc)
-	if err := s.Charts().Add(*charts...); err != nil {
-		s.Warningf("couldn't add charts for sdc '%s(%s)': %v", sdc.ID, sdc.SdcIp, err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("couldn't add charts for sdc '%s(%s)': %v", sdc.ID, sdc.SdcIp, err)
 	}
 }

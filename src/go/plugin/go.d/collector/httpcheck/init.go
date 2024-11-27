@@ -19,32 +19,32 @@ type headerMatch struct {
 	valMatcher matcher.Matcher
 }
 
-func (hc *HTTPCheck) validateConfig() error {
-	if hc.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("'url' not set")
 	}
 	return nil
 }
 
-func (hc *HTTPCheck) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(hc.ClientConfig)
+func (c *Collector) initHTTPClient() (*http.Client, error) {
+	return web.NewHTTPClient(c.ClientConfig)
 }
 
-func (hc *HTTPCheck) initResponseMatchRegexp() (*regexp.Regexp, error) {
-	if hc.ResponseMatch == "" {
+func (c *Collector) initResponseMatchRegexp() (*regexp.Regexp, error) {
+	if c.ResponseMatch == "" {
 		return nil, nil
 	}
-	return regexp.Compile(hc.ResponseMatch)
+	return regexp.Compile(c.ResponseMatch)
 }
 
-func (hc *HTTPCheck) initHeaderMatch() ([]headerMatch, error) {
-	if len(hc.HeaderMatch) == 0 {
+func (c *Collector) initHeaderMatch() ([]headerMatch, error) {
+	if len(c.HeaderMatch) == 0 {
 		return nil, nil
 	}
 
 	var hms []headerMatch
 
-	for _, v := range hc.HeaderMatch {
+	for _, v := range c.HeaderMatch {
 		if v.Key == "" {
 			continue
 		}
@@ -72,12 +72,12 @@ func (hc *HTTPCheck) initHeaderMatch() ([]headerMatch, error) {
 	return hms, nil
 }
 
-func (hc *HTTPCheck) initCharts() *module.Charts {
+func (c *Collector) initCharts() *module.Charts {
 	charts := httpCheckCharts.Copy()
 
 	for _, chart := range *charts {
 		chart.Labels = []module.Label{
-			{Key: "url", Value: hc.URL},
+			{Key: "url", Value: c.URL},
 		}
 	}
 

@@ -40,17 +40,17 @@ var (
 	}
 )
 
-func (x *X509Check) addCertCharts(commonName string, depth int) {
+func (c *Collector) addCertCharts(commonName string, depth int) {
 	charts := certChartsTmpl.Copy()
 
-	if depth > 0 || !x.CheckRevocation {
+	if depth > 0 || !c.CheckRevocation {
 		_ = charts.Remove(certRevocationStatusChartTmpl.ID)
 	}
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, depth)
 		chart.Labels = []module.Label{
-			{Key: "source", Value: x.Source},
+			{Key: "source", Value: c.Source},
 			{Key: "common_name", Value: commonName},
 			{Key: "depth", Value: strconv.Itoa(depth)},
 		}
@@ -59,7 +59,7 @@ func (x *X509Check) addCertCharts(commonName string, depth int) {
 		}
 	}
 
-	if err := x.Charts().Add(*charts...); err != nil {
-		x.Warningf("failed to add charts for '%s': %v", commonName, err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add charts for '%s': %v", commonName, err)
 	}
 }

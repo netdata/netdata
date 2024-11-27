@@ -113,7 +113,7 @@ var (
 	}
 )
 
-func (a *AP) addInterfaceCharts(dev *iwInterface) {
+func (c *Collector) addInterfaceCharts(dev *iwInterface) {
 	charts := apChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -127,15 +127,15 @@ func (a *AP) addInterfaceCharts(dev *iwInterface) {
 		}
 	}
 
-	if err := a.Charts().Add(*charts...); err != nil {
-		a.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 
 }
 
-func (a *AP) removeInterfaceCharts(dev *iwInterface) {
+func (c *Collector) removeInterfaceCharts(dev *iwInterface) {
 	px := fmt.Sprintf("ap_%s_%s_", dev.name, cleanSSID(dev.ssid))
-	for _, chart := range *a.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

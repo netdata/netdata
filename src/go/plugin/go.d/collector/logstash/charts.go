@@ -208,7 +208,7 @@ var pipelineChartsTmpl = module.Charts{
 	},
 }
 
-func (l *Logstash) addPipelineCharts(id string) {
+func (c *Collector) addPipelineCharts(id string) {
 	charts := pipelineChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -221,13 +221,13 @@ func (l *Logstash) addPipelineCharts(id string) {
 		}
 	}
 
-	if err := l.Charts().Add(*charts...); err != nil {
-		l.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (l *Logstash) removePipelineCharts(id string) {
-	for _, chart := range *l.Charts() {
+func (c *Collector) removePipelineCharts(id string) {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, "pipeline_"+id) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

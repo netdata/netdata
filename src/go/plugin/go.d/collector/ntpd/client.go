@@ -9,6 +9,13 @@ import (
 	"github.com/facebook/time/ntp/control"
 )
 
+type ntpConn interface {
+	systemInfo() (map[string]string, error)
+	peerInfo(id uint16) (map[string]string, error)
+	peerIDs() ([]uint16, error)
+	close()
+}
+
 func newNTPClient(c Config) (ntpConn, error) {
 	conn, err := net.DialTimeout("udp", c.Address, c.Timeout.Duration())
 	if err != nil {

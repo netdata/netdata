@@ -14,26 +14,26 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
-func (n *NVMe) collect() (map[string]int64, error) {
-	if n.exec == nil {
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.exec == nil {
 		return nil, errors.New("nvme-cli is not initialized (nil)")
 	}
 
 	now := time.Now()
-	if n.forceListDevices || now.Sub(n.listDevicesTime) > n.listDevicesEvery {
-		n.forceListDevices = false
-		n.listDevicesTime = now
-		if err := n.listNVMeDevices(); err != nil {
+	if c.forceListDevices || now.Sub(c.listDevicesTime) > c.listDevicesEvery {
+		c.forceListDevices = false
+		c.listDevicesTime = now
+		if err := c.listNVMeDevices(); err != nil {
 			return nil, err
 		}
 	}
 
 	mx := make(map[string]int64)
 
-	for path := range n.devicePaths {
-		if err := n.collectNVMeDevice(mx, path); err != nil {
-			n.Error(err)
-			n.forceListDevices = true
+	for path := range c.devicePaths {
+		if err := c.collectNVMeDevice(mx, path); err != nil {
+			c.Error(err)
+			c.forceListDevices = true
 			continue
 		}
 	}
@@ -41,8 +41,8 @@ func (n *NVMe) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (n *NVMe) collectNVMeDevice(mx map[string]int64, devicePath string) error {
-	stats, err := n.exec.smartLog(devicePath)
+func (c *Collector) collectNVMeDevice(mx map[string]int64, devicePath string) error {
+	stats, err := c.exec.smartLog(devicePath)
 	if err != nil {
 		return fmt.Errorf("exec nvme smart-log for '%s': %v", devicePath, err)
 	}
@@ -79,28 +79,28 @@ func (n *NVMe) collectNVMeDevice(mx map[string]int64, devicePath string) error {
 	return nil
 }
 
-func (n *NVMe) listNVMeDevices() error {
-	devList, err := n.exec.list()
+func (c *Collector) listNVMeDevices() error {
+	devList, err := c.exec.list()
 	if err != nil {
 		return fmt.Errorf("exec nvme list: %v", err)
 	}
 
-	n.Debugf("found %d NVMe devices (%v)", len(devList.Devices), devList.Devices)
+	c.Debugf("found %d NVMe devices (%v)", len(devList.Devices), devList.Devices)
 
 	seen := make(map[string]bool)
 
 	for _, dev := range devList.Devices {
 		path := dev.DevicePath
 		seen[path] = true
-		if !n.devicePaths[path] {
-			n.devicePaths[path] = true
-			n.addDeviceCharts(path, dev.ModelNumber)
+		if !c.devicePaths[path] {
+			c.devicePaths[path] = true
+			c.addDeviceCharts(path, dev.ModelNumber)
 		}
 	}
-	for path := range n.devicePaths {
+	for path := range c.devicePaths {
 		if !seen[path] {
-			delete(n.devicePaths, path)
-			n.removeDeviceCharts(path)
+			delete(c.devicePaths, path)
+			c.removeDeviceCharts(path)
 		}
 	}
 

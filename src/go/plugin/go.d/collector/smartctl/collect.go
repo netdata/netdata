@@ -15,61 +15,61 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func (s *Smartctl) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	now := time.Now()
 
-	if s.forceScan || s.isTimeToScan(now) {
-		devices, err := s.scanDevices()
+	if c.forceScan || c.isTimeToScan(now) {
+		devices, err := c.scanDevices()
 		if err != nil {
 			return nil, err
 		}
 
-		for k, dev := range s.scannedDevices {
+		for k, dev := range c.scannedDevices {
 			if _, ok := devices[k]; !ok {
-				delete(s.scannedDevices, k)
-				delete(s.seenDevices, k)
-				s.removeDeviceCharts(dev)
+				delete(c.scannedDevices, k)
+				delete(c.seenDevices, k)
+				c.removeDeviceCharts(dev)
 			}
 		}
 
-		s.forceDevicePoll = !maps.Equal(s.scannedDevices, devices)
-		s.scannedDevices = devices
-		s.lastScanTime = now
-		s.forceScan = false
+		c.forceDevicePoll = !maps.Equal(c.scannedDevices, devices)
+		c.scannedDevices = devices
+		c.lastScanTime = now
+		c.forceScan = false
 	}
 
-	if s.forceDevicePoll || s.isTimeToPollDevices(now) {
+	if c.forceDevicePoll || c.isTimeToPollDevices(now) {
 		mx := make(map[string]int64)
 
 		// TODO: make it concurrent
-		for _, d := range s.scannedDevices {
-			if err := s.collectScannedDevice(mx, d); err != nil {
-				s.Warning(err)
+		for _, d := range c.scannedDevices {
+			if err := c.collectScannedDevice(mx, d); err != nil {
+				c.Warning(err)
 				continue
 			}
 		}
 
-		s.forceDevicePoll = false
-		s.lastDevicePollTime = now
-		s.mx = mx
+		c.forceDevicePoll = false
+		c.lastDevicePollTime = now
+		c.mx = mx
 	}
 
-	return s.mx, nil
+	return c.mx, nil
 }
 
-func (s *Smartctl) collectScannedDevice(mx map[string]int64, scanDev *scanDevice) error {
-	resp, err := s.exec.deviceInfo(scanDev.name, scanDev.typ, s.NoCheckPowerMode)
+func (c *Collector) collectScannedDevice(mx map[string]int64, scanDev *scanDevice) error {
+	resp, err := c.exec.deviceInfo(scanDev.name, scanDev.typ, c.NoCheckPowerMode)
 	if err != nil {
 		if resp != nil && isDeviceOpenFailedNoSuchDevice(resp) && !scanDev.extra {
-			s.Infof("smartctl reported that device '%s' type '%s' no longer exists", scanDev.name, scanDev.typ)
-			s.forceScan = true
+			c.Infof("smartctl reported that device '%s' type '%s' no longer exists", scanDev.name, scanDev.typ)
+			c.forceScan = true
 			return nil
 		}
 		return fmt.Errorf("failed to get device info for '%s' type '%s': %v", scanDev.name, scanDev.typ, err)
 	}
 
 	if isDeviceInLowerPowerMode(resp) {
-		s.Debugf("device '%s' type '%s' is in a low-power mode, skipping", scanDev.name, scanDev.typ)
+		c.Debugf("device '%s' type '%s' is in a low-power mode, skipping", scanDev.name, scanDev.typ)
 		return nil
 	}
 
@@ -78,17 +78,17 @@ func (s *Smartctl) collectScannedDevice(mx map[string]int64, scanDev *scanDevice
 		return nil
 	}
 
-	if !s.seenDevices[scanDev.key()] {
-		s.seenDevices[scanDev.key()] = true
-		s.addDeviceCharts(dev)
+	if !c.seenDevices[scanDev.key()] {
+		c.seenDevices[scanDev.key()] = true
+		c.addDeviceCharts(dev)
 	}
 
-	s.collectSmartDevice(mx, dev)
+	c.collectSmartDevice(mx, dev)
 
 	return nil
 }
 
-func (s *Smartctl) collectSmartDevice(mx map[string]int64, dev *smartDevice) {
+func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice) {
 	px := fmt.Sprintf("device_%s_type_%s_", dev.deviceName(), dev.deviceType())
 
 	if v, ok := dev.powerOnTime(); ok {
@@ -165,12 +165,12 @@ func (s *Smartctl) collectSmartDevice(mx map[string]int64, dev *smartDevice) {
 	}
 }
 
-func (s *Smartctl) isTimeToScan(now time.Time) bool {
-	return s.ScanEvery.Duration().Seconds() != 0 && now.After(s.lastScanTime.Add(s.ScanEvery.Duration()))
+func (c *Collector) isTimeToScan(now time.Time) bool {
+	return c.ScanEvery.Duration().Seconds() != 0 && now.After(c.lastScanTime.Add(c.ScanEvery.Duration()))
 }
 
-func (s *Smartctl) isTimeToPollDevices(now time.Time) bool {
-	return now.After(s.lastDevicePollTime.Add(s.PollDevicesEvery.Duration()))
+func (c *Collector) isTimeToPollDevices(now time.Time) bool {
+	return now.After(c.lastDevicePollTime.Add(c.PollDevicesEvery.Duration()))
 
 }
 

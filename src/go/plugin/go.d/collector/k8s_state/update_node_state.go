@@ -2,9 +2,9 @@
 
 package k8s_state
 
-func (ks *KubeState) updateNodeState(r resource) {
+func (c *Collector) updateNodeState(r resource) {
 	if r.value() == nil {
-		if ns, ok := ks.state.nodes[r.source()]; ok {
+		if ns, ok := c.state.nodes[r.source()]; ok {
 			ns.deleted = true
 		}
 		return
@@ -12,7 +12,7 @@ func (ks *KubeState) updateNodeState(r resource) {
 
 	node, err := toNode(r)
 	if err != nil {
-		ks.Warning(err)
+		c.Warning(err)
 		return
 	}
 
@@ -20,10 +20,10 @@ func (ks *KubeState) updateNodeState(r resource) {
 		return
 	}
 
-	ns, ok := ks.state.nodes[r.source()]
+	ns, ok := c.state.nodes[r.source()]
 	if !ok {
 		ns = newNodeState()
-		ks.state.nodes[r.source()] = ns
+		c.state.nodes[r.source()] = ns
 	}
 
 	if !ok {

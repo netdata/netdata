@@ -12,14 +12,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (h *HDFS) collect() (map[string]int64, error) {
-	req, err := web.NewHTTPRequest(h.RequestConfig)
+const (
+	dataNodeType = "DataNode"
+	nameNodeType = "NameNode"
+)
+
+func (c *Collector) collect() (map[string]int64, error) {
+	req, err := web.NewHTTPRequest(c.RequestConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}
 
 	var raw rawJMX
-	if err := web.DoHTTP(h.httpClient).RequestJSON(req, &raw); err != nil {
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &raw); err != nil {
 		return nil, err
 	}
 
@@ -27,19 +32,19 @@ func (h *HDFS) collect() (map[string]int64, error) {
 		return nil, errors.New("empty response")
 	}
 
-	mx := h.collectRawJMX(raw)
+	mx := c.collectRawJMX(raw)
 
 	return stm.ToMap(mx), nil
 }
 
-func (h *HDFS) determineNodeType() (nodeType, error) {
-	req, err := web.NewHTTPRequest(h.RequestConfig)
+func (c *Collector) determineNodeType() (string, error) {
+	req, err := web.NewHTTPRequest(c.RequestConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to create HTTP request: %v", err)
 	}
 
 	var raw rawJMX
-	if err := web.DoHTTP(h.httpClient).RequestJSON(req, &raw); err != nil {
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &raw); err != nil {
 		return "", err
 	}
 
@@ -57,59 +62,59 @@ func (h *HDFS) determineNodeType() (nodeType, error) {
 		return "", errors.New("couldn't find process name in JvmMetrics")
 	}
 
-	t := nodeType(strings.Trim(string(v), "\""))
+	t := strings.Trim(string(v), "\"")
 	if t == nameNodeType || t == dataNodeType {
 		return t, nil
 	}
 	return "", errors.New("unknown node type")
 }
 
-func (h *HDFS) collectRawJMX(raw rawJMX) *metrics {
+func (c *Collector) collectRawJMX(raw rawJMX) *metrics {
 	var mx metrics
-	switch h.nodeType {
+	switch c.nodeType {
 	default:
-		panic(fmt.Sprintf("unsupported node type : '%s'", h.nodeType))
+		panic(fmt.Sprintf("unsupported node type : '%s'", c.nodeType))
 	case nameNodeType:
-		h.collectNameNode(&mx, raw)
+		c.collectNameNode(&mx, raw)
 	case dataNodeType:
-		h.collectDataNode(&mx, raw)
+		c.collectDataNode(&mx, raw)
 	}
 	return &mx
 }
 
-func (h *HDFS) collectNameNode(mx *metrics, raw rawJMX) {
-	if err := h.collectJVM(mx, raw); err != nil {
-		h.Debugf("error on collecting jvm : %v", err)
+func (c *Collector) collectNameNode(mx *metrics, raw rawJMX) {
+	if err := c.collectJVM(mx, raw); err != nil {
+		c.Debugf("error on collecting jvm : %v", err)
 	}
 
-	if err := h.collectRPCActivity(mx, raw); err != nil {
-		h.Debugf("error on collecting rpc activity : %v", err)
+	if err := c.collectRPCActivity(mx, raw); err != nil {
+		c.Debugf("error on collecting rpc activity : %v", err)
 	}
 
-	if err := h.collectFSNameSystem(mx, raw); err != nil {
-		h.Debugf("error on collecting fs name system : %v", err)
-	}
-}
-
-func (h *HDFS) collectDataNode(mx *metrics, raw rawJMX) {
-	if err := h.collectJVM(mx, raw); err != nil {
-		h.Debugf("error on collecting jvm : %v", err)
-	}
-
-	if err := h.collectRPCActivity(mx, raw); err != nil {
-		h.Debugf("error on collecting rpc activity : %v", err)
-	}
-
-	if err := h.collectFSDatasetState(mx, raw); err != nil {
-		h.Debugf("error on collecting fs dataset state : %v", err)
-	}
-
-	if err := h.collectDataNodeActivity(mx, raw); err != nil {
-		h.Debugf("error on collecting datanode activity state : %v", err)
+	if err := c.collectFSNameSystem(mx, raw); err != nil {
+		c.Debugf("error on collecting fs name system : %v", err)
 	}
 }
 
-func (h *HDFS) collectJVM(mx *metrics, raw rawJMX) error {
+func (c *Collector) collectDataNode(mx *metrics, raw rawJMX) {
+	if err := c.collectJVM(mx, raw); err != nil {
+		c.Debugf("error on collecting jvm : %v", err)
+	}
+
+	if err := c.collectRPCActivity(mx, raw); err != nil {
+		c.Debugf("error on collecting rpc activity : %v", err)
+	}
+
+	if err := c.collectFSDatasetState(mx, raw); err != nil {
+		c.Debugf("error on collecting fs dataset state : %v", err)
+	}
+
+	if err := c.collectDataNodeActivity(mx, raw); err != nil {
+		c.Debugf("error on collecting datanode activity state : %v", err)
+	}
+}
+
+func (c *Collector) collectJVM(mx *metrics, raw rawJMX) error {
 	v := raw.findJvm()
 	if v == nil {
 		return nil
@@ -125,7 +130,7 @@ func (h *HDFS) collectJVM(mx *metrics, raw rawJMX) error {
 	return nil
 }
 
-func (h *HDFS) collectRPCActivity(mx *metrics, raw rawJMX) error {
+func (c *Collector) collectRPCActivity(mx *metrics, raw rawJMX) error {
 	v := raw.findRPCActivity()
 	if v == nil {
 		return nil
@@ -141,7 +146,7 @@ func (h *HDFS) collectRPCActivity(mx *metrics, raw rawJMX) error {
 	return nil
 }
 
-func (h *HDFS) collectFSNameSystem(mx *metrics, raw rawJMX) error {
+func (c *Collector) collectFSNameSystem(mx *metrics, raw rawJMX) error {
 	v := raw.findFSNameSystem()
 	if v == nil {
 		return nil
@@ -159,7 +164,7 @@ func (h *HDFS) collectFSNameSystem(mx *metrics, raw rawJMX) error {
 	return nil
 }
 
-func (h *HDFS) collectFSDatasetState(mx *metrics, raw rawJMX) error {
+func (c *Collector) collectFSDatasetState(mx *metrics, raw rawJMX) error {
 	v := raw.findFSDatasetState()
 	if v == nil {
 		return nil
@@ -178,7 +183,7 @@ func (h *HDFS) collectFSDatasetState(mx *metrics, raw rawJMX) error {
 	return nil
 }
 
-func (h *HDFS) collectDataNodeActivity(mx *metrics, raw rawJMX) error {
+func (c *Collector) collectDataNodeActivity(mx *metrics, raw rawJMX) error {
 	v := raw.findDataNodeActivity()
 	if v == nil {
 		return nil

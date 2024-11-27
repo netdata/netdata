@@ -324,7 +324,7 @@ var (
 	}
 )
 
-func (v *Varnish) addBackendCharts(fullName string) {
+func (c *Collector) addBackendCharts(fullName string) {
 	charts := backendChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -337,13 +337,13 @@ func (v *Varnish) addBackendCharts(fullName string) {
 		}
 	}
 
-	if err := v.Charts().Add(*charts...); err != nil {
-		v.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 
 }
 
-func (v *Varnish) addStorageCharts(name string) {
+func (c *Collector) addStorageCharts(name string) {
 	charts := storageChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -356,24 +356,24 @@ func (v *Varnish) addStorageCharts(name string) {
 		}
 	}
 
-	if err := v.Charts().Add(*charts...); err != nil {
-		v.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 
 }
 
-func (v *Varnish) removeBackendCharts(name string) {
+func (c *Collector) removeBackendCharts(name string) {
 	px := fmt.Sprintf("backend_%s_", name)
-	v.removeCharts(cleanChartID(px))
+	c.removeCharts(cleanChartID(px))
 }
 
-func (v *Varnish) removeStorageCharts(name string) {
+func (c *Collector) removeStorageCharts(name string) {
 	px := fmt.Sprintf("storage_%s_", name)
-	v.removeCharts(cleanChartID(px))
+	c.removeCharts(cleanChartID(px))
 }
 
-func (v *Varnish) removeCharts(prefix string) {
-	for _, chart := range *v.Charts() {
+func (c *Collector) removeCharts(prefix string) {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

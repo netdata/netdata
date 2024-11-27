@@ -14,14 +14,14 @@ var zpoolHealthStates = []string{
 	"suspended",
 }
 
-func (z *ZFSPool) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 
 	mx := make(map[string]int64)
 
-	if err := z.collectZpoolList(mx); err != nil {
+	if err := c.collectZpoolList(mx); err != nil {
 		return nil, err
 	}
-	if err := z.collectZpoolListVdev(mx); err != nil {
+	if err := c.collectZpoolListVdev(mx); err != nil {
 		return mx, err
 	}
 

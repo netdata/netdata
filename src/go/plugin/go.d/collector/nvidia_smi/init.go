@@ -8,15 +8,15 @@ import (
 	"os/exec"
 )
 
-func (nv *NvidiaSmi) initNvidiaSmiExec() (nvidiaSmiBinary, error) {
-	binPath := nv.BinaryPath
+func (c *Collector) initNvidiaSmiExec() (nvidiaSmiBinary, error) {
+	binPath := c.BinaryPath
 	if _, err := os.Stat(binPath); os.IsNotExist(err) {
-		path, err := exec.LookPath(nv.binName)
+		path, err := exec.LookPath(c.binName)
 		if err != nil {
-			return nil, fmt.Errorf("error on lookup '%s': %v", nv.binName, err)
+			return nil, fmt.Errorf("error on lookup '%s': %v", c.binName, err)
 		}
 		binPath = path
 	}
 
-	return newNvidiaSmiBinary(binPath, nv.Config, nv.Logger)
+	return newNvidiaSmiBinary(binPath, c.Config, c.Logger)
 }

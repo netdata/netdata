@@ -11,31 +11,31 @@ import (
 
 const precision = 100
 
-func (a *Apcupsd) collect() (map[string]int64, error) {
-	if a.conn == nil {
-		conn, err := a.establishConnection()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.conn == nil {
+		conn, err := c.establishConnection()
 		if err != nil {
 			return nil, err
 		}
-		a.conn = conn
+		c.conn = conn
 	}
 
-	resp, err := a.conn.status()
+	resp, err := c.conn.status()
 	if err != nil {
-		a.Cleanup()
+		c.Cleanup()
 		return nil, err
 	}
 
 	mx := make(map[string]int64)
 
-	if err := a.collectStatus(mx, resp); err != nil {
+	if err := c.collectStatus(mx, resp); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (a *Apcupsd) collectStatus(mx map[string]int64, resp []byte) error {
+func (c *Collector) collectStatus(mx map[string]int64, resp []byte) error {
 	st, err := parseStatus(resp)
 	if err != nil {
 		return fmt.Errorf("failed to parse status: %v", err)
@@ -105,7 +105,7 @@ func (a *Apcupsd) collectStatus(mx map[string]int64, resp []byte) error {
 	}
 	if st.battdate != "" {
 		if v, err := battdateSecondsAgo(st.battdate); err != nil {
-			a.Debugf("failed to calculate time since battery replacement for date '%s': %v", st.battdate, err)
+			c.Debugf("failed to calculate time since battery replacement for date '%s': %v", st.battdate, err)
 		} else {
 			mx["battery_seconds_since_replacement"] = v
 		}
@@ -133,8 +133,8 @@ func battdateSecondsAgo(battdate string) (int64, error) {
 	return secsAgo, nil
 }
 
-func (a *Apcupsd) establishConnection() (apcupsdConn, error) {
-	conn := a.newConn(a.Config)
+func (c *Collector) establishConnection() (apcupsdConn, error) {
+	conn := c.newConn(c.Config)
 
 	if err := conn.connect(); err != nil {
 		return nil, err

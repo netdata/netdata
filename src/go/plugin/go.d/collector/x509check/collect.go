@@ -12,43 +12,43 @@ import (
 	"github.com/cloudflare/cfssl/revoke"
 )
 
-func (x *X509Check) collect() (map[string]int64, error) {
-	certs, err := x.prov.certificates()
+func (c *Collector) collect() (map[string]int64, error) {
+	certs, err := c.prov.certificates()
 	if err != nil {
 		return nil, err
 	}
 
 	if len(certs) == 0 {
-		return nil, fmt.Errorf("no certificate was provided by '%s'", x.Config.Source)
+		return nil, fmt.Errorf("no certificate was provided by '%s'", c.Config.Source)
 	}
 
 	mx := make(map[string]int64)
 
-	if err := x.collectCertificates(mx, certs); err != nil {
+	if err := c.collectCertificates(mx, certs); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (x *X509Check) collectCertificates(mx map[string]int64, certs []*x509.Certificate) error {
+func (c *Collector) collectCertificates(mx map[string]int64, certs []*x509.Certificate) error {
 	for i, cert := range certs {
 		cn := cert.Subject.CommonName
 
-		if !x.seenCerts[cn] {
-			x.seenCerts[cn] = true
-			x.addCertCharts(cn, i)
+		if !c.seenCerts[cn] {
+			c.seenCerts[cn] = true
+			c.addCertCharts(cn, i)
 		}
 
 		px := fmt.Sprintf("cert_depth%d_", i)
 
 		mx[px+"expiry"] = int64(time.Until(cert.NotAfter).Seconds())
 
-		if i == 0 && x.CheckRevocation {
+		if i == 0 && c.CheckRevocation {
 			func() {
 				rev, ok, err := revoke.VerifyCertificateError(cert)
 				if err != nil {
-					x.Debug(err)
+					c.Debug(err)
 					return
 				}
 				if !ok {
@@ -59,7 +59,7 @@ func (x *X509Check) collectCertificates(mx map[string]int64, certs []*x509.Certi
 			}()
 		}
 
-		if !x.CheckFullChain {
+		if !c.CheckFullChain {
 			break
 		}
 	}

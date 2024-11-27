@@ -140,9 +140,10 @@ var (
 	}
 )
 
-func (d *Docker) addContainerCharts(name, image string) {
+func (c *Collector) addContainerCharts(name, image string) {
 	charts := containerChartsTmpl.Copy()
-	if !d.CollectContainerSize {
+
+	if !c.CollectContainerSize {
 		_ = charts.Remove(containerWritableLayerSizeChartTmpl.ID)
 	}
 
@@ -157,15 +158,15 @@ func (d *Docker) addContainerCharts(name, image string) {
 		}
 	}
 
-	if err := d.Charts().Add(*charts...); err != nil {
-		d.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (d *Docker) removeContainerCharts(name string) {
+func (c *Collector) removeContainerCharts(name string) {
 	px := fmt.Sprintf("container_%s", name)
 
-	for _, chart := range *d.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

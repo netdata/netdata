@@ -53,10 +53,10 @@ const (
 	metricExchangeHTTPProxyRequestsTotal                     = "windows_exchange_http_proxy_requests_total"
 )
 
-func (w *Windows) collectExchange(mx map[string]int64, pms prometheus.Series) {
-	if !w.cache.collection[collectorExchange] {
-		w.cache.collection[collectorExchange] = true
-		w.addExchangeCharts()
+func (c *Collector) collectExchange(mx map[string]int64, pms prometheus.Series) {
+	if !c.cache.collection[collectorExchange] {
+		c.cache.collection[collectorExchange] = true
+		c.addExchangeCharts()
 	}
 
 	if pm := pms.FindByName(metricExchangeActiveSyncPingCmdsPending); pm.Len() > 0 {
@@ -99,13 +99,13 @@ func (w *Windows) collectExchange(mx map[string]int64, pms prometheus.Series) {
 		mx["exchange_rpc_user_count"] = int64(pm.Max())
 	}
 
-	w.collectExchangeAddTransportQueueMetric(mx, pms)
-	w.collectExchangeAddWorkloadMetric(mx, pms)
-	w.collectExchangeAddLDAPMetric(mx, pms)
-	w.collectExchangeAddHTTPProxyMetric(mx, pms)
+	c.collectExchangeAddTransportQueueMetric(mx, pms)
+	c.collectExchangeAddWorkloadMetric(mx, pms)
+	c.collectExchangeAddLDAPMetric(mx, pms)
+	c.collectExchangeAddHTTPProxyMetric(mx, pms)
 }
 
-func (w *Windows) collectExchangeAddTransportQueueMetric(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectExchangeAddTransportQueueMetric(mx map[string]int64, pms prometheus.Series) {
 	pms = pms.FindByNames(
 		metricExchangeTransportQueuesActiveMailboxDelivery,
 		metricExchangeTransportQueuesExternalActiveRemoteDelivery,
@@ -125,7 +125,7 @@ func (w *Windows) collectExchangeAddTransportQueueMetric(mx map[string]int64, pm
 	}
 }
 
-func (w *Windows) collectExchangeAddWorkloadMetric(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectExchangeAddWorkloadMetric(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 
 	for _, pm := range pms.FindByNames(
@@ -150,20 +150,20 @@ func (w *Windows) collectExchangeAddWorkloadMetric(mx map[string]int64, pms prom
 	}
 
 	for name := range seen {
-		if !w.cache.exchangeWorkload[name] {
-			w.cache.exchangeWorkload[name] = true
-			w.addExchangeWorkloadCharts(name)
+		if !c.cache.exchangeWorkload[name] {
+			c.cache.exchangeWorkload[name] = true
+			c.addExchangeWorkloadCharts(name)
 		}
 	}
-	for name := range w.cache.exchangeWorkload {
+	for name := range c.cache.exchangeWorkload {
 		if !seen[name] {
-			delete(w.cache.exchangeWorkload, name)
-			w.removeExchangeWorkloadCharts(name)
+			delete(c.cache.exchangeWorkload, name)
+			c.removeExchangeWorkloadCharts(name)
 		}
 	}
 }
 
-func (w *Windows) collectExchangeAddLDAPMetric(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectExchangeAddLDAPMetric(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 
 	for _, pm := range pms.FindByNames(
@@ -190,20 +190,20 @@ func (w *Windows) collectExchangeAddLDAPMetric(mx map[string]int64, pms promethe
 	}
 
 	for name := range seen {
-		if !w.cache.exchangeLDAP[name] {
-			w.cache.exchangeLDAP[name] = true
-			w.addExchangeLDAPCharts(name)
+		if !c.cache.exchangeLDAP[name] {
+			c.cache.exchangeLDAP[name] = true
+			c.addExchangeLDAPCharts(name)
 		}
 	}
-	for name := range w.cache.exchangeLDAP {
+	for name := range c.cache.exchangeLDAP {
 		if !seen[name] {
-			delete(w.cache.exchangeLDAP, name)
-			w.removeExchangeLDAPCharts(name)
+			delete(c.cache.exchangeLDAP, name)
+			c.removeExchangeLDAPCharts(name)
 		}
 	}
 }
 
-func (w *Windows) collectExchangeAddHTTPProxyMetric(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectExchangeAddHTTPProxyMetric(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 
 	for _, pm := range pms.FindByNames(
@@ -231,15 +231,15 @@ func (w *Windows) collectExchangeAddHTTPProxyMetric(mx map[string]int64, pms pro
 	}
 
 	for name := range seen {
-		if !w.cache.exchangeHTTPProxy[name] {
-			w.cache.exchangeHTTPProxy[name] = true
-			w.addExchangeHTTPProxyCharts(name)
+		if !c.cache.exchangeHTTPProxy[name] {
+			c.cache.exchangeHTTPProxy[name] = true
+			c.addExchangeHTTPProxyCharts(name)
 		}
 	}
-	for name := range w.cache.exchangeHTTPProxy {
+	for name := range c.cache.exchangeHTTPProxy {
 		if !seen[name] {
-			delete(w.cache.exchangeHTTPProxy, name)
-			w.removeExchangeHTTPProxyCharts(name)
+			delete(c.cache.exchangeHTTPProxy, name)
+			c.removeExchangeHTTPProxyCharts(name)
 		}
 	}
 }

@@ -10,43 +10,43 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (p *Phpfpm) initClient() (client, error) {
-	if p.Socket != "" {
-		return p.initSocketClient()
+func (c *Collector) initClient() (client, error) {
+	if c.Socket != "" {
+		return c.initSocketClient()
 	}
-	if p.Address != "" {
-		return p.initTcpClient()
+	if c.Address != "" {
+		return c.initTcpClient()
 	}
-	if p.URL != "" {
-		return p.initHTTPClient()
+	if c.URL != "" {
+		return c.initHTTPClient()
 	}
 
 	return nil, errors.New("neither 'socket' nor 'url' set")
 }
 
-func (p *Phpfpm) initHTTPClient() (*httpClient, error) {
-	c, err := web.NewHTTPClient(p.ClientConfig)
+func (c *Collector) initHTTPClient() (*httpClient, error) {
+	cli, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %v", err)
 	}
 
-	p.Debugf("using HTTP client: url='%s', timeout='%s'", p.URL, p.Timeout)
+	c.Debugf("using HTTP client: url='%s', timeout='%s'", c.URL, c.Timeout)
 
-	return newHTTPClient(c, p.RequestConfig)
+	return newHTTPClient(cli, c.RequestConfig)
 }
 
-func (p *Phpfpm) initSocketClient() (*socketClient, error) {
-	if _, err := os.Stat(p.Socket); err != nil {
-		return nil, fmt.Errorf("the socket '%s' does not exist: %v", p.Socket, err)
+func (c *Collector) initSocketClient() (*socketClient, error) {
+	if _, err := os.Stat(c.Socket); err != nil {
+		return nil, fmt.Errorf("the socket '%s' does not exist: %v", c.Socket, err)
 	}
 
-	p.Debugf("using socket client: socket='%s', timeout='%s', fcgi_path='%s'", p.Socket, p.Timeout, p.FcgiPath)
+	c.Debugf("using socket client: socket='%s', timeout='%s', fcgi_path='%s'", c.Socket, c.Timeout, c.FcgiPath)
 
-	return newSocketClient(p.Logger, p.Socket, p.Timeout.Duration(), p.FcgiPath), nil
+	return newSocketClient(c.Logger, c.Socket, c.Timeout.Duration(), c.FcgiPath), nil
 }
 
-func (p *Phpfpm) initTcpClient() (*tcpClient, error) {
-	p.Debugf("using tcp client: address='%s', timeout='%s', fcgi_path='%s'", p.Address, p.Timeout, p.FcgiPath)
+func (c *Collector) initTcpClient() (*tcpClient, error) {
+	c.Debugf("using tcp client: address='%s', timeout='%s', fcgi_path='%s'", c.Address, c.Timeout, c.FcgiPath)
 
-	return newTcpClient(p.Logger, p.Address, p.Timeout.Duration(), p.FcgiPath), nil
+	return newTcpClient(c.Logger, c.Address, c.Timeout.Duration(), c.FcgiPath), nil
 }

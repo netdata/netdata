@@ -11,8 +11,8 @@ const (
 	driverNameSas      = "mpt3sas"
 )
 
-func (s *StorCli) collect() (map[string]int64, error) {
-	cntrlResp, err := s.queryControllersInfo()
+func (c *Collector) collect() (map[string]int64, error) {
+	cntrlResp, err := c.queryControllersInfo()
 	if err != nil {
 		return nil, err
 	}
@@ -23,20 +23,20 @@ func (s *StorCli) collect() (map[string]int64, error) {
 
 	switch driver {
 	case driverNameMegaraid:
-		if err := s.collectMegaraidControllersInfo(mx, cntrlResp); err != nil {
+		if err := c.collectMegaraidControllersInfo(mx, cntrlResp); err != nil {
 			return nil, fmt.Errorf("failed to collect megaraid controller info: %s", err)
 		}
 		if len(cntrlResp.Controllers[0].ResponseData.PDList) > 0 {
-			drivesResp, err := s.queryDrivesInfo()
+			drivesResp, err := c.queryDrivesInfo()
 			if err != nil {
 				return nil, fmt.Errorf("failed to collect megaraid drive info: %s", err)
 			}
-			if err := s.collectMegaRaidDrives(mx, drivesResp); err != nil {
+			if err := c.collectMegaRaidDrives(mx, drivesResp); err != nil {
 				return nil, err
 			}
 		}
 	case driverNameSas:
-		if err := s.collectMpt3sasControllersInfo(mx, cntrlResp); err != nil {
+		if err := c.collectMpt3sasControllersInfo(mx, cntrlResp); err != nil {
 			return nil, fmt.Errorf("failed to collect mpt3sas controller info: %s", err)
 		}
 	default:

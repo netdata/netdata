@@ -10,9 +10,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
-func (v *Varnish) initVarnishstatBinary() (varnishstatBinary, error) {
-	if v.Config.DockerContainer != "" {
-		return newVarnishstatDockerExecBinary(v.Config, v.Logger), nil
+func (c *Collector) initVarnishstatBinary() (varnishstatBinary, error) {
+	if c.Config.DockerContainer != "" {
+		return newVarnishstatDockerExecBinary(c.Config, c.Logger), nil
 	}
 
 	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
@@ -22,7 +22,7 @@ func (v *Varnish) initVarnishstatBinary() (varnishstatBinary, error) {
 
 	}
 
-	varnishstat := newVarnishstatExecBinary(ndsudoPath, v.Config, v.Logger)
+	varnishstat := newVarnishstatExecBinary(ndsudoPath, c.Config, c.Logger)
 
 	return varnishstat, nil
 }

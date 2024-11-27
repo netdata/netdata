@@ -12,20 +12,20 @@ import (
 	"time"
 )
 
-func (pc *PortCheck) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	wg := &sync.WaitGroup{}
 
-	for _, port := range pc.tcpPorts {
+	for _, port := range c.tcpPorts {
 		wg.Add(1)
 		port := port
-		go func() { defer wg.Done(); pc.checkTCPPort(port) }()
+		go func() { defer wg.Done(); c.checkTCPPort(port) }()
 	}
 
-	if pc.doUdpPorts {
-		for _, port := range pc.udpPorts {
+	if c.doUdpPorts {
+		for _, port := range c.udpPorts {
 			wg.Add(1)
 			port := port
-			go func() { defer wg.Done(); pc.checkUDPPort(port) }()
+			go func() { defer wg.Done(); c.checkUDPPort(port) }()
 		}
 	}
 
@@ -35,10 +35,10 @@ func (pc *PortCheck) collect() (map[string]int64, error) {
 
 	now := time.Now()
 
-	for _, p := range pc.tcpPorts {
-		if !pc.seenTcpPorts[p.number] {
-			pc.seenTcpPorts[p.number] = true
-			pc.addTCPPortCharts(p)
+	for _, p := range c.tcpPorts {
+		if !c.seenTcpPorts[p.number] {
+			c.seenTcpPorts[p.number] = true
+			c.addTCPPortCharts(p)
 		}
 
 		px := fmt.Sprintf("tcp_port_%d_", p.number)
@@ -51,19 +51,19 @@ func (pc *PortCheck) collect() (map[string]int64, error) {
 		mx[px+p.status] = 1
 	}
 
-	if pc.doUdpPorts {
-		for _, p := range pc.udpPorts {
+	if c.doUdpPorts {
+		for _, p := range c.udpPorts {
 			if p.err != nil {
 				if isListenOpNotPermittedError(p.err) {
-					pc.doUdpPorts = false
+					c.doUdpPorts = false
 					break
 				}
 				continue
 			}
 
-			if !pc.seenUdpPorts[p.number] {
-				pc.seenUdpPorts[p.number] = true
-				pc.addUDPPortCharts(p)
+			if !c.seenUdpPorts[p.number] {
+				c.seenUdpPorts[p.number] = true
+				c.addUDPPortCharts(p)
 			}
 
 			px := fmt.Sprintf("udp_port_%d_", p.number)
@@ -78,9 +78,9 @@ func (pc *PortCheck) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (pc *PortCheck) address(port int) string {
+func (c *Collector) address(port int) string {
 	// net.JoinHostPort expects literal IPv6 address, it adds []
-	host := strings.Trim(pc.Host, "[]")
+	host := strings.Trim(c.Host, "[]")
 	return net.JoinHostPort(host, strconv.Itoa(port))
 }
 

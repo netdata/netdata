@@ -7,26 +7,26 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 )
 
-func (g *Geth) collect() (map[string]int64, error) {
-	pms, err := g.prom.ScrapeSeries()
+func (c *Collector) collect() (map[string]int64, error) {
+	pms, err := c.prom.ScrapeSeries()
 	if err != nil {
 		return nil, err
 	}
-	mx := g.collectGeth(pms)
+	mx := c.collectGeth(pms)
 
 	return stm.ToMap(mx), nil
 }
 
-func (g *Geth) collectGeth(pms prometheus.Series) map[string]float64 {
+func (c *Collector) collectGeth(pms prometheus.Series) map[string]float64 {
 	mx := make(map[string]float64)
-	g.collectChainData(mx, pms)
-	g.collectP2P(mx, pms)
-	g.collectTxPool(mx, pms)
-	g.collectRpc(mx, pms)
+	c.collectChainData(mx, pms)
+	c.collectP2P(mx, pms)
+	c.collectTxPool(mx, pms)
+	c.collectRpc(mx, pms)
 	return mx
 }
 
-func (g *Geth) collectChainData(mx map[string]float64, pms prometheus.Series) {
+func (c *Collector) collectChainData(mx map[string]float64, pms prometheus.Series) {
 	pms = pms.FindByNames(
 		chainValidation,
 		chainWrite,
@@ -44,20 +44,20 @@ func (g *Geth) collectChainData(mx map[string]float64, pms prometheus.Series) {
 		reorgsExecuted,
 		goRoutines,
 	)
-	g.collectEth(mx, pms)
+	c.collectEth(mx, pms)
 
 }
 
-func (g *Geth) collectRpc(mx map[string]float64, pms prometheus.Series) {
+func (c *Collector) collectRpc(mx map[string]float64, pms prometheus.Series) {
 	pms = pms.FindByNames(
 		rpcRequests,
 		rpcSuccess,
 		rpcFailure,
 	)
-	g.collectEth(mx, pms)
+	c.collectEth(mx, pms)
 }
 
-func (g *Geth) collectTxPool(mx map[string]float64, pms prometheus.Series) {
+func (c *Collector) collectTxPool(mx map[string]float64, pms prometheus.Series) {
 	pms = pms.FindByNames(
 		txPoolInvalid,
 		txPoolPending,
@@ -71,10 +71,10 @@ func (g *Geth) collectTxPool(mx map[string]float64, pms prometheus.Series) {
 		txPoolQueuedEviction,
 		txPoolQueuedRatelimit,
 	)
-	g.collectEth(mx, pms)
+	c.collectEth(mx, pms)
 }
 
-func (g *Geth) collectP2P(mx map[string]float64, pms prometheus.Series) {
+func (c *Collector) collectP2P(mx map[string]float64, pms prometheus.Series) {
 	pms = pms.FindByNames(
 		p2pDials,
 		p2pEgress,
@@ -82,10 +82,10 @@ func (g *Geth) collectP2P(mx map[string]float64, pms prometheus.Series) {
 		p2pPeers,
 		p2pServes,
 	)
-	g.collectEth(mx, pms)
+	c.collectEth(mx, pms)
 }
 
-func (g *Geth) collectEth(mx map[string]float64, pms prometheus.Series) {
+func (c *Collector) collectEth(mx map[string]float64, pms prometheus.Series) {
 	for _, pm := range pms {
 		mx[pm.Name()] += pm.Value
 	}

@@ -474,89 +474,89 @@ var (
 	}
 )
 
-func (p *Pulsar) adjustCharts(pms prometheus.Series) {
+func (c *Collector) adjustCharts(pms prometheus.Series) {
 	if pms := pms.FindByName(metricPulsarStorageReadRate); pms.Len() == 0 || pms[0].Labels.Get("namespace") == "" {
-		p.removeSummaryChart(sumStorageOperationsRateChart.ID)
-		p.removeNamespaceChart(nsStorageOperationsChart.ID)
-		p.removeNamespaceChart(topicStorageReadRateChart.ID)
-		p.removeNamespaceChart(topicStorageWriteRateChart.ID)
-		delete(p.topicChartsMapping, topicStorageReadRateChart.ID)
-		delete(p.topicChartsMapping, topicStorageWriteRateChart.ID)
+		c.removeSummaryChart(sumStorageOperationsRateChart.ID)
+		c.removeNamespaceChart(nsStorageOperationsChart.ID)
+		c.removeNamespaceChart(topicStorageReadRateChart.ID)
+		c.removeNamespaceChart(topicStorageWriteRateChart.ID)
+		delete(c.topicChartsMapping, topicStorageReadRateChart.ID)
+		delete(c.topicChartsMapping, topicStorageWriteRateChart.ID)
 	}
 	if pms.FindByName(metricPulsarSubscriptionMsgRateRedeliver).Len() == 0 {
-		p.removeSummaryChart(sumSubsMsgRateRedeliverChart.ID)
-		p.removeSummaryChart(sumSubsBlockedOnUnackedMsgChart.ID)
-		p.removeNamespaceChart(nsSubsMsgRateRedeliverChart.ID)
-		p.removeNamespaceChart(nsSubsBlockedOnUnackedMsgChart.ID)
-		p.removeNamespaceChart(topicSubsMsgRateRedeliverChart.ID)
-		p.removeNamespaceChart(topicSubsBlockedOnUnackedMsgChart.ID)
-		delete(p.topicChartsMapping, topicSubsMsgRateRedeliverChart.ID)
-		delete(p.topicChartsMapping, topicSubsBlockedOnUnackedMsgChart.ID)
+		c.removeSummaryChart(sumSubsMsgRateRedeliverChart.ID)
+		c.removeSummaryChart(sumSubsBlockedOnUnackedMsgChart.ID)
+		c.removeNamespaceChart(nsSubsMsgRateRedeliverChart.ID)
+		c.removeNamespaceChart(nsSubsBlockedOnUnackedMsgChart.ID)
+		c.removeNamespaceChart(topicSubsMsgRateRedeliverChart.ID)
+		c.removeNamespaceChart(topicSubsBlockedOnUnackedMsgChart.ID)
+		delete(c.topicChartsMapping, topicSubsMsgRateRedeliverChart.ID)
+		delete(c.topicChartsMapping, topicSubsBlockedOnUnackedMsgChart.ID)
 	}
 	if pms.FindByName(metricPulsarReplicationBacklog).Len() == 0 {
-		p.removeSummaryChart(sumReplicationRateChart.ID)
-		p.removeSummaryChart(sumReplicationThroughputRateChart.ID)
-		p.removeSummaryChart(sumReplicationBacklogChart.ID)
-		p.removeNamespaceChart(nsReplicationRateChart.ID)
-		p.removeNamespaceChart(nsReplicationThroughputChart.ID)
-		p.removeNamespaceChart(nsReplicationBacklogChart.ID)
-		p.removeNamespaceChart(topicReplicationRateInChart.ID)
-		p.removeNamespaceChart(topicReplicationRateOutChart.ID)
-		p.removeNamespaceChart(topicReplicationThroughputRateInChart.ID)
-		p.removeNamespaceChart(topicReplicationThroughputRateOutChart.ID)
-		p.removeNamespaceChart(topicReplicationBacklogChart.ID)
-		delete(p.topicChartsMapping, topicReplicationRateInChart.ID)
-		delete(p.topicChartsMapping, topicReplicationRateOutChart.ID)
-		delete(p.topicChartsMapping, topicReplicationThroughputRateInChart.ID)
-		delete(p.topicChartsMapping, topicReplicationThroughputRateOutChart.ID)
-		delete(p.topicChartsMapping, topicReplicationBacklogChart.ID)
+		c.removeSummaryChart(sumReplicationRateChart.ID)
+		c.removeSummaryChart(sumReplicationThroughputRateChart.ID)
+		c.removeSummaryChart(sumReplicationBacklogChart.ID)
+		c.removeNamespaceChart(nsReplicationRateChart.ID)
+		c.removeNamespaceChart(nsReplicationThroughputChart.ID)
+		c.removeNamespaceChart(nsReplicationBacklogChart.ID)
+		c.removeNamespaceChart(topicReplicationRateInChart.ID)
+		c.removeNamespaceChart(topicReplicationRateOutChart.ID)
+		c.removeNamespaceChart(topicReplicationThroughputRateInChart.ID)
+		c.removeNamespaceChart(topicReplicationThroughputRateOutChart.ID)
+		c.removeNamespaceChart(topicReplicationBacklogChart.ID)
+		delete(c.topicChartsMapping, topicReplicationRateInChart.ID)
+		delete(c.topicChartsMapping, topicReplicationRateOutChart.ID)
+		delete(c.topicChartsMapping, topicReplicationThroughputRateInChart.ID)
+		delete(c.topicChartsMapping, topicReplicationThroughputRateOutChart.ID)
+		delete(c.topicChartsMapping, topicReplicationBacklogChart.ID)
 	}
 }
 
-func (p *Pulsar) removeSummaryChart(chartID string) {
-	if err := p.Charts().Remove(chartID); err != nil {
-		p.Warning(err)
+func (c *Collector) removeSummaryChart(chartID string) {
+	if err := c.Charts().Remove(chartID); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Pulsar) removeNamespaceChart(chartID string) {
-	if err := p.nsCharts.Remove(chartID); err != nil {
-		p.Warning(err)
+func (c *Collector) removeNamespaceChart(chartID string) {
+	if err := c.nsCharts.Remove(chartID); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Pulsar) updateCharts() {
+func (c *Collector) updateCharts() {
 	// NOTE: order is important
-	for ns := range p.curCache.namespaces {
-		if !p.cache.namespaces[ns] {
-			p.cache.namespaces[ns] = true
-			p.addNamespaceCharts(ns)
+	for ns := range c.curCache.namespaces {
+		if !c.cache.namespaces[ns] {
+			c.cache.namespaces[ns] = true
+			c.addNamespaceCharts(ns)
 		}
 	}
-	for top := range p.curCache.topics {
-		if !p.cache.topics[top] {
-			p.cache.topics[top] = true
-			p.addTopicToCharts(top)
+	for top := range c.curCache.topics {
+		if !c.cache.topics[top] {
+			c.cache.topics[top] = true
+			c.addTopicToCharts(top)
 		}
 	}
-	for top := range p.cache.topics {
-		if p.curCache.topics[top] {
+	for top := range c.cache.topics {
+		if c.curCache.topics[top] {
 			continue
 		}
-		delete(p.cache.topics, top)
-		p.removeTopicFromCharts(top)
+		delete(c.cache.topics, top)
+		c.removeTopicFromCharts(top)
 	}
-	for ns := range p.cache.namespaces {
-		if p.curCache.namespaces[ns] {
+	for ns := range c.cache.namespaces {
+		if c.curCache.namespaces[ns] {
 			continue
 		}
-		delete(p.cache.namespaces, ns)
-		p.removeNamespaceFromCharts(ns)
+		delete(c.cache.namespaces, ns)
+		c.removeNamespaceFromCharts(ns)
 	}
 }
 
-func (p *Pulsar) addNamespaceCharts(ns namespace) {
-	charts := p.nsCharts.Copy()
+func (c *Collector) addNamespaceCharts(ns namespace) {
+	charts := c.nsCharts.Copy()
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, ns.name)
 		chart.Fam = fmt.Sprintf(chart.Fam, ns.name)
@@ -564,28 +564,28 @@ func (p *Pulsar) addNamespaceCharts(ns namespace) {
 			dim.ID = fmt.Sprintf(dim.ID, ns.name)
 		}
 	}
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *Pulsar) removeNamespaceFromCharts(ns namespace) {
-	for _, chart := range *p.nsCharts {
+func (c *Collector) removeNamespaceFromCharts(ns namespace) {
+	for _, chart := range *c.nsCharts {
 		id := fmt.Sprintf(chart.ID, ns.name)
-		if chart = p.Charts().Get(id); chart != nil {
+		if chart = c.Charts().Get(id); chart != nil {
 			chart.MarkRemove()
 		} else {
-			p.Warningf("could not remove namespace chart '%s'", id)
+			c.Warningf("could not remove namespace chart '%s'", id)
 		}
 	}
 }
 
-func (p *Pulsar) addTopicToCharts(top topic) {
-	for id, metric := range p.topicChartsMapping {
+func (c *Collector) addTopicToCharts(top topic) {
+	for id, metric := range c.topicChartsMapping {
 		id = fmt.Sprintf(id, top.namespace)
-		chart := p.Charts().Get(id)
+		chart := c.Charts().Get(id)
 		if chart == nil {
-			p.Warningf("could not add topic '%s' to chart '%s': chart not found", top.name, id)
+			c.Warningf("could not add topic '%s' to chart '%s': chart not found", top.name, id)
 			continue
 		}
 
@@ -609,23 +609,23 @@ func (p *Pulsar) addTopicToCharts(top topic) {
 		}
 
 		if err := chart.AddDim(&dim); err != nil {
-			p.Warning(err)
+			c.Warning(err)
 		}
 		chart.MarkNotCreated()
 	}
 }
 
-func (p *Pulsar) removeTopicFromCharts(top topic) {
-	for id, metric := range p.topicChartsMapping {
+func (c *Collector) removeTopicFromCharts(top topic) {
+	for id, metric := range c.topicChartsMapping {
 		id = fmt.Sprintf(id, top.namespace)
-		chart := p.Charts().Get(id)
+		chart := c.Charts().Get(id)
 		if chart == nil {
-			p.Warningf("could not remove topic '%s' from chart '%s': chart not found", top.name, id)
+			c.Warningf("could not remove topic '%s' from chart '%s': chart not found", top.name, id)
 			continue
 		}
 
 		if err := chart.MarkDimRemove(metric+"_"+top.name, true); err != nil {
-			p.Warning(err)
+			c.Warning(err)
 		}
 		chart.MarkNotCreated()
 	}
