@@ -399,37 +399,37 @@ var (
 	}
 )
 
-func (ks *KubeState) newNodeCharts(ns *nodeState) *module.Charts {
-	cs := nodeChartsTmpl.Copy()
-	for _, c := range *cs {
-		c.ID = fmt.Sprintf(c.ID, replaceDots(ns.id()))
-		c.Labels = ks.newNodeChartLabels(ns)
-		for _, d := range c.Dims {
+func (c *Collector) newNodeCharts(ns *nodeState) *module.Charts {
+	charts := nodeChartsTmpl.Copy()
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, replaceDots(ns.id()))
+		chart.Labels = c.newNodeChartLabels(ns)
+		for _, d := range chart.Dims {
 			d.ID = fmt.Sprintf(d.ID, ns.id())
 		}
 	}
-	return cs
+	return charts
 }
 
-func (ks *KubeState) newNodeChartLabels(ns *nodeState) []module.Label {
+func (c *Collector) newNodeChartLabels(ns *nodeState) []module.Label {
 	labels := []module.Label{
 		{Key: labelKeyNodeName, Value: ns.name, Source: module.LabelSourceK8s},
-		{Key: labelKeyClusterID, Value: ks.kubeClusterID, Source: module.LabelSourceK8s},
-		{Key: labelKeyClusterName, Value: ks.kubeClusterName, Source: module.LabelSourceK8s},
+		{Key: labelKeyClusterID, Value: c.kubeClusterID, Source: module.LabelSourceK8s},
+		{Key: labelKeyClusterName, Value: c.kubeClusterName, Source: module.LabelSourceK8s},
 	}
 	return labels
 }
 
-func (ks *KubeState) addNodeCharts(ns *nodeState) {
-	cs := ks.newNodeCharts(ns)
-	if err := ks.Charts().Add(*cs...); err != nil {
-		ks.Warning(err)
+func (c *Collector) addNodeCharts(ns *nodeState) {
+	cs := c.newNodeCharts(ns)
+	if err := c.Charts().Add(*cs...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (ks *KubeState) removeNodeCharts(ns *nodeState) {
+func (c *Collector) removeNodeCharts(ns *nodeState) {
 	prefix := fmt.Sprintf("node_%s", replaceDots(ns.id()))
-	for _, c := range *ks.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()
@@ -591,19 +591,19 @@ var (
 	}
 )
 
-func (ks *KubeState) newPodCharts(ps *podState) *module.Charts {
+func (c *Collector) newPodCharts(ps *podState) *module.Charts {
 	charts := podChartsTmpl.Copy()
-	for _, c := range *charts {
-		c.ID = fmt.Sprintf(c.ID, replaceDots(ps.id()))
-		c.Labels = ks.newPodChartLabels(ps)
-		for _, d := range c.Dims {
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, replaceDots(ps.id()))
+		chart.Labels = c.newPodChartLabels(ps)
+		for _, d := range chart.Dims {
 			d.ID = fmt.Sprintf(d.ID, ps.id())
 		}
 	}
 	return charts
 }
 
-func (ks *KubeState) newPodChartLabels(ps *podState) []module.Label {
+func (c *Collector) newPodChartLabels(ps *podState) []module.Label {
 	labels := []module.Label{
 		{Key: labelKeyNamespace, Value: ps.namespace, Source: module.LabelSourceK8s},
 		{Key: labelKeyPodName, Value: ps.name, Source: module.LabelSourceK8s},
@@ -611,22 +611,22 @@ func (ks *KubeState) newPodChartLabels(ps *podState) []module.Label {
 		{Key: labelKeyQoSClass, Value: ps.qosClass, Source: module.LabelSourceK8s},
 		{Key: labelKeyControllerKind, Value: ps.controllerKind, Source: module.LabelSourceK8s},
 		{Key: labelKeyControllerName, Value: ps.controllerName, Source: module.LabelSourceK8s},
-		{Key: labelKeyClusterID, Value: ks.kubeClusterID, Source: module.LabelSourceK8s},
-		{Key: labelKeyClusterName, Value: ks.kubeClusterName, Source: module.LabelSourceK8s},
+		{Key: labelKeyClusterID, Value: c.kubeClusterID, Source: module.LabelSourceK8s},
+		{Key: labelKeyClusterName, Value: c.kubeClusterName, Source: module.LabelSourceK8s},
 	}
 	return labels
 }
 
-func (ks *KubeState) addPodCharts(ps *podState) {
-	charts := ks.newPodCharts(ps)
-	if err := ks.Charts().Add(*charts...); err != nil {
-		ks.Warning(err)
+func (c *Collector) addPodCharts(ps *podState) {
+	charts := c.newPodCharts(ps)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (ks *KubeState) updatePodChartsNodeLabel(ps *podState) {
+func (c *Collector) updatePodChartsNodeLabel(ps *podState) {
 	prefix := fmt.Sprintf("pod_%s", replaceDots(ps.id()))
-	for _, c := range *ks.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			updateNodeLabel(c, ps.nodeName)
 			c.MarkNotCreated()
@@ -643,9 +643,9 @@ func updateNodeLabel(c *module.Chart, nodeName string) {
 	}
 }
 
-func (ks *KubeState) removePodCharts(ps *podState) {
+func (c *Collector) removePodCharts(ps *podState) {
 	prefix := fmt.Sprintf("pod_%s", replaceDots(ps.id()))
-	for _, c := range *ks.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()
@@ -730,30 +730,30 @@ var (
 	}()
 )
 
-func (ks *KubeState) newContainerCharts(ps *podState, cs *containerState) *module.Charts {
+func (c *Collector) newContainerCharts(ps *podState, cs *containerState) *module.Charts {
 	charts := containerChartsTmpl.Copy()
-	for _, c := range *charts {
-		c.ID = fmt.Sprintf(c.ID, replaceDots(ps.id()), cs.name)
-		c.Labels = ks.newContainerChartLabels(ps, cs)
-		for _, d := range c.Dims {
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, replaceDots(ps.id()), cs.name)
+		chart.Labels = c.newContainerChartLabels(ps, cs)
+		for _, d := range chart.Dims {
 			d.ID = fmt.Sprintf(d.ID, ps.id(), cs.name)
 		}
 	}
 	return charts
 }
 
-func (ks *KubeState) newContainerChartLabels(ps *podState, cs *containerState) []module.Label {
-	labels := ks.newPodChartLabels(ps)
+func (c *Collector) newContainerChartLabels(ps *podState, cs *containerState) []module.Label {
+	labels := c.newPodChartLabels(ps)
 	labels = append(
 		labels, module.Label{Key: labelKeyContainerName, Value: cs.name, Source: module.LabelSourceK8s},
 	)
 	return labels
 }
 
-func (ks *KubeState) addContainerCharts(ps *podState, cs *containerState) {
-	charts := ks.newContainerCharts(ps, cs)
-	if err := ks.Charts().Add(*charts...); err != nil {
-		ks.Warning(err)
+func (c *Collector) addContainerCharts(ps *podState, cs *containerState) {
+	charts := c.newContainerCharts(ps, cs)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 

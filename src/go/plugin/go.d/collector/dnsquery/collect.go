@@ -12,28 +12,28 @@ import (
 	"github.com/miekg/dns"
 )
 
-func (d *DNSQuery) collect() (map[string]int64, error) {
-	if d.dnsClient == nil {
-		d.dnsClient = d.newDNSClient(d.Network, d.Timeout.Duration())
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.dnsClient == nil {
+		c.dnsClient = c.newDNSClient(c.Network, c.Timeout.Duration())
 	}
 
 	mx := make(map[string]int64)
-	domain := randomDomain(d.Domains)
-	d.Debugf("current domain : %s", domain)
+	domain := randomDomain(c.Domains)
+	c.Debugf("current domain : %s", domain)
 
 	var wg sync.WaitGroup
 	var mux sync.RWMutex
-	for _, srv := range d.Servers {
-		for rtypeName, rtype := range d.recordTypes {
+	for _, srv := range c.Servers {
+		for rtypeName, rtype := range c.recordTypes {
 			wg.Add(1)
 			go func(srv, rtypeName string, rtype uint16, wg *sync.WaitGroup) {
 				defer wg.Done()
 
 				msg := new(dns.Msg)
 				msg.SetQuestion(dns.Fqdn(domain), rtype)
-				address := net.JoinHostPort(srv, strconv.Itoa(d.Port))
+				address := net.JoinHostPort(srv, strconv.Itoa(c.Port))
 
-				resp, rtt, err := d.dnsClient.Exchange(msg, address)
+				resp, rtt, err := c.dnsClient.Exchange(msg, address)
 
 				mux.Lock()
 				defer mux.Unlock()
@@ -45,13 +45,13 @@ func (d *DNSQuery) collect() (map[string]int64, error) {
 				mx[px+"query_status_dns_error"] = 0
 
 				if err != nil {
-					d.Debugf("error on querying %s after %s query for %s : %s", srv, rtypeName, domain, err)
+					c.Debugf("error on querying %s after %s query for %s : %s", srv, rtypeName, domain, err)
 					mx[px+"query_status_network_error"] = 1
 					return
 				}
 
 				if resp != nil && resp.Rcode != dns.RcodeSuccess {
-					d.Debugf("invalid answer from %s after %s query for %s (rcode %d)", srv, rtypeName, domain, resp.Rcode)
+					c.Debugf("invalid answer from %s after %s query for %s (rcode %d)", srv, rtypeName, domain, resp.Rcode)
 					mx[px+"query_status_dns_error"] = 1
 				} else {
 					mx[px+"query_status_success"] = 1

@@ -10,12 +10,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
-func (ig *IntelGPU) initIntelGPUTopExec() (intelGpuTop, error) {
-	ndsudoPath := filepath.Join(executable.Directory, ig.ndsudoName)
+func (c *Collector) initIntelGPUTopExec() (intelGpuTop, error) {
+	ndsudoPath := filepath.Join(executable.Directory, c.ndsudoName)
 	if _, err := os.Stat(ndsudoPath); err != nil {
 		return nil, fmt.Errorf("ndsudo executable not found: %v", err)
 
 	}
 
-	return newIntelGpuTopExec(ig.Logger, ndsudoPath, ig.UpdateEvery, ig.Device)
+	return newIntelGpuTopExec(c.Logger, ndsudoPath, c.UpdateEvery, c.Device)
 }

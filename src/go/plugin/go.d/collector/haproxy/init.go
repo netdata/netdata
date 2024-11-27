@@ -10,23 +10,23 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (h *Haproxy) validateConfig() error {
-	if h.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("'url' is not set")
 	}
-	if _, err := web.NewHTTPRequest(h.RequestConfig); err != nil {
+	if _, err := web.NewHTTPRequest(c.RequestConfig); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (h *Haproxy) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(h.ClientConfig)
+func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
+	httpClient, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	prom := prometheus.NewWithSelector(httpClient, h.RequestConfig, sr)
+	prom := prometheus.NewWithSelector(httpClient, c.RequestConfig, sr)
 	return prom, nil
 }
 

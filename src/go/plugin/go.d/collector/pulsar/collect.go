@@ -14,17 +14,17 @@ func isValidPulsarMetrics(pms prometheus.Series) bool {
 	return pms.FindByName(metricPulsarTopicsCount).Len() > 0
 }
 
-func (p *Pulsar) resetCurCache() {
-	for ns := range p.curCache.namespaces {
-		delete(p.curCache.namespaces, ns)
+func (c *Collector) resetCurCache() {
+	for ns := range c.curCache.namespaces {
+		delete(c.curCache.namespaces, ns)
 	}
-	for top := range p.curCache.topics {
-		delete(p.curCache.topics, top)
+	for top := range c.curCache.topics {
+		delete(c.curCache.topics, top)
 	}
 }
 
-func (p *Pulsar) collect() (map[string]int64, error) {
-	pms, err := p.prom.ScrapeSeries()
+func (c *Collector) collect() (map[string]int64, error) {
+	pms, err := c.prom.ScrapeSeries()
 	if err != nil {
 		return nil, err
 	}
@@ -33,24 +33,24 @@ func (p *Pulsar) collect() (map[string]int64, error) {
 		return nil, errors.New("returned metrics aren't Apache Pulsar metrics")
 	}
 
-	p.once.Do(func() {
-		p.adjustCharts(pms)
+	c.once.Do(func() {
+		c.adjustCharts(pms)
 	})
 
-	mx := p.collectMetrics(pms)
-	p.updateCharts()
-	p.resetCurCache()
+	mx := c.collectMetrics(pms)
+	c.updateCharts()
+	c.resetCurCache()
 
 	return stm.ToMap(mx), nil
 }
 
-func (p *Pulsar) collectMetrics(pms prometheus.Series) map[string]float64 {
+func (c *Collector) collectMetrics(pms prometheus.Series) map[string]float64 {
 	mx := make(map[string]float64)
-	p.collectBroker(mx, pms)
+	c.collectBroker(mx, pms)
 	return mx
 }
 
-func (p *Pulsar) collectBroker(mx map[string]float64, pms prometheus.Series) {
+func (c *Collector) collectBroker(mx map[string]float64, pms prometheus.Series) {
 	pms = findPulsarMetrics(pms)
 	for _, pm := range pms {
 		ns, top := newNamespace(pm), newTopic(pm)
@@ -58,20 +58,20 @@ func (p *Pulsar) collectBroker(mx map[string]float64, pms prometheus.Series) {
 			continue
 		}
 
-		p.curCache.namespaces[ns] = true
+		c.curCache.namespaces[ns] = true
 
 		value := pm.Value * precision(pm.Name())
 		mx[pm.Name()] += value
 		mx[pm.Name()+"_"+ns.name] += value
 
-		if top.name == "" || !p.topicFilter.MatchString(top.name) {
+		if top.name == "" || !c.topicFilter.MatchString(top.name) {
 			continue
 		}
 
-		p.curCache.topics[top] = true
+		c.curCache.topics[top] = true
 		mx[pm.Name()+"_"+top.name] += value
 	}
-	mx["pulsar_namespaces_count"] = float64(len(p.curCache.namespaces))
+	mx["pulsar_namespaces_count"] = float64(len(c.curCache.namespaces))
 }
 
 func newNamespace(pm prometheus.SeriesSample) namespace {

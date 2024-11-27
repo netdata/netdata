@@ -262,7 +262,7 @@ var (
 	}
 )
 
-func (nv *NvidiaSmi) addGpuCharts(gpu gpuInfo, index int) {
+func (c *Collector) addGpuCharts(gpu gpuInfo, index int) {
 	charts := gpuXMLCharts.Copy()
 
 	if !isValidValue(gpu.Utilization.GpuUtil) {
@@ -304,8 +304,8 @@ func (nv *NvidiaSmi) addGpuCharts(gpu gpuInfo, index int) {
 		}
 	}
 
-	if err := nv.Charts().Add(*charts...); err != nil {
-		nv.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
@@ -339,7 +339,7 @@ var (
 	}
 )
 
-func (nv *NvidiaSmi) addMIGDeviceCharts(gpu gpuInfo, mig gpuMIGDeviceInfo) {
+func (c *Collector) addMIGDeviceCharts(gpu gpuInfo, mig gpuMIGDeviceInfo) {
 	charts := migDeviceXMLCharts.Copy()
 
 	for _, c := range *charts {
@@ -354,15 +354,15 @@ func (nv *NvidiaSmi) addMIGDeviceCharts(gpu gpuInfo, mig gpuMIGDeviceInfo) {
 		}
 	}
 
-	if err := nv.Charts().Add(*charts...); err != nil {
-		nv.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (nv *NvidiaSmi) removeCharts(prefix string) {
+func (c *Collector) removeCharts(prefix string) {
 	prefix = strings.ToLower(prefix)
 
-	for _, c := range *nv.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()

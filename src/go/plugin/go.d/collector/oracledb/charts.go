@@ -319,7 +319,7 @@ var (
 	}
 )
 
-func (o *OracleDB) addTablespaceCharts(tablespace string) {
+func (c *Collector) addTablespaceCharts(tablespace string) {
 	charts := tablespaceChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -332,14 +332,14 @@ func (o *OracleDB) addTablespaceCharts(tablespace string) {
 		}
 	}
 
-	if err := o.Charts().Add(*charts...); err != nil {
-		o.Warningf("failed to add tablespace '%s' charts: %v", tablespace, err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add tablespace '%s' charts: %v", tablespace, err)
 	}
 }
 
-func (o *OracleDB) removeTablespaceChart(tablespace string) {}
+func (c *Collector) removeTablespaceChart(tablespace string) {}
 
-func (o *OracleDB) addWaitClassCharts(waitClass string) {
+func (c *Collector) addWaitClassCharts(waitClass string) {
 	charts := waitClassChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -352,8 +352,8 @@ func (o *OracleDB) addWaitClassCharts(waitClass string) {
 		}
 	}
 
-	if err := o.Charts().Add(*charts...); err != nil {
-		o.Warningf("failed to add wait class '%s' charts: %v", waitClass, err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add wait class '%s' charts: %v", waitClass, err)
 	}
 }
 

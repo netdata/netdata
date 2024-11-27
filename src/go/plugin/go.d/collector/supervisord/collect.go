@@ -9,31 +9,31 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-func (s *Supervisord) collect() (map[string]int64, error) {
-	info, err := s.client.getAllProcessInfo()
+func (c *Collector) collect() (map[string]int64, error) {
+	info, err := c.client.getAllProcessInfo()
 	if err != nil {
 		return nil, err
 	}
 
 	ms := make(map[string]int64)
-	s.collectAllProcessInfo(ms, info)
+	c.collectAllProcessInfo(ms, info)
 
 	return ms, nil
 }
 
-func (s *Supervisord) collectAllProcessInfo(ms map[string]int64, info []processStatus) {
-	s.resetCache()
+func (c *Collector) collectAllProcessInfo(ms map[string]int64, info []processStatus) {
+	c.resetCache()
 	ms["running_processes"] = 0
 	ms["non_running_processes"] = 0
 	for _, p := range info {
-		if _, ok := s.cache[p.group]; !ok {
-			s.cache[p.group] = make(map[string]bool)
-			s.addProcessGroupCharts(p)
+		if _, ok := c.cache[p.group]; !ok {
+			c.cache[p.group] = make(map[string]bool)
+			c.addProcessGroupCharts(p)
 		}
-		if _, ok := s.cache[p.group][p.name]; !ok {
-			s.addProcessToCharts(p)
+		if _, ok := c.cache[p.group][p.name]; !ok {
+			c.addProcessToCharts(p)
 		}
-		s.cache[p.group][p.name] = true
+		c.cache[p.group][p.name] = true
 
 		ms["group_"+p.group+"_running_processes"] += 0
 		ms["group_"+p.group+"_non_running_processes"] += 0
@@ -50,28 +50,28 @@ func (s *Supervisord) collectAllProcessInfo(ms map[string]int64, info []processS
 		ms[id+"_uptime"] = calcProcessUptime(p)
 		ms[id+"_downtime"] = calcProcessDowntime(p)
 	}
-	s.cleanupCache()
+	c.cleanupCache()
 }
 
-func (s *Supervisord) resetCache() {
-	for _, procs := range s.cache {
+func (c *Collector) resetCache() {
+	for _, procs := range c.cache {
 		for name := range procs {
 			procs[name] = false
 		}
 	}
 }
 
-func (s *Supervisord) cleanupCache() {
-	for group, procs := range s.cache {
+func (c *Collector) cleanupCache() {
+	for group, procs := range c.cache {
 		for name, ok := range procs {
 			if !ok {
-				s.removeProcessFromCharts(group, name)
-				delete(s.cache[group], name)
+				c.removeProcessFromCharts(group, name)
+				delete(c.cache[group], name)
 			}
 		}
-		if len(s.cache[group]) == 0 {
-			s.removeProcessGroupCharts(group)
-			delete(s.cache, group)
+		if len(c.cache[group]) == 0 {
+			c.removeProcessGroupCharts(group)
+			delete(c.cache, group)
 		}
 	}
 }
@@ -90,18 +90,18 @@ func calcProcessDowntime(p processStatus) int64 {
 	return int64(p.now - p.stop)
 }
 
-func (s *Supervisord) addProcessGroupCharts(p processStatus) {
+func (c *Collector) addProcessGroupCharts(p processStatus) {
 	charts := newProcGroupCharts(p.group)
-	if err := s.Charts().Add(*charts...); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (s *Supervisord) addProcessToCharts(p processStatus) {
+func (c *Collector) addProcessToCharts(p processStatus) {
 	id := procID(p)
-	for _, c := range *s.Charts() {
+	for _, chart := range *c.Charts() {
 		var dimID string
-		switch c.ID {
+		switch chart.ID {
 		case fmt.Sprintf(groupProcessesStateCodeChartTmpl.ID, p.group):
 			dimID = id + "_state_code"
 		case fmt.Sprintf(groupProcessesExitStatusChartTmpl.ID, p.group):
@@ -114,17 +114,17 @@ func (s *Supervisord) addProcessToCharts(p processStatus) {
 			continue
 		}
 		dim := &module.Dim{ID: dimID, Name: p.name}
-		if err := c.AddDim(dim); err != nil {
-			s.Warning(err)
+		if err := chart.AddDim(dim); err != nil {
+			c.Warning(err)
 			return
 		}
-		c.MarkNotCreated()
+		chart.MarkNotCreated()
 	}
 }
 
-func (s *Supervisord) removeProcessGroupCharts(group string) {
+func (c *Collector) removeProcessGroupCharts(group string) {
 	prefix := "group_" + group
-	for _, c := range *s.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()
@@ -132,11 +132,11 @@ func (s *Supervisord) removeProcessGroupCharts(group string) {
 	}
 }
 
-func (s *Supervisord) removeProcessFromCharts(group, name string) {
+func (c *Collector) removeProcessFromCharts(group, name string) {
 	id := procID(processStatus{name: name, group: group})
-	for _, c := range *s.Charts() {
+	for _, chart := range *c.Charts() {
 		var dimID string
-		switch c.ID {
+		switch chart.ID {
 		case fmt.Sprintf(groupProcessesStateCodeChartTmpl.ID, group):
 			dimID = id + "_state_code"
 		case fmt.Sprintf(groupProcessesExitStatusChartTmpl.ID, group):
@@ -148,11 +148,11 @@ func (s *Supervisord) removeProcessFromCharts(group, name string) {
 		default:
 			continue
 		}
-		if err := c.MarkDimRemove(dimID, true); err != nil {
-			s.Warning(err)
+		if err := chart.MarkDimRemove(dimID, true); err != nil {
+			c.Warning(err)
 			return
 		}
-		c.MarkNotCreated()
+		chart.MarkNotCreated()
 	}
 }
 

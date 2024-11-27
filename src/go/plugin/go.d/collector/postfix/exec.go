@@ -11,6 +11,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
+type postqueueBinary interface {
+	list() ([]byte, error)
+}
+
 func newPostqueueExec(binPath string, timeout time.Duration) *postqueueExec {
 	return &postqueueExec{
 		binPath: binPath,

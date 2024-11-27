@@ -16,8 +16,8 @@ var (
 	urlQueryStatusService = url.Values{"level": {"debug"}}.Encode()
 )
 
-func (p *Puppet) collect() (map[string]int64, error) {
-	stats, err := p.queryStatsService()
+func (c *Collector) collect() (map[string]int64, error) {
+	stats, err := c.queryStatsService()
 	if err != nil {
 		return nil, err
 	}
@@ -27,8 +27,8 @@ func (p *Puppet) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (p *Puppet) queryStatsService() (*statusServiceResponse, error) {
-	req, err := web.NewHTTPRequestWithPath(p.RequestConfig, urlPathStatusService)
+func (c *Collector) queryStatsService() (*statusServiceResponse, error) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathStatusService)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (p *Puppet) queryStatsService() (*statusServiceResponse, error) {
 	req.URL.RawQuery = urlQueryStatusService
 
 	var stats statusServiceResponse
-	if err := web.DoHTTP(p.httpClient).RequestJSON(req, &stats); err != nil {
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &stats); err != nil {
 		return nil, err
 	}
 

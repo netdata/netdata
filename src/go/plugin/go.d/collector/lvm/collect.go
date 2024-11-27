@@ -23,8 +23,8 @@ type lvsReport struct {
 	} `json:"report"`
 }
 
-func (l *LVM) collect() (map[string]int64, error) {
-	bs, err := l.exec.lvsReportJson()
+func (c *Collector) collect() (map[string]int64, error) {
+	bs, err := c.exec.lvsReportJson()
 	if err != nil {
 		return nil, err
 	}
@@ -43,14 +43,14 @@ func (l *LVM) collect() (map[string]int64, error) {
 			}
 
 			if !isThinPool(lv.LVAttr) {
-				l.Debugf("skipping lv '%s' vg '%s': not a thin pool", lv.LVName, lv.VGName)
+				c.Debugf("skipping lv '%s' vg '%s': not a thin pool", lv.LVName, lv.VGName)
 				continue
 			}
 
 			key := fmt.Sprintf("lv_%s_vg_%s", lv.LVName, lv.VGName)
-			if !l.lvmThinPools[key] {
-				l.addLVMThinPoolCharts(lv.LVName, lv.VGName)
-				l.lvmThinPools[key] = true
+			if !c.lvmThinPools[key] {
+				c.addLVMThinPoolCharts(lv.LVName, lv.VGName)
+				c.lvmThinPools[key] = true
 			}
 			if v, ok := parseFloat(lv.DataPercent); ok {
 				mx[key+"_data_percent"] = int64(v * 100)

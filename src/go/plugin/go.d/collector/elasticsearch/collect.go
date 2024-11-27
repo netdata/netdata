@@ -24,31 +24,31 @@ const (
 	urlPathClusterStats   = "/_cluster/stats"
 )
 
-func (es *Elasticsearch) collect() (map[string]int64, error) {
-	if es.clusterName == "" {
-		name, err := es.getClusterName()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.clusterName == "" {
+		name, err := c.getClusterName()
 		if err != nil {
 			return nil, err
 		}
-		es.clusterName = name
+		c.clusterName = name
 	}
 
-	ms := es.scrapeElasticsearch()
+	ms := c.scrapeElasticsearch()
 	if ms.empty() {
 		return nil, nil
 	}
 
 	mx := make(map[string]int64)
 
-	es.collectNodesStats(mx, ms)
-	es.collectClusterHealth(mx, ms)
-	es.collectClusterStats(mx, ms)
-	es.collectLocalIndicesStats(mx, ms)
+	c.collectNodesStats(mx, ms)
+	c.collectClusterHealth(mx, ms)
+	c.collectClusterStats(mx, ms)
+	c.collectLocalIndicesStats(mx, ms)
 
 	return mx, nil
 }
 
-func (es *Elasticsearch) collectNodesStats(mx map[string]int64, ms *esMetrics) {
+func (c *Collector) collectNodesStats(mx map[string]int64, ms *esMetrics) {
 	if !ms.hasNodesStats() {
 		return
 	}
@@ -58,28 +58,28 @@ func (es *Elasticsearch) collectNodesStats(mx map[string]int64, ms *esMetrics) {
 	for nodeID, node := range ms.NodesStats.Nodes {
 		seen[nodeID] = true
 
-		if !es.nodes[nodeID] {
-			es.nodes[nodeID] = true
-			es.addNodeCharts(nodeID, node)
+		if !c.nodes[nodeID] {
+			c.nodes[nodeID] = true
+			c.addNodeCharts(nodeID, node)
 		}
 
 		merge(mx, stm.ToMap(node), "node_"+nodeID)
 	}
 
-	for nodeID := range es.nodes {
+	for nodeID := range c.nodes {
 		if !seen[nodeID] {
-			delete(es.nodes, nodeID)
-			es.removeNodeCharts(nodeID)
+			delete(c.nodes, nodeID)
+			c.removeNodeCharts(nodeID)
 		}
 	}
 }
 
-func (es *Elasticsearch) collectClusterHealth(mx map[string]int64, ms *esMetrics) {
+func (c *Collector) collectClusterHealth(mx map[string]int64, ms *esMetrics) {
 	if !ms.hasClusterHealth() {
 		return
 	}
 
-	es.addClusterHealthChartsOnce.Do(es.addClusterHealthCharts)
+	c.addClusterHealthChartsOnce.Do(c.addClusterHealthCharts)
 
 	merge(mx, stm.ToMap(ms.ClusterHealth), "cluster")
 
@@ -88,17 +88,17 @@ func (es *Elasticsearch) collectClusterHealth(mx map[string]int64, ms *esMetrics
 	mx["cluster_status_red"] = metrix.Bool(ms.ClusterHealth.Status == "red")
 }
 
-func (es *Elasticsearch) collectClusterStats(mx map[string]int64, ms *esMetrics) {
+func (c *Collector) collectClusterStats(mx map[string]int64, ms *esMetrics) {
 	if !ms.hasClusterStats() {
 		return
 	}
 
-	es.addClusterStatsChartsOnce.Do(es.addClusterStatsCharts)
+	c.addClusterStatsChartsOnce.Do(c.addClusterStatsCharts)
 
 	merge(mx, stm.ToMap(ms.ClusterStats), "cluster")
 }
 
-func (es *Elasticsearch) collectLocalIndicesStats(mx map[string]int64, ms *esMetrics) {
+func (c *Collector) collectLocalIndicesStats(mx map[string]int64, ms *esMetrics) {
 	if !ms.hasLocalIndicesStats() {
 		return
 	}
@@ -108,9 +108,9 @@ func (es *Elasticsearch) collectLocalIndicesStats(mx map[string]int64, ms *esMet
 	for _, v := range ms.LocalIndicesStats {
 		seen[v.Index] = true
 
-		if !es.indices[v.Index] {
-			es.indices[v.Index] = true
-			es.addIndexCharts(v.Index)
+		if !c.indices[v.Index] {
+			c.indices[v.Index] = true
+			c.addIndexCharts(v.Index)
 		}
 
 		px := fmt.Sprintf("node_index_%s_stats_", v.Index)
@@ -123,102 +123,102 @@ func (es *Elasticsearch) collectLocalIndicesStats(mx map[string]int64, ms *esMet
 		mx[px+"store_size_in_bytes"] = convertIndexStoreSizeToBytes(v.StoreSize)
 	}
 
-	for index := range es.indices {
+	for index := range c.indices {
 		if !seen[index] {
-			delete(es.indices, index)
-			es.removeIndexCharts(index)
+			delete(c.indices, index)
+			c.removeIndexCharts(index)
 		}
 	}
 }
 
-func (es *Elasticsearch) scrapeElasticsearch() *esMetrics {
+func (c *Collector) scrapeElasticsearch() *esMetrics {
 	ms := &esMetrics{}
 	wg := &sync.WaitGroup{}
 
-	if es.DoNodeStats {
+	if c.DoNodeStats {
 		wg.Add(1)
-		go func() { defer wg.Done(); es.scrapeNodesStats(ms) }()
+		go func() { defer wg.Done(); c.scrapeNodesStats(ms) }()
 	}
-	if es.DoClusterHealth {
+	if c.DoClusterHealth {
 		wg.Add(1)
-		go func() { defer wg.Done(); es.scrapeClusterHealth(ms) }()
+		go func() { defer wg.Done(); c.scrapeClusterHealth(ms) }()
 	}
-	if es.DoClusterStats {
+	if c.DoClusterStats {
 		wg.Add(1)
-		go func() { defer wg.Done(); es.scrapeClusterStats(ms) }()
+		go func() { defer wg.Done(); c.scrapeClusterStats(ms) }()
 	}
-	if !es.ClusterMode && es.DoIndicesStats {
+	if !c.ClusterMode && c.DoIndicesStats {
 		wg.Add(1)
-		go func() { defer wg.Done(); es.scrapeLocalIndicesStats(ms) }()
+		go func() { defer wg.Done(); c.scrapeLocalIndicesStats(ms) }()
 	}
 	wg.Wait()
 
 	return ms
 }
 
-func (es *Elasticsearch) scrapeNodesStats(ms *esMetrics) {
+func (c *Collector) scrapeNodesStats(ms *esMetrics) {
 	var p string
-	if es.ClusterMode {
+	if c.ClusterMode {
 		p = urlPathNodesStats
 	} else {
 		p = urlPathLocalNodeStats
 	}
 
-	req, _ := web.NewHTTPRequestWithPath(es.RequestConfig, p)
+	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, p)
 
 	var stats esNodesStats
-	if err := web.DoHTTP(es.httpClient).RequestJSON(req, &stats); err != nil {
-		es.Warning(err)
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &stats); err != nil {
+		c.Warning(err)
 		return
 	}
 
 	ms.NodesStats = &stats
 }
 
-func (es *Elasticsearch) scrapeClusterHealth(ms *esMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(es.RequestConfig, urlPathClusterHealth)
+func (c *Collector) scrapeClusterHealth(ms *esMetrics) {
+	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathClusterHealth)
 
 	var health esClusterHealth
-	if err := web.DoHTTP(es.httpClient).RequestJSON(req, &health); err != nil {
-		es.Warning(err)
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &health); err != nil {
+		c.Warning(err)
 		return
 	}
 
 	ms.ClusterHealth = &health
 }
 
-func (es *Elasticsearch) scrapeClusterStats(ms *esMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(es.RequestConfig, urlPathClusterStats)
+func (c *Collector) scrapeClusterStats(ms *esMetrics) {
+	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathClusterStats)
 
 	var stats esClusterStats
-	if err := web.DoHTTP(es.httpClient).RequestJSON(req, &stats); err != nil {
-		es.Warning(err)
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &stats); err != nil {
+		c.Warning(err)
 		return
 	}
 
 	ms.ClusterStats = &stats
 }
 
-func (es *Elasticsearch) scrapeLocalIndicesStats(ms *esMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(es.RequestConfig, urlPathIndicesStats)
+func (c *Collector) scrapeLocalIndicesStats(ms *esMetrics) {
+	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathIndicesStats)
 	req.URL.RawQuery = "local=true&format=json"
 
 	var stats []esIndexStats
-	if err := web.DoHTTP(es.httpClient).RequestJSON(req, &stats); err != nil {
-		es.Warning(err)
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &stats); err != nil {
+		c.Warning(err)
 		return
 	}
 
 	ms.LocalIndicesStats = removeSystemIndices(stats)
 }
 
-func (es *Elasticsearch) getClusterName() (string, error) {
-	req, _ := web.NewHTTPRequest(es.RequestConfig)
+func (c *Collector) getClusterName() (string, error) {
+	req, _ := web.NewHTTPRequest(c.RequestConfig)
 
 	var info struct {
 		ClusterName string `json:"cluster_name"`
 	}
-	if err := web.DoHTTP(es.httpClient).RequestJSON(req, &info); err != nil {
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &info); err != nil {
 		return "", err
 	}
 

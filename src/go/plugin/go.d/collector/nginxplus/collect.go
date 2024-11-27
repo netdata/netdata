@@ -10,54 +10,54 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
-func (n *NginxPlus) collect() (map[string]int64, error) {
-	if n.apiVersion == 0 {
-		v, err := n.queryAPIVersion()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.apiVersion == 0 {
+		v, err := c.queryAPIVersion()
 		if err != nil {
 			return nil, err
 		}
-		n.apiVersion = v
+		c.apiVersion = v
 	}
 
 	now := time.Now()
-	if now.Sub(n.queryEndpointsTime) > n.queryEndpointsEvery {
-		n.queryEndpointsTime = now
-		if err := n.queryAvailableEndpoints(); err != nil {
+	if now.Sub(c.queryEndpointsTime) > c.queryEndpointsEvery {
+		c.queryEndpointsTime = now
+		if err := c.queryAvailableEndpoints(); err != nil {
 			return nil, err
 		}
 	}
 
-	ms := n.queryMetrics()
+	ms := c.queryMetrics()
 	if ms.empty() {
 		return nil, errors.New("no metrics collected")
 	}
 
 	mx := make(map[string]int64)
-	n.cache.resetUpdated()
-	n.collectInfo(mx, ms)
-	n.collectConnections(mx, ms)
-	n.collectSSL(mx, ms)
-	n.collectHTTPRequests(mx, ms)
-	n.collectHTTPCache(mx, ms)
-	n.collectHTTPServerZones(mx, ms)
-	n.collectHTTPLocationZones(mx, ms)
-	n.collectHTTPUpstreams(mx, ms)
-	n.collectStreamServerZones(mx, ms)
-	n.collectStreamUpstreams(mx, ms)
-	n.collectResolvers(mx, ms)
-	n.updateCharts()
+	c.cache.resetUpdated()
+	c.collectInfo(mx, ms)
+	c.collectConnections(mx, ms)
+	c.collectSSL(mx, ms)
+	c.collectHTTPRequests(mx, ms)
+	c.collectHTTPCache(mx, ms)
+	c.collectHTTPServerZones(mx, ms)
+	c.collectHTTPLocationZones(mx, ms)
+	c.collectHTTPUpstreams(mx, ms)
+	c.collectStreamServerZones(mx, ms)
+	c.collectStreamUpstreams(mx, ms)
+	c.collectResolvers(mx, ms)
+	c.updateCharts()
 
 	return mx, nil
 }
 
-func (n *NginxPlus) collectInfo(mx map[string]int64, ms *nginxMetrics) {
+func (c *Collector) collectInfo(mx map[string]int64, ms *nginxMetrics) {
 	if ms.info == nil {
 		return
 	}
 	mx["uptime"] = int64(ms.info.Timestamp.Sub(ms.info.LoadTimestamp).Seconds())
 }
 
-func (n *NginxPlus) collectConnections(mx map[string]int64, ms *nginxMetrics) {
+func (c *Collector) collectConnections(mx map[string]int64, ms *nginxMetrics) {
 	if ms.connections == nil {
 		return
 	}
@@ -67,7 +67,7 @@ func (n *NginxPlus) collectConnections(mx map[string]int64, ms *nginxMetrics) {
 	mx["connections_idle"] = ms.connections.Idle
 }
 
-func (n *NginxPlus) collectSSL(mx map[string]int64, ms *nginxMetrics) {
+func (c *Collector) collectSSL(mx map[string]int64, ms *nginxMetrics) {
 	if ms.ssl == nil {
 		return
 	}
@@ -85,7 +85,7 @@ func (n *NginxPlus) collectSSL(mx map[string]int64, ms *nginxMetrics) {
 	mx["ssl_verify_failures_other"] = ms.ssl.VerifyFailures.Other
 }
 
-func (n *NginxPlus) collectHTTPRequests(mx map[string]int64, ms *nginxMetrics) {
+func (c *Collector) collectHTTPRequests(mx map[string]int64, ms *nginxMetrics) {
 	if ms.httpRequests == nil {
 		return
 	}
@@ -93,12 +93,12 @@ func (n *NginxPlus) collectHTTPRequests(mx map[string]int64, ms *nginxMetrics) {
 	mx["http_requests_current"] = ms.httpRequests.Current
 }
 
-func (n *NginxPlus) collectHTTPCache(mx map[string]int64, ms *nginxMetrics) {
+func (c *Collector) collectHTTPCache(mx map[string]int64, ms *nginxMetrics) {
 	if ms.httpCaches == nil {
 		return
 	}
 	for name, cache := range *ms.httpCaches {
-		n.cache.putHTTPCache(name)
+		c.cache.putHTTPCache(name)
 		px := fmt.Sprintf("http_cache_%s_", name)
 		mx[px+"state_cold"] = metrix.Bool(cache.Cold)
 		mx[px+"state_warm"] = metrix.Bool(!cache.Cold)
@@ -112,12 +112,12 @@ func (n *NginxPlus) collectHTTPCache(mx map[string]int64, ms *nginxMetrics) {
 	}
 }
 
-func (n *NginxPlus) collectHTTPServerZones(mx map[string]int64, ms *nginxMetrics) {
+func (c *Collector) collectHTTPServerZones(mx map[string]int64, ms *nginxMetrics) {
 	if ms.httpServerZones == nil {
 		return
 	}
 	for name, zone := range *ms.httpServerZones {
-		n.cache.putHTTPServerZone(name)
+		c.cache.putHTTPServerZone(name)
 
 		px := fmt.Sprintf("http_server_zone_%s_", name)
 		mx[px+"requests_processing"] = zone.Processing
@@ -134,12 +134,12 @@ func (n *NginxPlus) collectHTTPServerZones(mx map[string]int64, ms *nginxMetrics
 	}
 }
 
-func (n *NginxPlus) collectHTTPLocationZones(mx map[string]int64, ms *nginxMetrics) {
+func (c *Collector) collectHTTPLocationZones(mx map[string]int64, ms *nginxMetrics) {
 	if ms.httpLocationZones == nil {
 		return
 	}
 	for name, zone := range *ms.httpLocationZones {
-		n.cache.putHTTPLocationZone(name)
+		c.cache.putHTTPLocationZone(name)
 
 		px := fmt.Sprintf("http_location_zone_%s_", name)
 		mx[px+"requests"] = zone.Requests
@@ -155,12 +155,12 @@ func (n *NginxPlus) collectHTTPLocationZones(mx map[string]int64, ms *nginxMetri
 	}
 }
 
-func (n *NginxPlus) collectHTTPUpstreams(mx map[string]int64, ms *nginxMetrics) {
+func (c *Collector) collectHTTPUpstreams(mx map[string]int64, ms *nginxMetrics) {
 	if ms.httpUpstreams == nil {
 		return
 	}
 	for name, upstream := range *ms.httpUpstreams {
-		n.cache.putHTTPUpstream(name, upstream.Zone)
+		c.cache.putHTTPUpstream(name, upstream.Zone)
 
 		px := fmt.Sprintf("http_upstream_%s_zone_%s_", name, upstream.Zone)
 		mx[px+"zombies"] = upstream.Zombies
@@ -168,7 +168,7 @@ func (n *NginxPlus) collectHTTPUpstreams(mx map[string]int64, ms *nginxMetrics) 
 		mx[px+"peers"] = int64(len(upstream.Peers))
 
 		for _, peer := range upstream.Peers {
-			n.cache.putHTTPUpstreamServer(name, peer.Server, peer.Name, upstream.Zone)
+			c.cache.putHTTPUpstreamServer(name, peer.Server, peer.Name, upstream.Zone)
 
 			px = fmt.Sprintf("http_upstream_%s_server_%s_zone_%s_", name, peer.Server, upstream.Zone)
 			mx[px+"active"] = peer.Active
@@ -191,12 +191,12 @@ func (n *NginxPlus) collectHTTPUpstreams(mx map[string]int64, ms *nginxMetrics) 
 	}
 }
 
-func (n *NginxPlus) collectStreamServerZones(mx map[string]int64, ms *nginxMetrics) {
+func (c *Collector) collectStreamServerZones(mx map[string]int64, ms *nginxMetrics) {
 	if ms.streamServerZones == nil {
 		return
 	}
 	for name, zone := range *ms.streamServerZones {
-		n.cache.putStreamServerZone(name)
+		c.cache.putStreamServerZone(name)
 
 		px := fmt.Sprintf("stream_server_zone_%s_", name)
 		mx[px+"connections"] = zone.Connections
@@ -211,19 +211,19 @@ func (n *NginxPlus) collectStreamServerZones(mx map[string]int64, ms *nginxMetri
 	}
 }
 
-func (n *NginxPlus) collectStreamUpstreams(mx map[string]int64, ms *nginxMetrics) {
+func (c *Collector) collectStreamUpstreams(mx map[string]int64, ms *nginxMetrics) {
 	if ms.streamUpstreams == nil {
 		return
 	}
 	for name, upstream := range *ms.streamUpstreams {
-		n.cache.putStreamUpstream(name, upstream.Zone)
+		c.cache.putStreamUpstream(name, upstream.Zone)
 
 		px := fmt.Sprintf("stream_upstream_%s_zone_%s_", name, upstream.Zone)
 		mx[px+"zombies"] = upstream.Zombies
 		mx[px+"peers"] = int64(len(upstream.Peers))
 
 		for _, peer := range upstream.Peers {
-			n.cache.putStreamUpstreamServer(name, peer.Server, peer.Name, upstream.Zone)
+			c.cache.putStreamUpstreamServer(name, peer.Server, peer.Name, upstream.Zone)
 
 			px = fmt.Sprintf("stream_upstream_%s_server_%s_zone_%s_", name, peer.Server, upstream.Zone)
 
@@ -239,12 +239,12 @@ func (n *NginxPlus) collectStreamUpstreams(mx map[string]int64, ms *nginxMetrics
 	}
 }
 
-func (n *NginxPlus) collectResolvers(mx map[string]int64, ms *nginxMetrics) {
+func (c *Collector) collectResolvers(mx map[string]int64, ms *nginxMetrics) {
 	if ms.resolvers == nil {
 		return
 	}
 	for name, zone := range *ms.resolvers {
-		n.cache.putResolver(name)
+		c.cache.putResolver(name)
 
 		px := fmt.Sprintf("resolver_zone_%s_", name)
 		mx[px+"requests_name"] = zone.Requests.Name
@@ -261,123 +261,123 @@ func (n *NginxPlus) collectResolvers(mx map[string]int64, ms *nginxMetrics) {
 	}
 }
 
-func (n *NginxPlus) updateCharts() {
+func (c *Collector) updateCharts() {
 	const notSeenLimit = 3
 
-	for key, v := range n.cache.httpCaches {
+	for key, v := range c.cache.httpCaches {
 		if v.updated && !v.hasCharts {
 			v.hasCharts = true
-			n.addHTTPCacheCharts(v.name)
+			c.addHTTPCacheCharts(v.name)
 			continue
 		}
 		if !v.updated {
 			if v.notSeenTimes++; v.notSeenTimes >= notSeenLimit {
-				delete(n.cache.httpCaches, key)
-				n.removeHTTPCacheCharts(v.name)
+				delete(c.cache.httpCaches, key)
+				c.removeHTTPCacheCharts(v.name)
 			}
 		}
 	}
-	for key, v := range n.cache.httpServerZones {
+	for key, v := range c.cache.httpServerZones {
 		if v.updated && !v.hasCharts {
 			v.hasCharts = true
-			n.addHTTPServerZoneCharts(v.zone)
+			c.addHTTPServerZoneCharts(v.zone)
 			continue
 		}
 		if !v.updated {
 			if v.notSeenTimes++; v.notSeenTimes >= notSeenLimit {
-				delete(n.cache.httpServerZones, key)
-				n.removeHTTPServerZoneCharts(v.zone)
+				delete(c.cache.httpServerZones, key)
+				c.removeHTTPServerZoneCharts(v.zone)
 			}
 		}
 	}
-	for key, v := range n.cache.httpLocationZones {
+	for key, v := range c.cache.httpLocationZones {
 		if v.updated && !v.hasCharts {
 			v.hasCharts = true
-			n.addHTTPLocationZoneCharts(v.zone)
+			c.addHTTPLocationZoneCharts(v.zone)
 			continue
 		}
 		if !v.updated {
 			if v.notSeenTimes++; v.notSeenTimes >= notSeenLimit {
-				delete(n.cache.httpLocationZones, key)
-				n.removeHTTPLocationZoneCharts(v.zone)
+				delete(c.cache.httpLocationZones, key)
+				c.removeHTTPLocationZoneCharts(v.zone)
 			}
 		}
 	}
-	for key, v := range n.cache.httpUpstreams {
+	for key, v := range c.cache.httpUpstreams {
 		if v.updated && !v.hasCharts {
 			v.hasCharts = true
-			n.addHTTPUpstreamCharts(v.name, v.zone)
+			c.addHTTPUpstreamCharts(v.name, v.zone)
 			continue
 		}
 		if !v.updated {
 			if v.notSeenTimes++; v.notSeenTimes >= notSeenLimit {
-				delete(n.cache.httpUpstreams, key)
-				n.removeHTTPUpstreamCharts(v.name, v.zone)
+				delete(c.cache.httpUpstreams, key)
+				c.removeHTTPUpstreamCharts(v.name, v.zone)
 			}
 		}
 	}
-	for key, v := range n.cache.httpUpstreamServers {
+	for key, v := range c.cache.httpUpstreamServers {
 		if v.updated && !v.hasCharts {
 			v.hasCharts = true
-			n.addHTTPUpstreamServerCharts(v.name, v.serverAddr, v.serverName, v.zone)
+			c.addHTTPUpstreamServerCharts(v.name, v.serverAddr, v.serverName, v.zone)
 			continue
 		}
 		if !v.updated {
 			if v.notSeenTimes++; v.notSeenTimes >= notSeenLimit {
-				delete(n.cache.httpUpstreamServers, key)
-				n.removeHTTPUpstreamServerCharts(v.name, v.serverAddr, v.zone)
+				delete(c.cache.httpUpstreamServers, key)
+				c.removeHTTPUpstreamServerCharts(v.name, v.serverAddr, v.zone)
 			}
 		}
 	}
-	for key, v := range n.cache.streamServerZones {
+	for key, v := range c.cache.streamServerZones {
 		if v.updated && !v.hasCharts {
 			v.hasCharts = true
-			n.addStreamServerZoneCharts(v.zone)
+			c.addStreamServerZoneCharts(v.zone)
 			continue
 		}
 		if !v.updated {
 			if v.notSeenTimes++; v.notSeenTimes >= notSeenLimit {
-				delete(n.cache.streamServerZones, key)
-				n.removeStreamServerZoneCharts(v.zone)
+				delete(c.cache.streamServerZones, key)
+				c.removeStreamServerZoneCharts(v.zone)
 			}
 		}
 	}
-	for key, v := range n.cache.streamUpstreams {
+	for key, v := range c.cache.streamUpstreams {
 		if v.updated && !v.hasCharts {
 			v.hasCharts = true
-			n.addStreamUpstreamCharts(v.name, v.zone)
+			c.addStreamUpstreamCharts(v.name, v.zone)
 			continue
 		}
 		if !v.updated {
 			if v.notSeenTimes++; v.notSeenTimes >= notSeenLimit {
-				delete(n.cache.streamUpstreams, key)
-				n.removeStreamUpstreamCharts(v.name, v.zone)
+				delete(c.cache.streamUpstreams, key)
+				c.removeStreamUpstreamCharts(v.name, v.zone)
 			}
 		}
 	}
-	for key, v := range n.cache.streamUpstreamServers {
+	for key, v := range c.cache.streamUpstreamServers {
 		if v.updated && !v.hasCharts {
 			v.hasCharts = true
-			n.addStreamUpstreamServerCharts(v.name, v.serverAddr, v.serverName, v.zone)
+			c.addStreamUpstreamServerCharts(v.name, v.serverAddr, v.serverName, v.zone)
 			continue
 		}
 		if !v.updated {
 			if v.notSeenTimes++; v.notSeenTimes >= notSeenLimit {
-				delete(n.cache.streamUpstreamServers, key)
-				n.removeStreamUpstreamServerCharts(v.name, v.serverAddr, v.zone)
+				delete(c.cache.streamUpstreamServers, key)
+				c.removeStreamUpstreamServerCharts(v.name, v.serverAddr, v.zone)
 			}
 		}
 	}
-	for key, v := range n.cache.resolvers {
+	for key, v := range c.cache.resolvers {
 		if v.updated && !v.hasCharts {
 			v.hasCharts = true
-			n.addResolverZoneCharts(v.zone)
+			c.addResolverZoneCharts(v.zone)
 			continue
 		}
 		if !v.updated {
 			if v.notSeenTimes++; v.notSeenTimes >= notSeenLimit {
-				delete(n.cache.resolvers, key)
-				n.removeResolverZoneCharts(v.zone)
+				delete(c.cache.resolvers, key)
+				c.removeResolverZoneCharts(v.zone)
 			}
 		}
 	}

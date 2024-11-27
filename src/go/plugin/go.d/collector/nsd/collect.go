@@ -12,8 +12,8 @@ import (
 	"strings"
 )
 
-func (n *Nsd) collect() (map[string]int64, error) {
-	stats, err := n.exec.stats()
+func (c *Collector) collect() (map[string]int64, error) {
+	stats, err := c.exec.stats()
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func (n *Nsd) collect() (map[string]int64, error) {
 	sc := bufio.NewScanner(bytes.NewReader(stats))
 
 	for sc.Scan() {
-		n.collectStatsLine(mx, sc.Text())
+		c.collectStatsLine(mx, sc.Text())
 	}
 
 	if len(mx) == 0 {
@@ -42,14 +42,14 @@ func (n *Nsd) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (n *Nsd) collectStatsLine(mx map[string]int64, line string) {
+func (c *Collector) collectStatsLine(mx map[string]int64, line string) {
 	if line = strings.TrimSpace(line); line == "" {
 		return
 	}
 
 	key, value, ok := strings.Cut(line, "=")
 	if !ok {
-		n.Debugf("invalid line in stats: '%s'", line)
+		c.Debugf("invalid line in stats: '%s'", line)
 		return
 	}
 
@@ -66,7 +66,7 @@ func (n *Nsd) collectStatsLine(mx map[string]int64, line string) {
 	}
 
 	if err != nil {
-		n.Debugf("invalid value in stats line '%s': '%s'", line, value)
+		c.Debugf("invalid value in stats line '%s': '%s'", line, value)
 		return
 	}
 

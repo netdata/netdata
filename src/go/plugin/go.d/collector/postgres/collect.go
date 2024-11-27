@@ -21,134 +21,134 @@ const (
 	pgVersion17 = 17_00_00
 )
 
-func (p *Postgres) collect() (map[string]int64, error) {
-	if p.db == nil {
-		db, err := p.openPrimaryConnection()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.db == nil {
+		db, err := c.openPrimaryConnection()
 		if err != nil {
 			return nil, err
 		}
-		p.db = db
+		c.db = db
 	}
 
-	if p.pgVersion == 0 {
-		ver, err := p.doQueryServerVersion()
+	if c.pgVersion == 0 {
+		ver, err := c.doQueryServerVersion()
 		if err != nil {
 			return nil, fmt.Errorf("querying server version error: %v", err)
 		}
-		p.pgVersion = ver
-		p.Debugf("connected to PostgreSQL v%d", p.pgVersion)
+		c.pgVersion = ver
+		c.Debugf("connected to PostgreSQL v%d", c.pgVersion)
 	}
 
-	if p.superUser == nil {
-		v, err := p.doQueryIsSuperUser()
+	if c.superUser == nil {
+		v, err := c.doQueryIsSuperUser()
 		if err != nil {
 			return nil, fmt.Errorf("querying is super user error: %v", err)
 		}
-		p.superUser = &v
-		p.Debugf("connected as super user: %v", *p.superUser)
+		c.superUser = &v
+		c.Debugf("connected as super user: %v", *c.superUser)
 	}
 
-	if p.pgIsInRecovery == nil {
-		v, err := p.doQueryPGIsInRecovery()
+	if c.pgIsInRecovery == nil {
+		v, err := c.doQueryPGIsInRecovery()
 		if err != nil {
 			return nil, fmt.Errorf("querying recovery status error: %v", err)
 		}
-		p.pgIsInRecovery = &v
-		p.Debugf("the instance is in recovery mode: %v", *p.pgIsInRecovery)
+		c.pgIsInRecovery = &v
+		c.Debugf("the instance is in recovery mode: %v", *c.pgIsInRecovery)
 	}
 
 	now := time.Now()
 
-	if now.Sub(p.recheckSettingsTime) > p.recheckSettingsEvery {
-		p.recheckSettingsTime = now
-		maxConn, err := p.doQuerySettingsMaxConnections()
+	if now.Sub(c.recheckSettingsTime) > c.recheckSettingsEvery {
+		c.recheckSettingsTime = now
+		maxConn, err := c.doQuerySettingsMaxConnections()
 		if err != nil {
 			return nil, fmt.Errorf("querying settings max connections error: %v", err)
 		}
-		p.mx.maxConnections = maxConn
+		c.mx.maxConnections = maxConn
 
-		maxLocks, err := p.doQuerySettingsMaxLocksHeld()
+		maxLocks, err := c.doQuerySettingsMaxLocksHeld()
 		if err != nil {
 			return nil, fmt.Errorf("querying settings max locks held error: %v", err)
 		}
-		p.mx.maxLocksHeld = maxLocks
+		c.mx.maxLocksHeld = maxLocks
 	}
 
-	p.resetMetrics()
+	c.resetMetrics()
 
-	if p.pgVersion >= pgVersion10 {
+	if c.pgVersion >= pgVersion10 {
 		// need 'backend_type' in pg_stat_activity
-		p.addXactQueryRunningTimeChartsOnce.Do(func() {
-			p.addTransactionsRunTimeHistogramChart()
-			p.addQueriesRunTimeHistogramChart()
+		c.addXactQueryRunningTimeChartsOnce.Do(func() {
+			c.addTransactionsRunTimeHistogramChart()
+			c.addQueriesRunTimeHistogramChart()
 		})
 	}
-	if p.isSuperUser() {
-		p.addWALFilesChartsOnce.Do(p.addWALFilesCharts)
+	if c.isSuperUser() {
+		c.addWALFilesChartsOnce.Do(c.addWALFilesCharts)
 	}
 
-	if err := p.doQueryGlobalMetrics(); err != nil {
+	if err := c.doQueryGlobalMetrics(); err != nil {
 		return nil, err
 	}
-	if err := p.doQueryReplicationMetrics(); err != nil {
+	if err := c.doQueryReplicationMetrics(); err != nil {
 		return nil, err
 	}
-	if err := p.doQueryDatabasesMetrics(); err != nil {
+	if err := c.doQueryDatabasesMetrics(); err != nil {
 		return nil, err
 	}
-	if p.dbSr != nil {
-		if err := p.doQueryQueryableDatabases(); err != nil {
+	if c.dbSr != nil {
+		if err := c.doQueryQueryableDatabases(); err != nil {
 			return nil, err
 		}
 	}
-	if err := p.doQueryTablesMetrics(); err != nil {
+	if err := c.doQueryTablesMetrics(); err != nil {
 		return nil, err
 	}
-	if err := p.doQueryIndexesMetrics(); err != nil {
+	if err := c.doQueryIndexesMetrics(); err != nil {
 		return nil, err
 	}
 
-	if now.Sub(p.doSlowTime) > p.doSlowEvery {
-		p.doSlowTime = now
-		if err := p.doQueryBloat(); err != nil {
+	if now.Sub(c.doSlowTime) > c.doSlowEvery {
+		c.doSlowTime = now
+		if err := c.doQueryBloat(); err != nil {
 			return nil, err
 		}
-		if err := p.doQueryColumns(); err != nil {
+		if err := c.doQueryColumns(); err != nil {
 			return nil, err
 		}
 	}
 
 	mx := make(map[string]int64)
-	p.collectMetrics(mx)
+	c.collectMetrics(mx)
 
 	return mx, nil
 }
 
-func (p *Postgres) openPrimaryConnection() (*sql.DB, error) {
-	db, err := sql.Open("pgx", p.DSN)
+func (c *Collector) openPrimaryConnection() (*sql.DB, error) {
+	db, err := sql.Open("pgx", c.DSN)
 	if err != nil {
-		return nil, fmt.Errorf("error on opening a connection with the Postgres database [%s]: %v", p.DSN, err)
+		return nil, fmt.Errorf("error on opening a connection with the Postgres database [%s]: %v", c.DSN, err)
 	}
 
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(10 * time.Minute)
 
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("error on pinging the Postgres database [%s]: %v", p.DSN, err)
+		return nil, fmt.Errorf("error on pinging the Postgres database [%s]: %v", c.DSN, err)
 	}
 
 	return db, nil
 }
 
-func (p *Postgres) openSecondaryConnection(dbname string) (*sql.DB, string, error) {
-	cfg, err := pgx.ParseConfig(p.DSN)
+func (c *Collector) openSecondaryConnection(dbname string) (*sql.DB, string, error) {
+	cfg, err := pgx.ParseConfig(c.DSN)
 	if err != nil {
-		return nil, "", fmt.Errorf("error on parsing DSN [%s]: %v", p.DSN, err)
+		return nil, "", fmt.Errorf("error on parsing DSN [%s]: %v", c.DSN, err)
 	}
 
 	cfg.Database = dbname
@@ -164,7 +164,7 @@ func (p *Postgres) openSecondaryConnection(dbname string) (*sql.DB, string, erro
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(10 * time.Minute)
 
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
@@ -176,65 +176,65 @@ func (p *Postgres) openSecondaryConnection(dbname string) (*sql.DB, string, erro
 	return db, connStr, nil
 }
 
-func (p *Postgres) isSuperUser() bool { return p.superUser != nil && *p.superUser }
+func (c *Collector) isSuperUser() bool { return c.superUser != nil && *c.superUser }
 
-func (p *Postgres) isPGInRecovery() bool { return p.pgIsInRecovery != nil && *p.pgIsInRecovery }
+func (c *Collector) isPGInRecovery() bool { return c.pgIsInRecovery != nil && *c.pgIsInRecovery }
 
-func (p *Postgres) getDBMetrics(name string) *dbMetrics {
-	db, ok := p.mx.dbs[name]
+func (c *Collector) getDBMetrics(name string) *dbMetrics {
+	db, ok := c.mx.dbs[name]
 	if !ok {
 		db = &dbMetrics{name: name}
-		p.mx.dbs[name] = db
+		c.mx.dbs[name] = db
 	}
 	return db
 }
 
-func (p *Postgres) getTableMetrics(name, db, schema string) *tableMetrics {
+func (c *Collector) getTableMetrics(name, db, schema string) *tableMetrics {
 	key := name + "_" + db + "_" + schema
-	m, ok := p.mx.tables[key]
+	m, ok := c.mx.tables[key]
 	if !ok {
 		m = &tableMetrics{db: db, schema: schema, name: name}
-		p.mx.tables[key] = m
+		c.mx.tables[key] = m
 	}
 	return m
 }
 
-func (p *Postgres) hasTableMetrics(name, db, schema string) bool {
+func (c *Collector) hasTableMetrics(name, db, schema string) bool {
 	key := name + "_" + db + "_" + schema
-	_, ok := p.mx.tables[key]
+	_, ok := c.mx.tables[key]
 	return ok
 }
 
-func (p *Postgres) getIndexMetrics(name, table, db, schema string) *indexMetrics {
+func (c *Collector) getIndexMetrics(name, table, db, schema string) *indexMetrics {
 	key := name + "_" + table + "_" + db + "_" + schema
-	m, ok := p.mx.indexes[key]
+	m, ok := c.mx.indexes[key]
 	if !ok {
 		m = &indexMetrics{name: name, db: db, schema: schema, table: table}
-		p.mx.indexes[key] = m
+		c.mx.indexes[key] = m
 	}
 	return m
 }
 
-func (p *Postgres) hasIndexMetrics(name, table, db, schema string) bool {
+func (c *Collector) hasIndexMetrics(name, table, db, schema string) bool {
 	key := name + "_" + table + "_" + db + "_" + schema
-	_, ok := p.mx.indexes[key]
+	_, ok := c.mx.indexes[key]
 	return ok
 }
 
-func (p *Postgres) getReplAppMetrics(name string) *replStandbyAppMetrics {
-	app, ok := p.mx.replApps[name]
+func (c *Collector) getReplAppMetrics(name string) *replStandbyAppMetrics {
+	app, ok := c.mx.replApps[name]
 	if !ok {
 		app = &replStandbyAppMetrics{name: name}
-		p.mx.replApps[name] = app
+		c.mx.replApps[name] = app
 	}
 	return app
 }
 
-func (p *Postgres) getReplSlotMetrics(name string) *replSlotMetrics {
-	slot, ok := p.mx.replSlots[name]
+func (c *Collector) getReplSlotMetrics(name string) *replSlotMetrics {
+	slot, ok := c.mx.replSlots[name]
 	if !ok {
 		slot = &replSlotMetrics{name: name}
-		p.mx.replSlots[name] = slot
+		c.mx.replSlots[name] = slot
 	}
 	return slot
 }

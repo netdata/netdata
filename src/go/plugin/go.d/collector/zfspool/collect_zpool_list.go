@@ -24,8 +24,8 @@ type zpoolEntry struct {
 	health     string
 }
 
-func (z *ZFSPool) collectZpoolList(mx map[string]int64) error {
-	bs, err := z.exec.list()
+func (c *Collector) collectZpoolList(mx map[string]int64) error {
+	bs, err := c.exec.list()
 	if err != nil {
 		return err
 	}
@@ -40,9 +40,9 @@ func (z *ZFSPool) collectZpoolList(mx map[string]int64) error {
 	for _, zpool := range zpools {
 		seen[zpool.name] = true
 
-		if !z.seenZpools[zpool.name] {
-			z.addZpoolCharts(zpool.name)
-			z.seenZpools[zpool.name] = true
+		if !c.seenZpools[zpool.name] {
+			c.addZpoolCharts(zpool.name)
+			c.seenZpools[zpool.name] = true
 		}
 
 		px := "zpool_" + zpool.name + "_"
@@ -68,10 +68,10 @@ func (z *ZFSPool) collectZpoolList(mx map[string]int64) error {
 		mx[px+"health_state_"+zpool.health] = 1
 	}
 
-	for name := range z.seenZpools {
+	for name := range c.seenZpools {
 		if !seen[name] {
-			z.removeZpoolCharts(name)
-			delete(z.seenZpools, name)
+			c.removeZpoolCharts(name)
+			delete(c.seenZpools, name)
 		}
 	}
 

@@ -8,13 +8,13 @@ import (
 	"strings"
 )
 
-func (a *AdaptecRaid) collect() (map[string]int64, error) {
+func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := a.collectLogicalDevices(mx); err != nil {
+	if err := c.collectLogicalDevices(mx); err != nil {
 		return nil, err
 	}
-	if err := a.collectPhysicalDevices(mx); err != nil {
+	if err := c.collectPhysicalDevices(mx); err != nil {
 		return nil, err
 	}
 

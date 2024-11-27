@@ -30,16 +30,16 @@ func isHaproxyMetrics(pms prometheus.Series) bool {
 	return false
 }
 
-func (h *Haproxy) collect() (map[string]int64, error) {
-	pms, err := h.prom.ScrapeSeries()
+func (c *Collector) collect() (map[string]int64, error) {
+	pms, err := c.prom.ScrapeSeries()
 	if err != nil {
 		return nil, err
 	}
 
-	if h.validateMetrics && !isHaproxyMetrics(pms) {
+	if c.validateMetrics && !isHaproxyMetrics(pms) {
 		return nil, errors.New("unexpected metrics (not HAProxy)")
 	}
-	h.validateMetrics = false
+	c.validateMetrics = false
 
 	mx := make(map[string]int64)
 	for _, pm := range pms {
@@ -48,9 +48,9 @@ func (h *Haproxy) collect() (map[string]int64, error) {
 			continue
 		}
 
-		if !h.proxies[proxy] {
-			h.proxies[proxy] = true
-			h.addProxyToCharts(proxy)
+		if !c.proxies[proxy] {
+			c.proxies[proxy] = true
+			c.addProxyToCharts(proxy)
 		}
 
 		mx[dimID(pm)] = int64(pm.Value * multiplier(pm))
@@ -59,47 +59,47 @@ func (h *Haproxy) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (h *Haproxy) addProxyToCharts(proxy string) {
-	h.addDimToChart(chartBackendCurrentSessions.ID, &module.Dim{
+func (c *Collector) addProxyToCharts(proxy string) {
+	c.addDimToChart(chartBackendCurrentSessions.ID, &module.Dim{
 		ID:   proxyDimID(metricBackendCurrentSessions, proxy),
 		Name: proxy,
 	})
-	h.addDimToChart(chartBackendSessions.ID, &module.Dim{
+	c.addDimToChart(chartBackendSessions.ID, &module.Dim{
 		ID:   proxyDimID(metricBackendSessionsTotal, proxy),
 		Name: proxy,
 		Algo: module.Incremental,
 	})
 
-	h.addDimToChart(chartBackendResponseTimeAverage.ID, &module.Dim{
+	c.addDimToChart(chartBackendResponseTimeAverage.ID, &module.Dim{
 		ID:   proxyDimID(metricBackendResponseTimeAverageSeconds, proxy),
 		Name: proxy,
 	})
-	if err := h.Charts().Add(newChartBackendHTTPResponses(proxy)); err != nil {
-		h.Warning(err)
+	if err := c.Charts().Add(newChartBackendHTTPResponses(proxy)); err != nil {
+		c.Warning(err)
 	}
 
-	h.addDimToChart(chartBackendCurrentQueue.ID, &module.Dim{
+	c.addDimToChart(chartBackendCurrentQueue.ID, &module.Dim{
 		ID:   proxyDimID(metricBackendCurrentQueue, proxy),
 		Name: proxy,
 	})
-	h.addDimToChart(chartBackendQueueTimeAverage.ID, &module.Dim{
+	c.addDimToChart(chartBackendQueueTimeAverage.ID, &module.Dim{
 		ID:   proxyDimID(metricBackendQueueTimeAverageSeconds, proxy),
 		Name: proxy,
 	})
 
-	if err := h.Charts().Add(newChartBackendNetworkIO(proxy)); err != nil {
-		h.Warning(err)
+	if err := c.Charts().Add(newChartBackendNetworkIO(proxy)); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (h *Haproxy) addDimToChart(chartID string, dim *module.Dim) {
-	chart := h.Charts().Get(chartID)
+func (c *Collector) addDimToChart(chartID string, dim *module.Dim) {
+	chart := c.Charts().Get(chartID)
 	if chart == nil {
-		h.Warningf("error on adding '%s' dimension: can not find '%s' chart", dim.ID, chartID)
+		c.Warningf("error on adding '%s' dimension: can not find '%s' chart", dim.ID, chartID)
 		return
 	}
 	if err := chart.AddDim(dim); err != nil {
-		h.Warning(err)
+		c.Warning(err)
 		return
 	}
 	chart.MarkNotCreated()

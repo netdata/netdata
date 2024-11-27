@@ -18,14 +18,14 @@ type ipPool struct {
 	addresses iprange.Pool
 }
 
-func (d *DHCPd) validateConfig() error {
-	if d.Config.LeasesPath == "" {
+func (c *Collector) validateConfig() error {
+	if c.Config.LeasesPath == "" {
 		return errors.New("'lease_path' parameter not set")
 	}
-	if len(d.Config.Pools) == 0 {
+	if len(c.Config.Pools) == 0 {
 		return errors.New("'pools' parameter not set")
 	}
-	for i, cfg := range d.Config.Pools {
+	for i, cfg := range c.Config.Pools {
 		if cfg.Name == "" {
 			return fmt.Errorf("'pools[%d]->pool.name' parameter not set", i+1)
 		}
@@ -36,10 +36,10 @@ func (d *DHCPd) validateConfig() error {
 	return nil
 }
 
-func (d *DHCPd) initPools() ([]ipPool, error) {
+func (c *Collector) initPools() ([]ipPool, error) {
 	var pools []ipPool
 
-	for i, cfg := range d.Pools {
+	for i, cfg := range c.Pools {
 		ipRange, err := iprange.ParseRanges(cfg.Networks)
 		if err != nil {
 			return nil, fmt.Errorf("parse pools[%d]->pool.networks '%s' ('%s'): %v", i+1, cfg.Name, cfg.Networks, err)
@@ -55,7 +55,7 @@ func (d *DHCPd) initPools() ([]ipPool, error) {
 	return pools, nil
 }
 
-func (d *DHCPd) initCharts(pools []ipPool) (*module.Charts, error) {
+func (c *Collector) initCharts(pools []ipPool) (*module.Charts, error) {
 	charts := &module.Charts{}
 
 	if err := charts.Add(activeLeasesTotalChart.Copy()); err != nil {

@@ -22,7 +22,7 @@ type nodeCoordinates struct {
 	}
 }
 
-func (c *Consul) collectNetworkRTT(mx map[string]int64) error {
+func (c *Collector) collectNetworkRTT(mx map[string]int64) error {
 	req, err := c.createRequest(urlPathCoordinateNodes)
 	if err != nil {
 		return err

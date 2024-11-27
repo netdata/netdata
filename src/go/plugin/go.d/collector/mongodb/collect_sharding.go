@@ -9,8 +9,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-func (m *Mongo) collectSharding(mx map[string]int64) error {
-	nodes, err := m.conn.shardNodes()
+func (c *Collector) collectSharding(mx map[string]int64) error {
+	nodes, err := c.conn.shardNodes()
 	if err != nil {
 		return err
 	}
@@ -18,7 +18,7 @@ func (m *Mongo) collectSharding(mx map[string]int64) error {
 	mx["shard_nodes_aware"] = nodes.ShardAware
 	mx["shard_nodes_unaware"] = nodes.ShardUnaware
 
-	dbPart, err := m.conn.shardDatabasesPartitioning()
+	dbPart, err := c.conn.shardDatabasesPartitioning()
 	if err != nil {
 		return err
 	}
@@ -26,7 +26,7 @@ func (m *Mongo) collectSharding(mx map[string]int64) error {
 	mx["shard_databases_partitioned"] = dbPart.Partitioned
 	mx["shard_databases_unpartitioned"] = dbPart.UnPartitioned
 
-	collPart, err := m.conn.shardCollectionsPartitioning()
+	collPart, err := c.conn.shardCollectionsPartitioning()
 	if err != nil {
 		return err
 	}
@@ -34,7 +34,7 @@ func (m *Mongo) collectSharding(mx map[string]int64) error {
 	mx["shard_collections_partitioned"] = collPart.Partitioned
 	mx["shard_collections_unpartitioned"] = collPart.UnPartitioned
 
-	chunksPerShard, err := m.conn.shardChunks()
+	chunksPerShard, err := c.conn.shardChunks()
 	if err != nil {
 		return err
 	}
@@ -47,23 +47,23 @@ func (m *Mongo) collectSharding(mx map[string]int64) error {
 	}
 
 	for id := range seen {
-		if !m.shards[id] {
-			m.shards[id] = true
-			m.addShardCharts(id)
+		if !c.shards[id] {
+			c.shards[id] = true
+			c.addShardCharts(id)
 		}
 	}
 
-	for id := range m.shards {
+	for id := range c.shards {
 		if !seen[id] {
-			delete(m.shards, id)
-			m.removeShardCharts(id)
+			delete(c.shards, id)
+			c.removeShardCharts(id)
 		}
 	}
 
 	return nil
 }
 
-func (m *Mongo) addShardCharts(id string) {
+func (c *Collector) addShardCharts(id string) {
 	charts := chartsTmplShardingShard.Copy()
 
 	for _, chart := range *charts {
@@ -76,16 +76,16 @@ func (m *Mongo) addShardCharts(id string) {
 		}
 	}
 
-	if err := m.Charts().Add(*charts...); err != nil {
-		m.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 
 }
 
-func (m *Mongo) removeShardCharts(id string) {
+func (c *Collector) removeShardCharts(id string) {
 	px := fmt.Sprintf("%s%s_", chartPxShard, id)
 
-	for _, chart := range *m.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
@@ -93,10 +93,10 @@ func (m *Mongo) removeShardCharts(id string) {
 	}
 }
 
-func (m *Mongo) addShardingCharts() {
+func (c *Collector) addShardingCharts() {
 	charts := chartsSharding.Copy()
 
-	if err := m.Charts().Add(*charts...); err != nil {
-		m.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }

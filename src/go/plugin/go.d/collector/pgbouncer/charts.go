@@ -229,16 +229,16 @@ func newDatabaseCharts(dbname, pgDBName string) *module.Charts {
 	return charts
 }
 
-func (p *PgBouncer) addNewDatabaseCharts(dbname, pgDBName string) {
+func (c *Collector) addNewDatabaseCharts(dbname, pgDBName string) {
 	charts := newDatabaseCharts(dbname, pgDBName)
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (p *PgBouncer) removeDatabaseCharts(dbname string) {
+func (c *Collector) removeDatabaseCharts(dbname string) {
 	prefix := fmt.Sprintf("db_%s_", dbname)
-	for _, c := range *p.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasPrefix(c.ID, prefix) {
 			c.MarkRemove()
 			c.MarkNotCreated()

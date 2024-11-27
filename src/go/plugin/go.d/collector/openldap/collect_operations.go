@@ -13,7 +13,7 @@ const (
 	attrMonitorOpCompleted = "monitorOpCompleted"
 )
 
-func (l *OpenLDAP) collectOperations(mx map[string]int64) error {
+func (c *Collector) collectOperations(mx map[string]int64) error {
 	req := newLdapOperationsSearchRequest()
 
 	dnMetricMap := map[string]string{
@@ -26,10 +26,10 @@ func (l *OpenLDAP) collectOperations(mx map[string]int64) error {
 		"cn=Search,cn=Operations,cn=Monitor":  "search_operations",
 	}
 
-	return l.doSearchRequest(req, func(entry *ldap.Entry) {
+	return c.doSearchRequest(req, func(entry *ldap.Entry) {
 		metric := dnMetricMap[entry.DN]
 		if metric == "" {
-			l.Debugf("skipping entry '%s'", entry.DN)
+			c.Debugf("skipping entry '%s'", entry.DN)
 			return
 		}
 
@@ -41,12 +41,12 @@ func (l *OpenLDAP) collectOperations(mx map[string]int64) error {
 		for prefix, attr := range attrs {
 			s := entry.GetAttributeValue(attr)
 			if s == "" {
-				l.Debugf("entry '%s' does not have attribute '%s'", entry.DN, attr)
+				c.Debugf("entry '%s' does not have attribute '%s'", entry.DN, attr)
 				continue
 			}
 			v, err := strconv.ParseInt(s, 10, 64)
 			if err != nil {
-				l.Debugf("failed to parse entry '%s' value '%s': %v", entry.DN, s, err)
+				c.Debugf("failed to parse entry '%s' value '%s': %v", entry.DN, s, err)
 				continue
 			}
 

@@ -10,20 +10,20 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (r *RabbitMQ) collectVhosts(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(r.RequestConfig, urlPathAPIVhosts)
+func (c *Collector) collectVhosts(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPIVhosts)
 	if err != nil {
 		return fmt.Errorf("failed to create vhosts stats request: %w", err)
 	}
 
 	var resp []apiVhostResp
 
-	if err := r.webClient().RequestJSON(req, &resp); err != nil {
+	if err := c.webClient().RequestJSON(req, &resp); err != nil {
 		return err
 	}
 
 	for _, vhost := range resp {
-		r.cache.getVhost(vhost.Name).seen = true
+		c.cache.getVhost(vhost.Name).seen = true
 
 		px := fmt.Sprintf("vhost_%s_", vhost.Name)
 

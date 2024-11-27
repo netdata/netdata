@@ -24,10 +24,10 @@ const (
 	metricMemStandbyCacheReserveBytes        = "windows_memory_standby_cache_reserve_bytes"
 )
 
-func (w *Windows) collectMemory(mx map[string]int64, pms prometheus.Series) {
-	if !w.cache.collection[collectorMemory] {
-		w.cache.collection[collectorMemory] = true
-		w.addMemoryCharts()
+func (c *Collector) collectMemory(mx map[string]int64, pms prometheus.Series) {
+	if !c.cache.collection[collectorMemory] {
+		c.cache.collection[collectorMemory] = true
+		c.addMemoryCharts()
 	}
 
 	if pm := pms.FindByName(metricMemAvailBytes); pm.Len() > 0 {

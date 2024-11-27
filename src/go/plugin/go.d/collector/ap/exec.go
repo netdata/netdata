@@ -13,6 +13,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
+type iwBinary interface {
+	devices() ([]byte, error)
+	stationStatistics(ifaceName string) ([]byte, error)
+}
+
 func newIwExec(binPath string, timeout time.Duration) *iwCliExec {
 	return &iwCliExec{
 		binPath: binPath,

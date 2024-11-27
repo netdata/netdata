@@ -28,33 +28,33 @@ func newPattern(up userPattern) (*pattern, error) {
 	return &pattern{name: up.Name, Matcher: m}, nil
 }
 
-func (w *WebLog) createURLPatterns() error {
-	if len(w.URLPatterns) == 0 {
-		w.Debug("skipping URL patterns creating, no patterns provided")
+func (c *Collector) createURLPatterns() error {
+	if len(c.URLPatterns) == 0 {
+		c.Debug("skipping URL patterns creating, no patterns provided")
 		return nil
 	}
-	w.Debug("starting URL patterns creating")
-	for _, up := range w.URLPatterns {
+	c.Debug("starting URL patterns creating")
+	for _, up := range c.URLPatterns {
 		p, err := newPattern(up)
 		if err != nil {
 			return fmt.Errorf("create pattern %+v: %v", up, err)
 		}
-		w.Debugf("created pattern '%s', type '%T', match '%s'", p.name, p.Matcher, up.Match)
-		w.urlPatterns = append(w.urlPatterns, p)
+		c.Debugf("created pattern '%s', type '%T', match '%s'", p.name, p.Matcher, up.Match)
+		c.urlPatterns = append(c.urlPatterns, p)
 	}
-	w.Debugf("created %d URL pattern(s)", len(w.URLPatterns))
+	c.Debugf("created %d URL pattern(s)", len(c.URLPatterns))
 	return nil
 }
 
-func (w *WebLog) createCustomFields() error {
-	if len(w.CustomFields) == 0 {
-		w.Debug("skipping custom fields creating, no custom fields provided")
+func (c *Collector) createCustomFields() error {
+	if len(c.CustomFields) == 0 {
+		c.Debug("skipping custom fields creating, no custom fields provided")
 		return nil
 	}
 
-	w.Debug("starting custom fields creating")
-	w.customFields = make(map[string][]*pattern)
-	for i, cf := range w.CustomFields {
+	c.Debug("starting custom fields creating")
+	c.customFields = make(map[string][]*pattern)
+	for i, cf := range c.CustomFields {
 		if cf.Name == "" {
 			return fmt.Errorf("create custom field: name not set (field %d)", i+1)
 		}
@@ -63,45 +63,45 @@ func (w *WebLog) createCustomFields() error {
 			if err != nil {
 				return fmt.Errorf("create field '%s' pattern %+v: %v", cf.Name, up, err)
 			}
-			w.Debugf("created field '%s', pattern '%s', type '%T', match '%s'", cf.Name, p.name, p.Matcher, up.Match)
-			w.customFields[cf.Name] = append(w.customFields[cf.Name], p)
+			c.Debugf("created field '%s', pattern '%s', type '%T', match '%s'", cf.Name, p.name, p.Matcher, up.Match)
+			c.customFields[cf.Name] = append(c.customFields[cf.Name], p)
 		}
 	}
-	w.Debugf("created %d custom field(s)", len(w.CustomFields))
+	c.Debugf("created %d custom field(s)", len(c.CustomFields))
 	return nil
 }
 
-func (w *WebLog) createCustomTimeFields() error {
-	if len(w.CustomTimeFields) == 0 {
-		w.Debug("skipping custom time fields creating, no custom time fields provided")
+func (c *Collector) createCustomTimeFields() error {
+	if len(c.CustomTimeFields) == 0 {
+		c.Debug("skipping custom time fields creating, no custom time fields provided")
 		return nil
 	}
 
-	w.Debug("starting custom time fields creating")
-	w.customTimeFields = make(map[string][]float64)
-	for i, ctf := range w.CustomTimeFields {
+	c.Debug("starting custom time fields creating")
+	c.customTimeFields = make(map[string][]float64)
+	for i, ctf := range c.CustomTimeFields {
 		if ctf.Name == "" {
 			return fmt.Errorf("create custom field: name not set (field %d)", i+1)
 		}
-		w.customTimeFields[ctf.Name] = ctf.Histogram
-		w.Debugf("created time field '%s', histogram '%v'", ctf.Name, ctf.Histogram)
+		c.customTimeFields[ctf.Name] = ctf.Histogram
+		c.Debugf("created time field '%s', histogram '%v'", ctf.Name, ctf.Histogram)
 	}
-	w.Debugf("created %d custom time field(s)", len(w.CustomTimeFields))
+	c.Debugf("created %d custom time field(s)", len(c.CustomTimeFields))
 	return nil
 }
 
-func (w *WebLog) createCustomNumericFields() error {
-	if len(w.CustomNumericFields) == 0 {
-		w.Debug("no custom time fields provided")
+func (c *Collector) createCustomNumericFields() error {
+	if len(c.CustomNumericFields) == 0 {
+		c.Debug("no custom time fields provided")
 		return nil
 	}
 
-	w.Debugf("creating custom numeric fields for '%+v'", w.CustomNumericFields)
+	c.Debugf("creating custom numeric fields for '%+v'", c.CustomNumericFields)
 
-	w.customNumericFields = make(map[string]bool)
+	c.customNumericFields = make(map[string]bool)
 
-	for i := range w.CustomNumericFields {
-		v := w.CustomNumericFields[i]
+	for i := range c.CustomNumericFields {
+		v := c.CustomNumericFields[i]
 		if v.Name == "" {
 			return fmt.Errorf("custom numeric field (%d): 'name' not set", i+1)
 		}
@@ -114,48 +114,48 @@ func (w *WebLog) createCustomNumericFields() error {
 		if v.Divisor <= 0 {
 			v.Divisor = 1
 		}
-		w.CustomNumericFields[i] = v
-		w.customNumericFields[v.Name] = true
+		c.CustomNumericFields[i] = v
+		c.customNumericFields[v.Name] = true
 	}
 
 	return nil
 }
 
-func (w *WebLog) createLogLine() {
-	w.line = newEmptyLogLine()
+func (c *Collector) createLogLine() {
+	c.line = newEmptyLogLine()
 
-	for v := range w.customFields {
-		w.line.custom.fields[v] = struct{}{}
+	for v := range c.customFields {
+		c.line.custom.fields[v] = struct{}{}
 	}
-	for v := range w.customTimeFields {
-		w.line.custom.fields[v] = struct{}{}
+	for v := range c.customTimeFields {
+		c.line.custom.fields[v] = struct{}{}
 	}
-	for v := range w.customNumericFields {
-		w.line.custom.fields[v] = struct{}{}
+	for v := range c.customNumericFields {
+		c.line.custom.fields[v] = struct{}{}
 	}
 }
 
-func (w *WebLog) createLogReader() error {
-	w.Cleanup()
-	w.Debug("starting log reader creating")
+func (c *Collector) createLogReader() error {
+	c.Cleanup()
+	c.Debug("starting log reader creating")
 
-	reader, err := logs.Open(w.Path, w.ExcludePath, w.Logger)
+	reader, err := logs.Open(c.Path, c.ExcludePath, c.Logger)
 	if err != nil {
 		return fmt.Errorf("creating log reader: %v", err)
 	}
 
-	w.Debugf("created log reader, current file '%s'", reader.CurrentFilename())
-	w.file = reader
+	c.Debugf("created log reader, current file '%s'", reader.CurrentFilename())
+	c.file = reader
 
 	return nil
 }
 
-func (w *WebLog) createParser() error {
-	w.Debug("starting parser creating")
+func (c *Collector) createParser() error {
+	c.Debug("starting parser creating")
 
 	const readLinesNum = 100
 
-	lines, err := logs.ReadLastLines(w.file.CurrentFilename(), readLinesNum)
+	lines, err := logs.ReadLastLines(c.file.CurrentFilename(), readLinesNum)
 	if err != nil {
 		return fmt.Errorf("failed to read last lines: %v", err)
 	}
@@ -165,23 +165,23 @@ func (w *WebLog) createParser() error {
 		if line = strings.TrimSpace(line); line == "" {
 			continue
 		}
-		w.Debugf("last line: '%s'", line)
+		c.Debugf("last line: '%s'", line)
 
-		w.parser, err = w.newParser([]byte(line))
+		c.parser, err = c.newParser([]byte(line))
 		if err != nil {
-			w.Debugf("failed to create parser from line: %v", err)
+			c.Debugf("failed to create parser from line: %v", err)
 			continue
 		}
 
-		w.line.reset()
+		c.line.reset()
 
-		if err = w.parser.Parse([]byte(line), w.line); err != nil {
-			w.Debugf("failed to parse line: %v", err)
+		if err = c.parser.Parse([]byte(line), c.line); err != nil {
+			c.Debugf("failed to parse line: %v", err)
 			continue
 		}
 
-		if err = w.line.verify(); err != nil {
-			w.Debugf("failed to verify line: %v", err)
+		if err = c.line.verify(); err != nil {
+			c.Debugf("failed to verify line: %v", err)
 			continue
 		}
 
@@ -190,7 +190,7 @@ func (w *WebLog) createParser() error {
 	}
 
 	if !found {
-		return fmt.Errorf("failed to create log parser (file '%s')", w.file.CurrentFilename())
+		return fmt.Errorf("failed to create log parser (file '%s')", c.file.CurrentFilename())
 	}
 
 	return nil

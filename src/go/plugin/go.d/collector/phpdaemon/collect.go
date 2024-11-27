@@ -34,15 +34,15 @@ type fullStatus struct {
 	Uptime *int64 `json:"uptime" stm:"uptime"`
 }
 
-func (p *PHPDaemon) collect() (map[string]int64, error) {
-	req, err := web.NewHTTPRequest(p.RequestConfig)
+func (c *Collector) collect() (map[string]int64, error) {
+	req, err := web.NewHTTPRequest(c.RequestConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request to '%s': %w", p.URL, err)
+		return nil, fmt.Errorf("failed to create HTTP request to '%s': %w", c.URL, err)
 	}
 
 	var st fullStatus
 
-	if err := web.DoHTTP(p.httpClient).RequestJSON(req, &st); err != nil {
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &st); err != nil {
 		return nil, err
 	}
 
@@ -52,9 +52,9 @@ func (p *PHPDaemon) collect() (map[string]int64, error) {
 
 	mx := stm.ToMap(st)
 
-	p.once.Do(func() {
+	c.once.Do(func() {
 		if _, ok := mx["uptime"]; ok {
-			_ = p.charts.Add(uptimeChart.Copy())
+			_ = c.charts.Add(uptimeChart.Copy())
 		}
 	})
 

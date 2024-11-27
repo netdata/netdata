@@ -18,13 +18,13 @@ WHERE
 
 var reVersionCore = regexp.MustCompile(`^\d+\.\d+\.\d+`)
 
-func (m *MySQL) collectVersion() error {
+func (c *Collector) collectVersion() error {
 	// https://mariadb.com/kb/en/version/
 	q := queryShowVersion
-	m.Debugf("executing query: '%s'", queryShowVersion)
+	c.Debugf("executing query: '%s'", queryShowVersion)
 
 	var name, version, versionComment string
-	_, err := m.collectQuery(q, func(column, value string, _ bool) {
+	_, err := c.collectQuery(q, func(column, value string, _ bool) {
 		switch column {
 		case "Variable_name":
 			name = value
@@ -41,7 +41,7 @@ func (m *MySQL) collectVersion() error {
 		return err
 	}
 
-	m.Infof("application version: '%s', version_comment: '%s'", version, versionComment)
+	c.Infof("application version: '%s', version_comment: '%s'", version, versionComment)
 
 	// version string is not always valid semver (ex.: 8.0.22-0ubuntu0.20.04.2)
 	s := reVersionCore.FindString(version)
@@ -54,9 +54,9 @@ func (m *MySQL) collectVersion() error {
 		return fmt.Errorf("couldn't parse version string '%s': %v", s, err)
 	}
 
-	m.version = ver
-	m.isMariaDB = strings.Contains(version, "MariaDB") || strings.Contains(versionComment, "mariadb")
-	m.isPercona = strings.Contains(versionComment, "Percona")
+	c.version = ver
+	c.isMariaDB = strings.Contains(version, "MariaDB") || strings.Contains(versionComment, "mariadb")
+	c.isPercona = strings.Contains(versionComment, "Percona")
 
 	return nil
 }

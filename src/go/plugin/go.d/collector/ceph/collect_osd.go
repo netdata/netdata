@@ -8,7 +8,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (c *Ceph) collectOsds(mx map[string]int64) error {
+func (c *Collector) collectOsds(mx map[string]int64) error {
 	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiOsd)
 	if err != nil {
 		return err

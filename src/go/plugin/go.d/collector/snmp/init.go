@@ -14,30 +14,30 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
-func (s *SNMP) validateConfig() error {
-	if s.Hostname == "" {
+func (c *Collector) validateConfig() error {
+	if c.Hostname == "" {
 		return errors.New("SNMP hostname is required")
 	}
-	if s.Vnode.GUID != "" {
-		if err := uuid.Validate(s.Vnode.GUID); err != nil {
+	if c.Vnode.GUID != "" {
+		if err := uuid.Validate(c.Vnode.GUID); err != nil {
 			return fmt.Errorf("invalid Vnode GUID: %v", err)
 		}
 	}
 	return nil
 }
 
-func (s *SNMP) initSNMPClient() (gosnmp.Handler, error) {
-	client := s.newSnmpClient()
+func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
+	client := c.newSnmpClient()
 
-	client.SetTarget(s.Hostname)
-	client.SetPort(uint16(s.Options.Port))
-	client.SetRetries(s.Options.Retries)
-	client.SetTimeout(time.Duration(s.Options.Timeout) * time.Second)
-	client.SetMaxOids(s.Options.MaxOIDs)
-	client.SetMaxRepetitions(uint32(s.Options.MaxRepetitions))
+	client.SetTarget(c.Hostname)
+	client.SetPort(uint16(c.Options.Port))
+	client.SetRetries(c.Options.Retries)
+	client.SetTimeout(time.Duration(c.Options.Timeout) * time.Second)
+	client.SetMaxOids(c.Options.MaxOIDs)
+	client.SetMaxRepetitions(uint32(c.Options.MaxRepetitions))
 
-	ver := parseSNMPVersion(s.Options.Version)
-	comm := s.Community
+	ver := parseSNMPVersion(c.Options.Version)
+	comm := c.Community
 
 	switch ver {
 	case gosnmp.Version1:
@@ -47,32 +47,32 @@ func (s *SNMP) initSNMPClient() (gosnmp.Handler, error) {
 		client.SetCommunity(comm)
 		client.SetVersion(gosnmp.Version2c)
 	case gosnmp.Version3:
-		if s.User.Name == "" {
+		if c.User.Name == "" {
 			return nil, errors.New("username is required for SNMPv3")
 		}
 		client.SetVersion(gosnmp.Version3)
 		client.SetSecurityModel(gosnmp.UserSecurityModel)
-		client.SetMsgFlags(parseSNMPv3SecurityLevel(s.User.SecurityLevel))
+		client.SetMsgFlags(parseSNMPv3SecurityLevel(c.User.SecurityLevel))
 		client.SetSecurityParameters(&gosnmp.UsmSecurityParameters{
-			UserName:                 s.User.Name,
-			AuthenticationProtocol:   parseSNMPv3AuthProtocol(s.User.AuthProto),
-			AuthenticationPassphrase: s.User.AuthKey,
-			PrivacyProtocol:          parseSNMPv3PrivProtocol(s.User.PrivProto),
-			PrivacyPassphrase:        s.User.PrivKey,
+			UserName:                 c.User.Name,
+			AuthenticationProtocol:   parseSNMPv3AuthProtocol(c.User.AuthProto),
+			AuthenticationPassphrase: c.User.AuthKey,
+			PrivacyProtocol:          parseSNMPv3PrivProtocol(c.User.PrivProto),
+			PrivacyPassphrase:        c.User.PrivKey,
 		})
 	default:
-		return nil, fmt.Errorf("invalid SNMP version: %s", s.Options.Version)
+		return nil, fmt.Errorf("invalid SNMP version: %s", c.Options.Version)
 	}
 
-	s.Info(snmpClientConnInfo(client))
+	c.Info(snmpClientConnInfo(client))
 
 	return client, nil
 }
 
-func (s *SNMP) initNetIfaceFilters() (matcher.Matcher, matcher.Matcher, error) {
+func (c *Collector) initNetIfaceFilters() (matcher.Matcher, matcher.Matcher, error) {
 	byName, byType := matcher.FALSE(), matcher.FALSE()
 
-	if v := s.NetworkInterfaceFilter.ByName; v != "" {
+	if v := c.NetworkInterfaceFilter.ByName; v != "" {
 		m, err := matcher.NewSimplePatternsMatcher(v)
 		if err != nil {
 			return nil, nil, err
@@ -80,7 +80,7 @@ func (s *SNMP) initNetIfaceFilters() (matcher.Matcher, matcher.Matcher, error) {
 		byName = m
 	}
 
-	if v := s.NetworkInterfaceFilter.ByType; v != "" {
+	if v := c.NetworkInterfaceFilter.ByType; v != "" {
 		m, err := matcher.NewSimplePatternsMatcher(v)
 		if err != nil {
 			return nil, nil, err
@@ -91,8 +91,8 @@ func (s *SNMP) initNetIfaceFilters() (matcher.Matcher, matcher.Matcher, error) {
 	return byName, byType, nil
 }
 
-func (s *SNMP) initOIDs() (oids []string) {
-	for _, c := range *s.charts {
+func (c *Collector) initOIDs() (oids []string) {
+	for _, c := range *c.charts {
 		for _, d := range c.Dims {
 			oids = append(oids, d.ID)
 		}

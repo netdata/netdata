@@ -14,6 +14,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
+type intelGpuTop interface {
+	queryGPUSummaryJson() ([]byte, error)
+	stop() error
+}
+
 func newIntelGpuTopExec(log *logger.Logger, ndsudoPath string, updateEvery int, device string) (*intelGpuTopExec, error) {
 	topExec := &intelGpuTopExec{
 		Logger:             log,

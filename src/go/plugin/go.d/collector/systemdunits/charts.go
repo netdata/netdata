@@ -20,7 +20,7 @@ const (
 	prioUnitFileState
 )
 
-func (s *SystemdUnits) addUnitCharts(name, typ string) {
+func (c *Collector) addUnitCharts(name, typ string) {
 	chart := module.Chart{
 		ID:       "unit_%s_%s_state",
 		Title:    "%s Unit State",
@@ -49,17 +49,17 @@ func (s *SystemdUnits) addUnitCharts(name, typ string) {
 		d.ID = fmt.Sprintf(d.ID, name, typ, d.Name)
 	}
 
-	if err := s.Charts().Add(&chart); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(&chart); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (s *SystemdUnits) removeUnitCharts(name, typ string) {
+func (c *Collector) removeUnitCharts(name, typ string) {
 	px := fmt.Sprintf("unit_%s_%s_", name, typ)
-	s.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (s *SystemdUnits) addUnitFileCharts(unitPath string) {
+func (c *Collector) addUnitFileCharts(unitPath string) {
 	_, unitName := filepath.Split(unitPath)
 	unitType := strings.TrimPrefix(filepath.Ext(unitPath), ".")
 
@@ -97,18 +97,18 @@ func (s *SystemdUnits) addUnitFileCharts(unitPath string) {
 		dim.ID = fmt.Sprintf(dim.ID, unitPath)
 	}
 
-	if err := s.Charts().Add(&chart); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(&chart); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (s *SystemdUnits) removeUnitFileCharts(unitPath string) {
+func (c *Collector) removeUnitFileCharts(unitPath string) {
 	px := fmt.Sprintf("unit_file_%s_", strings.ReplaceAll(unitPath, ".", "_"))
-	s.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (s *SystemdUnits) removeCharts(prefix string) {
-	for _, chart := range *s.Charts() {
+func (c *Collector) removeCharts(prefix string) {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

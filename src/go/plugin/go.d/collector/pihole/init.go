@@ -13,31 +13,31 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (p *Pihole) validateConfig() error {
-	if p.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
 	return nil
 }
 
-func (p *Pihole) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(p.ClientConfig)
+func (c *Collector) initHTTPClient() (*http.Client, error) {
+	return web.NewHTTPClient(c.ClientConfig)
 }
 
-func (p *Pihole) getWebPassword() string {
+func (c *Collector) getWebPassword() string {
 	// do no read setupVarsPath is password is set in the configuration file
-	if p.Password != "" {
-		return p.Password
+	if c.Password != "" {
+		return c.Password
 	}
-	if !isLocalHost(p.URL) {
-		p.Info("abort web password auto detection, host is not localhost")
+	if !isLocalHost(c.URL) {
+		c.Info("abort web password auto detection, host is not localhost")
 		return ""
 	}
 
-	p.Infof("starting web password auto detection, reading : %s", p.SetupVarsPath)
-	pass, err := getWebPassword(p.SetupVarsPath)
+	c.Infof("starting web password auto detection, reading : %s", c.SetupVarsPath)
+	pass, err := getWebPassword(c.SetupVarsPath)
 	if err != nil {
-		p.Warningf("error during reading '%s' : %v", p.SetupVarsPath, err)
+		c.Warningf("error during reading '%s' : %v", c.SetupVarsPath, err)
 	}
 
 	return pass

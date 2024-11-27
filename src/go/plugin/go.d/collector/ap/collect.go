@@ -34,8 +34,8 @@ type stationStats struct {
 	rxBitrate float64
 }
 
-func (a *AP) collect() (map[string]int64, error) {
-	bs, err := a.exec.devices()
+func (c *Collector) collect() (map[string]int64, error) {
+	bs, err := c.exec.devices()
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (a *AP) collect() (map[string]int64, error) {
 	seen := make(map[string]bool)
 
 	for _, iface := range apInterfaces {
-		bs, err = a.exec.stationStatistics(iface.name)
+		bs, err = c.exec.stationStatistics(iface.name)
 		if err != nil {
 			return nil, fmt.Errorf("getting station statistics for %s: %v", iface, err)
 		}
@@ -68,9 +68,9 @@ func (a *AP) collect() (map[string]int64, error) {
 
 		seen[key] = true
 
-		if _, ok := a.seenIfaces[key]; !ok {
-			a.seenIfaces[key] = iface
-			a.addInterfaceCharts(iface)
+		if _, ok := c.seenIfaces[key]; !ok {
+			c.seenIfaces[key] = iface
+			c.addInterfaceCharts(iface)
 		}
 
 		px := fmt.Sprintf("ap_%s_%s_", iface.name, iface.ssid)
@@ -90,10 +90,10 @@ func (a *AP) collect() (map[string]int64, error) {
 		}
 	}
 
-	for key, iface := range a.seenIfaces {
+	for key, iface := range c.seenIfaces {
 		if !seen[key] {
-			delete(a.seenIfaces, key)
-			a.removeInterfaceCharts(iface)
+			delete(c.seenIfaces, key)
+			c.removeInterfaceCharts(iface)
 		}
 	}
 

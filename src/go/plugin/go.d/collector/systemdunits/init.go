@@ -11,18 +11,18 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
-func (s *SystemdUnits) validateConfig() error {
-	if len(s.Include) == 0 {
+func (c *Collector) validateConfig() error {
+	if len(c.Include) == 0 {
 		return errors.New("'include' option not set")
 	}
 	return nil
 }
 
-func (s *SystemdUnits) initUnitSelector() (matcher.Matcher, error) {
-	if len(s.Include) == 0 {
+func (c *Collector) initUnitSelector() (matcher.Matcher, error) {
+	if len(c.Include) == 0 {
 		return matcher.TRUE(), nil
 	}
 
-	expr := strings.Join(s.Include, " ")
+	expr := strings.Join(c.Include, " ")
 	return matcher.NewSimplePatternsMatcher(expr)
 }

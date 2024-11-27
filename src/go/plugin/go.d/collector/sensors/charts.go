@@ -301,85 +301,85 @@ var (
 	}
 )
 
-func (s *Sensors) updateCharts(chips []*lmsensors.Chip) {
+func (c *Collector) updateCharts(chips []*lmsensors.Chip) {
 	seen := make(map[string]bool)
 
 	for _, chip := range chips {
 		for _, sn := range chip.Sensors.Voltage {
 			key := chip.UniqueName + "_" + sn.Name
 			seen[key] = true
-			if !s.seenSensors[key] {
-				s.seenSensors[key] = true
-				s.addVoltageCharts(chip, sn)
+			if !c.seenSensors[key] {
+				c.seenSensors[key] = true
+				c.addVoltageCharts(chip, sn)
 			}
 		}
 		for _, sn := range chip.Sensors.Fan {
 			key := chip.UniqueName + "_" + sn.Name
 			seen[key] = true
-			if !s.seenSensors[key] {
-				s.seenSensors[key] = true
-				s.addFanCharts(chip, sn)
+			if !c.seenSensors[key] {
+				c.seenSensors[key] = true
+				c.addFanCharts(chip, sn)
 			}
 		}
 		for _, sn := range chip.Sensors.Temperature {
 			key := chip.UniqueName + "_" + sn.Name
 			seen[key] = true
-			if !s.seenSensors[key] {
-				s.seenSensors[key] = true
-				s.addTemperatureCharts(chip, sn)
+			if !c.seenSensors[key] {
+				c.seenSensors[key] = true
+				c.addTemperatureCharts(chip, sn)
 			}
 		}
 		for _, sn := range chip.Sensors.Current {
 			key := chip.UniqueName + "_" + sn.Name
 			seen[key] = true
-			if !s.seenSensors[key] {
-				s.seenSensors[key] = true
-				s.addCurrentCharts(chip, sn)
+			if !c.seenSensors[key] {
+				c.seenSensors[key] = true
+				c.addCurrentCharts(chip, sn)
 			}
 		}
 		for _, sn := range chip.Sensors.Power {
 			key := chip.UniqueName + "_" + sn.Name
 			seen[key] = true
-			if !s.seenSensors[key] {
-				s.seenSensors[key] = true
-				s.addPowerCharts(chip, sn)
+			if !c.seenSensors[key] {
+				c.seenSensors[key] = true
+				c.addPowerCharts(chip, sn)
 			}
 		}
 		for _, sn := range chip.Sensors.Energy {
 			key := chip.UniqueName + "_" + sn.Name
 			seen[key] = true
-			if !s.seenSensors[key] {
-				s.seenSensors[key] = true
-				s.addEnergyCharts(chip, sn)
+			if !c.seenSensors[key] {
+				c.seenSensors[key] = true
+				c.addEnergyCharts(chip, sn)
 			}
 		}
 		for _, sn := range chip.Sensors.Humidity {
 			key := chip.UniqueName + "_" + sn.Name
 			seen[key] = true
-			if !s.seenSensors[key] {
-				s.seenSensors[key] = true
-				s.addHumidityCharts(chip, sn)
+			if !c.seenSensors[key] {
+				c.seenSensors[key] = true
+				c.addHumidityCharts(chip, sn)
 			}
 		}
 		for _, sn := range chip.Sensors.Intrusion {
 			key := chip.UniqueName + "_" + sn.Name
 			seen[key] = true
-			if !s.seenSensors[key] {
-				s.seenSensors[key] = true
-				s.addIntrusionCharts(chip, sn)
+			if !c.seenSensors[key] {
+				c.seenSensors[key] = true
+				c.addIntrusionCharts(chip, sn)
 			}
 		}
 	}
 
-	for key := range s.seenSensors {
+	for key := range c.seenSensors {
 		if !seen[key] {
-			delete(s.seenSensors, key)
-			s.removeSensorChart(key)
+			delete(c.seenSensors, key)
+			c.removeSensorChart(key)
 		}
 	}
 }
 
-func (s *Sensors) addTemperatureCharts(chip *lmsensors.Chip, sn *lmsensors.TemperatureSensor) {
+func (c *Collector) addTemperatureCharts(chip *lmsensors.Chip, sn *lmsensors.TemperatureSensor) {
 	charts := temperatureSensorChartsTmpl.Copy()
 
 	if sn.Input == nil {
@@ -389,10 +389,10 @@ func (s *Sensors) addTemperatureCharts(chip *lmsensors.Chip, sn *lmsensors.Tempe
 		_ = charts.Remove(temperatureSensorAlarmChartTmpl.ID)
 	}
 
-	s.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
+	c.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
 }
 
-func (s *Sensors) addVoltageCharts(chip *lmsensors.Chip, sn *lmsensors.VoltageSensor) {
+func (c *Collector) addVoltageCharts(chip *lmsensors.Chip, sn *lmsensors.VoltageSensor) {
 	charts := voltageSensorChartsTmpl.Copy()
 
 	if sn.Input == nil {
@@ -405,10 +405,10 @@ func (s *Sensors) addVoltageCharts(chip *lmsensors.Chip, sn *lmsensors.VoltageSe
 		_ = charts.Remove(voltageSensorAlarmChartTmpl.ID)
 	}
 
-	s.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
+	c.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
 }
 
-func (s *Sensors) addFanCharts(chip *lmsensors.Chip, sn *lmsensors.FanSensor) {
+func (c *Collector) addFanCharts(chip *lmsensors.Chip, sn *lmsensors.FanSensor) {
 	charts := fanSensorChartsTmpl.Copy()
 
 	if sn.Input == nil {
@@ -418,10 +418,10 @@ func (s *Sensors) addFanCharts(chip *lmsensors.Chip, sn *lmsensors.FanSensor) {
 		_ = charts.Remove(fanSensorAlarmChartTmpl.ID)
 	}
 
-	s.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
+	c.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
 }
 
-func (s *Sensors) addCurrentCharts(chip *lmsensors.Chip, sn *lmsensors.CurrentSensor) {
+func (c *Collector) addCurrentCharts(chip *lmsensors.Chip, sn *lmsensors.CurrentSensor) {
 	charts := currentSensorChartsTmpl.Copy()
 
 	if sn.Input == nil {
@@ -434,10 +434,10 @@ func (s *Sensors) addCurrentCharts(chip *lmsensors.Chip, sn *lmsensors.CurrentSe
 		_ = charts.Remove(currentSensorAlarmChartTmpl.ID)
 	}
 
-	s.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
+	c.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
 }
 
-func (s *Sensors) addPowerCharts(chip *lmsensors.Chip, sn *lmsensors.PowerSensor) {
+func (c *Collector) addPowerCharts(chip *lmsensors.Chip, sn *lmsensors.PowerSensor) {
 	charts := powerSensorChartsTmpl.Copy()
 
 	if sn.Input == nil {
@@ -450,45 +450,45 @@ func (s *Sensors) addPowerCharts(chip *lmsensors.Chip, sn *lmsensors.PowerSensor
 		_ = charts.Remove(powerSensorAlarmChartTmpl.ID)
 	}
 
-	s.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
+	c.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
 }
 
-func (s *Sensors) addEnergyCharts(chip *lmsensors.Chip, sn *lmsensors.EnergySensor) {
+func (c *Collector) addEnergyCharts(chip *lmsensors.Chip, sn *lmsensors.EnergySensor) {
 	charts := energySensorChartsTmpl.Copy()
 
 	if sn.Input == nil {
 		_ = charts.Remove(energySensorInputChartTmpl.ID)
 	}
 
-	s.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
+	c.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
 }
 
-func (s *Sensors) addHumidityCharts(chip *lmsensors.Chip, sn *lmsensors.HumiditySensor) {
+func (c *Collector) addHumidityCharts(chip *lmsensors.Chip, sn *lmsensors.HumiditySensor) {
 	charts := humiditySensorChartsTmpl.Copy()
 
 	if sn.Input == nil {
 		_ = charts.Remove(humiditySensorInputChartTmpl.ID)
 	}
 
-	s.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
+	c.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
 }
 
-func (s *Sensors) addIntrusionCharts(chip *lmsensors.Chip, sn *lmsensors.IntrusionSensor) {
+func (c *Collector) addIntrusionCharts(chip *lmsensors.Chip, sn *lmsensors.IntrusionSensor) {
 	charts := intrusionSensorChartsTmpl.Copy()
 
 	if sn.Alarm == nil {
 		_ = charts.Remove(intrusionSensorAlarmChartTmpl.ID)
 	}
 
-	s.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
+	c.addCharts(charts, chip.UniqueName, chip.SysDevice, sn.Name, sn.Label)
 }
 
-func (s *Sensors) addCharts(charts *module.Charts, chipUniqueName, chipSysDevice, snName, snLabel string) {
+func (c *Collector) addCharts(charts *module.Charts, chipUniqueName, chipSysDevice, snName, snLabel string) {
 	if len(*charts) == 0 {
 		return
 	}
 
-	if lbl := s.relabel(chipUniqueName, snName); lbl != "" {
+	if lbl := c.relabel(chipUniqueName, snName); lbl != "" {
 		snLabel = lbl
 	}
 
@@ -506,15 +506,15 @@ func (s *Sensors) addCharts(charts *module.Charts, chipUniqueName, chipSysDevice
 		}
 	}
 
-	if err := s.Charts().Add(*charts...); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (s *Sensors) removeSensorChart(px string) {
+func (c *Collector) removeSensorChart(px string) {
 	px = cleanChartId(px)
 
-	for _, chart := range *s.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
@@ -523,15 +523,15 @@ func (s *Sensors) removeSensorChart(px string) {
 	}
 }
 
-func (s *Sensors) relabel(chipUniqueName, snName string) string {
-	for _, rv := range s.Relabel {
+func (c *Collector) relabel(chipUniqueName, snName string) string {
+	for _, rv := range c.Relabel {
 		if rv.Chip == "" {
 			return ""
 		}
 
 		mr, err := matcher.NewSimplePatternsMatcher(rv.Chip)
 		if err != nil {
-			s.Debugf("failed to create simple pattern matcher from '%s': %v", rv.Chip, err)
+			c.Debugf("failed to create simple pattern matcher from '%s': %v", rv.Chip, err)
 			return ""
 		}
 

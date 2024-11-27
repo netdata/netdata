@@ -26,8 +26,8 @@ var replicaSetMemberStates = map[string]int{
 
 // TODO: deal with duplicates if we collect metrics from all cluster nodes
 // should we only collect ReplSetStatus (at least by default) from primary nodes? (db.runCommand( { isMaster: 1 } ))
-func (m *Mongo) collectReplSetStatus(mx map[string]int64) error {
-	s, err := m.conn.replSetGetStatus()
+func (c *Collector) collectReplSetStatus(mx map[string]int64) error {
+	s, err := c.conn.replSetGetStatus()
 	if err != nil {
 		return fmt.Errorf("error get status of the replica set from mongo: %s", err)
 	}
@@ -60,25 +60,25 @@ func (m *Mongo) collectReplSetStatus(mx map[string]int64) error {
 	}
 
 	for name, member := range seen {
-		if !m.replSetMembers[name] {
-			m.replSetMembers[name] = true
-			m.Debugf("new replica set member '%s': adding charts", name)
-			m.addReplSetMemberCharts(member)
+		if !c.replSetMembers[name] {
+			c.replSetMembers[name] = true
+			c.Debugf("new replica set member '%s': adding charts", name)
+			c.addReplSetMemberCharts(member)
 		}
 	}
 
-	for name := range m.replSetMembers {
+	for name := range c.replSetMembers {
 		if _, ok := seen[name]; !ok {
-			delete(m.replSetMembers, name)
-			m.Debugf("stale replica set member '%s': removing charts", name)
-			m.removeReplSetMemberCharts(name)
+			delete(c.replSetMembers, name)
+			c.Debugf("stale replica set member '%s': removing charts", name)
+			c.removeReplSetMemberCharts(name)
 		}
 	}
 
 	return nil
 }
 
-func (m *Mongo) addReplSetMemberCharts(v documentReplSetMember) {
+func (c *Collector) addReplSetMemberCharts(v documentReplSetMember) {
 	charts := chartsTmplReplSetMember.Copy()
 
 	if v.Self != nil {
@@ -97,15 +97,15 @@ func (m *Mongo) addReplSetMemberCharts(v documentReplSetMember) {
 		}
 	}
 
-	if err := m.Charts().Add(*charts...); err != nil {
-		m.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *Mongo) removeReplSetMemberCharts(name string) {
+func (c *Collector) removeReplSetMemberCharts(name string) {
 	px := fmt.Sprintf("%s%s_", chartPxReplSetMember, name)
 
-	for _, chart := range *m.Charts() {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, px) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

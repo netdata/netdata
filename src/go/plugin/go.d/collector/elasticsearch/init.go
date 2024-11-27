@@ -9,19 +9,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (es *Elasticsearch) validateConfig() error {
-	if es.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("URL not set")
 	}
-	if !(es.DoNodeStats || es.DoClusterHealth || es.DoClusterStats || es.DoIndicesStats) {
+	if !(c.DoNodeStats || c.DoClusterHealth || c.DoClusterStats || c.DoIndicesStats) {
 		return errors.New("all API calls are disabled")
 	}
-	if _, err := web.NewHTTPRequest(es.RequestConfig); err != nil {
+	if _, err := web.NewHTTPRequest(c.RequestConfig); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (es *Elasticsearch) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(es.ClientConfig)
+func (c *Collector) initHTTPClient() (*http.Client, error) {
+	return web.NewHTTPClient(c.ClientConfig)
 }

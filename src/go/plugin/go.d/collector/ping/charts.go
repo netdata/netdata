@@ -92,10 +92,10 @@ func newHostCharts(host string) *module.Charts {
 	return charts
 }
 
-func (p *Ping) addHostCharts(host string) {
+func (c *Collector) addHostCharts(host string) {
 	charts := newHostCharts(host)
 
-	if err := p.Charts().Add(*charts...); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }

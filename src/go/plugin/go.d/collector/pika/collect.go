@@ -15,27 +15,27 @@ import (
 
 const precision = 1000 // float values multiplier and dimensions divisor
 
-func (p *Pika) collect() (map[string]int64, error) {
-	info, err := p.pdb.Info(context.Background(), "all").Result()
+func (c *Collector) collect() (map[string]int64, error) {
+	info, err := c.pdb.Info(context.Background(), "all").Result()
 	if err != nil {
 		return nil, err
 	}
 
-	if p.server == "" {
+	if c.server == "" {
 		s, v, err := extractServerVersion(info)
 		if err != nil {
 			return nil, fmt.Errorf("can not extract server app and version: %v", err)
 		}
-		p.server, p.version = s, v
-		p.Debugf(`server="%s",version="%s"`, s, v)
+		c.server, c.version = s, v
+		c.Debugf(`server="%s",version="%s"`, s, v)
 	}
 
-	if p.server != "pika" {
-		return nil, fmt.Errorf("unsupported server app, want=pika, got=%s", p.server)
+	if c.server != "pika" {
+		return nil, fmt.Errorf("unsupported server app, want=pika, got=%s", c.server)
 	}
 
 	ms := make(map[string]int64)
-	p.collectInfo(ms, info)
+	c.collectInfo(ms, info)
 
 	return ms, nil
 }

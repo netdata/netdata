@@ -29,15 +29,15 @@ type nuStatus struct {
 	} `json:"requests" stm:"requests"`
 }
 
-func (n *NginxUnit) collect() (map[string]int64, error) {
-	req, err := web.NewHTTPRequestWithPath(n.RequestConfig, urlPathStatus)
+func (c *Collector) collect() (map[string]int64, error) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathStatus)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request to '%s': %v", n.URL, err)
+		return nil, fmt.Errorf("failed to create HTTP request to '%s': %v", c.URL, err)
 	}
 
 	var status nuStatus
 
-	wc := web.DoHTTP(n.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
+	wc := web.DoHTTP(c.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
 		var msg struct {
 			Error string `json:"error"`
 		}

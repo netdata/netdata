@@ -117,7 +117,7 @@ var chartDeviceDirtySizeTmpl = module.Chart{
 	},
 }
 
-func (c *DmCache) addDeviceCharts(device string) {
+func (c *Collector) addDeviceCharts(device string) {
 	charts := deviceChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -135,7 +135,7 @@ func (c *DmCache) addDeviceCharts(device string) {
 	}
 }
 
-func (c *DmCache) removeDeviceCharts(device string) {
+func (c *Collector) removeDeviceCharts(device string) {
 	px := fmt.Sprintf("dmcache_device_%s_", cleanDeviceName(device))
 
 	for _, chart := range *c.Charts() {

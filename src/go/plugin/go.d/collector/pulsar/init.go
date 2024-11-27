@@ -10,25 +10,25 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (p *Pulsar) validateConfig() error {
-	if p.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
 	return nil
 }
 
-func (p *Pulsar) initPrometheusClient() (prometheus.Prometheus, error) {
-	client, err := web.NewHTTPClient(p.ClientConfig)
+func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return prometheus.New(client, p.RequestConfig), nil
+	return prometheus.New(client, c.RequestConfig), nil
 }
 
-func (p *Pulsar) initTopicFilerMatcher() (matcher.Matcher, error) {
-	if p.TopicFilter.Empty() {
+func (c *Collector) initTopicFilerMatcher() (matcher.Matcher, error) {
+	if c.TopicFilter.Empty() {
 		return matcher.FALSE(), nil
 	}
-	return p.TopicFilter.Parse()
+	return c.TopicFilter.Parse()
 }

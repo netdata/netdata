@@ -7,18 +7,18 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (g *Geth) validateConfig() error {
-	if g.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("url not set")
 	}
 	return nil
 }
 
-func (g *Geth) initPrometheusClient() (prometheus.Prometheus, error) {
-	client, err := web.NewHTTPClient(g.ClientConfig)
+func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return prometheus.New(client, g.RequestConfig), nil
+	return prometheus.New(client, c.RequestConfig), nil
 }

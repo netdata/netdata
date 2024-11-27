@@ -72,66 +72,66 @@ var (
 	reJSON = regexp.MustCompile(`^[[:space:]]*{.*}[[:space:]]*$`)
 )
 
-func (w *WebLog) newParser(record []byte) (logs.Parser, error) {
-	if w.ParserConfig.LogType == typeAuto {
-		w.Debugf("log_type is %s, will try format auto-detection", typeAuto)
+func (c *Collector) newParser(record []byte) (logs.Parser, error) {
+	if c.ParserConfig.LogType == typeAuto {
+		c.Debugf("log_type is %s, will try format auto-detection", typeAuto)
 		if len(record) == 0 {
-			return nil, fmt.Errorf("empty line, can't auto-detect format (%s)", w.file.CurrentFilename())
+			return nil, fmt.Errorf("empty line, can't auto-detect format (%s)", c.file.CurrentFilename())
 		}
-		return w.guessParser(record)
+		return c.guessParser(record)
 	}
 
-	w.ParserConfig.CSV.Format = cleanApacheLogFormat(w.ParserConfig.CSV.Format)
-	w.Debugf("log_type is %s, skipping auto-detection", w.ParserConfig.LogType)
-	switch w.ParserConfig.LogType {
+	c.ParserConfig.CSV.Format = cleanApacheLogFormat(c.ParserConfig.CSV.Format)
+	c.Debugf("log_type is %s, skipping auto-detection", c.ParserConfig.LogType)
+	switch c.ParserConfig.LogType {
 	case logs.TypeCSV:
-		w.Debugf("config: %+v", w.ParserConfig.CSV)
+		c.Debugf("config: %+v", c.ParserConfig.CSV)
 	case logs.TypeLTSV:
-		w.Debugf("config: %+v", w.ParserConfig.LogType)
+		c.Debugf("config: %+v", c.ParserConfig.LogType)
 	case logs.TypeRegExp:
-		w.Debugf("config: %+v", w.ParserConfig.RegExp)
+		c.Debugf("config: %+v", c.ParserConfig.RegExp)
 	case logs.TypeJSON:
-		w.Debugf("config: %+v", w.ParserConfig.JSON)
+		c.Debugf("config: %+v", c.ParserConfig.JSON)
 	}
-	return logs.NewParser(w.ParserConfig, w.file)
+	return logs.NewParser(c.ParserConfig, c.file)
 }
 
-func (w *WebLog) guessParser(record []byte) (logs.Parser, error) {
-	w.Debug("starting log type auto-detection")
+func (c *Collector) guessParser(record []byte) (logs.Parser, error) {
+	c.Debug("starting log type auto-detection")
 	if reLTSV.Match(record) {
-		w.Debug("log type is LTSV")
-		return logs.NewLTSVParser(w.ParserConfig.LTSV, w.file)
+		c.Debug("log type is LTSV")
+		return logs.NewLTSVParser(c.ParserConfig.LTSV, c.file)
 	}
 	if reJSON.Match(record) {
-		w.Debug("log type is JSON")
-		return logs.NewJSONParser(w.ParserConfig.JSON, w.file)
+		c.Debug("log type is JSON")
+		return logs.NewJSONParser(c.ParserConfig.JSON, c.file)
 	}
-	w.Debug("log type is CSV")
-	return w.guessCSVParser(record)
+	c.Debug("log type is CSV")
+	return c.guessCSVParser(record)
 }
 
-func (w *WebLog) guessCSVParser(record []byte) (logs.Parser, error) {
-	w.Debug("starting csv log format auto-detection")
-	w.Debugf("config: %+v", w.ParserConfig.CSV)
+func (c *Collector) guessCSVParser(record []byte) (logs.Parser, error) {
+	c.Debug("starting csv log format auto-detection")
+	c.Debugf("config: %+v", c.ParserConfig.CSV)
 	for _, format := range guessOrder {
 		format = cleanCSVFormat(format)
-		cfg := w.ParserConfig.CSV
+		cfg := c.ParserConfig.CSV
 		cfg.Format = format
 
-		w.Debugf("trying format: '%s'", format)
-		parser, err := logs.NewCSVParser(cfg, w.file)
+		c.Debugf("trying format: '%s'", format)
+		parser, err := logs.NewCSVParser(cfg, c.file)
 		if err != nil {
 			return nil, err
 		}
 
 		line := newEmptyLogLine()
 		if err := parser.Parse(record, line); err != nil {
-			w.Debug("parse: ", err)
+			c.Debug("parse: ", err)
 			continue
 		}
 
 		if err = line.verify(); err != nil {
-			w.Debug("verify: ", err)
+			c.Debug("verify: ", err)
 			continue
 		}
 		return parser, nil

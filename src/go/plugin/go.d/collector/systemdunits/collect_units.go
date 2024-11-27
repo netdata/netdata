@@ -32,15 +32,15 @@ var unitStates = []string{
 	unitStateDeactivating,
 }
 
-func (s *SystemdUnits) collectUnits(mx map[string]int64, conn systemdConnection) error {
+func (c *Collector) collectUnits(mx map[string]int64, conn systemdConnection) error {
 	var units []dbus.UnitStatus
 	var err error
 
-	if s.systemdVersion >= 230 {
+	if c.systemdVersion >= 230 {
 		// https://github.com/systemd/systemd/pull/3142
-		units, err = s.getLoadedUnitsByPatterns(conn)
+		units, err = c.getLoadedUnitsByPatterns(conn)
 	} else {
-		units, err = s.getLoadedUnits(conn)
+		units, err = c.getLoadedUnits(conn)
 	}
 	if err != nil {
 		return err
@@ -56,23 +56,23 @@ func (s *SystemdUnits) collectUnits(mx map[string]int64, conn systemdConnection)
 
 		seen[unit.Name] = true
 
-		if s.SkipTransient {
-			if _, ok := s.unitTransient[unit.Name]; !ok {
-				prop, err := s.getUnitTransientProperty(conn, unit.Name)
+		if c.SkipTransient {
+			if _, ok := c.unitTransient[unit.Name]; !ok {
+				prop, err := c.getUnitTransientProperty(conn, unit.Name)
 				if err != nil {
 					return err
 				}
 				prop = strings.Trim(prop, "\"")
-				s.unitTransient[unit.Name] = prop == "true"
+				c.unitTransient[unit.Name] = prop == "true"
 			}
-			if s.unitTransient[unit.Name] {
+			if c.unitTransient[unit.Name] {
 				continue
 			}
 		}
 
-		if !s.seenUnits[unit.Name] {
-			s.seenUnits[unit.Name] = true
-			s.addUnitCharts(name, typ)
+		if !c.seenUnits[unit.Name] {
+			c.seenUnits[unit.Name] = true
+			c.addUnitCharts(name, typ)
 		}
 
 		for _, s := range unitStates {
@@ -81,29 +81,29 @@ func (s *SystemdUnits) collectUnits(mx map[string]int64, conn systemdConnection)
 		mx[fmt.Sprintf("unit_%s_%s_state_%s", name, typ, unit.ActiveState)] = 1
 	}
 
-	for k := range s.seenUnits {
+	for k := range c.seenUnits {
 		if !seen[k] {
-			delete(s.seenUnits, k)
+			delete(c.seenUnits, k)
 			if name, typ, ok := extractUnitNameType(k); ok {
-				s.removeUnitCharts(name, typ)
+				c.removeUnitCharts(name, typ)
 			}
 		}
 	}
 
-	for k := range s.unitTransient {
+	for k := range c.unitTransient {
 		if !seen[k] {
-			delete(s.unitTransient, k)
+			delete(c.unitTransient, k)
 		}
 	}
 
 	return nil
 }
 
-func (s *SystemdUnits) getLoadedUnits(conn systemdConnection) ([]dbus.UnitStatus, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), s.Timeout.Duration())
+func (c *Collector) getLoadedUnits(conn systemdConnection) ([]dbus.UnitStatus, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	s.Debugf("calling function 'ListUnits'")
+	c.Debugf("calling function 'ListUnits'")
 	units, err := conn.ListUnitsContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error on ListUnits: %v", err)
@@ -115,23 +115,23 @@ func (s *SystemdUnits) getLoadedUnits(conn systemdConnection) ([]dbus.UnitStatus
 
 	loaded := units[:0]
 	for _, unit := range units {
-		if unit.LoadState == "loaded" && s.unitSr.MatchString(unit.Name) {
+		if unit.LoadState == "loaded" && c.unitSr.MatchString(unit.Name) {
 			loaded = append(loaded, unit)
 		}
 	}
 
-	s.Debugf("got total/loaded %d/%d units", len(units), len(loaded))
+	c.Debugf("got total/loaded %d/%d units", len(units), len(loaded))
 
 	return loaded, nil
 }
 
-func (s *SystemdUnits) getLoadedUnitsByPatterns(conn systemdConnection) ([]dbus.UnitStatus, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), s.Timeout.Duration())
+func (c *Collector) getLoadedUnitsByPatterns(conn systemdConnection) ([]dbus.UnitStatus, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	s.Debugf("calling function 'ListUnitsByPatterns'")
+	c.Debugf("calling function 'ListUnitsByPatterns'")
 
-	units, err := conn.ListUnitsByPatternsContext(ctx, unitStates, s.Include)
+	units, err := conn.ListUnitsByPatternsContext(ctx, unitStates, c.Include)
 	if err != nil {
 		return nil, fmt.Errorf("error on ListUnitsByPatterns: %v", err)
 	}
@@ -146,16 +146,16 @@ func (s *SystemdUnits) getLoadedUnitsByPatterns(conn systemdConnection) ([]dbus.
 			loaded = append(loaded, unit)
 		}
 	}
-	s.Debugf("got total/loaded %d/%d units", len(units), len(loaded))
+	c.Debugf("got total/loaded %d/%d units", len(units), len(loaded))
 
 	return loaded, nil
 }
 
-func (s *SystemdUnits) getUnitTransientProperty(conn systemdConnection, unit string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), s.Timeout.Duration())
+func (c *Collector) getUnitTransientProperty(conn systemdConnection, unit string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	s.Debugf("calling function 'GetUnitProperty' for unit '%s'", unit)
+	c.Debugf("calling function 'GetUnitProperty' for unit '%s'", unit)
 
 	prop, err := conn.GetUnitPropertyContext(ctx, unit, transientProperty)
 	if err != nil {

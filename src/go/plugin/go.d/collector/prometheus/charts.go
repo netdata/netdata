@@ -17,7 +17,7 @@ const (
 	prioGORuntime = prioDefault + 10
 )
 
-func (p *Prometheus) addGaugeChart(id, name, help string, labels labels.Labels) {
+func (c *Collector) addGaugeChart(id, name, help string, labels labels.Labels) {
 	units := getChartUnits(name)
 
 	cType := module.Line
@@ -30,7 +30,7 @@ func (p *Prometheus) addGaugeChart(id, name, help string, labels labels.Labels) 
 		Title:    getChartTitle(name, help),
 		Units:    units,
 		Fam:      getChartFamily(name),
-		Ctx:      getChartContext(p.application(), name),
+		Ctx:      getChartContext(c.application(), name),
 		Type:     cType,
 		Priority: getChartPriority(name),
 		Dims: module.Dims{
@@ -41,21 +41,21 @@ func (p *Prometheus) addGaugeChart(id, name, help string, labels labels.Labels) 
 	for _, lbl := range labels {
 		chart.Labels = append(chart.Labels,
 			module.Label{
-				Key:   p.labelName(lbl.Name),
+				Key:   c.labelName(lbl.Name),
 				Value: apostropheReplacer.Replace(lbl.Value),
 			},
 		)
 	}
 
-	if err := p.Charts().Add(chart); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 		return
 	}
 
-	p.cache.addChart(id, chart)
+	c.cache.addChart(id, chart)
 }
 
-func (p *Prometheus) addCounterChart(id, name, help string, labels labels.Labels) {
+func (c *Collector) addCounterChart(id, name, help string, labels labels.Labels) {
 	units := getChartUnits(name)
 
 	switch units {
@@ -74,7 +74,7 @@ func (p *Prometheus) addCounterChart(id, name, help string, labels labels.Labels
 		Title:    getChartTitle(name, help),
 		Units:    units,
 		Fam:      getChartFamily(name),
-		Ctx:      getChartContext(p.application(), name),
+		Ctx:      getChartContext(c.application(), name),
 		Type:     cType,
 		Priority: getChartPriority(name),
 		Dims: module.Dims{
@@ -84,21 +84,21 @@ func (p *Prometheus) addCounterChart(id, name, help string, labels labels.Labels
 	for _, lbl := range labels {
 		chart.Labels = append(chart.Labels,
 			module.Label{
-				Key:   p.labelName(lbl.Name),
+				Key:   c.labelName(lbl.Name),
 				Value: apostropheReplacer.Replace(lbl.Value),
 			},
 		)
 	}
 
-	if err := p.Charts().Add(chart); err != nil {
-		p.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 		return
 	}
 
-	p.cache.addChart(id, chart)
+	c.cache.addChart(id, chart)
 }
 
-func (p *Prometheus) addSummaryCharts(id, name, help string, labels labels.Labels, quantiles []prometheus.Quantile) {
+func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels, quantiles []prometheus.Quantile) {
 	units := getChartUnits(name)
 
 	switch units {
@@ -113,7 +113,7 @@ func (p *Prometheus) addSummaryCharts(id, name, help string, labels labels.Label
 			Title:    getChartTitle(name, help),
 			Units:    units,
 			Fam:      getChartFamily(name),
-			Ctx:      getChartContext(p.application(), name),
+			Ctx:      getChartContext(c.application(), name),
 			Priority: getChartPriority(name),
 			Dims: func() (dims module.Dims) {
 				for _, v := range quantiles {
@@ -132,7 +132,7 @@ func (p *Prometheus) addSummaryCharts(id, name, help string, labels labels.Label
 			Title:    getChartTitle(name, help),
 			Units:    units,
 			Fam:      getChartFamily(name),
-			Ctx:      getChartContext(p.application(), name) + "_sum",
+			Ctx:      getChartContext(c.application(), name) + "_sum",
 			Priority: getChartPriority(name),
 			Dims: module.Dims{
 				{ID: id + "_sum", Name: name + "_sum", Algo: module.Incremental, Div: precision},
@@ -143,7 +143,7 @@ func (p *Prometheus) addSummaryCharts(id, name, help string, labels labels.Label
 			Title:    getChartTitle(name, help),
 			Units:    "events/s",
 			Fam:      getChartFamily(name),
-			Ctx:      getChartContext(p.application(), name) + "_count",
+			Ctx:      getChartContext(c.application(), name) + "_count",
 			Priority: getChartPriority(name),
 			Dims: module.Dims{
 				{ID: id + "_count", Name: name + "_count", Algo: module.Incremental},
@@ -154,19 +154,19 @@ func (p *Prometheus) addSummaryCharts(id, name, help string, labels labels.Label
 	for _, chart := range charts {
 		for _, lbl := range labels {
 			chart.Labels = append(chart.Labels, module.Label{
-				Key:   p.labelName(lbl.Name),
+				Key:   c.labelName(lbl.Name),
 				Value: apostropheReplacer.Replace(lbl.Value),
 			})
 		}
-		if err := p.Charts().Add(chart); err != nil {
-			p.Warning(err)
+		if err := c.Charts().Add(chart); err != nil {
+			c.Warning(err)
 			continue
 		}
-		p.cache.addChart(id, chart)
+		c.cache.addChart(id, chart)
 	}
 }
 
-func (p *Prometheus) addHistogramCharts(id, name, help string, labels labels.Labels, buckets []prometheus.Bucket) {
+func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labels, buckets []prometheus.Bucket) {
 	units := getChartUnits(name)
 
 	switch units {
@@ -181,7 +181,7 @@ func (p *Prometheus) addHistogramCharts(id, name, help string, labels labels.Lab
 			Title:    getChartTitle(name, help),
 			Units:    "observations/s",
 			Fam:      getChartFamily(name),
-			Ctx:      getChartContext(p.application(), name),
+			Ctx:      getChartContext(c.application(), name),
 			Priority: getChartPriority(name),
 			Dims: func() (dims module.Dims) {
 				for _, v := range buckets {
@@ -200,7 +200,7 @@ func (p *Prometheus) addHistogramCharts(id, name, help string, labels labels.Lab
 			Title:    getChartTitle(name, help),
 			Units:    units,
 			Fam:      getChartFamily(name),
-			Ctx:      getChartContext(p.application(), name) + "_sum",
+			Ctx:      getChartContext(c.application(), name) + "_sum",
 			Priority: getChartPriority(name),
 			Dims: module.Dims{
 				{ID: id + "_sum", Name: name + "_sum", Algo: module.Incremental, Div: precision},
@@ -211,7 +211,7 @@ func (p *Prometheus) addHistogramCharts(id, name, help string, labels labels.Lab
 			Title:    getChartTitle(name, help),
 			Units:    "events/s",
 			Fam:      getChartFamily(name),
-			Ctx:      getChartContext(p.application(), name) + "_count",
+			Ctx:      getChartContext(c.application(), name) + "_count",
 			Priority: getChartPriority(name),
 			Dims: module.Dims{
 				{ID: id + "_count", Name: name + "_count", Algo: module.Incremental},
@@ -222,30 +222,30 @@ func (p *Prometheus) addHistogramCharts(id, name, help string, labels labels.Lab
 	for _, chart := range charts {
 		for _, lbl := range labels {
 			chart.Labels = append(chart.Labels, module.Label{
-				Key:   p.labelName(lbl.Name),
+				Key:   c.labelName(lbl.Name),
 				Value: apostropheReplacer.Replace(lbl.Value),
 			})
 		}
-		if err := p.Charts().Add(chart); err != nil {
-			p.Warning(err)
+		if err := c.Charts().Add(chart); err != nil {
+			c.Warning(err)
 			continue
 		}
-		p.cache.addChart(id, chart)
+		c.cache.addChart(id, chart)
 	}
 }
 
-func (p *Prometheus) application() string {
-	if p.Application != "" {
-		return p.Application
+func (c *Collector) application() string {
+	if c.Application != "" {
+		return c.Application
 	}
-	return p.Name
+	return c.Name
 }
 
-func (p *Prometheus) labelName(lblName string) string {
-	if p.LabelPrefix == "" {
+func (c *Collector) labelName(lblName string) string {
+	if c.LabelPrefix == "" {
 		return lblName
 	}
-	return p.LabelPrefix + "_" + lblName
+	return c.LabelPrefix + "_" + lblName
 }
 
 func getChartTitle(name, help string) string {

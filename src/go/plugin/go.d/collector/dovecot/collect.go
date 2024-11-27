@@ -13,33 +13,33 @@ import (
 
 // FIXME: drop using "old_stats" in favour of "stats" (https://doc.dovecot.org/configuration_manual/stats/openmetrics/).
 
-func (d *Dovecot) collect() (map[string]int64, error) {
-	if d.conn == nil {
-		conn, err := d.establishConn()
+func (c *Collector) collect() (map[string]int64, error) {
+	if c.conn == nil {
+		conn, err := c.establishConn()
 		if err != nil {
 			return nil, err
 		}
-		d.conn = conn
+		c.conn = conn
 	}
 
-	stats, err := d.conn.queryExportGlobal()
+	stats, err := c.conn.queryExportGlobal()
 	if err != nil {
-		d.conn.disconnect()
-		d.conn = nil
+		c.conn.disconnect()
+		c.conn = nil
 		return nil, err
 	}
 
 	mx := make(map[string]int64)
 
 	// https://doc.dovecot.org/configuration_manual/stats/old_statistics/#statistics-gathered
-	if err := d.collectExportGlobal(mx, stats); err != nil {
+	if err := c.collectExportGlobal(mx, stats); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (d *Dovecot) collectExportGlobal(mx map[string]int64, resp []byte) error {
+func (c *Collector) collectExportGlobal(mx map[string]int64, resp []byte) error {
 	sc := bufio.NewScanner(bytes.NewReader(resp))
 
 	if !sc.Scan() {
@@ -68,7 +68,7 @@ func (d *Dovecot) collectExportGlobal(mx map[string]int64, resp []byte) error {
 
 		v, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
-			d.Debugf("failed to parse export value %s %s: %v", name, val, err)
+			c.Debugf("failed to parse export value %s %s: %v", name, val, err)
 			continue
 		}
 
@@ -78,8 +78,8 @@ func (d *Dovecot) collectExportGlobal(mx map[string]int64, resp []byte) error {
 	return nil
 }
 
-func (d *Dovecot) establishConn() (dovecotConn, error) {
-	conn := d.newConn(d.Config)
+func (c *Collector) establishConn() (dovecotConn, error) {
+	conn := c.newConn(c.Config)
 
 	if err := conn.connect(); err != nil {
 		return nil, err

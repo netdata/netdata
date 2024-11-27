@@ -948,7 +948,7 @@ var (
 	}
 )
 
-func (c *ClickHouse) addDiskCharts(disk *seenDisk) {
+func (c *Collector) addDiskCharts(disk *seenDisk) {
 	charts := diskChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -966,12 +966,12 @@ func (c *ClickHouse) addDiskCharts(disk *seenDisk) {
 	}
 }
 
-func (c *ClickHouse) removeDiskCharts(disk *seenDisk) {
+func (c *Collector) removeDiskCharts(disk *seenDisk) {
 	px := fmt.Sprintf("disk_%s_", disk.disk)
 	c.removeCharts(px)
 }
 
-func (c *ClickHouse) addTableCharts(table *seenTable) {
+func (c *Collector) addTableCharts(table *seenTable) {
 	charts := tableChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -990,12 +990,12 @@ func (c *ClickHouse) addTableCharts(table *seenTable) {
 	}
 }
 
-func (c *ClickHouse) removeTableCharts(table *seenTable) {
+func (c *Collector) removeTableCharts(table *seenTable) {
 	px := fmt.Sprintf("table_%s_database_%s_", table.table, table.db)
 	c.removeCharts(px)
 }
 
-func (c *ClickHouse) removeCharts(prefix string) {
+func (c *Collector) removeCharts(prefix string) {
 	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()

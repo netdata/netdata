@@ -9,13 +9,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (t *Tomcat) validateConfig() error {
-	if t.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return fmt.Errorf("url not set")
 	}
 	return nil
 }
 
-func (t *Tomcat) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(t.ClientConfig)
+func (c *Collector) initHTTPClient() (*http.Client, error) {
+	return web.NewHTTPClient(c.ClientConfig)
 }

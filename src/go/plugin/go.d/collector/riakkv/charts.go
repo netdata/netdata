@@ -439,23 +439,23 @@ var (
 	}
 )
 
-func (r *RiakKv) adjustCharts(mx map[string]int64) {
+func (c *Collector) adjustCharts(mx map[string]int64) {
 	var i int
-	for _, chart := range *r.Charts() {
+	for _, chart := range *c.Charts() {
 		chart.Dims = slices.DeleteFunc(chart.Dims, func(dim *module.Dim) bool {
 			_, ok := mx[dim.ID]
 			if !ok {
-				r.Debugf("removing dimension '%s' from chart '%s': metric not found", dim.ID, chart.ID)
+				c.Debugf("removing dimension '%s' from chart '%s': metric not found", dim.ID, chart.ID)
 			}
 			return !ok
 		})
 
 		if len(chart.Dims) == 0 {
-			r.Debugf("removing chart '%s': no metrics found", chart.ID)
+			c.Debugf("removing chart '%s': no metrics found", chart.ID)
 			continue
 		}
 
-		(*r.Charts())[i] = chart
+		(*c.Charts())[i] = chart
 		i++
 	}
 }

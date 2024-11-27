@@ -9,15 +9,15 @@ import (
 	"strings"
 )
 
-func (p *Postfix) validateConfig() error {
-	if p.BinaryPath == "" {
+func (c *Collector) validateConfig() error {
+	if c.BinaryPath == "" {
 		return errors.New("no postqueue binary path specified")
 	}
 	return nil
 }
 
-func (p *Postfix) initPostqueueExec() (postqueueBinary, error) {
-	binPath := p.BinaryPath
+func (c *Collector) initPostqueueExec() (postqueueBinary, error) {
+	binPath := c.BinaryPath
 
 	if !strings.HasPrefix(binPath, "/") {
 		path, err := exec.LookPath(binPath)
@@ -31,8 +31,8 @@ func (p *Postfix) initPostqueueExec() (postqueueBinary, error) {
 		return nil, err
 	}
 
-	pq := newPostqueueExec(binPath, p.Timeout.Duration())
-	pq.Logger = p.Logger
+	pq := newPostqueueExec(binPath, c.Timeout.Duration())
+	pq.Logger = c.Logger
 
 	return pq, nil
 }

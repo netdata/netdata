@@ -137,7 +137,7 @@ var (
 	}
 )
 
-func (t *Tomcat) addConnectorCharts(name string) {
+func (c *Collector) addConnectorCharts(name string) {
 	charts := connectorChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -150,12 +150,12 @@ func (t *Tomcat) addConnectorCharts(name string) {
 		}
 	}
 
-	if err := t.Charts().Add(*charts...); err != nil {
-		t.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (t *Tomcat) addMemPoolCharts(name, typ string) {
+func (c *Collector) addMemPoolCharts(name, typ string) {
 	name = strings.ReplaceAll(name, "'", "")
 
 	charts := jvmMemoryPoolChartsTmpl.Copy()
@@ -171,23 +171,23 @@ func (t *Tomcat) addMemPoolCharts(name, typ string) {
 		}
 	}
 
-	if err := t.Charts().Add(*charts...); err != nil {
-		t.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (t *Tomcat) removeConnectorCharts(name string) {
+func (c *Collector) removeConnectorCharts(name string) {
 	px := fmt.Sprintf("connector_%s_", cleanName(name))
-	t.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (t *Tomcat) removeMemoryPoolCharts(name string) {
+func (c *Collector) removeMemoryPoolCharts(name string) {
 	px := fmt.Sprintf("jvm_mem_pool_%s_", cleanName(name))
-	t.removeCharts(px)
+	c.removeCharts(px)
 }
 
-func (t *Tomcat) removeCharts(prefix string) {
-	for _, chart := range *t.Charts() {
+func (c *Collector) removeCharts(prefix string) {
+	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
 			chart.MarkRemove()
 			chart.MarkNotCreated()

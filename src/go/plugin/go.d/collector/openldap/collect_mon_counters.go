@@ -12,7 +12,7 @@ const (
 	attrMonitorCounter = "monitorCounter"
 )
 
-func (l *OpenLDAP) collectMonitorCounters(mx map[string]int64) error {
+func (c *Collector) collectMonitorCounters(mx map[string]int64) error {
 	req := newLdapMonitorCountersSearchRequest()
 
 	dnMetricMap := map[string]string{
@@ -25,22 +25,22 @@ func (l *OpenLDAP) collectMonitorCounters(mx map[string]int64) error {
 		"cn=Read,cn=Waiters,cn=Monitor":         "read_waiters",
 	}
 
-	return l.doSearchRequest(req, func(entry *ldap.Entry) {
+	return c.doSearchRequest(req, func(entry *ldap.Entry) {
 		metric := dnMetricMap[entry.DN]
 		if metric == "" {
-			l.Debugf("skipping entry '%s'", entry.DN)
+			c.Debugf("skipping entry '%s'", entry.DN)
 			return
 		}
 
 		s := entry.GetAttributeValue(attrMonitorCounter)
 		if s == "" {
-			l.Debugf("entry '%s' does not have attribute '%s'", entry.DN, attrMonitorCounter)
+			c.Debugf("entry '%s' does not have attribute '%s'", entry.DN, attrMonitorCounter)
 			return
 		}
 
 		v, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
-			l.Debugf("failed to parse entry '%s' value '%s': %v", entry.DN, s, err)
+			c.Debugf("failed to parse entry '%s' value '%s': %v", entry.DN, s, err)
 			return
 		}
 

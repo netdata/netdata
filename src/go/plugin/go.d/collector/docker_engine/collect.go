@@ -13,32 +13,32 @@ func isDockerEngineMetrics(pms prometheus.Series) bool {
 	return pms.FindByName("engine_daemon_engine_info").Len() > 0
 }
 
-func (de *DockerEngine) collect() (map[string]int64, error) {
-	pms, err := de.prom.ScrapeSeries()
+func (c *Collector) collect() (map[string]int64, error) {
+	pms, err := c.prom.ScrapeSeries()
 	if err != nil {
 		return nil, err
 	}
 
 	if !isDockerEngineMetrics(pms) {
-		return nil, fmt.Errorf("'%s' returned non docker engine metrics", de.URL)
+		return nil, fmt.Errorf("'%s' returned non docker engine metrics", c.URL)
 	}
 
-	mx := de.collectMetrics(pms)
+	mx := c.collectMetrics(pms)
 	return stm.ToMap(mx), nil
 }
 
-func (de *DockerEngine) collectMetrics(pms prometheus.Series) metrics {
+func (c *Collector) collectMetrics(pms prometheus.Series) metrics {
 	var mx metrics
 	collectHealthChecks(&mx, pms)
 	collectContainerActions(&mx, pms)
 	collectBuilderBuildsFails(&mx, pms)
 	if hasContainerStates(pms) {
-		de.hasContainerStates = true
+		c.hasContainerStates = true
 		mx.Container.States = &containerStates{}
 		collectContainerStates(&mx, pms)
 	}
 	if isSwarmManager(pms) {
-		de.isSwarmManager = true
+		c.isSwarmManager = true
 		mx.SwarmManager = &swarmManager{}
 		collectSwarmManager(&mx, pms)
 	}

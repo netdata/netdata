@@ -9,13 +9,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (c *ClickHouse) validateConfig() error {
+func (c *Collector) validateConfig() error {
 	if c.URL == "" {
 		return errors.New("url not set")
 	}
 	return nil
 }
 
-func (c *ClickHouse) initHTTPClient() (*http.Client, error) {
+func (c *Collector) initHTTPClient() (*http.Client, error) {
 	return web.NewHTTPClient(c.ClientConfig)
 }

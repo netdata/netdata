@@ -23,8 +23,8 @@ type megaBBU struct {
 	designCap     string
 }
 
-func (m *MegaCli) collectBBU(mx map[string]int64) error {
-	bs, err := m.exec.bbuInfo()
+func (c *Collector) collectBBU(mx map[string]int64) error {
+	bs, err := c.exec.bbuInfo()
 	if err != nil {
 		return err
 	}
@@ -35,14 +35,14 @@ func (m *MegaCli) collectBBU(mx map[string]int64) error {
 	}
 
 	if len(bbus) == 0 {
-		m.Debugf("no BBUs found")
+		c.Debugf("no BBUs found")
 		return nil
 	}
 
 	for _, bbu := range bbus {
-		if !m.bbu[bbu.adapterNumber] {
-			m.bbu[bbu.adapterNumber] = true
-			m.addBBUCharts(bbu)
+		if !c.bbu[bbu.adapterNumber] {
+			c.bbu[bbu.adapterNumber] = true
+			c.addBBUCharts(bbu)
 		}
 
 		px := fmt.Sprintf("bbu_adapter_%s_", bbu.adapterNumber)
@@ -56,7 +56,7 @@ func (m *MegaCli) collectBBU(mx map[string]int64) error {
 		}
 	}
 
-	m.Debugf("found %d BBUs", len(m.bbu))
+	c.Debugf("found %d BBUs", len(c.bbu))
 
 	return nil
 }

@@ -10,8 +10,8 @@ import (
 	"strings"
 )
 
-func (e *Exim) collect() (map[string]int64, error) {
-	resp, err := e.exec.countMessagesInQueue()
+func (c *Collector) collect() (map[string]int64, error) {
+	resp, err := c.exec.countMessagesInQueue()
 	if err != nil {
 		return nil, err
 	}

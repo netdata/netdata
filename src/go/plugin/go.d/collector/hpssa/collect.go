@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-func (h *Hpssa) collect() (map[string]int64, error) {
-	data, err := h.exec.controllersInfo()
+func (c *Collector) collect() (map[string]int64, error) {
+	data, err := c.exec.controllersInfo()
 	if err != nil {
 		return nil, err
 	}
@@ -21,36 +21,36 @@ func (h *Hpssa) collect() (map[string]int64, error) {
 
 	mx := make(map[string]int64)
 
-	h.collectControllers(mx, controllers)
+	c.collectControllers(mx, controllers)
 
-	h.updateCharts(controllers)
+	c.updateCharts(controllers)
 
 	return mx, nil
 }
 
-func (h *Hpssa) collectControllers(mx map[string]int64, controllers map[string]*hpssaController) {
+func (c *Collector) collectControllers(mx map[string]int64, controllers map[string]*hpssaController) {
 	for _, cntrl := range controllers {
-		h.collectController(mx, cntrl)
+		c.collectController(mx, cntrl)
 
 		for _, pd := range cntrl.unassignedDrives {
-			h.collectPhysicalDrive(mx, pd)
+			c.collectPhysicalDrive(mx, pd)
 		}
 
 		for _, arr := range cntrl.arrays {
-			h.collectArray(mx, arr)
+			c.collectArray(mx, arr)
 
 			for _, ld := range arr.logicalDrives {
-				h.collectLogicalDrive(mx, ld)
+				c.collectLogicalDrive(mx, ld)
 
 				for _, pd := range ld.physicalDrives {
-					h.collectPhysicalDrive(mx, pd)
+					c.collectPhysicalDrive(mx, pd)
 				}
 			}
 		}
 	}
 }
 
-func (h *Hpssa) collectController(mx map[string]int64, cntrl *hpssaController) {
+func (c *Collector) collectController(mx map[string]int64, cntrl *hpssaController) {
 	px := fmt.Sprintf("cntrl_%s_slot_%s_", cntrl.model, cntrl.slot)
 
 	writeStatusOkNok(mx, px, cntrl.controllerStatus)
@@ -77,7 +77,7 @@ func (h *Hpssa) collectController(mx map[string]int64, cntrl *hpssaController) {
 	writeStatusOkNok(mx, px+"cache_battery_", cntrl.batteryCapacitorStatus)
 }
 
-func (h *Hpssa) collectArray(mx map[string]int64, arr *hpssaArray) {
+func (c *Collector) collectArray(mx map[string]int64, arr *hpssaArray) {
 	if arr.cntrl == nil {
 		return
 	}
@@ -88,7 +88,7 @@ func (h *Hpssa) collectArray(mx map[string]int64, arr *hpssaArray) {
 	writeStatusOkNok(mx, px, arr.status)
 }
 
-func (h *Hpssa) collectLogicalDrive(mx map[string]int64, ld *hpssaLogicalDrive) {
+func (c *Collector) collectLogicalDrive(mx map[string]int64, ld *hpssaLogicalDrive) {
 	if ld.cntrl == nil || ld.arr == nil {
 		return
 	}
@@ -99,7 +99,7 @@ func (h *Hpssa) collectLogicalDrive(mx map[string]int64, ld *hpssaLogicalDrive) 
 	writeStatusOkNok(mx, px, ld.status)
 }
 
-func (h *Hpssa) collectPhysicalDrive(mx map[string]int64, pd *hpssaPhysicalDrive) {
+func (c *Collector) collectPhysicalDrive(mx map[string]int64, pd *hpssaPhysicalDrive) {
 	if pd.cntrl == nil {
 		return
 	}

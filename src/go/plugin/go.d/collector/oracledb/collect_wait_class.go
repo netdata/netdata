@@ -19,14 +19,14 @@ WHERE
     AND n.wait_class != 'Idle'
 `
 
-func (o *OracleDB) collectWaitClass(mx map[string]int64) error {
+func (c *Collector) collectWaitClass(mx map[string]int64) error {
 	q := queryWaitClass
-	o.Debugf("executing query: %s", q)
+	c.Debugf("executing query: %s", q)
 
 	seen := make(map[string]bool)
 	var wclass, wtime string
 
-	err := o.doQuery(q, func(column, value string, lineEnd bool) error {
+	err := c.doQuery(q, func(column, value string, lineEnd bool) error {
 		switch column {
 		case "WAIT_CLASS":
 			wclass = value
@@ -50,9 +50,9 @@ func (o *OracleDB) collectWaitClass(mx map[string]int64) error {
 	}
 
 	for name := range seen {
-		if !o.seenWaitClasses[name] {
-			o.seenWaitClasses[name] = true
-			o.addWaitClassCharts(name)
+		if !c.seenWaitClasses[name] {
+			c.seenWaitClasses[name] = true
+			c.addWaitClassCharts(name)
 		}
 	}
 

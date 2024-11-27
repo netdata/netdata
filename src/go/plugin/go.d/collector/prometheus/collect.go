@@ -18,107 +18,107 @@ const (
 	precision = 1000
 )
 
-func (p *Prometheus) collect() (map[string]int64, error) {
-	mfs, err := p.prom.Scrape()
+func (c *Collector) collect() (map[string]int64, error) {
+	mfs, err := c.prom.Scrape()
 	if err != nil {
 		return nil, err
 	}
 
 	if mfs.Len() == 0 {
-		p.Warningf("endpoint '%s' returned 0 metric families", p.URL)
+		c.Warningf("endpoint '%s' returned 0 metric families", c.URL)
 		return nil, nil
 	}
 
 	// TODO: shouldn't modify the value from Config
-	if p.ExpectedPrefix != "" {
-		if !hasPrefix(mfs, p.ExpectedPrefix) {
-			return nil, fmt.Errorf("'%s' metrics have no expected prefix (%s)", p.URL, p.ExpectedPrefix)
+	if c.ExpectedPrefix != "" {
+		if !hasPrefix(mfs, c.ExpectedPrefix) {
+			return nil, fmt.Errorf("'%s' metrics have no expected prefix (%s)", c.URL, c.ExpectedPrefix)
 		}
-		p.ExpectedPrefix = ""
+		c.ExpectedPrefix = ""
 	}
 
 	// TODO: shouldn't modify the value from Config
-	if p.MaxTS > 0 {
-		if n := calcMetrics(mfs); n > p.MaxTS {
-			return nil, fmt.Errorf("'%s' num of time series (%d) > limit (%d)", p.URL, n, p.MaxTS)
+	if c.MaxTS > 0 {
+		if n := calcMetrics(mfs); n > c.MaxTS {
+			return nil, fmt.Errorf("'%s' num of time series (%d) > limit (%d)", c.URL, n, c.MaxTS)
 		}
-		p.MaxTS = 0
+		c.MaxTS = 0
 	}
 
 	mx := make(map[string]int64)
 
-	p.resetCache()
-	defer p.removeStaleCharts()
+	c.resetCache()
+	defer c.removeStaleCharts()
 
 	for _, mf := range mfs {
 		if strings.HasSuffix(mf.Name(), "_info") {
 			continue
 		}
-		if p.MaxTSPerMetric > 0 && len(mf.Metrics()) > p.MaxTSPerMetric {
-			p.Debugf("metric '%s' num of time series (%d) > limit (%d), skipping it",
-				mf.Name(), len(mf.Metrics()), p.MaxTSPerMetric)
+		if c.MaxTSPerMetric > 0 && len(mf.Metrics()) > c.MaxTSPerMetric {
+			c.Debugf("metric '%s' num of time series (%d) > limit (%d), skipping it",
+				mf.Name(), len(mf.Metrics()), c.MaxTSPerMetric)
 			continue
 		}
 
 		switch mf.Type() {
 		case model.MetricTypeGauge:
-			p.collectGauge(mx, mf)
+			c.collectGauge(mx, mf)
 		case model.MetricTypeCounter:
-			p.collectCounter(mx, mf)
+			c.collectCounter(mx, mf)
 		case model.MetricTypeSummary:
-			p.collectSummary(mx, mf)
+			c.collectSummary(mx, mf)
 		case model.MetricTypeHistogram:
-			p.collectHistogram(mx, mf)
+			c.collectHistogram(mx, mf)
 		case model.MetricTypeUnknown:
-			p.collectUntyped(mx, mf)
+			c.collectUntyped(mx, mf)
 		}
 	}
 
 	return mx, nil
 }
 
-func (p *Prometheus) collectGauge(mx map[string]int64, mf *prometheus.MetricFamily) {
+func (c *Collector) collectGauge(mx map[string]int64, mf *prometheus.MetricFamily) {
 	for _, m := range mf.Metrics() {
 		if m.Gauge() == nil || math.IsNaN(m.Gauge().Value()) {
 			continue
 		}
 
-		id := mf.Name() + p.joinLabels(m.Labels())
+		id := mf.Name() + c.joinLabels(m.Labels())
 
-		if !p.cache.hasP(id) {
-			p.addGaugeChart(id, mf.Name(), mf.Help(), m.Labels())
+		if !c.cache.hasP(id) {
+			c.addGaugeChart(id, mf.Name(), mf.Help(), m.Labels())
 		}
 
 		mx[id] = int64(m.Gauge().Value() * precision)
 	}
 }
 
-func (p *Prometheus) collectCounter(mx map[string]int64, mf *prometheus.MetricFamily) {
+func (c *Collector) collectCounter(mx map[string]int64, mf *prometheus.MetricFamily) {
 	for _, m := range mf.Metrics() {
 		if m.Counter() == nil || math.IsNaN(m.Counter().Value()) {
 			continue
 		}
 
-		id := mf.Name() + p.joinLabels(m.Labels())
+		id := mf.Name() + c.joinLabels(m.Labels())
 
-		if !p.cache.hasP(id) {
-			p.addCounterChart(id, mf.Name(), mf.Help(), m.Labels())
+		if !c.cache.hasP(id) {
+			c.addCounterChart(id, mf.Name(), mf.Help(), m.Labels())
 		}
 
 		mx[id] = int64(m.Counter().Value() * precision)
 	}
 }
 
-func (p *Prometheus) collectSummary(mx map[string]int64, mf *prometheus.MetricFamily) {
+func (c *Collector) collectSummary(mx map[string]int64, mf *prometheus.MetricFamily) {
 	for _, m := range mf.Metrics() {
 		if m.Summary() == nil || len(m.Summary().Quantiles()) == 0 {
 			continue
 		}
 
-		id := mf.Name() + p.joinLabels(m.Labels())
+		id := mf.Name() + c.joinLabels(m.Labels())
 
-		if !p.cache.hasP(id) {
-			p.addSummaryCharts(id, mf.Name(), mf.Help(), m.Labels(), m.Summary().Quantiles())
+		if !c.cache.hasP(id) {
+			c.addSummaryCharts(id, mf.Name(), mf.Help(), m.Labels(), m.Summary().Quantiles())
 		}
 
 		for _, v := range m.Summary().Quantiles() {
@@ -133,16 +133,16 @@ func (p *Prometheus) collectSummary(mx map[string]int64, mf *prometheus.MetricFa
 	}
 }
 
-func (p *Prometheus) collectHistogram(mx map[string]int64, mf *prometheus.MetricFamily) {
+func (c *Collector) collectHistogram(mx map[string]int64, mf *prometheus.MetricFamily) {
 	for _, m := range mf.Metrics() {
 		if m.Histogram() == nil || len(m.Histogram().Buckets()) == 0 {
 			continue
 		}
 
-		id := mf.Name() + p.joinLabels(m.Labels())
+		id := mf.Name() + c.joinLabels(m.Labels())
 
-		if !p.cache.hasP(id) {
-			p.addHistogramCharts(id, mf.Name(), mf.Help(), m.Labels(), m.Histogram().Buckets())
+		if !c.cache.hasP(id) {
+			c.addHistogramCharts(id, mf.Name(), mf.Help(), m.Labels(), m.Histogram().Buckets())
 		}
 
 		for _, v := range m.Histogram().Buckets() {
@@ -157,27 +157,27 @@ func (p *Prometheus) collectHistogram(mx map[string]int64, mf *prometheus.Metric
 	}
 }
 
-func (p *Prometheus) collectUntyped(mx map[string]int64, mf *prometheus.MetricFamily) {
+func (c *Collector) collectUntyped(mx map[string]int64, mf *prometheus.MetricFamily) {
 	for _, m := range mf.Metrics() {
 		if m.Untyped() == nil || math.IsNaN(m.Untyped().Value()) {
 			continue
 		}
 
-		if p.isFallbackTypeGauge(mf.Name()) {
-			id := mf.Name() + p.joinLabels(m.Labels())
+		if c.isFallbackTypeGauge(mf.Name()) {
+			id := mf.Name() + c.joinLabels(m.Labels())
 
-			if !p.cache.hasP(id) {
-				p.addGaugeChart(id, mf.Name(), mf.Help(), m.Labels())
+			if !c.cache.hasP(id) {
+				c.addGaugeChart(id, mf.Name(), mf.Help(), m.Labels())
 			}
 
 			mx[id] = int64(m.Untyped().Value() * precision)
 		}
 
-		if p.isFallbackTypeCounter(mf.Name()) || strings.HasSuffix(mf.Name(), "_total") {
-			id := mf.Name() + p.joinLabels(m.Labels())
+		if c.isFallbackTypeCounter(mf.Name()) || strings.HasSuffix(mf.Name(), "_total") {
+			id := mf.Name() + c.joinLabels(m.Labels())
 
-			if !p.cache.hasP(id) {
-				p.addCounterChart(id, mf.Name(), mf.Help(), m.Labels())
+			if !c.cache.hasP(id) {
+				c.addCounterChart(id, mf.Name(), mf.Help(), m.Labels())
 			}
 
 			mx[id] = int64(m.Untyped().Value() * precision)
@@ -185,15 +185,15 @@ func (p *Prometheus) collectUntyped(mx map[string]int64, mf *prometheus.MetricFa
 	}
 }
 
-func (p *Prometheus) isFallbackTypeGauge(name string) bool {
-	return p.fallbackType.gauge != nil && p.fallbackType.gauge.MatchString(name)
+func (c *Collector) isFallbackTypeGauge(name string) bool {
+	return c.fallbackType.gauge != nil && c.fallbackType.gauge.MatchString(name)
 }
 
-func (p *Prometheus) isFallbackTypeCounter(name string) bool {
-	return p.fallbackType.counter != nil && p.fallbackType.counter.MatchString(name)
+func (c *Collector) isFallbackTypeCounter(name string) bool {
+	return c.fallbackType.counter != nil && c.fallbackType.counter.MatchString(name)
 }
 
-func (p *Prometheus) joinLabels(labels labels.Labels) string {
+func (c *Collector) joinLabels(labels labels.Labels) string {
 	var sb strings.Builder
 	for _, lbl := range labels {
 		name, val := lbl.Name, lbl.Value
@@ -218,16 +218,16 @@ func (p *Prometheus) joinLabels(labels labels.Labels) string {
 	return sb.String()
 }
 
-func (p *Prometheus) resetCache() {
-	for _, v := range p.cache.entries {
+func (c *Collector) resetCache() {
+	for _, v := range c.cache.entries {
 		v.seen = false
 	}
 }
 
 const maxNotSeenTimes = 10
 
-func (p *Prometheus) removeStaleCharts() {
-	for k, v := range p.cache.entries {
+func (c *Collector) removeStaleCharts() {
+	for k, v := range c.cache.entries {
 		if v.seen {
 			continue
 		}
@@ -236,7 +236,7 @@ func (p *Prometheus) removeStaleCharts() {
 				chart.MarkRemove()
 				chart.MarkNotCreated()
 			}
-			delete(p.cache.entries, k)
+			delete(c.cache.entries, k)
 		}
 	}
 }

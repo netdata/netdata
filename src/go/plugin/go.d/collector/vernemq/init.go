@@ -9,18 +9,18 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
-func (v *VerneMQ) validateConfig() error {
-	if v.URL == "" {
+func (c *Collector) validateConfig() error {
+	if c.URL == "" {
 		return errors.New("url is required but not set")
 	}
 	return nil
 }
 
-func (v *VerneMQ) initPrometheusClient() (prometheus.Prometheus, error) {
-	client, err := web.NewHTTPClient(v.ClientConfig)
+func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
+	client, err := web.NewHTTPClient(c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return prometheus.New(client, v.RequestConfig), nil
+	return prometheus.New(client, c.RequestConfig), nil
 }

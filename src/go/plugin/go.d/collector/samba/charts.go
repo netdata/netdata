@@ -70,21 +70,21 @@ var (
 	}
 )
 
-func (s *Samba) addCharts(mx map[string]int64) {
+func (c *Collector) addCharts(mx map[string]int64) {
 	for k := range mx {
 		if name, ok := extractCallName(k, "syscall_", "_count"); ok {
-			s.addSysCallChart(name, syscallCallsChartTmpl.Copy())
+			c.addSysCallChart(name, syscallCallsChartTmpl.Copy())
 		} else if name, ok := extractCallName(k, "syscall_", "_bytes"); ok {
-			s.addSysCallChart(name, syscallTransferredDataChartTmpl.Copy())
+			c.addSysCallChart(name, syscallTransferredDataChartTmpl.Copy())
 		} else if name, ok := extractCallName(k, "smb2_", "_count"); ok {
-			s.addSmb2CallChart(name, smb2CallCallsChartTmpl.Copy())
+			c.addSmb2CallChart(name, smb2CallCallsChartTmpl.Copy())
 			// all smb2* metrics have inbytes and outbytes
-			s.addSmb2CallChart(name, smb2CallTransferredDataChartTmpl.Copy())
+			c.addSmb2CallChart(name, smb2CallTransferredDataChartTmpl.Copy())
 		}
 	}
 }
 
-func (s *Samba) addSysCallChart(syscall string, chart *module.Chart) {
+func (c *Collector) addSysCallChart(syscall string, chart *module.Chart) {
 	chart = chart.Copy()
 	chart.ID = fmt.Sprintf(chart.ID, syscall)
 	chart.Labels = []module.Label{
@@ -94,12 +94,12 @@ func (s *Samba) addSysCallChart(syscall string, chart *module.Chart) {
 		dim.ID = fmt.Sprintf(dim.ID, syscall)
 	}
 
-	if err := s.Charts().Add(chart); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (s *Samba) addSmb2CallChart(smb2Call string, chart *module.Chart) {
+func (c *Collector) addSmb2CallChart(smb2Call string, chart *module.Chart) {
 	chart = chart.Copy()
 	chart.ID = fmt.Sprintf(chart.ID, smb2Call)
 	chart.Labels = []module.Label{
@@ -109,8 +109,8 @@ func (s *Samba) addSmb2CallChart(smb2Call string, chart *module.Chart) {
 		dim.ID = fmt.Sprintf(dim.ID, smb2Call)
 	}
 
-	if err := s.Charts().Add(chart); err != nil {
-		s.Warning(err)
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }
 

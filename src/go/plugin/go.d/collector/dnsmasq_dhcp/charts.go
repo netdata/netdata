@@ -95,16 +95,16 @@ func newDHCPRangeCharts(dhcpRange string) *module.Charts {
 	return charts
 }
 
-func (d *DnsmasqDHCP) addDHCPRangeCharts(dhcpRange string) {
+func (c *Collector) addDHCPRangeCharts(dhcpRange string) {
 	charts := newDHCPRangeCharts(dhcpRange)
-	if err := d.Charts().Add(*charts...); err != nil {
-		d.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (d *DnsmasqDHCP) removeDHCPRangeCharts(dhcpRange string) {
+func (c *Collector) removeDHCPRangeCharts(dhcpRange string) {
 	p := "dhcp_range_" + dhcpRange
-	for _, c := range *d.Charts() {
+	for _, c := range *c.Charts() {
 		if strings.HasSuffix(c.ID, p) {
 			c.MarkRemove()
 			c.MarkNotCreated()

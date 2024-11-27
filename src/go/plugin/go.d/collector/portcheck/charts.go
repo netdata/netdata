@@ -93,19 +93,19 @@ var (
 	}
 )
 
-func (pc *PortCheck) addTCPPortCharts(port *tcpPort) {
-	charts := newPortCharts(pc.Host, port.number, tcpPortChartsTmpl.Copy())
+func (c *Collector) addTCPPortCharts(port *tcpPort) {
+	charts := newPortCharts(c.Host, port.number, tcpPortChartsTmpl.Copy())
 
-	if err := pc.Charts().Add(*charts...); err != nil {
-		pc.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (pc *PortCheck) addUDPPortCharts(port *udpPort) {
-	charts := newPortCharts(pc.Host, port.number, udpPortChartsTmpl.Copy())
+func (c *Collector) addUDPPortCharts(port *udpPort) {
+	charts := newPortCharts(c.Host, port.number, udpPortChartsTmpl.Copy())
 
-	if err := pc.Charts().Add(*charts...); err != nil {
-		pc.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 

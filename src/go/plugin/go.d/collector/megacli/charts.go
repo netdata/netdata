@@ -134,7 +134,7 @@ var (
 	}
 )
 
-func (m *MegaCli) addAdapterCharts(ad *megaAdapter) {
+func (c *Collector) addAdapterCharts(ad *megaAdapter) {
 	charts := adapterChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -147,12 +147,12 @@ func (m *MegaCli) addAdapterCharts(ad *megaAdapter) {
 		}
 	}
 
-	if err := m.Charts().Add(*charts...); err != nil {
-		m.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *MegaCli) addPhysDriveCharts(pd *megaPhysDrive) {
+func (c *Collector) addPhysDriveCharts(pd *megaPhysDrive) {
 	charts := physDriveChartsTmpl.Copy()
 
 	for _, chart := range *charts {
@@ -169,12 +169,12 @@ func (m *MegaCli) addPhysDriveCharts(pd *megaPhysDrive) {
 		}
 	}
 
-	if err := m.Charts().Add(*charts...); err != nil {
-		m.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }
 
-func (m *MegaCli) addBBUCharts(bbu *megaBBU) {
+func (c *Collector) addBBUCharts(bbu *megaBBU) {
 	charts := bbuChartsTmpl.Copy()
 
 	if _, ok := calcCapDegradationPerc(bbu); !ok {
@@ -192,7 +192,7 @@ func (m *MegaCli) addBBUCharts(bbu *megaBBU) {
 		}
 	}
 
-	if err := m.Charts().Add(*charts...); err != nil {
-		m.Warning(err)
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
 	}
 }

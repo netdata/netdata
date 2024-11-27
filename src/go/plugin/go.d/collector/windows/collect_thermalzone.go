@@ -12,7 +12,7 @@ const (
 	metricThermalzoneTemperatureCelsius = "windows_thermalzone_temperature_celsius"
 )
 
-func (w *Windows) collectThermalzone(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectThermalzone(mx map[string]int64, pms prometheus.Series) {
 	seen := make(map[string]bool)
 	for _, pm := range pms.FindByName(metricThermalzoneTemperatureCelsius) {
 		if name := cleanZoneName(pm.Labels.Get("name")); name != "" {
@@ -22,15 +22,15 @@ func (w *Windows) collectThermalzone(mx map[string]int64, pms prometheus.Series)
 	}
 
 	for zone := range seen {
-		if !w.cache.thermalZones[zone] {
-			w.cache.thermalZones[zone] = true
-			w.addThermalZoneCharts(zone)
+		if !c.cache.thermalZones[zone] {
+			c.cache.thermalZones[zone] = true
+			c.addThermalZoneCharts(zone)
 		}
 	}
-	for zone := range w.cache.thermalZones {
+	for zone := range c.cache.thermalZones {
 		if !seen[zone] {
-			delete(w.cache.thermalZones, zone)
-			w.removeThermalZoneCharts(zone)
+			delete(c.cache.thermalZones, zone)
+			c.removeThermalZoneCharts(zone)
 		}
 	}
 }

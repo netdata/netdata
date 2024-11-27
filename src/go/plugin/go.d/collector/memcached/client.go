@@ -9,6 +9,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
 )
 
+type memcachedConn interface {
+	connect() error
+	disconnect()
+	queryStats() ([]byte, error)
+}
+
 func newMemcachedConn(conf Config) memcachedConn {
 	return &memcachedClient{conn: socket.New(socket.Config{
 		Address: conf.Address,
