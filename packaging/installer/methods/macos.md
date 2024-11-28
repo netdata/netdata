@@ -31,8 +31,7 @@ The Netdata Agent is installed under `/usr/local/netdata`. Dependencies are hand
 
 The `kickstart.sh` script accepts additional parameters to automatically [connect](/src/claim/README.md) your node to Netdata
 Cloud immediately after installation. Find the `token` and `rooms` strings by [signing in to Netdata
-Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Connect Nodes** in the [Spaces management
-area](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces).
+Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Connect Nodes** on any of the prompts from the UI.
 
 - `--claim-token`: Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node
   after the install.

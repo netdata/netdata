@@ -6,13 +6,21 @@
 
 **Merged pull requests:**
 
+- Claiming proxy defaults and additonal log info [\#19098](https://github.com/netdata/netdata/pull/19098) ([ktsaou](https://github.com/ktsaou))
+- Reset parameter when generating an alert snapshot [\#19097](https://github.com/netdata/netdata/pull/19097) ([stelfrag](https://github.com/stelfrag))
+- Update Registry docs [\#19095](https://github.com/netdata/netdata/pull/19095) ([Ancairon](https://github.com/Ancairon))
+- Collected and available metrics, instances and contexts [\#19094](https://github.com/netdata/netdata/pull/19094) ([ktsaou](https://github.com/ktsaou))
 - docs\(systemd-journal.plugin\): correct full-text search [\#19093](https://github.com/netdata/netdata/pull/19093) ([ilyam8](https://github.com/ilyam8))
+- Daemon docs edits [\#19091](https://github.com/netdata/netdata/pull/19091) ([Ancairon](https://github.com/Ancairon))
+- chore\(go.d.plugin\): renames part 2  [\#19090](https://github.com/netdata/netdata/pull/19090) ([ilyam8](https://github.com/ilyam8))
+- remove stale docs, and update links and optimization documentation [\#19089](https://github.com/netdata/netdata/pull/19089) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#19088](https://github.com/netdata/netdata/pull/19088) ([netdatabot](https://github.com/netdatabot))
 - docs: fix go.d modules rename leftovers [\#19087](https://github.com/netdata/netdata/pull/19087) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#19086](https://github.com/netdata/netdata/pull/19086) ([netdatabot](https://github.com/netdatabot))
 - update integrations gen script [\#19085](https://github.com/netdata/netdata/pull/19085) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/hpssa\): handle HPE Smart Array line [\#19084](https://github.com/netdata/netdata/pull/19084) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d.plugin\): renames [\#19081](https://github.com/netdata/netdata/pull/19081) ([ilyam8](https://github.com/ilyam8))
+- Use mimalloc [\#19080](https://github.com/netdata/netdata/pull/19080) ([vkalintiris](https://github.com/vkalintiris))
 - Regenerate integrations.js [\#19079](https://github.com/netdata/netdata/pull/19079) ([netdatabot](https://github.com/netdatabot))
 - Remove Go windows integration [\#19078](https://github.com/netdata/netdata/pull/19078) ([Ancairon](https://github.com/Ancairon))
 - Split database overview and configuration reference [\#19077](https://github.com/netdata/netdata/pull/19077) ([Ancairon](https://github.com/Ancairon))
@@ -435,12 +443,6 @@
 - fix some docs issues [\#18553](https://github.com/netdata/netdata/pull/18553) ([ilyam8](https://github.com/ilyam8))
 - go.d fix Goland code inspection warnings [\#18552](https://github.com/netdata/netdata/pull/18552) ([ilyam8](https://github.com/ilyam8))
 - Bump k8s.io/client-go from 0.31.0 to 0.31.1 in /src/go [\#18549](https://github.com/netdata/netdata/pull/18549) ([dependabot[bot]](https://github.com/apps/dependabot))
-- go.d move doing http req logic to web [\#18546](https://github.com/netdata/netdata/pull/18546) ([ilyam8](https://github.com/ilyam8))
-- go.d pkg web renames [\#18545](https://github.com/netdata/netdata/pull/18545) ([ilyam8](https://github.com/ilyam8))
-- go.d fix duplicate closeBody func [\#18544](https://github.com/netdata/netdata/pull/18544) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18543](https://github.com/netdata/netdata/pull/18543) ([netdatabot](https://github.com/netdatabot))
-- go.d typesense: fix name in meta [\#18542](https://github.com/netdata/netdata/pull/18542) ([ilyam8](https://github.com/ilyam8))
-- Misc code cleanup [\#18540](https://github.com/netdata/netdata/pull/18540) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

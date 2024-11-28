@@ -1,6 +1,6 @@
 # Nodes tab
 
-The nodes tab provides a summarized view of your [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-rooms), allowing you to view quick information per node.
+The nodes tab provides a summarized view of your [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#rooms), allowing you to view quick information per node.
 
 > **Tip**  
 >
