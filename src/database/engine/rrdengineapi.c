@@ -279,8 +279,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
     
     handle->pgc_page = NULL;
     handle->page_data = NULL;
-    handle->page_data_size = 0;
-    
+
     handle->page_position = 0;
     handle->page_entries_max = 0;
     handle->update_every_ut = (usec_t)update_every * USEC_PER_SEC;
@@ -339,7 +338,6 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
     handle->page_position = 0;
     handle->page_entries_max = 0;
     handle->page_data = NULL;
-    handle->page_data_size = 0;
 
     // important!
     // we should never zero page end time ut, because this will allow
@@ -355,8 +353,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
 static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *handle,
                                                 struct rrdengine_instance *ctx,
                                                 usec_t point_in_time_ut,
-                                                PGD *data,
-                                                size_t data_size) {
+                                                PGD *data) {
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
     const uint32_t update_every_s = (uint32_t)(handle->update_every_ut / USEC_PER_SEC);
 
@@ -365,7 +362,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
             .metric_id = mrg_metric_id(main_mrg, handle->metric),
             .start_time_s = point_in_time_s,
             .end_time_s = point_in_time_s,
-            .size = data_size,
+            .size = pgd_memory_footprint(data),
             .data = data,
             .update_every_s = update_every_s,
             .hot = true
@@ -405,7 +402,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         pgc_page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
     }
 
-    handle->page_entries_max = data_size / CTX_POINT_SIZE_BYTES(ctx);
+    handle->page_entries_max = pgd_capacity(data);
     handle->page_start_time_ut = point_in_time_ut;
     handle->page_end_time_ut = point_in_time_ut;
     handle->page_position = 1; // zero is already in our data
@@ -436,7 +433,7 @@ static size_t aligned_allocation_entries(size_t max_slots, size_t target_slot, t
     return slots;
 }
 
-static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
+static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, usec_t point_in_time_ut) {
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     PGD *d = NULL;
@@ -462,8 +459,6 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, siz
 
     internal_fatal(slots < 3 || slots > max_slots, "ooops! wrong distribution of metrics across time");
     internal_fatal(size > tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
-
-    *data_size = size;
 
     switch (ctx->config.page_type) {
         case RRDENG_PAGE_TYPE_ARRAY_32BIT:
@@ -496,7 +491,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     if(unlikely(!handle->page_data))
-        handle->page_data = rrdeng_alloc_new_page_data(handle, &handle->page_data_size, point_in_time_ut);
+        handle->page_data = rrdeng_alloc_new_page_data(handle, point_in_time_ut);
 
     timing_step(TIMING_STEP_DBENGINE_CHECK_DATA);
 
@@ -508,7 +503,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
     timing_step(TIMING_STEP_DBENGINE_PACK);
 
     if(unlikely(!handle->pgc_page)) {
-        rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, handle->page_data, handle->page_data_size);
+        rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, handle->page_data);
         // handle->position is set to 1 already
     }
     else {

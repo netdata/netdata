@@ -34,6 +34,7 @@ bool pgd_is_empty(PGD *pg);
 uint32_t pgd_slots_used(PGD *pg);
 
 uint32_t pgd_memory_footprint(PGD *pg);
+uint32_t pgd_capacity(PGD *pg);
 uint32_t pgd_disk_footprint(PGD *pg);
 
 void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size);

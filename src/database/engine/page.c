@@ -512,6 +512,16 @@ uint32_t pgd_slots_used(PGD *pg)
     return pg->used;
 }
 
+uint32_t pgd_capacity(PGD *pg) {
+    if (!pg)
+        return 0;
+
+    if (pg == PGD_EMPTY)
+        return 0;
+
+    return pg->slots;
+}
+
 uint32_t pgd_memory_footprint(PGD *pg)
 {
     if (!pg)
