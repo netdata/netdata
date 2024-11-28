@@ -3,10 +3,6 @@
 
 #include "../libnetdata.h"
 
-# ifdef __cplusplus
-extern "C" {
-# endif
-
 // workers interfaces
 
 #define WORKER_UTILIZATION_MAX_JOB_TYPES 80
@@ -26,15 +22,9 @@ void worker_register_job_name(size_t job_id, const char *name);
 void worker_register_job_custom_metric(size_t job_id, const char *name, const char *units, WORKER_METRIC_TYPE type);
 void worker_unregister(void);
 
-void worker_is_idle___enabled(void);
-void worker_is_busy___enabled(size_t job_id);
-void worker_set_metric___enabled(size_t job_id, NETDATA_DOUBLE value);
-
-struct worker;
-extern __thread struct worker *worker;
-#define worker_is_idle() do { if(worker) worker_is_idle___enabled(); } while(0)
-#define worker_is_busy(id) do { if(worker) worker_is_busy___enabled(id); } while(0)
-#define worker_set_metric(id, value) do { if(worker) worker_set_metric___enabled(id, value); } while(0)
+void worker_is_idle(void);
+void worker_is_busy(size_t job_id);
+void worker_set_metric(size_t job_id, NETDATA_DOUBLE value);
 
 // statistics interface
 
@@ -55,9 +45,5 @@ void workers_foreach(const char *name, void (*callback)(
                                                       , NETDATA_DOUBLE *job_custom_values
                                                       )
                                                       , void *data);
-
-# ifdef __cplusplus
-}
-# endif
 
 #endif // WORKER_UTILIZATION_H

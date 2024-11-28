@@ -1996,7 +1996,6 @@ void *replication_thread_main(void *ptr) {
         }
 
         if(unlikely(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY)) {
-
             worker_is_busy(WORKER_JOB_WAIT);
             replication_recursive_lock();
 
