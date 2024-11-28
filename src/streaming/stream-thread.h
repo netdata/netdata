@@ -4,6 +4,14 @@
 #define NETDATA_STREAM_THREAD_H
 
 #include "libnetdata/libnetdata.h"
+
+struct pollfd_slotted {
+    struct pollfd *ptr;
+    int32_t slot;
+};
+
+#define PFD_EMPTY (struct pollfd_slotted){.ptr = NULL, .slot = -1}
+
 #include "sender-internals.h"
 #include "receiver-internals.h"
 
@@ -173,8 +181,8 @@ void stream_receive_process_input(struct stream_thread *sth, struct receiver_sta
 void stream_sender_dispatcher_cleanup(struct stream_thread *sth);
 void stream_receiver_cleanup(struct stream_thread *sth);
 
-struct pollfd *stream_thread_pollfd_get(struct stream_thread *sth, int fd, POLLFD_TYPE type, struct receiver_state *rpt, struct sender_state *s);
-void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd *pfd, int32_t slot);
+struct pollfd_slotted stream_thread_pollfd_get(struct stream_thread *sth, int fd, POLLFD_TYPE type, struct receiver_state *rpt, struct sender_state *s);
+void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd_slotted pfd);
 
 struct stream_thread *stream_thread_by_slot_id(size_t thread_slot);
 

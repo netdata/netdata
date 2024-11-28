@@ -4,6 +4,7 @@
 #define NETDATA_SENDER_INTERNALS_H
 
 #include "rrdpush.h"
+#include "stream-thread.h"
 #include "h2o-common.h"
 #include "aclk/https_client.h"
 #include "stream-parents.h"
@@ -82,7 +83,7 @@ struct sender_state {
         size_t bytes_sent_by_type[STREAM_TRAFFIC_TYPE_MAX];
 
         int32_t slot;
-        struct pollfd *pfd;
+        struct pollfd_slotted pfd;
     } thread;
 
     struct {

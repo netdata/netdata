@@ -28,9 +28,9 @@ void worker_set_metric___enabled(size_t job_id, NETDATA_DOUBLE value);
 
 struct worker;
 extern __thread struct worker *worker;
-#define worker_is_idle() { if(unlikely(worker)) worker_is_idle___enabled(); }
-#define worker_is_busy(id) { if(unlikely(worker)) worker_is_busy___enabled(id); }
-#define worker_set_metric(id, value) { if(unlikely(worker)) worker_set_metric___enabled(id, value); }
+#define worker_is_idle() do { if(worker) worker_is_idle___enabled(); } while(0)
+#define worker_is_busy(id) do { if(worker) worker_is_busy___enabled(id); } while(0)
+#define worker_set_metric(id, value) do { if(worker) worker_set_metric___enabled(id, value); } while(0)
 
 // statistics interface
 

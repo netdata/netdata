@@ -64,7 +64,7 @@ static int set_pipe_size(int pipe_fd, int new_size) {
 // --------------------------------------------------------------------------------------------------------------------
 // pollfd array
 
-struct pollfd *stream_thread_pollfd_get(struct stream_thread *sth, int fd, POLLFD_TYPE type, struct receiver_state *rpt, struct sender_state *s) {
+struct pollfd_slotted stream_thread_pollfd_get(struct stream_thread *sth, int fd, POLLFD_TYPE type, struct receiver_state *rpt, struct sender_state *s) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     size_t i;
@@ -106,25 +106,25 @@ struct pollfd *stream_thread_pollfd_get(struct stream_thread *sth, int fd, POLLF
             break;
     }
 
-    return &sth->run.pollfds[i];
+    struct pollfd_slotted rc = {
+        .slot = (int32_t)i,
+        .ptr = &sth->run.pollfds[i],
+    };
+    return rc;
 }
 
-void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd *pfd, int32_t slot) {
+void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd_slotted pfd) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-    internal_fatal(!pfd, "struct pollfd pointer is NULL");
+    internal_fatal(pfd.slot < 0 || (size_t)pfd.slot >= sth->run.used, "Invalid PFD slot to release");
+    internal_fatal(&sth->run.pollfds[pfd.slot] != pfd.ptr, "Invalid PFD to release");
 
-    if(slot < 0 || (size_t)slot >= sth->run.used)
-        fatal("STREAM[%zu]: invalid struct pollfd pointer to release", sth->id);
-
-    internal_fatal(&sth->run.pollfds[slot] != pfd, "Invalid slot number %d", slot);
-
-    sth->run.pollfds[slot] = (struct pollfd){
+    sth->run.pollfds[pfd.slot] = (struct pollfd){
         .fd = -1,
         .events = 0,
         .revents = 0,
     };
 
-    sth->run.meta[slot] = (struct pollfd_meta){
+    sth->run.meta[pfd.slot] = (struct pollfd_meta){
         .type = POLLFD_TYPE_EMPTY,
     };
 }

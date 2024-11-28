@@ -198,7 +198,8 @@ void stream_sender_dispatcher_handle_op(struct stream_thread *sth, struct sender
         struct sender_state *s = sth->snd.run.senders[msg->snd_run_slot];
 
         if(msg->op & SENDER_MSG_ENABLE_SENDING) {
-            s->thread.pfd->events |= POLLOUT;
+            internal_fatal(!s->thread.pfd.ptr, "invalid sender PFD");
+            s->thread.pfd.ptr->events |= POLLOUT;
             if(msg->op == SENDER_MSG_ENABLE_SENDING)
                 return;
         }
@@ -449,7 +450,7 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct 
     }
 
     if(s == sth->snd.run.senders[slot] || !sth->snd.run.senders[slot]) {
-        stream_thread_pollfd_release(sth, s->thread.pfd, s->thread.slot);
+        stream_thread_pollfd_release(sth, s->thread.pfd);
         if (slot == sth->snd.run.used - 1)
             sth->snd.run.used--;
     }
@@ -467,7 +468,7 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct 
     // clear these asap, to make sender_commit() stop processing data for this host
     sender_lock(s);
     s->thread.slot = -1;
-    s->thread.pfd = NULL;
+    s->thread.pfd = PFD_EMPTY;
 
     s->thread.msg.snd_run_slot = -1;
     s->thread.msg.session = 0;
@@ -512,8 +513,8 @@ void stream_sender_dispatcher_check_all_nodes(struct stream_thread *sth) {
             continue;
 
         // the default for all nodes
-        s->thread.pfd->events = POLLIN;
-        s->thread.pfd->revents = 0;
+        s->thread.pfd.ptr->events = POLLIN;
+        s->thread.pfd.ptr->revents = 0;
 
         // If the TCP window never opened, then something is wrong, restart connection
         if(unlikely(now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
@@ -553,7 +554,7 @@ void stream_sender_dispatcher_check_all_nodes(struct stream_thread *sth) {
                 buffer_ratio = s->thread.buffer_ratio;
 
             if (outstanding)
-                s->thread.pfd->events |= POLLOUT;
+                s->thread.pfd.ptr->events |= POLLOUT;
         }
         sender_unlock(s);
     }
@@ -625,7 +626,7 @@ void stream_sender_dispatcher_process_sender(struct stream_thread *sth, struct s
 
                 if(!s->thread.bytes_outstanding) {
                     // we sent them all
-                    s->thread.pfd->events &= ~(POLLOUT);
+                    s->thread.pfd.ptr->events &= ~(POLLOUT);
 
                     // recreate the circular buffer if we have to
                     stream_sender_cbuffer_recreate_timed_unsafe(s, now_s, false);

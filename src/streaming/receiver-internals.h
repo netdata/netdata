@@ -4,6 +4,7 @@
 #define NETDATA_RECEIVER_INTERNALS_H
 
 #include "receiver.h"
+#include "stream-thread.h"
 #include "stream-conf.h"
 #include "database/rrd.h"
 #include "plugins.d/plugins_d.h"
@@ -51,7 +52,7 @@ struct receiver_state {
         } compressed;
 
         size_t slot;
-        struct pollfd *pfd;
+        struct pollfd_slotted pfd;
     } receiver;
 
     struct {
