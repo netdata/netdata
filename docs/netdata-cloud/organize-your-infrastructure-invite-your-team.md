@@ -90,7 +90,7 @@ Rooms are organizational units within a Space that provide:
 1. Access Rooms through the Space's sidebar.
 2. Click the green plus (**+**) icon next to "Rooms" to create new Rooms.
 
-   <img src="https://github.com/user-attachments/assets/16958ba8-53ac-4e78-a51f-7ea328e97f31" height="400px" alt="Individual Space sidebar">
+   <img src="https://github.com/user-attachments/assets/16958ba8-53ac-4e78-a51f-7ea328e97f31" height="400px" alt="Individual Space sidebar"/>
 
 **Settings and Configuration**
 
