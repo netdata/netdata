@@ -186,11 +186,11 @@ void *stream_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_STREAM_METRIC_NODES, "nodes", "nodes", WORKER_METRIC_ABSOLUTE);
 
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_READ,
-                                      "received bytes", "bytes/s",
+                                      "receiver received bytes", "bytes/s",
                                       WORKER_METRIC_INCREMENT);
 
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED,
-                                      "received uncompressed bytes", "bytes/s",
+                                      "receiver received uncompressed bytes", "bytes/s",
                                       WORKER_METRIC_INCREMENT);
 
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
