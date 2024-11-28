@@ -14,8 +14,8 @@ struct pollfd_slotted {
 
 #define PFD_EMPTY (struct pollfd_slotted){ .sth = NULL, .fd = -1, .slot = -1, }
 
-#include "sender-internals.h"
-#include "receiver-internals.h"
+#include "stream-sender-internals.h"
+#include "stream-receiver-internals.h"
 
 #include "plugins.d/pluginsd_parser.h"
 
@@ -47,28 +47,28 @@ struct pollfd_slotted {
 #define WORKER_SENDER_JOB_EXECUTE_FUNCTION                              (WORKER_PARSER_FIRST_JOB - 20)
 #define WORKER_SENDER_JOB_EXECUTE_META                                  (WORKER_PARSER_FIRST_JOB - 19)
 
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_OVERFLOW                (WORKER_PARSER_FIRST_JOB - 18)
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_TIMEOUT                 (WORKER_PARSER_FIRST_JOB - 17)
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SOCKET_ERROR            (WORKER_PARSER_FIRST_JOB - 16)
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED           (WORKER_PARSER_FIRST_JOB - 15)
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR           (WORKER_PARSER_FIRST_JOB - 14)
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR              (WORKER_PARSER_FIRST_JOB - 13)
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_COMPRESSION_ERROR       (WORKER_PARSER_FIRST_JOB - 12)
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVER_LEFT           (WORKER_PARSER_FIRST_JOB - 11)
-#define WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_HOST_CLEANUP            (WORKER_PARSER_FIRST_JOB - 10)
+#define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW                           (WORKER_PARSER_FIRST_JOB - 18)
+#define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT                            (WORKER_PARSER_FIRST_JOB - 17)
+#define WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR                       (WORKER_PARSER_FIRST_JOB - 16)
+#define WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED                      (WORKER_PARSER_FIRST_JOB - 15)
+#define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR                      (WORKER_PARSER_FIRST_JOB - 14)
+#define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR                         (WORKER_PARSER_FIRST_JOB - 13)
+#define WORKER_SENDER_JOB_DISCONNECT_COMPRESSION_ERROR                  (WORKER_PARSER_FIRST_JOB - 12)
+#define WORKER_SENDER_JOB_DISCONNECT_RECEIVER_LEFT                      (WORKER_PARSER_FIRST_JOB - 11)
+#define WORKER_SENDER_JOB_DISCONNECT_HOST_CLEANUP                       (WORKER_PARSER_FIRST_JOB - 10)
 
 // dispatcher metrics
 // this has to be the same at pluginsd_parser.h
 #define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION                      (WORKER_PARSER_FIRST_JOB - 9)
 #define WORKER_STREAM_METRIC_NODES                                      (WORKER_PARSER_FIRST_JOB - 8)
-#define WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO                       (WORKER_PARSER_FIRST_JOB - 7)
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED                     (WORKER_PARSER_FIRST_JOB - 6)
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT                         (WORKER_PARSER_FIRST_JOB - 5)
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED                   (WORKER_PARSER_FIRST_JOB - 4)
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED                 (WORKER_PARSER_FIRST_JOB - 3)
-#define WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO            (WORKER_PARSER_FIRST_JOB - 2)
-#define WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE                   (WORKER_PARSER_FIRST_JOB - 1)
-#define WORKER_SENDER_DISPATHCER_JOB_MESSAGES                           (WORKER_PARSER_FIRST_JOB - 0)
+#define WORKER_SENDER_JOB_BUFFER_RATIO                                  (WORKER_PARSER_FIRST_JOB - 7)
+#define WORKER_SENDER_JOB_BYTES_RECEIVED                                (WORKER_PARSER_FIRST_JOB - 6)
+#define WORKER_SENDER_JOB_BYTES_SENT                                    (WORKER_PARSER_FIRST_JOB - 5)
+#define WORKER_SENDER_JOB_BYTES_COMPRESSED                              (WORKER_PARSER_FIRST_JOB - 4)
+#define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED                            (WORKER_PARSER_FIRST_JOB - 3)
+#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO                       (WORKER_PARSER_FIRST_JOB - 2)
+#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE                              (WORKER_PARSER_FIRST_JOB - 1)
+#define WORKER_SENDER_JOB_MESSAGES                                      (WORKER_PARSER_FIRST_JOB - 0)
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 29
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 25
@@ -169,19 +169,19 @@ struct stream_thread_globals {
 
 extern struct stream_thread_globals stream_thread_globals;
 
-void stream_sender_dispatcher_move_queue_to_running_unsafe(struct stream_thread *sth);
+void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth);
 void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth);
-void stream_sender_dispatcher_check_all_nodes(struct stream_thread *sth);
+void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth);
 
 void stream_receiver_add_to_queue(struct receiver_state *rpt);
 void stream_sender_add_to_connector_queue(RRDHOST *host);
-void stream_sender_dispatcher_handle_op(struct stream_thread *sth, struct sender_op *msg);
 
-void stream_sender_dispatcher_process_sender(struct stream_thread *sth, struct sender_state *s, short revents, size_t slot, time_t now_s);
-void stream_receive_process_input(struct stream_thread *sth, struct receiver_state *rpt, size_t slot, time_t now_s);
+void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, short revents, size_t slot, time_t now_s);
+void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, short revents, size_t slot, time_t now_s);
 
-void stream_sender_dispatcher_cleanup(struct stream_thread *sth);
+void stream_sender_cleanup(struct stream_thread *sth);
 void stream_receiver_cleanup(struct stream_thread *sth);
+void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, struct sender_op *msg);
 
 struct pollfd_slotted stream_thread_pollfd_get(struct stream_thread *sth, int fd, POLLFD_TYPE type, struct receiver_state *rpt, struct sender_state *s);
 void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd_slotted pfd);

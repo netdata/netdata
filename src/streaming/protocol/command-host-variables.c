@@ -19,7 +19,7 @@ void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQU
         BUFFER *wb = sender_start(host->sender);
         rrdpush_sender_add_host_variable_to_buffer(wb, rva);
         sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-        sender_thread_buffer_free();
+        sender_commit_thread_buffer_free();
     }
 }
 
@@ -45,7 +45,7 @@ void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
         int ret = rrdvar_walkthrough_read(host->rrdvars, rrdpush_sender_thread_custom_host_variables_callback, &tmp);
         (void)ret;
         sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-        sender_thread_buffer_free();
+        sender_commit_thread_buffer_free();
 
         netdata_log_debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
     }

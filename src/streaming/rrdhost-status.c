@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdhost-status.h"
-#include "receiver-internals.h"
-#include "sender-internals.h"
+#include "stream-receiver-internals.h"
+#include "stream-sender-internals.h"
 
 ENUM_STR_MAP_DEFINE(RRDHOST_DB_STATUS) = {
     { RRDHOST_DB_STATUS_INITIALIZING, "initializing" },

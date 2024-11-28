@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "receiver-internals.h"
+#include "stream-receiver-internals.h"
 
-char *receiver_program_version_strdupz(RRDHOST *host) {
+char *stream_receiver_program_version_strdupz(RRDHOST *host) {
     rrdhost_receiver_lock(host);
     char *host_version = strdupz(
         host->receiver && host->receiver->program_version ? host->receiver->program_version :

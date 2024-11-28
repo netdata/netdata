@@ -66,7 +66,7 @@ static void build_node_info(RRDHOST *host)
 
     char *host_version = NULL;
     if (host != localhost)
-        host_version = receiver_program_version_strdupz(host);
+        host_version = stream_receiver_program_version_strdupz(host);
 
     node_info.data.name = rrdhost_hostname(host);
     node_info.data.os = rrdhost_os(host);

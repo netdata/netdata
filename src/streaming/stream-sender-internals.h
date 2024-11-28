@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_SENDER_INTERNALS_H
-#define NETDATA_SENDER_INTERNALS_H
+#ifndef NETDATA_STREAM_SENDER_INTERNALS_H
+#define NETDATA_STREAM_SENDER_INTERNALS_H
 
-#include "rrdpush.h"
+#include "stream.h"
 #include "stream-thread.h"
 #include "h2o-common.h"
 #include "aclk/https_client.h"
@@ -181,7 +181,7 @@ bool stream_sender_is_host_stopped(struct sender_state *s);
 
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_op msg);
 
-void stream_sender_update_dispatcher_added_data_unsafe(struct sender_state *s, STREAM_TRAFFIC_TYPE type, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
+void stream_sender_thread_data_added_data_unsafe(struct sender_state *s, STREAM_TRAFFIC_TYPE type, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
 
 void stream_sender_add_to_queue(struct sender_state *s);
 
@@ -194,6 +194,6 @@ bool stream_connector_is_signaled_to_stop(struct sender_state *s);
 
 void stream_sender_on_connect(struct sender_state *s);
 
-void stream_sender_giveup(struct sender_state *s);
+void stream_sender_remove(struct sender_state *s);
 
-#endif //NETDATA_SENDER_INTERNALS_H
+#endif //NETDATA_STREAM_SENDER_INTERNALS_H

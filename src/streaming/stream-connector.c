@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "sender-internals.h"
+#include "stream-sender-internals.h"
 
 typedef struct {
     char *os_name;
@@ -638,7 +638,7 @@ static void stream_connector_remove(struct sender_state *s) {
     struct connector *sc = stream_connector_get(s);
     __atomic_sub_fetch(&sc->nodes, 1, __ATOMIC_RELAXED);
 
-    stream_sender_giveup(s);
+    stream_sender_remove(s);
 }
 
 static void *stream_connector_thread(void *ptr) {

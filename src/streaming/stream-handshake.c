@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrdpush.h"
+#include "stream.h"
 
 static struct {
     STREAM_HANDSHAKE err;

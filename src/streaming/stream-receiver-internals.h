@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_RECEIVER_INTERNALS_H
-#define NETDATA_RECEIVER_INTERNALS_H
+#ifndef NETDATA_STREAM_RECEIVER_INTERNALS_H
+#define NETDATA_STREAM_RECEIVER_INTERNALS_H
 
-#include "receiver.h"
+#include "stream.h"
 #include "stream-thread.h"
 #include "stream-conf.h"
 #include "database/rrd.h"
@@ -76,8 +76,12 @@ struct receiver_state {
 #define unless_h2o_rrdpush(x) if(!is_h2o_rrdpush(x))
 #endif
 
-void receiver_state_free(struct receiver_state *rpt);
-bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason);
+bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt);
+void rrdhost_clear_receiver(struct receiver_state *rpt);
+void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status, ND_LOG_FIELD_PRIORITY priority);
+
+void stream_receiver_free(struct receiver_state *rpt);
+bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE reason);
 
 
-#endif //NETDATA_RECEIVER_INTERNALS_H
+#endif //NETDATA_STREAM_RECEIVER_INTERNALS_H

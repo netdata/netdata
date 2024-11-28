@@ -163,7 +163,7 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);
     buffer_json_member_add_boolean(wb, "stream-enabled", stream_send.enabled);
 
-    buffer_json_member_add_boolean(wb, "stream-compression", rrdhost_sender_has_compression(host));
+    buffer_json_member_add_boolean(wb, "stream-compression", stream_sender_has_compression(host));
 
     buffer_json_member_add_boolean(wb, "https-enabled", true);
 

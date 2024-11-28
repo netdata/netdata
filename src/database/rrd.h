@@ -126,7 +126,7 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
 #include "rrdlabels.h"
 #include "streaming/stream-capabilities.h"
 #include "streaming/stream-path.h"
-#include "streaming/rrdpush.h"
+#include "streaming/stream.h"
 //#include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
 

@@ -1346,7 +1346,8 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                         return;
                     }
 
-                    w->response.code = rrdpush_receiver_thread_spawn(w, (char *)buffer_tostring(w->url_query_string_decoded), NULL);
+                    w->response.code = stream_receiver_accept_connection(
+                        w, (char *)buffer_tostring(w->url_query_string_decoded), NULL);
                     return;
 
                 case HTTP_REQUEST_MODE_OPTIONS:

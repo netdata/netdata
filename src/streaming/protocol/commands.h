@@ -4,7 +4,7 @@
 #define NETDATA_STREAMING_PROTCOL_COMMANDS_H
 
 #include "database/rrd.h"
-#include "../rrdpush.h"
+#include "../stream.h"
 
 typedef struct rrdset_stream_buffer {
     STREAM_CAPABILITIES capabilities;

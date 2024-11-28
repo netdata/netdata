@@ -31,7 +31,7 @@ CLOUD_STATUS cloud_status(void) {
 
     if(localhost->sender &&
         rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS) &&
-        rrdhost_sender_has_capabilities(localhost, STREAM_CAP_NODE_ID) &&
+        stream_sender_has_capabilities(localhost, STREAM_CAP_NODE_ID) &&
         !UUIDiszero(localhost->node_id) &&
         !UUIDiszero(localhost->aclk.claim_id_of_parent))
         return CLOUD_STATUS_INDIRECT;

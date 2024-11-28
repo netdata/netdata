@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "sender-internals.h"
+#include "stream-sender-internals.h"
 
 #define TIME_TO_CONSIDER_PARENTS_SIMILAR 120
 
@@ -301,7 +301,7 @@ int stream_info_to_json_v1(BUFFER *wb, const char *machine_guid) {
     buffer_json_member_add_uint64(wb, "status", ret);
     buffer_json_member_add_uuid(wb, "host_id", localhost->host_id.uuid);
     buffer_json_member_add_uint64(wb, "nodes", dictionary_entries(rrdhost_root_index));
-    buffer_json_member_add_uint64(wb, "receivers", stream_currently_connected_receivers());
+    buffer_json_member_add_uint64(wb, "receivers", stream_receivers_currently_connected());
     buffer_json_member_add_uint64(wb, "nonce", os_random32());
 
     if(ret == HTTP_RESP_OK) {

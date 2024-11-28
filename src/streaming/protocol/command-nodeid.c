@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "commands.h"
-#include "../receiver-internals.h"
-#include "../sender-internals.h"
+#include "../stream-receiver-internals.h"
+#include "../stream-sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
 
 // the child disconnected from the parent, and it has to clear the parent's claim id

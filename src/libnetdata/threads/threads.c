@@ -236,7 +236,7 @@ void netdata_threads_init_for_external_plugins(size_t stacksize) {
 // ----------------------------------------------------------------------------
 
 void rrdset_thread_rda_free(void);
-void sender_thread_buffer_free(void);
+void sender_commit_thread_buffer_free(void);
 void query_target_free(void);
 void service_exits(void);
 void rrd_collector_finished(void);
@@ -305,7 +305,7 @@ static void nd_thread_exit(void *pptr) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread with task id %d finished", nti->tid);
 
     rrd_collector_finished();
-    sender_thread_buffer_free();
+    sender_commit_thread_buffer_free();
     rrdset_thread_rda_free();
     query_target_free();
     thread_cache_destroy();

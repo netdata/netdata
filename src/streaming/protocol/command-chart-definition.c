@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "commands.h"
-#include "../sender-internals.h"
+#include "../stream-sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
 
 // chart labels
@@ -197,7 +197,7 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     BUFFER *wb = sender_start(host->sender);
     rrdpush_chart_definition_to_pluginsd(wb, st);
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-    sender_thread_buffer_free();
+    sender_commit_thread_buffer_free();
 
     return true;
 }

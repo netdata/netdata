@@ -1425,7 +1425,7 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
 )
 
 set(STREAMING_PLUGIN_FILES
-        src/streaming/rrdpush.h
+        src/streaming/stream.h
         src/streaming/stream-compression/compression.c
         src/streaming/stream-compression/compression.h
         src/streaming/stream-compression/brotli.c
@@ -1436,8 +1436,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-compression/lz4.h
         src/streaming/stream-compression/zstd.c
         src/streaming/stream-compression/zstd.h
-        src/streaming/receiver.c
-        src/streaming/sender-dispatcher.c
+        src/streaming/stream-receiver.c
+        src/streaming/stream-sender.c
         src/streaming/replication.c
         src/streaming/replication.h
         src/streaming/h2o-common.h
@@ -1450,9 +1450,9 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-capabilities.c
         src/streaming/stream-capabilities.h
         src/streaming/stream-connector.c
-        src/streaming/sender-internals.h
-        src/streaming/sender-execute.c
-        src/streaming/sender-commit.c
+        src/streaming/stream-sender-internals.h
+        src/streaming/stream-sender-execute.c
+        src/streaming/stream-sender-commit.c
         src/streaming/stream-parents.c
         src/streaming/stream-handshake.c
         src/streaming/protocol/command-function.c
@@ -1463,16 +1463,15 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-conf.c
         src/streaming/stream-conf.h
         src/streaming/stream-handshake.h
-        src/streaming/sender.h
         src/streaming/stream-parents.h
         src/streaming/rrdhost-status.c
         src/streaming/rrdhost-status.h
-        src/streaming/receiver.h
-        src/streaming/sender-api.c
-        src/streaming/receiver-internals.h
-        src/streaming/receiver-api.c
+        src/streaming/stream-sender-api.c
+        src/streaming/stream-receiver-internals.h
+        src/streaming/stream-receiver-api.c
         src/streaming/stream-thread.c
         src/streaming/stream-thread.h
+        src/streaming/stream-receiver-connection.c
 )
 
 set(WEB_PLUGIN_FILES

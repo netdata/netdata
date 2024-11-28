@@ -30,7 +30,7 @@
 #endif
 
 // streaming metrics between netdata servers
-#include "streaming/rrdpush.h"
+#include "streaming/stream.h"
 
 // anomaly detection
 #include "ml/ml_public.h"

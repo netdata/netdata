@@ -23,7 +23,7 @@ static void stream_execute_function_callback(BUFFER *func_wb, int code, void *da
         pluginsd_function_result_end_to_buffer(wb);
 
         sender_commit(s, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
-        sender_thread_buffer_free();
+        sender_commit_thread_buffer_free();
 
         internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %"PRIu64" usec).",
                        rrdhost_hostname(s->host), s->connected_to,

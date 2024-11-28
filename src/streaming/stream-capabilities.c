@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrdpush.h"
-#include "receiver-internals.h"
-#include "sender-internals.h"
+#include "stream.h"
+#include "stream-receiver-internals.h"
+#include "stream-sender-internals.h"
 
 static STREAM_CAPABILITIES globally_disabled_capabilities = STREAM_CAP_ALWAYS_DISABLED;
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "commands.h"
-#include "../sender-internals.h"
+#include "../stream-sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
 
 void rrdpush_send_global_functions(RRDHOST *host) {
@@ -19,5 +19,5 @@ void rrdpush_send_global_functions(RRDHOST *host) {
     // this is just metadata not an interactive function call
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 
-    sender_thread_buffer_free();
+    sender_commit_thread_buffer_free();
 }

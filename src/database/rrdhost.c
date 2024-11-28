@@ -240,7 +240,7 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
     if(stream && parents && api_key) {
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
 
-        rrdhost_sender_structures_init(host);
+        stream_sender_structures_init(host);
 
         host->stream.snd.destination = string_dup(parents);
         rrdhost_stream_parents_update_from_destination(host);
@@ -1197,10 +1197,10 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     // ------------------------------------------------------------------------
     // clean up streaming
 
-    rrdhost_sender_structures_free(host);
+    stream_sender_structures_free(host);
 
     if (netdata_exit || force)
-        stop_streaming_receiver(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP);
+        stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP);
 
 
     // ------------------------------------------------------------------------
@@ -1383,7 +1383,7 @@ static void rrdhost_load_auto_labels(void) {
     int has_unstable_connection = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "has unstable connection", CONFIG_BOOLEAN_NO);
     rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
 
-    rrdlabels_add(labels, "_is_parent", (stream_currently_connected_receivers() > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_is_parent", (stream_receivers_currently_connected() > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
     rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_os", string2str(localhost->os), RRDLABEL_SRC_AUTO);
@@ -1393,7 +1393,7 @@ static void rrdhost_load_auto_labels(void) {
 }
 
 void rrdhost_set_is_parent_label(void) {
-    uint32_t count = stream_currently_connected_receivers();
+    uint32_t count = stream_receivers_currently_connected();
 
     if (count == 0 || count == 1) {
         RRDLABELS *labels = localhost->rrdlabels;

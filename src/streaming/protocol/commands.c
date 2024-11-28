@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "commands.h"
-#include "../sender-internals.h"
+#include "../stream-sender-internals.h"
 
 RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock_time) {
     RRDHOST *host = st->rrdhost;
@@ -13,7 +13,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
     if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS))) {
 
         if(unlikely(!(host_flags & (RRDHOST_FLAG_RRDPUSH_SENDER_ADDED | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))))
-            rrdhost_sender_start(host);
+            stream_sender_start_host(host);
 
         if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS))) {
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);

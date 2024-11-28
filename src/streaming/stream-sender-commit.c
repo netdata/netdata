@@ -9,7 +9,7 @@ static __thread bool sender_thread_buffer_used = false;
 static __thread size_t sender_thread_buffer_our_recreates = 0;    // the sender sequence, when we created this buffer
 static __thread size_t sender_thread_buffer_sender_recreates = 0; // sender_commit() copies this, while having the sender lock
 
-void sender_thread_buffer_free(void) {
+void sender_commit_thread_buffer_free(void) {
     buffer_free(sender_thread_buffer);
     sender_thread_buffer = NULL;
     sender_thread_buffer_used = false;
@@ -68,7 +68,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     if (!s->thread.msg.session) {
         // the dispatcher is not there anymore - ignore these data
         sender_unlock(s);
-        sender_thread_buffer_free(); // free the thread data
+        sender_commit_thread_buffer_free(); // free the thread data
         return;
     }
 
@@ -185,7 +185,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
 
     // update s->dispatcher entries
     bool enable_sending = s->thread.bytes_outstanding == 0;
-    stream_sender_update_dispatcher_added_data_unsafe(s, type, total_compressed_len, total_uncompressed_len);
+    stream_sender_thread_data_added_data_unsafe(s, type, total_compressed_len, total_uncompressed_len);
 
     if (enable_sending)
         msg = s->thread.msg;

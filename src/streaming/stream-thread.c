@@ -11,6 +11,109 @@ struct stream_thread_globals stream_thread_globals = {
 // --------------------------------------------------------------------------------------------------------------------
 // pipe messages
 
+static void stream_thread_handle_op(struct stream_thread *sth, struct sender_op *msg) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
+    sth->messages.processed++;
+
+    if (msg->session &&                                                                         // there is a session
+        msg->snd_run_slot >= 0 && (size_t)msg->snd_run_slot < sth->snd.run.used &&              // slot is valid
+        sth->snd.run.senders[msg->snd_run_slot] &&                                              // slot is not NULL
+        msg->snd_run_slot == sth->snd.run.senders[msg->snd_run_slot]->thread.slot &&            // slot matches
+        sth->snd.run.senders[msg->snd_run_slot] == msg->sender &&                               // same sender
+        sth->snd.run.senders[msg->snd_run_slot]->thread.msg.session == msg->session &&          // same session
+        (size_t)msg->thread_slot == sth->id)                                                    // same thread
+    {
+        struct sender_state *s = sth->snd.run.senders[msg->snd_run_slot];
+
+        if(msg->op & SENDER_MSG_ENABLE_SENDING) {
+            struct pollfd *pfd = pfd_validate(sth, s->thread.pfd);
+            pfd->events |= POLLOUT;
+            msg->op &= ~(SENDER_MSG_ENABLE_SENDING);
+        }
+
+        if(msg->op)
+            stream_sender_handle_op(sth, s, msg);
+    }
+    else {
+        internal_fatal(true, "invalid message");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM[%zu]: invalid message", sth->id);
+    }
+}
+
+void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_op msg) {
+    if (msg.snd_run_slot < 0 || !msg.session || !msg.sender)
+        return;
+
+    internal_fatal(msg.sender != s, "the sender pointer in the message does not match this sender");
+
+    struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
+    if(!sth || sth != stream_thread_pollfd_sth(s->thread.pfd)) {
+        internal_fatal(true, "stream thread pointer in the messages do not match");
+        return;
+    }
+
+    bool send_pipe_msg = false;
+
+    // check if we can execute the message now
+    if(sth->tid == gettid_cached()) {
+        // we are running at the dispatcher thread
+        // no need for locks or queuing
+        sth->messages.bypassed++;
+        stream_thread_handle_op(sth, &msg);
+        return;
+    }
+
+    // add it to the message queue of the thread
+    spinlock_lock(&sth->messages.spinlock);
+    {
+        sth->messages.added++;
+        if (s->thread.msg_slot >= sth->messages.used || sth->messages.array[s->thread.msg_slot].sender != s) {
+            if (unlikely(sth->messages.used >= sth->messages.size)) {
+                // this should never happen, but let's find the root cause
+
+                if (!sth->messages.size) {
+                    // we are exiting
+                    spinlock_unlock(&sth->messages.spinlock);
+                    return;
+                }
+
+                // try to find us in the list
+                for (size_t i = 0; i < sth->messages.size; i++) {
+                    if (sth->messages.array[i].sender == s) {
+                        s->thread.msg_slot = i;
+                        sth->messages.array[s->thread.msg_slot].op |= msg.op;
+                        spinlock_unlock(&sth->messages.spinlock);
+                        internal_fatal(true, "the dispatcher message queue is full, but this sender is already on slot %zu", i);
+                        return;
+                    }
+                }
+
+                fatal("the dispatcher message queue is full, but this should never happen");
+            }
+
+            // let's use a new slot
+            send_pipe_msg = !sth->messages.used; // write to the pipe, only when the queue was empty before this msg
+            s->thread.msg_slot = sth->messages.used++;
+            sth->messages.array[s->thread.msg_slot] = msg;
+        }
+        else
+            // the existing slot is good
+            sth->messages.array[s->thread.msg_slot].op |= msg.op;
+    }
+    spinlock_unlock(&sth->messages.spinlock);
+
+    // signal the streaming thread to wake up and process messages
+    if(send_pipe_msg &&
+        sth->pipe.fds[PIPE_WRITE] != -1 &&
+        write(sth->pipe.fds[PIPE_WRITE], " ", 1) != 1) {
+        nd_log_limit_static_global_var(erl, 1, 1 * USEC_PER_MS);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                     "STREAM %s [send]: cannot write to dispatcher pipe",
+                     rrdhost_hostname(s->host));
+    }
+}
+
 static void stream_thread_read_pipe_messages(struct stream_thread *sth) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
@@ -28,7 +131,7 @@ static void stream_thread_read_pipe_messages(struct stream_thread *sth) {
 
     for(size_t i = 0; i < used ;i++) {
         struct sender_op *msg = &sth->messages.copy[i];
-        stream_sender_dispatcher_handle_op(sth, msg);
+        stream_thread_handle_op(sth, msg);
     }
 }
 
@@ -155,39 +258,44 @@ void *stream_thread(void *ptr) {
     struct stream_thread *sth = ptr;
 
     worker_register("STREAM");
+
+    // stream thread main event loop
     worker_register_job_name(WORKER_STREAM_JOB_LIST, "list");
     worker_register_job_name(WORKER_STREAM_JOB_DEQUEUE, "dequeue");
     worker_register_job_name(WORKER_STREAM_JOB_PREP, "prep");
     worker_register_job_name(WORKER_STREAM_JOB_POLL_ERROR, "poll error");
     worker_register_job_name(WORKER_SENDER_JOB_PIPE_READ, "pipe read");
 
+    // both sender and receiver
     worker_register_job_name(WORKER_STREAM_JOB_SOCKET_RECEIVE, "receive");
     worker_register_job_name(WORKER_STREAM_JOB_SOCKET_SEND, "send");
     worker_register_job_name(WORKER_STREAM_JOB_SOCKET_ERROR, "sock error");
 
+    // receiver
     worker_register_job_name(WORKER_STREAM_JOB_COMPRESS, "compress");
     worker_register_job_name(WORKER_STREAM_JOB_DECOMPRESS, "decompress");
 
-
+    // sender
     worker_register_job_name(WORKER_SENDER_JOB_EXECUTE, "execute");
     worker_register_job_name(WORKER_SENDER_JOB_EXECUTE_REPLAY, "replay");
     worker_register_job_name(WORKER_SENDER_JOB_EXECUTE_FUNCTION, "function");
     worker_register_job_name(WORKER_SENDER_JOB_EXECUTE_META, "meta");
 
-
     // disconnection reasons
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_OVERFLOW, "disconnect overflow");
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SOCKET_ERROR, "disconnect socket error");
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_PARENT_CLOSED, "disconnect parent closed");
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_COMPRESSION_ERROR, "disconnect compression error");
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_RECEIVER_LEFT, "disconnect receiver left");
-    worker_register_job_name(WORKER_SENDER_DISPATCHER_JOB_DISCONNECT_HOST_CLEANUP, "disconnect host cleanup");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW, "disconnect overflow");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR, "disconnect socket error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED, "disconnect parent closed");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_COMPRESSION_ERROR, "disconnect compression error");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_RECEIVER_LEFT, "disconnect receiver left");
+    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_HOST_CLEANUP, "disconnect host cleanup");
 
-
-    worker_register_job_custom_metric(WORKER_STREAM_METRIC_NODES, "nodes", "nodes", WORKER_METRIC_ABSOLUTE);
+    // metrics
+    worker_register_job_custom_metric(WORKER_STREAM_METRIC_NODES,
+                                      "nodes", "nodes",
+                                      WORKER_METRIC_ABSOLUTE);
 
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_READ,
                                       "receiver received bytes", "bytes/s",
@@ -201,16 +309,37 @@ void *stream_thread(void *ptr) {
                                       "receiver replication completion", "%",
                                       WORKER_METRIC_ABSOLUTE);
 
-    worker_register_job_custom_metric(WORKER_SENDER_DISPATCHER_JOB_BUFFER_RATIO, "sender used buffer ratio", "%", WORKER_METRIC_ABSOLUTE);
-    worker_register_job_custom_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED, "sender bytes received", "bytes/s", WORKER_METRIC_INCREMENT);
-    worker_register_job_custom_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT, "sender bytes sent", "bytes/s", WORKER_METRIC_INCREMENT);
-    worker_register_job_custom_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSED, "sender bytes compressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-    worker_register_job_custom_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_UNCOMPRESSED, "sender bytes uncompressed", "bytes/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-    worker_register_job_custom_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_COMPRESSION_RATIO, "sender cumulative compression savings ratio", "%", WORKER_METRIC_ABSOLUTE);
-    worker_register_job_custom_metric(WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE, "sender replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
-    worker_register_job_custom_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, "ops processed", "messages", WORKER_METRIC_INCREMENTAL_TOTAL);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BUFFER_RATIO,
+                                      "sender used buffer ratio", "%",
+                                      WORKER_METRIC_ABSOLUTE);
 
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_RECEIVED,
+                                      "sender bytes received", "bytes/s",
+                                      WORKER_METRIC_INCREMENT);
 
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT,
+                                      "sender bytes sent", "bytes/s",
+                                      WORKER_METRIC_INCREMENT);
+
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED,
+                                      "sender bytes compressed", "bytes/s",
+                                      WORKER_METRIC_INCREMENTAL_TOTAL);
+
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED,
+                                      "sender bytes uncompressed", "bytes/s",
+                                      WORKER_METRIC_INCREMENTAL_TOTAL);
+
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO,
+                                      "sender cumulative compression savings ratio", "%",
+                                      WORKER_METRIC_ABSOLUTE);
+
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE,
+                                      "sender replication dict entries", "entries",
+                                      WORKER_METRIC_ABSOLUTE);
+
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_MESSAGES,
+                                      "ops processed", "messages",
+                                      WORKER_METRIC_INCREMENTAL_TOTAL);
 
     if(pipe(sth->pipe.fds) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM[%zu]: cannot create required pipe.", sth->id);
@@ -240,7 +369,7 @@ void *stream_thread(void *ptr) {
             spinlock_lock(&sth->queue.spinlock);
             stream_thread_messages_resize_unsafe(sth);
             stream_receiver_move_queue_to_running_unsafe(sth);
-            stream_sender_dispatcher_move_queue_to_running_unsafe(sth);
+            stream_sender_move_queue_to_running_unsafe(sth);
             spinlock_unlock(&sth->queue.spinlock);
             last_dequeue_ut = now_ut;
         }
@@ -250,8 +379,8 @@ void *stream_thread(void *ptr) {
 
             // periodically check the entire list of nodes
             // this detects unresponsive parents too (timeout)
-            stream_sender_dispatcher_check_all_nodes(sth);
-            worker_set_metric(WORKER_SENDER_DISPATHCER_JOB_MESSAGES, (NETDATA_DOUBLE)(sth->messages.processed));
+            stream_sender_check_all_nodes_from_poll(sth);
+            worker_set_metric(WORKER_SENDER_JOB_MESSAGES, (NETDATA_DOUBLE)(sth->messages.processed));
             worker_set_metric(WORKER_STREAM_METRIC_NODES, (NETDATA_DOUBLE)sth->nodes_count);
             last_check_all_nodes_ut = now_ut;
         }
@@ -297,7 +426,7 @@ void *stream_thread(void *ptr) {
                     internal_fatal(s != sth->snd.run.senders[sender_slot], "Invalid sender dispatcher pointer!");
 
                     if(sender_slot >= 0 && (size_t)sender_slot < sth->snd.run.used && sth->snd.run.senders[sender_slot] == s)
-                        stream_sender_dispatcher_process_sender(sth, s, revents, sender_slot, now_s);
+                        stream_sender_process_poll_events(sth, s, revents, sender_slot, now_s);
 
                     replay_entries += dictionary_entries(s->replication.requests);
                     break;
@@ -310,7 +439,7 @@ void *stream_thread(void *ptr) {
                     internal_fatal(rpt != sth->rcv.run.receivers[receiver_slot], "Invalid receiver pointer!");
 
                     if(receiver_slot >= 0 && (size_t)receiver_slot < sth->rcv.run.used && sth->rcv.run.receivers[receiver_slot] == rpt)
-                        stream_receive_process_input(sth, rpt, receiver_slot, now_s);
+                        stream_receive_process_poll_events(sth, rpt, revents, receiver_slot, now_s);
 
                     break;
                 }
@@ -336,21 +465,21 @@ void *stream_thread(void *ptr) {
             }
         }
 
-        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)sth->snd.bytes_received);
-        worker_set_metric(WORKER_SENDER_DISPATCHER_JOB_BYTES_SENT, (NETDATA_DOUBLE)sth->snd.bytes_sent);
-        worker_set_metric(WORKER_SENDER_DISPATHCER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
+        worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)sth->snd.bytes_received);
+        worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, (NETDATA_DOUBLE)sth->snd.bytes_sent);
+        worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
     }
 
     // dequeue
     spinlock_lock(&sth->queue.spinlock);
     while(sth->queue.senders)
-        stream_sender_dispatcher_move_queue_to_running_unsafe(sth);
+        stream_sender_move_queue_to_running_unsafe(sth);
     while(sth->queue.receivers)
         stream_receiver_move_queue_to_running_unsafe(sth);
     spinlock_unlock(&sth->queue.spinlock);
 
     // cleanup receiver and dispatcher
-    stream_sender_dispatcher_cleanup(sth);
+    stream_sender_cleanup(sth);
     stream_receiver_cleanup(sth);
 
     // cleanup the thread structures

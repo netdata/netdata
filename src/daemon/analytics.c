@@ -377,7 +377,7 @@ void analytics_https(void)
     BUFFER *b = buffer_create(30, NULL);
     analytics_exporting_connectors_ssl(b);
 
-    buffer_strcat(b, rrdhost_sender_is_connected_with_ssl(localhost) ? "streaming|" : "|");
+    buffer_strcat(b, stream_sender_is_connected_with_ssl(localhost) ? "streaming|" : "|");
     buffer_strcat(b, netdata_ssl_web_server_ctx ? "web" : "");
 
     analytics_set_data_str(&analytics_data.netdata_config_https_available, (char *)buffer_tostring(b));
