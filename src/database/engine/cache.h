@@ -191,7 +191,7 @@ size_t pgc_get_current_cache_size(PGC *cache);
 size_t pgc_get_wanted_cache_size(PGC *cache);
 
 // resetting the end time of a hot page
-void pgc_page_hot_set_end_time_s(PGC *cache, PGC_PAGE *page, time_t end_time_s);
+void pgc_page_hot_set_end_time_s(PGC *cache, PGC_PAGE *page, time_t end_time_s, size_t additional_bytes);
 bool pgc_page_to_clean_evict_or_release(PGC *cache, PGC_PAGE *page);
 
 typedef void (*migrate_to_v2_callback)(Word_t section, unsigned datafile_fileno, uint8_t type, Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos, size_t count_of_unique_extents, size_t count_of_unique_metrics, size_t count_of_unique_pages, void *data);

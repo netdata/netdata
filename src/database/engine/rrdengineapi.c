@@ -491,10 +491,10 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
 
     timing_step(TIMING_STEP_DBENGINE_CHECK_DATA);
 
-    pgd_append_point(handle->page_data,
-                     point_in_time_ut,
-                     n, min_value, max_value, count, anomaly_count, flags,
-                     handle->page_position);
+    size_t additional_bytes = pgd_append_point(handle->page_data,
+                                               point_in_time_ut,
+                                               n, min_value, max_value, count, anomaly_count, flags,
+                                               handle->page_position);
 
     timing_step(TIMING_STEP_DBENGINE_PACK);
 
@@ -504,7 +504,8 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
     }
     else {
         // update an existing page
-        pgc_page_hot_set_end_time_s(main_cache, handle->pgc_page, (time_t) (point_in_time_ut / USEC_PER_SEC));
+        pgc_page_hot_set_end_time_s(main_cache, handle->pgc_page,
+                                    (time_t) (point_in_time_ut / USEC_PER_SEC), additional_bytes);
         handle->page_end_time_ut = point_in_time_ut;
 
         if(unlikely(++handle->page_position >= handle->page_entries_max)) {

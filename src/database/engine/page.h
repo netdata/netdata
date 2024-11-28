@@ -39,7 +39,7 @@ uint32_t pgd_disk_footprint(PGD *pg);
 
 void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size);
 
-void pgd_append_point(PGD *pg,
+size_t pgd_append_point(PGD *pg,
                       usec_t point_in_time_ut,
                       NETDATA_DOUBLE n,
                       NETDATA_DOUBLE min_value,

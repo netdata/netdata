@@ -2181,7 +2181,7 @@ bool pgc_flush_pages(PGC *cache) {
     return flush_pages(cache, 0, PGC_SECTION_ALL, true, false);
 }
 
-void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time_t end_time_s) {
+void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time_t end_time_s, size_t additional_bytes) {
     internal_fatal(!is_page_hot(page),
                    "DBENGINE CACHE: end_time_s update on non-hot page");
 
@@ -2189,6 +2189,35 @@ void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time
                    "DBENGINE CACHE: end_time_s is not bigger than existing");
 
     __atomic_store_n(&page->end_time_s, end_time_s, __ATOMIC_RELAXED);
+
+    if(additional_bytes) {
+        page_transition_lock(cache, page);
+
+        size_t old_assumed_size = page->assumed_size;
+
+        size_t size = page_size_from_assumed_size(cache, old_assumed_size);
+        size += additional_bytes;
+        page->assumed_size = page_assumed_size(cache, size);
+
+        size_t delta = page->assumed_size - old_assumed_size;
+        __atomic_add_fetch(&cache->stats.added_size, delta, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&cache->stats.size, delta, __ATOMIC_RELAXED);
+
+        struct pgc_queue_statistics *qstats = NULL;
+        if(page->flags & PGC_PAGE_HOT)
+            qstats = cache->hot.stats;
+        else if(page->flags & PGC_PAGE_DIRTY)
+            qstats = cache->dirty.stats;
+        else if(page->flags & PGC_PAGE_CLEAN)
+            qstats = cache->clean.stats;
+
+        if(qstats) {
+            __atomic_add_fetch(&qstats->size, delta, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&qstats->added_size, delta, __ATOMIC_RELAXED);
+        }
+
+        page_transition_unlock(cache, page);
+    }
 
 #ifdef PGC_COUNT_POINTS_COLLECTED
     __atomic_add_fetch(&cache->stats.points_collected, 1, __ATOMIC_RELAXED);
@@ -2897,7 +2926,7 @@ int pgc_unittest(void) {
             .hot = true,
     }, NULL);
 
-    pgc_page_hot_set_end_time_s(cache, page2, 2001);
+    pgc_page_hot_set_end_time_s(cache, page2, 2001, 0);
     pgc_page_hot_to_dirty_and_release(cache, page2, false);
 
     PGC_PAGE *page3 = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
@@ -2910,7 +2939,7 @@ int pgc_unittest(void) {
             .hot = true,
     }, NULL);
 
-    pgc_page_hot_set_end_time_s(cache, page3, 2001);
+    pgc_page_hot_set_end_time_s(cache, page3, 2001, 0);
     pgc_page_hot_to_dirty_and_release(cache, page3, false);
 
     pgc_destroy(cache);

@@ -642,7 +642,8 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
 // ----------------------------------------------------------------------------
 // data collection
 
-void pgd_append_point(PGD *pg,
+// returns additional memory that may have been allocated to store this point
+size_t pgd_append_point(PGD *pg,
                       usec_t point_in_time_ut __maybe_unused,
                       NETDATA_DOUBLE n,
                       NETDATA_DOUBLE min_value,
@@ -727,6 +728,8 @@ void pgd_append_point(PGD *pg,
 
                 ok = gorilla_writer_write(pg->gorilla.writer, t);
                 internal_fatal(ok == false, "Failed to writer value in newly allocated gorilla buffer.");
+
+                return RRDENG_GORILLA_32BIT_BUFFER_SIZE;
             }
 
             break;
@@ -735,6 +738,8 @@ void pgd_append_point(PGD *pg,
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, pg->type);
             break;
     }
+
+    return 0;
 }
 
 // ----------------------------------------------------------------------------
