@@ -109,15 +109,14 @@ struct pollfd *stream_thread_pollfd_get(struct stream_thread *sth, int fd, POLLF
     return &sth->run.pollfds[i];
 }
 
-void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd *pfd) {
+void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd *pfd, int32_t slot) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
     internal_fatal(!pfd, "struct pollfd pointer is NULL");
 
-    size_t slot = pfd - sth->run.pollfds;
-    if(slot >= sth->run.used)
+    if(slot < 0 || (size_t)slot >= sth->run.used)
         fatal("STREAM[%zu]: invalid struct pollfd pointer to release", sth->id);
 
-    internal_fatal(&sth->run.pollfds[slot] != pfd, "Invalid calculated slot number %zu", slot);
+    internal_fatal(&sth->run.pollfds[slot] != pfd, "Invalid slot number %d", slot);
 
     sth->run.pollfds[slot] = (struct pollfd){
         .fd = -1,

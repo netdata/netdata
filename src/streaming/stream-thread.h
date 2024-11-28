@@ -174,7 +174,7 @@ void stream_sender_dispatcher_cleanup(struct stream_thread *sth);
 void stream_receiver_cleanup(struct stream_thread *sth);
 
 struct pollfd *stream_thread_pollfd_get(struct stream_thread *sth, int fd, POLLFD_TYPE type, struct receiver_state *rpt, struct sender_state *s);
-void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd *pfd);
+void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd *pfd, int32_t slot);
 
 struct stream_thread *stream_thread_by_slot_id(size_t thread_slot);
 

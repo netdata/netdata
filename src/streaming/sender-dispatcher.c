@@ -261,9 +261,10 @@ void stream_sender_dispatcher_handle_op(struct stream_thread *sth, struct sender
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM[%zu]: invalid msg id %u", sth->id, (unsigned)msg->op);
     }
-    else
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM[%zu]: invalid message in dispatcher", sth->id);
+    else {
+        internal_fatal(true, "invalid message");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM[%zu]: invalid message", sth->id);
+    }
 }
 
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_op msg) {
@@ -448,7 +449,7 @@ static void stream_sender_dispatcher_move_running_to_connector_or_remove(struct 
     }
 
     if(s == sth->snd.run.senders[slot] || !sth->snd.run.senders[slot]) {
-        stream_thread_pollfd_release(sth, s->thread.pfd);
+        stream_thread_pollfd_release(sth, s->thread.pfd, s->thread.slot);
         if (slot == sth->snd.run.used - 1)
             sth->snd.run.used--;
     }

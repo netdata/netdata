@@ -494,7 +494,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
            , rpt->client_port ? rpt->client_port : "-"
            , why ? why : "");
 
-    stream_thread_pollfd_release(sth, rpt->receiver.pfd);
+    stream_thread_pollfd_release(sth, rpt->receiver.pfd, rpt->receiver.slot);
     rpt->receiver.slot = -1;
     rpt->receiver.pfd = NULL;
     rpt->host->stream.rcv.status.tid = 0;
