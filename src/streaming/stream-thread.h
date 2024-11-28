@@ -5,7 +5,9 @@
 
 #include "libnetdata/libnetdata.h"
 
+struct stream_thread;
 struct pollfd_slotted {
+    struct stream_thread *sth;
     struct pollfd *ptr;
     int32_t slot;
 };

@@ -107,6 +107,7 @@ struct pollfd_slotted stream_thread_pollfd_get(struct stream_thread *sth, int fd
     }
 
     struct pollfd_slotted rc = {
+        .sth = sth,
         .slot = (int32_t)i,
         .ptr = &sth->run.pollfds[i],
     };
@@ -115,6 +116,8 @@ struct pollfd_slotted stream_thread_pollfd_get(struct stream_thread *sth, int fd
 
 void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd_slotted pfd) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
+    internal_fatal(pfd.sth != sth, "Invalid stream_thread slot to release");
     internal_fatal(pfd.slot < 0 || (size_t)pfd.slot >= sth->run.used, "Invalid PFD slot to release");
     internal_fatal(&sth->run.pollfds[pfd.slot] != pfd.ptr, "Invalid PFD to release");
 
@@ -384,8 +387,11 @@ void stream_thread_node_removed(RRDHOST *host) {
     spinlock_lock(&stream_thread_globals.assign.spinlock);
     internal_fatal(!host->stream.refcount, "invalid stream refcount %u (while stopping node)", host->stream.refcount);
 
-    if(--host->stream.refcount == 0)
+    if(--host->stream.refcount == 0) {
+        struct stream_thread *sth = host->stream.thread;
+        sth->nodes_count--;
         host->stream.thread = NULL;
+    }
 
     spinlock_unlock(&stream_thread_globals.assign.spinlock);
 }
@@ -411,9 +417,9 @@ static struct stream_thread *stream_thread_get_unsafe(RRDHOST *host) {
         }
     }
 
-    host->stream.thread = &stream_thread_globals.threads[selected_thread_slot];
+    struct stream_thread *sth = host->stream.thread = &stream_thread_globals.threads[selected_thread_slot];
     host->stream.refcount = 0;
-    stream_thread_globals.threads[selected_thread_slot].nodes_count++;
+    sth->nodes_count++;
 
     return host->stream.thread;
 }
