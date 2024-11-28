@@ -463,12 +463,8 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, use
     switch (ctx->config.page_type) {
         case RRDENG_PAGE_TYPE_ARRAY_32BIT:
         case RRDENG_PAGE_TYPE_ARRAY_TIER1:
-            d = pgd_create(ctx->config.page_type, slots);
-            break;
         case RRDENG_PAGE_TYPE_GORILLA_32BIT:
-            // ignore slots, and use the fixed number of slots per gorilla buffer.
-            // gorilla will automatically add more buffers if needed.
-            d = pgd_create(ctx->config.page_type, RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
+            d = pgd_create(ctx->config.page_type, slots);
             break;
         default:
             fatal("Unknown page type: %uc\n", ctx->config.page_type);

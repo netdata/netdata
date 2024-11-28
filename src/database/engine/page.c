@@ -259,7 +259,6 @@ PGD *pgd_create(uint8_t type, uint32_t slots)
             internal_fatal(slots == 1,
                       "DBENGINE: invalid number of slots (%u) or page type (%u)", slots, type);
 
-            pg->slots = slots;
             pg->last_sn = 0;
             pg->last_sn_count = 0;
 
