@@ -132,6 +132,10 @@ void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd_slott
     };
 }
 
+struct stream_thread *stream_thread_pollfd_sth(struct pollfd_slotted pfd) {
+    return pfd.sth;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
 static void stream_thread_messages_resize_unsafe(struct stream_thread *sth) {

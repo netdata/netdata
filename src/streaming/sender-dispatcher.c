@@ -269,14 +269,20 @@ void stream_sender_dispatcher_handle_op(struct stream_thread *sth, struct sender
 }
 
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_op msg) {
-    if (msg.snd_run_slot < 0 || !msg.session || msg.sender != s)
+    if (msg.snd_run_slot < 0 || !msg.session || !msg.sender)
         return;
 
+    internal_fatal(msg.sender != s, "the sender pointer in the message does not match this sender");
+
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
-    if(!sth) return;
+    if(!sth || sth != stream_thread_pollfd_sth(s->thread.pfd)) {
+        internal_fatal(true, "stream thread pointer in the messages do not match");
+        return;
+    }
 
     bool send_pipe_msg = false;
 
+    // check if we can execute the message now
     if(sth->tid == gettid_cached()) {
         // we are running at the dispatcher thread
         // no need for locks or queuing
@@ -285,6 +291,7 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_
         return;
     }
 
+    // add it to the message queue of the thread
     spinlock_lock(&sth->messages.spinlock);
     {
         sth->messages.added++;
@@ -323,6 +330,7 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_
     }
     spinlock_unlock(&sth->messages.spinlock);
 
+    // signal the streaming thread to wake up and process messages
     if(send_pipe_msg &&
         sth->pipe.fds[PIPE_WRITE] != -1 &&
         write(sth->pipe.fds[PIPE_WRITE], " ", 1) != 1) {
