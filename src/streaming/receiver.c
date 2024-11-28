@@ -484,8 +484,6 @@ static void stream_receiver_on_disconnect(struct stream_thread *sth __maybe_unus
 static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, size_t slot, const char *why) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
-    stream_thread_node_removed(rpt->host);
-
     nd_log(NDLS_DAEMON, NDLP_ERR,
            "STREAM '%s' [receive from [%s]:%s]: "
            "receiver disconnected: %s"
@@ -495,9 +493,11 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
            , why ? why : "");
 
     stream_thread_pollfd_release(sth, rpt->receiver.pfd);
-    rpt->receiver.slot = -1;
     rpt->receiver.pfd = PFD_EMPTY;
+    rpt->receiver.slot = -1;
     rpt->host->stream.rcv.status.tid = 0;
+
+    stream_thread_node_removed(rpt->host);
 
     stream_receiver_on_disconnect(sth, rpt);
     // DO NOT USE rpt after this point
