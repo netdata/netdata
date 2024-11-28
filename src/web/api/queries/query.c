@@ -2001,7 +2001,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
         long before_wanted = smaller_tier_last_time;
 
         struct rrddim_tier *tmp = &rd->tiers[read_tier];
-        storage_engine_query_init(tmp->seb, tmp->smh, &seqh, after_wanted, before_wanted, STORAGE_PRIORITY_HIGH);
+        storage_engine_query_init(tmp->seb, tmp->smh, &seqh, after_wanted, before_wanted, STORAGE_PRIORITY_SYNCHRONOUS);
 
         size_t points_read = 0;
 
