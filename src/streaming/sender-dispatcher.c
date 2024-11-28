@@ -198,8 +198,8 @@ void stream_sender_dispatcher_handle_op(struct stream_thread *sth, struct sender
         struct sender_state *s = sth->snd.run.senders[msg->snd_run_slot];
 
         if(msg->op & SENDER_MSG_ENABLE_SENDING) {
-            internal_fatal(!s->thread.pfd.ptr, "invalid sender PFD");
-            s->thread.pfd.ptr->events |= POLLOUT;
+            struct pollfd *pfd = pfd_validate(sth, s->thread.pfd);
+            pfd->events |= POLLOUT;
             if(msg->op == SENDER_MSG_ENABLE_SENDING)
                 return;
         }
@@ -513,8 +513,9 @@ void stream_sender_dispatcher_check_all_nodes(struct stream_thread *sth) {
             continue;
 
         // the default for all nodes
-        s->thread.pfd.ptr->events = POLLIN;
-        s->thread.pfd.ptr->revents = 0;
+        struct pollfd *pfd = pfd_validate(sth, s->thread.pfd);
+        pfd->events = POLLIN;
+        pfd->revents = 0;
 
         // If the TCP window never opened, then something is wrong, restart connection
         if(unlikely(now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
@@ -554,7 +555,7 @@ void stream_sender_dispatcher_check_all_nodes(struct stream_thread *sth) {
                 buffer_ratio = s->thread.buffer_ratio;
 
             if (outstanding)
-                s->thread.pfd.ptr->events |= POLLOUT;
+                pfd->events |= POLLOUT;
         }
         sender_unlock(s);
     }
@@ -625,8 +626,9 @@ void stream_sender_dispatcher_process_sender(struct stream_thread *sth, struct s
                 sth->snd.bytes_sent += bytes;
 
                 if(!s->thread.bytes_outstanding) {
-                    // we sent them all
-                    s->thread.pfd.ptr->events &= ~(POLLOUT);
+                    // we sent them all - remove POLLOUT
+                    struct pollfd *pfd = pfd_validate(sth, s->thread.pfd);
+                    pfd->events &= ~(POLLOUT);
 
                     // recreate the circular buffer if we have to
                     stream_sender_cbuffer_recreate_timed_unsafe(s, now_s, false);

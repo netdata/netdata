@@ -109,7 +109,7 @@ struct pollfd_slotted stream_thread_pollfd_get(struct stream_thread *sth, int fd
     struct pollfd_slotted rc = {
         .sth = sth,
         .slot = (int32_t)i,
-        .ptr = &sth->run.pollfds[i],
+        .fd = fd,
     };
     return rc;
 }
@@ -119,7 +119,7 @@ void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd_slott
 
     internal_fatal(pfd.sth != sth, "Invalid stream_thread slot to release");
     internal_fatal(pfd.slot < 0 || (size_t)pfd.slot >= sth->run.used, "Invalid PFD slot to release");
-    internal_fatal(&sth->run.pollfds[pfd.slot] != pfd.ptr, "Invalid PFD to release");
+    internal_fatal(sth->run.pollfds[pfd.slot].fd != pfd.fd, "Invalid PFD fd to release");
 
     sth->run.pollfds[pfd.slot] = (struct pollfd){
         .fd = -1,

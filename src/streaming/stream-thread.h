@@ -8,11 +8,11 @@
 struct stream_thread;
 struct pollfd_slotted {
     struct stream_thread *sth;
-    struct pollfd *ptr;
     int32_t slot;
+    int fd;
 };
 
-#define PFD_EMPTY (struct pollfd_slotted){.ptr = NULL, .slot = -1}
+#define PFD_EMPTY (struct pollfd_slotted){ .sth = NULL, .fd = -1, .slot = -1, }
 
 #include "sender-internals.h"
 #include "receiver-internals.h"
@@ -191,6 +191,13 @@ struct stream_thread *stream_thread_by_slot_id(size_t thread_slot);
 static inline bool rrdhost_is_this_a_stream_thread(RRDHOST *host) {
     pid_t tid = gettid_cached();
     return host->stream.rcv.status.tid == tid || host->stream.snd.status.tid == tid;
+}
+
+static inline struct pollfd *pfd_validate(struct stream_thread *sth, struct pollfd_slotted pfd) {
+    internal_fatal(pfd.sth != sth, "invalid sender PFD worker_thread");
+    internal_fatal(pfd.slot < 0 || (size_t)pfd.slot >= sth->run.used, "invalid sender PFD slot");
+    internal_fatal(pfd.fd != sth->run.pollfds[pfd.slot].fd, "invalid sender PFD file descriptor");
+    return &sth->run.pollfds[pfd.slot];
 }
 
 void stream_thread_node_queued(RRDHOST *host);
