@@ -3,6 +3,10 @@
 
 #include "../libnetdata.h"
 
+# ifdef __cplusplus
+extern "C" {
+# endif
+
 // workers interfaces
 
 #define WORKER_UTILIZATION_MAX_JOB_TYPES 80
@@ -51,5 +55,9 @@ void workers_foreach(const char *name, void (*callback)(
                                                       , NETDATA_DOUBLE *job_custom_values
                                                       )
                                                       , void *data);
+
+# ifdef __cplusplus
+}
+# endif
 
 #endif // WORKER_UTILIZATION_H
