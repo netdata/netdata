@@ -41,7 +41,7 @@ Charts also synchronize as you interact with them, even across contexts _or_ nod
 
 ### Text cards
 
-You can use text cards as notes to explain to other members of the [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-rooms) the purpose of the dashboard's arrangement.
+You can use text cards as notes to explain to other members of the [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#rooms) the purpose of the dashboard's arrangement.
 
 By clicking the `T` icon on the text box, you can switch between font sizes.
 
