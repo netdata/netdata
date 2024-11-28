@@ -8,8 +8,7 @@ This section guides you through installing and securely connecting a new Agent t
 
 There are three places in the UI where you can add/connect your Node:
 
-- **Space/Room settings**: Click the cogwheel (the bottom-left corner or next to the Room name at the top) and
-  select "Nodes." Click the "+" button to add a new node.
+- **Space/Room settings**: Click the cogwheel (the bottom-left corner or next to the Room name at the top) and select "Nodes." Click the "+" button to add a new node.
 - [**Nodes tab**](/docs/dashboards-and-charts/nodes-tab.md): Click on the "Add nodes" button.
 - **Integrations page**: From the "Deploy" groups of integrations, select the OS or container environment your node runs on, and follow the instructions.
 
