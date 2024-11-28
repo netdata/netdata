@@ -1,69 +1,118 @@
 # Spaces and Rooms
 
-Netdata Cloud works with [Spaces](#spaces) and [Rooms](#rooms). They allow you to better organize your infrastructure and provide the right access to your team.
+This guide explains how to effectively organize your infrastructure monitoring using Netdata Cloud.
+
+Netdata Cloud uses two primary organizational concepts:
+
+- [Spaces](#spaces): High-level containers for your entire infrastructure.
+- [Rooms](#rooms): Flexible groupings within Spaces for specific monitoring needs.
 
 ## Spaces
 
-A Space is a high-level container. It's a collaboration environment where you can organize team members, access levels and connect the nodes you want to monitor.
+**What is a Space?**
 
-### Best practices
+Space serves as your primary collaboration environment in Netdata Cloud. It allows you to:
 
-You can use any number of Spaces you want, but keep in mind that you can only add any given node to a **single** Space.
+- Organize team members and manage access levels.
+- Connect nodes for monitoring.
+- Create a unified monitoring environment.
 
-We recommend sticking to one Space so that you can keep all your nodes and their respective metrics in one place. You can then use multiple [Rooms](#rooms) to further organize your infrastructure monitoring.
+**Key Space Characteristics**
 
-### Navigation
+- Each node can only belong to **one** Space.
+- You can create multiple Spaces, but we recommend using a single Space for most use cases.
+- All team members in a Space can access its monitoring data based on their assigned roles.
 
-You can navigate through your different Spaces by using the left-most bar of the interface. From there you can also create a new Space by clicking the plus **+** icon.
+### Space Management
 
-![image](https://github.com/netdata/netdata/assets/70198089/74f622ac-07bf-40c7-81ba-f3907ed16c42)
+**Navigation**
 
-### Management
+1. Use the left-most sidebar to switch between Spaces.
+2. Click the plus (**+**) icon to create a new Space.
 
-Manage your spaces by selecting a particular space and clicking on the gear icon in the lower left-hand corner. This will open the Space's settings view, where you can take a multitude of actions regarding the Space's Rooms, nodes, integrations, configurations, and more.
+**Settings and Configuration**
+
+1. Select your Space.
+2. Click the gear icon in the lower left corner.
+3. Access settings for:
+    - Room management.
+    - Node configuration.
+    - Integration setup.
+    - General Space settings.
 
 ## Rooms
 
-Spaces use Rooms to organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
+**What is a Room?**
 
-**A node can be in N Rooms.**
+Rooms are organizational units within a Space that provide:
 
-Once you add nodes to a Space, all of them will be visible in the **All nodes** Room. Then you can group your nodes into more Rooms. Every Room has its own dashboards, navigation, indicators, and management tools.
+- Infrastructure-wide dashboards.
+- Real-time metrics visualization.
+- Focused monitoring views.
+- Flexible node grouping.
 
-### Best Practices
+**Key Room Characteristics**
 
-We recommend a few strategies for organizing your Rooms.
+- A node can belong to **multiple** Rooms.
+- All nodes automatically appear in the "All nodes" Room.
+- Each Room has independent dashboards and monitoring tools.
 
-- **Service, purpose, location, etc.**
+### Room Organization Strategies
 
-  You can group Rooms by a service (Nginx, MySQL, Pulsar, and so on), their purpose (webserver, database, application), their physical location, whether they're "bare metal" or a Docker container, the PaaS/cloud provider it runs on, and much more. This allows you to see entire slices of your infrastructure by moving from one Room to another.
+1. **Service-Based Organization**
 
-- **End-to-end apps/services**
+   Group nodes by:
+    - Specific services (Nginx, MySQL, Pulsar).
+    - Purpose (webserver, database, application).
+    - Physical location.
+    - Infrastructure type (bare metal, containers).
+    - Cloud provider.
 
-  If you have a user-facing SaaS product, or an internal service that this product relies on, you may want to monitor that entire stack in a single Room. This might include Kubernetes clusters, Docker containers, proxies, databases, web servers, brokers, and more. End-to-end Rooms are valuable tools for ensuring the health and performance of your organization's essential services.
+2. **End-to-End Application Monitoring**
 
-- **Incident response**
+   Create Rooms for:
+    - Complete SaaS product stacks.
+    - Internal service dependencies.
+    - Full application ecosystems including Kubernetes clusters, Docker containers, Proxies, Databases, Web servers, and Message brokers.
 
-  You can also create new Rooms as one of the first steps in your incident response process. For example, you have a user-facing web app that relies on Apache Pulsar for a message queue, and one of your nodes using the [Pulsar collector](/src/go/plugin/go.d/collector/pulsar/README.md) begins reporting a suspiciously low messages rate. You can create a Room called `$year-$month-$day-pulsar-rate`, add all your Pulsar nodes in addition to nodes they connect to, and begin diagnosing the root cause in a Room optimized for getting to resolution as fast as possible.
+3. **Incident Response**
 
-### Navigation
+   Create dedicated Rooms for:
+    - Active incident investigation.
+    - Problem diagnosis.
+    - Performance troubleshooting.
+    - Root cause analysis.
 
-You can navigate through your Rooms from the Space's sidebar.
+### Room Management
 
-<img src="https://github.com/user-attachments/assets/16958ba8-53ac-4e78-a51f-7ea328e97f31" height="400px" alt="Individual Space sidebar">
+**Navigation**
 
-To add new Rooms to any Space, click on the green plus icon **+** next to the **Rooms** heading on the Room's sidebar.
+1. Access Rooms through the Space's sidebar.
+2. Click the green plus (**+**) icon next to "Rooms" to create new Rooms.
 
-### Management
+   <img src="https://github.com/user-attachments/assets/16958ba8-53ac-4e78-a51f-7ea328e97f31" height="400px" alt="Individual Space sidebar">
 
-All the users and nodes involved in a particular Space can be part of a Room.
+**Settings and Configuration**
 
-Click on the gear icon next to the Room's name in the top of the page to open the Room settings. From there you can take the same actions as with the Spaces settings, but now catered towards the specific Room.
+1. Click the gear icon next to the Room name.
+2. Manage:
+    - Room access.
+    - Node grouping.
+    - Dashboard settings.
+    - Monitoring configurations.
 
-## Invite your team
+## Team Collaboration
 
-Invite your entire SRE, DevOPs, or ITOps team to your Space, to give everyone access into your infrastructure from a single pane of glass.
+**Inviting Team Members**
 
-To do so, click on **Invite Users** in the Space's sidebar or any other such prompt around the UI.
+1. Click "Invite Users" in the Space's sidebar.
+2. Set appropriate access levels:
+    - Rooms.
+    - User roles.
 
-Follow the instructions on screen, to provide the right Room access and roles to the invitees.
+**Best Practices for Team Access**
+
+- Invite all relevant team members (SRE, DevOps, ITOps).
+- Configure role-based access control.
+- Maintain clear permission hierarchies.
+- Regular access review and updates.
