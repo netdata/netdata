@@ -20,7 +20,7 @@ type Processor func([]byte) (bool, error)
 // Implementations should provide connections for various socket types such as TCP, UDP, or Unix domain sockets.
 type Client interface {
 	Connect() error
-	Disconnect()
+	Disconnect() error
 	Command(command string, process Processor) error
 }
 
@@ -34,7 +34,7 @@ func ConnectAndRead(cfg Config, process Processor) error {
 		return err
 	}
 
-	defer sock.Disconnect()
+	defer func() { _ = sock.Disconnect() }()
 
 	return sock.read(process)
 }
@@ -55,9 +55,10 @@ type Socket struct {
 
 // Config encapsulates the settings required to establish a network connection.
 type Config struct {
-	Address string
-	Timeout time.Duration
-	TLSConf *tls.Config
+	Address      string
+	Timeout      time.Duration
+	TLSConf      *tls.Config
+	MaxReadLines int64
 }
 
 // Connect establishes a connection to the specified address using the configuration details.
@@ -73,11 +74,13 @@ func (s *Socket) Connect() error {
 }
 
 // Disconnect terminates the active connection if one exists.
-func (s *Socket) Disconnect() {
-	if s.conn != nil {
-		_ = s.conn.Close()
-		s.conn = nil
+func (s *Socket) Disconnect() error {
+	if s.conn == nil {
+		return nil
 	}
+	err := s.conn.Close()
+	s.conn = nil
+	return err
 }
 
 // Command sends a command string to the connected server and processes its response line by line
@@ -97,7 +100,7 @@ func (s *Socket) Command(command string, process Processor) error {
 
 func (s *Socket) write(command string) error {
 	if s.conn == nil {
-		return errors.New("attempt to write on nil connection")
+		return errors.New("write: nil connection")
 	}
 
 	if err := s.conn.SetWriteDeadline(s.deadline()); err != nil {
@@ -111,10 +114,10 @@ func (s *Socket) write(command string) error {
 
 func (s *Socket) read(process Processor) error {
 	if process == nil {
-		return errors.New("process func is nil")
+		return errors.New("read: process func is nil")
 	}
 	if s.conn == nil {
-		return errors.New("attempt to read on nil connection")
+		return errors.New("read: nil connection")
 	}
 
 	if err := s.conn.SetReadDeadline(s.deadline()); err != nil {
@@ -123,10 +126,16 @@ func (s *Socket) read(process Processor) error {
 
 	sc := bufio.NewScanner(s.conn)
 
+	var n int64
+	limit := s.MaxReadLines
+
 	for sc.Scan() {
 		more, err := process(sc.Bytes())
 		if err != nil {
 			return err
+		}
+		if n++; limit > 0 && n > limit {
+			return fmt.Errorf("read line limit exceeded (%d", limit)
 		}
 		if !more {
 			break
@@ -138,7 +147,6 @@ func (s *Socket) read(process Processor) error {
 
 func (s *Socket) dial() (net.Conn, error) {
 	network, address := parseAddress(s.Address)
-	fmt.Println(network, address)
 
 	var d net.Dialer
 	d.Timeout = s.timeout()

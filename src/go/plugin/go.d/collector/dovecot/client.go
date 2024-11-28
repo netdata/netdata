@@ -37,14 +37,13 @@ func (c *dovecotClient) queryExportGlobal() ([]byte, error) {
 	var b bytes.Buffer
 	var n int
 
-	err := c.conn.Command("EXPORT\tglobal\n", func(bs []byte) bool {
+	if err := c.conn.Command("EXPORT\tglobal\n", func(bs []byte) (bool, error) {
 		b.Write(bs)
 		b.WriteByte('\n')
 
 		n++
-		return n < 2
-	})
-	if err != nil {
+		return n < 2, nil
+	}); err != nil {
 		return nil, err
 	}
 

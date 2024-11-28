@@ -36,13 +36,13 @@ func (c *memcachedClient) disconnect() {
 
 func (c *memcachedClient) queryStats() ([]byte, error) {
 	var b bytes.Buffer
-	err := c.conn.Command("stats\r\n", func(bytes []byte) bool {
+	if err := c.conn.Command("stats\r\n", func(bytes []byte) (bool, error) {
 		s := strings.TrimSpace(string(bytes))
 		b.WriteString(s)
 		b.WriteByte('\n')
-		return !(strings.HasPrefix(s, "END") || strings.HasPrefix(s, "ERROR"))
-	})
-	if err != nil {
+
+		return !(strings.HasPrefix(s, "END") || strings.HasPrefix(s, "ERROR")), nil
+	}); err != nil {
 		return nil, err
 	}
 	return b.Bytes(), nil

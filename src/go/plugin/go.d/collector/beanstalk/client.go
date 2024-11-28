@@ -88,9 +88,10 @@ func newBeanstalkConn(conf Config, log *logger.Logger) beanstalkConn {
 	return &beanstalkClient{
 		Logger: log,
 		client: socket.New(socket.Config{
-			Address: conf.Address,
-			Timeout: conf.Timeout.Duration(),
-			TLSConf: nil,
+			Address:      conf.Address,
+			Timeout:      conf.Timeout.Duration(),
+			MaxReadLines: 2000,
+			TLSConf:      nil,
 		}),
 	}
 }
@@ -180,43 +181,34 @@ func (c *beanstalkClient) queryStatsTube(tubeName string) (*tubeStats, error) {
 }
 
 func (c *beanstalkClient) query(command string) (string, []byte, error) {
-	var resp string
-	var length int
-	var body []byte
-	var err error
-
 	c.Debugf("executing command: %s", command)
 
-	const limitReadLines = 1000
-	var num int
+	var (
+		resp   string
+		body   []byte
+		length int
+		err    error
+	)
 
-	clientErr := c.client.Command(command+"\r\n", func(line []byte) bool {
+	if err := c.client.Command(command+"\r\n", func(line []byte) (bool, error) {
 		if resp == "" {
 			s := string(line)
 			c.Debugf("command '%s' response: '%s'", command, s)
 
 			resp, length, err = parseResponseLine(s)
 			if err != nil {
-				err = fmt.Errorf("command '%s' line '%s': %v", command, s, err)
+				return false, fmt.Errorf("command '%s' line '%s': %v", command, s, err)
 			}
-			return err == nil && resp == "OK"
-		}
 
-		if num++; num >= limitReadLines {
-			err = fmt.Errorf("command '%s': read line limit exceeded (%d)", command, limitReadLines)
-			return false
+			return resp == "OK", nil
 		}
 
 		body = append(body, line...)
 		body = append(body, '\n')
 
-		return len(body) < length
-	})
-	if clientErr != nil {
-		return "", nil, fmt.Errorf("command '%s' client error: %v", command, clientErr)
-	}
-	if err != nil {
-		return "", nil, err
+		return len(body) < length, nil
+	}); err != nil {
+		return "", nil, fmt.Errorf("command '%s': %v", command, err)
 	}
 
 	return resp, body, nil
