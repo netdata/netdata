@@ -2,19 +2,12 @@
 
 ## System Requirements
 
-**Core Infrastructure**:
-
-| Requirement           | Details                                                                                                                                        |
-|:----------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------|
-| **Kubernetes**        | - Version 1.23 or newer<br/>- Metrics server installed (for autoscaling)<br/>- Default storage class configured (SSD-based preferred)          |
-| **TLS certificate**   | - Single certificate for all endpoints, or separate certificates for frontend, API, and MQTT<br/>- Must be trusted by all connecting entities. |
-| **Minimum Resources** | - 4 CPU cores<br/>- 15GiB memory<br/>- Note: Cloud services are ephemeral                                                                      |
-
-**Non-Production Dependencies Requirements**:
-
-- 8 CPU cores
-- 14GiB memory
-- 160GiB SSD storage for PVCs
+| Component                  | Details                                                                                                                                        |
+|:---------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------|
+| **Kubernetes**             | - Version 1.23 or newer<br/>- Metrics server installed (for autoscaling)<br/>- Default storage class configured (SSD-based preferred)          |
+| **TLS certificate**        | - Single certificate for all endpoints, or separate certificates for frontend, API, and MQTT<br/>- Must be trusted by all connecting entities. |
+| **Netdata Cloud Services** | - 4 CPU cores<br/>- 15GiB memory<br/>- Note: Cloud services are ephemeral                                                                      |
+| **Third-Party Services**   | - 8 CPU cores<br/>- 14GiB memory<br/>- 160GiB SSD storage for PVCs                                                                             |
 
 > **Note**:
 >
