@@ -1035,18 +1035,18 @@ size_t dynamic_open_cache_size(void) {
     size_t main_wanted_cache_size = pgc_get_wanted_cache_size(main_cache);
     size_t target_size = main_wanted_cache_size / 100 * 5; // 5%
 
-    static bool query_current_size = true;
-    if(query_current_size) {
-        size_t main_current_cache_size = pgc_get_current_cache_size(main_cache);
-
-        size_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
-                                          main_wanted_cache_size - main_current_cache_size : 0;
-
-        if(main_free_cache_size > target_size)
-            target_size = main_free_cache_size;
-        else
-            query_current_size = false;
-    }
+//    static bool query_current_size = true;
+//    if(query_current_size) {
+//        size_t main_current_cache_size = pgc_get_current_cache_size(main_cache);
+//
+//        size_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
+//                                          main_wanted_cache_size - main_current_cache_size : 0;
+//
+//        if(main_free_cache_size > target_size)
+//            target_size = main_free_cache_size;
+//        else
+//            query_current_size = false;
+//    }
 
     if(target_size < 2 * 1024 * 1024)
         target_size = 2 * 1024 * 1024;
@@ -1059,18 +1059,18 @@ size_t dynamic_extent_cache_size(void) {
 
     size_t target_size = main_wanted_cache_size / 100 * 10; // 10%
 
-    static bool query_current_size = true;
-    if(query_current_size) {
-        size_t main_current_cache_size = pgc_get_current_cache_size(main_cache);
-
-        size_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
-                                          main_wanted_cache_size - main_current_cache_size : 0;
-
-        if(main_free_cache_size > target_size)
-            target_size = main_free_cache_size;
-        else
-            query_current_size = false;
-    }
+//    static bool query_current_size = true;
+//    if(query_current_size) {
+//        size_t main_current_cache_size = pgc_get_current_cache_size(main_cache);
+//
+//        size_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
+//                                          main_wanted_cache_size - main_current_cache_size : 0;
+//
+//        if(main_free_cache_size > target_size)
+//            target_size = main_free_cache_size;
+//        else
+//            query_current_size = false;
+//    }
 
     if(target_size < 5 * 1024 * 1024)
         target_size = 5 * 1024 * 1024;
