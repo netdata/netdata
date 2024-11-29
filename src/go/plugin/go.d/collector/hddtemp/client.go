@@ -25,21 +25,15 @@ type hddtempClient struct {
 }
 
 func (c *hddtempClient) queryHddTemp() (string, error) {
-	var i int
-	var s string
-
 	cfg := socket.Config{
 		Address: c.address,
 		Timeout: c.timeout,
 	}
 
-	err := socket.ConnectAndRead(cfg, func(bs []byte) bool {
-		if i++; i > 1 {
-			return false
-		}
+	var s string
+	err := socket.ConnectAndRead(cfg, func(bs []byte) (bool, error) {
 		s = string(bs)
-		return true
-
+		return false, nil
 	})
 	if err != nil {
 		return "", err

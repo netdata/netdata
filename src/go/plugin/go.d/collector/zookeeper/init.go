@@ -30,9 +30,10 @@ func (c *Collector) initZookeeperFetcher() (fetcher, error) {
 	}
 
 	sock := socket.New(socket.Config{
-		Address: c.Address,
-		Timeout: c.Timeout.Duration(),
-		TLSConf: tlsConf,
+		Address:      c.Address,
+		Timeout:      c.Timeout.Duration(),
+		TLSConf:      tlsConf,
+		MaxReadLines: 2000,
 	})
 
 	return &zookeeperFetcher{Client: sock}, nil

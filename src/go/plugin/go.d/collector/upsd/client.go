@@ -133,7 +133,7 @@ func (c *upsdClient) sendCommand(cmd string) ([]string, error) {
 	var errMsg string
 	endLine := getEndLine(cmd)
 
-	err := c.conn.Command(cmd+"\n", func(bytes []byte) bool {
+	err := c.conn.Command(cmd+"\n", func(bytes []byte) (bool, error) {
 		line := string(bytes)
 		resp = append(resp, line)
 
@@ -141,7 +141,7 @@ func (c *upsdClient) sendCommand(cmd string) ([]string, error) {
 			errMsg = strings.TrimPrefix(line, "ERR ")
 		}
 
-		return line != endLine && errMsg == ""
+		return line != endLine && errMsg == "", nil
 	})
 	if err != nil {
 		return nil, err

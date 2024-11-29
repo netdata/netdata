@@ -4,7 +4,6 @@ package uwsgi
 
 import (
 	"bytes"
-	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
@@ -28,30 +27,19 @@ type uwsgiClient struct {
 
 func (c *uwsgiClient) queryStats() ([]byte, error) {
 	var b bytes.Buffer
-	var n int64
-	var err error
-	const readLineLimit = 1000 * 10
 
 	cfg := socket.Config{
-		Address: c.address,
-		Timeout: c.timeout,
+		Address:      c.address,
+		Timeout:      c.timeout,
+		MaxReadLines: 1000 * 10,
 	}
 
-	clientErr := socket.ConnectAndRead(cfg, func(bs []byte) bool {
+	if err := socket.ConnectAndRead(cfg, func(bs []byte) (bool, error) {
 		b.Write(bs)
 		b.WriteByte('\n')
-
-		if n++; n >= readLineLimit {
-			err = fmt.Errorf("read line limit exceeded %d", readLineLimit)
-			return false
-		}
 		// The server will close the connection when it has finished sending data.
-		return true
-	})
-	if clientErr != nil {
-		return nil, clientErr
-	}
-	if err != nil {
+		return true, nil
+	}); err != nil {
 		return nil, err
 	}
 
