@@ -39,12 +39,17 @@ struct pgc_size_histogram_entry {
 };
 
 #define PGC_SIZE_HISTOGRAM_ENTRIES 15
+#define PGC_QUEUE_HOT   0
+#define PGC_QUEUE_DIRTY 1
+#define PGC_QUEUE_CLEAN 2
 
 struct pgc_size_histogram {
     struct pgc_size_histogram_entry array[PGC_SIZE_HISTOGRAM_ENTRIES];
 };
 
 struct pgc_queue_statistics {
+    struct pgc_size_histogram size_histogram;
+
     alignas(64) size_t entries;
     alignas(64) size_t size;
 
@@ -59,8 +64,6 @@ struct pgc_queue_statistics {
 };
 
 struct pgc_statistics {
-    struct pgc_size_histogram size_histogram;
-
     alignas(64) size_t wanted_cache_size;
     alignas(64) size_t current_cache_size;
 
@@ -159,11 +162,7 @@ struct pgc_statistics {
     // ----------------------------------------------------------------------------------------------------------------
     // per queue statistics
 
-    struct {
-        struct pgc_queue_statistics hot;
-        struct pgc_queue_statistics dirty;
-        struct pgc_queue_statistics clean;
-    } queues;
+    struct pgc_queue_statistics queues[3];
 };
 
 typedef void (*free_clean_page_callback)(PGC *cache, PGC_ENTRY entry);

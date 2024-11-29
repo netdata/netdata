@@ -1267,8 +1267,10 @@ struct dbengine2_cache_pointers {
     RRDDIM *rd_pgc_memory_evicting;
     RRDDIM *rd_pgc_memory_flushing;
 
-    RRDSET *st_pgc_page_size_heatmap;
-    RRDDIM *rd_pgc_page_size_x[PGC_SIZE_HISTOGRAM_ENTRIES];
+    struct {
+        RRDSET *st_pgc_page_size_heatmap;
+        RRDDIM *rd_pgc_page_size_x[PGC_SIZE_HISTOGRAM_ENTRIES];
+    } queues[3];
     
     RRDSET *st_pgc_tm;
     RRDDIM *rd_pgc_tm_current;
@@ -1416,9 +1418,9 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
         rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_searches_closest, (collected_number)pgc_stats->searches_closest);
         rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_searches_exact, (collected_number)pgc_stats->searches_exact);
-        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_add_hot, (collected_number)pgc_stats->queues.hot.added_entries);
-        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_add_clean, (collected_number)(pgc_stats->added_entries - pgc_stats->queues.hot.added_entries));
-        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_evictions, (collected_number)pgc_stats->queues.clean.removed_entries);
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_add_hot, (collected_number)pgc_stats->queues[PGC_QUEUE_HOT].added_entries);
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_add_clean, (collected_number)(pgc_stats->added_entries - pgc_stats->queues[PGC_QUEUE_HOT].added_entries));
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_evictions, (collected_number)pgc_stats->queues[PGC_QUEUE_CLEAN].removed_entries);
         rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_flushes, (collected_number)pgc_stats->flushes_completed);
         rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_acquires, (collected_number)pgc_stats->acquires);
         rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_releases, (collected_number)pgc_stats->releases);
@@ -1470,21 +1472,39 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                                 (collected_number)(pgc_stats->wanted_cache_size - pgc_stats->current_cache_size);
 
         rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_free, free);
-        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_hot, (collected_number)pgc_stats->queues.hot.size);
-        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_dirty, (collected_number)pgc_stats->queues.dirty.size);
-        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_clean, (collected_number)pgc_stats->queues.clean.size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_hot, (collected_number)pgc_stats->queues[PGC_QUEUE_HOT].size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_dirty, (collected_number)pgc_stats->queues[PGC_QUEUE_DIRTY].size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_clean, (collected_number)pgc_stats->queues[PGC_QUEUE_CLEAN].size);
         rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_evicting, (collected_number)pgc_stats->evicting_size);
         rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_flushing, (collected_number)pgc_stats->flushing_size);
-        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_index,
-                              (collected_number)(pgc_stats->size - pgc_stats->queues.clean.size - pgc_stats->queues.hot.size - pgc_stats->queues.dirty.size - pgc_stats->evicting_size - pgc_stats->flushing_size));
+        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_index,(collected_number)(pgc_stats->size - pgc_stats->queues[PGC_QUEUE_CLEAN].size - pgc_stats->queues[PGC_QUEUE_HOT].size - pgc_stats->queues[PGC_QUEUE_DIRTY].size - pgc_stats->evicting_size - pgc_stats->flushing_size));
 
         rrdset_done(ptrs->st_pgc_memory);
     }
 
-    {
-        if (unlikely(!ptrs->st_pgc_page_size_heatmap)) {
+    for(size_t q = 0; q < 3 ;q++) {
+        const char *queue;
+        switch(q) {
+            case PGC_QUEUE_HOT:
+                queue = "hot";
+                break;
+
+            case PGC_QUEUE_DIRTY:
+                queue = "dirty";
+                break;
+
+            default:
+            case PGC_QUEUE_CLEAN:
+                queue = "clean";
+                break;
+        }
+
+        if (unlikely(!ptrs->queues[q].st_pgc_page_size_heatmap)) {
+            CLEAN_BUFFER *ctx = buffer_create(100, NULL);
+            buffer_sprintf(ctx, "netdata.dbengine_%s_page_sizes", name);
+
             CLEAN_BUFFER *id = buffer_create(100, NULL);
-            buffer_sprintf(id, "dbengine_%s_page_sizes", name);
+            buffer_sprintf(id, "dbengine_%s_%s_page_sizes", name, queue);
             
             CLEAN_BUFFER *family = buffer_create(100, NULL);
             buffer_sprintf(family, "dbengine %s cache", name);
@@ -1492,12 +1512,12 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             CLEAN_BUFFER *title = buffer_create(100, NULL);
             buffer_sprintf(title, "Netdata %s Page Sizes", name);
 
-            ptrs->st_pgc_page_size_heatmap = rrdset_create_localhost(
+            ptrs->queues[q].st_pgc_page_size_heatmap = rrdset_create_localhost(
                 "netdata",
                 buffer_tostring(id),
                 NULL,
                 buffer_tostring(family),
-                NULL,
+                buffer_tostring(ctx),
                 buffer_tostring(title),
                 "pages",
                 "netdata",
@@ -1506,22 +1526,25 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                 localhost->rrd_update_every,
                 RRDSET_TYPE_HEATMAP);
 
-            ptrs->rd_pgc_page_size_x[0] = rrddim_add(ptrs->st_pgc_page_size_heatmap, "empty", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            for(size_t i = 1; i < _countof(ptrs->rd_pgc_page_size_x) - 1 ;i++) {
+            ptrs->queues[q].rd_pgc_page_size_x[0] = rrddim_add(ptrs->queues[q].st_pgc_page_size_heatmap, "empty", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            for(size_t i = 1; i < _countof(ptrs->queues[q].rd_pgc_page_size_x) - 1 ;i++) {
                 char buf[64];
-                snprintfz(buf, sizeof(buf), "%zu", pgc_stats->size_histogram.array[i].upto);
+                snprintfz(buf, sizeof(buf), "%zu", pgc_stats->queues[q].size_histogram.array[i].upto);
                 // size_snprintf(&buf[1], sizeof(buf) - 1, pgc_stats->size_histogram.array[i].upto, "B", true);
-                ptrs->rd_pgc_page_size_x[i] = rrddim_add(ptrs->st_pgc_page_size_heatmap, buf, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                ptrs->queues[q].rd_pgc_page_size_x[i] = rrddim_add(ptrs->queues[q].st_pgc_page_size_heatmap, buf, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            ptrs->rd_pgc_page_size_x[_countof(ptrs->rd_pgc_page_size_x) - 1] = rrddim_add(ptrs->st_pgc_page_size_heatmap, "+inf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->queues[q].rd_pgc_page_size_x[_countof(ptrs->queues[q].rd_pgc_page_size_x) - 1] = rrddim_add(ptrs->queues[q].st_pgc_page_size_heatmap, "+inf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrdlabels_add(ptrs->queues[q].st_pgc_page_size_heatmap->rrdlabels, "Cache", name, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(ptrs->queues[q].st_pgc_page_size_heatmap->rrdlabels, "Queue", queue, RRDLABEL_SRC_AUTO);
 
             priority++;
         }
 
-        for(size_t i = 0; i < _countof(ptrs->rd_pgc_page_size_x) - 1 ;i++)
-            rrddim_set_by_pointer(ptrs->st_pgc_page_size_heatmap, ptrs->rd_pgc_page_size_x[i], (collected_number)pgc_stats->size_histogram.array[i].count);
+        for(size_t i = 0; i < _countof(ptrs->queues[q].rd_pgc_page_size_x) - 1 ;i++)
+            rrddim_set_by_pointer(ptrs->queues[q].st_pgc_page_size_heatmap, ptrs->queues[q].rd_pgc_page_size_x[i], (collected_number)pgc_stats->queues[q].size_histogram.array[i].count);
 
-        rrdset_done(ptrs->st_pgc_page_size_heatmap);
+        rrdset_done(ptrs->queues[q].st_pgc_page_size_heatmap);
     }
     
     {
@@ -1566,10 +1589,10 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
         rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_current, (collected_number)pgc_stats->current_cache_size);
         rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_wanted, (collected_number)pgc_stats->wanted_cache_size);
         rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_referenced, (collected_number)pgc_stats->referenced_size);
-        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_hot_max, (collected_number)pgc_stats->queues.hot.max_size);
-        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_dirty_max, (collected_number)pgc_stats->queues.dirty.max_size);
-        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_hot, (collected_number)pgc_stats->queues.hot.size);
-        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_dirty, (collected_number)pgc_stats->queues.dirty.size);
+        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_hot_max, (collected_number)pgc_stats->queues[PGC_QUEUE_HOT].max_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_dirty_max, (collected_number)pgc_stats->queues[PGC_QUEUE_DIRTY].max_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_hot, (collected_number)pgc_stats->queues[PGC_QUEUE_HOT].size);
+        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_dirty, (collected_number)pgc_stats->queues[PGC_QUEUE_DIRTY].size);
 
         rrdset_done(ptrs->st_pgc_tm);
     }
@@ -1610,9 +1633,9 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             priority++;
         }
 
-        rrddim_set_by_pointer(ptrs->st_pgc_pages, ptrs->rd_pgc_pages_clean, (collected_number)pgc_stats->queues.clean.entries);
-        rrddim_set_by_pointer(ptrs->st_pgc_pages, ptrs->rd_pgc_pages_hot, (collected_number)pgc_stats->queues.hot.entries);
-        rrddim_set_by_pointer(ptrs->st_pgc_pages, ptrs->rd_pgc_pages_dirty, (collected_number)pgc_stats->queues.dirty.entries);
+        rrddim_set_by_pointer(ptrs->st_pgc_pages, ptrs->rd_pgc_pages_clean, (collected_number)pgc_stats->queues[PGC_QUEUE_CLEAN].entries);
+        rrddim_set_by_pointer(ptrs->st_pgc_pages, ptrs->rd_pgc_pages_hot, (collected_number)pgc_stats->queues[PGC_QUEUE_HOT].entries);
+        rrddim_set_by_pointer(ptrs->st_pgc_pages, ptrs->rd_pgc_pages_dirty, (collected_number)pgc_stats->queues[PGC_QUEUE_DIRTY].entries);
         rrddim_set_by_pointer(ptrs->st_pgc_pages, ptrs->rd_pgc_pages_referenced, (collected_number)pgc_stats->referenced_entries);
 
         rrdset_done(ptrs->st_pgc_pages);
@@ -1653,9 +1676,9 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             priority++;
         }
 
-        rrddim_set_by_pointer(ptrs->st_pgc_memory_changes, ptrs->rd_pgc_memory_new_clean, (collected_number)(pgc_stats->added_size - pgc_stats->queues.hot.added_size));
-        rrddim_set_by_pointer(ptrs->st_pgc_memory_changes, ptrs->rd_pgc_memory_clean_evictions, (collected_number)pgc_stats->queues.clean.removed_size);
-        rrddim_set_by_pointer(ptrs->st_pgc_memory_changes, ptrs->rd_pgc_memory_new_hot, (collected_number)pgc_stats->queues.hot.added_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_changes, ptrs->rd_pgc_memory_new_clean, (collected_number)(pgc_stats->added_size - pgc_stats->queues[PGC_QUEUE_HOT].added_size));
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_changes, ptrs->rd_pgc_memory_clean_evictions, (collected_number)pgc_stats->queues[PGC_QUEUE_CLEAN].removed_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_changes, ptrs->rd_pgc_memory_new_hot, (collected_number)pgc_stats->queues[PGC_QUEUE_HOT].added_size);
 
         rrdset_done(ptrs->st_pgc_memory_changes);
     }
@@ -1694,8 +1717,8 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             priority++;
         }
 
-        rrddim_set_by_pointer(ptrs->st_pgc_memory_migrations, ptrs->rd_pgc_memory_dirty_to_clean, (collected_number)pgc_stats->queues.dirty.removed_size);
-        rrddim_set_by_pointer(ptrs->st_pgc_memory_migrations, ptrs->rd_pgc_memory_hot_to_dirty, (collected_number)pgc_stats->queues.dirty.added_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_migrations, ptrs->rd_pgc_memory_dirty_to_clean, (collected_number)pgc_stats->queues[PGC_QUEUE_DIRTY].removed_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_migrations, ptrs->rd_pgc_memory_hot_to_dirty, (collected_number)pgc_stats->queues[PGC_QUEUE_DIRTY].added_size);
 
         rrdset_done(ptrs->st_pgc_memory_migrations);
     }
