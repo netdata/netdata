@@ -1,6 +1,6 @@
 # Netdata Cloud On-Prem PoC without k8s
 
-These instructions are about installing a light version of Netdata Cloud, for clients who do not have a Kubernetes cluster installed. This setup is **for demonstration purposes only**, as it has no built-in resiliency on failures of any kind.
+These instructions are about installing a light version of Netdata Cloud for clients who do not have a Kubernetes cluster installed. This setup is **for demonstration purposes only**, as it has no built-in resiliency on failures of any kind.
 
 ## Prerequisites
 
@@ -44,7 +44,7 @@ The script above is responsible for:
 
 3. The script starts to provision the K3s cluster with gathered data.
 
-After cluster provisioning the PoC Cloud is ready to be used.
+After cluster provisioning, the PoC Cloud is ready to be used.
 
 > **Warning**
 >
@@ -52,7 +52,7 @@ After cluster provisioning the PoC Cloud is ready to be used.
 
 ## Logging-in
 
-Only login by mail can work without further configuration. Every mail this PoC Cloud sends, will appear on the mailcatcher, which acts as the SMTP server with a simple GUI to read the mails.
+Only login by mail can work without further configuration. Every mail this PoC Cloud sends will appear on the mailcatcher, which acts as the SMTP server with a simple GUI to read the mails.
 
 1. Open PoC Cloud in the web browser on the URL you specified
 2. Provide an email
