@@ -53,25 +53,3 @@ flowchart TD
     %% auth ~~~ spaceroom
     emqx <.-> bridges o-..-o pulsar
 ```
-
-## Requirements
-
-The following components are required to run Netdata Cloud On-Prem:
-
-- **Kubernetes cluster** version 1.23+
-- **Kubernetes metrics server** (for autoscaling)
-- **TLS certificate** for secure connections. A single endpoint is required but there is an option to split the frontend, api, and MQTT endpoints. The certificate must be trusted by all entities connecting to it.
-- Default **storage class configured and working** (persistent volumes based on SSDs are preferred)
-
-The following 3rd party components are used, which can be pulled with the `netdata-cloud-dependency` package we provide:
-
-- **Ingress controller** supporting HTTPS
-- **PostgreSQL** version 13.7 (main database for all metadata Netdata Cloud maintains)
-- **EMQX** version 5.11 (MQTT Broker that allows Agents to send messages to the On-Prem Cloud)
-- **Apache Pulsar** version 2.10+ (message broken for inter-container communication)
-- **Traefik** version 2.7.x (internal API Gateway)
-- **Elasticsearch** version 8.8.x (stores the feed of events)
-- **Redis** version 6.2 (caching)
-- imagePullSecret (our ECR repos are secured)
-
-Keep in mind though that the pulled versions are not configured properly for production use. Customers of Netdata Cloud On-Prem are expected to configure these applications according to their needs and policies for production use. Netdata Cloud On-Prem can be configured to use all these applications as a shared resource from other existing production installations.

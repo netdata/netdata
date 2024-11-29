@@ -1,227 +1,142 @@
 # Netdata Cloud On-Prem Installation
 
-This installation guide assumes the prerequisites for installing Netdata Cloud On-Prem as satisfied. For more information please refer to the [requirements documentation](/docs/netdata-cloud/netdata-cloud-on-prem/README.md#requirements).
+## System Requirements
 
-## Installation Requirements
+**Core Infrastructure**:
 
-The following components are required to install Netdata Cloud On-Prem:
+| Requirement           | Details                                                                                                                                        |
+|:----------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------|
+| **Kubernetes**        | - Version 1.23 or newer<br/>- Metrics server installed (for autoscaling)<br/>- Default storage class configured (SSD-based preferred)          |
+| **TLS certificate**   | - Single certificate for all endpoints, or separate certificates for frontend, API, and MQTT<br/>- Must be trusted by all connecting entities. |
+| **Minimum Resources** | - 4 CPU cores<br/>- 15GiB memory<br/>- Note: Cloud services are ephemeral                                                                      |
 
-- **AWS** CLI
-- **Helm** version 3.12+ with OCI Configuration (explained in the installation section)
-- **Kubectl**
-
-The minimum requirements for Netdata-Cloud are:
-
-- 4 CPU cores
-- 15GiB of memory
-- Cloud services are ephemeral
-
-The requirements for the non-production Dependencies helm chart:
+**Non-Production Dependencies Requirements**:
 
 - 8 CPU cores
-- 14GiB of memory
-- 160GiB for PVCs (SSD)
+- 14GiB memory
+- 160GiB SSD storage for PVCs
 
-> **_NOTE:_** Values for each component may vary depending on the type of load. The most compute-intensive task that the On-Prem needs to perform is the initial sync of directly connected Agents. The testing for these requirements was conducted with 1,000 nodes directly connected to the On-Prem. If you plan on spawning hundreds of new nodes within a few minutes, Postgres will be the first bottleneck. For example, a 2 vCPU / 8 GiB memory / 1k IOPS database can handle 1,000 nodes without any problems if your environment is fairly steady, adding nodes in batches of 10-30 (directly connected).
+> **Note**:
+>
+> These requirements were tested with 1,000 directly connected nodes.
+> Resource needs may vary based on your workload.
+> The initial sync of directly connected Agents is the most compute-intensive operation.
+> For example, a Postgres instance with 2 vCPU, 8GiB memory, and 1k IOPS can handle 1,000 nodes in a steady environment when adding nodes in batches of 10–30.
 
-## Preparations for Installation
+## Required Components
 
-### Configure AWS CLI
+### Third-Party Services
 
-Install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
+All components below are included in the `netdata-cloud-dependency` package:
 
-There are 2 options for configuring `aws cli` to work with the provided credentials. The first one is to set the environment variables:
+| Component              | Version | Purpose                             |
+|------------------------|---------|-------------------------------------|
+| **PostgreSQL**         | 13.7    | Main metadata database              |
+| **EMQX**               | 5.11    | MQTT Broker for Agent communication |
+| **Apache Pulsar**      | 2.10+   | Inter-container message broker      |
+| **Traefik**            | 2.7.x   | Internal API Gateway                |
+| **Elasticsearch**      | 8.8.x   | Events feed storage                 |
+| **Redis**              | 6.2     | Caching layer                       |
+| **Ingress Controller** | -       | HTTPS support                       |
+| **imagePullSecret**    | -       | Secured ECR repository access       |
 
-```bash
-export AWS_ACCESS_KEY_ID=<your_secret_id>
-export AWS_SECRET_ACCESS_KEY=<your_secret_key>
-```
+> **Important**:
+>
+> The provided dependency versions require additional configuration for production use.
+> Customers should configure these applications according to their production requirements and policies.
 
-The second one is to use an interactive shell:
+### Installation Tools
 
-```bash
-aws configure
-```
-
-### Configure helm to use secured ECR repository
-
-Using `aws` command we will generate a token for helm to access the secured ECR repository:
-
-```bash
-aws ecr get-login-password --region us-east-1 | helm registry login --username AWS --password-stdin 362923047827.dkr.ecr.us-east-1.amazonaws.com
-```
-
-After this step you should be able to add the repository to your helm or just pull the helm chart:
-
-```bash
-helm pull oci://362923047827.dkr.ecr.us-east-1.amazonaws.com/netdata-cloud-dependency --untar #optional
-helm pull oci://362923047827.dkr.ecr.us-east-1.amazonaws.com/netdata-cloud-onprem --untar
-```
-
-Local folders with the newest versions of helm charts should appear on your working dir.
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+- Helm (version 3.12+ with OCI Configuration)
+- Kubectl
 
 ## Installation
 
-Netdata provides access to two helm charts:
-
-1. `netdata-cloud-dependency` - required applications for `netdata-cloud-onprem`.
-2. `netdata-cloud-onprem` - the application itself + provisioning
-
-### netdata-cloud-dependency
-
-This helm chart is designed to install the necessary applications:
-
-- Redis
-- Elasticsearch
-- EMQX
-- Apache Pulsar
-- PostgreSQL
-- Traefik
-- Mailcatcher
-- k8s-ecr-login-renew
-- kubernetes-ingress
-
-Although we provide an easy way to install all these applications, we expect users of Netdata Cloud On-Prem to provide production quality versions for them. Therefore, every configuration option is available through `values.yaml` in the folder that contains your netdata-cloud-dependency helm chart. All configuration options are described in `README.md` which is a part of the helm chart.
-
-Each component can be enabled/disabled individually. It is done by true/false switches in `values.yaml`. This way, it is easier to migrate to production-grade components gradually.
-
-Unless you prefer otherwise, `k8s-ecr-login-renew` is responsible for calling out the `AWS API` for token regeneration.  This token is then injected into the secret that every node is using for authentication with secured ECR when pulling the images.
-
-The default setting in `values.yaml` of `netdata-cloud-onprem` - `.global.imagePullSecrets` is configured to work out of the box with the dependency helm chart.
-
-For helm chart installation - save your changes in `values.yaml` and execute:
-
-```shell
-cd [your helm chart location]
-helm upgrade --wait --install netdata-cloud-dependency -n netdata-cloud --create-namespace -f values.yaml .
-```
-
-Keep in mind that `netdata-cloud-dependency` is provided only as a proof of concept. Users installing Netdata Cloud On-Prem should properly configure these components.
-
-### netdata-cloud-onprem
-
-Every configuration option is available in `values.yaml` in the folder that contains your `netdata-cloud-onprem` helm chart. All configuration options are described in the `README.md` which is a part of the helm chart.
-
-#### Installing Netdata Cloud On-Prem
-
-```shell
-cd [your helm chart location]
-helm upgrade --wait --install netdata-cloud-onprem -n netdata-cloud --create-namespace -f values.yaml .
-```
-
-##### Important notes
-
-1. Installation takes care of provisioning the resources with migration services.
-
-2. During the first installation, a secret called the `netdata-cloud-common` is created. It contains several randomly generated entries. Deleting helm chart is not going to delete this secret, nor reinstalling the whole On-Prem, unless manually deleted by kubernetes administrator. The content of this secret is extremely relevant - strings that are contained there are essential parts of encryption. Losing or changing the data that it contains will result in data loss.
-
-## Short description of Netdata Cloud microservices
-
-### cloud-accounts-service
-
-Responsible for user registration & authentication. Manages user account information.
-
-### cloud-agent-data-ctrl-service
-
-Forwards request from the Cloud to the relevant Agents.
-The requests include:
-
-- Fetching chart metadata from the Agent
-- Fetching chart data from the Agent
-- Fetching function data from the Agent
-
-### cloud-agent-mqtt-input-service
-
-Forwards MQTT messages emitted by the Agent related to the Agent entities to the internal Pulsar broker. These include Agent connection state updates.
-
-### cloud-agent-mqtt-output-service
-
-Forwards Pulsar messages emitted in the Cloud related to the Agent entities to the MQTT broker. From there, the messages reach the relevant Agent.
-
-### cloud-alarm-config-mqtt-input-service
-
-Forwards MQTT messages emitted by the Agent related to the alarm-config entities to the internal Pulsar broker.  These include the data for the alarm configuration as seen by the Agent.
-
-### cloud-alarm-log-mqtt-input-service
-
-Forwards MQTT messages emitted by the Agent related to the alarm-log entities to the internal Pulsar broker. These contain data about the alarm transitions that occurred in an Agent.
-
-### cloud-alarm-mqtt-output-service
-
-Forwards Pulsar messages emitted in the Cloud related to the alarm entities to the MQTT broker. From there, the messages reach the relevant Agent.
-
-### cloud-alarm-processor-service
-
-Persists latest alert statuses received from the Agent in the Cloud.
-Aggregates alert statuses from relevant node instances.
-Exposes API endpoints to fetch alert data for visualization on the Cloud.
-Determines if notifications need to be sent when alert statuses change and emits relevant messages to Pulsar.
-Exposes API endpoints to store and return notification-silencing data.
-
-### cloud-alarm-streaming-service
-
-Responsible for starting the alert stream between the Agent and the Cloud.
-Ensures that messages are processed in the correct order, and starts a reconciliation process between the Cloud and the Agent if out-of-order processing occurs.
-
-### cloud-charts-mqtt-input-service
-
-Forwards MQTT messages emitted by the Agent related to the chart entities to the internal Pulsar broker. These include the chart metadata that is used to display relevant charts on the Cloud.
-
-### cloud-charts-mqtt-output-service
-
-Forwards Pulsar messages emitted in the Cloud related to the charts entities to the MQTT broker. From there, the messages reach the relevant Agent.
-
-### cloud-charts-service
-
-Exposes API endpoints to fetch the chart metadata.
-Forwards data requests via the `cloud-agent-data-ctrl-service` to the relevant Agents to fetch chart data points.
-Exposes API endpoints to call various other endpoints on the Agent, for instance, functions.
-
-### cloud-custom-dashboard-service
-
-Exposes API endpoints to fetch and store custom dashboard data.
-
-### cloud-environment-service
-
-Serves as the first contact point between the Agent and the Cloud.
-Returns authentication and MQTT endpoints to connecting Agents.
-
-### cloud-feed-service
-
-Processes incoming feed events and stores them in Elasticsearch.
-Exposes API endpoints to fetch feed events from Elasticsearch.
-
-### cloud-frontend
-
-Contains the on-prem Cloud website. Serves static content.
-
-### cloud-iam-user-service
-
-Acts as a middleware for authentication on most of the API endpoints. Validates incoming token headers, injects the relevant ones, and forwards the requests.
-
-### cloud-metrics-exporter
-
-Exports various metrics from an On-Prem Cloud installation. Uses the Prometheus metric exposition format.
-
-### cloud-netdata-assistant
-
-Exposes API endpoints to fetch a human-friendly explanation of various netdata configuration options, namely the alerts.
-
-### cloud-node-mqtt-input-service
-
-Forwards MQTT messages emitted by the Agent related to the node entities to the internal Pulsar broker. These include the node metadata as well as their connectivity state, either direct or via parents.
-
-### cloud-node-mqtt-output-service
-
-Forwards Pulsar messages emitted in the Cloud related to the charts entities to the MQTT broker. From there, the messages reach the relevant Agent.
-
-### cloud-notifications-dispatcher-service
-
-Exposes API endpoints to handle integrations.
-Handles incoming notification messages and uses the relevant channels(email, slack...) to notify relevant users.
-
-### cloud-spaceroom-service
-
-Exposes API endpoints to fetch and store relations between Agents, nodes, spaces, users, and rooms.
-Acts as a provider of authorization for other Cloud endpoints.
-Exposes API endpoints to authenticate Agents connecting to the Cloud.
+1. **AWS CLI Configuration**
+
+   Configure AWS credentials using either environment variables:
+
+   ```bash
+   export AWS_ACCESS_KEY_ID=<your_secret_id>
+   export AWS_SECRET_ACCESS_KEY=<your_secret_key>
+   ```
+
+   Or through interactive setup:
+
+   ```bash
+   aws configure
+   ```
+
+2. **Configure Helm for ECR Access**
+
+   Generate token for ECR access:
+
+   ```bash
+   aws ecr get-login-password --region us-east-1 | helm registry login --username AWS --password-stdin 362923047827.dkr.ecr.us-east-1.amazonaws.com
+   ```
+
+3. **Pull Required Helm Charts**
+
+   ```bash
+   helm pull oci://362923047827.dkr.ecr.us-east-1.amazonaws.com/netdata-cloud-dependency --untar  # Optional
+   helm pull oci://362923047827.dkr.ecr.us-east-1.amazonaws.com/netdata-cloud-onprem --untar
+   ```
+   The charts will be extracted to your current working directory.
+
+4. **Install Dependencies**
+
+   The `netdata-cloud-dependency` chart installs all required third-party applications. While we provide this for easy setup, **production environments should use their own configured versions of these components**:
+
+    - Configure the installation by editing `values.yaml` in your `netdata-cloud-dependency` chart directory.
+    - Install the dependencies:
+        ```bash
+        cd [your helm chart location]
+        helm upgrade --wait --install netdata-cloud-dependency -n netdata-cloud --create-namespace -f values.yaml .
+        ```
+5. **Install Netdata Cloud On-Prem**
+
+    - Configure the installation by editing `values.yaml` in your `netdata-cloud-onprem` chart directory.
+    - Install the application:
+         ```bash
+         cd [your helm chart location]
+         helm upgrade --wait --install netdata-cloud-onprem -n netdata-cloud --create-namespace -f values.yaml .
+         ```
+
+   > **Important**:
+   >
+   > Installation includes resource provisioning with migration services.
+   >
+   > During the first installation, a `netdata-cloud-common` secret is created containing critical encryption data. This secret persists through reinstalls and should never be deleted, as this will result in data loss.
+
+## Architecture Components
+
+<details><summary>View detailed microservices description</summary>
+
+| Microservice                           | Description                                                                                                                                                                                                                                                                                                                                                                                        |
+|:---------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| cloud-accounts-service                 | Handles user registration & authentication                                                                                                                                                                                                                                                                                                                                                         |
+| cloud-agent-data-ctrl-service          | Forwards request from the OCP to the relevant Agents. The requests include fetching Chart metadata, Chart data and Function data from the Agents.                                                                                                                                                                                                                                                  |
+| cloud-agent-mqtt-input-service         | Forwards MQTT messages emitted by the Agent to the internal Pulsar broker. They are related to the Agent entities and include Agent connection state updates.                                                                                                                                                                                                                                      |
+| cloud-agent-mqtt-output-service        | Forwards Pulsar messages emitted on the OCP to the MQTT broker. They are related to the Agent entities. From there, the messages reach the relevant Agent.                                                                                                                                                                                                                                         |
+| cloud-alarm-config-mqtt-input-service  | Forwards MQTT messages emitted by the Agent to the internal Pulsar broker. They related to the alarm-config entities like data for the alarm configuration as seen by the Agent.                                                                                                                                                                                                                   |
+| cloud-alarm-log-mqtt-input-service     | Forwards MQTT messages emitted by the Agent to the internal Pulsar broker. They are related to the alarm-log entities containing data about the alarm transitions that occurred in an Agent.                                                                                                                                                                                                       |
+| cloud-alarm-mqtt-output-service        | Forwards Pulsar messages emitted in the Cloud to the MQTT broker. They are related to the alarm entities and from there, the messages reach the relevant Agent.                                                                                                                                                                                                                                    |
+| cloud-alarm-processor-service          | Persists latest Alert status received from the Agent in the OCP<br/>Aggregates Alert statuses from relevant node instances<br/>Exposes API endpoints to fetch Alert data for visualization on the Cloud<br/>Determines if notifications need to be sent when Alert statuses change and emits relevant messages to Pulsar<br/>Exposes API endpoints to store and return notification-silencing data |
+| cloud-alarm-streaming-service          | Responsible for starting the Alert stream between the Agent and the OCP<br/>Ensures that messages are processed in the correct order, and starts a reconciliation process between the Cloud and the Agent if out-of-order processing occurs                                                                                                                                                        |
+| cloud-charts-mqtt-input-service        | Forwards MQTT messages emitted by the Agent related to the chart entities to the internal Pulsar broker. These include the chart metadata that is used to display relevant charts on the Cloud.                                                                                                                                                                                                    |
+| cloud-charts-mqtt-output-service       | Forwards Pulsar messages emitted in the Cloud related to the charts entities to the MQTT broker. From there, the messages reach the relevant Agent.                                                                                                                                                                                                                                                |
+| cloud-charts-service                   | Exposes API endpoints to fetch the chart metadata<br/>Forwards data requests via the `cloud-agent-data-ctrl-service` to the relevant Agents to fetch chart data points<br/>Exposes API endpoints to call various other endpoints on the Agent, for instance, functions                                                                                                                             |
+| cloud-custom-dashboard-service         | Exposes API endpoints to fetch and store custom dashboard data                                                                                                                                                                                                                                                                                                                                     |
+| cloud-environment-service              | Serves as the first contact point between the Agent and the OCP<br/>Returns authentication and MQTT endpoints to connecting Agents                                                                                                                                                                                                                                                                 |
+| cloud-feed-service                     | Processes incoming feed events and stores them in Elasticsearch<br/>Exposes API endpoints to fetch feed events from Elasticsearch                                                                                                                                                                                                                                                                  |
+| cloud-frontend                         | Contains the OCP website. Serves static content.                                                                                                                                                                                                                                                                                                                                                   |
+| cloud-iam-user-service                 | Acts as a middleware for authentication on most of the API endpoints<br/>Validates incoming token headers, injects the relevant ones, and forwards the requests                                                                                                                                                                                                                                    |
+| cloud-metrics-exporter                 | Exports various metrics from an OCP installation<br/>Uses the Prometheus metric exposition format                                                                                                                                                                                                                                                                                                  |
+| cloud-netdata-assistant                | Exposes API endpoints to fetch a human-friendly explanation of various Netdata configuration options, namely the Alerts.                                                                                                                                                                                                                                                                           |
+| cloud-node-mqtt-input-service          | Forwards MQTT messages emitted by the Agent related to the node entities to the internal Pulsar broker<br/>These include the node metadata as well as their connectivity state, either direct or via Parents                                                                                                                                                                                       |
+| cloud-node-mqtt-output-service         | Forwards Pulsar messages emitted in the OCP related to the charts entities to the MQTT broker<br/>From there, the messages reach the relevant Agent                                                                                                                                                                                                                                                |
+| cloud-notifications-dispatcher-service | Exposes API endpoints to handle integrations<br/>Handles incoming notification messages and uses the relevant channels(email, slack...) to notify relevant users                                                                                                                                                                                                                                   |
+| cloud-spaceroom-service                | Exposes API endpoints to fetch and store relations between Agents, nodes, spaces, users, and rooms<br/>Acts as a provider of authorization for other Cloud endpoints<br/>Exposes API endpoints to authenticate Agents connecting to the Cloud                                                                                                                                                      |
+
+</details>
