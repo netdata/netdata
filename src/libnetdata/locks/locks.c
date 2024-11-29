@@ -388,6 +388,7 @@ void rw_spinlock_read_lock(RW_SPINLOCK *rw_spinlock) {
 
         spinlock_unlock(&rw_spinlock->spinlock);
         tinysleep();
+        sched_yield(); // let the writer run
     }
 
     nd_thread_rwspinlock_read_locked();
