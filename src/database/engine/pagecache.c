@@ -1078,6 +1078,10 @@ size_t dynamic_extent_cache_size(void) {
     return target_size;
 }
 
+size_t pgc_main_nominal_page_size(void *data) {
+    return pgd_buffer_memory_footprint(data);
+}
+
 void pgc_and_mrg_initialize(void)
 {
     main_mrg = mrg_create(0);
@@ -1109,6 +1113,7 @@ void pgc_and_mrg_initialize(void)
             0,
             0
     );
+    pgc_set_nominal_page_size_callback(main_cache, pgc_main_nominal_page_size);
 
     open_cache = pgc_create(
             "OPEN_PGC",

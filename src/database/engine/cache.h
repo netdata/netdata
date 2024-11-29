@@ -238,6 +238,9 @@ size_t pgc_count_hot_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr
 typedef size_t (*dynamic_target_cache_size_callback)(void);
 void pgc_set_dynamic_target_cache_size_callback(PGC *cache, dynamic_target_cache_size_callback callback);
 
+typedef size_t (*nominal_page_size_callback)(void *);
+void pgc_set_nominal_page_size_callback(PGC *cache, nominal_page_size_callback callback);
+
 // return true when there is more work to do
 bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict);
 bool pgc_flush_pages(PGC *cache);

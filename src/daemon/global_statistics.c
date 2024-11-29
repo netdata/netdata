@@ -1510,7 +1510,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             buffer_sprintf(family, "dbengine %s cache", name);
 
             CLEAN_BUFFER *title = buffer_create(100, NULL);
-            buffer_sprintf(title, "Netdata %s Page Sizes", name);
+            buffer_sprintf(title, "Netdata %s Nominal Page Sizes (without overheads)", name);
 
             ptrs->queues[q].st_pgc_page_size_heatmap = rrdset_create_localhost(
                 "netdata",

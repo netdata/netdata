@@ -708,6 +708,31 @@ size_t aral_element_size(ARAL *ar) {
     return ar->config.requested_element_size;
 }
 
+size_t aral_element_size_actual(ARAL *ar) {
+    return ar->config.element_size;
+}
+
+size_t aral_allocation_slot_size(size_t requested_size, bool usable) {
+    // we need to add a page pointer after the element
+    // so, first align the element size to the pointer size
+    size_t element_size = natural_alignment(requested_size, sizeof(uintptr_t));
+
+    // then add the size of a pointer to it
+    element_size += sizeof(uintptr_t);
+
+    // make sure it is at least what we need for an ARAL_FREE slot
+    if (element_size < sizeof(ARAL_FREE))
+        element_size = sizeof(ARAL_FREE);
+
+    // and finally align it to the natural alignment
+    element_size = natural_alignment(element_size, ARAL_NATURAL_ALIGNMENT);
+
+    if(usable)
+        return element_size - sizeof(uintptr_t);
+
+    return element_size;
+}
+
 ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size,
                   struct aral_statistics *stats, const char *filename, const char **cache_dir, bool mmap, bool lockless) {
     ARAL *ar = callocz(1, sizeof(ARAL));
@@ -737,19 +762,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
     else
         ar->config.natural_page_size = page_size;
 
-    // we need to add a page pointer after the element
-    // so, first align the element size to the pointer size
-    ar->config.element_size = natural_alignment(ar->config.requested_element_size, sizeof(uintptr_t));
-
-    // then add the size of a pointer to it
-    ar->config.element_size += sizeof(uintptr_t);
-
-    // make sure it is at least what we need for an ARAL_FREE slot
-    if (ar->config.element_size < sizeof(ARAL_FREE))
-        ar->config.element_size = sizeof(ARAL_FREE);
-
-    // and finally align it to the natural alignment
-    ar->config.element_size = natural_alignment(ar->config.element_size, ARAL_NATURAL_ALIGNMENT);
+    ar->config.element_size = aral_allocation_slot_size(ar->config.requested_element_size, false);
 
     ar->config.max_page_elements = ar->config.requested_max_page_size / ar->config.element_size;
 

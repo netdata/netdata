@@ -105,10 +105,11 @@ struct pgc {
         size_t evict_low_threshold_per1000;
 
         dynamic_target_cache_size_callback dynamic_target_size_cb;
+        nominal_page_size_callback nominal_page_size_cb;
     } config;
 
     struct {
-        SPINLOCK spinlock;              // when locked, the evict_thread is currently evicting pages
+        SPINLOCK spinlock;  // when locked, the evict_thread is currently evicting pages
         ND_THREAD *thread;              // the thread
         struct completion completion;   // signal the thread to wake up
     } evictor;
@@ -195,6 +196,17 @@ static inline void pointer_del(PGC *cache __maybe_unused, PGC_PAGE *page __maybe
 }
 
 // ----------------------------------------------------------------------------
+// helpers
+
+static inline size_t page_assumed_size(PGC *cache, size_t size) {
+    return size + (sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page + sizeof(Word_t) * 3);
+}
+
+static inline size_t page_size_from_assumed_size(PGC *cache, size_t assumed_size) {
+    return assumed_size - (sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page + sizeof(Word_t) * 3);
+}
+
+// ----------------------------------------------------------------------------
 // locking
 
 static inline size_t pgc_indexing_partition(PGC *cache, Word_t metric_id) {
@@ -261,12 +273,22 @@ static void pgc_size_histogram_init(struct pgc_size_histogram *h) {
     // the histogram needs to be all-inclusive for the possible sizes
     // so, we start from 0, and the last value is SIZE_MAX.
 
-    h->array[0].upto = 0;
+    size_t values[PGC_SIZE_HISTOGRAM_ENTRIES] = {
+        0, 32, 64, 128, 256, 512, 1024, 2048,
+        4096, 8192, 16384, 32768, 65536, 128 * 1024, SIZE_MAX
+    };
 
-    for(size_t i = 1, upto = 32; i < _countof(h->array) - 1; i++, upto *= 2)
-        h->array[i].upto = upto;
+    size_t last_value = 0;
+    for(size_t i = 0; i < PGC_SIZE_HISTOGRAM_ENTRIES; i++) {
+        if(i > 0 && values[i] == 0)
+            fatal("only the first value in the array can be zero");
 
-    h->array[_countof(h->array) - 1].upto = SIZE_MAX;
+        if(i > 0 && values[i] <= last_value)
+            fatal("the values need to be sorted");
+
+        h->array[i].upto = values[i];
+        last_value = values[i];
+    }
 }
 
 static inline size_t pgc_size_histogram_slot(struct pgc_size_histogram *h, size_t size) {
@@ -288,14 +310,26 @@ static inline size_t pgc_size_histogram_slot(struct pgc_size_histogram *h, size_
     return low - 1;
 }
 
-static inline void pgc_size_histogram_add(struct pgc_size_histogram *h, size_t size) {
+static inline void pgc_size_histogram_add(PGC *cache, struct pgc_size_histogram *h, PGC_PAGE *page) {
+    size_t size;
+    if(cache->config.nominal_page_size_cb)
+        size = cache->config.nominal_page_size_cb(page->data);
+    else
+        size = page_size_from_assumed_size(cache, page->assumed_size);
+
     size_t slot = pgc_size_histogram_slot(h, size);
     internal_fatal(slot >= _countof(h->array), "hey!");
 
     __atomic_add_fetch(&h->array[slot].count, 1, __ATOMIC_RELAXED);
 }
 
-static inline void pgc_size_histogram_del(struct pgc_size_histogram *h, size_t size) {
+static inline void pgc_size_histogram_del(PGC *cache, struct pgc_size_histogram *h, PGC_PAGE *page) {
+    size_t size;
+    if(cache->config.nominal_page_size_cb)
+        size = cache->config.nominal_page_size_cb(page->data);
+    else
+        size = page_size_from_assumed_size(cache, page->assumed_size);
+
     size_t slot = pgc_size_histogram_slot(h, size);
     internal_fatal(slot >= _countof(h->array), "hey!");
 
@@ -488,17 +522,6 @@ static inline bool flushing_critical(PGC *cache) {
 }
 
 // ----------------------------------------------------------------------------
-// helpers
-
-static inline size_t page_assumed_size(PGC *cache, size_t size) {
-    return size + (sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page + sizeof(Word_t) * 3);
-}
-
-static inline size_t page_size_from_assumed_size(PGC *cache, size_t assumed_size) {
-    return assumed_size - (sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page + sizeof(Word_t) * 3);
-}
-
-// ----------------------------------------------------------------------------
 // Linked list management
 
 static inline void atomic_set_max(size_t *max, size_t desired) {
@@ -627,12 +650,12 @@ static void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PA
     atomic_set_max(&q->stats->max_size, size);
 
     if(cache->config.stats)
-        pgc_size_histogram_add(&q->stats->size_histogram, page_size_from_assumed_size(cache, page->assumed_size));
+        pgc_size_histogram_add(cache, &q->stats->size_histogram, page);
 }
 
 static void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PAGE *page, bool having_lock) {
     if(cache->config.stats)
-        pgc_size_histogram_del(&q->stats->size_histogram, page_size_from_assumed_size(cache, page->assumed_size));
+        pgc_size_histogram_del(cache, &q->stats->size_histogram, page);
 
     __atomic_sub_fetch(&q->stats->entries, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&q->stats->size, page->assumed_size, __ATOMIC_RELAXED);
@@ -2219,6 +2242,10 @@ void pgc_set_dynamic_target_cache_size_callback(PGC *cache, dynamic_target_cache
     evict_pages(cache, 0, 0, true, false);
 }
 
+void pgc_set_nominal_page_size_callback(PGC *cache, nominal_page_size_callback callback) {
+    cache->config.nominal_page_size_cb = callback;
+}
+
 size_t pgc_get_current_cache_size(PGC *cache) {
     cache_usage_per1000(cache, NULL);
     return __atomic_load_n(&cache->stats.current_cache_size, __ATOMIC_RELAXED);
@@ -2253,6 +2280,17 @@ void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time
     if(additional_bytes) {
         page_transition_lock(cache, page);
 
+        struct pgc_queue_statistics *queue_stats = NULL;
+        if(page->flags & PGC_PAGE_HOT)
+            queue_stats = cache->hot.stats;
+        else if(page->flags & PGC_PAGE_DIRTY)
+            queue_stats = cache->dirty.stats;
+        else if(page->flags & PGC_PAGE_CLEAN)
+            queue_stats = cache->clean.stats;
+
+        if(queue_stats && cache->config.stats)
+            pgc_size_histogram_del(cache, &queue_stats->size_histogram, page);
+
         size_t old_assumed_size = page->assumed_size;
 
         size_t old_size = page_size_from_assumed_size(cache, old_assumed_size);
@@ -2264,23 +2302,12 @@ void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time
         __atomic_add_fetch(&cache->stats.added_size, delta, __ATOMIC_RELAXED);
         __atomic_add_fetch(&cache->stats.referenced_size, delta, __ATOMIC_RELAXED);
 
-        struct pgc_queue_statistics *queue_stats = NULL;
-        if(page->flags & PGC_PAGE_HOT)
-            queue_stats = cache->hot.stats;
-        else if(page->flags & PGC_PAGE_DIRTY)
-            queue_stats = cache->dirty.stats;
-        else if(page->flags & PGC_PAGE_CLEAN)
-            queue_stats = cache->clean.stats;
-
         if(queue_stats) {
             __atomic_add_fetch(&queue_stats->size, delta, __ATOMIC_RELAXED);
             __atomic_add_fetch(&queue_stats->added_size, delta, __ATOMIC_RELAXED);
 
-            if(cache->config.stats) {
-                // the real size, not the assumed
-                pgc_size_histogram_add(&queue_stats->size_histogram, size);
-                pgc_size_histogram_del(&queue_stats->size_histogram, old_size);
-            }
+            if(cache->config.stats)
+                pgc_size_histogram_add(cache, &queue_stats->size_histogram, page);
         }
 
         page_transition_unlock(cache, page);

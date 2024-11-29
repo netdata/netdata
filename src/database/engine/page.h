@@ -33,6 +33,7 @@ uint32_t pgd_type(PGD *pg);
 bool pgd_is_empty(PGD *pg);
 uint32_t pgd_slots_used(PGD *pg);
 
+uint32_t pgd_buffer_memory_footprint(PGD *pg);
 uint32_t pgd_memory_footprint(PGD *pg);
 uint32_t pgd_capacity(PGD *pg);
 uint32_t pgd_disk_footprint(PGD *pg);
