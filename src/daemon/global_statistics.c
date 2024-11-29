@@ -295,7 +295,7 @@ static void global_statistics_charts(void) {
                     "netdata"
                     , "server_cpu"
                     , NULL
-                    , "netdata"
+                    , "CPU usage"
                     , NULL
                     , "Netdata CPU usage"
                     , "milliseconds/s"
@@ -324,7 +324,7 @@ static void global_statistics_charts(void) {
                     "netdata",
                     "uptime",
                     NULL,
-                    "netdata",
+                    "Uptime",
                     NULL,
                     "Netdata uptime",
                     "seconds",
@@ -352,9 +352,9 @@ static void global_statistics_charts(void) {
                     "netdata"
                     , "clients"
                     , NULL
-                    , "api"
+                    , "HTTP API"
                     , NULL
-                    , "Netdata Web Clients"
+                    , "Netdata Web API Clients"
                     , "connected clients"
                     , "netdata"
                     , "stats"
@@ -381,9 +381,9 @@ static void global_statistics_charts(void) {
                     "netdata"
                     , "requests"
                     , NULL
-                    , "api"
+                    , "HTTP API"
                     , NULL
-                    , "Netdata Web Requests"
+                    , "Netdata Web API Requests Received"
                     , "requests/s"
                     , "netdata"
                     , "stats"
@@ -411,9 +411,9 @@ static void global_statistics_charts(void) {
                     "netdata"
                     , "net"
                     , NULL
-                    , "api"
+                    , "HTTP API"
                     , NULL
-                    , "Netdata Network Traffic"
+                    , "Netdata Web API Network Traffic"
                     , "kilobits/s"
                     , "netdata"
                     , "stats"
@@ -443,9 +443,9 @@ static void global_statistics_charts(void) {
                     "netdata"
                     , "response_time"
                     , NULL
-                    , "api"
+                    , "HTTP API"
                     , NULL
-                    , "Netdata API Response Time"
+                    , "Netdata Web API Response Time"
                     , "milliseconds/request"
                     , "netdata"
                     , "stats"
@@ -512,7 +512,7 @@ static void global_statistics_extended_charts(void) {
                     "netdata",
                     "memory",
                     NULL,
-                    "netdata",
+                    "Memory Usage",
                     NULL,
                     "Netdata Memory",
                     "bytes",
@@ -601,7 +601,7 @@ static void global_statistics_extended_charts(void) {
                 "netdata",
                 "memory_buffers",
                 NULL,
-                "netdata",
+                "Memory Usage",
                 NULL,
                 "Netdata Memory Buffers",
                 "bytes",
@@ -655,9 +655,9 @@ static void global_statistics_extended_charts(void) {
                     "netdata"
                     , "compression_ratio"
                     , NULL
-                    , "api"
+                    , "HTTP API"
                     , NULL
-                    , "Netdata API Responses Compression Savings Ratio"
+                    , "Netdata Web API Responses Compression Savings Ratio"
                     , "percentage"
                     , "netdata"
                     , "stats"
@@ -705,9 +705,9 @@ static void global_statistics_extended_charts(void) {
                     "netdata"
                     , "queries"
                     , NULL
-                    , "queries"
+                    , "Time-Series Queries"
                     , NULL
-                    , "Netdata DB Queries"
+                    , "Netdata Time-Series DB Queries"
                     , "queries/s"
                     , "netdata"
                     , "stats"
@@ -754,9 +754,9 @@ static void global_statistics_extended_charts(void) {
                     "netdata"
                     , "db_points_read"
                     , NULL
-                    , "queries"
+                    , "Time-Series Queries"
                     , NULL
-                    , "Netdata DB Points Query Read"
+                    , "Netdata Time-Series DB Points Query Read"
                     , "points/s"
                     , "netdata"
                     , "stats"
@@ -801,9 +801,9 @@ static void global_statistics_extended_charts(void) {
                     "netdata"
                     , "db_points_results"
                     , NULL
-                    , "queries"
+                    , "Time-Series Queries"
                     , NULL
-                    , "Netdata Points in Query Results"
+                    , "Netdata Time-Series Points in Query Results"
                     , "points/s"
                     , "netdata"
                     , "stats"
@@ -845,9 +845,9 @@ static void global_statistics_extended_charts(void) {
                     "netdata"
                     , "db_points_stored"
                     , NULL
-                    , "queries"
+                    , "Time-Series Queries"
                     , NULL
-                    , "Netdata DB Points Stored"
+                    , "Netdata Time-Series DB Points Stored"
                     , "points/s"
                     , "netdata"
                     , "stats"
