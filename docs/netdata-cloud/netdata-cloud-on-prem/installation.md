@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-The following components are required to run the On Prem Cloud (OPC):
+The following components are required to run the On-Prem Cloud (OPC):
 
 | component                                        | description                                                                                                                                                                                         |
 |:-------------------------------------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
