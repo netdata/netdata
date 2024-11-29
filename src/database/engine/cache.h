@@ -51,14 +51,27 @@ struct pgc_statistics {
     alignas(64) size_t wanted_cache_size;
     alignas(64) size_t current_cache_size;
 
+    // ----------------------------------------------------------------------------------------------------------------
+    // volume
+
+    alignas(64) size_t entries;                 // all the entries (includes clean, dirty, hot)
+    alignas(64) size_t size;                    // all the entries (includes clean, dirty, hot)
+
+    alignas(64) size_t referenced_entries;      // all the entries currently referenced
+    alignas(64) size_t referenced_size;         // all the entries currently referenced
+
     alignas(64) size_t added_entries;
     alignas(64) size_t added_size;
 
     alignas(64) size_t removed_entries;
     alignas(64) size_t removed_size;
 
-    alignas(64) size_t entries;                 // all the entries (includes clean, dirty, hot)
-    alignas(64) size_t size;                    // all the entries (includes clean, dirty, hot)
+#ifdef PGC_COUNT_POINTS_COLLECTED
+    alignas(64) size_t points_collected;
+#endif
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // migrations
 
     alignas(64) size_t evicting_entries;
     alignas(64) size_t evicting_size;
@@ -69,12 +82,16 @@ struct pgc_statistics {
     alignas(64) size_t hot2dirty_entries;
     alignas(64) size_t hot2dirty_size;
 
+    alignas(64) size_t hot_empty_pages_evicted_immediately;
+    alignas(64) size_t hot_empty_pages_evicted_later;
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // workload
+
     alignas(64) size_t acquires;
     alignas(64) size_t releases;
 
     alignas(64) size_t acquires_for_deletion;
-    alignas(64) size_t referenced_entries;      // all the entries currently referenced
-    alignas(64) size_t referenced_size;         // all the entries currently referenced
 
     alignas(64) size_t searches_exact;
     alignas(64) size_t searches_exact_hits;
@@ -86,19 +103,17 @@ struct pgc_statistics {
 
     alignas(64) size_t flushes_completed;
     alignas(64) size_t flushes_completed_size;
-    alignas(64) size_t flushes_cancelled;
     alignas(64) size_t flushes_cancelled_size;
 
-#ifdef PGC_COUNT_POINTS_COLLECTED
-    alignas(64) size_t points_collected;
-#endif
+    // ----------------------------------------------------------------------------------------------------------------
+    // critical events
 
-    alignas(64) size_t insert_spins;
-    alignas(64) size_t waster_evict_useless_spins;
-    alignas(64) size_t release_spins;
-    alignas(64) size_t acquire_spins;
-    alignas(64) size_t delete_spins;
-    alignas(64) size_t flush_spins;
+    alignas(64) size_t events_cache_under_severe_pressure;
+    alignas(64) size_t events_cache_needs_space_aggressively;
+    alignas(64) size_t events_flush_critical;
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // worker threads
 
     alignas(64) size_t workers_search;
     alignas(64) size_t workers_add;
@@ -107,20 +122,29 @@ struct pgc_statistics {
     alignas(64) size_t workers_jv2_flush;
     alignas(64) size_t workers_hot2dirty;
 
-    alignas(64) size_t hot_empty_pages_evicted_immediately;
-    alignas(64) size_t hot_empty_pages_evicted_later;
+    // ----------------------------------------------------------------------------------------------------------------
+    // waste events
 
-    // events
-    alignas(64) size_t events_evict_relocated;
+    // waste events - spins
+    alignas(64) size_t waste_insert_spins;
+    alignas(64) size_t waste_evict_useless_spins;
+    alignas(64) size_t waste_release_spins;
+    alignas(64) size_t waste_acquire_spins;
+    alignas(64) size_t waste_delete_spins;
+
+    // waste events - eviction
+    alignas(64) size_t waste_evict_relocated;
     alignas(64) size_t waste_evict_thread_signals;
     alignas(64) size_t waste_evictions_inline_on_add;
     alignas(64) size_t waste_evictions_inline_on_release;
-    alignas(64) size_t events_cache_under_severe_pressure;
-    alignas(64) size_t events_cache_needs_space_aggressively;
-    alignas(64) size_t events_flush_critical;
+
+    // waste events - flushing
     alignas(64) size_t waste_flush_on_add;
     alignas(64) size_t waste_flush_on_release;
+    alignas(64) size_t waste_flushes_cancelled;
 
+    // ----------------------------------------------------------------------------------------------------------------
+    // per queue statistics
 
     struct {
         struct pgc_queue_statistics hot;
