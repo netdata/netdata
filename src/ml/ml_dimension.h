@@ -108,7 +108,7 @@ public:
     AcquiredDimension &operator=(AcquiredDimension &&) = default;
 
     bool acquired() const {
-        return Dim != nullptr;
+        return AcqRD != nullptr;
     }
 
     ml_host_t *host() const {

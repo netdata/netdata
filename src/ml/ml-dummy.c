@@ -101,10 +101,12 @@ void ml_dimension_received_anomaly(RRDDIM *rd, bool is_anomalous) {
 void ml_update_global_statistics_charts(uint64_t models_consulted,
                                         uint64_t models_received,
                                         uint64_t models_sent,
+                                        uint64_t models_ignored,
                                         uint64_t models_deserialization_failures) {
     UNUSED(models_consulted);
     UNUSED(models_received);
     UNUSED(models_sent);
+    UNUSED(models_ignored);
     UNUSED(models_deserialization_failures);
 }
 
