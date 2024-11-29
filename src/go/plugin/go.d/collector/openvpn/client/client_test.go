@@ -98,7 +98,9 @@ func (m *mockSocketClient) Command(command string, process socket.Processor) err
 	}
 
 	for s.Scan() {
-		process(s.Bytes())
+		if _, err := process(s.Bytes()); err != nil {
+			return err
+		}
 	}
 	return nil
 }

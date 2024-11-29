@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- docs: fix img tag [\#19102](https://github.com/netdata/netdata/pull/19102) ([ilyam8](https://github.com/ilyam8))
+- Edit the organize doc [\#19101](https://github.com/netdata/netdata/pull/19101) ([Ancairon](https://github.com/Ancairon))
+- Update connecting documentation [\#19100](https://github.com/netdata/netdata/pull/19100) ([Ancairon](https://github.com/Ancairon))
 - Claiming proxy defaults and additonal log info [\#19098](https://github.com/netdata/netdata/pull/19098) ([ktsaou](https://github.com/ktsaou))
 - Reset parameter when generating an alert snapshot [\#19097](https://github.com/netdata/netdata/pull/19097) ([stelfrag](https://github.com/stelfrag))
 - Update Registry docs [\#19095](https://github.com/netdata/netdata/pull/19095) ([Ancairon](https://github.com/Ancairon))
@@ -442,7 +445,6 @@
 - add go.d/nginxunit [\#18554](https://github.com/netdata/netdata/pull/18554) ([ilyam8](https://github.com/ilyam8))
 - fix some docs issues [\#18553](https://github.com/netdata/netdata/pull/18553) ([ilyam8](https://github.com/ilyam8))
 - go.d fix Goland code inspection warnings [\#18552](https://github.com/netdata/netdata/pull/18552) ([ilyam8](https://github.com/ilyam8))
-- Bump k8s.io/client-go from 0.31.0 to 0.31.1 in /src/go [\#18549](https://github.com/netdata/netdata/pull/18549) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

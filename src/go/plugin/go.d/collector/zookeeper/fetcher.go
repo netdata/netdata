@@ -4,13 +4,10 @@ package zookeeper
 
 import (
 	"bytes"
-	"fmt"
 	"unsafe"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
 )
-
-const limitReadLines = 2000
 
 type fetcher interface {
 	fetch(command string) ([]string, error)
@@ -26,21 +23,12 @@ func (c *zookeeperFetcher) fetch(command string) (rows []string, err error) {
 	}
 	defer func() { _ = c.Disconnect() }()
 
-	var num int
-	clientErr := c.Command(command, func(b []byte) bool {
+	if err := c.Command(command, func(b []byte) (bool, error) {
 		if !isZKLine(b) || isMntrLineOK(b) {
 			rows = append(rows, string(b))
 		}
-		if num += 1; num >= limitReadLines {
-			err = fmt.Errorf("read line limit exceeded (%d)", limitReadLines)
-			return false
-		}
-		return true
-	})
-	if clientErr != nil {
-		return nil, clientErr
-	}
-	if err != nil {
+		return true, nil
+	}); err != nil {
 		return nil, err
 	}
 

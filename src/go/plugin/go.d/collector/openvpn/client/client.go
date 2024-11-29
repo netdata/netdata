@@ -57,29 +57,26 @@ func (c *Client) Version() (*Version, error) {
 
 func (c *Client) get(command string, stopRead stopReadFunc) (output []string, err error) {
 	var num int
-	var maxLinesErr error
-	err = c.Command(command, func(bytes []byte) bool {
+	if err := c.Command(command, func(bytes []byte) (bool, error) {
 		line := string(bytes)
 		num++
 		if num > maxLinesToRead {
-			maxLinesErr = fmt.Errorf("read line limit exceeded (%d)", maxLinesToRead)
-			return false
+			return false, fmt.Errorf("read line limit exceeded (%d)", maxLinesToRead)
 		}
 
 		// skip real-time messages
 		if strings.HasPrefix(line, ">") {
-			return true
+			return true, nil
 		}
 
 		line = strings.Trim(line, "\r\n ")
 		output = append(output, line)
 		if stopRead != nil && stopRead(line) {
-			return false
+			return false, nil
 		}
-		return true
-	})
-	if maxLinesErr != nil {
-		return nil, maxLinesErr
+		return true, nil
+	}); err != nil {
+		return nil, err
 	}
 	return output, err
 }

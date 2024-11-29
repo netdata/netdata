@@ -25,10 +25,6 @@ Use the alphabetized list below to find the answer to your single-term questions
 
 - [**Anomaly Advisor**](/docs/dashboards-and-charts/anomaly-advisor-tab.md): A Netdata feature that lets you focus on potentially anomalous metrics and charts related to a particular highlight window of interest.
 
-## B
-
-- [**Bookmarks**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#manage-spaces): Netdata Cloud's bookmarks put your tools in one accessible place. Bookmarks are shared between all Rooms in a Space, so any users in your Space will be able to see and use them.
-
 ## C
 
 - [**Child**](/docs/observability-centralization-points/metrics-centralization-points/README.md): A node, running Netdata, that streams metric data to one or more parent.
@@ -123,13 +119,13 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Replication Streaming**](/src/streaming/README.md): Streaming configuration where child `A`, _with_ a database and web dashboard, streams metrics to parent `B`.
 
-- [**Room**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-rooms): Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
+- [**Room**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#rooms): Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
 
 ## S
 
 - [**Single Node Dashboard**](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata Agent, with thousand of metrics and hundreds of interactive charts that requires no set up.
 
-- [**Space**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
+- [**Space**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#spaces): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
 
 ## T
 

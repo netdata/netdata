@@ -5,10 +5,10 @@ Netdata allows organizing your observability infrastructure with Spaces, Rooms, 
 
 ## Spaces and Rooms
 
-[Spaces](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces) are used for organization-level or infrastructure-level
+[Spaces](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#spaces) are used for organization-level or infrastructure-level
 grouping of nodes and people. A node can only appear in a single space, while people can have access to multiple spaces.
 
-The [Rooms](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-rooms) in a space bring together nodes and people in
+The [Rooms](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#rooms) in a space bring together nodes and people in
 collaboration areas. Rooms can also be used for fine-tuned
 [role-based access control](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 

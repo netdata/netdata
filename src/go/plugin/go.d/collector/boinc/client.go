@@ -111,25 +111,20 @@ func (c *boincClient) send(req *boincRequest) (*boincReply, error) {
 
 	var b bytes.Buffer
 
-	clientErr := c.conn.Command(string(reqData), func(bs []byte) bool {
+	if err := c.conn.Command(string(reqData), func(bs []byte) (bool, error) {
 		s := strings.TrimSpace(string(bs))
 		if s == "" {
-			return true
+			return true, nil
 		}
 
 		if b.Len() == 0 && s != respStart {
-			err = fmt.Errorf("unexpected response first line: %s", s)
-			return false
+			return false, fmt.Errorf("unexpected response first line: %s", s)
 		}
 
 		b.WriteString(s)
 
-		return s != respEnd
-	})
-	if clientErr != nil {
-		return nil, fmt.Errorf("failed to send command: %v", clientErr)
-	}
-	if err != nil {
+		return s != respEnd, nil
+	}); err != nil {
 		return nil, fmt.Errorf("failed to send command: %v", err)
 	}
 
