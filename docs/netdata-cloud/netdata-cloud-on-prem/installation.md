@@ -1,149 +1,121 @@
 # Netdata Cloud On-Prem Installation
 
-## Prerequisites
+## System Requirements
 
-The following components are required to run the On-Prem Cloud (OPC):
+**Core Infrastructure**:
 
-| component                                        | description                                                                                                                                                                                         |
-|:-------------------------------------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Kubernetes cluster**                           | v1.23+                                                                                                                                                                                              |
-| **Kubernetes metrics server**                    | Used for autoscaling                                                                                                                                                                                |
-| **TLS certificate**                              | Used for secure connections. A single endpoint is required but there is an option to split the frontend, API, and MQTT endpoints. The certificate must be trusted by all entities connecting to it. |
-| Default **storage class configured and working** | Persistent volumes based on SSDs are preferred                                                                                                                                                      |
+| Requirement           | Details                                                                                                                                        |
+|:----------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------|
+| **Kubernetes**        | - Version 1.23 or newer<br/>- Metrics server installed (for autoscaling)<br/>- Default storage class configured (SSD-based preferred)          |
+| **TLS certificate**   | - Single certificate for all endpoints, or separate certificates for frontend, API, and MQTT<br/>- Must be trusted by all connecting entities. |
+| **Minimum Resources** | - 4 CPU cores<br/>- 15GiB memory<br/>- Note: Cloud services are ephemeral                                                                      |
 
-The following 3rd party components are used, which can be pulled with the `netdata-cloud-dependency` package we provide:
-
-| component              | description                                                       |
-|:-----------------------|:------------------------------------------------------------------|
-| **Ingress controller** | Supporting HTTPS                                                  |
-| **PostgreSQL**         | v13.7, the main database for all metadata the OPC maintains       |
-| **EMQX**               | v5.11, MQTT Broker that allows Agents to send messages to the OPC |
-| **Apache Pulsar**      | v2.10+, message broker for inter-container communication          |
-| **Traefik**            | v2.7.x, the internal API Gateway                                  |
-| **Elasticsearch**      | v8.8.x, stores the events feed                                    |
-| **Redis**              | v6.2, used for caching                                            |
-| **imagePullSecret**    | our ECR repos are secured                                         |
-
-> **Note**
->
-> Keep in mind that the pulled versions are not configured properly for production use.
->
-> Customers of OPC are expected to configure these applications according to their needs and policies for production use.
-
-**The following components are required for installation:**
-
-- AWS CLI
-- Helm version 3.12+ with OCI Configuration (explained in the installation section)
-- Kubectl
-
-**Minimum requirements:**
-
-- 4 CPU cores
-- 15GiB of memory
-- Cloud services are ephemeral
-
-**The requirements for the non-production Dependencies helm chart:**
+**Non-Production Dependencies Requirements**:
 
 - 8 CPU cores
-- 14GiB of memory
-- 160GiB for PVCs (SSD)
+- 14GiB memory
+- 160GiB SSD storage for PVCs
 
-> **Note**
+> **Note**:
 >
-> Values for each component may vary depending on the type of load. The most compute-intensive task that the OPC needs to perform is the initial sync of directly connected Agents.
+> These requirements were tested with 1,000 directly connected nodes.
+> Resource needs may vary based on your workload.
+> The initial sync of directly connected Agents is the most compute-intensive operation.
+> For example, a Postgres instance with 2 vCPU, 8GiB memory, and 1k IOPS can handle 1,000 nodes in a steady environment when adding nodes in batches of 10–30.
+
+## Required Components
+
+### Third-Party Services
+
+All components below are included in the `netdata-cloud-dependency` package:
+
+| Component              | Version | Purpose                             |
+|------------------------|---------|-------------------------------------|
+| **PostgreSQL**         | 13.7    | Main metadata database              |
+| **EMQX**               | 5.11    | MQTT Broker for Agent communication |
+| **Apache Pulsar**      | 2.10+   | Inter-container message broker      |
+| **Traefik**            | 2.7.x   | Internal API Gateway                |
+| **Elasticsearch**      | 8.8.x   | Events feed storage                 |
+| **Redis**              | 6.2     | Caching layer                       |
+| **Ingress Controller** | -       | HTTPS support                       |
+| **imagePullSecret**    | -       | Secured ECR repository access       |
+
+> **Important**:
 >
-> The testing for these requirements was conducted with 1,000 nodes directly connected to the OPC.
->
-> If you plan on spawning hundreds of new nodes within a few minutes, Postgres will be the first bottleneck. For example, a 2 vCPU / 8 GiB memory / 1k IOPS database can handle 1,000 nodes without any problems if your environment is fairly steady, adding nodes in batches of 10-30 (directly connected).
+> The provided dependency versions require additional configuration for production use.
+> Customers should configure these applications according to their production requirements and policies.
 
-## Preparation
+### Installation Tools
 
-### Configure AWS CLI
-
-Install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
-
-There are 2 options for configuring `aws cli` to work with the provided credentials. The first one is to set the environment variables:
-
-```bash
-export AWS_ACCESS_KEY_ID=<your_secret_id>
-export AWS_SECRET_ACCESS_KEY=<your_secret_key>
-```
-
-The second one is to use an interactive shell:
-
-```bash
-aws configure
-```
-
-### Configure helm to use secured ECR repository
-
-Using `aws` command we will generate a token for helm to access the secured ECR repository:
-
-```bash
-aws ecr get-login-password --region us-east-1 | helm registry login --username AWS --password-stdin 362923047827.dkr.ecr.us-east-1.amazonaws.com
-```
-
-After this step you should be able to add the repository to your helm or just pull the helm chart:
-
-```bash
-helm pull oci://362923047827.dkr.ecr.us-east-1.amazonaws.com/netdata-cloud-dependency --untar #optional
-helm pull oci://362923047827.dkr.ecr.us-east-1.amazonaws.com/netdata-cloud-onprem --untar
-```
-
-Local folders with the newest versions of helm charts should appear on your working dir.
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+- Helm (version 3.12+ with OCI Configuration)
+- Kubectl
 
 ## Installation
 
-Netdata provides access to two helm charts:
+1. **AWS CLI Configuration**
 
-1. `netdata-cloud-dependency` - required applications for `netdata-cloud-onprem`.
-2. `netdata-cloud-onprem` - the application itself + provisioning
+   Configure AWS credentials using either environment variables:
 
-### `netdata-cloud-dependency`
+   ```bash
+   export AWS_ACCESS_KEY_ID=<your_secret_id>
+   export AWS_SECRET_ACCESS_KEY=<your_secret_key>
+   ```
 
-This helm chart is designed to install the necessary applications mentioned in the prerequisites.
+   Or through interactive setup:
 
-Although we provide an easy way to install all these applications, we expect users of OPC to provide production quality versions for them. Therefore, every configuration option is available through `values.yaml` in the folder that contains your netdata-cloud-dependency helm chart. All configuration options are described in the `README.md` which is a part of the helm chart.
+   ```bash
+   aws configure
+   ```
 
-Each component can be enabled/disabled individually. It is done by true/false switches in `values.yaml`. This way it is easier to migrate to production-grade components gradually.
+2. **Configure Helm for ECR Access**
 
-Unless you prefer otherwise, `k8s-ecr-login-renew` is responsible for calling out the `AWS API` for token regeneration.  This token is then injected into the secret that every node is using for authentication with secured ECR when pulling the images.
+   Generate token for ECR access:
 
-The default setting in `values.yaml` of `netdata-cloud-onprem` - `.global.imagePullSecrets` is configured to work out of the box with the dependency helm chart.
+   ```bash
+   aws ecr get-login-password --region us-east-1 | helm registry login --username AWS --password-stdin 362923047827.dkr.ecr.us-east-1.amazonaws.com
+   ```
 
-For helm chart installation - save your changes in `values.yaml` and execute:
+3. **Pull Required Helm Charts**
 
-```shell
-cd [your helm chart location]
-helm upgrade --wait --install netdata-cloud-dependency -n netdata-cloud --create-namespace -f values.yaml .
-```
+   ```bash
+   helm pull oci://362923047827.dkr.ecr.us-east-1.amazonaws.com/netdata-cloud-dependency --untar  # Optional
+   helm pull oci://362923047827.dkr.ecr.us-east-1.amazonaws.com/netdata-cloud-onprem --untar
+   ```
+   The charts will be extracted to your current working directory.
 
-Keep in mind that `netdata-cloud-dependency` is provided only as a proof of concept. Users installing OPC should properly configure these components.
+4. **Install Dependencies**
 
-### `netdata-cloud-onprem`
+   The `netdata-cloud-dependency` chart installs all required third-party applications. While we provide this for easy setup, **production environments should use their own configured versions of these components**:
 
-Every configuration option is available in `values.yaml` in the folder that contains your `netdata-cloud-onprem` helm chart. All configuration options are described in the `README.md` which is a part of the helm chart.
+    - Configure the installation by editing `values.yaml` in your `netdata-cloud-dependency` chart directory.
+    - Install the dependencies:
+        ```bash
+        cd [your helm chart location]
+        helm upgrade --wait --install netdata-cloud-dependency -n netdata-cloud --create-namespace -f values.yaml .
+        ```
+5. **Install Netdata Cloud On-Prem**
 
-**Afterwards, you can install the OPC:**
+    - Configure the installation by editing `values.yaml` in your `netdata-cloud-onprem` chart directory.
+    - Install the application:
+         ```bash
+         cd [your helm chart location]
+         helm upgrade --wait --install netdata-cloud-onprem -n netdata-cloud --create-namespace -f values.yaml .
+         ```
 
-```shell
-cd [your helm chart location]
-helm upgrade --wait --install netdata-cloud-onprem -n netdata-cloud --create-namespace -f values.yaml .
-```
+   > **Important**:
+   >
+   > Installation includes resource provisioning with migration services.
+   >
+   > During the first installation, a `netdata-cloud-common` secret is created containing critical encryption data. This secret persists through reinstalls and should never be deleted, as this will result in data loss.
 
-> **Important**
->
-> 1. Installation takes care of provisioning the resources with migration services.
->
-> 2. During the first installation, a secret called the `netdata-cloud-common` is created. It contains several randomly generated entries. Deleting helm chart is not going to delete this secret, nor reinstalling the whole OPC, unless manually deleted by a kubernetes administrator. The content of this secret is extremely important - strings that are contained there are essential parts of encryption. Losing or changing the data that it contains will result in data loss.
+## Architecture Components
 
-## Short description of the microservices
+<details><summary>View detailed microservices description</summary>
 
-<details><summary>details</summary>
-
-| microservice                           | description                                                                                                                                                                                                                                                                                                                                                                                        |
+| Microservice                           | Description                                                                                                                                                                                                                                                                                                                                                                                        |
 |:---------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| cloud-accounts-service                 | Responsible for user registration & authentication                                                                                                                                                                                                                                                                                                                                                 |
+| cloud-accounts-service                 | Handles user registration & authentication                                                                                                                                                                                                                                                                                                                                                         |
 | cloud-agent-data-ctrl-service          | Forwards request from the OCP to the relevant Agents. The requests include fetching Chart metadata, Chart data and Function data from the Agents.                                                                                                                                                                                                                                                  |
 | cloud-agent-mqtt-input-service         | Forwards MQTT messages emitted by the Agent to the internal Pulsar broker. They are related to the Agent entities and include Agent connection state updates.                                                                                                                                                                                                                                      |
 | cloud-agent-mqtt-output-service        | Forwards Pulsar messages emitted on the OCP to the MQTT broker. They are related to the Agent entities. From there, the messages reach the relevant Agent.                                                                                                                                                                                                                                         |
