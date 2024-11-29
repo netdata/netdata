@@ -60,6 +60,7 @@ static struct global_statistics {
     uint64_t ml_result_points_generated;
     uint64_t ml_models_consulted;
     uint64_t ml_models_received;
+    uint64_t ml_models_ignored;
     uint64_t ml_models_sent;
     uint64_t ml_models_deserialization_failures;
 
@@ -109,6 +110,10 @@ void global_statistics_ml_query_completed(size_t points_read) {
 
 void global_statistics_ml_models_received() {
     __atomic_fetch_add(&global_statistics.ml_models_received, 1, __ATOMIC_RELAXED);
+}
+
+void global_statistics_ml_models_ignored() {
+    __atomic_fetch_add(&global_statistics.ml_models_ignored, 1, __ATOMIC_RELAXED);
 }
 
 void global_statistics_ml_models_sent() {
@@ -241,9 +246,10 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     gs->ml_db_points_read            = __atomic_load_n(&global_statistics.ml_db_points_read, __ATOMIC_RELAXED);
     gs->ml_result_points_generated   = __atomic_load_n(&global_statistics.ml_result_points_generated, __ATOMIC_RELAXED);
     gs->ml_models_consulted          = __atomic_load_n(&global_statistics.ml_models_consulted, __ATOMIC_RELAXED);
-    gs->ml_models_received          = __atomic_load_n(&global_statistics.ml_models_received, __ATOMIC_RELAXED);
-    gs->ml_models_sent          = __atomic_load_n(&global_statistics.ml_models_sent, __ATOMIC_RELAXED);
-    gs->ml_models_deserialization_failures          = __atomic_load_n(&global_statistics.ml_models_deserialization_failures, __ATOMIC_RELAXED);
+    gs->ml_models_received           = __atomic_load_n(&global_statistics.ml_models_received, __ATOMIC_RELAXED);
+    gs->ml_models_sent               = __atomic_load_n(&global_statistics.ml_models_sent, __ATOMIC_RELAXED);
+    gs->ml_models_ignored            = __atomic_load_n(&global_statistics.ml_models_ignored, __ATOMIC_RELAXED);
+    gs->ml_models_deserialization_failures = __atomic_load_n(&global_statistics.ml_models_deserialization_failures, __ATOMIC_RELAXED);
 
     gs->exporters_queries_made       = __atomic_load_n(&global_statistics.exporters_queries_made, __ATOMIC_RELAXED);
     gs->exporters_db_points_read     = __atomic_load_n(&global_statistics.exporters_db_points_read, __ATOMIC_RELAXED);
@@ -834,6 +840,7 @@ static void global_statistics_extended_charts(void) {
         gs.ml_models_consulted,
         gs.ml_models_received,
         gs.ml_models_sent,
+        gs.ml_models_ignored,
         gs.ml_models_deserialization_failures);
 
     {

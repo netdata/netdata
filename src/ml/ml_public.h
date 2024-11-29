@@ -46,6 +46,7 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **stmt);
 void ml_update_global_statistics_charts(uint64_t models_consulted,
                                         uint64_t models_received,
                                         uint64_t models_sent,
+                                        uint64_t models_ignored,
                                         uint64_t models_deserialization_failures);
 
 bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm);

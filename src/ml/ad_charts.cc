@@ -547,6 +547,7 @@ void ml_update_training_statistics_chart(ml_worker_t *worker, const ml_queue_sta
 void ml_update_global_statistics_charts(uint64_t models_consulted,
                                         uint64_t models_received,
                                         uint64_t models_sent,
+                                        uint64_t models_ignored,
                                         uint64_t models_deserialization_failures)
 {
     if (!Cfg.enable_statistics_charts)
@@ -584,6 +585,7 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
         static RRDSET *st = NULL;
         static RRDDIM *rd_received = NULL;
         static RRDDIM *rd_sent = NULL;
+        static RRDDIM *rd_ignored = NULL;
         static RRDDIM *rd_deserialization_failures = NULL;
 
         if (unlikely(!st)) {
@@ -604,11 +606,13 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
 
             rd_received = rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_sent = rrddim_add(st, "sent", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ignored = rrddim_add(st, "ignored", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_deserialization_failures = rrddim_add(st, "deserialization failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_received, (collected_number) models_received);
         rrddim_set_by_pointer(st, rd_sent, (collected_number) models_sent);
+        rrddim_set_by_pointer(st, rd_ignored, (collected_number) models_ignored);
         rrddim_set_by_pointer(st, rd_deserialization_failures, (collected_number) models_deserialization_failures);
 
         rrdset_done(st);

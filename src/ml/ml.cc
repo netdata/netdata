@@ -1151,11 +1151,14 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
     }
 
     ml_dimension_t *Dim = reinterpret_cast<ml_dimension_t *>(AcqDim.dimension());
-    Dim->kmeans = req.inlined_km;
+    if (!Dim) {
+        global_statistics_ml_models_ignored();
+        return ML_WORKER_RESULT_OK;
+    }
 
+    Dim->kmeans = req.inlined_km;
     ml_dimension_update_models(worker, Dim);
     global_statistics_ml_models_received();
-
     return ML_WORKER_RESULT_OK;
 }
 

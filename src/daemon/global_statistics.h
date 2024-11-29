@@ -39,6 +39,7 @@ extern size_t rrddim_db_memory_size;
 void global_statistics_ml_query_completed(size_t points_read);
 void global_statistics_ml_models_consulted(size_t models_consulted);
 void global_statistics_ml_models_received();
+void global_statistics_ml_models_ignored();
 void global_statistics_ml_models_sent();
 void global_statistics_ml_models_deserialization_failures();
 
