@@ -33,6 +33,17 @@ typedef struct pgc_entry {
     uint8_t *custom_data;
 } PGC_ENTRY;
 
+struct pgc_size_histogram_entry {
+    size_t upto;
+    size_t count;
+};
+
+#define PGC_SIZE_HISTOGRAM_ENTRIES 15
+
+struct pgc_size_histogram {
+    struct pgc_size_histogram_entry array[PGC_SIZE_HISTOGRAM_ENTRIES];
+};
+
 struct pgc_queue_statistics {
     alignas(64) size_t entries;
     alignas(64) size_t size;
@@ -48,6 +59,8 @@ struct pgc_queue_statistics {
 };
 
 struct pgc_statistics {
+    struct pgc_size_histogram size_histogram;
+
     alignas(64) size_t wanted_cache_size;
     alignas(64) size_t current_cache_size;
 
@@ -152,7 +165,6 @@ struct pgc_statistics {
         struct pgc_queue_statistics clean;
     } queues;
 };
-
 
 typedef void (*free_clean_page_callback)(PGC *cache, PGC_ENTRY entry);
 typedef void (*save_dirty_page_callback)(PGC *cache, PGC_ENTRY *entries_array, PGC_PAGE **pages_array, size_t entries);

@@ -1267,6 +1267,9 @@ struct dbengine2_cache_pointers {
     RRDDIM *rd_pgc_memory_evicting;
     RRDDIM *rd_pgc_memory_flushing;
 
+    RRDSET *st_pgc_page_size_heatmap;
+    RRDDIM *rd_pgc_page_size_x[PGC_SIZE_HISTOGRAM_ENTRIES];
+    
     RRDSET *st_pgc_tm;
     RRDDIM *rd_pgc_tm_current;
     RRDDIM *rd_pgc_tm_wanted;
@@ -1478,6 +1481,49 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
         rrdset_done(ptrs->st_pgc_memory);
     }
 
+    {
+        if (unlikely(!ptrs->st_pgc_page_size_heatmap)) {
+            CLEAN_BUFFER *id = buffer_create(100, NULL);
+            buffer_sprintf(id, "dbengine_%s_page_sizes", name);
+            
+            CLEAN_BUFFER *family = buffer_create(100, NULL);
+            buffer_sprintf(family, "dbengine %s cache", name);
+
+            CLEAN_BUFFER *title = buffer_create(100, NULL);
+            buffer_sprintf(title, "Netdata %s Page Sizes", name);
+
+            ptrs->st_pgc_page_size_heatmap = rrdset_create_localhost(
+                "netdata",
+                buffer_tostring(id),
+                NULL,
+                buffer_tostring(family),
+                NULL,
+                buffer_tostring(title),
+                "pages",
+                "netdata",
+                "stats",
+                priority,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_HEATMAP);
+
+            ptrs->rd_pgc_page_size_x[0] = rrddim_add(ptrs->st_pgc_page_size_heatmap, "empty", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            for(size_t i = 1; i < _countof(ptrs->rd_pgc_page_size_x) - 1 ;i++) {
+                char buf[64];
+                snprintfz(buf, sizeof(buf), "%zu", pgc_stats->size_histogram.array[i].upto);
+                // size_snprintf(&buf[1], sizeof(buf) - 1, pgc_stats->size_histogram.array[i].upto, "B", true);
+                ptrs->rd_pgc_page_size_x[i] = rrddim_add(ptrs->st_pgc_page_size_heatmap, buf, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            ptrs->rd_pgc_page_size_x[_countof(ptrs->rd_pgc_page_size_x) - 1] = rrddim_add(ptrs->st_pgc_page_size_heatmap, "+inf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            priority++;
+        }
+
+        for(size_t i = 0; i < _countof(ptrs->rd_pgc_page_size_x) - 1 ;i++)
+            rrddim_set_by_pointer(ptrs->st_pgc_page_size_heatmap, ptrs->rd_pgc_page_size_x[i], (collected_number)pgc_stats->size_histogram.array[i].count);
+
+        rrdset_done(ptrs->st_pgc_page_size_heatmap);
+    }
+    
     {
         if (unlikely(!ptrs->st_pgc_tm)) {
             BUFFER *id = buffer_create(100, NULL);
