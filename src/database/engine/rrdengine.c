@@ -1716,6 +1716,7 @@ static void timer_per_sec_cb(uv_timer_t* handle) {
 }
 
 static void dbengine_initialize_structures(void) {
+    pgd_init_arals();
     pgc_and_mrg_initialize();
 
     pdc_init();
@@ -1727,7 +1728,6 @@ static void dbengine_initialize_structures(void) {
     rrdeng_query_handle_init();
     page_descriptors_init();
     extent_buffer_init();
-    pgd_init_arals();
     extent_io_descriptor_init();
 }
 

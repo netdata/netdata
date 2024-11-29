@@ -545,6 +545,8 @@ struct section_pages {
     PGC_PAGE *base;
 };
 
+static struct aral_statistics aral_statistics_for_pgc = { 0 };
+
 static ARAL *pgc_section_pages_aral = NULL;
 static void pgc_section_pages_static_aral_init(void) {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
@@ -558,7 +560,7 @@ static void pgc_section_pages_static_aral_init(void) {
                     "pgc_section",
                     sizeof(struct section_pages),
                     0,
-                    65536, NULL,
+                    65536, &aral_statistics_for_pgc,
                     NULL, NULL, false, false);
 
         spinlock_unlock(&spinlock);
@@ -1955,15 +1957,25 @@ static void *evict_thread(void *ptr) {
 // ----------------------------------------------------------------------------
 // public API
 
+ARAL *pgd_get_aral_for_pgc(size_t pgc_partition);
+
+size_t pgc_sizeof_page(void) {
+    return sizeof(PGC_PAGE);
+}
+
 PGC *pgc_create(const char *name,
-                size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
+                size_t clean_size_bytes,
+                free_clean_page_callback pgc_free_cb,
                 size_t max_dirty_pages_per_flush,
                 save_dirty_init_callback pgc_save_init_cb,
                 save_dirty_page_callback pgc_save_dirty_cb,
-                size_t max_pages_per_inline_eviction, size_t max_inline_evictors,
+                size_t max_pages_per_inline_eviction,
+                size_t max_inline_evictors,
                 size_t max_skip_pages_per_inline_eviction,
                 size_t max_flushes_inline,
-                PGC_OPTIONS options, size_t partitions, size_t additional_bytes_per_page) {
+                PGC_OPTIONS options,
+                size_t partitions,
+                size_t additional_bytes_per_page) {
 
     if(max_pages_per_inline_eviction < 1)
         max_pages_per_inline_eviction = 1;
@@ -1984,8 +1996,8 @@ PGC *pgc_create(const char *name,
     cache->config.pgc_save_dirty_cb = pgc_save_dirty_cb;
     cache->config.max_pages_per_inline_eviction = max_pages_per_inline_eviction;
     cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 2) ? 2 : max_skip_pages_per_inline_eviction;
-    cache->config.max_flushes_inline = (max_flushes_inline < 1) ? 1 : max_flushes_inline;
-    cache->config.partitions = partitions < 1 ? 4 + (size_t)get_netdata_cpus() : partitions;
+    cache->config.max_flushes_inline = (max_flushes_inline == 0) ? 2 : max_flushes_inline;
+    cache->config.partitions = partitions == 0 ? 1ULL + get_netdata_cpus() / 2 : partitions;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
     cache->config.stats = global_statistics_enabled;
 
@@ -1995,12 +2007,6 @@ PGC *pgc_create(const char *name,
     cache->config.healthy_size_per1000        =  980; // don't evict if the current size is below this threshold
     cache->config.evict_low_threshold_per1000 =  970; // when evicting, bring the size down to this threshold
 
-    {
-        spinlock_init(&cache->evictor.spinlock);
-        completion_init(&cache->evictor.completion);
-        cache->evictor.thread = nd_thread_create(name, NETDATA_THREAD_OPTION_JOINABLE, evict_thread, cache);
-    }
-
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
 
     pgc_section_pages_static_aral_init();
@@ -2009,9 +2015,9 @@ PGC *pgc_create(const char *name,
         rw_spinlock_init(&cache->index[part].rw_spinlock);
 
 #ifdef PGC_WITH_ARAL
-        {
-            char buf[100 +1];
-            snprintfz(buf, sizeof(buf) - 1, "%s[%zu]", name, part);
+        if(cache->config.additional_bytes_per_page) {
+            char buf[100];
+            snprintfz(buf, sizeof(buf), "%s[%zu]", name, part);
             cache->index[part].aral = aral_create(
                 buf,
                 sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
@@ -2019,6 +2025,10 @@ PGC *pgc_create(const char *name,
                 16384,
                 aral_get_statistics(pgc_section_pages_aral),
                 NULL, NULL, false, false);
+        }
+        else {
+            cache->index[part].aral = pgd_get_aral_for_pgc(part);
+            internal_fatal(!cache->index->aral, "Cannot get ARAL from DBENGINE");
         }
 #endif
     }
@@ -2044,11 +2054,18 @@ PGC *pgc_create(const char *name,
     pgc_size_histogram_init(&cache->dirty.stats->size_histogram);
     pgc_size_histogram_init(&cache->clean.stats->size_histogram);
 
+    // last create the eviction thread
+    {
+        spinlock_init(&cache->evictor.spinlock);
+        completion_init(&cache->evictor.completion);
+        cache->evictor.thread = nd_thread_create(name, NETDATA_THREAD_OPTION_JOINABLE, evict_thread, cache);
+    }
+
     return cache;
 }
 
 struct aral_statistics *pgc_aral_statistics(void) {
-    return aral_get_statistics(pgc_section_pages_aral);
+    return &aral_statistics_for_pgc;
 }
 
 size_t pgc_aral_structures(void) {
@@ -2091,8 +2108,9 @@ void pgc_destroy(PGC *cache) {
 //            netdata_rwlock_destroy(&cache->index[part].rw_spinlock);
 
 #ifdef PGC_WITH_ARAL
-        for(size_t part = 0; part < cache->config.partitions ; part++)
-            aral_destroy(cache->index[part].aral);
+        if(cache->config.additional_bytes_per_page)
+            for(size_t part = 0; part < cache->config.partitions ; part++)
+                aral_destroy(cache->index[part].aral);
 #endif
         freez(cache->index);
         freez(cache);
