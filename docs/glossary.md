@@ -1,12 +1,10 @@
 # Glossary
 
-The Netdata community welcomes engineers, SREs, admins, etc. of all levels of expertise with engineering and the Netdata tool. And just as a journey of a thousand miles starts with one step, sometimes, the journey to mastery begins with understanding a single term.
+Welcome to Netdata's terminology guide! Whether you're a seasoned engineer or just starting your journey in system monitoring, this glossary helps demystify the terms used throughout our documentation and community.
 
-As such, we want to provide a little Glossary as a reference starting point for new users who might be confused about the Netdata vernacular that more familiar users might take for granted.
+This glossary serves as a living document, continuously updated to help you understand Netdata concepts, features, and terminology. Each term links to detailed documentation for deeper exploration.
 
-If you're here looking for the definition of a term you heard elsewhere in our community or products, or if you just want to learn Netdata from the ground up, you've come to the right page.
-
-Use the alphabetized list below to find the answer to your single-term questions, and click the bolded list items to explore more on the topics! We'll be sure to keep constantly updating this list, so if you hear a word that you would like for us to cover, just let us know or submit a request!
+Missing a term? Let us know or submit a request to expand our glossary. Together, we can make Netdata more accessible to everyone.
 
 [A](#a) | [B](#b) | [C](#c) | [D](#d)| [E](#e) | [F](#f) | [G](#g) | [H](#h) | [I](#i) | [J](#j) | [K](#k) | [L](#l) | [M](#m) | [N](#n) | [O](#o) | [P](#p)
 | [Q](#q) | [R](#r) | [S](#s) | [T](#t) | [U](#u) | [V](#v) | [W](#w) | [X](#x) | [Y](#y) | [Z](#z)
@@ -27,7 +25,7 @@ Use the alphabetized list below to find the answer to your single-term questions
 
 ## C
 
-- [**Child**](/docs/observability-centralization-points/metrics-centralization-points/README.md): A node, running Netdata, that streams metric data to one or more parent.
+- [**Child**](/docs/observability-centralization-points/metrics-centralization-points/README.md): A node, running Netdata, that streams metric data to one or more Parents.
 
 - [**Cloud** or **Netdata Cloud**](/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
@@ -37,7 +35,7 @@ Use the alphabetized list below to find the answer to your single-term questions
 
 - [**Context**](/docs/dashboards-and-charts/netdata-charts.md#contexts): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
 
-- [**Custom dashboards**](/src/web/gui/custom/README.md) A dashboard that you can create using simple HTML (no javascript is required for basic dashboards).
+- [**Custom dashboards**](/src/web/gui/custom/README.md) A dashboard that you can create using simple HTML (no JavaScript is required for basic dashboards).
 
 ## D
 
@@ -55,9 +53,9 @@ Use the alphabetized list below to find the answer to your single-term questions
 
 - [**Family**](/docs/dashboards-and-charts/netdata-charts.md#families): 1. What we consider our Netdata community of users and engineers. 2. A single instance of a hardware or software resource that needs to be displayed separately from similar instances.
 
-- [**Flood Protection**](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#flood-protection): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud does not send notifications about this node
+- [**Flood Protection**](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#flood-protection): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud doesn’t send notifications about this node
 
-- [**Functions** or **Netdata Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can  bring additional information to support troubleshooting or trigger some action to happen on the node itself.
+- [**Functions** or **Netdata Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
 ## G
 
@@ -81,7 +79,7 @@ Use the alphabetized list below to find the answer to your single-term questions
 
 ## M
 
-- [**Metrics Collection**](/src/collectors/README.md):  With zero configuration, Netdata auto-detects thousands of data sources upon starting and immediately collects per-second metrics. Netdata can immediately collect metrics from these endpoints thanks to 300+ collectors, which all come pre-installed when you install Netdata.
+- [**Metrics Collection**](/src/collectors/README.md): With zero configuration, Netdata auto-detects thousands of data sources upon starting and immediately collects per-second metrics. Netdata can immediately collect metrics from these endpoints thanks to 300+ collectors, which all come pre-installed when you install Netdata.
 
 - [**Metric Correlations**](/docs/metric-correlations.md): A Netdata feature that lets you quickly find metrics and charts related to a particular window of interest that you want to explore further.
 
@@ -91,17 +89,16 @@ Use the alphabetized list below to find the answer to your single-term questions
 
 - [**Metrics Streaming Replication**](/docs/observability-centralization-points/README.md): Each node running Netdata can stream the metrics it collects, in real time, to another node. Metric streaming allows you to replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database (TSDB).
 
-
 ## N
 
 - [**Netdata**](https://www.netdata.cloud/): Netdata is a monitoring tool designed by system administrators, DevOps engineers, and developers to collect everything, help you visualize
-metrics, troubleshoot complex performance problems, and make data interoperable with the rest of your monitoring stack.
+  metrics, troubleshoot complex performance problems, and make data interoperable with the rest of your monitoring stack.
 
 - [**Netdata Agent** or **Agent**](/packaging/installer/README.md): Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
 
 - [**Netdata Cloud** or **Cloud**](/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
-- [**Netdata Functions** or **Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can  bring additional information to support troubleshooting or trigger some action to happen on the node itself.
+- [**Netdata Functions** or **Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
 ## O
 
@@ -123,25 +120,25 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 ## S
 
-- [**Single Node Dashboard**](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata Agent, with thousand of metrics and hundreds of interactive charts that requires no set up.
+- [**Single Node Dashboard**](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata Agent, with thousands of metrics and hundreds of interactive charts that requires no setup.
 
-- [**Space**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#spaces): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
+- [**Space**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#spaces): A high-level container and virtual collaboration area where you can organize team members, access levels, and the nodes you want to monitor.
 
 ## T
 
 - [**Template Entity Type**](/src/health/REFERENCE.md#entity-types): Entity type that defines rules that apply to all charts of a specific context, and use the template label. Templates help you apply one entity to all disks, all network interfaces, all MySQL databases, and so on.
 
-- [**Tiers**](/src/database/engine/README.md#tiers): Tiering is a mechanism of providing multiple tiers of data with different granularity of metrics (the frequency they are collected and stored, i.e. their resolution).
+- [**Tiers**](/src/database/engine/README.md#tiers): Tiering is a mechanism of providing multiple tiers of data with different granularity of metrics (the frequency they are collected and stored, i.e., their resolution).
 
 ## U
 
-- [**Unlimited Scalability**](https://www.netdata.cloud/#:~:text=love%20community%20contributions!-,Infinite%20Scalability,-By%20storing%20data): With Netdata's distributed architecture, you can seamless observe a couple, hundreds or
-even thousands of nodes. There are no actual bottlenecks especially if you retain metrics locally in the Agents.
+- [**Unlimited Scalability**](https://www.netdata.cloud/#:~:text=love%20community%20contributions!-,Infinite%20Scalability,-By%20storing%20data): With Netdata's distributed architecture, you can seamlessly observe a couple, hundreds or
+  even thousands of nodes. There are no actual bottlenecks especially if you retain metrics locally in the Agents.
 
 ## V
 
-- [**Visualizations**](/docs/dashboards-and-charts/README.md): Netdata uses dimensions, contexts, and families to sort your metric data into graphs, charts, and alerts that maximize your understand of your infrastructure and your ability to troubleshoot it, along or on a team.
+- [**Visualizations**](/docs/dashboards-and-charts/README.md): Netdata uses dimensions, contexts, and families to sort your metric data into graphs, charts, and alerts that maximize your understanding of your infrastructure and your ability to troubleshoot it, along or on a team.
 
 ## Z
 
-- **Zero Configuration**: Netdata is pre-configured and capable to autodetect and monitor any well-known application that runs on your system. You just deploy and connect Netdata Agents in your Netdata space, and monitor them in seconds.
+- **Zero Configuration**: Netdata is pre-configured and capable of autodetect and monitor any well-known application that runs on your system. You deploy and connect Netdata Agents in your Netdata space, and monitor them in seconds.
