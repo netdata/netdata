@@ -10,20 +10,20 @@ typedef struct aral ARAL;
 
 struct aral_statistics {
     struct {
-        size_t allocations;
-        size_t allocated_bytes;
+        alignas(64) size_t allocations;
+        alignas(64) size_t allocated_bytes;
     } structures;
 
     struct {
-        size_t allocations;
-        size_t allocated_bytes;
-        size_t used_bytes;
+        alignas(64) size_t allocations;
+        alignas(64) size_t allocated_bytes;
+        alignas(64) size_t used_bytes;
     } malloc;
 
     struct {
-        size_t allocations;
-        size_t allocated_bytes;
-        size_t used_bytes;
+        alignas(64) size_t allocations;
+        alignas(64) size_t allocated_bytes;
+        alignas(64) size_t used_bytes;
     } mmap;
 };
 
@@ -35,9 +35,6 @@ size_t aral_requested_element_size(ARAL *ar);
 
 // return the exact memory footprint of the elements
 size_t aral_actual_element_size(ARAL *ar);
-
-// predict the exact memory footprint of the elements
-size_t aral_allocation_slot_size(size_t requested_element_size, bool usable);
 
 size_t aral_overhead(ARAL *ar);
 size_t aral_structures(ARAL *ar);

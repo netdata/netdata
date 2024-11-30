@@ -158,7 +158,7 @@ void pgd_init_arals(void) {
             arals[arals_slot(slot, partition)] = aral_create(
                 buf,
                 aral_sizes[slot],
-                65536 / (aral_sizes[slot] + sizeof(uintptr_t)),
+                0,
                 65536,
                 &aral_statistics_for_pgd,
                 NULL, NULL, false, false);

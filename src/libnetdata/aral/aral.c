@@ -72,7 +72,7 @@ struct aral {
         size_t max_allocation_size;     // calculated in bytes
         size_t max_page_elements;       // calculated
         size_t page_ptr_offset;         // calculated
-        size_t natural_page_size;       // calculated
+        size_t system_page_size;        // calculated
 
         size_t initial_page_elements;
         size_t requested_element_size;
@@ -105,6 +105,9 @@ struct aral {
     struct aral_statistics *stats;
 };
 
+static inline void aral_move_page_with_free_list___aral_lock_needed(ARAL *ar, ARAL_PAGE *page);
+static void aral_defrag_sorted_page_position___aral_lock_needed(ARAL *ar, ARAL_PAGE *page);
+
 size_t aral_structures_from_stats(struct aral_statistics *stats) {
     return __atomic_load_n(&stats->structures.allocated_bytes, __ATOMIC_RELAXED);
 }
@@ -127,12 +130,12 @@ struct aral_statistics *aral_get_statistics(ARAL *ar) {
 }
 
 static inline size_t memory_alignment(size_t size, size_t alignment) {
-    return (size + alignment - 1) & ~(alignment - 1);
+    // return (size + alignment - 1) & ~(alignment - 1); // assumees alignment is power of 2
+    return ((size + alignment - 1) / alignment) * alignment;
 }
 
 static size_t aral_align_alloc_size(ARAL *ar, uint64_t size) {
-    if(size % ar->config.natural_page_size)
-        size += ar->config.natural_page_size - (size % ar->config.natural_page_size) ;
+    size = memory_alignment(size, ar->config.system_page_size);
 
     if(size % ar->config.element_size)
         size -= size % ar->config.element_size;
@@ -452,12 +455,25 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
 
     // acquire a slot for the caller
     page->aral_lock.used_elements++;
-    if(--page->aral_lock.free_elements == 0) {
-        // we are done with this page
-        // move the full page last
-        // so that pages with free items remain first in the list
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, aral_lock.prev, aral_lock.next);
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ar->aral_lock.pages, page, aral_lock.prev, aral_lock.next);
+    page->aral_lock.free_elements--;
+
+    if(page->aral_lock.free_elements == 0) {
+        if(ar->aral_lock.pages->aral_lock.prev != page) {
+            // we are done with this page
+            // move the full page last
+            // so that pages with free items remain first in the list
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, aral_lock.prev, aral_lock.next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ar->aral_lock.pages, page, aral_lock.prev, aral_lock.next);
+        }
+    }
+    else if(page->aral_lock.free_elements == 1) {
+        if(ar->aral_lock.pages != page) {
+            // we are done with this page
+            // move the full page last
+            // so that pages with free items remain first in the list
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, aral_lock.prev, aral_lock.next);
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->aral_lock.pages, page, aral_lock.prev, aral_lock.next);
+        }
     }
 
     aral_unlock(ar);
@@ -584,7 +600,7 @@ static void aral_defrag_sorted_page_position___aral_lock_needed(ARAL *ar, ARAL_P
     }
     else {
         for(tmp = (page == ar->aral_lock.pages) ? NULL : page->aral_lock.prev ;
-            tmp && (!tmp->aral_lock.free_elements || tmp->aral_lock.free_elements > page->aral_lock.free_elements);
+            tmp && tmp != page && (!tmp->aral_lock.free_elements || tmp->aral_lock.free_elements > page->aral_lock.free_elements);
             tmp = (tmp == ar->aral_lock.pages) ? NULL : tmp->aral_lock.prev)
             move_earlier++;
 
@@ -681,11 +697,23 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
 
         if(!is_this_page_the_last_one)
             aral_del_page___no_lock_needed(ar, page TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
+
+        return;
     }
-    else {
+
+    if(page->aral_lock.free_elements == 1) {
+        if(ar->aral_lock.pages != page) {
+            // we are done with this page
+            // move the full page last
+            // so that pages with free items remain first in the list
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, aral_lock.prev, aral_lock.next);
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->aral_lock.pages, page, aral_lock.prev, aral_lock.next);
+        }
+    }
+    else
         aral_move_page_with_free_list___aral_lock_needed(ar, page);
-        aral_unlock(ar);
-    }
+
+    aral_unlock(ar);
 }
 
 void aral_destroy_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
@@ -713,7 +741,7 @@ size_t aral_actual_element_size(ARAL *ar) {
     return ar->config.element_size;
 }
 
-size_t aral_allocation_slot_size(size_t requested_element_size, bool usable) {
+static size_t aral_allocation_slot_size(size_t requested_element_size, bool usable) {
     // we need to add a page pointer after the element
     // so, first align the element size to the pointer size
     size_t element_size = memory_alignment(requested_element_size, sizeof(uintptr_t));
@@ -759,9 +787,9 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
 
     long int page_size = sysconf(_SC_PAGE_SIZE);
     if (unlikely(page_size == -1))
-        ar->config.natural_page_size = 4096;
+        ar->config.system_page_size = 4096;
     else
-        ar->config.natural_page_size = page_size;
+        ar->config.system_page_size = page_size;
 
     ar->config.element_size = aral_allocation_slot_size(ar->config.requested_element_size, false);
 
