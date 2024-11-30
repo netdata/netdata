@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- docs: update On-Prem System Requirements [\#19107](https://github.com/netdata/netdata/pull/19107) ([ilyam8](https://github.com/ilyam8))
+- On-prem docs edits 2 [\#19105](https://github.com/netdata/netdata/pull/19105) ([Ancairon](https://github.com/Ancairon))
+- Docs edits on Cloud versions and On Prem [\#19104](https://github.com/netdata/netdata/pull/19104) ([Ancairon](https://github.com/Ancairon))
+- chore\(go.d/pkg/socket\): add err to callback return values [\#19103](https://github.com/netdata/netdata/pull/19103) ([ilyam8](https://github.com/ilyam8))
 - docs: fix img tag [\#19102](https://github.com/netdata/netdata/pull/19102) ([ilyam8](https://github.com/ilyam8))
 - Edit the organize doc [\#19101](https://github.com/netdata/netdata/pull/19101) ([Ancairon](https://github.com/Ancairon))
 - Update connecting documentation [\#19100](https://github.com/netdata/netdata/pull/19100) ([Ancairon](https://github.com/Ancairon))
@@ -443,8 +447,6 @@
 - add nginx unit to apps\_groups.conf [\#18557](https://github.com/netdata/netdata/pull/18557) ([ilyam8](https://github.com/ilyam8))
 - go.d fix typesense/nginxunit meta [\#18556](https://github.com/netdata/netdata/pull/18556) ([ilyam8](https://github.com/ilyam8))
 - add go.d/nginxunit [\#18554](https://github.com/netdata/netdata/pull/18554) ([ilyam8](https://github.com/ilyam8))
-- fix some docs issues [\#18553](https://github.com/netdata/netdata/pull/18553) ([ilyam8](https://github.com/ilyam8))
-- go.d fix Goland code inspection warnings [\#18552](https://github.com/netdata/netdata/pull/18552) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
