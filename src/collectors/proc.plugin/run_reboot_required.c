@@ -57,15 +57,15 @@ int do_run_reboot_required(int update_every, usec_t dt) {
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_required = rrddim_add(st, "required", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_not_required = rrddim_add(st, "not_required", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_required = rrddim_add(st, "required", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     struct stat buf;
     bool exists = (stat(signal_file_path, &buf) == 0);
 
-    rrddim_set_by_pointer(st, rd_required, exists ? 1 : 0);
     rrddim_set_by_pointer(st, rd_not_required, exists ? 0 : 1);
+    rrddim_set_by_pointer(st, rd_required, exists ? 1 : 0);
     rrdset_done(st);
 
     return 0;
