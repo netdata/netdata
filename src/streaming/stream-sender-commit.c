@@ -8,6 +8,7 @@ static __thread BUFFER *sender_thread_buffer = NULL;
 static __thread bool sender_thread_buffer_used = false;
 static __thread size_t sender_thread_buffer_our_recreates = 0;    // the sender sequence, when we created this buffer
 static __thread size_t sender_thread_buffer_sender_recreates = 0; // sender_commit() copies this, while having the sender lock
+static __thread const char *sender_thread_buffer_last_function = NULL;
 
 void sender_commit_thread_buffer_free(void) {
     buffer_free(sender_thread_buffer);
@@ -15,12 +16,16 @@ void sender_commit_thread_buffer_free(void) {
     sender_thread_buffer_used = false;
     sender_thread_buffer_our_recreates = 0;
     sender_thread_buffer_sender_recreates = 0;
+    sender_thread_buffer_last_function = NULL;
 }
 
 // Collector thread starting a transmission
-BUFFER *sender_start(struct sender_state *s __maybe_unused) {
+BUFFER *sender_start_with_trace(struct sender_state *s __maybe_unused, const char *func) {
     if(unlikely(sender_thread_buffer_used))
-        fatal("STREAMING: thread buffer is used multiple times concurrently.");
+        fatal("STREAMING: thread buffer is used multiple times concurrently. "
+              "It is already being used by '%s()', and now is called by '%s()'",
+              sender_thread_buffer_last_function ? sender_thread_buffer_last_function : "(null)",
+              func ? func : "(null)");
 
     if(unlikely(sender_thread_buffer &&
                  sender_thread_buffer->size > THREAD_BUFFER_INITIAL_SIZE &&
@@ -50,6 +55,7 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
         fatal("STREAMING: sender is committing a buffer twice.");
 
     sender_thread_buffer_used = false;
+    sender_thread_buffer_last_function = NULL;
 
     char *src = (char *)buffer_tostring(wb);
     size_t src_len = buffer_strlen(wb);

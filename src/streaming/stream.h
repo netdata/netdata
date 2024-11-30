@@ -25,7 +25,9 @@ struct receiver_state;
 #include "stream-parents.h"
 
 // thread buffer for sending data upstream (to a parent)
-BUFFER *sender_start(struct sender_state *s);
+BUFFER *sender_start_with_trace(struct sender_state *s, const char *func);
+#define sender_start(s) sender_start_with_trace(s, __FUNCTION__)
+
 void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type);
 void sender_commit_thread_buffer_free(void);
 
