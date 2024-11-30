@@ -9,7 +9,7 @@ $HTTP["url"] =~ "^/netdata/" {
 }
 ```
 
-If you have older lighttpd you have to use a chain (such as below), as explained [at this Stack Overflow answer](http://stackoverflow.com/questions/14536554/lighttpd-configuration-to-proxy-rewrite-from-one-domain-to-another).
+If you have older lighttpd, you have to use a chain (such as below), as explained [at this Stack Overflow answer](http://stackoverflow.com/questions/14536554/lighttpd-configuration-to-proxy-rewrite-from-one-domain-to-another).
 
 ```text
 $HTTP["url"] =~ "^/netdata/" {
@@ -29,7 +29,7 @@ then you can get away with just
 proxy.server  = ( "" => ( ( "host" => "127.0.0.1", "port" => 19999 )))
 ```
 
-Though if it's public facing you might then want to put some authentication on it. `htdigest` support looks like:
+Though if it's public facing, you might then want to put some authentication on it. `htdigest` support looks like:
 
 ```text
 auth.backend = "htdigest"

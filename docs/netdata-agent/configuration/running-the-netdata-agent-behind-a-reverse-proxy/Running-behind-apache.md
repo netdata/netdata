@@ -1,6 +1,6 @@
 # Running Netdata behind Apache's mod_proxy
 
-Below you can find instructions for configuring an apache server to:
+Below, you can find instructions for configuring an apache server to:
 
 1. Proxy a single Netdata via an HTTP and HTTPS virtual host.
 2. Dynamically proxy any number of Netdata servers.
@@ -148,12 +148,12 @@ _Assuming the main goal is to make Netdata running in HTTPS._
 1. Make a subdomain for Netdata on which you enable and force HTTPS - You can use a free Let's Encrypt certificate
 2. Go to "Apache & nginx Settings", and in the following section, add:
 
-  ```text
-  RewriteEngine on
-  RewriteRule (.*) http://localhost:19999/$1 [P,L]
-  ```
+   ```text
+   RewriteEngine on
+   RewriteRule (.*) http://localhost:19999/$1 [P,L]
+   ```
   
-3. Optional: If your server is remote, then just replace "localhost" with your actual hostname or IP, it just works.  
+3. Optional: If your server is remote, then replace "localhost" with your actual hostname or IP, it just works.  
 
 Repeat the operation for as many servers as you need.
 
@@ -218,7 +218,7 @@ Note: Changes are applied by reloading or restarting Apache.
 
 ## Configuration of Content Security Policy
 
-If you want to enable CSP within your Apache, you should consider some special requirements of the headers. Modify your configuration like that:
+If you want to enable CSP within your Apache, you should consider some special requirements for the headers. Modify your configuration like that:
 
 ```text
     Header always set Content-Security-Policy "default-src http: 'unsafe-inline' 'self' 'unsafe-eval'; script-src http: 'unsafe-inline' 'self' 'unsafe-eval'; style-src http: 'self' 'unsafe-inline'"
@@ -229,9 +229,9 @@ Note: Changes are applied by reloading or restarting Apache.
 ## Using Netdata with Apache's `mod_evasive` module
 
 The `mod_evasive` Apache module helps system administrators protect their web server from brute force and distributed
-denial of service attack (DDoS) attacks.
+denial-of-service attack (DDoS) attacks.
 
-Because Netdata sends a request to the web server for every chart update, it's normal to create 20-30 requests per
+Because Netdata sends a request to the web server for every chart update, it's normal to create 20–30 requests per
 second, per client. If you're using `mod_evasive` on your Apache web server, this volume of requests will trigger the
 module's protection, and your dashboard will become unresponsive. You may even begin to see 403 errors.
 
@@ -239,10 +239,10 @@ To mitigate this issue, you will need to change the value of the `DOSPageCount` 
 which can typically be found at `/etc/httpd/conf.d/mod_evasive.conf` or `/etc/apache2/mods-enabled/evasive.conf`.
 
 The `DOSPageCount` option sets the limit of the number of requests from a single IP address for the same page per page
-interval, which is usually 1 second. The default value is `2` requests per second. Clearly, Netdata's typical usage will
+interval, which is usually 1 second. The default value is `2` requests per second. Netdata's typical usage will
 exceed that threshold, and `mod_evasive` will add your IP address to a blocklist.
 
-Our users have found success by setting `DOSPageCount` to `30`. Try this, and raise the value if you continue to see 403
+Our users have found success by setting `DOSPageCount` to `30`. Try this and raise the value if you continue to see 403
 errors while accessing the dashboard.
 
 ```text
@@ -273,7 +273,7 @@ See issues [#2011](https://github.com/netdata/netdata/issues/2011) and
 
 ## Netdata configuration
 
-You might edit `/etc/netdata/netdata.conf` to optimize your setup a bit. For applying these changes you need to restart Netdata.
+You might edit `/etc/netdata/netdata.conf` to optimize your setup a bit. For applying these changes, you need to restart Netdata.
 
 ### Response compression
 
@@ -316,14 +316,14 @@ You can also use a unix domain socket. This will also provide a faster route bet
     bind to = unix:/tmp/netdata.sock
 ```
 
-Apache 2.4.24+ can not read from `/tmp` so create your socket in `/var/run/netdata`
+Apache 2.4.24+ can’t read from `/tmp` so create your socket in `/var/run/netdata`
 
 ```text
 [web]
     bind to = unix:/var/run/netdata/netdata.sock
 ```
 
-At the apache side, prepend the 2nd argument to `ProxyPass` with `unix:/tmp/netdata.sock|`, like this:
+At the apache side, prepend the second argument to `ProxyPass` with `unix:/tmp/netdata.sock|`, like this:
 
 ```text
 ProxyPass "/netdata/" "unix:/tmp/netdata.sock|http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
@@ -341,7 +341,7 @@ If your apache server is not on localhost, you can set:
 
 ## Prevent the double access.log
 
-apache logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
+Apache logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
 ```text
 [logs]
@@ -352,5 +352,5 @@ apache logs accesses and Netdata logs them too. You can prevent Netdata from gen
 
 Make sure the requests reach Netdata, by examining `/var/log/netdata/access.log`.
 
-1. if the requests do not reach Netdata, your apache does not forward them.
-2. if the requests reach Netdata but the URLs are wrong, you have not re-written them properly.
+1. if the requests don’t reach Netdata, your apache doesn’t forward them.
+2. if the requests reach Netdata but the URLs are wrong, you haven’t re-written them properly.

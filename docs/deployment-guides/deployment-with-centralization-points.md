@@ -1,10 +1,10 @@
 # Deployment with Centralization Points
 
-An observability centralization point can centralize both metrics and logs. The sending systems are called Children, while the receiving systems are called a Parents.
+An observability centralization point can centralize both metrics and logs. The sending systems are called Children, while the receiving systems are called Parents.
 
 When metrics and logs are centralized, the Children are never queried for metrics and logs. The Netdata Parents have all the data needed to satisfy queries.
 
-- **Metrics** are centralized by Netdata, with a feature we call **Streaming**. The Parents listen for incoming connections and permit access only to Children that connect to it with the right API key. Children are configured to push their metrics to the Parents and they initiate the connections to do so.
+- **Metrics** are centralized by Netdata, with a feature we call **Streaming**. The Parents listen for incoming connections and permit access only to Children that connect to it with the right API key. Children are configured to push their metrics to the Parents, and they initiate the connections to do so.
 
 - **Logs** are centralized with methodologies provided by `systemd-journald`. This involves installing `systemd-journal-remote` on both the Parent and the Children, and configuring the keys required for this communication.
 
@@ -16,7 +16,7 @@ When metrics and logs are centralized, the Children are never queried for metric
 |   Centrally dispatched alert notifications    |                                             Yes, at Netdata Cloud                                             |
 |         Data are exclusively on-prem          |                    Yes, Netdata Cloud queries Netdata Agents to satisfy dashboard queries.                    |
 
-A configuration with 2 observability centralization points, looks like this:
+A configuration with 2 observability centralization points looks like this:
 
 ```mermaid
 flowchart LR

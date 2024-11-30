@@ -24,7 +24,7 @@ One way we write empowering, educational content is by using a consistent voice 
 
 _Voice_ is like your personality, which doesn't really change day to day.
 
-_Tone_ is how you express your personality. Your expression changes based on your attitude or mood, or based on who
+_Tone_ is how you express your personality. Your expression changes based on your attitude or mood, or based on whom
 you're around. In writing, you reflect tone in your word choice, punctuation, sentence structure, or emoji.
 
 The same idea about voice and tone applies to organizations, too. Our voice shouldn't change much between two pieces of
@@ -35,7 +35,7 @@ content, no matter who wrote each, but the tone might be quite different based o
 Netdata's voice is authentic, passionate, playful, and respectful.
 
 - **Authentic** writing is honest and fact-driven. Focus on Netdata's strength while accurately communicating what
-  Netdata can and cannot do, and emphasize technical accuracy over hard sells and marketing jargon.
+  Netdata can and can’t do, and emphasize technical accuracy over hard sells and marketing jargon.
 - **Passionate** writing is strong and direct. Be a champion for the product or feature you're writing about, and let
   your unique personality and writing style shine.
 - **Playful** writing is friendly, thoughtful, and engaging. Don't take yourself too seriously, as long as it's not at
@@ -45,7 +45,7 @@ Netdata's voice is authentic, passionate, playful, and respectful.
 
 ### Tone
 
-Netdata's tone is fun and playful, but clarity and conciseness comes first. We also tend to be informal, and aren't
+Netdata's tone is fun and playful, but clarity and conciseness come first. We also tend to be informal, and aren't
 afraid of a playful joke or two.
 
 While we have general standards for voice and tone, we do want every individual's unique writing style to reflect in
@@ -61,14 +61,14 @@ of these are expanded into individual sections in
 the [language, grammar, and mechanics](#language-grammar-and-mechanics) section below.
 
 - Would this language make sense to someone who doesn't work here?
-- Could someone quickly scan this document and understand the material?
+- Could anyone quickly scan this document and understand the material?
 - Create an information hierarchy with key information presented first and clearly called out to improve clarity and readability.
 - Avoid directional language like "sidebar on the right of the page" or "header at the top of the page" since
   presentation elements may adapt for devices.
 - Use descriptive links rather than "click here" or "learn more".
 - Include alt text for images and image links.
 - Ensure any information contained within a graphic element is also available as plain text.
-- Avoid idioms that may not be familiar to the user or that may not make sense when translated.
+- Avoid idioms that may not be familiar to the user, or that may not make sense when translated.
 - Avoid local, cultural, or historical references that may be unfamiliar to users.
 - Prioritize active, direct language.
 - Avoid referring to someone's age unless it is directly relevant; likewise, avoid referring to people with age-related
@@ -85,7 +85,7 @@ the [language, grammar, and mechanics](#language-grammar-and-mechanics) section 
 
 ## Language, grammar, and mechanics
 
-To ensure Netdata's writing is clear, concise, and universal, we have established standards for language, grammar, and
+To ensure Netdata's writing is clear, concise, and universal, we’ve established standards for language, grammar, and
 certain writing mechanics. However, if you're writing about Netdata for an external publication, such as a guest blog
 post, follow that publication's style guide or standards, while keeping
 the [preferred spelling of Netdata terms](#netdata-specific-terms) in mind.
@@ -134,7 +134,7 @@ to say, "Netdata's one-line installer requires fewer steps than manually install
 A particular word, phrase, or metaphor you're familiar with might not translate well to the other cultures featured
 among Netdata's global community. We recommended you avoid slang or colloquialisms in your writing.
 
-In addition, don't use abbreviations that have not yet been defined in the content. See our section on
+In addition, don't use abbreviations that haven’t yet been defined in the content. See our section on
 [abbreviations](#abbreviations-acronyms-and-initialisms) for additional guidance.
 
 If you must use industry jargon, such as "mean time to resolution," define the term as clearly and concisely as you can.
@@ -162,7 +162,7 @@ capitalization. In summary:
 
 Whenever you refer to the company Netdata, Inc., or the open-source monitoring Agent the company develops, capitalize both words.
 
-However, if you are referring to a process, user, or group on a Linux system, use lowercase and fence the word in an
+However, if you’re referring to a process, user, or group on a Linux system, use lowercase and fence the word in an
 inline code block: `` `netdata` ``.
 
 |                 |                                                                                                |
@@ -222,7 +222,7 @@ before "and" or "or."
 
 ### Future releases or features
 
-Do not mention future releases or upcoming features in writing unless they have been previously communicated via a
+Do not mention future releases or upcoming features in writing unless they’ve been previously communicated via a
 public roadmap.
 
 In particular, documentation must describe, as accurately as possible, the Netdata Agent _as of the [latest
@@ -239,7 +239,7 @@ reader.
 | Not recommended | To install Netdata, click [here](/packaging/installer/README.md).                         |
 | **Recommended** | To install Netdata, read the [installation instructions](/packaging/installer/README.md). |
 
-Use links as often as required to provide necessary context. Blog posts and guides require fewer hyperlinks than
+Use links as often as required to provide the necessary context. Blog posts and guides require fewer hyperlinks than
 documentation.
 
 ### Contractions
@@ -310,7 +310,7 @@ our writing more universal, and users on `sudo`-less systems are generally alrea
 differently.
 
 For example, most users need to use `sudo` with the `edit-config` script, because the Netdata config directory is owned
-by the `netdata` user. Same goes for restarting the Netdata Agent with `systemctl`.
+by the `netdata` user. The same goes for restarting the Netdata Agent with `systemctl`.
 
 |                 |                                                                                                                                              |
 |-----------------|----------------------------------------------------------------------------------------------------------------------------------------------|
@@ -447,7 +447,7 @@ The following tables describe the standard spelling, capitalization, and usage o
 
 | Term                        | Definition                                                                                                                                                                                                                                                                                                                                                                                                            |
 |-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Connected Node**            | A node that you've proved ownership of by completing the [connecting to Cloud process](/src/claim/README.md). The claimed node will then appear in your Space and any Rooms you added it to.                                                                                                                                                                                                                          |
+| **Connected Node**          | A node that you've proved ownership of by completing the [connecting to Cloud process](/src/claim/README.md). The claimed node will then appear in your Space and any Rooms you added it to.                                                                                                                                                                                                                          |
 | **Netdata**                 | The company behind the open-source Netdata Agent and the Netdata Cloud web application. Never use _netdata_ or _NetData_. <br /><br />In general, focus on the user's goals, actions, and solutions rather than what the company provides. For example, write _Learn more about enabling alert notifications on your preferred platforms_ instead of _Netdata sends alert notifications to your preferred platforms_. |
 | **Netdata Agent**           | The free and open source [monitoring agent](https://github.com/netdata/netdata) that you can install on all of your distributed systems, whether they're physical, virtual, containerized, ephemeral, and more. The Agent monitors systems running Linux, Docker, Kubernetes, macOS, FreeBSD, and more, and collects metrics from hundreds of popular services and applications.                                      |
 | **Netdata Cloud**           | The web application hosted at [https://app.netdata.cloud](https://app.netdata.cloud) that helps you monitor an entire infrastructure of distributed systems in real time. <br /><br />Never use _Cloud_ without the preceding _Netdata_ to avoid ambiguity.                                                                                                                                                           |
@@ -463,5 +463,5 @@ The following tables describe the standard spelling, capitalization, and usage o
 | Term                        | Definition                                                                                                                                                                                                                  |
 |-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **filesystem**              | Use instead of _file system_.                                                                                                                                                                                               |
-| **pre-configured**           | The concept that many of Netdata's features come with sane defaults that users don't need to configure to find immediate value.                                                                                             |
+| **pre-configured**          | The concept that many of Netdata's features come with sane defaults that users don't need to configure to find immediate value.                                                                                             |
 | **real time**/**real-time** | Use _real time_ as a noun phrase, most often with _in_: _Netdata collects metrics in real time_. Use _real-time_ as an adjective: _Netdata collects real-time metrics from hundreds of supported applications and services. |
