@@ -33,6 +33,9 @@ int do_run_reboot_required(int update_every, usec_t dt) {
             if (!netdata_configured_host_prefix || !*netdata_configured_host_prefix || is_dir_mounted(filename) != 1) {
                 return 1;
             }
+        } else if (access("/usr/bin/dpkg", X_OK) != 0) {
+            // reboot-required only used by Debian-based systems
+            return 1;
         }
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/var/run/reboot-required");
