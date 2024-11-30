@@ -1579,6 +1579,7 @@ static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unu
 struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
     return (struct rrdeng_buffer_sizes) {
             .pgc         = pgc_aral_overhead() + pgc_aral_structures(),
+            .pgd         = pgd_aral_overhead() + pgd_aral_structures(),
             .mrg         = mrg_aral_overhead() + mrg_aral_structures(),
             .opcodes     = aral_overhead(rrdeng_main.cmd_queue.ar) + aral_structures(rrdeng_main.cmd_queue.ar),
             .handles     = aral_overhead(rrdeng_main.handles.ar) + aral_structures(rrdeng_main.handles.ar),

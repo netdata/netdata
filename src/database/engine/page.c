@@ -75,6 +75,8 @@ struct {
 #error "You need to update the slots reserved for storage tiers"
 #endif
 
+static struct aral_statistics aral_statistics_for_pgd = { 0 };
+
 static size_t aral_sizes_delta;
 static size_t aral_sizes_count;
 static size_t aral_sizes[] = {
@@ -97,6 +99,14 @@ static ARAL **arals = NULL;
 #define arals_slot(slot, partition) ((partition) * aral_sizes_count + (slot))
 static ARAL *pgd_get_aral_by_size_and_partition(size_t size, size_t partition);
 
+size_t pgd_aral_structures(void) {
+    return aral_structures(pgd_alloc_globals.aral_pgd[0]);
+}
+
+size_t pgd_aral_overhead(void) {
+    return aral_overhead(pgd_alloc_globals.aral_pgd[0]);
+}
+
 int aral_size_sort_compare(const void *a, const void *b) {
     size_t size_a = *(const size_t *)a;
     size_t size_b = *(const size_t *)b;
@@ -108,8 +118,6 @@ void pgd_init_arals(void) {
 
     for(size_t i = 0; i < RRD_STORAGE_TIERS ;i++)
         aral_sizes[i] = tier_page_size[i];
-
-    aral_sizes[RRD_STORAGE_TIERS] = pgc_sizeof_page();
 
     size_t max_delta = 0;
     for(size_t i = 0; i < aral_sizes_count ;i++) {
@@ -152,7 +160,7 @@ void pgd_init_arals(void) {
                 aral_sizes[slot],
                 65536 / (aral_sizes[slot] + sizeof(uintptr_t)),
                 256 * 1024 / (aral_sizes[slot] + sizeof(uintptr_t)),
-                pgc_aral_statistics(),
+                &aral_statistics_for_pgd,
                 NULL, NULL, false, false);
         }
     }

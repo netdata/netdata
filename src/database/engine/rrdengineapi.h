@@ -218,6 +218,7 @@ struct rrdeng_buffer_sizes {
     size_t deol;
     size_t pd;
     size_t pgc;
+    size_t pgd;
     size_t mrg;
 #ifdef PDC_USE_JULYL
     size_t julyl;

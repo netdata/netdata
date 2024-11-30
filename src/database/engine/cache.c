@@ -1970,10 +1970,6 @@ static void *evict_thread(void *ptr) {
 // ----------------------------------------------------------------------------
 // public API
 
-size_t pgc_sizeof_page(void) {
-    return sizeof(PGC_PAGE);
-}
-
 PGC *pgc_create(const char *name,
                 size_t clean_size_bytes,
                 free_clean_page_callback pgc_free_cb,
@@ -2070,10 +2066,6 @@ PGC *pgc_create(const char *name,
     }
 
     return cache;
-}
-
-struct aral_statistics *pgc_aral_statistics(void) {
-    return &aral_statistics_for_pgc;
 }
 
 size_t pgc_aral_structures(void) {
