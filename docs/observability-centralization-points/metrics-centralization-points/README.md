@@ -1,4 +1,3 @@
-
 # Metrics Centralization Points (Netdata Parents)
 
 ```mermaid
@@ -16,7 +15,7 @@ Netdata **Streaming and Replication** copies the recent past samples (replicatio
 
 Each production system (Netdata Child) can stream to **only one** Netdata Parent at a time. The configuration allows configuring multiple Netdata Parents for high availability, but only the first found working will be used.
 
-Netdata Parents receive metric samples **from multiple** production systems (Netdata Children) and have the option to re-stream them to another Netdata Parent. This allows building an infinite hierarchy of Netdata Parents. It also enables the configuration of Netdata Parents Clusters, for high availability.
+Netdata Parents receive metric samples **from multiple** production systems (Netdata Children) and can re-stream them to another Netdata Parent. This allows building an infinite hierarchy of Netdata Parents. It also enables the configuration of Netdata Parents Clusters, for high availability.
 
 |           Feature           |                                                         Netdata Child (production system)                                                          |                      Netdata Parent (centralization point)                      |
 |:---------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------------------:|:-------------------------------------------------------------------------------:|
@@ -25,7 +24,7 @@ Netdata Parents receive metric samples **from multiple** production systems (Net
 |   Alerts & Notifications    |                                                       Can be disabled (enabled by default).                                                        |  Runs health checks and sends notifications for all systems aggregated to it.   |
 |      API and Dashboard      |                                                       Can be disabled (enabled by default).                                                        | Serves the dashboard for all systems aggregated to it, using its own retention. |
 |      Exporting Metrics      |                                                         Not required (enabled by default).                                                         |  Exports the samples of all metrics collected by the systems aggregated to it.  |
-|      Netdata Functions      |                                                            Netdata Child must be online.                                                           |          Forwards Functions requests to the Children connected to it.           |
+|      Netdata Functions      |                                                           Netdata Child must be online.                                                            |          Forwards Functions requests to the Children connected to it.           |
 | Connection to Netdata Cloud |                                                                   Not required.                                                                    |  Each Netdata Parent registers to Netdata Cloud all systems aggregated to it.   |
 
 ## Supported Configurations
@@ -37,11 +36,11 @@ For Netdata Children:
 
 For Netdata Parents:
 
-1. **Standalone**: The Parent is standalone, either the only Parent available in the infrastructure, or the top-most of an hierarchy of Parents.
-2. **Cluster**: The Parent is part of a cluster of Parents, all having the same data, from the same Children. A Cluster of Parents offers high-availability.
+1. **Standalone**: The Parent is standalone, either the only Parent available in the infrastructure, or the top-most of a hierarchy of Parents.
+2. **Cluster**: The Parent is part of a cluster of Parents, all having the same data from the same Children. A Cluster of Parents offers high-availability.
 3. **Proxy**: The Parent receives metrics and stores them locally, but it also forwards them to a Grand Parent.
 
-A Cluster is configured as a number of circular **Proxies**, ie. each of the nodes in a cluster has all the others configured as its Parents. So, if multiple levels of metrics centralization points (Netdata Parents) are required, only the top-most level can be a cluster.
+A Cluster consists of nodes configured as circular **Proxies**, where each node acts as a Parent to all others. When using multiple levels of centralization, only the top level can be configured as a cluster.
 
 ## Best Practices
 

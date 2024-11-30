@@ -2,11 +2,11 @@
 
 This page will guide you through creating a **passive** journal centralization setup using **self-signed certificates** for encryption and authorization.
 
-Once you centralize your infrastructure logs to a server, Netdata will automatically detect all the logs from all servers and organize them in sources. With the setup described in this document, on recent systemd versions, Netdata will automatically name all remote sources using the names of the clients, as they are described at their certificates (on older versions, the names will be IPs or reverse DNS lookups of the IPs).
+Once you centralize your infrastructure logs to a server, Netdata will automatically detect all the logs from all servers and organize them in sources. With the setup described in this document, on recent systemd versions, Netdata will automatically name all remote sources using the names of the clients, as they’re described at their certificates (on older versions, the names will be IPs or reverse DNS lookups of the IPs).
 
 A **passive** journal server waits for clients to push their metrics to it, so in this setup we will:
 
-1. configure a certificates authority and issue self-signed certificates for your servers.
+1. configure a certificate authority and issue self-signed certificates for your servers.
 2. configure `systemd-journal-remote` on the server, to listen for incoming connections.
 3. configure `systemd-journal-upload` on the clients, to push their logs to the server.
 
@@ -16,7 +16,7 @@ Keep in mind that the authorization involved works like this:
    So, **the server will accept logs from any client having a valid certificate**.
 2. The client (`systemd-journal-upload`) validates that the receiver (`systemd-journal-remote`) uses a trusted certificate (like the server does) and it also checks that the hostname or IP of the URL specified to its configuration, matches one of the names or IPs of the server it gets connected to. So, **the client does a validation that it connected to the right server**, using the URL hostname against the names and IPs of the server on its certificate.
 
-This means, that if both certificates are issued by the same certificate authority, only the client can potentially reject the server.
+This means that if both certificates are issued by the same certificate authority, only the client can potentially reject the server.
 
 ## Self-signed certificates
 
@@ -24,7 +24,7 @@ To simplify the process of creating and managing self-signed certificates, we ha
 
 This helps to also automate the distribution of the certificates to your servers (it generates a new bash script for each of your servers, which includes everything required, including the certificates).
 
-We suggest to keep this script and all the involved certificates at the journals centralization server, in the directory `/etc/ssl/systemd-journal`, so that you can make future changes as required. If you prefer to keep the certificate authority and all the certificates at a more secure location, just use the script on that location.
+We suggest keeping this script and all the involved certificates at the journal centralization server, in the directory `/etc/ssl/systemd-journal`, so that you can make future changes as required. If you prefer to keep the certificate authority and all the certificates at a more secure location, use the script on that location.
 
 On the server that will issue the certificates (usually the centralization server), do the following:
 
@@ -52,7 +52,7 @@ Where:
 
 Repeat this process to create the certificates for all your servers. You can add servers as required, at any time in the future.
 
-Existing certificates are never re-generated. Typically certificates need to be revoked and new ones to be issued. But `systemd-journal-remote` tools do not support handling revocations. So, the only option you have to re-issue a certificate is to delete its files in `/etc/ssl/systemd-journal` and run the script again to create a new one.
+Existing certificates are never re-generated. Typically, certificates need to be revoked and new ones to be issued. But `systemd-journal-remote` tools don’t support handling revocations. So, the only option you have to re-issue a certificate is to delete its files in `/etc/ssl/systemd-journal` and run the script again to create a new one.
 
 Once you run the script of each of your servers, in `/etc/ssl/systemd-journal` you will find shell scripts named `runme-on-XXX.sh`, where `XXX` are the canonical names of your servers.
 
@@ -64,13 +64,13 @@ You can copy and paste (or `scp`) these scripts on your server and each of your 
 sudo scp /etc/ssl/systemd-journal/runme-on-XXX.sh XXX:/tmp/
 ```
 
-For the rest of this guide, we assume that you have copied the right `runme-on-XXX.sh` at the `/tmp` of all the servers for which you issued certificates.
+For the rest of this guide, we assume that you’ve copied the right `runme-on-XXX.sh` at the `/tmp` of all the servers for which you issued certificates.
 
 ### note about certificates file permissions
 
 It is worth noting that `systemd-journal` certificates need to be owned by `systemd-journal-remote:systemd-journal`.
 
-Both the user `systemd-journal-remote` and the group `systemd-journal` are automatically added by the `systemd-journal-remote` package. However, `systemd-journal-upload` (and `systemd-journal-gatewayd` - that is not used in this guide) use dynamic users. Thankfully they are added to the `systemd-journal` remote group.
+Both the user `systemd-journal-remote` and the group `systemd-journal` are automatically added by the `systemd-journal-remote` package. However, `systemd-journal-upload` (and `systemd-journal-gatewayd` - that is not used in this guide) use dynamic users. Thankfully they’re added to the `systemd-journal` remote group.
 
 So, by having the certificates owned by `systemd-journal-remote:systemd-journal`, satisfies both `systemd-journal-remote` which is not in the `systemd-journal` group, and `systemd-journal-upload` (and `systemd-journal-gatewayd`) which use dynamic users.
 
@@ -200,7 +200,7 @@ Here it is in action, in Netdata:
 
 ## Verify it works
 
-To verify the central server is receiving logs, run this on the central server:
+To verify that the central server is receiving logs, run this on the central server:
 
 ```bash
 sudo ls -l /var/log/journal/remote/

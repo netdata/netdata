@@ -65,7 +65,7 @@ Check [RAM Requirements](/docs/netdata-agent/sizing-netdata-agents/ram-requireme
    Netdata uses a custom 32-bit floating-point format tailored for efficient storage of time-series data, along with an anomaly bit. This, combined with a fixed-step database design, enables efficient storage and retrieval of data.
 
    | Tier                              | Approximate Sample Size (bytes) |
-   |-----------------------------------|---------------------------------|
+      |-----------------------------------|---------------------------------|
    | High-resolution tier (per-second) | 0.6                             |
    | Mid-resolution tier (per-minute)  | 6                               |
    | Low-resolution tier (per-hour)    | 18                              |

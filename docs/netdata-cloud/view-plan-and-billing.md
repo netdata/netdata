@@ -6,7 +6,7 @@ For more info visit the [Netdata Cloud Pricing](https://netdata.cloud/pricing) p
 
 ## Plans
 
-Plans define the features and customization options available within a Space. Different Spaces can have different plans, giving you flexibility based on your needs.
+Plans define the features and customization options available within Space. Different Spaces can have different plans, giving you flexibility based on your needs.
 
 Netdata Cloud plans (excluding Community) involve:
 
@@ -44,7 +44,7 @@ Please refer to the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page 
 ### Prerequisites
 
 - A Netdata Cloud account
-- Admin or Billing user access to the Space
+- Admin or Billing user access to Space
 
 ### Steps
 
@@ -53,26 +53,26 @@ Please refer to the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page 
 1. Navigate to **Space settings** (the cog above your profile icon).
 2. Select the **Plan & Billing** tab.
 3. You'll see:
-   - **Credit** amount, if applicable, usable for future invoices or subscription changes. More on this at [Plan changes and credit balance](/docs/netdata-cloud/view-plan-and-billing.md#plan-changes-and-credit-balance).
-   - **Billing email** linked to your subscription, where all related notifications are sent.
-   - A link to the **Billing options and Invoices** in our billing provider's Customer Portal, where you can:
-     - Manage subscriptions and payment methods.
-     - Update billing information such as email, address, phone number, and Tax ID.
-     - View invoice history.
-   - The **Change plan** button, showing details of your current plan with options to upgrade or cancel.
-   - Your **Usage chart**, displaying daily and period counts of live nodes and how they relate to your billing.
+    - **Credit** amount, if applicable, usable for future invoices or subscription changes. More on this at [Plan changes and credit balance](/docs/netdata-cloud/view-plan-and-billing.md#plan-changes-and-credit-balance).
+    - **Billing email** linked to your subscription, where all related notifications are sent.
+    - A link to the **Billing options and Invoices** in our billing provider's Customer Portal, where you can:
+        - Manage subscriptions and payment methods.
+        - Update billing information such as email, address, phone number, and Tax ID.
+        - View invoice history.
+    - The **Change plan** button, showing details of your current plan with options to upgrade or cancel.
+    - Your **Usage chart**, displaying daily and period counts of live nodes and how they relate to your billing.
 
 #### Update a Subscription Plan
 
 1. In the **Plan & Billing** tab, click **Change plan** to see:
-   - Billing frequency and committed nodes (if applicable).
-   - Current billing information, which must be updated through our billing provider's Customer Portal via **Change billing info and payment method** link.
-   - Options to enter a promotion code and a breakdown of charges, including subscription total, applicable discounts, credit usage, tax details, and total payable amount.
+    - Billing frequency and committed nodes (if applicable).
+    - Current billing information, which must be updated through our billing provider's Customer Portal via **Change billing info and payment method** link.
+    - Options to enter a promotion code and a breakdown of charges, including subscription total, applicable discounts, credit usage, tax details, and total payable amount.
 
 > **Note**
 >
 > - Checkout is performed directly if there's an active plan.
-> - Plan changes, including downgrades or cancellations, may impact notification settings or user access. More details at [Plan changes and credit balance](/docs/netdata-cloud/view-plan-and-billing.md#plan-changes-and-credit-balance).
+> - Plan changes, including downgrades or cancellations, may impact notification settings or user access. More details on [Plan changes and credit balance](/docs/netdata-cloud/view-plan-and-billing.md#plan-changes-and-credit-balance).
 
 ## FAQ
 

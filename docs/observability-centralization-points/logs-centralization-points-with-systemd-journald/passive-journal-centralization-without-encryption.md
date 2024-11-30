@@ -2,7 +2,7 @@
 
 This page will guide you through creating a passive journal centralization setup without the use of encryption.
 
-Once you centralize your infrastructure logs to a server, Netdata will automatically detects all the logs from all servers and organize them in sources.
+Once you centralize your infrastructure logs to a server, Netdata will automatically detect all the logs from all servers and organize them in sources.
 With the setup described in this document, journal files are identified by the IPs of the clients sending the logs. Netdata will automatically do
 reverse DNS lookups to find the names of the server and name the sources on the dashboard accordingly.
 
@@ -101,7 +101,7 @@ sudo systemctl start systemd-journal-upload
 
 ## Verify it works
 
-To verify the central server is receiving logs, run this on the central server:
+To verify that the central server is receiving logs, run this on the central server:
 
 ```bash
 sudo ls -l /var/log/journal/remote/

@@ -2,17 +2,20 @@
 
 When planning the deployment of Observability Centralization Points, the following factors need consideration:
 
-1. **Volume of Monitored Systems**: The number of systems being monitored dictates the scaling and number of centralization points required. Larger infrastructures may necessitate multiple centralization points to manage the volume of data effectively and maintain performance.
+1. **Volume of Monitored Systems**: The number of systems being monitored dictates the scaling and number of centralization points required. Larger infrastructures may require multiple centralization points to manage the volume of data effectively and maintain performance.
 
 2. **Cost of Data Transfer**: Particularly in multi-cloud or hybrid environments, the location of centralization points can significantly impact egress bandwidth costs. Strategically placing centralization points in each data center or cloud region can minimize these costs by reducing the need for cross-network data transfer.
 
 3. **Usability without Netdata Cloud**: When not using Netdata Cloud, observability with Netdata is simpler when there are fewer centralization points, making it easier to remember where observability is and how to access it.
 
-4. When Netdata Cloud is used, infrastructure level views are provided independently of the centralization points, so it is preferable to centralize as required for security (e.g. internet access), cost control (e.g. egress bandwidth, dedicated resources) and operational efficiency (regions, services or teams isolation).
+4. Netdata Cloud provides infrastructure-wide views regardless of centralization points, allowing you to optimize your setup based on:
+    - Security requirements (such as internet access controls)
+    - Cost management (including bandwidth and resource allocation)
+    - Operational needs (like regional, service, or team isolation)
 
 ## Cost Optimization
 
-Netdata has been designed for observability cost optimization. For optimal cost we recommend using Netdata Cloud and multiple independent observability centralization points:
+Netdata has been designed for observability cost optimization. For optimal cost, we recommend using Netdata Cloud and multiple independent observability centralization points:
 
 - **Scale out**: add more, smaller centralization points to distribute the load. This strategy provides the least resource consumption per unit of workload, maintaining optimal performance and resource efficiency across your observability infrastructure.
 
@@ -20,13 +23,15 @@ Netdata has been designed for observability cost optimization. For optimal cost 
 
 - **Unified or separate centralization for logs and metrics**: Netdata allows centralizing metrics and logs together or separately. Consider factors such as access frequency, data retention policies, and compliance requirements to enhance performance and reduce costs.
 
-- **Decentralized configuration management**: each Netdata centralization point can have its own unique configuration for retention and alerts. This enables 1) finer control on infrastructure costs and 2) localized control for separate services or teams.
+- **Decentralized configuration management**: each Netdata centralization point can have its own unique configuration for retention and alerts. This enables:
+    - Finer control on infrastructure costs
+    - Localized control for separate services or teams
 
 ## Pros and Cons
 
 Compared to other observability solutions, the design of Netdata offers:
 
-- **Enhanced Scalability and Flexibility**: Netdata's support for multiple independent observability centralization points allows for a more scalable and flexible architecture. This feature is particularly advantageous in distributed and complex environments, enabling tailored observability strategies that can vary by region, service, or team requirements.
+- **Enhanced Scalability and Flexibility**: Netdata's support for multiple independent observability centralization points allows for a more scalable and flexible architecture. This feature is particularly helpful in distributed and complex environments, enabling tailored observability strategies that can vary by region, service, or team requirements.
 
 - **Resilience and Fault Tolerance**: The ability to deploy multiple centralization points also contributes to greater system resilience and fault tolerance. Replication is a native feature of Netdata centralization points, so in the event of a failure at one centralization point, others can continue to function, ensuring continuous observability.
 

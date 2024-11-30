@@ -32,11 +32,11 @@ You can read more about the different options in the [Alerts reference documenta
 ### Alerting Conditions
 
 - **Thresholds**: Set thresholds for warning and critical Alert states, specifying whether the Alert should trigger above or below these thresholds. Advanced settings allow for custom formulas.
-  - **Recovery Thresholds**: Set thresholds for downgrading the Alert from critical to warning or from warning to clear.
+- **Recovery Thresholds**: Set thresholds for downgrading the Alert from critical to warning or from warning to clear.
 - **Check Interval**: Define how frequently the health check should run.
 - **Delay Notifications**: Manage notification delays for Alert escalations or de-escalations.
-- **Agent Specific Options**: Options exclusive to the Netdata Agent, like repeat notification frequencies and notification recipients.
-  - **Custom Exec Script**: Define custom scripts to execute when an Alert triggers.
+- **Agent-Specific Options**: Options exclusive to the Netdata Agent, like repeat notification frequencies and notification recipients.
+- **Custom Exec Script**: Define custom scripts to execute when an Alert triggers.
 
 ### Alert Name, Description, and Summary Section
 

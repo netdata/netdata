@@ -17,7 +17,7 @@ Netdata collects usage information via two different channels:
 - **Agent dashboard**: We use the [PostHog JavaScript integration](https://posthog.com/docs/integrations/js-integration) (with sensitive event attributes overwritten to be anonymized) to send product usage events when you access an [Agent's dashboard](/docs/dashboards-and-charts/README.md).
 - **Agent backend**: The `netdata` daemon executes the [`anonymous-statistics.sh`](https://github.com/netdata/netdata/blob/6469cf92724644f5facf343e4bdd76ac0551a418/daemon/anonymous-statistics.sh.in) script when Netdata starts, stops cleanly, or fails.
 
-You can opt-out from sending anonymous statistics to Netdata through three different [opt-out mechanisms](#opt-out).
+You can opt out from sending anonymous statistics to Netdata through three different [opt-out mechanisms](#opt-out).
 
 ## Agent Dashboard - PostHog JavaScript
 
@@ -68,7 +68,7 @@ directory`, which is usually `/usr/libexec/netdata/plugins.d`.
 
 ## Opt-out
 
-You can opt-out from sending anonymous statistics to Netdata through three different opt-out mechanisms:
+You can opt out from sending anonymous statistics to Netdata through three different opt-out mechanisms:
 
 **Create a file called `.opt-out-from-anonymous-statistics`.** This empty file, stored in your Netdata configuration
 directory (usually `/etc/netdata`), immediately stops the statistics script from running, and works with any type of

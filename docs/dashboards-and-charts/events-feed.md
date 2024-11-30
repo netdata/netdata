@@ -61,14 +61,14 @@ At a high-level view, these are the domains from which the Events feed will prov
 
 ## Who can access the events?
 
-All users will be able to see events from the Topology and Alerts domain but Auditing events, once these are added, will only be accessible to administrators. For more details check the [Netdata Role-Based Access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+All users will be able to see events from the Topology and Alerts domain, but Auditing events, once these are added, will only be accessible to administrators. For more details, check the [Netdata Role-Based Access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
 ## How to use the events feed
 
 1. Click on the **Events** tab (located near the top of your screen)
 2. You will be presented with a table listing the events that occurred from the timeframe defined on the [date time picker](/docs/dashboards-and-charts/visualization-date-and-time-controls.md#date-and-time-selector)
-3. You can use the filtering capabilities available on right-hand bar to slice through the results provided
+3. You can use the filtering capabilities available on the right-hand bar to slice through the results provided
 
 > **Note**
 >
-> When you try to query a longer period than what your space allows you will see an error message highlighting that you are querying data outside your plan.
+> When you try to query a longer period than what your space allows, you will see an error message highlighting that you are querying data outside your plan.

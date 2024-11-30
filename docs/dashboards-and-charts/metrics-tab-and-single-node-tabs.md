@@ -16,10 +16,10 @@ On the right-hand side, there is a bar that:
 
 - Allows for quick navigation through the sections of the dashboard
 - Provides a filtering mechanism that can filter charts by:
-  - Host labels
-  - Node status
-  - Netdata version
-  - Individual nodes
+    - Host labels
+    - Node status
+    - Netdata version
+    - Individual nodes
 - Presents the active alerts for the Room
 
 From this bar you can also view the maximum chart anomaly rate on each menu section by clicking the `AR%` button.

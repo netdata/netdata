@@ -9,7 +9,7 @@ thousands of metrics, you may want to alter your experience based on a particula
 
 ## Dashboard settings
 
-To change dashboard settings, click the on the **settings** icon
+To change dashboard settings, click on the **settings** icon
 ![Import icon](https://raw.githubusercontent.com/netdata/netdata-ui/98e31799c1ec0983f433537ff16d2ac2b0d994aa/src/components/icon/assets/gear.svg)
 in the top panel.
 

@@ -4,8 +4,8 @@ Netdata Cloud's role-based-access mechanism allows you to control what functiona
 
 ## What roles are available?
 
-With the advent of the paid plans we revamped the roles to cover needs expressed by Netdata users, like providing more limited access to their customers, or
-being able to join any Room. We also aligned the offered roles to the target audience of each plan. The end result is the following:
+With the advent of the paid plans, we revamped the roles to cover needs expressed by Netdata users, like providing more limited access to their customers, or
+being able to join any Room. We also aligned the offered roles to the target audience of each plan. The result is the following:
 
 | **Role**                                                                                                                                                                                  | **Community**      | **Homelab**        | **Business**       | **Enterprise On-Premise** |
 |:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------|:-------------------|:-------------------|:--------------------------|
@@ -18,7 +18,7 @@ being able to join any Room. We also aligned the offered roles to the target aud
 
 ## Which functionalities are available for each role?
 
-In more detail, you can find on the following tables which functionalities are available for each role on each domain.
+In more detail, you can find on the following tables which functionalities are available for each role in each domain.
 
 ### Space Management
 

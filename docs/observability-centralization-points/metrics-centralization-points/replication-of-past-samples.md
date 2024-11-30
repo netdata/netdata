@@ -6,7 +6,7 @@ The same replication mechanism is used between Netdata Parents (the sending Netd
 
 ## Replication Limitations
 
-The current implementation is optimized to replicate small durations and have minimal impact during reconnects. As a result it has the following limitations:
+The current implementation is optimized to replicate small durations and have minimal impact during reconnecting. As a result, it has the following limitations:
 
 1. Replication can only append samples to metrics. Only missing samples at the end of each time-series are replicated.
 
@@ -49,9 +49,9 @@ On the receiving side (Netdata Parent):
 
 On the sending side (Netdata Children, or Netdata Parent when parents are clustered):
 
-- `[db].replication threads` controls how many concurrent threads will be replicating metrics. The default is 1. Usually the performance is about 2 million samples per second per thread, so increasing this number may allow replication to progress faster between Netdata Parents.
+- `[db].replication threads` controls how many concurrent threads will be replicating metrics. The default is 1. Usually the performance is about two million samples per second per thread, so increasing this number may allow replication to progress faster between Netdata Parents.
 
-- `[db].cleanup obsolete charts after` controls for how much time after metrics stop being collected will not be available for replication. The default is 1 hour (3600 seconds). If you plan to have scheduled maintenance on Netdata Parents of more than 1 hour, we recommend increasing this setting. Keep in mind however, that increasing this duration in highly ephemeral environments can have an impact on RAM utilization, since metrics will be considered as collected for longer durations.
+- `[db].cleanup obsolete charts after` controls for how much time after metrics stop being collected will not be available for replication. The default is 1 hour (3600 seconds). If you plan to have scheduled maintenance on Netdata Parents of more than 1 hour, we recommend increasing this setting. Keep in mind, however, that increasing this duration in highly ephemeral environments can have an impact on RAM utilization, since metrics will be considered as collected for longer durations.
 
 ## Monitoring Replication Progress
 

@@ -1,6 +1,6 @@
 # Nodes tab
 
-The nodes tab provides a summarized view of your [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#rooms), allowing you to view quick information per node.
+The Nodes tab provides a summarized view of your [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#rooms), allowing you to view quick information per node.
 
 > **Tip**  
 >
@@ -22,7 +22,7 @@ In the top right-hand corner, you can:
 Each node row allows you to:
 
 - View the node's status
-- Go to a single node dashboard, by clicking the node name
+- Go to a single node dashboard by clicking the node name
 - View information about the node, along with a button to display more in the right-hand sidebar
 - View active alerts for the node
 - View Machine Learning status
