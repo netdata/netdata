@@ -19,6 +19,11 @@
 // ideal to have the same overhead as libc is 4k
 #define ARAL_MAX_PAGE_SIZE_MALLOC (65*1024)
 
+// we don't need alignof(max_align_t) for normal C structures
+// alignof(uintptr_r) is sufficient for our use cases
+// #define SYSTEM_REQUIRED_ALIGNMENT (alignof(max_align_t))
+#define SYSTEM_REQUIRED_ALIGNMENT (alignof(uintptr_t))
+
 typedef struct aral_free {
     size_t size;
     struct aral_free *next;
@@ -55,6 +60,10 @@ typedef enum {
 
 struct aral {
     struct {
+        /* alignas(64) */ size_t allocators; // the number of threads currently trying to allocate memory
+    } atomic;
+
+    struct {
         char name[ARAL_MAX_NAME + 1];
 
         ARAL_OPTIONS options;
@@ -77,7 +86,7 @@ struct aral {
     } config;
 
     struct {
-        SPINLOCK spinlock;
+        alignas(64) SPINLOCK spinlock;
         size_t file_number;             // for mmap
         struct aral_page *pages;        // linked list of pages
 
@@ -88,14 +97,10 @@ struct aral {
     } aral_lock;
 
     struct {
-        SPINLOCK spinlock;
+        /* alignas(64) */ SPINLOCK spinlock;
         size_t allocating_elements;     // currently allocating elements
         size_t allocation_size;         // current / next allocation size
     } adders;
-
-    struct {
-        size_t allocators;              // the number of threads currently trying to allocate memory
-    } atomic;
 
     struct aral_statistics *stats;
 };
@@ -121,12 +126,8 @@ struct aral_statistics *aral_get_statistics(ARAL *ar) {
     return ar->stats;
 }
 
-#define ARAL_NATURAL_ALIGNMENT  (sizeof(uintptr_t) * 2)
-static inline size_t natural_alignment(size_t size, size_t alignment) {
-    if(unlikely(size % alignment))
-        size = size + alignment - (size % alignment);
-
-    return size;
+static inline size_t memory_alignment(size_t size, size_t alignment) {
+    return (size + alignment - 1) & ~(alignment - 1);
 }
 
 static size_t aral_align_alloc_size(ARAL *ar, uint64_t size) {
@@ -471,7 +472,7 @@ void *aral_callocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAM
 }
 
 void *aral_mallocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
-#ifdef FSANITIZE_ADDRESS
+#if defined(FSANITIZE_ADDRESS)
     return mallocz(ar->config.requested_element_size);
 #endif
 
@@ -623,7 +624,7 @@ static inline void aral_move_page_with_free_list___aral_lock_needed(ARAL *ar, AR
 }
 
 void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
-#ifdef FSANITIZE_ADDRESS
+#if defined(FSANITIZE_ADDRESS)
     freez(ptr);
     return;
 #endif
@@ -704,18 +705,18 @@ void aral_destroy_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS
     freez(ar);
 }
 
-size_t aral_element_size(ARAL *ar) {
+size_t aral_requested_element_size(ARAL *ar) {
     return ar->config.requested_element_size;
 }
 
-size_t aral_element_size_actual(ARAL *ar) {
+size_t aral_actual_element_size(ARAL *ar) {
     return ar->config.element_size;
 }
 
-size_t aral_allocation_slot_size(size_t requested_size, bool usable) {
+size_t aral_allocation_slot_size(size_t requested_element_size, bool usable) {
     // we need to add a page pointer after the element
     // so, first align the element size to the pointer size
-    size_t element_size = natural_alignment(requested_size, sizeof(uintptr_t));
+    size_t element_size = memory_alignment(requested_element_size, sizeof(uintptr_t));
 
     // then add the size of a pointer to it
     element_size += sizeof(uintptr_t);
@@ -725,7 +726,7 @@ size_t aral_allocation_slot_size(size_t requested_size, bool usable) {
         element_size = sizeof(ARAL_FREE);
 
     // and finally align it to the natural alignment
-    element_size = natural_alignment(element_size, ARAL_NATURAL_ALIGNMENT);
+    element_size = memory_alignment(element_size, SYSTEM_REQUIRED_ALIGNMENT);
 
     if(usable)
         return element_size - sizeof(uintptr_t);
@@ -773,7 +774,8 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
         fatal("ARAL: '%s' failed to calculate properly page_ptr_offset: "
               "element size %zu, sizeof(uintptr_t) %zu, natural alignment %zu, "
               "final element size %zu, page_ptr_offset %zu",
-              ar->config.name, ar->config.requested_element_size, sizeof(uintptr_t), ARAL_NATURAL_ALIGNMENT,
+              ar->config.name, ar->config.requested_element_size, sizeof(uintptr_t),
+            SYSTEM_REQUIRED_ALIGNMENT,
               ar->config.element_size, ar->config.page_ptr_offset);
 
     //netdata_log_info("ARAL: element size %zu, sizeof(uintptr_t) %zu, natural alignment %zu, final element size %zu, page_ptr_offset %zu",
@@ -868,8 +870,9 @@ ARAL *aral_by_size_acquire(size_t size) {
         ar = aral_by_size_globals.array[size].ar;
         aral_by_size_globals.array[size].refcount++;
 
-        internal_fatal(aral_element_size(ar) != size, "DICTIONARY: aral has size %zu but we want %zu",
-                       aral_element_size(ar), size);
+        internal_fatal(
+            aral_requested_element_size(ar) != size, "DICTIONARY: aral has size %zu but we want %zu",
+            aral_requested_element_size(ar), size);
     }
 
     if(!ar) {
@@ -894,7 +897,7 @@ ARAL *aral_by_size_acquire(size_t size) {
 }
 
 void aral_by_size_release(ARAL *ar) {
-    size_t size = aral_element_size(ar);
+    size_t size = aral_requested_element_size(ar);
 
     if(size <= ARAL_BY_SIZE_MAX_SIZE) {
         spinlock_lock(&aral_by_size_globals.spinlock);

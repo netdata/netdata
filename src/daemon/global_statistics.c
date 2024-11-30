@@ -72,8 +72,9 @@ static struct global_statistics {
 
     uint64_t tier0_hot_gorilla_buffers;
 
-    uint64_t tier0_disk_compressed_bytes;
-    uint64_t tier0_disk_uncompressed_bytes;
+    uint64_t gorilla_tier0_disk_actual_bytes;
+    uint64_t gorilla_tier0_disk_optimal_bytes;
+    uint64_t gorilla_tier0_disk_original_bytes;
 
     uint64_t db_points_stored_per_tier[RRD_STORAGE_TIERS];
 
@@ -92,8 +93,9 @@ static struct global_statistics {
         .api_data_result_points_generated = 0,
 
         .tier0_hot_gorilla_buffers = 0,
-        .tier0_disk_compressed_bytes = 0,
-        .tier0_disk_uncompressed_bytes = 0,
+        .gorilla_tier0_disk_actual_bytes = 0,
+        .gorilla_tier0_disk_optimal_bytes = 0,
+        .gorilla_tier0_disk_original_bytes = 0,
 };
 
 void global_statistics_rrdset_done_chart_collection_completed(size_t *points_read_per_tier_array) {
@@ -142,12 +144,10 @@ void global_statistics_gorilla_buffer_add_hot() {
     __atomic_fetch_add(&global_statistics.tier0_hot_gorilla_buffers, 1, __ATOMIC_RELAXED);
 }
 
-void global_statistics_tier0_disk_compressed_bytes(uint32_t size) {
-    __atomic_fetch_add(&global_statistics.tier0_disk_compressed_bytes, size, __ATOMIC_RELAXED);
-}
-
-void global_statistics_tier0_disk_uncompressed_bytes(uint32_t size) {
-    __atomic_fetch_add(&global_statistics.tier0_disk_uncompressed_bytes, size, __ATOMIC_RELAXED);
+void global_statistics_gorilla_tier0_on_disk_sizes(uint32_t actual, uint32_t optimal, uint32_t original) {
+    __atomic_fetch_add(&global_statistics.gorilla_tier0_disk_actual_bytes, actual, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.gorilla_tier0_disk_optimal_bytes, optimal, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.gorilla_tier0_disk_original_bytes, original, __ATOMIC_RELAXED);
 }
 
 void global_statistics_rrdr_query_completed(size_t queries, uint64_t db_points_read, uint64_t result_points_generated, QUERY_SOURCE query_source) {
@@ -258,8 +258,9 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
 
     gs->tier0_hot_gorilla_buffers     = __atomic_load_n(&global_statistics.tier0_hot_gorilla_buffers, __ATOMIC_RELAXED);
 
-    gs->tier0_disk_compressed_bytes = __atomic_load_n(&global_statistics.tier0_disk_compressed_bytes, __ATOMIC_RELAXED);
-    gs->tier0_disk_uncompressed_bytes = __atomic_load_n(&global_statistics.tier0_disk_uncompressed_bytes, __ATOMIC_RELAXED);
+    gs->gorilla_tier0_disk_actual_bytes = __atomic_load_n(&global_statistics.gorilla_tier0_disk_actual_bytes, __ATOMIC_RELAXED);
+    gs->gorilla_tier0_disk_optimal_bytes = __atomic_load_n(&global_statistics.gorilla_tier0_disk_optimal_bytes, __ATOMIC_RELAXED);
+    gs->gorilla_tier0_disk_original_bytes = __atomic_load_n(&global_statistics.gorilla_tier0_disk_original_bytes, __ATOMIC_RELAXED);
 
     for(size_t tier = 0; tier < storage_tiers ;tier++)
         gs->db_points_stored_per_tier[tier] = __atomic_load_n(&global_statistics.db_points_stored_per_tier[tier], __ATOMIC_RELAXED);
@@ -910,17 +911,18 @@ static void global_statistics_extended_charts(void) {
     {
         static RRDSET *st_tier0_compression_info = NULL;
 
-        static RRDDIM *rd_compressed_bytes = NULL;
+        static RRDDIM *rd_actual_bytes = NULL;
+        static RRDDIM *rd_optimal_bytes = NULL;
         static RRDDIM *rd_uncompressed_bytes = NULL;
 
         if (unlikely(!st_tier0_compression_info)) {
             st_tier0_compression_info = rrdset_create_localhost(
                     "netdata"
-                    , "tier0_compression_info"
+                    , "tier0_gorilla_efficiency"
                     , NULL
                     , "dbengine gorilla"
                     , NULL
-                    , "Tier 0 compression info"
+                    , "DBENGINE Gorilla Compression Efficiency on Tier 0"
                     , "bytes"
                     , "netdata"
                     , "stats"
@@ -929,12 +931,14 @@ static void global_statistics_extended_charts(void) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_compressed_bytes = rrddim_add(st_tier0_compression_info, "compressed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_actual_bytes = rrddim_add(st_tier0_compression_info, "actual", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_optimal_bytes = rrddim_add(st_tier0_compression_info, "optimal", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_uncompressed_bytes = rrddim_add(st_tier0_compression_info, "uncompressed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(st_tier0_compression_info, rd_compressed_bytes, (collected_number)gs.tier0_disk_compressed_bytes);
-        rrddim_set_by_pointer(st_tier0_compression_info, rd_uncompressed_bytes, (collected_number)gs.tier0_disk_uncompressed_bytes);
+        rrddim_set_by_pointer(st_tier0_compression_info, rd_actual_bytes, (collected_number)gs.gorilla_tier0_disk_actual_bytes);
+        rrddim_set_by_pointer(st_tier0_compression_info, rd_optimal_bytes, (collected_number)gs.gorilla_tier0_disk_optimal_bytes);
+        rrddim_set_by_pointer(st_tier0_compression_info, rd_uncompressed_bytes, (collected_number)gs.gorilla_tier0_disk_original_bytes);
 
         rrdset_done(st_tier0_compression_info);
     }

@@ -58,7 +58,7 @@ struct pgd {
 // ----------------------------------------------------------------------------
 // memory management
 
-#define ARAL_TOLERANCE_TO_DEDUP 32           // deduplicate aral sizes, if the delta is below this number of bytes
+#define ARAL_TOLERANCE_TO_DEDUP 7           // deduplicate aral sizes, if the delta is below this number of bytes
 #define PGD_ARAL_PARTITIONS 1
 
 struct {
@@ -85,17 +85,12 @@ static size_t aral_sizes[] = {
     [RRD_STORAGE_TIERS - 2] = 0,
     [RRD_STORAGE_TIERS - 1] = 0,
 
-    // leave space for pgc aral,
-    [RRD_STORAGE_TIERS] = 0,
+    // gorilla buffer size
+    RRDENG_GORILLA_32BIT_BUFFER_SIZE,
 
-    // add a spread of the pages sizes wanted
-    32, 64, 128, 256, 384, 512, 768,
-    1024, 1536, 2048, 2560, 3072, 3584, 4096, 4608,
-    5 * 1024, 6 * 1024,
-
-    // add other well known structures
-    RRDENG_GORILLA_32BIT_BUFFER_SIZE, RRDENG_GORILLA_32BIT_BUFFER_SIZE/4, RRDENG_GORILLA_32BIT_BUFFER_SIZE/2,
-    sizeof(PGD), sizeof(gorilla_writer_t),
+    // our structures
+    sizeof(gorilla_writer_t),
+    sizeof(PGD),
 };
 static ARAL **arals = NULL;
 
@@ -106,10 +101,6 @@ int aral_size_sort_compare(const void *a, const void *b) {
     size_t size_a = *(const size_t *)a;
     size_t size_b = *(const size_t *)b;
     return (size_a > size_b) - (size_a < size_b);
-}
-
-ARAL *pgd_get_aral_for_pgc(size_t pgc_partition) {
-    return pgd_get_aral_by_size_and_partition(pgc_sizeof_page(), pgc_partition % PGD_ARAL_PARTITIONS);
 }
 
 void pgd_init_arals(void) {
@@ -125,7 +116,6 @@ void pgd_init_arals(void) {
         size_t wanted = aral_sizes[i];
         size_t usable = aral_allocation_slot_size(wanted, true);
         internal_fatal(usable < wanted, "usable cannot be less than wanted");
-        internal_fatal(aral_allocation_slot_size(usable, true) != usable, "usable is not recursive");
         if(usable > wanted && usable - wanted > max_delta)
             max_delta = usable - wanted;
 
@@ -168,7 +158,7 @@ void pgd_init_arals(void) {
     }
 
     for(size_t p = 0; p < PGD_ARAL_PARTITIONS ;p++) {
-        pgd_alloc_globals.aral_pgd[p] = pgd_get_aral_by_size_and_partition(sizeof(struct pgd), p);
+        pgd_alloc_globals.aral_pgd[p] = pgd_get_aral_by_size_and_partition(sizeof(PGD), p);
         pgd_alloc_globals.aral_gorilla_writer[p] = pgd_get_aral_by_size_and_partition(sizeof(gorilla_writer_t), p);
         pgd_alloc_globals.aral_gorilla_buffer[p] = pgd_get_aral_by_size_and_partition(RRDENG_GORILLA_32BIT_BUFFER_SIZE, p);
 
@@ -178,9 +168,9 @@ void pgd_init_arals(void) {
                        , "required PGD aral sizes not found");
     }
 
-    pgd_alloc_globals.sizeof_pgd = aral_element_size_actual(pgd_alloc_globals.aral_pgd[0]);
-    pgd_alloc_globals.sizeof_gorilla_writer_t = aral_element_size_actual(pgd_alloc_globals.aral_gorilla_writer[0]);
-    pgd_alloc_globals.sizeof_gorilla_buffer_32bit = aral_element_size_actual(pgd_alloc_globals.aral_gorilla_buffer[0]);
+    pgd_alloc_globals.sizeof_pgd = aral_actual_element_size(pgd_alloc_globals.aral_pgd[0]);
+    pgd_alloc_globals.sizeof_gorilla_writer_t = aral_actual_element_size(pgd_alloc_globals.aral_gorilla_writer[0]);
+    pgd_alloc_globals.sizeof_gorilla_buffer_32bit = aral_actual_element_size(pgd_alloc_globals.aral_gorilla_buffer[0]);
 }
 
 static ARAL *pgd_get_aral_by_size_and_partition(size_t size, size_t partition) {
@@ -209,7 +199,7 @@ static ARAL *pgd_get_aral_by_size_and_partition(size_t size, size_t partition) {
     internal_fatal(slot >= aral_sizes_count || aral_sizes[slot] < size, "Invalid PGD size binary search");
 
     ARAL *ar = arals[arals_slot(slot, partition)];
-    internal_fatal(!ar || aral_element_size(ar) < size, "Invalid PGD aral lookup");
+    internal_fatal(!ar || aral_requested_element_size(ar) < size, "Invalid PGD aral lookup");
     return ar;
 }
 
@@ -250,7 +240,7 @@ static void pgd_data_free(void *page, size_t size, size_t partition) {
 static size_t pgd_data_footprint(size_t size, size_t partition) {
     ARAL *ar = pgd_get_aral_by_size_and_partition(size, partition);
     if(ar)
-        return aral_element_size_actual(ar);
+        return aral_actual_element_size(ar);
     else
         return size;
 }
@@ -259,7 +249,7 @@ static size_t pgd_data_footprint(size_t size, size_t partition) {
 // management api
 
 // Helper function to write the last storage numbers we've tracked
-static void gorilla_flush_last_sn(struct pgd *pg)
+static void gorilla_flush_last_sn(PGD *pg)
 {
     // write any `last_sn`, `last_sn_count` times
     for (uint16_t i = 0; i != pg->last_sn_count; i++) {
@@ -363,8 +353,6 @@ PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size)
             internal_fatal(size % RRDENG_GORILLA_32BIT_BUFFER_SIZE, "Expected size to be a multiple of %zu-bytes",
                 RRDENG_GORILLA_32BIT_BUFFER_SIZE);
 
-            // find the size we need
-            size = gorilla_buffer_unpatched_nbytes(base) + 4;
             pg->raw.data = (void *)pgd_data_alloc(size, pg->partition);
             pg->raw.size = size;
 
@@ -611,10 +599,12 @@ uint32_t pgd_disk_footprint(PGD *pg)
                 gorilla_flush_last_sn(pg);
                 size = pg->gorilla.num_buffers * RRDENG_GORILLA_32BIT_BUFFER_SIZE;
 
-                if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR) {
-                    global_statistics_tier0_disk_compressed_bytes(gorilla_writer_nbytes(pg->gorilla.writer));
-                    global_statistics_tier0_disk_uncompressed_bytes(gorilla_writer_entries(pg->gorilla.writer) * sizeof(storage_number));
-                }
+                if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR)
+                    global_statistics_gorilla_tier0_on_disk_sizes(
+                        gorilla_writer_actual_nbytes(pg->gorilla.writer),
+                        gorilla_writer_optimal_nbytes(pg->gorilla.writer),
+                        tier_page_size[0]);
+
             } else if (pg->states & PGD_STATE_CREATED_FROM_DISK) {
                 size = pg->raw.size;
             } else {

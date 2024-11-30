@@ -17,6 +17,17 @@ static constexpr size_t bit_size() noexcept
     return (sizeof(T) * CHAR_BIT);
 }
 
+static uint32_t gorilla_buffer_nbytes(uint32_t nbits) {
+    uint32_t slots = (nbits + RRDENG_GORILLA_32BIT_SLOT_BITS - 1) / RRDENG_GORILLA_32BIT_SLOT_BITS;
+    assert(slots > 0 && slots <= RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
+
+    // this is needed to avoid heap buffer overflow in bit_buffer_read()
+    if(slots < RRDENG_GORILLA_32BIT_BUFFER_SLOTS)
+        slots++;
+
+    return slots * RRDENG_GORILLA_32BIT_SLOT_BYTES;
+}
+
 static void bit_buffer_write(uint32_t *buf, size_t pos, uint32_t v, size_t nbits)
 {
     assert(nbits > 0 && nbits <= bit_size<uint32_t>());
@@ -191,20 +202,39 @@ gorilla_buffer_t *gorilla_writer_drop_head_buffer(gorilla_writer_t *gw) {
     return curr_head;
 }
 
-uint32_t gorilla_writer_nbytes(const gorilla_writer_t *gw)
+uint32_t gorilla_writer_actual_nbytes(const gorilla_writer_t *gw)
 {
-    uint32_t nbits = 0;
+    uint32_t nbytes = 0;
 
     const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_SEQ_CST);
     do {
         const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_SEQ_CST);
 
-        nbits += __atomic_load_n(&curr_gbuf->header.nbits, __ATOMIC_SEQ_CST);
+        nbytes += RRDENG_GORILLA_32BIT_BUFFER_SIZE;
 
         curr_gbuf = next_gbuf;
     } while (curr_gbuf);
 
-    return (nbits + (CHAR_BIT - 1)) / CHAR_BIT;
+    return nbytes;
+}
+
+uint32_t gorilla_writer_optimal_nbytes(const gorilla_writer_t *gw)
+{
+    uint32_t nbytes = 0;
+
+    const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_SEQ_CST);
+    do {
+        const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_SEQ_CST);
+
+        if(next_gbuf)
+            nbytes += RRDENG_GORILLA_32BIT_BUFFER_SIZE;
+        else
+            nbytes += gorilla_buffer_nbytes(__atomic_load_n(&curr_gbuf->header.nbits, __ATOMIC_SEQ_CST));
+
+        curr_gbuf = next_gbuf;
+    } while (curr_gbuf);
+
+    return nbytes;
 }
 
 bool gorilla_writer_serialize(const gorilla_writer_t *gw, uint8_t *dst, uint32_t dst_size) {
@@ -264,16 +294,17 @@ size_t gorilla_buffer_unpatched_nbuffers(const gorilla_buffer_t *gbuf) {
 }
 
 size_t gorilla_buffer_unpatched_nbytes(const gorilla_buffer_t *gbuf) {
-    size_t nbytes = 0;
+    size_t nbytes = sizeof(gorilla_buffer_t);
     while(gbuf) {
-        nbytes += sizeof(gorilla_buffer_t) + (gbuf->header.nbits + (CHAR_BIT - 1)) / CHAR_BIT;
-
         if(gbuf->header.next) {
+            nbytes += RRDENG_GORILLA_32BIT_BUFFER_SIZE;
             const auto *buf = reinterpret_cast<const uint32_t *>(gbuf);
             gbuf = reinterpret_cast<const gorilla_buffer_t *>(&buf[RRDENG_GORILLA_32BIT_BUFFER_SLOTS]);
         }
-        else
+        else {
+            nbytes += gorilla_buffer_nbytes(gbuf->header.nbits);
             break;
+        }
     }
 
     return nbytes;

@@ -31,13 +31,13 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
                   struct aral_statistics *stats, const char *filename, const char **cache_dir, bool mmap, bool lockless);
 
 // return the size of the element, as requested
-size_t aral_element_size(ARAL *ar);
+size_t aral_requested_element_size(ARAL *ar);
 
 // return the exact memory footprint of the elements
-size_t aral_element_size_actual(ARAL *ar);
+size_t aral_actual_element_size(ARAL *ar);
 
 // predict the exact memory footprint of the elements
-size_t aral_allocation_slot_size(size_t requested_size, bool usable);
+size_t aral_allocation_slot_size(size_t requested_element_size, bool usable);
 
 size_t aral_overhead(ARAL *ar);
 size_t aral_structures(ARAL *ar);

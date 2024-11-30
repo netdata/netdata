@@ -540,7 +540,7 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
 #endif
 
     DICTIONARY *dict = dictionary_create_internal(master->options, master->stats,
-                                                  master->value_aral ? aral_element_size(master->value_aral) : 0);
+                                                  master->value_aral ? aral_requested_element_size(master->value_aral) : 0);
 
     dict->master = master;
 
