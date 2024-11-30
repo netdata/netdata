@@ -80,12 +80,12 @@ static struct aral_statistics aral_statistics_for_pgd = { 0 };
 static size_t aral_sizes_delta;
 static size_t aral_sizes_count;
 static size_t aral_sizes[] = {
-    // leave space for the storage tier page sizes
-    [RRD_STORAGE_TIERS - 5] = 0,
-    [RRD_STORAGE_TIERS - 4] = 0,
-    [RRD_STORAGE_TIERS - 3] = 0,
-    [RRD_STORAGE_TIERS - 2] = 0,
-    [RRD_STORAGE_TIERS - 1] = 0,
+//    // leave space for the storage tier page sizes
+//    [RRD_STORAGE_TIERS - 5] = 0,
+//    [RRD_STORAGE_TIERS - 4] = 0,
+//    [RRD_STORAGE_TIERS - 3] = 0,
+//    [RRD_STORAGE_TIERS - 2] = 0,
+//    [RRD_STORAGE_TIERS - 1] = 0,
 
     // gorilla buffer size
     RRDENG_GORILLA_32BIT_BUFFER_SIZE,
@@ -116,13 +116,13 @@ int aral_size_sort_compare(const void *a, const void *b) {
 void pgd_init_arals(void) {
     aral_sizes_count = _countof(aral_sizes);
 
-    for(size_t i = 0; i < RRD_STORAGE_TIERS ;i++)
-        aral_sizes[i] = tier_page_size[i];
+//    for(size_t i = 0; i < RRD_STORAGE_TIERS ;i++)
+//        aral_sizes[i] = tier_page_size[i];
 
     size_t max_delta = 0;
     for(size_t i = 0; i < aral_sizes_count ;i++) {
         size_t wanted = aral_sizes[i];
-        size_t usable = aral_allocation_slot_size(wanted, true);
+        size_t usable = aral_sizes[i]; /* aral_allocation_slot_size(wanted, true);*/
         internal_fatal(usable < wanted, "usable cannot be less than wanted");
         if(usable > wanted && usable - wanted > max_delta)
             max_delta = usable - wanted;
@@ -159,7 +159,7 @@ void pgd_init_arals(void) {
                 buf,
                 aral_sizes[slot],
                 65536 / (aral_sizes[slot] + sizeof(uintptr_t)),
-                256 * 1024 / (aral_sizes[slot] + sizeof(uintptr_t)),
+                65536,
                 &aral_statistics_for_pgd,
                 NULL, NULL, false, false);
         }

@@ -563,7 +563,7 @@ static void pgc_section_pages_static_aral_init(void) {
                 "pgc_section",
                 sizeof(struct section_pages),
                 0,
-                65536, &aral_statistics_for_pgc,
+                16384, &aral_statistics_for_pgc,
                 NULL, NULL, false, false);
     }
 
@@ -572,7 +572,7 @@ static void pgc_section_pages_static_aral_init(void) {
             "pgc_pages",
             sizeof(PGC_PAGE),
             0,
-            65536,
+            32768,
             &aral_statistics_for_pgc,
             NULL, NULL, false, false);
     }
