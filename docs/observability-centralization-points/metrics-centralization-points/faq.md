@@ -12,10 +12,10 @@ No. When you set up an active-active cluster, even if child nodes connect random
 
 ## How much retention do the child nodes need?
 
-Child nodes need to have only the retention required in order to connect to another Parent if one fails or stops for maintenance.
+Child nodes need to have only the retention required to connect to another Parent if one fails or stops for maintenance.
 
 - If you have a cluster of parents, 5 to 10 minutes in `alloc` mode is usually enough.
-- If you have only 1 parent, it would be better to run the child nodes with `dbengine` so that they will have enough retention to back-fill the parent node if it stops for maintenance.
+- If you have only one parent, it would be better to run the child nodes with `dbengine` so that they will have enough retention to back-fill the parent node if it stops for maintenance.
 
 ## Does streaming between child nodes and parents support encryption?
 
@@ -29,7 +29,7 @@ No. The streaming protocol works on the same port as the internal web server of 
 
 Although this can be done and for streaming between child and parent nodes it could work, we recommend not doing it. It can lead to several kinds of problems.
 
-It is better to configure all the parent nodes directly in the child nodes `stream.conf`. The child nodes will do everything in their power to find a parent node to connect and they will never give up.
+It is better to configure all the parent nodes directly in the child nodes `stream.conf`. The child nodes will do everything in their power to find a parent node to connect, and they will never give up.
 
 ## When I have multiple parents for the same children, will I receive alert notifications from all of them?
 
@@ -41,7 +41,7 @@ We recommend using Netdata Cloud to avoid receiving duplicate alert notification
 
 Yes. Function requests will be received by the Parents and forwarded to the Child via their streaming connection. Function requests are propagated between parents, so this will work even if multiple levels of Netdata Parents are involved.
 
-## If I have a cluster of parents and get one out for maintenance for a few hours, will it have missing data when it returns back online?
+## If I have a cluster of parents and get one out for maintenance for a few hours, will it have missing data when it returns online?
 
 Check [Restoring a Netdata Parent after maintenance](/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md).
 
@@ -61,9 +61,9 @@ Yes. When configuring the Parents at the Children `stream.conf`, configure them 
 
 It depends on the ephemerality setting of each Netdata Child.
 
-1. **Permanent nodes**: These are nodes that should be available permanently and if they disconnect an alert should be triggered to notify you.  By default, all nodes are considered permanent (not ephemeral).
+1. **Permanent nodes**: These are nodes that should be available permanently and if they disconnect, an alert should be triggered to notify you. By default, all nodes are considered permanent (not ephemeral).
 
-2. **Ephemeral nodes**: These are nodes that are ephemeral by nature and they may shutdown at any point in time without any impact on the services you run.
+2. **Ephemeral nodes**: These are nodes that are ephemeral by nature, and they may shut down at any point in time without any impact on the services you run.
 
 To set the ephemeral flag on a node, edit its netdata.conf and in the `[global]` section set `is ephemeral node = yes`. This setting is propagated to parent nodes and Netdata Cloud.
 
@@ -75,4 +75,4 @@ A node can be forced into this "forgotten" state with the Netdata CLI tool on th
 netdatacli remove-stale-node <node_id | machine_guid | hostname | ALL_NODES>
 ```
 
-When using Netdata Cloud (via a parent or directly) and a permanent node gets disconnected, Netdata Cloud sends node disconnection notifications.
+When using Netdata Cloud (via a parent or directly), and a permanent node gets disconnected, Netdata Cloud sends node disconnection notifications.

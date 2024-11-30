@@ -67,6 +67,6 @@ with a nice priority to protect production applications in case the system is st
 agents are configured by default to be the first processes to be killed by the operating system in case the operating
 system starves for memory resources (OS-OOM - Operating System Out Of Memory events).
 
-## User Customizable Security Settings
+## User-Customizable Security Settings
 
 Netdata provides users with the flexibility to customize the Agent's security settings. Users can configure TLS across the system, and the Agent provides extensive access control lists on all its interfaces to limit access to its endpoints based on IP. Additionally, users can configure the CPU and Memory priority of Netdata Agents.
