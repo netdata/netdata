@@ -1472,6 +1472,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-thread.c
         src/streaming/stream-thread.h
         src/streaming/stream-receiver-connection.c
+        src/streaming/stream-sender-commit.h
+        src/streaming/stream-traffic-types.h
 )
 
 set(WEB_PLUGIN_FILES

@@ -9,6 +9,8 @@ extern "C" {
 
 #include "libnetdata/libnetdata.h"
 #include "rrd-database-mode.h"
+#include "streaming/stream-traffic-types.h"
+#include "streaming/stream-sender-commit.h"
 
 // non-existing structs instead of voids
 // to enable type checking at compile time
@@ -1211,6 +1213,9 @@ struct rrdhost {
                     size_t charts;                  // the number of charts currently being replicated to a parent
                 } replication;
             } status;
+
+            // reserved for the plugins.d parser - do not use for other purposes
+            struct sender_buffer commit;
 
             STRING *destination;                    // where to send metrics to
             STRING *api_key;                        // the api key at the receiving netdata

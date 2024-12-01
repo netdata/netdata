@@ -11,13 +11,11 @@ void rrdpush_send_global_functions(RRDHOST *host) {
     if(unlikely(!rrdhost_can_send_metadata_to_parent(host)))
         return;
 
-    BUFFER *wb = sender_start(host->sender);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
     rrd_global_functions_expose_rrdpush(host, wb, stream_has_capability(host->sender, STREAM_CAP_DYNCFG));
 
     // send it as STREAM_TRAFFIC_TYPE_METADATA, not STREAM_TRAFFIC_TYPE_FUNCTIONS
     // this is just metadata not an interactive function call
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-
-    sender_commit_thread_buffer_free();
+    sender_commit_clean_buffer(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 }

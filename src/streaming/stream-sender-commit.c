@@ -4,59 +4,58 @@
 
 #define SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
 
-static __thread BUFFER *sender_thread_buffer = NULL;
-static __thread bool sender_thread_buffer_used = false;
-static __thread size_t sender_thread_buffer_our_recreates = 0;    // the sender sequence, when we created this buffer
-static __thread size_t sender_thread_buffer_sender_recreates = 0; // sender_commit() copies this, while having the sender lock
-static __thread const char *sender_thread_buffer_last_function = NULL;
+static __thread struct sender_buffer commit___thread = { 0 };
+
+void sender_buffer_destroy(struct sender_buffer *commit) {
+    buffer_free(commit->wb);
+    commit->wb = NULL;
+    commit->used = false;
+    commit->our_recreates = 0;
+    commit->sender_recreates = 0;
+    commit->last_function = NULL;
+}
 
 void sender_commit_thread_buffer_free(void) {
-    buffer_free(sender_thread_buffer);
-    sender_thread_buffer = NULL;
-    sender_thread_buffer_used = false;
-    sender_thread_buffer_our_recreates = 0;
-    sender_thread_buffer_sender_recreates = 0;
-    sender_thread_buffer_last_function = NULL;
+    sender_buffer_destroy(&commit___thread);
 }
 
 // Collector thread starting a transmission
-BUFFER *sender_start_with_trace(struct sender_state *s __maybe_unused, const char *func) {
-    if(unlikely(sender_thread_buffer_used))
+BUFFER *sender_commit_start_with_trace(struct sender_state *s __maybe_unused, struct sender_buffer *commit, const char *func) {
+    if(unlikely(commit->used))
         fatal("STREAMING: thread buffer is used multiple times concurrently (%u). "
               "It is already being used by '%s()', and now is called by '%s()'",
-              (unsigned)sender_thread_buffer_used,
-              sender_thread_buffer_last_function ? sender_thread_buffer_last_function : "(null)",
+              (unsigned)commit->used,
+              commit->last_function ? commit->last_function : "(null)",
               func ? func : "(null)");
 
-    if(unlikely(sender_thread_buffer &&
-                 sender_thread_buffer->size > THREAD_BUFFER_INITIAL_SIZE &&
-                 sender_thread_buffer_our_recreates != sender_thread_buffer_sender_recreates)) {
-        buffer_free(sender_thread_buffer);
-        sender_thread_buffer = NULL;
+    if(unlikely(commit->wb &&
+                 commit->wb->size > THREAD_BUFFER_INITIAL_SIZE &&
+                 commit->our_recreates != commit->sender_recreates)) {
+        buffer_free(commit->wb);
+        commit->wb = NULL;
     }
 
-    if(unlikely(!sender_thread_buffer)) {
-        sender_thread_buffer = buffer_create(THREAD_BUFFER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_streaming);
-        sender_thread_buffer_our_recreates = sender_thread_buffer_sender_recreates;
+    if(unlikely(!commit->wb)) {
+        commit->wb = buffer_create(THREAD_BUFFER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_streaming);
+        commit->our_recreates = commit->sender_recreates;
     }
 
-    sender_thread_buffer_used = true;
-    buffer_flush(sender_thread_buffer);
-    return sender_thread_buffer;
+    commit->used = true;
+    buffer_flush(commit->wb);
+    return commit->wb;
+}
+
+BUFFER *sender_thread_buffer_with_trace(struct sender_state *s __maybe_unused, const char *func) {
+    return sender_commit_start_with_trace(s, &commit___thread, func);
+}
+
+BUFFER *sender_host_buffer_with_trace(struct rrdhost *host, const char *func) {
+    return sender_commit_start_with_trace(host->sender, &host->stream.snd.commit, func);
 }
 
 // Collector thread finishing a transmission
-void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type) {
+void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buffer *commit, STREAM_TRAFFIC_TYPE type) {
     struct sender_op msg;
-
-    if (unlikely(wb != sender_thread_buffer))
-        fatal("STREAMING: sender is trying to commit a buffer that is not this thread's buffer.");
-
-    if (unlikely(!sender_thread_buffer_used))
-        fatal("STREAMING: sender is committing a buffer twice.");
-
-    sender_thread_buffer_used = false;
-    sender_thread_buffer_last_function = NULL;
 
     char *src = (char *)buffer_tostring(wb);
     size_t src_len = buffer_strlen(wb);
@@ -70,12 +69,14 @@ void sender_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type)
     sender_lock(s);
 
     // copy the sequence number of sender buffer recreates, while having our lock
-    sender_thread_buffer_sender_recreates = s->sbuf.recreates;
+    if(commit)
+        commit->sender_recreates = s->sbuf.recreates;
 
     if (!s->thread.msg.session) {
         // the dispatcher is not there anymore - ignore these data
         sender_unlock(s);
-        sender_commit_thread_buffer_free(); // free the thread data
+        if(commit)
+            sender_buffer_destroy(commit);
         return;
     }
 
@@ -232,4 +233,19 @@ compression_failed_with_lock: {
                "STREAM %s [send to %s]: COMPRESSION failed (twice). Deactivating compression and restarting connection.",
                rrdhost_hostname(s->host), s->connected_to);
     }
+}
+
+void sender_thread_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type, const char *func) {
+    struct sender_buffer *commit = (wb == commit___thread.wb) ? & commit___thread : &s->host->stream.snd.commit;
+
+    if (unlikely(wb != commit->wb))
+        fatal("STREAMING: function '%s()' is trying to commit an unknown commit buffer.", func);
+
+    if (unlikely(!commit->used))
+        fatal("STREAMING: function '%s()' is committing a sender buffer twice.", func);
+
+    commit->used = false;
+    commit->last_function = NULL;
+
+    sender_buffer_commit(s, wb, commit, type);
 }

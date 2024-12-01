@@ -3,6 +3,13 @@
 #include "commands.h"
 #include "../stream-sender-internals.h"
 
+static BUFFER *preferred_sender_buffer(RRDHOST *host) {
+    if(host == localhost && host->sender)
+        return sender_thread_buffer(localhost->sender);
+    else
+        return sender_host_buffer(host);
+}
+
 RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock_time) {
     RRDHOST *host = st->rrdhost;
 
@@ -28,7 +35,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
     }
 
     if(unlikely(host_flags & RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
-        BUFFER *wb = sender_start(host->sender);
+        BUFFER *wb = preferred_sender_buffer(host);
         rrd_global_functions_expose_rrdpush(host, wb, stream_has_capability(host->sender, STREAM_CAP_DYNCFG));
         sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
     }
@@ -42,7 +49,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
         return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
 
     if(unlikely(!exposed_upstream)) {
-        BUFFER *wb = sender_start(host->sender);
+        BUFFER *wb = preferred_sender_buffer(host);
         replication_in_progress = rrdpush_chart_definition_to_pluginsd(wb, st);
         sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
     }
@@ -54,7 +61,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
         .capabilities = host->sender->capabilities,
         .v2 = stream_has_capability(host->sender, STREAM_CAP_INTERPOLATED),
         .rrdset_flags = rrdset_flags,
-        .wb = sender_start(host->sender),
+        .wb = preferred_sender_buffer(host),
         .wall_clock_time = wall_clock_time,
     };
 }

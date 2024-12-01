@@ -398,9 +398,6 @@ static void stream_receiver_on_disconnect(struct stream_thread *sth __maybe_unus
     buffer_free(rpt->receiver.buffer);
     rpt->receiver.buffer = NULL;
 
-    // cleanup the sender buffer, because we may end-up reusing an incomplete buffer
-    sender_commit_thread_buffer_free();
-
     size_t count = 0;
     PARSER *parser = __atomic_load_n(&rpt->receiver.parser, __ATOMIC_RELAXED);
     if(parser) {

@@ -15,12 +15,10 @@ void rrdpush_send_host_labels(RRDHOST *host) {
                  || !stream_has_capability(host->sender, STREAM_CAP_HLABELS)))
         return;
 
-    BUFFER *wb = sender_start(host->sender);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
     rrdlabels_walkthrough_read(host->rrdlabels, send_labels_callback, wb);
     buffer_sprintf(wb, "OVERWRITE %s\n", "labels");
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-
-    sender_commit_thread_buffer_free();
+    sender_commit_clean_buffer(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 }

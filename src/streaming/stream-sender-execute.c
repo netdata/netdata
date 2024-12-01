@@ -13,7 +13,8 @@ static void stream_execute_function_callback(BUFFER *func_wb, int code, void *da
     struct sender_state *s = tmp->sender;
 
     if(rrdhost_can_send_metadata_to_parent(s->host)) {
-        BUFFER *wb = sender_start(s);
+        // for functions we use a new buffer, to avoid keeping a big buffer in memory
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
         pluginsd_function_result_begin_to_buffer(
             wb, string2str(tmp->transaction), code,
@@ -22,8 +23,7 @@ static void stream_execute_function_callback(BUFFER *func_wb, int code, void *da
         buffer_fast_strcat(wb, buffer_tostring(func_wb), buffer_strlen(func_wb));
         pluginsd_function_result_end_to_buffer(wb);
 
-        sender_commit(s, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
-        sender_commit_thread_buffer_free();
+        sender_commit_clean_buffer(s, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
 
         internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %"PRIu64" usec).",
                        rrdhost_hostname(s->host), s->connected_to,
@@ -42,12 +42,12 @@ static void stream_execute_function_progress_callback(void *data, size_t done, s
     struct sender_state *s = tmp->sender;
 
     if(rrdhost_can_send_metadata_to_parent(s->host)) {
-        BUFFER *wb = sender_start(s);
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
         buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION_PROGRESS " '%s' %zu %zu\n",
                        string2str(tmp->transaction), done, all);
 
-        sender_commit(s, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
+        sender_commit_clean_buffer(s, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
     }
 }
 

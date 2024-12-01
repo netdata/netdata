@@ -638,7 +638,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     // we might want to optimize this by filling a temporary buffer
     // and copying the result to the host's buffer in order to avoid
     // holding the host's buffer lock for too long
-    BUFFER *wb = sender_start(host->sender);
+    BUFFER *wb = sender_thread_buffer(host->sender);
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN, sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1);
 

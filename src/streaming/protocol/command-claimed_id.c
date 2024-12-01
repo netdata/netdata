@@ -60,7 +60,7 @@ void rrdpush_sender_send_claimed_id(RRDHOST *host) {
     if(unlikely(!rrdhost_can_send_metadata_to_parent(host)))
         return;
 
-    BUFFER *wb = sender_start(host->sender);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
     char str[UUID_STR_LEN] = "";
     ND_UUID uuid = host->aclk.claim_id_of_origin;
@@ -72,7 +72,5 @@ void rrdpush_sender_send_claimed_id(RRDHOST *host) {
     buffer_sprintf(wb, PLUGINSD_KEYWORD_CLAIMED_ID " '%s' '%s'\n",
                    host->machine_guid, str);
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-
-    sender_commit_thread_buffer_free();
+    sender_commit_clean_buffer(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 }

@@ -194,10 +194,9 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     if(unlikely(!rrdhost_can_send_metadata_to_parent(host) || !should_send_chart_matching(st, rrdset_flag_get(st))))
         return false;
 
-    BUFFER *wb = sender_start(host->sender);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
     rrdpush_chart_definition_to_pluginsd(wb, st);
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-    sender_commit_thread_buffer_free();
+    sender_commit_clean_buffer(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 
     return true;
 }

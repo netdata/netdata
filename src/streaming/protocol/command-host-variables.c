@@ -16,10 +16,9 @@ static inline void rrdpush_sender_add_host_variable_to_buffer(BUFFER *wb, const 
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva) {
     if(rrdhost_can_send_metadata_to_parent(host)) {
-        BUFFER *wb = sender_start(host->sender);
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
         rrdpush_sender_add_host_variable_to_buffer(wb, rva);
-        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-        sender_commit_thread_buffer_free();
+        sender_commit_clean_buffer(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
     }
 }
 
@@ -38,14 +37,13 @@ static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY
 
 void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
     if(rrdhost_can_send_metadata_to_parent(host)) {
-        BUFFER *wb = sender_start(host->sender);
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
         struct custom_host_variables_callback tmp = {
             .wb = wb
         };
         int ret = rrdvar_walkthrough_read(host->rrdvars, rrdpush_sender_thread_custom_host_variables_callback, &tmp);
         (void)ret;
-        sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-        sender_commit_thread_buffer_free();
+        sender_commit_clean_buffer(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 
         netdata_log_debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
     }

@@ -574,11 +574,13 @@ static void ml_dimension_stream_kmeans(const ml_dimension_t *dim)
     CLEAN_BUFFER *payload = buffer_create(0, NULL);
     ml_dimension_serialize_kmeans(dim, payload);
 
-    BUFFER *wb = sender_start(s);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+
     buffer_sprintf(
         wb, PLUGINSD_KEYWORD_JSON " " PLUGINSD_KEYWORD_JSON_CMD_ML_MODEL "\n%s\n" PLUGINSD_KEYWORD_JSON_END "\n",
         buffer_tostring(payload));
-    sender_commit(s, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    sender_commit_clean_buffer(s, wb, STREAM_TRAFFIC_TYPE_METADATA);
     global_statistics_ml_models_sent();
 }
 
