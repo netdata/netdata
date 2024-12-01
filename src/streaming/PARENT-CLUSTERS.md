@@ -127,13 +127,9 @@ evaluates the parents and prioritizes those with the most recent data.
 
 #### **Re-balancing After Cluster Changes**
 
-Once connected, child nodes begin streaming data and replicating metrics to
-their parent. The parent, in turn, propagates this data to its grandparent. Once
-the replication chain completes, the parent signals the child that it can now
-consider other parents for reconnection, if available.
-
-After receiving this signal, the child evaluates the other candidate parents
-again. The child may switch its connection to another parent, randomly.
+Currently, the only way to re-balance the cluster (i.e. to break the existing
+connections so that the children nodes will connect to both parents), is to
+restart the children.
 
 ---
 
