@@ -1075,6 +1075,8 @@ set(DAEMON_FILES
         src/daemon/telemetry/telemetry-workers.h
         src/daemon/telemetry/telemetry-trace-allocations.c
         src/daemon/telemetry/telemetry-trace-allocations.h
+        src/daemon/telemetry/telemetry-aral.c
+        src/daemon/telemetry/telemetry-aral.h
 )
 
 set(H2O_FILES

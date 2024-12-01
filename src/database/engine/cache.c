@@ -2031,12 +2031,15 @@ PGC *pgc_create(const char *name,
             sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
             0,
             16364,
-            aral_get_statistics(pgc_section_pages_aral),
+            &aral_statistics_for_pgc,
             NULL, NULL, false, false);
     }
     else
         cache->aral = pgc_pages_aral;
+
+    telemetry_aral_register(cache->aral, "pgc");
 #endif
+
 
     spinlock_init(&cache->hot.spinlock);
     spinlock_init(&cache->dirty.spinlock);

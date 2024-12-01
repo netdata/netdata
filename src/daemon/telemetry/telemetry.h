@@ -22,6 +22,7 @@ extern bool telemetry_extended_enabled;
 #include "telemetry-dictionary.h"
 #include "telemetry-workers.h"
 #include "telemetry-trace-allocations.h"
+#include "telemetry-aral.h"
 
 void *telemetry_thread_main(void *ptr);
 void *telemetry_thread_sqlite3_main(void *ptr);

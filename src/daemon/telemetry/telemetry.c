@@ -17,8 +17,9 @@
 #define WORKER_JOB_WORKERS              11
 #define WORKER_JOB_MALLOC_TRACE         12
 #define WORKER_JOB_REGISTRY             13
+#define WORKER_JOB_ARAL                 14
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 14
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 15
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 14
 #endif
 
@@ -42,6 +43,7 @@ static void telemetry_register_workers(void) {
     worker_register_job_name(WORKER_JOB_WORKERS, "workers");
     worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
     worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
+    worker_register_job_name(WORKER_JOB_ARAL, "aral");
 }
 
 static void telementry_cleanup(void *pptr)
@@ -68,6 +70,8 @@ void *telemetry_thread_main(void *ptr) {
         update_every = localhost->rrd_update_every;
         config_set_duration_seconds(CONFIG_SECTION_TELEMETRY, "update every", update_every);
     }
+
+    telemerty_aral_init();
 
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
@@ -133,6 +137,9 @@ void *telemetry_thread_main(void *ptr) {
 
         worker_is_busy(WORKER_JOB_WORKERS);
         telemetry_workers_do(telemetry_extended_enabled);
+
+        worker_is_busy(WORKER_JOB_ARAL);
+        telemetry_aral_do(telemetry_extended_enabled);
     }
 
     return NULL;

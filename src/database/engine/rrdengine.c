@@ -141,13 +141,15 @@ struct rrdeng_work {
 
 static void work_request_init(void) {
     rrdeng_main.work_cmd.ar = aral_create(
-            "dbengine-work-cmd",
-            sizeof(struct rrdeng_work),
-            0,
-            0,
+        "dbengine-work-cmd",
+        sizeof(struct rrdeng_work),
+        0,
+        0,
         NULL,
-            NULL, NULL, false, false
+        NULL, NULL, false, false
     );
+
+    telemetry_aral_register(rrdeng_main.work_cmd.ar, "workers");
 }
 
 enum LIBUV_WORKERS_STATUS {
@@ -266,6 +268,8 @@ void page_descriptors_init(void) {
             0,
             NULL,
             NULL, NULL, false, false);
+
+    telemetry_aral_register(rrdeng_main.xt_io_descr.ar, "descriptors");
 }
 
 struct page_descr_with_data *page_descriptor_get(void) {
@@ -290,6 +294,8 @@ static void extent_io_descriptor_init(void) {
             NULL,
             NULL, NULL, false, false
             );
+
+    telemetry_aral_register(rrdeng_main.xt_io_descr.ar, "extent io");
 }
 
 static struct extent_io_descriptor *extent_io_descriptor_get(void) {
@@ -313,6 +319,8 @@ void rrdeng_query_handle_init(void) {
             0,
             NULL,
             NULL, NULL, false, false);
+
+    telemetry_aral_register(rrdeng_main.handles.ar, "query handles");
 }
 
 struct rrdeng_query_handle *rrdeng_query_handle_get(void) {
@@ -433,6 +441,8 @@ static void rrdeng_cmd_queue_init(void) {
                                            0,
                                            NULL,
                                            NULL, NULL, false, false);
+
+    telemetry_aral_register(rrdeng_main.cmd_queue.ar, "opcodes");
 }
 
 static inline STORAGE_PRIORITY rrdeng_enq_cmd_map_opcode_to_priority(enum rrdeng_opcode opcode, STORAGE_PRIORITY priority) {

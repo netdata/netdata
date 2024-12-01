@@ -375,6 +375,7 @@ inline MRG *mrg_create(ssize_t partitions) {
 
         mrg->index[i].aral = aral_create(buf, sizeof(METRIC), 0, 16384, &mrg_aral_statistics, NULL, NULL, false, false);
     }
+    telemetry_aral_register(mrg->index[0].aral, "mrg");
 
     return mrg;
 }
@@ -394,7 +395,7 @@ inline void mrg_destroy(MRG *mrg __maybe_unused) {
     // to delete entries, the caller needs to keep pointers to them
     // and delete them one by one
 
-    ;
+    telemetry_aral_unregister(mrg->index[0].aral);
 }
 
 inline METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {

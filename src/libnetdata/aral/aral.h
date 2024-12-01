@@ -36,6 +36,7 @@ size_t aral_requested_element_size(ARAL *ar);
 // return the exact memory footprint of the elements
 size_t aral_actual_element_size(ARAL *ar);
 
+const char *aral_name(ARAL *ar);
 size_t aral_overhead(ARAL *ar);
 size_t aral_structures(ARAL *ar);
 struct aral_statistics *aral_get_statistics(ARAL *ar);

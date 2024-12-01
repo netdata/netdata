@@ -112,6 +112,10 @@ struct aral {
 
 static void aral_defrag_sorted_page_position___aral_lock_needed(ARAL *ar, ARAL_PAGE *page);
 
+const char *aral_name(ARAL *ar) {
+    return ar->config.name;
+}
+
 size_t aral_structures_from_stats(struct aral_statistics *stats) {
     return __atomic_load_n(&stats->structures.allocated_bytes, __ATOMIC_RELAXED);
 }
