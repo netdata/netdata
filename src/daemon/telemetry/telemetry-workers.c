@@ -97,7 +97,7 @@ struct worker_utilization {
 };
 
 static struct worker_utilization all_workers_utilization[] = {
-    { .name = "STATS",       .family = "workers global statistics",       .priority = 1000000 },
+    { .name = "STATS",       .family = "workers telemetry",               .priority = 1000000 },
     { .name = "HEALTH",      .family = "workers health alarms",           .priority = 1000000 },
     { .name = "MLTRAIN",     .family = "workers ML training",             .priority = 1000000 },
     { .name = "MLDETECT",    .family = "workers ML detection",            .priority = 1000000 },
@@ -122,7 +122,6 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "TC",          .family = "workers plugin tc",               .priority = 1000000 },
     { .name = "TIMEX",       .family = "workers plugin timex",            .priority = 1000000 },
     { .name = "IDLEJITTER",  .family = "workers plugin idlejitter",       .priority = 1000000 },
-    { .name = "LOGSMANAGPLG",.family = "workers plugin logs management",  .priority = 1000000 },
     { .name = "RRDCONTEXT",  .family = "workers contexts",                .priority = 1000000 },
     { .name = "REPLICATION", .family = "workers replication sender",      .priority = 1000000 },
     { .name = "SERVICE",     .family = "workers service",                 .priority = 1000000 },

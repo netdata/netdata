@@ -139,7 +139,7 @@ void *telemetry_thread_main(void *ptr) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// global statistics extended thread
+// telemetry extended thread
 
 static void telemetry_thread_sqlite3_cleanup(void *pptr)
 {

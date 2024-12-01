@@ -241,7 +241,7 @@ void telemetry_web_do(bool extended) {
             rd_savings = rrddim_add(st_compression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        // since we don't lock here to read the global statistics
+        // since we don't lock here to read the telemetry
         // read the smaller value first
         unsigned long long gcompressed_content_size = gs.content_size_compressed;
         unsigned long long gcontent_size = gs.content_size_uncompressed;

@@ -5,9 +5,6 @@
 
 #include "database/rrd.h"
 
-// ----------------------------------------------------------------------------
-// global statistics
-
 extern bool telemetry_enabled;
 extern bool telemetry_extended_enabled;
 

@@ -18,7 +18,7 @@ The configuration file uses an INI-style format with `[SECTION]` headers:
 | [[health]](#health-section-options)                               | [Health monitoring](/src/health/README.md)               |
 | `[web]`                                                           | [Web Server](/src/web/server/README.md)                  |
 | `[registry]`                                                      | [Registry](/src/registry/README.md)                      |
-| `[global statistics]`                                             | Internal monitoring                                      |
+| `[telemetry]`                                                     | Internal monitoring                                      |
 | `[statsd]`                                                        | [StatsD plugin](/src/collectors/statsd.plugin/README.md) |
 | [`[plugins]`](#plugins-section-options)                           | Data collection Plugins (Collectors)                     |
 | [[plugin:NAME]](#per-plugin-configuration)                        | Individual [Plugins](#per-plugin-configuration)          |

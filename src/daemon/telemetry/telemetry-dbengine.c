@@ -1438,7 +1438,7 @@ void telemetry_dbengine_do(bool extended) {
         rrd_rdunlock();
 
         if (dbengine_contexts) {
-            /* deduplicate global statistics by getting the ones from the last context */
+            /* deduplicate telemetry by getting the ones from the last context */
             stats_array[30] = local_stats_array[30];
             stats_array[31] = local_stats_array[31];
             stats_array[32] = local_stats_array[32];
