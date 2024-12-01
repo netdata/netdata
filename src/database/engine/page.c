@@ -728,7 +728,7 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
             bool ok = gorilla_writer_serialize(pg->gorilla.writer, dst, dst_size);
             UNUSED(ok);
             internal_fatal(!ok,
-                           "pgd_copy_to_extent() tried to serialize pg=%p, gw=%p (with dst_size=%u bytes, num_buffers=%zu)",
+                           "pgd_copy_to_extent() tried to serialize pg=%p, gw=%p (with dst_size=%u bytes, num_buffers=%u)",
                            pg, pg->gorilla.writer, dst_size, pg->gorilla.num_buffers);
             break;
         }
