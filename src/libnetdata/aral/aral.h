@@ -52,27 +52,34 @@ int aral_unittest(size_t elements);
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
 
-#define aral_callocz(ar) aral_callocz_internal(ar, __FILE__, __FUNCTION__, __LINE__)
-#define aral_mallocz(ar) aral_mallocz_internal(ar, __FILE__, __FUNCTION__, __LINE__)
+#define aral_callocz(ar) aral_callocz_internal(ar, false, __FILE__, __FUNCTION__, __LINE__)
+#define aral_callocz_marked(ar) aral_callocz_internal(ar, true, __FILE__, __FUNCTION__, __LINE__)
+#define aral_mallocz(ar) aral_mallocz_internal(ar, false, __FILE__, __FUNCTION__, __LINE__)
+#define aral_mallocz_marked(ar) aral_mallocz_internal(ar, true, __FILE__, __FUNCTION__, __LINE__)
 #define aral_freez(ar, ptr) aral_freez_internal(ar, ptr, __FILE__, __FUNCTION__, __LINE__)
 #define aral_destroy(ar) aral_destroy_internal(ar, __FILE__, __FUNCTION__, __LINE__)
 
-void *aral_callocz_internal(ARAL *ar, const char *file, const char *function, size_t line);
-void *aral_mallocz_internal(ARAL *ar, const char *file, const char *function, size_t line);
+void *aral_callocz_internal(ARAL *ar, bool marked, const char *file, const char *function, size_t line);
+void *aral_mallocz_internal(ARAL *ar, bool marked, const char *file, const char *function, size_t line);
 void aral_freez_internal(ARAL *ar, void *ptr, const char *file, const char *function, size_t line);
 void aral_destroy_internal(ARAL *ar, const char *file, const char *function, size_t line);
 
 #else // NETDATA_TRACE_ALLOCATIONS
 
-#define aral_mallocz(ar) aral_mallocz_internal(ar)
-#define aral_callocz(ar) aral_callocz_internal(ar)
+#define aral_mallocz(ar) aral_mallocz_internal(ar, false)
+#define aral_mallocz_marked(ar) aral_mallocz_internal(ar, true)
+#define aral_callocz(ar) aral_callocz_internal(ar, false)
+#define aral_callocz_marked(ar) aral_callocz_internal(ar, true)
 #define aral_freez(ar, ptr) aral_freez_internal(ar, ptr)
 #define aral_destroy(ar) aral_destroy_internal(ar)
 
-void *aral_callocz_internal(ARAL *ar);
-void *aral_mallocz_internal(ARAL *ar);
+
+void *aral_callocz_internal(ARAL *ar, bool marked);
+void *aral_mallocz_internal(ARAL *ar, bool marked);
 void aral_freez_internal(ARAL *ar, void *ptr);
 void aral_destroy_internal(ARAL *ar);
+
+void aral_unmark_allocation(ARAL *ar, void *ptr);
 
 #endif // NETDATA_TRACE_ALLOCATIONS
 

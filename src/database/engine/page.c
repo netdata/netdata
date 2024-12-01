@@ -6,6 +6,8 @@
 
 typedef enum __attribute__((packed)) {
     PAGE_OPTION_ALL_VALUES_EMPTY    = (1 << 0),
+    PAGE_OPTION_ARAL_MARKED         = (1 << 1),
+    PAGE_OPTION_ARAL_UNMARKED       = (1 << 2),
 } PAGE_OPTIONS;
 
 typedef enum __attribute__((packed)) {
@@ -213,25 +215,35 @@ static ARAL *pgd_get_aral_by_size_and_partition(size_t size, size_t partition) {
 
 static inline gorilla_writer_t *pgd_gorilla_writer_alloc(size_t partition) {
     internal_fatal(partition >= PGD_ARAL_PARTITIONS, "invalid gorilla writer partition %zu", partition);
-    return aral_mallocz(pgd_alloc_globals.aral_gorilla_writer[partition]);
+    return aral_mallocz_marked(pgd_alloc_globals.aral_gorilla_writer[partition]);
 }
 
 static inline gorilla_buffer_t *pgd_gorilla_buffer_alloc(size_t partition) {
     internal_fatal(partition >= PGD_ARAL_PARTITIONS, "invalid gorilla buffer partition %zu", partition);
-    return aral_mallocz(pgd_alloc_globals.aral_gorilla_buffer[partition]);
+    return aral_mallocz_marked(pgd_alloc_globals.aral_gorilla_buffer[partition]);
 }
 
-static inline PGD *pgd_alloc(void) {
+static inline PGD *pgd_alloc(bool for_collector) {
     size_t partition = gettid_cached() % PGD_ARAL_PARTITIONS;
-    PGD *pgd = aral_mallocz(pgd_alloc_globals.aral_pgd[partition]);
+    PGD *pgd;
+
+    if(for_collector)
+        pgd = aral_mallocz_marked(pgd_alloc_globals.aral_pgd[partition]);
+    else
+        pgd = aral_mallocz(pgd_alloc_globals.aral_pgd[partition]);
+
     pgd->partition = partition;
     return pgd;
 }
 
-static inline void *pgd_data_alloc(size_t size, size_t partition) {
+static inline void *pgd_data_alloc(size_t size, size_t partition, bool for_collector) {
     ARAL *ar = pgd_get_aral_by_size_and_partition(size, partition);
-    if(ar)
-        return aral_mallocz(ar);
+    if(ar) {
+        if(for_collector)
+            return aral_mallocz_marked(ar);
+        else
+            return aral_mallocz(ar);
+    }
     else
         return mallocz(size);
 }
@@ -243,6 +255,14 @@ static void pgd_data_free(void *page, size_t size, size_t partition) {
     else
         freez(page);
     timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_TIER1_ARAL);
+}
+
+static void pgd_data_unmark(void *page, size_t size, size_t partition) {
+    if(!page) return;
+
+    ARAL *ar = pgd_get_aral_by_size_and_partition(size, partition);
+    if(ar)
+        aral_unmark_allocation(ar, page);
 }
 
 static size_t pgd_data_footprint(size_t size, size_t partition) {
@@ -257,8 +277,7 @@ static size_t pgd_data_footprint(size_t size, size_t partition) {
 // management api
 
 // Helper function to write the last storage numbers we've tracked
-static void gorilla_flush_last_sn(PGD *pg)
-{
+static void gorilla_flush_last_sn(PGD *pg) {
     // write any `last_sn`, `last_sn_count` times
     for (uint16_t i = 0; i != pg->last_sn_count; i++) {
         bool ok = gorilla_writer_write(pg->gorilla.writer, pg->last_sn);
@@ -278,14 +297,17 @@ static void gorilla_flush_last_sn(PGD *pg)
     pg->last_sn_count = 0;
 }
 
-PGD *pgd_create(uint8_t type, uint32_t slots)
-{
-    PGD *pg = pgd_alloc();
+PGD *pgd_create(uint8_t type, uint32_t slots) {
+
+    PGD *pg = pgd_alloc(true); // this is malloc'd !
     pg->type = type;
+    pg->states = PGD_STATE_CREATED_FROM_COLLECTOR;
+    pg->options = PAGE_OPTION_ALL_VALUES_EMPTY | PAGE_OPTION_ARAL_MARKED;
+    pg->last_sn = 0;
+    pg->last_sn_count = 0;
+
     pg->used = 0;
     pg->slots = slots;
-    pg->options = PAGE_OPTION_ALL_VALUES_EMPTY;
-    pg->states = PGD_STATE_CREATED_FROM_COLLECTOR;
 
     switch (type) {
         case RRDENG_PAGE_TYPE_ARRAY_32BIT:
@@ -296,15 +318,12 @@ PGD *pgd_create(uint8_t type, uint32_t slots)
                       "DBENGINE: invalid number of slots (%u) or page type (%u)", slots, type);
 
             pg->raw.size = size;
-            pg->raw.data = pgd_data_alloc(size, pg->partition);
+            pg->raw.data = pgd_data_alloc(size, pg->partition, true);
             break;
         }
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             internal_fatal(slots == 1,
                       "DBENGINE: invalid number of slots (%u) or page type (%u)", slots, type);
-
-            pg->last_sn = 0;
-            pg->last_sn_count = 0;
 
             // allocate new gorilla writer
             pg->gorilla.writer = pgd_gorilla_writer_alloc(pg->partition);
@@ -329,29 +348,27 @@ PGD *pgd_create(uint8_t type, uint32_t slots)
     return pg;
 }
 
-PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size)
-{
-    if (!size)
+PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size) {
+
+    if (!size || size < page_type_size[type])
         return PGD_EMPTY;
 
-    if (size < page_type_size[type])
-        return PGD_EMPTY;
-
-    PGD *pg = pgd_alloc();
-
+    PGD *pg = pgd_alloc(false); // this is malloc'd !
     pg->type = type;
     pg->states = PGD_STATE_CREATED_FROM_DISK;
-    pg->options = ~PAGE_OPTION_ALL_VALUES_EMPTY;
+    pg->options = PAGE_OPTION_ARAL_UNMARKED;
+    pg->last_sn = 0;
+    pg->last_sn_count = 0;
 
     switch (type)
     {
         case RRDENG_PAGE_TYPE_ARRAY_32BIT:
         case RRDENG_PAGE_TYPE_ARRAY_TIER1:
-            pg->raw.size = size;
             pg->used = size / page_type_size[type];
             pg->slots = pg->used;
 
-            pg->raw.data = pgd_data_alloc(size, pg->partition);
+            pg->raw.size = size;
+            pg->raw.data = pgd_data_alloc(size, pg->partition, false);
             memcpy(pg->raw.data, base, size);
             break;
 
@@ -361,17 +378,14 @@ PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size)
             internal_fatal(size % RRDENG_GORILLA_32BIT_BUFFER_SIZE, "Expected size to be a multiple of %zu-bytes",
                 RRDENG_GORILLA_32BIT_BUFFER_SIZE);
 
-            pg->raw.data = (void *)pgd_data_alloc(size, pg->partition);
+            pg->raw.data = (void *)pgd_data_alloc(size, pg->partition, false);
             pg->raw.size = size;
 
             memcpy(pg->raw.data, base, pg->raw.size);
 
             uint32_t total_entries = gorilla_buffer_patch((void *) pg->raw.data);
-
             pg->used = total_entries;
             pg->slots = pg->used;
-            pg->last_sn = 0;
-            pg->last_sn_count = 0;
             break;
 
         default:
@@ -384,12 +398,8 @@ PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size)
     return pg;
 }
 
-void pgd_free(PGD *pg)
-{
-    if (!pg)
-        return;
-
-    if (pg == PGD_EMPTY)
+void pgd_free(PGD *pg) {
+    if (!pg || pg == PGD_EMPTY)
         return;
 
     internal_fatal(pg->partition >= PGD_ARAL_PARTITIONS,
@@ -459,6 +469,57 @@ void pgd_free(PGD *pg)
     aral_freez(pgd_alloc_globals.aral_pgd[pg->partition], pg);
 
     timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_ARAL);
+}
+
+static void pgd_aral_unmark(PGD *pg) {
+    if (!pg ||
+        pg == PGD_EMPTY ||
+        (pg->options & PAGE_OPTION_ARAL_UNMARKED) ||
+        !(pg->options & PAGE_OPTION_ARAL_MARKED))
+        return;
+
+    internal_fatal(pg->partition >= PGD_ARAL_PARTITIONS,
+                   "PGD partition is invalid %u", pg->partition);
+
+    switch (pg->type)
+    {
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+            pgd_data_unmark(pg->raw.data, pg->raw.size, pg->partition);
+            break;
+
+        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
+            if (pg->states & PGD_STATE_CREATED_FROM_DISK)
+                pgd_data_unmark(pg->raw.data, pg->raw.size, pg->partition);
+
+            else if ((pg->states & PGD_STATE_CREATED_FROM_COLLECTOR) ||
+                     (pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING) ||
+                     (pg->states & PGD_STATE_FLUSHED_TO_DISK))
+            {
+                internal_fatal(pg->gorilla.writer == NULL, "PGD does not have an active gorilla writer");
+                internal_fatal(pg->gorilla.num_buffers == 0, "PGD does not have any gorilla buffers allocated");
+
+                gorilla_writer_aral_unmark(pg->gorilla.writer, pgd_alloc_globals.aral_gorilla_buffer[pg->partition]);
+                aral_unmark_allocation(pgd_alloc_globals.aral_gorilla_writer[pg->partition], pg->gorilla.writer);
+            }
+            else {
+                fatal("pgd_free() called on gorilla page with unsupported state");
+                // TODO: should we support any other states?
+                // if (!(pg->states & PGD_STATE_FLUSHED_TO_DISK))
+                //     fatal("pgd_free() is not supported yet for pages flushed to disk");
+            }
+
+            break;
+        }
+        default:
+            netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, pg->type);
+            break;
+    }
+
+    aral_unmark_allocation(pgd_alloc_globals.aral_pgd[pg->partition], pg);
+
+    // make sure we will not do this again
+    pg->options |= PAGE_OPTION_ARAL_UNMARKED;
 }
 
 // ----------------------------------------------------------------------------
@@ -584,6 +645,9 @@ uint32_t pgd_disk_footprint(PGD *pg)
 
     size_t size = 0;
 
+    // since the page is ready for flushing, let's unmark its pages to ARAL
+    pgd_aral_unmark(pg);
+
     switch (pg->type) {
         case RRDENG_PAGE_TYPE_ARRAY_32BIT:
         case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
@@ -628,6 +692,7 @@ uint32_t pgd_disk_footprint(PGD *pg)
 
     internal_fatal(pg->states & PGD_STATE_CREATED_FROM_DISK,
                    "Disk footprint asked for page created from disk.");
+
     pg->states = PGD_STATE_SCHEDULED_FOR_FLUSHING;
     return size;
 }

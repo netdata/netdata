@@ -22,8 +22,9 @@ void sender_commit_thread_buffer_free(void) {
 // Collector thread starting a transmission
 BUFFER *sender_start_with_trace(struct sender_state *s __maybe_unused, const char *func) {
     if(unlikely(sender_thread_buffer_used))
-        fatal("STREAMING: thread buffer is used multiple times concurrently. "
+        fatal("STREAMING: thread buffer is used multiple times concurrently (%u). "
               "It is already being used by '%s()', and now is called by '%s()'",
+              (unsigned)sender_thread_buffer_used,
               sender_thread_buffer_last_function ? sender_thread_buffer_last_function : "(null)",
               func ? func : "(null)");
 

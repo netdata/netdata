@@ -56,6 +56,9 @@ void gorilla_writer_add_buffer(gorilla_writer_t *gw, gorilla_buffer_t *gbuf, siz
 bool gorilla_writer_write(gorilla_writer_t *gw, uint32_t number);
 uint32_t gorilla_writer_entries(const gorilla_writer_t *gw);
 
+struct aral;
+void gorilla_writer_aral_unmark(const gorilla_writer_t *gw, struct aral *ar);
+
 gorilla_reader_t gorilla_writer_get_reader(const gorilla_writer_t *gw);
 
 gorilla_buffer_t *gorilla_writer_drop_head_buffer(gorilla_writer_t *gw);

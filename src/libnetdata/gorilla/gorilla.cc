@@ -421,6 +421,24 @@ bool gorilla_reader_read(gorilla_reader_t *gr, uint32_t *number)
     return true;
 }
 
+extern "C" {
+struct aral;
+void aral_unmark_allocation(struct aral *ar, void *ptr);
+}
+
+void gorilla_writer_aral_unmark(const gorilla_writer_t *gw, struct aral *ar)
+{
+    const gorilla_buffer_t *curr_gbuf = __atomic_load_n(&gw->head_buffer, __ATOMIC_SEQ_CST);
+    do {
+        const gorilla_buffer_t *next_gbuf = __atomic_load_n(&curr_gbuf->header.next, __ATOMIC_SEQ_CST);
+
+        // Call the C function here
+        aral_unmark_allocation(ar, const_cast<void*>(static_cast<const void*>(curr_gbuf)));
+
+        curr_gbuf = next_gbuf;
+    } while (curr_gbuf);
+}
+
 /*
  * Internal code used for fuzzing the library
 */
