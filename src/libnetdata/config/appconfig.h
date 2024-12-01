@@ -100,7 +100,7 @@
 #define CONFIG_SECTION_PROMETHEUS         "prometheus:exporter"
 #define CONFIG_SECTION_HOST_LABEL         "host labels"
 #define EXPORTING_CONF                    "exporting.conf"
-#define CONFIG_SECTION_GLOBAL_STATISTICS  "global statistics"
+#define CONFIG_SECTION_TELEMETRY          "telemetry"
 #define CONFIG_SECTION_DB                 "db"
 
 // these are used to limit the configuration names and values lengths

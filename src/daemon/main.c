@@ -1083,6 +1083,16 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
                 CONFIG_SECTION_DB,      "enable zero metrics");
 
+    config_move("global statistics",        "update every",
+                CONFIG_SECTION_TELEMETRY,   "update every");
+
+    config_move(CONFIG_SECTION_PLUGINS, "netdata monitoring",
+                CONFIG_SECTION_PLUGINS, "netdata telemetry");
+
+    config_move(CONFIG_SECTION_PLUGINS, "netdata monitoring extended",
+                CONFIG_SECTION_TELEMETRY, "extended telemetry");
+
+
     // ----------------------------------------------------------------------------------------------------------------
 
     bool found_old_config = false;
@@ -2130,11 +2140,14 @@ int netdata_main(int argc, char **argv) {
             default_stacksize = 1 * 1024 * 1024;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        config_set_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring", true);
-        config_set_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring extended", true);
+        telemetry_enabled = true;
+        telemetry_extended_enabled = true;
 #endif
 
-        if(config_get_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring extended", false))
+        telemetry_extended_enabled =
+            config_get_boolean(CONFIG_SECTION_TELEMETRY, "extended telemetry", telemetry_extended_enabled);
+
+        if(telemetry_extended_enabled)
             // this has to run before starting any other threads that use workers
             workers_utilization_enable();
 

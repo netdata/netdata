@@ -295,7 +295,7 @@ static void gorilla_flush_last_sn(PGD *pg) {
 
             gorilla_writer_add_buffer(pg->gorilla.writer, new_buffer, RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
             pg->gorilla.num_buffers += 1;
-            global_statistics_gorilla_buffer_add_hot();
+            telemetry_gorilla_hot_buffer_added();
 
             ok = gorilla_writer_write(pg->gorilla.writer, pg->last_sn);
             internal_fatal(ok == false, "Failed to writer value in newly allocated gorilla buffer.");
@@ -339,7 +339,7 @@ PGD *pgd_create(uint8_t type, uint32_t slots) {
             // allocate new gorilla buffer
             gorilla_buffer_t *gbuf = pgd_gorilla_buffer_alloc(pg->partition);
             memset(gbuf, 0, RRDENG_GORILLA_32BIT_BUFFER_SIZE);
-            global_statistics_gorilla_buffer_add_hot();
+            telemetry_gorilla_hot_buffer_added();
 
             *pg->gorilla.writer = gorilla_writer_init(gbuf, RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
             pg->gorilla.num_buffers = 1;
@@ -680,7 +680,7 @@ uint32_t pgd_disk_footprint(PGD *pg)
                 size = pg->gorilla.num_buffers * RRDENG_GORILLA_32BIT_BUFFER_SIZE;
 
                 if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR)
-                    global_statistics_gorilla_tier0_on_disk_sizes(
+                    telemetry_gorilla_tier0_page_flush(
                         gorilla_writer_actual_nbytes(pg->gorilla.writer),
                         gorilla_writer_optimal_nbytes(pg->gorilla.writer),
                         tier_page_size[0]);
@@ -825,7 +825,7 @@ size_t pgd_append_point(PGD *pg,
 
                 gorilla_writer_add_buffer(pg->gorilla.writer, new_buffer, RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
                 pg->gorilla.num_buffers += 1;
-                global_statistics_gorilla_buffer_add_hot();
+                telemetry_gorilla_hot_buffer_added();
 
                 ok = gorilla_writer_write(pg->gorilla.writer, t);
                 internal_fatal(ok == false, "Failed to writer value in newly allocated gorilla buffer.");

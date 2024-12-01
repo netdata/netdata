@@ -1293,7 +1293,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 }
 
 void store_metric_collection_completed() {
-    global_statistics_rrdset_done_chart_collection_completed(rrdset_done_statistics_points_stored_per_tier);
+    telemetry_queries_rrdset_collection_completed(rrdset_done_statistics_points_stored_per_tier);
 }
 
 // caching of dimensions rrdset_done() and rrdset_done_interpolate() loop through

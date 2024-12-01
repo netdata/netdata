@@ -1016,8 +1016,8 @@ set(DAEMON_FILES
         src/daemon/daemon.h
         src/daemon/libuv_workers.c
         src/daemon/libuv_workers.h
-        src/daemon/global_statistics.c
-        src/daemon/global_statistics.h
+        src/daemon/telemetry/telemetry.c
+        src/daemon/telemetry/telemetry.h
         src/daemon/analytics.c
         src/daemon/analytics.h
         src/daemon/main.c
@@ -1047,6 +1047,34 @@ set(DAEMON_FILES
         src/daemon/config/dyncfg-internals.h
         src/daemon/config/dyncfg-intercept.c
         src/daemon/config/dyncfg-tree.c
+        src/daemon/telemetry/telemetry-http-api.c
+        src/daemon/telemetry/telemetry-http-api.h
+        src/daemon/telemetry/telemetry-queries.c
+        src/daemon/telemetry/telemetry-queries.h
+        src/daemon/telemetry/telemetry-ingestion.c
+        src/daemon/telemetry/telemetry-ingestion.h
+        src/daemon/telemetry/telemetry-ml.c
+        src/daemon/telemetry/telemetry-ml.h
+        src/daemon/telemetry/telemetry-gorilla.c
+        src/daemon/telemetry/telemetry-gorilla.h
+        src/daemon/telemetry/telemetry-daemon.c
+        src/daemon/telemetry/telemetry-daemon.h
+        src/daemon/telemetry/telemetry-daemon-memory.c
+        src/daemon/telemetry/telemetry-daemon-memory.h
+        src/daemon/telemetry/telemetry-sqlite3.c
+        src/daemon/telemetry/telemetry-sqlite3.h
+        src/daemon/telemetry/telemetry-dbengine.c
+        src/daemon/telemetry/telemetry-dbengine.h
+        src/daemon/telemetry/telemetry-string.c
+        src/daemon/telemetry/telemetry-string.h
+        src/daemon/telemetry/telemetry-heartbeat.c
+        src/daemon/telemetry/telemetry-heartbeat.h
+        src/daemon/telemetry/telemetry-dictionary.c
+        src/daemon/telemetry/telemetry-dictionary.h
+        src/daemon/telemetry/telemetry-workers.c
+        src/daemon/telemetry/telemetry-workers.h
+        src/daemon/telemetry/telemetry-trace-allocations.c
+        src/daemon/telemetry/telemetry-trace-allocations.h
 )
 
 set(H2O_FILES

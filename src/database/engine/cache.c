@@ -2007,7 +2007,7 @@ PGC *pgc_create(const char *name,
     cache->config.max_flushes_inline = (max_flushes_inline == 0) ? 2 : max_flushes_inline;
     cache->config.partitions = partitions == 0 ? 1ULL + get_netdata_cpus() / 2 : partitions;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
-    cache->config.stats = global_statistics_enabled;
+    cache->config.stats = telemetry_enabled;
 
     cache->config.max_workers_evict_inline    = max_inline_evictors;
     cache->config.severe_pressure_per1000     = 1010; // INLINE: use releasers to evict pages (up to max_pages_per_inline_eviction * 2)

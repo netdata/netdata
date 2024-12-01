@@ -13,7 +13,7 @@
 
 #include "daemon/config/dyncfg.h"
 
-#include "global_statistics.h"
+#include "daemon/telemetry/telemetry.h"
 
 // health monitoring and alarm notifications
 #include "health/health.h"

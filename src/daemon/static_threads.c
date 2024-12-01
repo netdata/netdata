@@ -5,9 +5,6 @@
 void *aclk_main(void *ptr);
 void *analytics_main(void *ptr);
 void *cpuidlejitter_main(void *ptr);
-void *global_statistics_main(void *ptr);
-void *global_statistics_extended_main(void *ptr);
-void *global_statistics_sqlite3_main(void *ptr);
 void *health_main(void *ptr);
 void *pluginsd_main(void *ptr);
 void *service_main(void *ptr);
@@ -15,7 +12,7 @@ void *statsd_main(void *ptr);
 void *profile_main(void *ptr);
 void *replication_thread_main(void *ptr);
 
-extern bool global_statistics_enabled;
+extern bool telemetry_enabled;
 
 const struct netdata_static_thread static_threads_common[] = {
     {
@@ -46,37 +43,26 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = analytics_main
     },
     {
-        .name = "STATS_GLOBAL",
+        .name = "TELEMETRY",
         .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "netdata monitoring",
+        .config_name = "netdata telemetry",
         .env_name = "NETDATA_INTERNALS_MONITORING",
-        .global_variable = &global_statistics_enabled,
+        .global_variable = &telemetry_enabled,
         .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = global_statistics_main
+        .start_routine = telemetry_thread_main
     },
     {
-        .name = "STATS_GLOBAL_EXT",
-        .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "netdata monitoring extended",
-        .env_name = "NETDATA_INTERNALS_EXTENDED_MONITORING",
-        .global_variable = &global_statistics_enabled,
-        .enabled = 0, // the default value - it uses netdata.conf for users to enable it
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = global_statistics_extended_main
-    },
-    {
-        .name = "STATS_GLOBAL_SQLITE3_EXT",
-        .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "netdata monitoring extended",
+        .name = "TLMTRY-SQLITE3",
+        .config_section = CONFIG_SECTION_TELEMETRY,
+        .config_name = "extended telemetry",
         .env_name = NULL,
-        .global_variable = NULL,
+        .global_variable = &telemetry_extended_enabled,
         .enabled = 0, // the default value - it uses netdata.conf for users to enable it
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = global_statistics_sqlite3_main
+        .start_routine = telemetry_thread_sqlite3_main
     },
     {
         .name = "PLUGINSD",

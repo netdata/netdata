@@ -225,11 +225,8 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
     size_t sent = w->response.zoutput ? (size_t)w->response.zstream.total_out : size;
 
     if(update_web_stats)
-        global_statistics_web_request_completed(dt_usec(&tv, &w->timings.tv_in),
-                                                w->statistics.received_bytes,
-                                                w->statistics.sent_bytes,
-                                                size,
-                                                sent);
+        telemetry_web_request_completed(
+            dt_usec(&tv, &w->timings.tv_in), w->statistics.received_bytes, w->statistics.sent_bytes, size, sent);
 
     usec_t prep_ut = w->timings.tv_ready.tv_sec ? dt_usec(&w->timings.tv_ready, &w->timings.tv_in) : 0;
     usec_t sent_ut = w->timings.tv_ready.tv_sec ? dt_usec(&tv, &w->timings.tv_ready) : 0;

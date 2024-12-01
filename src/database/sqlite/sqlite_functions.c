@@ -13,7 +13,7 @@ SQLITE_API int sqlite3_exec_monitored(
     char **errmsg                              /* Error msg written here */
 ) {
     int rc = sqlite3_exec(db, sql, callback, data, errmsg);
-    global_statistics_sqlite3_query_completed(rc == SQLITE_OK, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
+    telemetry_sqlite3_query_completed(rc == SQLITE_OK, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
     return rc;
 }
 
@@ -25,14 +25,14 @@ SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
         rc = sqlite3_step(stmt);
         switch (rc) {
             case SQLITE_DONE:
-                global_statistics_sqlite3_query_completed(1, 0, 0);
+                telemetry_sqlite3_query_completed(1, 0, 0);
                 break;
             case SQLITE_ROW:
-                global_statistics_sqlite3_row_completed();
+                telemetry_sqlite3_row_completed();
                 break;
             case SQLITE_BUSY:
             case SQLITE_LOCKED:
-                global_statistics_sqlite3_query_completed(false, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
+                telemetry_sqlite3_query_completed(false, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
                 usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
                 continue;
             default:
