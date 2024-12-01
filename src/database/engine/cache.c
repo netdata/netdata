@@ -642,12 +642,14 @@ static void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PA
         // - New pages created as CLEAN, always have 1 access.
         // - DIRTY pages made CLEAN, depending on their accesses may be appended (accesses > 0) or prepended (accesses = 0).
 
-        if(page->accesses || page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
+        // FIXME - is it better for fragmentation to always append?
+
+//        if(page->accesses || page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(q->base, page, link.prev, link.next);
             page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
-        }
-        else
-            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(q->base, page, link.prev, link.next);
+//        }
+//        else
+//            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(q->base, page, link.prev, link.next);
 
         q->version++;
     }

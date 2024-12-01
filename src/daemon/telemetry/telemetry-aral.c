@@ -8,8 +8,8 @@ struct aral_info {
     RRDSET *st_memory;
     RRDDIM *rd_used, *rd_free, *rd_structures;
 
-    RRDSET *st_fragmentation;
-    RRDDIM *rd_fragmentation;
+    RRDSET *st_utilization;
+    RRDDIM *rd_utilization;
 };
 
 DEFINE_JUDYL_TYPED(ARAL_STATS, struct aral_info *);
@@ -80,15 +80,20 @@ void telemetry_aral_do(bool extended) {
         size_t used_bytes = __atomic_load_n(&stats->malloc.used_bytes, __ATOMIC_RELAXED) +
                             __atomic_load_n(&stats->mmap.used_bytes, __ATOMIC_RELAXED);
 
+        // slight difference may exist, due to the time needed to get these values
+        // fix the obvious discrepancies
+        if(used_bytes > allocated_bytes)
+            used_bytes = allocated_bytes;
+
         size_t structures_bytes = __atomic_load_n(&stats->structures.allocated_bytes, __ATOMIC_RELAXED);
 
-        size_t free_bytes = (allocated_bytes > used_bytes) ? allocated_bytes - used_bytes : 0;
+        size_t free_bytes = allocated_bytes - used_bytes;
 
-        NETDATA_DOUBLE fragmentation;
+        NETDATA_DOUBLE utilization;
         if(used_bytes && allocated_bytes)
-            fragmentation = 100 * (NETDATA_DOUBLE)free_bytes / (NETDATA_DOUBLE)allocated_bytes;
+            utilization = 100.0 * (NETDATA_DOUBLE)used_bytes / (NETDATA_DOUBLE)allocated_bytes;
         else
-            fragmentation = 0.0;
+            utilization = 100.0;
 
         {
             if (unlikely(!ai->st_memory)) {
@@ -125,19 +130,19 @@ void telemetry_aral_do(bool extended) {
         }
 
         {
-            if (unlikely(!ai->st_fragmentation)) {
+            if (unlikely(!ai->st_utilization)) {
                 char id[256];
 
-                snprintfz(id, sizeof(id), "aral_%s_fragmentation", ai->name);
+                snprintfz(id, sizeof(id), "aral_%s_utilization", ai->name);
                 netdata_fix_chart_id(id);
 
-                ai->st_fragmentation = rrdset_create_localhost(
+                ai->st_utilization = rrdset_create_localhost(
                     "netdata",
                     id,
                     NULL,
                     "ARAL",
-                    "netdata.aral_fragmentation",
-                    "Array Allocator Memory Fragmentation",
+                    "netdata.aral_utilization",
+                    "Array Allocator Memory Utilization",
                     "%",
                     "netdata",
                     "telemetry",
@@ -145,13 +150,13 @@ void telemetry_aral_do(bool extended) {
                     localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
-                rrdlabels_add(ai->st_fragmentation->rrdlabels, "ARAL", ai->name, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(ai->st_utilization->rrdlabels, "ARAL", ai->name, RRDLABEL_SRC_AUTO);
 
-                ai->rd_fragmentation = rrddim_add(ai->st_fragmentation, "fragmentation", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+                ai->rd_utilization = rrddim_add(ai->st_utilization, "utilization", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
             }
 
-            rrddim_set_by_pointer(ai->st_fragmentation, ai->rd_fragmentation, (collected_number)(fragmentation * 10000.0));
-            rrdset_done(ai->st_fragmentation);
+            rrddim_set_by_pointer(ai->st_utilization, ai->rd_utilization, (collected_number)(utilization * 10000.0));
+            rrdset_done(ai->st_utilization);
         }
     }
 
