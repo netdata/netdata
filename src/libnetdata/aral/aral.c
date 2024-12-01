@@ -857,6 +857,29 @@ static size_t aral_allocation_slot_size(size_t requested_element_size, bool usab
     return element_size;
 }
 
+static void optimal_max_page_size(ARAL *ar) {
+    if(ar->config.requested_max_page_size)
+        return;
+
+    size_t element_size = ar->config.element_size;
+    size_t system_page_size = ar->config.system_page_size;
+
+    if(element_size > system_page_size) {
+        size_t multiplier = system_page_size / (element_size - system_page_size);
+        if(multiplier > 5) multiplier = 4;
+        if(multiplier < 2) multiplier = 2;
+
+        ar->config.requested_max_page_size = memory_alignment(system_page_size * multiplier, system_page_size);
+        return;
+    }
+
+    size_t multiplier = (system_page_size * 4) / element_size;
+    if(multiplier > 200)
+        multiplier = 200;
+
+    ar->config.requested_max_page_size = memory_alignment(element_size * multiplier, system_page_size);
+}
+
 ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size,
                   struct aral_statistics *stats, const char *filename, const char **cache_dir, bool mmap, bool lockless) {
     ARAL *ar = callocz(1, sizeof(ARAL));
@@ -887,6 +910,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
         ar->config.system_page_size = page_size;
 
     ar->config.element_size = aral_allocation_slot_size(ar->config.requested_element_size, false);
+    optimal_max_page_size(ar);
 
     ar->config.max_page_elements = ar->config.requested_max_page_size / ar->config.element_size;
 
@@ -1005,7 +1029,7 @@ ARAL *aral_by_size_acquire(size_t size) {
         ar = aral_create(buf,
                          size,
                          0,
-                         65536 * ((size / 150) + 1),
+                         0,
                          &aral_by_size_globals.shared_statistics,
                          NULL, NULL, false, false);
 

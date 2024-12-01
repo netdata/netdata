@@ -53,7 +53,7 @@ void pdc_init(void) {
             "dbengine-pdc",
             sizeof(PDC),
             0,
-            65536,
+            0,
             NULL,
             NULL, NULL, false, false
             );
@@ -81,7 +81,7 @@ void page_details_init(void) {
             "dbengine-pd",
             sizeof(struct page_details),
             0,
-            65536,
+            0,
             NULL,
             NULL, NULL, false, false
     );
@@ -109,7 +109,7 @@ void epdl_init(void) {
             "dbengine-epdl",
             sizeof(EPDL),
             0,
-            65536,
+            0,
             NULL,
             NULL, NULL, false, false
     );
@@ -137,7 +137,7 @@ void deol_init(void) {
             "dbengine-deol",
             sizeof(DEOL),
             0,
-            65536,
+            0,
             NULL,
             NULL, NULL, false, false
     );

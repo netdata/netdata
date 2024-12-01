@@ -210,7 +210,7 @@ void dictionary_static_items_aral_init(void) {
                     "dict-items",
                     sizeof(DICTIONARY_ITEM),
                     0,
-                    65536,
+                    0,
                     aral_by_size_statistics(),
                     NULL, NULL, false, false);
 
@@ -220,7 +220,7 @@ void dictionary_static_items_aral_init(void) {
                     "dict-shared-items",
                     sizeof(DICTIONARY_ITEM_SHARED),
                     0,
-                    65536,
+                    0,
                     aral_by_size_statistics(),
                     NULL, NULL, false, false);
 

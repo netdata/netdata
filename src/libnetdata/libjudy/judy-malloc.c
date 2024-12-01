@@ -28,7 +28,7 @@ __attribute__((constructor)) void aral_judy_init(void) {
                 buf,
                 Words * sizeof(Word_t),
                 0,
-                65536,
+                0,
                 &judy_sizes_aral_statistics,
                 NULL, NULL, false, false);
         }

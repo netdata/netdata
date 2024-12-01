@@ -144,7 +144,8 @@ static void work_request_init(void) {
             "dbengine-work-cmd",
             sizeof(struct rrdeng_work),
             0,
-            65536, NULL,
+            0,
+        NULL,
             NULL, NULL, false, false
     );
 }
@@ -262,7 +263,7 @@ void page_descriptors_init(void) {
             "dbengine-descriptors",
             sizeof(struct page_descr_with_data),
             0,
-            65536 * 4,
+            0,
             NULL,
             NULL, NULL, false, false);
 }
@@ -285,7 +286,7 @@ static void extent_io_descriptor_init(void) {
             "dbengine-extent-io",
             sizeof(struct extent_io_descriptor),
             0,
-            65536,
+            0,
             NULL,
             NULL, NULL, false, false
             );
@@ -309,7 +310,7 @@ void rrdeng_query_handle_init(void) {
             "dbengine-query-handles",
             sizeof(struct rrdeng_query_handle),
             0,
-            65536,
+            0,
             NULL,
             NULL, NULL, false, false);
 }
@@ -429,7 +430,7 @@ static void rrdeng_cmd_queue_init(void) {
     rrdeng_main.cmd_queue.ar = aral_create("dbengine-opcodes",
                                            sizeof(struct rrdeng_cmd),
                                            0,
-                                           65536,
+                                           0,
                                            NULL,
                                            NULL, NULL, false, false);
 }

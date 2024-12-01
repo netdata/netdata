@@ -563,7 +563,7 @@ static void pgc_section_pages_static_aral_init(void) {
             "pgc_section",
             sizeof(struct section_pages),
             0,
-            16384,
+            0,
             &aral_statistics_for_pgc,
             NULL, NULL, false, false);
     }
@@ -573,7 +573,7 @@ static void pgc_section_pages_static_aral_init(void) {
             "pgc_pages",
             sizeof(PGC_PAGE),
             0,
-            16384,
+            0,
             &aral_statistics_for_pgc,
             NULL, NULL, false, false);
     }
@@ -2011,9 +2011,9 @@ PGC *pgc_create(const char *name,
 
     cache->config.max_workers_evict_inline    = max_inline_evictors;
     cache->config.severe_pressure_per1000     = 1000; // turn releasers into evictors above this threshold
-    cache->config.aggressive_evict_per1000    =  995; // turn adders into evictors above this threshold
-    cache->config.healthy_size_per1000        =  980; // don't evict if the current size is below this threshold
-    cache->config.evict_low_threshold_per1000 =  970; // when evicting, bring the size down to this threshold
+    cache->config.aggressive_evict_per1000    =  999; // turn adders into evictors above this threshold
+    cache->config.healthy_size_per1000        =  998; // don't evict if the current size is below this threshold
+    cache->config.evict_low_threshold_per1000 =  997; // when evicting, bring the size down to this threshold
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
 

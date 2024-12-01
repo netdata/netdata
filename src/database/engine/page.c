@@ -83,11 +83,11 @@ static size_t aral_sizes_delta;
 static size_t aral_sizes_count;
 static size_t aral_sizes[] = {
 //    // leave space for the storage tier page sizes
-//    [RRD_STORAGE_TIERS - 5] = 0,
-//    [RRD_STORAGE_TIERS - 4] = 0,
-//    [RRD_STORAGE_TIERS - 3] = 0,
-//    [RRD_STORAGE_TIERS - 2] = 0,
-//    [RRD_STORAGE_TIERS - 1] = 0,
+    [RRD_STORAGE_TIERS - 5] = 0,
+    [RRD_STORAGE_TIERS - 4] = 0,
+    [RRD_STORAGE_TIERS - 3] = 0,
+    [RRD_STORAGE_TIERS - 2] = 0,
+    [RRD_STORAGE_TIERS - 1] = 0,
 
     // gorilla buffer size
     RRDENG_GORILLA_32BIT_BUFFER_SIZE,
@@ -118,8 +118,8 @@ int aral_size_sort_compare(const void *a, const void *b) {
 void pgd_init_arals(void) {
     aral_sizes_count = _countof(aral_sizes);
 
-//    for(size_t i = 0; i < RRD_STORAGE_TIERS ;i++)
-//        aral_sizes[i] = tier_page_size[i];
+    for(size_t i = 0; i < RRD_STORAGE_TIERS ;i++)
+        aral_sizes[i] = tier_page_size[i];
 
     size_t max_delta = 0;
     for(size_t i = 0; i < aral_sizes_count ;i++) {
@@ -154,6 +154,14 @@ void pgd_init_arals(void) {
     arals = callocz(aral_sizes_count * PGD_ARAL_PARTITIONS, sizeof(ARAL *));
     for(size_t slot = 0; slot < aral_sizes_count ; slot++) {
         for(size_t partition = 0; partition < PGD_ARAL_PARTITIONS; partition++) {
+
+            if(partition > 0 && aral_sizes[slot] > 128) {
+                // do not create partitions for sizes above 128 bytes
+                // use the first partition for all of them
+                arals[arals_slot(slot, partition)] = arals[arals_slot(slot, 0)];
+                continue;
+            }
+
             char buf[32];
             snprintfz(buf, sizeof(buf), "pgd-%zu-%zu", aral_sizes[slot], partition);
 
@@ -161,7 +169,7 @@ void pgd_init_arals(void) {
                 buf,
                 aral_sizes[slot],
                 0,
-                16384,
+                0,
                 &aral_statistics_for_pgd,
                 NULL, NULL, false, false);
         }
