@@ -28,6 +28,10 @@ BUFFER *sender_commit_start_with_trace(struct sender_state *s __maybe_unused, st
               commit->last_function ? commit->last_function : "(null)",
               func ? func : "(null)");
 
+    if(unlikely(commit->receiver_tid && commit->receiver_tid != gettid_cached()))
+        fatal("STREAMING: thread buffer is reserved for tid %d, but it used by thread %d function '%s()'.",
+              commit->receiver_tid, gettid_cached(), func ? func : "(null)");
+
     if(unlikely(commit->wb &&
                  commit->wb->size > THREAD_BUFFER_INITIAL_SIZE &&
                  commit->our_recreates != commit->sender_recreates)) {

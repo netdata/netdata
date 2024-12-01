@@ -1214,7 +1214,7 @@ struct rrdhost {
                 } replication;
             } status;
 
-            // reserved for the plugins.d parser - do not use for other purposes
+            // reserved for the receiver/sender thread - do not use for other purposes
             struct sender_buffer commit;
 
             STRING *destination;                    // where to send metrics to

@@ -11,6 +11,7 @@ struct sender_state;
 struct receiver_state;
 
 struct sender_buffer {
+    pid_t receiver_tid;
     BUFFER *wb;
     bool used;
     size_t our_recreates;

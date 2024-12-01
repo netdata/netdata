@@ -4,10 +4,10 @@
 #include "../stream-sender-internals.h"
 
 static BUFFER *preferred_sender_buffer(RRDHOST *host) {
-    if(host == localhost && host->sender)
-        return sender_thread_buffer(localhost->sender);
-    else
+    if(host->stream.snd.commit.receiver_tid == gettid_cached())
         return sender_host_buffer(host);
+    else
+        return sender_thread_buffer(localhost->sender);
 }
 
 RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock_time) {

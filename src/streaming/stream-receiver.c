@@ -305,6 +305,9 @@ static void streaming_parser_init(struct receiver_state *rpt) {
     rrdpush_receiver_send_node_and_claim_id_to_child(rpt->host);
 
     rpt->receiver.buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
+
+    // help rrdset_push_metric_initialize() select the right buffer
+    rpt->host->stream.snd.commit.receiver_tid = gettid_cached();
 }
 
 // --------------------------------------------------------------------------------------------------------------------
