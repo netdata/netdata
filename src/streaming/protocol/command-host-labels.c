@@ -10,8 +10,8 @@ static int send_labels_callback(const char *name, const char *value, RRDLABEL_SR
     return 1;
 }
 
-void rrdpush_send_host_labels(RRDHOST *host) {
-    if(unlikely(!rrdhost_can_send_metadata_to_parent(host)
+void stream_send_host_labels(RRDHOST *host) {
+    if(unlikely(!rrdhost_can_stream_metadata_to_parent(host)
                  || !stream_has_capability(host->sender, STREAM_CAP_HLABELS)))
         return;
 

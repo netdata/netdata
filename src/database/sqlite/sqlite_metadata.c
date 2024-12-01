@@ -271,7 +271,7 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
     else
         uuid_unparse_lower(*node_id, wc->node_id);
 
-    rrdpush_receiver_send_node_and_claim_id_to_child(host);
+    stream_receiver_send_node_and_claim_id_to_child(host);
     stream_path_node_id_updated(host);
 }
 

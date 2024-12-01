@@ -232,7 +232,7 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
 
         if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush.sender.dim_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->stream.snd.dim_slot);
         }
 
         buffer_fast_strcat(wb, " '", 2);
@@ -466,7 +466,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
             if(with_slots) {
                 buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-                buffer_print_uint64_encoded(wb, integer_encoding, q->st->rrdpush.sender.chart_slot);
+                buffer_print_uint64_encoded(wb, integer_encoding, q->st->stream.snd.chart_slot);
             }
 
             buffer_fast_strcat(wb, " '' ", 4);
@@ -491,7 +491,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
                     if(with_slots) {
                         buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-                        buffer_print_uint64_encoded(wb, integer_encoding, d->rd->rrdpush.sender.dim_slot);
+                        buffer_print_uint64_encoded(wb, integer_encoding, d->rd->stream.snd.dim_slot);
                     }
 
                     buffer_fast_strcat(wb, " \"", 2);
@@ -644,7 +644,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
 
     if(with_slots) {
         buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-        buffer_print_uint64_encoded(wb, integer_encoding, q->st->rrdpush.sender.chart_slot);
+        buffer_print_uint64_encoded(wb, integer_encoding, q->st->stream.snd.chart_slot);
     }
 
     buffer_fast_strcat(wb, " '", 2);
@@ -704,7 +704,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
                 rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
 
                 if(!finished_with_gap)
-                    st->rrdpush.sender.resync_time_s = 0;
+                    st->stream.snd.resync_time_s = 0;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
                 internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' streaming starts",
@@ -1138,7 +1138,7 @@ static inline struct replication_sort_entry *replication_sort_entry_create(struc
     struct replication_sort_entry *rse = aral_mallocz(replication_globals.aral_rse);
     __atomic_add_fetch(&replication_globals.atomic.memory, sizeof(struct replication_sort_entry), __ATOMIC_RELAXED);
 
-    rrdpush_sender_pending_replication_requests_plus_one(rq->sender);
+    stream_sender_pending_replication_requests_plus_one(rq->sender);
 
     // copy the request
     rse->rq = rq;
@@ -1158,7 +1158,7 @@ static void replication_sort_entry_destroy(struct replication_sort_entry *rse) {
 }
 
 static void replication_sort_entry_add(struct replication_request *rq) {
-    if(unlikely(rrdpush_sender_replication_buffer_full_get(rq->sender))) {
+    if(unlikely(stream_sender_replication_buffer_full_get(rq->sender))) {
         rq->indexed_in_judy = false;
         rq->not_indexed_buffer_full = true;
         rq->not_indexed_preprocessing = false;
@@ -1226,7 +1226,7 @@ static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sor
     replication_globals.unsafe.removed++;
     replication_globals.unsafe.pending--;
 
-    rrdpush_sender_pending_replication_requests_minus_one(rse->rq->sender);
+    stream_sender_pending_replication_requests_minus_one(rse->rq->sender);
 
     rse->rq->indexed_in_judy = false;
     rse->rq->not_indexed_preprocessing = preprocessing;
@@ -1367,7 +1367,7 @@ static void replication_request_react_callback(const DICTIONARY_ITEM *item __may
     replication_sort_entry_add(rq);
 
     // this request is about a unique chart for this sender
-    rrdpush_sender_replicating_charts_plus_one(s);
+    stream_sender_replicating_charts_plus_one(s);
 }
 
 static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *sender_state) {
@@ -1419,7 +1419,7 @@ static void replication_request_delete_callback(const DICTIONARY_ITEM *item __ma
     struct replication_request *rq = value;
 
     // this request is about a unique chart for this sender
-    rrdpush_sender_replicating_charts_minus_one(rq->sender);
+    stream_sender_replicating_charts_minus_one(rq->sender);
 
     if(rq->indexed_in_judy)
         replication_sort_entry_del(rq, false);
@@ -1434,7 +1434,7 @@ static void replication_request_delete_callback(const DICTIONARY_ITEM *item __ma
 }
 
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq) {
-    return rq->sender_last_flush_ut == rrdpush_sender_get_flush_time(rq->sender);
+    return rq->sender_last_flush_ut == stream_sender_get_flush_time(rq->sender);
 }
 
 static bool replication_execute_request(struct replication_request *rq, bool workers) {
@@ -1496,7 +1496,7 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
             .after = after,
             .before = before,
             .start_streaming = start_streaming,
-            .sender_last_flush_ut = rrdpush_sender_get_flush_time(sender),
+            .sender_last_flush_ut = stream_sender_get_flush_time(sender),
             .indexed_in_judy = false,
             .not_indexed_buffer_full = false,
             .not_indexed_preprocessing = false,
@@ -1518,7 +1518,7 @@ void replication_sender_delete_pending_requests(struct sender_state *sender) {
     sender->replication.oldest_request_after_t = 0;
 }
 
-void replication_init_sender(struct sender_state *sender) {
+void replication_sender_init(struct sender_state *sender) {
     sender->replication.requests = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                               NULL, sizeof(struct replication_request));
 
@@ -1538,8 +1538,8 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
     size_t available = cbuffer_available_size_unsafe(s->host->sender->sbuf.cb);
     size_t percentage = (s->sbuf.cb->max_size - available) * 100 / s->sbuf.cb->max_size;
 
-    if(unlikely(percentage > MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED && !rrdpush_sender_replication_buffer_full_get(s))) {
-        rrdpush_sender_replication_buffer_full_set(s, true);
+    if(unlikely(percentage > MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED && !stream_sender_replication_buffer_full_get(s))) {
+        stream_sender_replication_buffer_full_set(s, true);
 
         struct replication_request *rq;
         dfe_start_read(s->replication.requests, rq) {
@@ -1552,8 +1552,8 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
         replication_globals.unsafe.senders_full++;
         replication_recursive_unlock();
     }
-    else if(unlikely(percentage < MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED && rrdpush_sender_replication_buffer_full_get(s))) {
-        rrdpush_sender_replication_buffer_full_set(s, false);
+    else if(unlikely(percentage < MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED && stream_sender_replication_buffer_full_get(s))) {
+        stream_sender_replication_buffer_full_set(s, false);
 
         struct replication_request *rq;
         dfe_start_read(s->replication.requests, rq) {
@@ -1569,7 +1569,7 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
         replication_recursive_unlock();
     }
 
-    rrdpush_sender_set_buffer_used_percent(s, percentage);
+    stream_sender_set_buffer_used_percent(s, percentage);
 }
 
 // ----------------------------------------------------------------------------
@@ -1578,11 +1578,11 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
 static size_t verify_host_charts_are_streaming_now(RRDHOST *host) {
     internal_error(
             host->sender &&
-            !rrdpush_sender_pending_replication_requests(host->sender) &&
+            !stream_sender_pending_replication_requests(host->sender) &&
             dictionary_entries(host->sender->replication.requests) != 0,
             "REPLICATION SUMMARY: 'host:%s' reports %zu pending replication requests, but its chart replication index says there are %zu charts pending replication",
             rrdhost_hostname(host),
-            rrdpush_sender_pending_replication_requests(host->sender),
+        stream_sender_pending_replication_requests(host->sender),
             dictionary_entries(host->sender->replication.requests)
             );
 
@@ -1775,7 +1775,7 @@ static int replication_pipeline_execute_next(void) {
         if(rq->found) {
             internal_fatal(rq->executed, "REPLAY FATAL: query has already been executed!");
 
-            if (rq->sender_last_flush_ut != rrdpush_sender_get_flush_time(rq->sender)) {
+            if (rq->sender_last_flush_ut != stream_sender_get_flush_time(rq->sender)) {
                 // the sender has reconnected since this request was queued,
                 // we can safely throw it away, since the parent will resend it
                 replication_response_cancel_and_finalize(rq->q);
@@ -1783,7 +1783,7 @@ static int replication_pipeline_execute_next(void) {
                 rq->found = false;
                 rq->q = NULL;
             }
-            else if (rrdpush_sender_replication_buffer_full_get(rq->sender)) {
+            else if (stream_sender_replication_buffer_full_get(rq->sender)) {
                 // the sender buffer is full, so we can ignore this request,
                 // it has already been marked as 'preprocessed' in the dictionary,
                 // and the sender will put it back in when there is

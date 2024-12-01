@@ -267,10 +267,14 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
         stream_send.compression.enabled));
 
     if(config->compression.enabled) {
-        rrdpush_parse_compression_order(config,
-            appconfig_get(&stream_config, machine_guid, "compression algorithms order",
-            appconfig_get(&stream_config, api_key, "compression algorithms order",
-            RRDPUSH_COMPRESSION_ALGORITHMS_ORDER)));
+        stream_parse_compression_order(
+            config,
+            appconfig_get(
+                &stream_config,
+                machine_guid,
+                "compression algorithms order",
+                appconfig_get(
+                    &stream_config, api_key, "compression algorithms order", STREAM_COMPRESSION_ALGORITHMS_ORDER)));
     }
 
     config->ephemeral =

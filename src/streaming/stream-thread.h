@@ -145,8 +145,8 @@ struct stream_thread {
         size_t bypassed;
         size_t size;
         size_t used;
-        struct sender_op *array;         // the array of messages from the senders
-        struct sender_op *copy;          // a copy of the array of messages from the senders, to work on
+        struct stream_opcode *array;         // the array of messages from the senders
+        struct stream_opcode *copy;          // a copy of the array of messages from the senders, to work on
     } messages;
 
     struct {
@@ -181,7 +181,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
 void stream_sender_cleanup(struct stream_thread *sth);
 void stream_receiver_cleanup(struct stream_thread *sth);
-void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, struct sender_op *msg);
+void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, struct stream_opcode *msg);
 
 struct pollfd_slotted stream_thread_pollfd_get(struct stream_thread *sth, int fd, POLLFD_TYPE type, struct receiver_state *rpt, struct sender_state *s);
 void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd_slotted pfd);

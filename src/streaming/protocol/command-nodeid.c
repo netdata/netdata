@@ -6,12 +6,12 @@
 #include "plugins.d/pluginsd_internals.h"
 
 // the child disconnected from the parent, and it has to clear the parent's claim id
-void rrdpush_sender_clear_parent_claim_id(RRDHOST *host) {
+void stream_sender_clear_parent_claim_id(RRDHOST *host) {
     host->aclk.claim_id_of_parent = UUID_ZERO;
 }
 
 // the parent sends to the child its claim id, node id and cloud url
-void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
+void stream_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
     if(host == localhost || UUIDiszero(host->node_id)) return;
 
     rrdhost_receiver_lock(host);
@@ -40,7 +40,7 @@ void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
 }
 
 // the sender of the child receives node id, claim id and cloud url from the receiver of the parent
-void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
+void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     char *claim_id_str = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
     char *node_id_str = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 2);
     char *url = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 3);
@@ -124,7 +124,7 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
         cloud_config_url_set(url);
 
     // send it down the line (to children)
-    rrdpush_receiver_send_node_and_claim_id_to_child(s->host);
+    stream_receiver_send_node_and_claim_id_to_child(s->host);
 
     if(node_id_updated)
         stream_path_node_id_updated(s->host);

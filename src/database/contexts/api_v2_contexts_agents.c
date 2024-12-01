@@ -49,7 +49,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                 available_instances += __atomic_load_n(&host->rrdctx.instances_count, __ATOMIC_RELAXED);
                 available_contexts += __atomic_load_n(&host->rrdctx.contexts_count, __ATOMIC_RELAXED);
 
-                if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED))
+                if(rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED))
                     sending++;
 
                 if (rrdhost_is_online(host)) {

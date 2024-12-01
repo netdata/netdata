@@ -85,7 +85,7 @@ void rrdvar_host_variable_set(RRDHOST *host, const RRDVAR_ACQUIRED *rva, NETDATA
         rv->value = value;
 
         // if the host is streaming, send this variable upstream immediately
-        rrdpush_sender_send_this_host_variable_now(host, rva);
+        stream_sender_send_this_host_variable_now(host, rva);
     }
 }
 

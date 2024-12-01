@@ -230,32 +230,6 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
-static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
-                                              bool stream,
-                                              STRING *parents,
-                                              STRING *api_key,
-                                              STRING *send_charts_matching) {
-    if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED)) return;
-
-    if(stream && parents && api_key) {
-        rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
-
-        stream_sender_structures_init(host);
-
-        host->stream.snd.destination = string_dup(parents);
-        rrdhost_stream_parents_update_from_destination(host);
-
-        host->stream.snd.api_key = string_dup(api_key);
-        host->stream.snd.charts_matching =
-            simple_pattern_create(string2str(send_charts_matching),
-                                  NULL, SIMPLE_PATTERN_EXACT, true);
-
-        rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
-    }
-    else
-        rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
-}
-
 #ifdef ENABLE_DBENGINE
 //
 //  true on success
@@ -404,8 +378,7 @@ static RRDHOST *rrdhost_create(
         rrd_functions_host_init(host);
         host->stream.snd.status.last_connected = now_realtime_sec();
         host->rrdlabels = rrdlabels_create();
-        rrdhost_initialize_rrdpush_sender(
-            host, stream, parents, api_key, send_charts_matching);
+        stream_sender_structures_init(host, stream, parents, api_key, send_charts_matching);
     }
 
     if(replication)
@@ -534,7 +507,8 @@ static RRDHOST *rrdhost_create(
          , host->rrd_update_every
          , rrd_memory_mode_name(host->rrd_memory_mode)
          , host->rrd_history_entries
-         , rrdhost_has_rrdpush_sender_enabled(host)?"enabled":"disabled"
+         ,
+        rrdhost_has_stream_sender_enabled(host)?"enabled":"disabled"
          , string2str(host->stream.snd.destination)
          , string2str(host->stream.snd.api_key)
          , host->health.enabled ?"enabled":"disabled"
@@ -667,7 +641,7 @@ static void rrdhost_update(RRDHOST *host
         if (!host->rrdset_root_index)
             rrdset_index_init(host);
 
-        rrdhost_initialize_rrdpush_sender(host, stream, parents, api_key, send_charts_matching);
+        stream_sender_structures_init(host, stream, parents, api_key, send_charts_matching);
 
         rrdcalc_rrdhost_index_init(host);
 
@@ -1462,7 +1436,7 @@ void reload_host_labels(void) {
 
     rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
 
-    rrdpush_send_host_labels(localhost);
+    stream_send_host_labels(localhost);
 }
 
 void rrdhost_finalize_collection(RRDHOST *host) {

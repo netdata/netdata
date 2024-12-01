@@ -7,14 +7,24 @@ bool stream_sender_has_capabilities(struct rrdhost *host, STREAM_CAPABILITIES ca
 }
 
 bool stream_sender_is_connected_with_ssl(struct rrdhost *host) {
-    return host && rrdhost_can_send_metadata_to_parent(host) && nd_sock_is_ssl(&host->sender->sock);
+    return host && rrdhost_can_stream_metadata_to_parent(host) && nd_sock_is_ssl(&host->sender->sock);
 }
 
 bool stream_sender_has_compression(struct rrdhost *host) {
     return host && host->sender && host->sender->compressor.initialized;
 }
 
-void stream_sender_structures_init(struct rrdhost *host) {
+void stream_sender_structures_init(RRDHOST *host, bool stream, STRING *parents, STRING *api_key, STRING *send_charts_matching) {
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_INITIALIZED))
+        return;
+
+    if(!stream || !parents || !api_key) {
+        rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
+        return;
+    }
+
+    rrdhost_flag_set(host, RRDHOST_FLAG_STREAM_SENDER_INITIALIZED);
+
     if (host->sender) return;
 
     host->sender = callocz(1, sizeof(*host->sender));
@@ -33,7 +43,16 @@ void stream_sender_structures_init(struct rrdhost *host) {
         host->sender->disabled_capabilities |= STREAM_CAP_COMPRESSIONS_AVAILABLE;
 
     spinlock_init(&host->sender->spinlock);
-    replication_init_sender(host->sender);
+    replication_sender_init(host->sender);
+
+    host->stream.snd.destination = string_dup(parents);
+    rrdhost_stream_parents_update_from_destination(host);
+
+    host->stream.snd.api_key = string_dup(api_key);
+    host->stream.snd.charts_matching = simple_pattern_create(
+        string2str(send_charts_matching), NULL, SIMPLE_PATTERN_EXACT, true);
+
+    rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
 }
 
 void stream_sender_structures_free(struct rrdhost *host) {
@@ -45,7 +64,7 @@ void stream_sender_structures_free(struct rrdhost *host) {
     stream_sender_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true);
     cbuffer_free(host->sender->sbuf.cb);
 
-    rrdpush_compressor_destroy(&host->sender->compressor);
+    stream_compressor_destroy(&host->sender->compressor);
 
     replication_cleanup_sender(host->sender);
 
@@ -56,11 +75,11 @@ void stream_sender_structures_free(struct rrdhost *host) {
 
     sender_buffer_destroy(&host->stream.snd.commit);
 
-    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
+    rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_SENDER_INITIALIZED);
 }
 
 void stream_sender_start_host(struct rrdhost *host) {
-    internal_fatal(!rrdhost_has_rrdpush_sender_enabled(host),
+    internal_fatal(!rrdhost_has_stream_sender_enabled(host),
                    "Host '%s' does not have streaming enabled, but %s() was called",
                    rrdhost_hostname(host), __FUNCTION__);
 
@@ -79,22 +98,22 @@ void stream_sender_signal_to_stop_and_wait(struct rrdhost *host, STREAM_HANDSHAK
     if (!host->sender)
         return;
 
-    sender_lock(host->sender);
+    stream_sender_lock(host->sender);
 
-    if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED)) {
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_ADDED)) {
         __atomic_store_n(&host->sender->exit.shutdown, true, __ATOMIC_RELAXED);
         host->sender->exit.reason = reason;
     }
 
-    struct sender_op msg = host->sender->thread.msg;
-    sender_unlock(host->sender);
+    struct stream_opcode msg = host->sender->thread.msg;
+    stream_sender_unlock(host->sender);
 
     if(reason == STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT)
-        msg.op = SENDER_MSG_STOP_RECEIVER_LEFT;
+        msg.opcode = STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT;
     else
-        msg.op = SENDER_MSG_STOP_HOST_CLEANUP;
+        msg.opcode = STREAM_OPCODE_SENDER_STOP_HOST_CLEANUP;
     stream_sender_send_msg_to_dispatcher(host->sender, msg);
 
-    while(wait && rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED))
+    while(wait && rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_ADDED))
         sleep_usec(10 * USEC_PER_MS);
 }

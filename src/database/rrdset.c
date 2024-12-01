@@ -11,23 +11,23 @@ void rrdset_metadata_updated(RRDSET *st) {
 }
 
 // ----------------------------------------------------------------------------
-// RRDSET rrdpush send chart_slots
+// RRDSET streaming send chart_slots
 
-static void rrdset_rrdpush_send_chart_slot_assign(RRDSET *st) {
+static void rrdset_stream_send_chart_slot_assign(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
     spinlock_lock(&host->stream.snd.pluginsd_chart_slots.available.spinlock);
 
     if(host->stream.snd.pluginsd_chart_slots.available.used > 0)
-        st->rrdpush.sender.chart_slot =
-                host->stream.snd.pluginsd_chart_slots.available.array[--host->stream.snd.pluginsd_chart_slots.available.used];
+        st->stream.snd.chart_slot =
+            host->stream.snd.pluginsd_chart_slots.available.array[--host->stream.snd.pluginsd_chart_slots.available.used];
     else
-        st->rrdpush.sender.chart_slot = ++host->stream.snd.pluginsd_chart_slots.last_used;
+        st->stream.snd.chart_slot = ++host->stream.snd.pluginsd_chart_slots.last_used;
 
     spinlock_unlock(&host->stream.snd.pluginsd_chart_slots.available.spinlock);
 }
 
-static void rrdset_rrdpush_send_chart_slot_release(RRDSET *st) {
-    if(!st->rrdpush.sender.chart_slot || st->rrdhost->stream.snd.pluginsd_chart_slots.available.ignore)
+static void rrdset_stream_send_chart_slot_release(RRDSET *st) {
+    if(!st->stream.snd.chart_slot || st->rrdhost->stream.snd.pluginsd_chart_slots.available.ignore)
         return;
 
     RRDHOST *host = st->rrdhost;
@@ -38,15 +38,15 @@ static void rrdset_rrdpush_send_chart_slot_release(RRDSET *st) {
         uint32_t new_size = (old_size > 0) ? (old_size * 2) : 1024;
 
         host->stream.snd.pluginsd_chart_slots.available.array =
-                reallocz(host->stream.snd.pluginsd_chart_slots.available.array, new_size * sizeof(uint32_t));
+            reallocz(host->stream.snd.pluginsd_chart_slots.available.array, new_size * sizeof(uint32_t));
 
         host->stream.snd.pluginsd_chart_slots.available.size = new_size;
     }
 
     host->stream.snd.pluginsd_chart_slots.available.array[host->stream.snd.pluginsd_chart_slots.available.used++] =
-            st->rrdpush.sender.chart_slot;
+            st->stream.snd.chart_slot;
 
-    st->rrdpush.sender.chart_slot = 0;
+    st->stream.snd.chart_slot = 0;
     spinlock_unlock(&host->stream.snd.pluginsd_chart_slots.available.spinlock);
 }
 
@@ -62,7 +62,7 @@ void rrdhost_pluginsd_send_chart_slots_free(RRDHOST *host) {
     // zero all the slots on all charts, so that they will not attempt to access the array
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        st->rrdpush.sender.chart_slot = 0;
+        st->stream.snd.chart_slot = 0;
     }
     rrdset_foreach_done(st);
 }
@@ -257,7 +257,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->chart_type = ctr->chart_type;
     st->rrdhost = host;
 
-    rrdset_rrdpush_send_chart_slot_assign(st);
+    rrdset_stream_send_chart_slot_assign(st);
 
     spinlock_init(&st->data_collection_lock);
 
@@ -340,7 +340,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdset_finalize_collection(st, false);
 
-    rrdset_rrdpush_send_chart_slot_release(st);
+    rrdset_stream_send_chart_slot_release(st);
 
     // remove it from the name index
     rrdset_index_del_name(host, st);
@@ -749,7 +749,7 @@ inline void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
 
         // the chart will not get more updates (data collection)
         // so, we have to push its definition now
-        rrdset_push_chart_definition_now(st);
+        stream_sender_send_rrdset_definition_now(st);
         rrdcontext_updated_rrdset_flags(st);
     }
 }
@@ -1464,7 +1464,7 @@ static inline size_t rrdset_done_interpolate(
                 (void) ml_dimension_is_anomalous(rd, current_time_s, 0, false);
 
                 if(rsb->wb && rsb->v2)
-                    rrddim_push_metrics_v2(rsb, rd, next_store_ut, NAN, SN_FLAG_NONE);
+                    stream_send_rrddim_metrics_v2(rsb, rd, next_store_ut, NAN, SN_FLAG_NONE);
 
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
                 continue;
@@ -1479,7 +1479,7 @@ static inline size_t rrdset_done_interpolate(
                 }
 
                 if(rsb->wb && rsb->v2)
-                    rrddim_push_metrics_v2(rsb, rd, next_store_ut, new_value, dim_storage_flags);
+                    stream_send_rrddim_metrics_v2(rsb, rd, next_store_ut, new_value, dim_storage_flags);
 
                 rrddim_store_metric(rd, next_store_ut, new_value, dim_storage_flags);
                 rd->collector.last_stored_value = new_value;
@@ -1490,7 +1490,7 @@ static inline size_t rrdset_done_interpolate(
                 rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rrddim_name(rd), current_entry);
 
                 if(rsb->wb && rsb->v2)
-                    rrddim_push_metrics_v2(rsb, rd, next_store_ut, NAN, SN_FLAG_NONE);
+                    stream_send_rrddim_metrics_v2(rsb, rd, next_store_ut, NAN, SN_FLAG_NONE);
 
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
                 rd->collector.last_stored_value = NAN;
@@ -1534,8 +1534,8 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     if(unlikely(!service_running(SERVICE_COLLECTORS))) return;
 
     RRDSET_STREAM_BUFFER stream_buffer = { .wb = NULL, };
-    if(unlikely(rrdhost_has_rrdpush_sender_enabled(st->rrdhost)))
-        stream_buffer = rrdset_push_metric_initialize(st, now.tv_sec);
+    if(unlikely(rrdhost_has_stream_sender_enabled(st->rrdhost)))
+        stream_buffer = stream_send_metrics_init(st, now.tv_sec);
 
     spinlock_lock(&st->data_collection_lock);
 
@@ -1660,7 +1660,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     st->counter_done++;
 
     if(stream_buffer.wb && !stream_buffer.v2)
-        rrdset_push_metrics_v1(&stream_buffer, st);
+        stream_send_rrdset_metrics_v1(&stream_buffer, st);
 
     size_t rda_slots = dictionary_entries(st->rrddim_root_index);
     struct rda_item *rda_base = rrdset_thread_rda_get(&rda_slots);
@@ -1988,7 +1988,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     }
 
     spinlock_unlock(&st->data_collection_lock);
-    rrdset_push_metrics_finished(&stream_buffer, st);
+    stream_send_rrdset_metrics_finished(&stream_buffer, st);
 
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------

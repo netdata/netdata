@@ -132,7 +132,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     rrdhost_receiver_lock(host);
     s->ingest.hops = (int16_t)(host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
     bool has_receiver = false;
-    if (host->receiver && !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED)) {
+    if (host->receiver && !rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED)) {
         has_receiver = true;
         s->ingest.replication.instances = rrdhost_receiver_replicating_charts(host);
         s->ingest.replication.completion = host->stream.rcv.status.replication.percent;
@@ -199,7 +199,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
         s->stream.hops = (int16_t)(s->ingest.hops + 1);
     }
     else {
-        sender_lock(host->sender);
+        stream_sender_lock(host->sender);
 
         s->stream.since = host->sender->last_state_since_t;
         s->stream.peers = nd_sock_socket_peers(&host->sender->sock);
@@ -210,7 +210,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
                MIN(sizeof(s->stream.sent_bytes_on_this_connection_per_type),
                    sizeof(host->sender->thread.bytes_sent_by_type)));
 
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED)) {
             s->stream.hops = host->sender->hops;
             s->stream.reason = STREAM_HANDSHAKE_NEVER;
             s->stream.capabilities = host->sender->capabilities;
@@ -231,7 +231,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
             s->stream.reason = host->sender->exit.reason;
         }
 
-        sender_unlock(host->sender);
+        stream_sender_unlock(host->sender);
     }
 
     s->stream.id = host->stream.snd.status.connections;

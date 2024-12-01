@@ -19,7 +19,7 @@
 #include "brotli.h"
 #endif
 
-void rrdpush_parse_compression_order(struct stream_receiver_config *config, const char *order) {
+void stream_parse_compression_order(struct stream_receiver_config *config, const char *order) {
     // empty all slots
     for(size_t i = 0; i < COMPRESSION_ALGORITHM_MAX ;i++)
         config->compression.priorities[i] = STREAM_CAP_NONE;
@@ -62,7 +62,7 @@ void rrdpush_parse_compression_order(struct stream_receiver_config *config, cons
         config->compression.priorities[slot++] = STREAM_CAP_GZIP;
 }
 
-void rrdpush_select_receiver_compression_algorithm(struct receiver_state *rpt) {
+void stream_select_receiver_compression_algorithm(struct receiver_state *rpt) {
     if (!rpt->config.compression.enabled)
         rpt->capabilities &= ~STREAM_CAP_COMPRESSIONS_AVAILABLE;
 
@@ -86,8 +86,8 @@ void rrdpush_select_receiver_compression_algorithm(struct receiver_state *rpt) {
     }
 }
 
-bool rrdpush_compression_initialize(struct sender_state *s) {
-    rrdpush_compressor_destroy(&s->compressor);
+bool stream_compression_initialize(struct sender_state *s) {
+    stream_compressor_destroy(&s->compressor);
 
     // IMPORTANT
     // KEEP THE SAME ORDER IN DECOMPRESSION
@@ -105,15 +105,15 @@ bool rrdpush_compression_initialize(struct sender_state *s) {
 
     if(s->compressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
         s->compressor.level = stream_send.compression.levels[s->compressor.algorithm];
-        rrdpush_compressor_init(&s->compressor);
+        stream_compressor_init(&s->compressor);
         return true;
     }
 
     return false;
 }
 
-bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
-    rrdpush_decompressor_destroy(&rpt->receiver.compressed.decompressor);
+bool stream_decompression_initialize(struct receiver_state *rpt) {
+    stream_decompressor_destroy(&rpt->receiver.compressed.decompressor);
 
     // IMPORTANT
     // KEEP THE SAME ORDER IN COMPRESSION
@@ -130,7 +130,7 @@ bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
         rpt->receiver.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_NONE;
 
     if(rpt->receiver.compressed.decompressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
-        rrdpush_decompressor_init(&rpt->receiver.compressed.decompressor);
+        stream_decompressor_init(&rpt->receiver.compressed.decompressor);
         return true;
     }
 
@@ -142,7 +142,7 @@ bool rrdpush_decompression_initialize(struct receiver_state *rpt) {
 * Inform the user through the error log file and
 * deactivate compression by downgrading the stream protocol.
 */
-void rrdpush_compression_deactivate(struct sender_state *s) {
+void stream_compression_deactivate(struct sender_state *s) {
     switch(s->compressor.algorithm) {
         case COMPRESSION_ALGORITHM_MAX:
         case COMPRESSION_ALGORITHM_NONE:
@@ -179,29 +179,29 @@ void rrdpush_compression_deactivate(struct sender_state *s) {
 // ----------------------------------------------------------------------------
 // compressor public API
 
-void rrdpush_compressor_init(struct compressor_state *state) {
+void stream_compressor_init(struct compressor_state *state) {
     switch(state->algorithm) {
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
-            rrdpush_compressor_init_zstd(state);
+            stream_compressor_init_zstd(state);
             break;
 #endif
 
 #ifdef ENABLE_LZ4
         case COMPRESSION_ALGORITHM_LZ4:
-            rrdpush_compressor_init_lz4(state);
+            stream_compressor_init_lz4(state);
             break;
 #endif
 
 #ifdef ENABLE_BROTLI
         case COMPRESSION_ALGORITHM_BROTLI:
-            rrdpush_compressor_init_brotli(state);
+            stream_compressor_init_brotli(state);
             break;
 #endif
 
         default:
         case COMPRESSION_ALGORITHM_GZIP:
-            rrdpush_compressor_init_gzip(state);
+            stream_compressor_init_gzip(state);
             break;
     }
 
@@ -209,29 +209,29 @@ void rrdpush_compressor_init(struct compressor_state *state) {
     simple_ring_buffer_reset(&state->output);
 }
 
-void rrdpush_compressor_destroy(struct compressor_state *state) {
+void stream_compressor_destroy(struct compressor_state *state) {
     switch(state->algorithm) {
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
-            rrdpush_compressor_destroy_zstd(state);
+            stream_compressor_destroy_zstd(state);
             break;
 #endif
 
 #ifdef ENABLE_LZ4
         case COMPRESSION_ALGORITHM_LZ4:
-            rrdpush_compressor_destroy_lz4(state);
+            stream_compressor_destroy_lz4(state);
             break;
 #endif
 
 #ifdef ENABLE_BROTLI
         case COMPRESSION_ALGORITHM_BROTLI:
-            rrdpush_compressor_destroy_brotli(state);
+            stream_compressor_destroy_brotli(state);
             break;
 #endif
 
         default:
         case COMPRESSION_ALGORITHM_GZIP:
-            rrdpush_compressor_destroy_gzip(state);
+            stream_compressor_destroy_gzip(state);
             break;
     }
 
@@ -241,36 +241,36 @@ void rrdpush_compressor_destroy(struct compressor_state *state) {
     simple_ring_buffer_destroy(&state->output);
 }
 
-size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t size, const char **out) {
+size_t stream_compress(struct compressor_state *state, const char *data, size_t size, const char **out) {
     size_t ret = 0;
 
     switch(state->algorithm) {
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
-            ret = rrdpush_compress_zstd(state, data, size, out);
+            ret = stream_compress_zstd(state, data, size, out);
             break;
 #endif
 
 #ifdef ENABLE_LZ4
         case COMPRESSION_ALGORITHM_LZ4:
-            ret = rrdpush_compress_lz4(state, data, size, out);
+            ret = stream_compress_lz4(state, data, size, out);
             break;
 #endif
 
 #ifdef ENABLE_BROTLI
         case COMPRESSION_ALGORITHM_BROTLI:
-            ret = rrdpush_compress_brotli(state, data, size, out);
+            ret = stream_compress_brotli(state, data, size, out);
             break;
 #endif
 
         default:
         case COMPRESSION_ALGORITHM_GZIP:
-            ret = rrdpush_compress_gzip(state, data, size, out);
+            ret = stream_compress_gzip(state, data, size, out);
             break;
     }
 
     if(unlikely(ret >= COMPRESSION_MAX_CHUNK)) {
-        netdata_log_error("RRDPUSH_COMPRESS: compressed data is %zu bytes, which is >= than the max chunk size %d",
+        netdata_log_error("STREAM_COMPRESS: compressed data is %zu bytes, which is >= than the max chunk size %d",
                 ret, COMPRESSION_MAX_CHUNK);
         return 0;
     }
@@ -281,32 +281,32 @@ size_t rrdpush_compress(struct compressor_state *state, const char *data, size_t
 // ----------------------------------------------------------------------------
 // decompressor public API
 
-void rrdpush_decompressor_destroy(struct decompressor_state *state) {
+void stream_decompressor_destroy(struct decompressor_state *state) {
     if(unlikely(!state->initialized))
         return;
 
     switch(state->algorithm) {
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
-            rrdpush_decompressor_destroy_zstd(state);
+            stream_decompressor_destroy_zstd(state);
             break;
 #endif
 
 #ifdef ENABLE_LZ4
         case COMPRESSION_ALGORITHM_LZ4:
-            rrdpush_decompressor_destroy_lz4(state);
+            stream_decompressor_destroy_lz4(state);
             break;
 #endif
 
 #ifdef ENABLE_BROTLI
         case COMPRESSION_ALGORITHM_BROTLI:
-            rrdpush_decompressor_destroy_brotli(state);
+            stream_decompressor_destroy_brotli(state);
             break;
 #endif
 
         default:
         case COMPRESSION_ALGORITHM_GZIP:
-            rrdpush_decompressor_destroy_gzip(state);
+            stream_decompressor_destroy_gzip(state);
             break;
     }
 
@@ -315,71 +315,71 @@ void rrdpush_decompressor_destroy(struct decompressor_state *state) {
     state->initialized = false;
 }
 
-void rrdpush_decompressor_init(struct decompressor_state *state) {
+void stream_decompressor_init(struct decompressor_state *state) {
     switch(state->algorithm) {
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
-            rrdpush_decompressor_init_zstd(state);
+            stream_decompressor_init_zstd(state);
             break;
 #endif
 
 #ifdef ENABLE_LZ4
         case COMPRESSION_ALGORITHM_LZ4:
-            rrdpush_decompressor_init_lz4(state);
+            stream_decompressor_init_lz4(state);
             break;
 #endif
 
 #ifdef ENABLE_BROTLI
         case COMPRESSION_ALGORITHM_BROTLI:
-            rrdpush_decompressor_init_brotli(state);
+            stream_decompressor_init_brotli(state);
             break;
 #endif
 
         default:
         case COMPRESSION_ALGORITHM_GZIP:
-            rrdpush_decompressor_init_gzip(state);
+            stream_decompressor_init_gzip(state);
             break;
     }
 
-    state->signature_size = RRDPUSH_COMPRESSION_SIGNATURE_SIZE;
+    state->signature_size = STREAM_COMPRESSION_SIGNATURE_SIZE;
     simple_ring_buffer_reset(&state->output);
 }
 
-size_t rrdpush_decompress(struct decompressor_state *state, const char *compressed_data, size_t compressed_size) {
+size_t stream_decompress(struct decompressor_state *state, const char *compressed_data, size_t compressed_size) {
     if (unlikely(state->output.read_pos != state->output.write_pos))
-        fatal("RRDPUSH_DECOMPRESS: asked to decompress new data, while there are unread data in the decompression buffer!");
+        fatal("STREAM_DECOMPRESS: asked to decompress new data, while there are unread data in the decompression buffer!");
 
     size_t ret = 0;
 
     switch(state->algorithm) {
 #ifdef ENABLE_ZSTD
         case COMPRESSION_ALGORITHM_ZSTD:
-            ret = rrdpush_decompress_zstd(state, compressed_data, compressed_size);
+            ret = stream_decompress_zstd(state, compressed_data, compressed_size);
             break;
 #endif
 
 #ifdef ENABLE_LZ4
         case COMPRESSION_ALGORITHM_LZ4:
-            ret = rrdpush_decompress_lz4(state, compressed_data, compressed_size);
+            ret = stream_decompress_lz4(state, compressed_data, compressed_size);
             break;
 #endif
 
 #ifdef ENABLE_BROTLI
         case COMPRESSION_ALGORITHM_BROTLI:
-            ret = rrdpush_decompress_brotli(state, compressed_data, compressed_size);
+            ret = stream_decompress_brotli(state, compressed_data, compressed_size);
             break;
 #endif
 
         default:
         case COMPRESSION_ALGORITHM_GZIP:
-            ret = rrdpush_decompress_gzip(state, compressed_data, compressed_size);
+            ret = stream_decompress_gzip(state, compressed_data, compressed_size);
             break;
     }
 
     // for backwards compatibility we cannot check for COMPRESSION_MAX_MSG_SIZE,
     // because old children may send this big payloads.
     if(unlikely(ret > COMPRESSION_MAX_CHUNK)) {
-        netdata_log_error("RRDPUSH_DECOMPRESS: decompressed data is %zu bytes, which is bigger than the max msg size %d",
+        netdata_log_error("STREAM_DECOMPRESS: decompressed data is %zu bytes, which is bigger than the max msg size %d",
                           ret, COMPRESSION_MAX_CHUNK);
         return 0;
     }
@@ -473,7 +473,7 @@ void unittest_generate_message(BUFFER *wb, time_t now_s, size_t counter) {
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
 }
 
-int unittest_rrdpush_compression_speed(compression_algorithm_t algorithm, const char *name) {
+int unittest_stream_compression_speed(compression_algorithm_t algorithm, const char *name) {
     fprintf(stderr, "\nTesting streaming compression speed with %s\n", name);
 
     struct compressor_state cctx =  {
@@ -485,8 +485,8 @@ int unittest_rrdpush_compression_speed(compression_algorithm_t algorithm, const 
             .algorithm = algorithm,
     };
 
-    rrdpush_compressor_init(&cctx);
-    rrdpush_decompressor_init(&dctx);
+    stream_compressor_init(&cctx);
+    stream_decompressor_init(&dctx);
 
     int errors = 0;
 
@@ -513,7 +513,7 @@ int unittest_rrdpush_compression_speed(compression_algorithm_t algorithm, const 
         bytes_uncompressed += txt_len;
 
         const char *out;
-        size_t size = rrdpush_compress(&cctx, txt, txt_len, &out);
+        size_t size = stream_compress(&cctx, txt, txt_len, &out);
 
         bytes_compressed += size;
         decompression_started_ut = now_monotonic_usec();
@@ -532,13 +532,12 @@ int unittest_rrdpush_compression_speed(compression_algorithm_t algorithm, const 
             goto cleanup;
         }
         else {
-            size_t dtxt_len = rrdpush_decompress(&dctx, out, size);
+            size_t dtxt_len = stream_decompress(&dctx, out, size);
             char *dtxt = (char *) &dctx.output.data[dctx.output.read_pos];
 
-            if(rrdpush_decompressed_bytes_in_buffer(&dctx) != dtxt_len) {
-                fprintf(stderr, "iteration %d: decompressed size %zu does not rrdpush_decompressed_bytes_in_buffer() %zu\n",
-                        i, dtxt_len, rrdpush_decompressed_bytes_in_buffer(&dctx)
-                       );
+            if(stream_decompressed_bytes_in_buffer(&dctx) != dtxt_len) {
+                fprintf(stderr, "iteration %d: decompressed size %zu does not stream_decompressed_bytes_in_buffer() %zu\n",
+                        i, dtxt_len, stream_decompressed_bytes_in_buffer(&dctx));
                 errors++;
                 goto cleanup;
             }
@@ -566,12 +565,12 @@ int unittest_rrdpush_compression_speed(compression_algorithm_t algorithm, const 
         }
 
         // here we are supposed to copy the data and advance the position
-        dctx.output.read_pos += rrdpush_decompressed_bytes_in_buffer(&dctx);
+        dctx.output.read_pos += stream_decompressed_bytes_in_buffer(&dctx);
     }
 
 cleanup:
-    rrdpush_compressor_destroy(&cctx);
-    rrdpush_decompressor_destroy(&dctx);
+    stream_compressor_destroy(&cctx);
+    stream_decompressor_destroy(&dctx);
 
     if(errors)
         fprintf(stderr, "Compression with %s: FAILED (%d errors)\n", name, errors);
@@ -585,7 +584,7 @@ cleanup:
     return errors;
 }
 
-int unittest_rrdpush_compression(compression_algorithm_t algorithm, const char *name) {
+int unittest_stream_compression(compression_algorithm_t algorithm, const char *name) {
     fprintf(stderr, "\nTesting streaming compression with %s\n", name);
 
     struct compressor_state cctx =  {
@@ -599,8 +598,8 @@ int unittest_rrdpush_compression(compression_algorithm_t algorithm, const char *
 
     char txt[COMPRESSION_MAX_MSG_SIZE];
 
-    rrdpush_compressor_init(&cctx);
-    rrdpush_decompressor_init(&dctx);
+    stream_compressor_init(&cctx);
+    stream_decompressor_init(&dctx);
 
     int errors = 0;
 
@@ -611,7 +610,7 @@ int unittest_rrdpush_compression(compression_algorithm_t algorithm, const char *
         size_t txt_len = i + 1;
 
         const char *out;
-        size_t size = rrdpush_compress(&cctx, txt, txt_len, &out);
+        size_t size = stream_compress(&cctx, txt, txt_len, &out);
 
         if(size == 0) {
             fprintf(stderr, "iteration %d: compressed size %zu is zero\n",
@@ -626,12 +625,13 @@ int unittest_rrdpush_compression(compression_algorithm_t algorithm, const char *
             goto cleanup;
         }
         else {
-            size_t dtxt_len = rrdpush_decompress(&dctx, out, size);
+            size_t dtxt_len = stream_decompress(&dctx, out, size);
             char *dtxt = (char *) &dctx.output.data[dctx.output.read_pos];
 
-            if(rrdpush_decompressed_bytes_in_buffer(&dctx) != dtxt_len) {
-                fprintf(stderr, "iteration %d: decompressed size %zu does not rrdpush_decompressed_bytes_in_buffer() %zu\n",
-                        i, dtxt_len, rrdpush_decompressed_bytes_in_buffer(&dctx)
+            if(stream_decompressed_bytes_in_buffer(&dctx) != dtxt_len) {
+                fprintf(stderr, "iteration %d: decompressed size %zu does not stream_decompressed_bytes_in_buffer() %zu\n",
+                        i, dtxt_len,
+                    stream_decompressed_bytes_in_buffer(&dctx)
                        );
                 errors++;
                 goto cleanup;
@@ -666,12 +666,12 @@ int unittest_rrdpush_compression(compression_algorithm_t algorithm, const char *
         memset((void *)out, 'x', size);
 
         // here we are supposed to copy the data and advance the position
-        dctx.output.read_pos += rrdpush_decompressed_bytes_in_buffer(&dctx);
+        dctx.output.read_pos += stream_decompressed_bytes_in_buffer(&dctx);
     }
 
 cleanup:
-    rrdpush_compressor_destroy(&cctx);
-    rrdpush_decompressor_destroy(&dctx);
+    stream_compressor_destroy(&cctx);
+    stream_decompressor_destroy(&dctx);
 
     if(errors)
         fprintf(stderr, "Compression with %s: FAILED (%d errors)\n", name, errors);
@@ -681,18 +681,18 @@ cleanup:
     return errors;
 }
 
-int unittest_rrdpush_compressions(void) {
+int unittest_stream_compressions(void) {
     int ret = 0;
 
-    ret += unittest_rrdpush_compression(COMPRESSION_ALGORITHM_ZSTD, "ZSTD");
-    ret += unittest_rrdpush_compression(COMPRESSION_ALGORITHM_LZ4, "LZ4");
-    ret += unittest_rrdpush_compression(COMPRESSION_ALGORITHM_BROTLI, "BROTLI");
-    ret += unittest_rrdpush_compression(COMPRESSION_ALGORITHM_GZIP, "GZIP");
+    ret += unittest_stream_compression(COMPRESSION_ALGORITHM_ZSTD, "ZSTD");
+    ret += unittest_stream_compression(COMPRESSION_ALGORITHM_LZ4, "LZ4");
+    ret += unittest_stream_compression(COMPRESSION_ALGORITHM_BROTLI, "BROTLI");
+    ret += unittest_stream_compression(COMPRESSION_ALGORITHM_GZIP, "GZIP");
 
-    ret += unittest_rrdpush_compression_speed(COMPRESSION_ALGORITHM_ZSTD, "ZSTD");
-    ret += unittest_rrdpush_compression_speed(COMPRESSION_ALGORITHM_LZ4, "LZ4");
-    ret += unittest_rrdpush_compression_speed(COMPRESSION_ALGORITHM_BROTLI, "BROTLI");
-    ret += unittest_rrdpush_compression_speed(COMPRESSION_ALGORITHM_GZIP, "GZIP");
+    ret += unittest_stream_compression_speed(COMPRESSION_ALGORITHM_ZSTD, "ZSTD");
+    ret += unittest_stream_compression_speed(COMPRESSION_ALGORITHM_LZ4, "LZ4");
+    ret += unittest_stream_compression_speed(COMPRESSION_ALGORITHM_BROTLI, "BROTLI");
+    ret += unittest_stream_compression_speed(COMPRESSION_ALGORITHM_GZIP, "GZIP");
 
     return ret;
 }

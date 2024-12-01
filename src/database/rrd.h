@@ -343,8 +343,8 @@ struct rrddim {
         struct {
             uint32_t sent_version;
             uint32_t dim_slot;
-        } sender;
-    } rrdpush;
+        } snd;
+    } stream;
 
     // ------------------------------------------------------------------------
     // data collection members
@@ -782,8 +782,8 @@ struct rrdset {
             uint32_t dim_last_slot_used;
 
             time_t resync_time_s;                   // the timestamp up to which we should resync clock upstream
-        } sender;
-    } rrdpush;
+        } snd;
+    } stream;
 
     // ------------------------------------------------------------------------
     // db mode SAVE, MAP specifics
@@ -854,13 +854,13 @@ static inline uint32_t rrdset_metadata_version(RRDSET *st) {
 }
 
 static inline uint32_t rrdset_metadata_upstream_version(RRDSET *st) {
-    return __atomic_load_n(&st->rrdpush.sender.sent_version, __ATOMIC_RELAXED);
+    return __atomic_load_n(&st->stream.snd.sent_version, __ATOMIC_RELAXED);
 }
 
 void rrdset_metadata_updated(RRDSET *st);
 
 static inline void rrdset_metadata_exposed_upstream(RRDSET *st, uint32_t version) {
-    __atomic_store_n(&st->rrdpush.sender.sent_version, version, __ATOMIC_RELAXED);
+    __atomic_store_n(&st->stream.snd.sent_version, version, __ATOMIC_RELAXED);
 }
 
 static inline bool rrdset_check_upstream_exposed(RRDSET *st) {
@@ -873,17 +873,17 @@ static inline uint32_t rrddim_metadata_version(RRDDIM *rd) {
 }
 
 static inline uint32_t rrddim_metadata_upstream_version(RRDDIM *rd) {
-    return __atomic_load_n(&rd->rrdpush.sender.sent_version, __ATOMIC_RELAXED);
+    return __atomic_load_n(&rd->stream.snd.sent_version, __ATOMIC_RELAXED);
 }
 
 void rrddim_metadata_updated(RRDDIM *rd);
 
 static inline void rrddim_metadata_exposed_upstream(RRDDIM *rd, uint32_t version) {
-    __atomic_store_n(&rd->rrdpush.sender.sent_version, version, __ATOMIC_RELAXED);
+    __atomic_store_n(&rd->stream.snd.sent_version, version, __ATOMIC_RELAXED);
 }
 
 static inline void rrddim_metadata_exposed_upstream_clear(RRDDIM *rd) {
-    __atomic_store_n(&rd->rrdpush.sender.sent_version, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&rd->stream.snd.sent_version, 0, __ATOMIC_RELAXED);
 }
 
 static inline bool rrddim_check_upstream_exposed(RRDDIM *rd) {
@@ -894,7 +894,7 @@ static inline bool rrddim_check_upstream_exposed(RRDDIM *rd) {
 // still, it can be removed, after the collector has finished
 // so, it is safe to check it without atomics
 static inline bool rrddim_check_upstream_exposed_collector(RRDDIM *rd) {
-    return rd->rrdset->version == rd->rrdpush.sender.sent_version;
+    return rd->rrdset->version == rd->stream.snd.sent_version;
 }
 
 STRING *rrd_string_strdupz(const char *s);
@@ -937,11 +937,11 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 11), // the host has pending dimension obsoletions
 
     // Streaming sender
-    RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED     = (1 << 12), // the host has initialized rrdpush structures
-    RRDHOST_FLAG_RRDPUSH_SENDER_ADDED           = (1 << 13), // When set, the sender thread is running
-    RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED       = (1 << 14), // When set, the host is connected to a parent
-    RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS = (1 << 15), // when set, rrdset_done() should push metrics to parent
-    RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS   = (1 << 16), // when set, we have logged the status of metrics streaming
+    RRDHOST_FLAG_STREAM_SENDER_INITIALIZED      = (1 << 12), // the host has initialized streaming sender structures
+    RRDHOST_FLAG_STREAM_SENDER_ADDED            = (1 << 13), // When set, the sender thread is running
+    RRDHOST_FLAG_STREAM_SENDER_CONNECTED        = (1 << 14), // When set, the host is connected to a parent
+    RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS  = (1 << 15), // when set, rrdset_done() should push metrics to parent
+    RRDHOST_FLAG_STREAM_SENDER_LOGGED_STATUS    = (1 << 16), // when set, we have logged the status of metrics streaming
 
     // Health
     RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 17), // contains charts and dims with uninitialized variables
@@ -962,7 +962,7 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     RRDHOST_FLAG_PENDING_CONTEXT_LOAD           = (1 << 26), // Context needs to be loaded
 
     RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 27), // metadata needs to be stored in the database
-    RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED  = (1 << 28), // set when the receiver part is disconnected
+    RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED   = (1 << 28), // set when the receiver part is disconnected
 
     RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 29), // set when the host has updated global functions
 } RRDHOST_FLAGS;
@@ -996,13 +996,12 @@ typedef enum __attribute__ ((__packed__)) {
 #define rrdhost_option_set(host, flag)   (host)->options |= flag
 #define rrdhost_option_clear(host, flag) (host)->options &= ~(flag)
 
-#define rrdhost_has_rrdpush_sender_enabled(host) (rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED) && (host)->sender)
+#define rrdhost_has_stream_sender_enabled(host) (rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED) && (host)->sender)
 
-#define rrdhost_can_send_metadata_to_parent(host)                                   \
-    (                                                                               \
-        rrdhost_has_rrdpush_sender_enabled(host) &&                                 \
-        rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS) &&    \
-        !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED)       \
+#define rrdhost_can_stream_metadata_to_parent(host)                                 \
+    (rrdhost_has_stream_sender_enabled(host) &&                                     \
+     rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS) &&        \
+     !rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED)          \
     )
 
 // ----------------------------------------------------------------------------
@@ -1368,7 +1367,7 @@ extern RRDHOST *localhost;
 #define rrdhost_sender_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->stream.snd.status.replication.charts), 1, __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_zero(host) (__atomic_store_n(&((host)->stream.snd.status.replication.charts), 0, __ATOMIC_RELAXED))
 
-#define rrdhost_is_online(host) ((host) == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))
+#define rrdhost_is_online(host) ((host) == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED))
 bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now);
 
 extern DICTIONARY *rrdhost_root_index;

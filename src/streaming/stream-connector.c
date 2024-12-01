@@ -59,7 +59,7 @@ static struct {
     {
         .response = START_STREAMING_PROMPT_VN,
         .length = sizeof(START_STREAMING_PROMPT_VN) - 1,
-        .status = RRDPUSH_STATUS_CONNECTED,
+        .status = STREAM_STATUS_CONNECTED,
         .version = STREAM_HANDSHAKE_OK_V3, // and above
         .dynamic = true,                 // dynamic = we will parse the version / capabilities
         .error = NULL,
@@ -70,7 +70,7 @@ static struct {
     {
         .response = START_STREAMING_PROMPT_V2,
         .length = sizeof(START_STREAMING_PROMPT_V2) - 1,
-        .status = RRDPUSH_STATUS_CONNECTED,
+        .status = STREAM_STATUS_CONNECTED,
         .version = STREAM_HANDSHAKE_OK_V2,
         .dynamic = false,
         .error = NULL,
@@ -81,7 +81,7 @@ static struct {
     {
         .response = START_STREAMING_PROMPT_V1,
         .length = sizeof(START_STREAMING_PROMPT_V1) - 1,
-        .status = RRDPUSH_STATUS_CONNECTED,
+        .status = STREAM_STATUS_CONNECTED,
         .version = STREAM_HANDSHAKE_OK_V1,
         .dynamic = false,
         .error = NULL,
@@ -92,7 +92,7 @@ static struct {
     {
         .response = START_STREAMING_ERROR_SAME_LOCALHOST,
         .length = sizeof(START_STREAMING_ERROR_SAME_LOCALHOST) - 1,
-        .status = RRDPUSH_STATUS_LOCALHOST,
+        .status = STREAM_STATUS_LOCALHOST,
         .version = STREAM_HANDSHAKE_ERROR_LOCALHOST,
         .dynamic = false,
         .error = "remote server rejected this stream, the host we are trying to stream is its localhost",
@@ -103,7 +103,7 @@ static struct {
     {
         .response = START_STREAMING_ERROR_ALREADY_STREAMING,
         .length = sizeof(START_STREAMING_ERROR_ALREADY_STREAMING) - 1,
-        .status = RRDPUSH_STATUS_ALREADY_CONNECTED,
+        .status = STREAM_STATUS_ALREADY_CONNECTED,
         .version = STREAM_HANDSHAKE_ERROR_ALREADY_CONNECTED,
         .dynamic = false,
         .error = "remote server rejected this stream, the host we are trying to stream is already streamed to it",
@@ -114,7 +114,7 @@ static struct {
     {
         .response = START_STREAMING_ERROR_NOT_PERMITTED,
         .length = sizeof(START_STREAMING_ERROR_NOT_PERMITTED) - 1,
-        .status = RRDPUSH_STATUS_PERMISSION_DENIED,
+        .status = STREAM_STATUS_PERMISSION_DENIED,
         .version = STREAM_HANDSHAKE_ERROR_DENIED,
         .dynamic = false,
         .error = "remote server denied access, probably we don't have the right API key?",
@@ -125,7 +125,7 @@ static struct {
     {
         .response = START_STREAMING_ERROR_BUSY_TRY_LATER,
         .length = sizeof(START_STREAMING_ERROR_BUSY_TRY_LATER) - 1,
-        .status = RRDPUSH_STATUS_RATE_LIMIT,
+        .status = STREAM_STATUS_RATE_LIMIT,
         .version = STREAM_HANDSHAKE_BUSY_TRY_LATER,
         .dynamic = false,
         .error = "remote server is currently busy, we should try later",
@@ -136,7 +136,7 @@ static struct {
     {
         .response = START_STREAMING_ERROR_INTERNAL_ERROR,
         .length = sizeof(START_STREAMING_ERROR_INTERNAL_ERROR) - 1,
-        .status = RRDPUSH_STATUS_INTERNAL_SERVER_ERROR,
+        .status = STREAM_STATUS_INTERNAL_SERVER_ERROR,
         .version = STREAM_HANDSHAKE_INTERNAL_ERROR,
         .dynamic = false,
         .error = "remote server is encountered an internal error, we should try later",
@@ -147,7 +147,7 @@ static struct {
     {
         .response = START_STREAMING_ERROR_INITIALIZATION,
         .length = sizeof(START_STREAMING_ERROR_INITIALIZATION) - 1,
-        .status = RRDPUSH_STATUS_INITIALIZATION_IN_PROGRESS,
+        .status = STREAM_STATUS_INITIALIZATION_IN_PROGRESS,
         .version = STREAM_HANDSHAKE_INITIALIZATION,
         .dynamic = false,
         .error = "remote server is initializing, we should try later",
@@ -160,7 +160,7 @@ static struct {
     {
         .response = NULL,
         .length = 0,
-        .status = RRDPUSH_STATUS_BAD_HANDSHAKE,
+        .status = STREAM_STATUS_BAD_HANDSHAKE,
         .version = STREAM_HANDSHAKE_ERROR_BAD_HANDSHAKE,
         .dynamic = false,
         .error = "remote node response is not understood, is it Netdata?",
@@ -443,7 +443,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
     if (s->parent_using_h2o && stream_connect_upgrade_prelude(host, s)) {
         ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_CANT_UPGRADE_CONNECTION),
+            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, STREAM_STATUS_CANT_UPGRADE_CONNECTION),
             ND_LOG_FIELD_END(),
         };
         ND_LOG_STACK_PUSH(lgs);
@@ -459,7 +459,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     ssize_t bytes = nd_sock_send_timeout(&s->sock, http, len, 0, timeout);
     if(bytes <= 0) { // timeout is 0
         ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_TIMEOUT),
+            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, STREAM_STATUS_TIMEOUT),
             ND_LOG_FIELD_END(),
         };
         ND_LOG_STACK_PUSH(lgs);
@@ -481,7 +481,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
         nd_sock_close(&s->sock);
 
         ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_TIMEOUT),
+            ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, STREAM_STATUS_TIMEOUT),
             ND_LOG_FIELD_END(),
         };
         ND_LOG_STACK_PUSH(lgs);
@@ -516,12 +516,12 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
         return false;
     }
 
-    rrdpush_compression_initialize(s);
+    stream_compression_initialize(s);
 
     log_sender_capabilities(s);
 
     ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_CONNECTED),
+        ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, STREAM_STATUS_CONNECTED),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -561,7 +561,7 @@ bool stream_connector_is_signaled_to_stop(struct sender_state *s) {
 }
 
 struct connector *stream_connector_get(struct sender_state *s) {
-    sender_lock(s);
+    stream_sender_lock(s);
 
     if(s->connector.id < 0 || s->connector.id >= MAX_CONNECTORS) {
         // assign this to the dispatcher with fewer nodes
@@ -583,7 +583,7 @@ struct connector *stream_connector_get(struct sender_state *s) {
     }
 
     struct connector *sc = &connector_globals.connectors[s->connector.id];
-    sender_unlock(s);
+    stream_sender_unlock(s);
 
     return sc;
 }
@@ -605,22 +605,22 @@ void stream_connector_requeue(struct sender_state *s) {
 
 void stream_connector_add(struct sender_state *s) {
     // multiple threads may come here - only one should be able to pass through
-    sender_lock(s);
-    if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->stream.snd.destination || !s->host->stream.snd.api_key) {
+    stream_sender_lock(s);
+    if(!rrdhost_has_stream_sender_enabled(s->host) || !s->host->stream.snd.destination || !s->host->stream.snd.api_key) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM %s [send]: host has streaming disabled - not sending data to a parent.",
                rrdhost_hostname(s->host));
-        sender_unlock(s);
+        stream_sender_unlock(s);
         return;
     }
-    if(rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED)) {
+    if(rrdhost_flag_check(s->host, RRDHOST_FLAG_STREAM_SENDER_ADDED)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM %s [send]: host has already added to sender - ignoring request",
                rrdhost_hostname(s->host));
-        sender_unlock(s);
+        stream_sender_unlock(s);
         return;
     }
-    rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED);
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
-    sender_unlock(s);
+    rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_SENDER_ADDED);
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED | RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
+    stream_sender_unlock(s);
 
     nd_sock_close(&s->sock);
     s->sbuf.cb->max_size = stream_send.buffer_max_size;

@@ -1481,7 +1481,7 @@ int julytest(void);
 int pluginsd_parser_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
-int unittest_rrdpush_compressions(void);
+int unittest_stream_compressions(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
@@ -1730,9 +1730,9 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return pluginsd_parser_unittest();
                         }
-                        else if(strcmp(optarg, "rrdpush_compressions_test") == 0) {
+                        else if(strcmp(optarg, "stream_compressions_test") == 0) {
                             unittest_running = true;
-                            return unittest_rrdpush_compressions();
+                            return unittest_stream_compressions();
                         }
                         else if(strcmp(optarg, "progresstest") == 0) {
                             unittest_running = true;
@@ -2244,7 +2244,7 @@ int netdata_main(int argc, char **argv) {
     netdata_random_session_id_generate();
 
     // ------------------------------------------------------------------------
-    // initialize rrd, registry, health, rrdpush, etc.
+    // initialize rrd, registry, health, streaming, etc.
 
     delta_startup_time("collecting system info");
 

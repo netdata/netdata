@@ -29,23 +29,23 @@
 #include "stream-compression/compression.h"
 #include "stream-conf.h"
 
-typedef void (*rrdpush_defer_action_t)(struct sender_state *s, void *data);
-typedef void (*rrdpush_defer_cleanup_t)(struct sender_state *s, void *data);
+typedef void (*stream_defer_action_t)(struct sender_state *s, void *data);
+typedef void (*stream_defer_cleanup_t)(struct sender_state *s, void *data);
 
 typedef enum __attribute__((packed)) {
-    SENDER_MSG_NONE                             = 0,
-    SENDER_MSG_ENABLE_SENDING                   = (1 << 0), // move traffic around as soon as possible
-    SENDER_MSG_RECONNECT_OVERFLOW               = (1 << 1), // reconnect the node, it has buffer overflow
-    SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION    = (1 << 2), // reconnect the node, but disable compression
-    SENDER_MSG_STOP_RECEIVER_LEFT               = (1 << 3), // disconnect the node, the receiver left
-    SENDER_MSG_STOP_HOST_CLEANUP                = (1 << 4), // disconnect the node, it is being de-allocated
-} SENDER_OP;
+    STREAM_OPCODE_NONE                                  = 0,
+    STREAM_OPCODE_SENDER_POLLOUT                        = (1 << 0), // move traffic around as soon as possible
+    STREAM_OPCODE_SENDER_BUFFER_OVERFLOW                = (1 << 1), // reconnect the node, it has buffer overflow
+    STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION  = (1 << 2), // reconnect the node, but disable compression
+    STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT             = (1 << 3), // disconnect the node, the receiver left
+    STREAM_OPCODE_SENDER_STOP_HOST_CLEANUP              = (1 << 4), // disconnect the node, it is being de-allocated
+} STREAM_OPCODE;
 
-struct sender_op {
+struct stream_opcode {
     int32_t thread_slot;                // the dispatcher id this message refers to
     int32_t snd_run_slot;               // the run slot of the dispatcher this message refers to
     uint32_t session;                   // random number used to verify that the message the dispatcher receives is for this sender
-    SENDER_OP op;                       // the actual message to be delivered
+    STREAM_OPCODE opcode;               // the actual message to be delivered
     struct sender_state *sender;
 };
 
@@ -60,7 +60,7 @@ struct sender_state {
     ND_SOCK sock;
 
     struct {
-        struct sender_op msg;   // the template for sending a message to the dispatcher - protected by sender_lock()
+        struct stream_opcode msg;   // the template for sending a message to the dispatcher - protected by sender_lock()
 
         // this is a property of stream_sender_send_msg_to_dispatcher()
         // protected by dispatcher->messages.spinlock
@@ -137,8 +137,8 @@ struct sender_state {
     struct {
         const char *end_keyword;
         BUFFER *payload;
-        rrdpush_defer_action_t action;
-        rrdpush_defer_cleanup_t cleanup;
+        stream_defer_action_t action;
+        stream_defer_cleanup_t cleanup;
         void *action_data;
     } defer;
 
@@ -148,27 +148,27 @@ struct sender_state {
     struct sender_state *prev, *next;
 };
 
-#define sender_lock(sender) spinlock_lock(&(sender)->spinlock)
-#define sender_unlock(sender) spinlock_unlock(&(sender)->spinlock)
+#define stream_sender_lock(sender) spinlock_lock(&(sender)->spinlock)
+#define stream_sender_unlock(sender) spinlock_unlock(&(sender)->spinlock)
 
-#define rrdpush_sender_replication_buffer_full_set(sender, value) __atomic_store_n(&((sender)->replication.atomic.reached_max), value, __ATOMIC_SEQ_CST)
-#define rrdpush_sender_replication_buffer_full_get(sender) __atomic_load_n(&((sender)->replication.atomic.reached_max), __ATOMIC_SEQ_CST)
+#define stream_sender_replication_buffer_full_set(sender, value) __atomic_store_n(&((sender)->replication.atomic.reached_max), value, __ATOMIC_SEQ_CST)
+#define stream_sender_replication_buffer_full_get(sender) __atomic_load_n(&((sender)->replication.atomic.reached_max), __ATOMIC_SEQ_CST)
 
-#define rrdpush_sender_set_buffer_used_percent(sender, value) __atomic_store_n(&((sender)->atomic.buffer_used_percentage), value, __ATOMIC_RELAXED)
-#define rrdpush_sender_get_buffer_used_percent(sender) __atomic_load_n(&((sender)->atomic.buffer_used_percentage), __ATOMIC_RELAXED)
+#define stream_sender_set_buffer_used_percent(sender, value) __atomic_store_n(&((sender)->atomic.buffer_used_percentage), value, __ATOMIC_RELAXED)
+#define stream_sender_get_buffer_used_percent(sender) __atomic_load_n(&((sender)->atomic.buffer_used_percentage), __ATOMIC_RELAXED)
 
-#define rrdpush_sender_set_flush_time(sender) __atomic_store_n(&((sender)->atomic.last_flush_time_ut), now_realtime_usec(), __ATOMIC_RELAXED)
-#define rrdpush_sender_get_flush_time(sender) __atomic_load_n(&((sender)->atomic.last_flush_time_ut), __ATOMIC_RELAXED)
+#define stream_sender_set_flush_time(sender) __atomic_store_n(&((sender)->atomic.last_flush_time_ut), now_realtime_usec(), __ATOMIC_RELAXED)
+#define stream_sender_get_flush_time(sender) __atomic_load_n(&((sender)->atomic.last_flush_time_ut), __ATOMIC_RELAXED)
 
-#define rrdpush_sender_replicating_charts(sender) __atomic_load_n(&((sender)->replication.atomic.charts_replicating), __ATOMIC_RELAXED)
-#define rrdpush_sender_replicating_charts_plus_one(sender) __atomic_add_fetch(&((sender)->replication.atomic.charts_replicating), 1, __ATOMIC_RELAXED)
-#define rrdpush_sender_replicating_charts_minus_one(sender) __atomic_sub_fetch(&((sender)->replication.atomic.charts_replicating), 1, __ATOMIC_RELAXED)
-#define rrdpush_sender_replicating_charts_zero(sender) __atomic_store_n(&((sender)->replication.atomic.charts_replicating), 0, __ATOMIC_RELAXED)
+#define stream_sender_replicating_charts(sender) __atomic_load_n(&((sender)->replication.atomic.charts_replicating), __ATOMIC_RELAXED)
+#define stream_sender_replicating_charts_plus_one(sender) __atomic_add_fetch(&((sender)->replication.atomic.charts_replicating), 1, __ATOMIC_RELAXED)
+#define stream_sender_replicating_charts_minus_one(sender) __atomic_sub_fetch(&((sender)->replication.atomic.charts_replicating), 1, __ATOMIC_RELAXED)
+#define stream_sender_replicating_charts_zero(sender) __atomic_store_n(&((sender)->replication.atomic.charts_replicating), 0, __ATOMIC_RELAXED)
 
-#define rrdpush_sender_pending_replication_requests(sender) __atomic_load_n(&((sender)->replication.atomic.pending_requests), __ATOMIC_RELAXED)
-#define rrdpush_sender_pending_replication_requests_plus_one(sender) __atomic_add_fetch(&((sender)->replication.atomic.pending_requests), 1, __ATOMIC_RELAXED)
-#define rrdpush_sender_pending_replication_requests_minus_one(sender) __atomic_sub_fetch(&((sender)->replication.atomic.pending_requests), 1, __ATOMIC_RELAXED)
-#define rrdpush_sender_pending_replication_requests_zero(sender) __atomic_store_n(&((sender)->replication.atomic.pending_requests), 0, __ATOMIC_RELAXED)
+#define stream_sender_pending_replication_requests(sender) __atomic_load_n(&((sender)->replication.atomic.pending_requests), __ATOMIC_RELAXED)
+#define stream_sender_pending_replication_requests_plus_one(sender) __atomic_add_fetch(&((sender)->replication.atomic.pending_requests), 1, __ATOMIC_RELAXED)
+#define stream_sender_pending_replication_requests_minus_one(sender) __atomic_sub_fetch(&((sender)->replication.atomic.pending_requests), 1, __ATOMIC_RELAXED)
+#define stream_sender_pending_replication_requests_zero(sender) __atomic_store_n(&((sender)->replication.atomic.pending_requests), 0, __ATOMIC_RELAXED)
 
 void stream_sender_add_to_connector_queue(RRDHOST *host);
 
@@ -179,7 +179,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
 bool stream_sender_is_host_stopped(struct sender_state *s);
 
-void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_op msg);
+void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_opcode msg);
 
 void stream_sender_thread_data_added_data_unsafe(struct sender_state *s, STREAM_TRAFFIC_TYPE type, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
 

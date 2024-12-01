@@ -6,7 +6,7 @@
 #include <brotli/encode.h>
 #include <brotli/decode.h>
 
-void rrdpush_compressor_init_brotli(struct compressor_state *state) {
+void stream_compressor_init_brotli(struct compressor_state *state) {
     if (!state->initialized) {
         state->initialized = true;
         state->stream = BrotliEncoderCreateInstance(NULL, NULL, NULL);
@@ -21,14 +21,14 @@ void rrdpush_compressor_init_brotli(struct compressor_state *state) {
     }
 }
 
-void rrdpush_compressor_destroy_brotli(struct compressor_state *state) {
+void stream_compressor_destroy_brotli(struct compressor_state *state) {
     if (state->stream) {
         BrotliEncoderDestroyInstance(state->stream);
         state->stream = NULL;
     }
 }
 
-size_t rrdpush_compress_brotli(struct compressor_state *state, const char *data, size_t size, const char **out) {
+size_t stream_compress_brotli(struct compressor_state *state, const char *data, size_t size, const char **out) {
     if (unlikely(!state || !size || !out))
         return 0;
 
@@ -41,26 +41,26 @@ size_t rrdpush_compress_brotli(struct compressor_state *state, const char *data,
     uint8_t *next_out = (uint8_t *)state->output.data;
 
     if (!BrotliEncoderCompressStream(state->stream, BROTLI_OPERATION_FLUSH, &available_in, &next_in, &available_out, &next_out, NULL)) {
-        netdata_log_error("STREAM: Brotli compression failed.");
+        netdata_log_error("STREAM_COMPRESS: Brotli compression failed.");
         return 0;
     }
 
     if(available_in != 0) {
-        netdata_log_error("STREAM: BrotliEncoderCompressStream() did not use all the input buffer, %zu bytes out of %zu remain",
+        netdata_log_error("STREAM_COMPRESS: BrotliEncoderCompressStream() did not use all the input buffer, %zu bytes out of %zu remain",
                 available_in, size);
         return 0;
     }
 
     size_t compressed_size = state->output.size - available_out;
     if(available_out == 0) {
-        netdata_log_error("STREAM: BrotliEncoderCompressStream() needs a bigger output buffer than the one we provided "
+        netdata_log_error("STREAM_COMPRESS: BrotliEncoderCompressStream() needs a bigger output buffer than the one we provided "
                           "(output buffer %zu bytes, compressed payload %zu bytes)",
                 state->output.size, size);
         return 0;
     }
 
     if(compressed_size == 0) {
-        netdata_log_error("STREAM: BrotliEncoderCompressStream() did not produce any output from the input provided "
+        netdata_log_error("STREAM_COMPRESS: BrotliEncoderCompressStream() did not produce any output from the input provided "
                           "(input buffer %zu bytes)",
                 size);
         return 0;
@@ -74,7 +74,7 @@ size_t rrdpush_compress_brotli(struct compressor_state *state, const char *data,
     return compressed_size;
 }
 
-void rrdpush_decompressor_init_brotli(struct decompressor_state *state) {
+void stream_decompressor_init_brotli(struct decompressor_state *state) {
     if (!state->initialized) {
         state->initialized = true;
         state->stream = BrotliDecoderCreateInstance(NULL, NULL, NULL);
@@ -83,14 +83,14 @@ void rrdpush_decompressor_init_brotli(struct decompressor_state *state) {
     }
 }
 
-void rrdpush_decompressor_destroy_brotli(struct decompressor_state *state) {
+void stream_decompressor_destroy_brotli(struct decompressor_state *state) {
     if (state->stream) {
         BrotliDecoderDestroyInstance(state->stream);
         state->stream = NULL;
     }
 }
 
-size_t rrdpush_decompress_brotli(struct decompressor_state *state, const char *compressed_data, size_t compressed_size) {
+size_t stream_decompress_brotli(struct decompressor_state *state, const char *compressed_data, size_t compressed_size) {
     if (unlikely(!state || !compressed_data || !compressed_size))
         return 0;
 
@@ -104,26 +104,26 @@ size_t rrdpush_decompress_brotli(struct decompressor_state *state, const char *c
     uint8_t *next_out = (uint8_t *)state->output.data;
 
     if (BrotliDecoderDecompressStream(state->stream, &available_in, &next_in, &available_out, &next_out, NULL) == BROTLI_DECODER_RESULT_ERROR) {
-        netdata_log_error("STREAM: Brotli decompression failed.");
+        netdata_log_error("STREAM_DECOMPRESS: Brotli decompression failed.");
         return 0;
     }
 
     if(available_in != 0) {
-        netdata_log_error("STREAM: BrotliDecoderDecompressStream() did not use all the input buffer, %zu bytes out of %zu remain",
+        netdata_log_error("STREAM_DECOMPRESS: BrotliDecoderDecompressStream() did not use all the input buffer, %zu bytes out of %zu remain",
                           available_in, compressed_size);
         return 0;
     }
 
     size_t decompressed_size = state->output.size - available_out;
     if(available_out == 0) {
-        netdata_log_error("STREAM: BrotliDecoderDecompressStream() needs a bigger output buffer than the one we provided "
+        netdata_log_error("STREAM_DECOMPRESS: BrotliDecoderDecompressStream() needs a bigger output buffer than the one we provided "
                           "(output buffer %zu bytes, compressed payload %zu bytes)",
                           state->output.size, compressed_size);
         return 0;
     }
 
     if(decompressed_size == 0) {
-        netdata_log_error("STREAM: BrotliDecoderDecompressStream() did not produce any output from the input provided "
+        netdata_log_error("STREAM_DECOMPRESS: BrotliDecoderDecompressStream() did not produce any output from the input provided "
                           "(input buffer %zu bytes)",
                           compressed_size);
         return 0;

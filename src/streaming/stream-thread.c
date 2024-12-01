@@ -11,7 +11,7 @@ struct stream_thread_globals stream_thread_globals = {
 // --------------------------------------------------------------------------------------------------------------------
 // pipe messages
 
-static void stream_thread_handle_op(struct stream_thread *sth, struct sender_op *msg) {
+static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opcode *msg) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     sth->messages.processed++;
@@ -26,13 +26,13 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct sender_op 
     {
         struct sender_state *s = sth->snd.run.senders[msg->snd_run_slot];
 
-        if(msg->op & SENDER_MSG_ENABLE_SENDING) {
+        if(msg->opcode & STREAM_OPCODE_SENDER_POLLOUT) {
             struct pollfd *pfd = pfd_validate(sth, s->thread.pfd);
             pfd->events |= POLLOUT;
-            msg->op &= ~(SENDER_MSG_ENABLE_SENDING);
+            msg->opcode &= ~(STREAM_OPCODE_SENDER_POLLOUT);
         }
 
-        if(msg->op)
+        if(msg->opcode)
             stream_sender_handle_op(sth, s, msg);
     }
     else {
@@ -41,7 +41,7 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct sender_op 
     }
 }
 
-void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_op msg) {
+void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_opcode msg) {
     if (msg.snd_run_slot < 0 || !msg.session || !msg.sender)
         return;
 
@@ -82,7 +82,7 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_
                 for (size_t i = 0; i < sth->messages.size; i++) {
                     if (sth->messages.array[i].sender == s) {
                         s->thread.msg_slot = i;
-                        sth->messages.array[s->thread.msg_slot].op |= msg.op;
+                        sth->messages.array[s->thread.msg_slot].opcode |= msg.opcode;
                         spinlock_unlock(&sth->messages.spinlock);
                         internal_fatal(true, "the dispatcher message queue is full, but this sender is already on slot %zu", i);
                         return;
@@ -99,7 +99,7 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct sender_
         }
         else
             // the existing slot is good
-            sth->messages.array[s->thread.msg_slot].op |= msg.op;
+            sth->messages.array[s->thread.msg_slot].opcode |= msg.opcode;
     }
     spinlock_unlock(&sth->messages.spinlock);
 
@@ -130,7 +130,7 @@ static void stream_thread_read_pipe_messages(struct stream_thread *sth) {
     spinlock_unlock(&sth->messages.spinlock);
 
     for(size_t i = 0; i < used ;i++) {
-        struct sender_op *msg = &sth->messages.copy[i];
+        struct stream_opcode *msg = &sth->messages.copy[i];
         stream_thread_handle_op(sth, msg);
     }
 }

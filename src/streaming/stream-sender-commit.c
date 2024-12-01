@@ -59,7 +59,7 @@ BUFFER *sender_host_buffer_with_trace(struct rrdhost *host, const char *func) {
 
 // Collector thread finishing a transmission
 void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buffer *commit, STREAM_TRAFFIC_TYPE type) {
-    struct sender_op msg;
+    struct stream_opcode msg;
 
     char *src = (char *)buffer_tostring(wb);
     size_t src_len = buffer_strlen(wb);
@@ -70,7 +70,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     size_t total_uncompressed_len = src_len;
     size_t total_compressed_len = 0;
 
-    sender_lock(s);
+    stream_sender_lock(s);
 
     // copy the sequence number of sender buffer recreates, while having our lock
     if(commit)
@@ -78,7 +78,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
 
     if (!s->thread.msg.session) {
         // the dispatcher is not there anymore - ignore these data
-        sender_unlock(s);
+        stream_sender_unlock(s);
         if(commit)
             sender_buffer_destroy(commit);
         return;
@@ -152,23 +152,23 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
             }
 
             const char *dst;
-            size_t dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
+            size_t dst_len = stream_compress(&s->compressor, src, size_to_compress, &dst);
             if (!dst_len) {
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                     "STREAM %s [send to %s]: COMPRESSION failed. Resetting compressor and re-trying",
                     rrdhost_hostname(s->host), s->connected_to);
 
-                rrdpush_compression_initialize(s);
-                dst_len = rrdpush_compress(&s->compressor, src, size_to_compress, &dst);
+                stream_compression_initialize(s);
+                dst_len = stream_compress(&s->compressor, src, size_to_compress, &dst);
                 if (!dst_len)
                     goto compression_failed_with_lock;
             }
 
-            rrdpush_signature_t signature = rrdpush_compress_encode_signature(dst_len);
+            stream_compression_signature_t signature = stream_compress_encode_signature(dst_len);
 
 #ifdef NETDATA_INTERNAL_CHECKS
             // check if reversing the signature provides the same length
-            size_t decoded_dst_len = rrdpush_decompress_decode_signature((const char *)&signature, sizeof(signature));
+            size_t decoded_dst_len = stream_decompress_decode_signature((const char *)&signature, sizeof(signature));
             if (decoded_dst_len != dst_len)
                 fatal(
                     "RRDPUSH COMPRESSION: invalid signature, original payload %zu bytes, "
@@ -202,10 +202,10 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     if (enable_sending)
         msg = s->thread.msg;
 
-    sender_unlock(s);
+    stream_sender_unlock(s);
 
     if (enable_sending) {
-        msg.op = SENDER_MSG_ENABLE_SENDING;
+        msg.opcode = STREAM_OPCODE_SENDER_POLLOUT;
         stream_sender_send_msg_to_dispatcher(s, msg);
     }
 
@@ -216,8 +216,8 @@ overflow_with_lock: {
         size_t buffer_max_size = s->sbuf.cb->max_size;
         size_t buffer_available = cbuffer_available_size_unsafe(s->sbuf.cb);
         msg = s->thread.msg;
-        sender_unlock(s);
-        msg.op = SENDER_MSG_RECONNECT_OVERFLOW;
+        stream_sender_unlock(s);
+        msg.opcode = STREAM_OPCODE_SENDER_BUFFER_OVERFLOW;
         stream_sender_send_msg_to_dispatcher(s, msg);
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s]: buffer overflow while adding %zu bytes (buffer size %zu, max size %zu, available %zu). "
@@ -228,10 +228,10 @@ overflow_with_lock: {
     }
 
 compression_failed_with_lock: {
-        rrdpush_compression_deactivate(s);
+    stream_compression_deactivate(s);
         msg = s->thread.msg;
-        sender_unlock(s);
-        msg.op = SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION;
+        stream_sender_unlock(s);
+        msg.opcode = STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION;
         stream_sender_send_msg_to_dispatcher(s, msg);
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s]: COMPRESSION failed (twice). Deactivating compression and restarting connection.",

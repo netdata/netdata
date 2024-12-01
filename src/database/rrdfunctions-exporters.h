@@ -7,8 +7,8 @@
 
 #define RRDFUNCTIONS_VERSION_SEPARATOR "|"
 
-void rrd_chart_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
-void rrd_global_functions_expose_rrdpush(RRDHOST *host, BUFFER *wb, bool dyncfg);
+void stream_sender_send_rrdset_functions(RRDSET *st, BUFFER *wb);
+void stream_sender_send_global_rrdhost_functions(RRDHOST *host, BUFFER *wb, bool dyncfg);
 
 void chart_functions2json(RRDSET *st, BUFFER *wb);
 void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst, void *value, size_t value_size);

@@ -151,7 +151,8 @@ static inline decompressor_status_t receiver_feed_decompressor(struct receiver_s
         return DECOMPRESS_NEED_MORE_DATA;
     }
 
-    size_t compressed_message_size = rrdpush_decompressor_start(&r->receiver.compressed.decompressor, buf + start, signature_size);
+    size_t compressed_message_size =
+        stream_decompressor_start(&r->receiver.compressed.decompressor, buf + start, signature_size);
 
     if (unlikely(!compressed_message_size)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "multiplexed uncompressed data in compressed stream!");
@@ -172,8 +173,8 @@ static inline decompressor_status_t receiver_feed_decompressor(struct receiver_s
         return DECOMPRESS_NEED_MORE_DATA;
     }
 
-    size_t bytes_to_parse = rrdpush_decompress(
-        &r->receiver.compressed.decompressor, buf + start + signature_size, compressed_message_size);
+    size_t bytes_to_parse =
+        stream_decompress(&r->receiver.compressed.decompressor, buf + start + signature_size, compressed_message_size);
 
     if (unlikely(!bytes_to_parse)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "no bytes to parse.");
@@ -189,12 +190,13 @@ static inline decompressor_status_t receiver_feed_decompressor(struct receiver_s
 }
 
 static inline decompressor_status_t receiver_get_decompressed(struct receiver_state *r) {
-    if (unlikely(!rrdpush_decompressed_bytes_in_buffer(&r->receiver.compressed.decompressor)))
+    if (unlikely(!stream_decompressed_bytes_in_buffer(&r->receiver.compressed.decompressor)))
         return DECOMPRESS_NEED_MORE_DATA;
 
     size_t available = sizeof(r->reader.read_buffer) - r->reader.read_len - 1;
     if (likely(available)) {
-        size_t len = rrdpush_decompressor_get(&r->receiver.compressed.decompressor, r->reader.read_buffer + r->reader.read_len, available);
+        size_t len = stream_decompressor_get(
+            &r->receiver.compressed.decompressor, r->reader.read_buffer + r->reader.read_len, available);
         if (unlikely(!len)) {
             internal_error(true, "decompressor returned zero length #1");
             return DECOMPRESS_FAILED;
@@ -287,7 +289,7 @@ static void streaming_parser_init(struct receiver_state *rpt) {
 
     rrd_collector_started();
 
-    rpt->receiver.compressed.enabled = rrdpush_decompression_initialize(rpt);
+    rpt->receiver.compressed.enabled = stream_decompression_initialize(rpt);
     buffered_reader_init(&rpt->reader);
 
 #ifdef NETDATA_LOG_STREAM_RECEIVE
@@ -302,7 +304,7 @@ static void streaming_parser_init(struct receiver_state *rpt) {
 #endif
 
     __atomic_store_n(&rpt->receiver.parser, parser, __ATOMIC_RELAXED);
-    rrdpush_receiver_send_node_and_claim_id_to_child(rpt->host);
+    stream_receiver_send_node_and_claim_id_to_child(rpt->host);
 
     rpt->receiver.buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
 
@@ -422,7 +424,7 @@ static void stream_receiver_on_disconnect(struct stream_thread *sth __maybe_unus
     {
         char msg[100 + 1];
         snprintfz(msg, sizeof(msg) - 1, "disconnected (completed %zu updates)", count);
-        rrdpush_receive_log_status(rpt, msg, RRDPUSH_STATUS_DISCONNECTED, NDLP_WARNING);
+        stream_receiver_log_status(rpt, msg, STREAM_STATUS_DISCONNECTED, NDLP_WARNING);
     }
 
     // in case we have cloud connection we inform cloud
@@ -585,7 +587,7 @@ void stream_receiver_cleanup(struct stream_thread *sth) {
     memset(&sth->rcv.run, 0, sizeof(sth->rcv.run));
 }
 
-static void rrdpush_receiver_replication_reset(RRDHOST *host) {
+static void stream_receiver_replication_reset(RRDHOST *host) {
     RRDSET *st;
     rrdset_foreach_read(st, host) {
         rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
@@ -630,12 +632,12 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
 
 //         this is a test
 //        if(rpt->hops <= host->sender->hops)
-//            rrdpush_sender_thread_stop(host, "HOPS MISMATCH", false);
+//            stream_sender_thread_stop(host, "HOPS MISMATCH", false);
 
         signal_rrdcontext = true;
-        rrdpush_receiver_replication_reset(host);
+        stream_receiver_replication_reset(host);
 
-        rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+        rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED);
         aclk_queue_node_info(rpt->host, true);
 
         rrdhost_stream_parents_reset(host, STREAM_HANDSHAKE_PREPARING);
@@ -660,14 +662,14 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
 
         if (host->receiver == rpt) {
-            rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+            rrdhost_flag_set(host, RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED);
             rrdhost_receiver_unlock(host);
             {
                 // run all these without having the receiver lock
 
                 stream_path_child_disconnected(host);
                 stream_sender_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
-                rrdpush_receiver_replication_reset(host);
+                stream_receiver_replication_reset(host);
                 rrdcontext_host_child_disconnected(host);
 
                 if (rpt->config.health.enabled)

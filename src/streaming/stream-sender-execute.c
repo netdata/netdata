@@ -12,7 +12,7 @@ static void stream_execute_function_callback(BUFFER *func_wb, int code, void *da
     struct inflight_stream_function *tmp = data;
     struct sender_state *s = tmp->sender;
 
-    if(rrdhost_can_send_metadata_to_parent(s->host)) {
+    if(rrdhost_can_stream_metadata_to_parent(s->host)) {
         // for functions we use a new buffer, to avoid keeping a big buffer in memory
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
@@ -41,7 +41,7 @@ static void stream_execute_function_progress_callback(void *data, size_t done, s
     struct inflight_stream_function *tmp = data;
     struct sender_state *s = tmp->sender;
 
-    if(rrdhost_can_send_metadata_to_parent(s->host)) {
+    if(rrdhost_can_stream_metadata_to_parent(s->host)) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
         buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION_PROGRESS " '%s' %zu %zu\n",
@@ -262,7 +262,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_NODE_ID) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE_META);
-            rrdpush_sender_get_node_and_claim_id_from_parent(s);
+            stream_sender_get_node_and_claim_id_from_parent(s);
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_JSON) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE_META);

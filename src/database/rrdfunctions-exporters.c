@@ -5,7 +5,7 @@
 #include "rrdfunctions-internals.h"
 #include "rrdfunctions-exporters.h"
 
-void rrd_chart_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
+void stream_sender_send_rrdset_functions(RRDSET *st, BUFFER *wb) {
     if(!st->functions_view)
         return;
 
@@ -27,7 +27,7 @@ void rrd_chart_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
     dfe_done(t);
 }
 
-void rrd_global_functions_expose_rrdpush(RRDHOST *host, BUFFER *wb, bool dyncfg) {
+void stream_sender_send_global_rrdhost_functions(RRDHOST *host, BUFFER *wb, bool dyncfg) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     size_t configs = 0;

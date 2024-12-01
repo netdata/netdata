@@ -24,21 +24,21 @@ static void stream_sender_cbuffer_recreate_timed_unsafe(struct sender_state *s, 
 }
 
 static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
-    rrdpush_sender_set_flush_time(host->sender);
+    stream_sender_set_flush_time(host->sender);
 
-    sender_lock(host->sender);
+    stream_sender_lock(host->sender);
 
     // flush the output buffer from any data it may have
     cbuffer_flush(host->sender->sbuf.cb);
     stream_sender_cbuffer_recreate_timed_unsafe(host->sender, now_monotonic_sec(), true);
 
-    sender_unlock(host->sender);
+    stream_sender_unlock(host->sender);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
 static void rrdpush_sender_charts_and_replication_reset(struct sender_state *s) {
-    rrdpush_sender_set_flush_time(s);
+    stream_sender_set_flush_time(s);
 
     // stop all replication commands inflight
     replication_sender_delete_pending_requests(s);
@@ -49,7 +49,7 @@ static void rrdpush_sender_charts_and_replication_reset(struct sender_state *s) 
         rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
         rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
 
-        st->rrdpush.sender.resync_time_s = 0;
+        st->stream.snd.resync_time_s = 0;
 
         RRDDIM *rd;
         rrddim_foreach_read(rd, st)
@@ -61,7 +61,7 @@ static void rrdpush_sender_charts_and_replication_reset(struct sender_state *s) 
     rrdset_foreach_done(st);
 
     rrdhost_sender_replicating_charts_zero(s->host);
-    rrdpush_sender_replicating_charts_zero(s);
+    stream_sender_replicating_charts_zero(s);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -71,7 +71,7 @@ void stream_sender_on_connect(struct sender_state *s) {
            "STREAM [dispatchX] [%s]: running on-connect hooks...",
            rrdhost_hostname(s->host));
 
-    rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
+    rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED);
 
     rrdpush_sender_charts_and_replication_reset(s);
     rrdpush_sender_cbuffer_flush(s->host);
@@ -88,14 +88,14 @@ static void stream_sender_on_ready_to_dispatch(struct sender_state *s) {
            rrdhost_hostname(s->host));
 
     // set this flag before sending any data, or the data will not be sent
-    rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+    rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
     stream_sender_execute_commands_cleanup(s);
-    rrdpush_sender_thread_send_custom_host_variables(s->host);
+    stream_sender_send_custom_host_variables(s->host);
     stream_path_send_to_parent(s->host);
-    rrdpush_sender_send_claimed_id(s->host);
-    rrdpush_send_host_labels(s->host);
-    rrdpush_send_global_functions(s->host);
+    stream_sender_send_claimed_id(s->host);
+    stream_send_host_labels(s->host);
+    stream_send_global_functions(s->host);
 }
 
 static void stream_sender_on_disconnect(struct sender_state *s) {
@@ -105,8 +105,8 @@ static void stream_sender_on_disconnect(struct sender_state *s) {
 
     stream_sender_execute_commands_cleanup(s);
     rrdpush_sender_charts_and_replication_reset(s);
-    rrdpush_sender_clear_parent_claim_id(s->host);
-    rrdpush_receiver_send_node_and_claim_id_to_child(s->host);
+    stream_sender_clear_parent_claim_id(s->host);
+    stream_receiver_send_node_and_claim_id_to_child(s->host);
     stream_path_parent_disconnected(s->host);
 }
 
@@ -189,7 +189,7 @@ void stream_sender_thread_data_added_data_unsafe(struct sender_state *s, STREAM_
 // --------------------------------------------------------------------------------------------------------------------
 // opcodes
 
-void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, struct sender_op *msg) {
+void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, struct stream_opcode *msg) {
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
         ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
@@ -201,14 +201,14 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    if(msg->op & SENDER_MSG_RECONNECT_OVERFLOW) {
+    if(msg->opcode & STREAM_OPCODE_SENDER_BUFFER_OVERFLOW) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW);
         errno_clear();
-        sender_lock(s);
+        stream_sender_lock(s);
         size_t buffer_size = s->sbuf.cb->size;
         size_t buffer_max_size = s->sbuf.cb->max_size;
         size_t buffer_available = cbuffer_available_size_unsafe(s->sbuf.cb);
-        sender_unlock(s);
+        stream_sender_unlock(s);
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM[%zu] %s [send to %s]: send buffer is full (buffer size %zu, max %zu, available %zu). "
                "Restarting connection.",
@@ -220,14 +220,14 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
         return;
     }
 
-    if(msg->op & SENDER_MSG_STOP_RECEIVER_LEFT) {
+    if(msg->opcode & STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVER_LEFT);
         stream_sender_move_running_to_connector_or_remove(
             sth, s, msg->snd_run_slot, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
         return;
     }
 
-    if(msg->op & SENDER_MSG_RECONNECT_WITHOUT_COMPRESSION) {
+    if(msg->opcode & STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_COMPRESSION_ERROR);
         errno_clear();
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -239,7 +239,7 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
         return;
     }
 
-    if(msg->op & SENDER_MSG_STOP_HOST_CLEANUP) {
+    if(msg->opcode & STREAM_OPCODE_SENDER_STOP_HOST_CLEANUP) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_HOST_CLEANUP);
         stream_sender_move_running_to_connector_or_remove(
             sth, s, msg->snd_run_slot, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, false);
@@ -247,7 +247,7 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
     }
 
     nd_log(NDLS_DAEMON, NDLP_ERR,
-           "STREAM[%zu]: invalid msg id %u", sth->id, (unsigned)msg->op);
+           "STREAM[%zu]: invalid msg id %u", sth->id, (unsigned)msg->opcode);
 }
 
 
@@ -304,7 +304,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
 
         sth->snd.run.senders[slot] = s;
 
-        sender_lock(s);
+        stream_sender_lock(s);
         s->thread.slot = (int32_t)slot;
         s->thread.pfd = stream_thread_pollfd_get(sth, s->sock.fd, POLLFD_TYPE_SENDER, NULL, s);
 
@@ -318,7 +318,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         s->last_state_since_t = now_realtime_sec();
 
         stream_sender_thread_data_reset_unsafe(s);
-        sender_unlock(s);
+        stream_sender_unlock(s);
 
         stream_sender_on_ready_to_dispatch(s);
 
@@ -334,16 +334,18 @@ void stream_sender_remove(struct sender_state *s) {
            "STREAM [connector] [%s]: streaming sender removed host: %s",
            rrdhost_hostname(s->host), stream_handshake_error_to_string(s->exit.reason));
 
-    sender_lock(s);
+    stream_sender_lock(s);
 
     __atomic_store_n(&s->exit.shutdown, false, __ATOMIC_RELAXED);
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_ADDED | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+    rrdhost_flag_clear(s->host,
+        RRDHOST_FLAG_STREAM_SENDER_ADDED | RRDHOST_FLAG_STREAM_SENDER_CONNECTED |
+            RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
     s->last_state_since_t = now_realtime_sec();
     stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, s->exit.reason, s->last_state_since_t);
     s->connector.id = -1;
 
-    sender_unlock(s);
+    stream_sender_unlock(s);
 
     rrdhost_stream_parents_reset(s->host, STREAM_HANDSHAKE_EXITING);
 
@@ -384,10 +386,10 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     }
 
     // clear this flag asap, to stop other threads from pushing metrics for this node
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED | RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
     // clear these asap, to make sender_commit() stop processing data for this host
-    sender_lock(s);
+    stream_sender_lock(s);
     s->thread.slot = -1;
     s->thread.pfd = PFD_EMPTY;
 
@@ -396,7 +398,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     s->thread.msg.sender = NULL;
 
     s->host->stream.snd.status.tid = 0;
-    sender_unlock(s);
+    stream_sender_unlock(s);
 
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
            "STREAM [dispatcher] [%s]: disconnected from parent, reason: %s",
@@ -440,8 +442,8 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
 
         // If the TCP window never opened, then something is wrong, restart connection
         if(unlikely(now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
-                     !rrdpush_sender_pending_replication_requests(s) &&
-                     !rrdpush_sender_replicating_charts(s)
+                     !stream_sender_pending_replication_requests(s) &&
+                     !stream_sender_replicating_charts(s)
                          )) {
 
             ND_LOG_STACK lgs[] = {
@@ -468,7 +470,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
             continue;
         }
 
-        sender_lock(s);
+        stream_sender_lock(s);
         {
             bytes_compressed += s->thread.bytes_compressed;
             bytes_uncompressed += s->thread.bytes_uncompressed;
@@ -479,7 +481,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
             if (outstanding)
                 pfd->events |= POLLOUT;
         }
-        sender_unlock(s);
+        stream_sender_unlock(s);
     }
 
     if (bytes_compressed && bytes_uncompressed) {
@@ -536,7 +538,7 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
 
         bool disconnect = false;
-        sender_lock(s);
+        stream_sender_lock(s);
         {
             char *chunk;
             size_t outstanding = cbuffer_next_unsafe(s->sbuf.cb, &chunk);
@@ -559,7 +561,7 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
             else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
                 disconnect = true;
         }
-        sender_unlock(s);
+        stream_sender_unlock(s);
 
         if(disconnect) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR);

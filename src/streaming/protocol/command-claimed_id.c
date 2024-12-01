@@ -3,7 +3,7 @@
 #include "commands.h"
 #include "plugins.d/pluginsd_internals.h"
 
-PARSER_RC rrdpush_receiver_pluginsd_claimed_id(char **words, size_t num_words, PARSER *parser) {
+PARSER_RC stream_receiver_pluginsd_claimed_id(char **words, size_t num_words, PARSER *parser) {
     const char *machine_guid_str = get_word(words, num_words, 1);
     const char *claim_id_str = get_word(words, num_words, 2);
 
@@ -47,17 +47,17 @@ PARSER_RC rrdpush_receiver_pluginsd_claimed_id(char **words, size_t num_words, P
 
     if(!uuid_is_null(claim_uuid)) {
         uuid_copy(host->aclk.claim_id_of_origin.uuid, claim_uuid);
-        rrdpush_sender_send_claimed_id(host);
+        stream_sender_send_claimed_id(host);
     }
 
     return PARSER_RC_OK;
 }
 
-void rrdpush_sender_send_claimed_id(RRDHOST *host) {
+void stream_sender_send_claimed_id(RRDHOST *host) {
     if(!stream_sender_has_capabilities(host, STREAM_CAP_CLAIM))
         return;
 
-    if(unlikely(!rrdhost_can_send_metadata_to_parent(host)))
+    if(unlikely(!rrdhost_can_stream_metadata_to_parent(host)))
         return;
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);

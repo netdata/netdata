@@ -795,8 +795,8 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
     // ------------------------------------------------------------------------
     // propagate it forward in v2
 
-    if(!parser->user.v2.stream_buffer.wb && rrdhost_has_rrdpush_sender_enabled(st->rrdhost))
-        parser->user.v2.stream_buffer = rrdset_push_metric_initialize(parser->user.st, wall_clock_time);
+    if(!parser->user.v2.stream_buffer.wb && rrdhost_has_stream_sender_enabled(st->rrdhost))
+        parser->user.v2.stream_buffer = stream_send_metrics_init(parser->user.st, wall_clock_time);
 
     if(parser->user.v2.stream_buffer.v2 && parser->user.v2.stream_buffer.wb) {
         // check receiver capabilities
@@ -817,7 +817,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
 
         if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush.sender.chart_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, st->stream.snd.chart_slot);
         }
 
         buffer_fast_strcat(wb, " '", 2);
@@ -971,7 +971,7 @@ static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *
 
         if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush.sender.dim_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->stream.snd.dim_slot);
         }
 
         buffer_fast_strcat(wb, " '", 2);
@@ -1027,7 +1027,7 @@ static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_
     // propagate the whole chart update in v1
 
     if(unlikely(!parser->user.v2.stream_buffer.v2 && !parser->user.v2.stream_buffer.begin_v2_added && parser->user.v2.stream_buffer.wb))
-        rrdset_push_metrics_v1(&parser->user.v2.stream_buffer, st);
+        stream_send_rrdset_metrics_v1(&parser->user.v2.stream_buffer, st);
 
     timing_step(TIMING_STEP_END2_PUSH_V1);
 
@@ -1043,7 +1043,7 @@ static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_
     // ------------------------------------------------------------------------
     // propagate it forward
 
-    rrdset_push_metrics_finished(&parser->user.v2.stream_buffer, st);
+    stream_send_rrdset_metrics_finished(&parser->user.v2.stream_buffer, st);
 
     timing_step(TIMING_STEP_END2_PROPAGATE);
 
@@ -1124,7 +1124,7 @@ static PARSER_RC pluginsd_json(char **words __maybe_unused, size_t num_words __m
     return PARSER_RC_OK;
 }
 
-PARSER_RC rrdpush_receiver_pluginsd_claimed_id(char **words, size_t num_words, PARSER *parser);
+PARSER_RC stream_receiver_pluginsd_claimed_id(char **words, size_t num_words, PARSER *parser);
 
 // ----------------------------------------------------------------------------
 
@@ -1310,7 +1310,7 @@ PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **w
         case PLUGINSD_KEYWORD_ID_VARIABLE:
             return pluginsd_variable(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_CLAIMED_ID:
-            return rrdpush_receiver_pluginsd_claimed_id(words, num_words, parser);
+            return stream_receiver_pluginsd_claimed_id(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_HOST:
             return pluginsd_host(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_HOST_DEFINE:
