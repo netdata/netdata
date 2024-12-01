@@ -36,9 +36,9 @@ func (c *Collector) scrapeUnboundStats() ([]entry, error) {
 	}
 	defer func() { _ = c.client.Disconnect() }()
 
-	err := c.client.Command(command+"\n", func(bytes []byte) bool {
+	err := c.client.Command(command+"\n", func(bytes []byte) (bool, error) {
 		output = append(output, string(bytes))
-		return true
+		return true, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("send command '%s': %w", command, err)

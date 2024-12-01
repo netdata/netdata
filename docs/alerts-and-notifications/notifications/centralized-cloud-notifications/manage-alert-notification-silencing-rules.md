@@ -7,12 +7,12 @@ From the Cloud interface, you can manage your space's Alert notification silenci
 To manage **space's Alert notification silencing rule settings**, you will need the following:
 
 - A Netdata Cloud account
-- Access to the space as an **administrator** or **manager** (**troubleshooters** can only view space rules)
+- Access to Space as an **administrator** or **manager** (**troubleshooters** can only view space rules)
 
 To manage your **personal Alert notification silencing rule settings**, you will need the following:
 
 - A Netdata Cloud account
-- Access to the space with any role except **billing**
+- Access to Space with any role except **billing**
 
 ### Steps
 
@@ -21,33 +21,33 @@ To manage your **personal Alert notification silencing rule settings**, you will
 3. Click on the **Notification Silencing Rules** tab.
 4. You will be presented with a table of the configured Alert notification silencing rules for:
 
-   - The space (if you aren't an **observer**)
-   - Yourself
+    - The space (if you aren't an **observer**)
+    - Yourself
 
    You will be able to:
 
-   1. **Add a new** Alert notification silencing rule configuration.
-      - Choose if it applies to **All users** or **Myself** (All users is only available for **administrators** and **managers**).
-      - You need to provide a name for the configuration so you can easily refer to it.
-      - Define criteria for Nodes, to which Rooms will the rule apply, on what Nodes and whether or not it applies to host labels key-value pairs.
-      - Define criteria for Alerts, such as Alert name is being targeted and on what Alert context. You can also specify if it will apply to a specific Alert role.
-      - Define when it will be applied:
-        - Immediately, from now until it is turned off or until a specific duration (start and end date automatically set).
-        - Scheduled, you can specify the start and end time for when the rule becomes active and then inactive (time is set according to your browser's local timezone).
-      Note: You are only able to add a rule if your space is on a [paid plan](/docs/netdata-cloud/view-plan-and-billing.md).
-   2. **Edit an existing** Alert notification silencing rule configuration. You will be able to change:
-      - The name provided for it
-      - Who it applies to
-      - Selection criteria for Nodes and Alerts
-      - When it will be applied
-   3. **Enable/Disable** a given Alert notification silencing rule configuration.
-      - Use the toggle to enable or disable
-   4. **Delete an existing** Alert notification silencing rule.
-      - Use the trash icon to delete your configuration
+    1. **Add a new** Alert notification silencing rule configuration.
+        - Choose if it applies to **All users** or **Myself** (All users is only available for **administrators** and **managers**).
+        - You need to provide a name for the configuration so you can refer to it.
+        - Define criteria for Nodes, to which Rooms will the rule apply, on what Nodes and whether it applies to host labels key-value pairs.
+        - Define criteria for Alerts, such as Alert name is being targeted and in what Alert context. You can also specify if it applies to a specific Alert role.
+        - Define when it is applied:
+            - Immediately, from now until it is turned off or until a specific duration (start and end date automatically set).
+            - Scheduled, you can specify the start and end time for when the rule becomes active and then inactive (time is set according to your browser's local timezone).
+              Note: You are only able to add a rule if your space is on a [paid plan](/docs/netdata-cloud/view-plan-and-billing.md).
+    2. **Edit an existing** Alert notification silencing rule configuration. You will be able to change:
+        - The name provided for it
+        - Who it applies to
+        - Selection criteria for Nodes and Alerts
+        - When it will be applied
+    3. **Enable/Disable** a given Alert notification silencing rule configuration.
+        - Use the toggle to enable or disable
+    4. **Delete an existing** Alert notification silencing rule.
+        - Use the trash icon to delete your configuration
 
 ## Silencing Rules Examples
 
-| Rule name                        | Rooms          | Nodes    | Host Label               | Alert name                                       | Alert context | Alert instance           | Alert role  | Description                                                                                                                                                                                                               |
+| Rule name                        | Rooms              | Nodes    | Host Label               | Alert name                                       | Alert context | Alert instance           | Alert role  | Description                                                                                                                                                                                                               |
 |:---------------------------------|:-------------------|:---------|:-------------------------|:-------------------------------------------------|:--------------|:-------------------------|:------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Space silencing                  | All Rooms          | *        | *                        | *                                                | *             | *                        | *           | This rule silences the entire space, targets all nodes, and for all users. E.g. infrastructure-wide maintenance window.                                                                                                   |
 | DB Servers Rooms                 | PostgreSQL Servers | *        | *                        | *                                                | *             | *                        | *           | This rule silences the nodes in the Room named PostgreSQL Servers, for example, it doesn't silence the `All Nodes` Room. E.g. My team with membership to this Room doesn't want to receive notifications for these nodes. |

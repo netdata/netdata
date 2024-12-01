@@ -6,6 +6,17 @@
 
 **Merged pull requests:**
 
+- docs: format, typos, and some simplifications in `docs/` [\#19112](https://github.com/netdata/netdata/pull/19112) ([ilyam8](https://github.com/ilyam8))
+- change dim order because of colours in reboot\_required [\#19111](https://github.com/netdata/netdata/pull/19111) ([ilyam8](https://github.com/ilyam8))
+- fix\(proc/reboot\_required\): disable on non Debian-based systems [\#19110](https://github.com/netdata/netdata/pull/19110) ([ilyam8](https://github.com/ilyam8))
+- feat\(proc.plugin\): add Reboot Required collector [\#19109](https://github.com/netdata/netdata/pull/19109) ([ilyam8](https://github.com/ilyam8))
+- docs: update On-Prem System Requirements [\#19107](https://github.com/netdata/netdata/pull/19107) ([ilyam8](https://github.com/ilyam8))
+- On-prem docs edits 2 [\#19105](https://github.com/netdata/netdata/pull/19105) ([Ancairon](https://github.com/Ancairon))
+- Docs edits on Cloud versions and On Prem [\#19104](https://github.com/netdata/netdata/pull/19104) ([Ancairon](https://github.com/Ancairon))
+- chore\(go.d/pkg/socket\): add err to callback return values [\#19103](https://github.com/netdata/netdata/pull/19103) ([ilyam8](https://github.com/ilyam8))
+- docs: fix img tag [\#19102](https://github.com/netdata/netdata/pull/19102) ([ilyam8](https://github.com/ilyam8))
+- Edit the organize doc [\#19101](https://github.com/netdata/netdata/pull/19101) ([Ancairon](https://github.com/Ancairon))
+- Update connecting documentation [\#19100](https://github.com/netdata/netdata/pull/19100) ([Ancairon](https://github.com/Ancairon))
 - Claiming proxy defaults and additonal log info [\#19098](https://github.com/netdata/netdata/pull/19098) ([ktsaou](https://github.com/ktsaou))
 - Reset parameter when generating an alert snapshot [\#19097](https://github.com/netdata/netdata/pull/19097) ([stelfrag](https://github.com/stelfrag))
 - Update Registry docs [\#19095](https://github.com/netdata/netdata/pull/19095) ([Ancairon](https://github.com/Ancairon))
@@ -436,13 +447,6 @@
 - go.d rename example =\> testrandom [\#18561](https://github.com/netdata/netdata/pull/18561) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18560](https://github.com/netdata/netdata/pull/18560) ([netdatabot](https://github.com/netdatabot))
 - go.d/prometheus: add label\_prefix config option [\#18559](https://github.com/netdata/netdata/pull/18559) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18558](https://github.com/netdata/netdata/pull/18558) ([netdatabot](https://github.com/netdatabot))
-- add nginx unit to apps\_groups.conf [\#18557](https://github.com/netdata/netdata/pull/18557) ([ilyam8](https://github.com/ilyam8))
-- go.d fix typesense/nginxunit meta [\#18556](https://github.com/netdata/netdata/pull/18556) ([ilyam8](https://github.com/ilyam8))
-- add go.d/nginxunit [\#18554](https://github.com/netdata/netdata/pull/18554) ([ilyam8](https://github.com/ilyam8))
-- fix some docs issues [\#18553](https://github.com/netdata/netdata/pull/18553) ([ilyam8](https://github.com/ilyam8))
-- go.d fix Goland code inspection warnings [\#18552](https://github.com/netdata/netdata/pull/18552) ([ilyam8](https://github.com/ilyam8))
-- Bump k8s.io/client-go from 0.31.0 to 0.31.1 in /src/go [\#18549](https://github.com/netdata/netdata/pull/18549) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

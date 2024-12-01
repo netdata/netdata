@@ -4,7 +4,7 @@
 
 [Nginx](https://nginx.org/en/) is an HTTP and reverse proxy server, a mail proxy server, and a generic TCP/UDP proxy server used to host websites and applications of all sizes.
 
-The software is known for its low impact on memory resources, high scalability, and its modular, event-driven architecture which can offer secure, predictable performance.
+The software is known for its low impact on memory resources, high scalability, and its modular, event-driven architecture, which can offer secure, predictable performance.
 
 ## Why Nginx
 
@@ -12,9 +12,9 @@ The software is known for its low impact on memory resources, high scalability, 
 
 - Nginx is used and useful in cases when you want to access different instances of Netdata from a single server.
 
-- Password-protect access to Netdata, until distributed authentication is implemented via the Netdata Cloud Sign In mechanism.
+- Password-protect access to Netdata until distributed authentication is implemented via the Netdata Cloud Sign In mechanism.
 
-- A proxy was necessary to encrypt the communication to Netdata, until v1.16.0, which provided TLS (HTTPS) support.
+- A proxy was necessary to encrypt the communication to Netdata until v1.16.0, which provided TLS (HTTPS) support.
 
 ## Nginx configuration file
 
@@ -24,7 +24,7 @@ Configuration options in Nginx are known as directives. Directives are organized
 
 Depending on your installation source, you’ll find an example configuration file at `/etc/nginx/conf.d/default.conf` or `etc/nginx/sites-enabled/default`, in some cases you may have to manually create the `sites-available` and `sites-enabled` directories.
 
-You can edit the Nginx configuration file with Nano, Vim or any other text editors you are comfortable with.
+You can edit the Nginx configuration file with Nano, Vim or any other text editors you’re comfortable with.
 
 After making changes to the configuration files:
 
@@ -112,7 +112,7 @@ server {
 
 ### As a subfolder for multiple Netdata servers, via one Nginx
 
-This is the recommended configuration when one Nginx will be used to manage multiple Netdata servers via sub-folders.
+This is the recommended configuration when one Nginx will be used to manage multiple Netdata servers via subfolders.
 
 ```text
 upstream backend-server1 {
@@ -155,9 +155,9 @@ server {
 }
 ```
 
-Of course you can add as many backend servers as you like.
+Of course, you can add as many backend servers as you like.
 
-Using the above, you access Netdata on the backend servers, like this:
+Using the above, you access Netdata on the backend servers like this:
 
 - `http://netdata.example.com/netdata/server1/` to reach `backend-server1`
 - `http://netdata.example.com/netdata/server2/` to reach `backend-server2`
@@ -173,7 +173,7 @@ proxy_set_header X-Forwarded-Proto https;
 proxy_pass https://localhost:19999;
 ```
 
-Optionally it is also possible to [enable TLS/SSL on Nginx](http://nginx.org/en/docs/http/configuring_https_servers.html), this way the user will encrypt not only the communication between Nginx and Netdata but also between the user and Nginx.
+Optionally, it is also possible to [enable TLS/SSL on Nginx](http://nginx.org/en/docs/http/configuring_https_servers.html), this way the user will encrypt not only the communication between Nginx and Netdata but also between the user and Nginx.
 
 If Nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
 
@@ -214,7 +214,7 @@ You can also use a unix domain socket. This will also provide a faster route bet
     bind to = unix:/var/run/netdata/netdata.sock
 ```
 
-At the Nginx side, use something like this to use the same unix domain socket:
+On the Nginx side, use something like this to use the same unix domain socket:
 
 ```text
 upstream backend {
@@ -265,11 +265,11 @@ To disable Netdata's gzip compression, open `netdata.conf` and in the `[web]` se
 
 ## SELinux
 
-If you get an 502 Bad Gateway error you might check your Nginx error log:
+If you get an 502 Bad Gateway error, you might check your Nginx error log:
 
 ```sh
 # cat /var/log/nginx/error.log:
 2016/09/09 12:34:05 [crit] 5731#5731: *1 connect() to 127.0.0.1:19999 failed (13: Permission denied) while connecting to upstream, client: 1.2.3.4, server: netdata.example.com, request: "GET / HTTP/2.0", upstream: "http://127.0.0.1:19999/", host: "netdata.example.com"
 ```
 
-If you see something like the above, chances are high that SELinux prevents nginx from connecting to the backend server. To fix that, just use this policy: `setsebool -P httpd_can_network_connect true`.
+If you see something like the above, chances are high that SELinux prevents nginx from connecting to the backend server. To fix that, use this policy: `setsebool -P httpd_can_network_connect true`.

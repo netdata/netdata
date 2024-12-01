@@ -14,15 +14,15 @@ It is notable for having much simpler configuration than many popular HTTP serve
 
 ## H2O configuration file
 
-On most systems, the H2O configuration is found under `/etc/h2o`. H2O uses [YAML 1.1](https://yaml.org/spec/1.1/), with a few special extensions, for it’s configuration files, with the main configuration file being `/etc/h2o/h2o.conf`.
+On most systems, the H2O configuration is found under `/etc/h2o`. H2O uses [YAML 1.1](https://yaml.org/spec/1.1/), with a few special extensions, for its configuration files, with the main configuration file being `/etc/h2o/h2o.conf`.
 
-You can edit the H2O configuration file with Nano, Vim or any other text editors with which you are comfortable.
+You can edit the H2O configuration file with Nano, Vim or any other text editors with which you’re comfortable.
 
 After making changes to the configuration files, perform the following:
 
 - Test the configuration with `h2o -m test -c /etc/h2o/h2o.conf`
 
-- Restart H2O to apply tha changes with `/etc/init.d/h2o restart` or `service h2o restart`
+- Restart H2O to apply the changes with `/etc/init.d/h2o restart` or `service h2o restart`
 
 ## Ways to access Netdata via H2O
 
@@ -63,7 +63,7 @@ hosts:
 
 ### As a subfolder for multiple Netdata servers, via one H2O instance
 
-This is the recommended configuration when one H2O instance will be used to manage multiple Netdata servers via sub-folders.
+This is the recommended configuration when one H2O instance will be used to manage multiple Netdata servers via subfolders.
 
 ```yaml
 hosts:
@@ -87,9 +87,9 @@ hosts:
         proxy.reverse.url: http://198.51.100.2:19999
 ```
 
-Of course you can add as many backend servers as you like.
+Of course, you can add as many backend servers as you like.
 
-Using the above, you access Netdata on the backend servers, like this:
+Using the above, you access Netdata on the backend servers like this:
 
 - `http://netdata.example.com/netdata/server1/` to reach Netdata on `198.51.100.1:19999`
 - `http://netdata.example.com/netdata/server2/` to reach Netdata on `198.51.100.2:19999`

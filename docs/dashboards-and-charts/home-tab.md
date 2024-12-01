@@ -16,20 +16,20 @@ A map consisting of node entries allows for quick hoverable information about ea
 
 The map classification can be altered, allowing the categorization of nodes by:
 
-- Status (e.g. Live)
-- OS (e.g. Ubuntu)
-- Technology (e.g. Container)
-- Agent version (e.g. v1.45.2)
-- Replication factor (e.g. Single, Multi)
-- Cloud provider (e.g AWS)
-- Cloud region (e.g. us-east-1)
-- Instance type (e.g. c6a.xlarge)
+- Status (e.g.,. Live)
+- OS (e.g., Ubuntu)
+- Technology (e.g., Container)
+- Agent version (e.g., v1.45.2)
+- Replication factor (e.g., Single, Multi)
+- Cloud provider (e.g., AWS)
+- Cloud region (e.g., us-east-1)
+- Instance type (e.g., c6a.xlarge)
 
 Color-coding can also be configured between:
 
-- Status (e.g. Live, Offline)
-- Connection stability (e.g. Stable, Unstable)
-- Replication factor (e.g. None, Single)
+- Status (e.g., Live, Offline)
+- Connection stability (e.g., Stable, Unstable)
+- Replication factor (e.g., None, Single)
 
 ## Data replication
 
@@ -49,7 +49,7 @@ The second table contains the top alerts in the last 24 hours, along with their 
 
 ## Netdata Assistant shortcut
 
-In the Home tab there is a shortcut button in order to start an instant conversation with the [Netdata Assistant](https://github.com/netdata/netdata/edit/master/docs/netdata-assistant.md).
+In the Home tab, there is a shortcut button to start an instant conversation with the [Netdata Assistant](https://github.com/netdata/netdata/edit/master/docs/netdata-assistant.md).
 
 ## Space metrics
 

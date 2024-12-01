@@ -22,14 +22,6 @@ func Test_clientFetch(t *testing.T) {
 	assert.Len(t, rows, 10)
 }
 
-func Test_clientFetchReadLineLimitExceeded(t *testing.T) {
-	c := &zookeeperFetcher{Client: &mockSocket{rowsNumResp: limitReadLines + 1}}
-
-	rows, err := c.fetch("whatever\n")
-	assert.Error(t, err)
-	assert.Len(t, rows, 0)
-}
-
 type mockSocket struct {
 	rowsNumResp int
 }
@@ -44,7 +36,9 @@ func (m *mockSocket) Disconnect() error {
 
 func (m *mockSocket) Command(command string, process socket.Processor) error {
 	for i := 0; i < m.rowsNumResp; i++ {
-		process([]byte(command))
+		if _, err := process([]byte(command)); err != nil {
+			return err
+		}
 	}
 	return nil
 }

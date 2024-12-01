@@ -10,18 +10,18 @@ From the Dashboards tab, click on the **+** button.
 
 In the modal, give your custom dashboard a name, and click **+ Add**.
 
-- The **Add Chart** button on the top right of the interface adds your first chart card. From the dropdown, select either **All Nodes** or a specific node.  
-  
+- The **Add Chart** button on the top right of the interface adds your first chart card. From the dropdown, select either **All Nodes** or a specific node.
+
   Next, select the context. You'll see a preview of the chart before you finish adding it. In this modal you can also [interact with the chart](/docs/dashboards-and-charts/netdata-charts.md), meaning you can configure all the aspects of the [NIDL framework](/docs/dashboards-and-charts/netdata-charts.md#nidl-framework) of the chart and more in detail, you can:
-  - define which `group by` method to use
-  - select the aggregation function over the data source
-  - select nodes
-  - select instances
-  - select dimensions
-  - select labels
-  - select the aggregation function over time
-  
-  After you are done configuring the chart, you can also change the type of the chart from the right hand side of the [Title bar](/docs/dashboards-and-charts/netdata-charts.md#title-bar), and select which of the final dimensions you want to be visible and in what order, from the [Dimensions bar](/docs/dashboards-and-charts/netdata-charts.md#dimensions-bar).
+    - define which `group by` method to use
+    - select the aggregation function over the data source
+    - select nodes
+    - select instances
+    - select dimensions
+    - select labels
+    - select the aggregation function over time
+
+  After you are done configuring the chart, you can also change the type of the chart from the right-hand side of the [Title bar](/docs/dashboards-and-charts/netdata-charts.md#title-bar), and select which of the final dimensions you want to be visible and in what order, from the [Dimensions bar](/docs/dashboards-and-charts/netdata-charts.md#dimensions-bar).
 
 - The **Add Text** button on the top right of the interface creates a new card with user-defined text, which you can use to describe or document a particular dashboard's meaning and purpose.
 
@@ -52,11 +52,11 @@ new location. Once you release your mouse, other elements re-sort to the grid sy
 
 ### Resize elements
 
-To resize any element on a dashboard, click on the bottom-right corner and drag it to its new size. Other elements re-sort to the grid system automatically.
+To resize any element on a dashboard, click in the bottom-right corner and drag it to its new size. Other elements re-sort to the grid system automatically.
 
 ### Go to chart
 
-Quickly jump to the location of the chart in either the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) or if the chart refers to a single node, its single node dashboard by clicking the 3-dot icon in the corner of any chart to open a menu. Hit the **Go to Chart** item.
+Quickly jump to the location of the chart in either the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) or if the chart refers to a single node, its single node dashboard by clicking the 3-dot icon in the corner of any chart to open a menu. Hit the **Go-to-Chart** item.
 
 You'll land directly on that chart of interest, but you can now scroll up and down to correlate your findings with other
 charts. Of course, you can continue to zoom, highlight, and pan through time just as you're used to with Netdata Charts.
@@ -93,4 +93,4 @@ Because of the visual complexity of individual charts, dashboards require a mini
 
 ## What's next?
 
-Once you've designed a dashboard or two, make sure to [invite your team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team) if you haven't already. You can add these new users to the same Room to let them see the same dashboards without any effort.
+Once you've designed a dashboard or two, make sure to [invite your team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#team-collaboration) if you haven't already. You can add these new users to the same Room to let them see the same dashboards without any effort.

@@ -58,9 +58,9 @@ func (c *torControlClient) authenticate() error {
 	}
 
 	var s string
-	err := c.conn.Command(cmd+"\n", func(bs []byte) bool {
+	err := c.conn.Command(cmd+"\n", func(bs []byte) (bool, error) {
 		s = string(bs)
-		return false
+		return false, nil
 	})
 	if err != nil {
 		return fmt.Errorf("authentication failed: %v", err)
@@ -74,7 +74,7 @@ func (c *torControlClient) authenticate() error {
 func (c *torControlClient) disconnect() {
 	// https://spec.torproject.org/control-spec/commands.html#quit
 
-	_ = c.conn.Command(cmdQuit+"\n", func(bs []byte) bool { return false })
+	_ = c.conn.Command(cmdQuit+"\n", func(bs []byte) (bool, error) { return false, nil })
 	_ = c.conn.Disconnect()
 }
 
@@ -87,27 +87,21 @@ func (c *torControlClient) getInfo(keywords ...string) ([]byte, error) {
 	cmd := fmt.Sprintf("%s %s", cmdGetInfo, strings.Join(keywords, " "))
 
 	var buf bytes.Buffer
-	var err error
 
-	clientErr := c.conn.Command(cmd+"\n", func(bs []byte) bool {
+	if err := c.conn.Command(cmd+"\n", func(bs []byte) (bool, error) {
 		s := string(bs)
 
 		switch {
 		case strings.HasPrefix(s, "250-"):
 			buf.WriteString(strings.TrimPrefix(s, "250-"))
 			buf.WriteByte('\n')
-			return true
+			return true, nil
 		case strings.HasPrefix(s, "250 "):
-			return false
+			return false, nil
 		default:
-			err = errors.New(s)
-			return false
+			return false, errors.New(s)
 		}
-	})
-	if clientErr != nil {
-		return nil, fmt.Errorf("command '%s' failed: %v", cmd, clientErr)
-	}
-	if err != nil {
+	}); err != nil {
 		return nil, fmt.Errorf("command '%s' failed: %v", cmd, err)
 	}
 

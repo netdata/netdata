@@ -1,6 +1,6 @@
 # Netdata Cloud
 
-Netdata Cloud is a service that complements Netdata installations. It is a key component in achieving optimal cost structure for large scale observability.
+Netdata Cloud is a service that complements Netdata installations. It is a key part in achieving optimal cost structure for large scale observability.
 
 Technically, Netdata Cloud is a thin control plane that allows the Netdata ecosystem to be a virtually unlimited scalable and flexible observability pipeline. With Netdata Cloud, this observability pipeline can span multiple teams, cloud providers, data centers and services, while remaining a uniform and highly integrated infrastructure, providing real-time and high-fidelity insights.
 
@@ -45,7 +45,7 @@ Netdata Cloud provides the following features, on top of what the Netdata Agents
 
 2. **Role Based Access Control (RBAC)**: Netdata Cloud has all the mechanisms for user-management and access control. It allows assigning all users a role, segmenting the infrastructure into rooms, and associating Rooms with roles and users.
 
-3. **Access from anywhere**: Netdata Agents are installed on-prem and this is where all your data are always stored. Netdata Cloud allows querying all the Netdata Agents (Standalone, Children and Parents) in real-time when dashboards are accessed via Netdata Cloud.
+3. **Access from anywhere**: Netdata Agents are installed on-prem, and this is where all your data is always stored. Netdata Cloud allows querying all the Netdata Agents (Standalone, Children and Parents) in real-time when dashboards are accessed via Netdata Cloud.
 
    This enables a much simpler access control, eliminating the complexities of setting up VPNs to access observability, and the bandwidth costs for centralizing all metrics to one place.
 
@@ -61,11 +61,16 @@ Netdata Cloud provides the following features, on top of what the Netdata Agents
 
 ## Data Exposed to Netdata Cloud
 
-Netdata is thin layer of top of Netdata Agents. It does not receive the samples collected, or the logs Netdata Agents maintain.
+Netdata Cloud serves as a thin layer on top of Netdata Agents. It does not receive the samples collected, or the logs Netdata Agents maintain.
 
-This is a key design decision for Netdata. If we were centralizing metric samples and logs, Netdata would have the same constrains and cost structure other observability solutions have, and we would be forced to lower metrics resolution, filter out metrics and eventually increase significantly the cost of observability.
+Netdata's design deliberately avoids centralizing raw metrics and logs. This prevents the common constraints of traditional observability solutions: reduced metric resolution, forced data filtering, and higher costs.
 
-Instead, Netdata Cloud receives and stores only metadata related to the metrics collected, such as the nodes collecting metrics and their labels, the metric names, their labels and their retention, the data collection plugins and modules running, the configured alerts and their transitions.
+Instead, Netdata Cloud only stores metadata such as:
+
+- Node information and labels
+- Metric names, labels, and retention periods
+- Active collectors and modules
+- Alert configurations and state changes
 
 This information is a small fraction of the total information maintained by Netdata Agents, allowing Netdata Cloud to remain high-resolution, high-fidelity and real-time, while being able to:
 
@@ -78,15 +83,15 @@ Metric samples and logs are transferred via Netdata Cloud to your Web Browser, o
 
 You can subscribe to Netdata Cloud updates at the [Netdata Cloud Status](https://status.netdata.cloud/) page.
 
-Netdata Cloud is a highly available, auto-scalable solution, however being a monitoring solution, we need to ensure dashboards are accessible during crisis.
+Netdata Cloud is a highly available, auto-scalable solution; however, being a monitoring solution, we need to ensure dashboards are accessible during crisis.
 
 Netdata Agents provide the same dashboard Netdata Cloud provides, with the following limitations:
 
 1. Netdata Agents (Children and Parents) dashboards are limited to their databases, while on Netdata Cloud the dashboard presents the entire infrastructure, from all Netdata Agents connected to it.
 
-2. When you are not logged-in or the Agent is not connected to Netdata Cloud, certain features of the Netdata Agent dashboard will not be available.
+2. When you are not logged in or the Agent is not connected to Netdata Cloud, certain features of the Netdata Agent dashboard will not be available.
 
-   When you are logged-in and the Agent is connected to Netdata Cloud, the dashboard has the same functionality as Netdata Cloud.
+   When you are logged in and the Agent is connected to Netdata Cloud, the dashboard has the same functionality as Netdata Cloud.
 
 To ensure dashboard high availability, Netdata Agent dashboards are available by directly accessing them, even when the connectivity between Children and Parents or Netdata Cloud faces issues. This allows the use of the individual Netdata Agents' dashboards during crisis, at different levels of aggregation.
 
@@ -98,16 +103,16 @@ Netdata Cloud queries Netdata Agents, so it provides exactly the same fidelity a
 
 The Netdata Agent and Netdata Cloud have similar query performance, but there are additional network latencies involved when the dashboards are viewed via Netdata Cloud.
 
-Accessing Netdata Agents on the same LAN has marginal network latency and their response time is only affected by the queries. However, accessing the same Netdata Agents via Netdata Cloud has a bigger network round-trip time, that looks like this:
+Accessing Netdata Agents on the same LAN has marginal network latency, and their response time is only affected by the queries. However, accessing the same Netdata Agents via Netdata Cloud has a bigger network round-trip time that looks like this:
 
 1. Your web browser makes a request to Netdata Cloud.
 2. Netdata Cloud sends the request to your Netdata Agents. If multiple Netdata Agents are involved, they are queried in parallel.
 3. Netdata Cloud receives their responses and aggregates them into a single response.
 4. Netdata Cloud replies to your web browser.
 
-If you are sitting on the same LAN as the Netdata Agents, the latency will be 2 times the round-trip network latency between this LAN and Netdata Cloud.
+If you are sitting on the same LAN as the Netdata Agents, the latency will be two times the round-trip network latency between this LAN and Netdata Cloud.
 
-However, when there are multiple Netdata Agents involved, the queries will be faster compared to a monitoring solution that has one centralization point. Netdata Cloud splits each query into multiple parts and each of the Netdata Agents involved will only perform a small part of the original query. So, when querying a large infrastructure, you enjoy the performance of the combined power of all your Netdata Agents, which is usually quite higher than any single-centralization-point monitoring solution.
+With multiple Netdata Agents, queries are faster than single-point monitoring solutions. Netdata Cloud distributes each query across multiple Agents, where each Agent processes only a portion of the query. This distributed approach uses your infrastructure's combined processing power, delivering superior performance compared to centralized solutions.
 
 ## Does Netdata Cloud require Observability Centralization Points?
 
@@ -115,20 +120,20 @@ No. Any or all Netdata Agents can be connected to Netdata Cloud.
 
 We recommend to create [observability centralization points](/docs/observability-centralization-points/README.md), as required for operational efficiency (ephemeral nodes, teams or services isolation, central control of alerts, production systems performance), security policies (internet isolation), or cost optimization (use existing capacities before allocating new ones).
 
-We suggest to review the [Best Practices for Observability Centralization Points](/docs/observability-centralization-points/best-practices.md).
+We suggest reviewing the [Best Practices for Observability Centralization Points](/docs/observability-centralization-points/best-practices.md).
 
 ## When I have Netdata Parents, do I need to connect Netdata Children to Netdata Cloud too?
 
-No, it is not needed, but it provides high-availability.
+No, it is unnecessary, but it provides high availability.
 
-When Netdata Parents are connected to Netdata Cloud, all their Netdata Children are available, via these Parents.
+When Netdata Parents are connected to Netdata Cloud, all their Netdata Children are available via these Parents.
 
-When multiple Netdata Parents maintain a database for the same Netdata Children (e.g. clustered Parents, or Parents and Grandparents), Netdata Cloud is able to detect the unique nodes in an infrastructure and query each node only once, using one of the available Parents.
+When multiple Parent nodes store data from the same Child nodes (in clusters or multi-level hierarchies), Netdata Cloud queries each unique node once through a single available Parent.
 
 Netdata Cloud prefers:
 
-- The most distant (from the Child) Parent available, when doing metrics visualization queries (since usually these Parents have been added for this purpose).
+- The most distant (from the Child) Parent is available when doing metrics visualization queries (since usually these Parents have been added for this purpose).
 
-- The closest (to the Child) Parent available, for [Top Monitoring](/docs/top-monitoring-netdata-functions.md) (since top-monitoring provides live data, like the processes running, the list of sockets open, etc). The streaming protocol of Netdata Parents and Children is able to forward such requests to the right child, via the Parents, to respond with live and accurate data.
+- The closest (to the Child) Parent available for [Top Monitoring](/docs/top-monitoring-netdata-functions.md) (since top-monitoring provides live data, like the processes running, the list of sockets open, etc.). The streaming protocol of Netdata Parents and Children is able to forward such requests to the right child, via the Parents, to respond with live and accurate data.
 
 Netdata Children may be connected to Netdata Cloud for high-availability, in case the Netdata Parents are unreachable.

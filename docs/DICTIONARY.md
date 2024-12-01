@@ -11,7 +11,7 @@ When the context is clear, we can omit the "Netdata" prefix for brevity.
 | **Agent** (**Agents**) | The core monitoring software that collects, processes and stores metrics |
 | **Daemon**             | The main Netdata process                                                 |
 | **Collector(s)**       | The various collectors of Netdata                                        |
-| **Registry**           | The default Netdata Registry, or any Agent acting as one                 ||
+| **Registry**           | The default Netdata Registry, or any Agent acting as one                 |
 
 ## Cloud
 
@@ -20,6 +20,7 @@ When the context is clear, we can omit the "Netdata" prefix for brevity.
 | **Cloud**             | The centralized platform for managing and visualizing Netdata metrics                 |
 | **Claim(ing) Token**  | The token used to Connect the Agent to the Cloud                                      |
 | **Connect(ing)(ion)** | The process of connecting the Agent to the Cloud. Do not use the word "claim" instead |
+| **Cloud On Prem**     | The version of Cloud we ship for Businesses that want to run it on premises           |
 
 ## Database
 

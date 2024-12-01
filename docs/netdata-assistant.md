@@ -4,7 +4,7 @@ The Netdata Assistant is a feature that uses large language models and the Netda
 
 ## Using Netdata Assistant
 
-- Navigate to the alerts tab
+- Navigate to the Alerts tab
 - If there are active alerts, the `Actions` column will have an Assistant button
 
   ![actions column](https://github-production-user-asset-6210df.s3.amazonaws.com/24860547/253559075-815ca123-e2b6-4d44-a780-eeee64cca420.png)
@@ -13,7 +13,7 @@ The Netdata Assistant is a feature that uses large language models and the Netda
 
   ![Netdata Assistant popup](https://github-production-user-asset-6210df.s3.amazonaws.com/24860547/253559645-62850c7b-cd1d-45f2-b2dd-474ecbf2b713.png)
 
-- In case you need more information, or want to understand deeper, Netdata Assistant also provides useful web links to resources that can help.
+- If you need more information or want to dig deeper into an issue, Netdata Assistant will also provide you with helpful web links to resources that can help you.
 
   ![useful resources](https://github-production-user-asset-6210df.s3.amazonaws.com/24860547/253560071-e768fa6d-6c9a-4504-bb1f-17d5f4707627.png)
 

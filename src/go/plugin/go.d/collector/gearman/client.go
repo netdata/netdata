@@ -19,8 +19,9 @@ type gearmanConn interface {
 
 func newGearmanConn(conf Config) gearmanConn {
 	return &gearmanClient{conn: socket.New(socket.Config{
-		Address: conf.Address,
-		Timeout: conf.Timeout.Duration(),
+		Address:      conf.Address,
+		Timeout:      conf.Timeout.Duration(),
+		MaxReadLines: 10000,
 	})}
 }
 
@@ -45,32 +46,20 @@ func (c *gearmanClient) queryPriorityStatus() ([]byte, error) {
 }
 
 func (c *gearmanClient) query(cmd string) ([]byte, error) {
-	const limitReadLines = 10000
-	var num int
-	var err error
 	var b bytes.Buffer
 
-	clientErr := c.conn.Command(cmd+"\n", func(bs []byte) bool {
+	if err := c.conn.Command(cmd+"\n", func(bs []byte) (bool, error) {
 		s := string(bs)
 
 		if strings.HasPrefix(s, "ERR") {
-			err = fmt.Errorf("command '%s': %s", cmd, s)
-			return false
+			return false, fmt.Errorf("command '%s': %s", cmd, s)
 		}
 
 		b.WriteString(s)
 		b.WriteByte('\n')
 
-		if num++; num >= limitReadLines {
-			err = fmt.Errorf("command '%s': read line limit exceeded (%d)", cmd, limitReadLines)
-			return false
-		}
-		return !strings.HasPrefix(s, ".")
-	})
-	if clientErr != nil {
-		return nil, fmt.Errorf("command '%s' client error: %v", cmd, clientErr)
-	}
-	if err != nil {
+		return !strings.HasPrefix(s, "."), nil
+	}); err != nil {
 		return nil, err
 	}
 

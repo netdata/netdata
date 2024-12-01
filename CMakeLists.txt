@@ -1641,6 +1641,7 @@ set(PROC_PLUGIN_FILES
         src/collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c
         src/collectors/proc.plugin/proc_vmstat.c
         src/collectors/proc.plugin/proc_uptime.c
+        src/collectors/proc.plugin/run_reboot_required.c
         src/collectors/proc.plugin/proc_pressure.c
         src/collectors/proc.plugin/proc_pressure.h
         src/collectors/proc.plugin/sys_kernel_mm_ksm.c
