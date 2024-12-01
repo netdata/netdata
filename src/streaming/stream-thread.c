@@ -36,8 +36,8 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
             stream_sender_handle_op(sth, s, msg);
     }
     else {
-        internal_fatal(true, "invalid message");
-        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM[%zu]: invalid message", sth->id);
+        // this may happen if we receive a POLLOUT opcode, but the sender has been disconnected
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM[%zu]: stream OPCODE %d ignored.", sth->id, msg->opcode);
     }
 }
 
