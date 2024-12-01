@@ -455,14 +455,14 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
 static void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
     const size_t per1000 = cache_usage_per1000(cache, NULL);
 
-    if (per1000 > cache->config.healthy_size_per1000 && spinlock_trylock(&cache->evictor.spinlock)) {
+    if (per1000 >= cache->config.healthy_size_per1000 && spinlock_trylock(&cache->evictor.spinlock)) {
         __atomic_add_fetch(&cache->stats.waste_evict_thread_signals, 1, __ATOMIC_RELAXED);
         completion_mark_complete_a_job(&cache->evictor.completion);
         spinlock_unlock(&cache->evictor.spinlock);
     }
 
     if(!(cache->config.options & PGC_OPTIONS_EVICT_PAGES_NO_INLINE)) {
-        if (per1000 >= cache->config.severe_pressure_per1000 && !on_release) {
+        if (per1000 > cache->config.aggressive_evict_per1000 && !on_release) {
             // the threads that add pages, turn into evictors when the cache needs evictions aggressively
             __atomic_add_fetch(&cache->stats.waste_evictions_inline_on_add, 1, __ATOMIC_RELAXED);
             evict_pages(cache,
@@ -470,13 +470,13 @@ static void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
                         cache->config.max_pages_per_inline_eviction,
                         false, false);
         }
-        else if (per1000 >= cache->config.severe_pressure_per1000 && on_release) {
-            // the threads that releasing pages, turn into evictors hen the cache is critical
+        else if (per1000 > cache->config.severe_pressure_per1000 && on_release) {
+            // the threads that are releasing pages, turn into evictors when the cache is critical
             __atomic_add_fetch(&cache->stats.waste_evictions_inline_on_release, 1, __ATOMIC_RELAXED);
 
             evict_pages(cache,
-                        cache->config.max_skip_pages_per_inline_eviction * 2,
-                        cache->config.max_pages_per_inline_eviction * 2,
+                        cache->config.max_skip_pages_per_inline_eviction,
+                        cache->config.max_pages_per_inline_eviction,
                         false, false);
         }
     }
@@ -2010,10 +2010,10 @@ PGC *pgc_create(const char *name,
     cache->config.stats = global_statistics_enabled;
 
     cache->config.max_workers_evict_inline    = max_inline_evictors;
-    cache->config.severe_pressure_per1000     = 1000; // turn releasers into evictors above this threshold
-    cache->config.aggressive_evict_per1000    =  999; // turn adders into evictors above this threshold
-    cache->config.healthy_size_per1000        =  998; // don't evict if the current size is below this threshold
-    cache->config.evict_low_threshold_per1000 =  997; // when evicting, bring the size down to this threshold
+    cache->config.severe_pressure_per1000     = 1010; // INLINE: use releasers to evict pages (up to max_pages_per_inline_eviction * 2)
+    cache->config.aggressive_evict_per1000    = 1000; // INLINE: use adders to evict page (up to max_pages_per_inline_eviction)
+    cache->config.healthy_size_per1000        =  995; // signal the eviction thread to evict immediately
+    cache->config.evict_low_threshold_per1000 =  995; // when evicting, bring the size down to this threshold
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
 
