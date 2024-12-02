@@ -620,7 +620,7 @@ static inline void link_all_processes_to_their_parents(void)
 
 //        pp = &ebpf_pids[p->ppid];
         pp = ebpf_find_pid_data(p->ppid);
-        if (likely(pp->pid)) {
+        if (likely(pp && pp->pid)) {
             p->parent = pp;
             pp->children_count++;
 
