@@ -303,11 +303,11 @@ static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
     freez(ptr);
 }
 
-ebpf_pid_data_t *ebpf_find_pid_data(pid_t pid);
+ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid);
 
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx) {
 //    ebpf_pid_data_t *ptr = &ebpf_pids[pid];
-    ebpf_pid_data_t *ptr = ebpf_find_pid_data(pid);
+    ebpf_pid_data_t *ptr = ebpf_find_or_create_pid_data(pid);
     ptr->thread_collecting |= 1<<idx;
     // The caller is getting data to work.
     if (!name && idx != EBPF_PIDS_PROC_FILE)
