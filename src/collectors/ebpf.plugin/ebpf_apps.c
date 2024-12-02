@@ -340,7 +340,7 @@ ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid)
     ebpf_pid_data_t *pid_data = ebpf_find_pid_data_unsafe(pid);
     if (!pid_data) {
         Pvoid_t *Pvalue = JudyLIns(&ebpf_pid_judyL, (Word_t) pid, PJE0);
-        internal_fatal(!PValue || PValue == PJERR, "EBPF: pid judy array");
+        internal_fatal(!Pvalue || Pvalue == PJERR, "EBPF: pid judy array");
         if (likely(!*Pvalue))
             *Pvalue = pid_data = callocz(1, sizeof(*pid_data));
         else
