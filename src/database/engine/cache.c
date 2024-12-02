@@ -2005,29 +2005,35 @@ PGC *pgc_create(const char *name,
 
     PGC *cache = callocz(1, sizeof(PGC));
     strncpyz(cache->config.name, name, PGC_NAME_MAX);
+
     cache->config.options = options;
-    cache->config.clean_size = (clean_size_bytes < 1 * 1024 * 1024) ? 1 * 1024 * 1024 : clean_size_bytes;
-    cache->config.pgc_free_clean_cb = pgc_free_cb;
-    cache->config.max_dirty_pages_per_call = max_dirty_pages_per_flush;
-    cache->config.pgc_save_init_cb = pgc_save_init_cb;
-    cache->config.pgc_save_dirty_cb = pgc_save_dirty_cb;
-    cache->config.max_pages_per_inline_eviction = max_pages_per_inline_eviction;
-    cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 2) ? 2 : max_skip_pages_per_inline_eviction;
-    cache->config.max_flushes_inline = (max_flushes_inline == 0) ? 2 : max_flushes_inline;
-    cache->config.partitions = partitions == 0 ? 1ULL + get_netdata_cpus() / 2 : partitions;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
     cache->config.stats = telemetry_enabled;
 
-    cache->config.max_workers_evict_inline    = max_inline_evictors;
-    cache->config.severe_pressure_per1000     = 1010; // INLINE: use releasers to evict pages (up to max_pages_per_inline_eviction)
-    cache->config.aggressive_evict_per1000    =  990; // INLINE: use adders to evict page (up to max_pages_per_inline_eviction)
-    cache->config.healthy_size_per1000        =  980; // signal the eviction thread to evict immediately
-    cache->config.evict_low_threshold_per1000 =  970; // when evicting, bring the size down to this threshold
+    // flushing
+    cache->config.max_flushes_inline            = (max_flushes_inline == 0) ? 2 : max_flushes_inline;
+    cache->config.max_dirty_pages_per_call      = max_dirty_pages_per_flush;
+    cache->config.pgc_save_init_cb              = pgc_save_init_cb;
+    cache->config.pgc_save_dirty_cb             = pgc_save_dirty_cb;
 
-    cache->config.use_all_ram = dbengine_use_all_ram_for_caches;
-    cache->config.out_of_memory_protection_bytes = dbengine_out_of_memory_protection;
+    // eviction strategy
+    cache->config.clean_size                    = (clean_size_bytes < 1 * 1024 * 1024) ? 1 * 1024 * 1024 : clean_size_bytes;
+    cache->config.pgc_free_clean_cb             = pgc_free_cb;
+    cache->config.max_workers_evict_inline      = max_inline_evictors;
+    cache->config.max_pages_per_inline_eviction = max_pages_per_inline_eviction;
+    cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 2) ? 2 : max_skip_pages_per_inline_eviction;
+    cache->config.severe_pressure_per1000       = 1010; // INLINE: use releasers to evict pages (up to max_pages_per_inline_eviction)
+    cache->config.aggressive_evict_per1000      =  990; // INLINE: use adders to evict page (up to max_pages_per_inline_eviction)
+    cache->config.healthy_size_per1000          =  980; // signal the eviction thread to evict immediately
+    cache->config.evict_low_threshold_per1000   =  970; // when evicting, bring the size down to this threshold
 
-    cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
+    // use all ram and protection from out of memory
+    cache->config.use_all_ram                       = dbengine_use_all_ram_for_caches;
+    cache->config.out_of_memory_protection_bytes    = dbengine_out_of_memory_protection;
+
+    // partitions
+    cache->config.partitions    = partitions == 0 ? 1ULL + get_netdata_cpus() / 2 : partitions;
+    cache->index                = callocz(cache->config.partitions, sizeof(struct pgc_index));
 
     pgc_section_pages_static_aral_init();
 
