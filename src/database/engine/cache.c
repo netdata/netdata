@@ -2019,10 +2019,10 @@ PGC *pgc_create(const char *name,
     cache->config.stats = telemetry_enabled;
 
     cache->config.max_workers_evict_inline    = max_inline_evictors;
-    cache->config.severe_pressure_per1000     = 1010; // INLINE: use releasers to evict pages (up to max_pages_per_inline_eviction * 2)
-    cache->config.aggressive_evict_per1000    = 1000; // INLINE: use adders to evict page (up to max_pages_per_inline_eviction)
-    cache->config.healthy_size_per1000        =  995; // signal the eviction thread to evict immediately
-    cache->config.evict_low_threshold_per1000 =  995; // when evicting, bring the size down to this threshold
+    cache->config.severe_pressure_per1000     = 1010; // INLINE: use releasers to evict pages (up to max_pages_per_inline_eviction)
+    cache->config.aggressive_evict_per1000    =  990; // INLINE: use adders to evict page (up to max_pages_per_inline_eviction)
+    cache->config.healthy_size_per1000        =  980; // signal the eviction thread to evict immediately
+    cache->config.evict_low_threshold_per1000 =  970; // when evicting, bring the size down to this threshold
 
     cache->config.use_all_ram = dbengine_use_all_ram_for_caches;
     cache->config.out_of_memory_protection_bytes = dbengine_out_of_memory_protection;
