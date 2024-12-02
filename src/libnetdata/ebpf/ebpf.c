@@ -1652,15 +1652,11 @@ int ebpf_disable_tracing_values(char *subsys, char *eventname)
  */
 static uint32_t ebpf_select_pc_prefix()
 {
-    long counter = 1;
-    uint32_t i;
-    for (i = 0; i < 128; i++) {
-        counter <<= 1;
-        if (counter < 0)
-            break;
-    }
-
-    return counter;
+#if SIZE_OF_VOID_P == 4
+    return 32;
+#else
+    return 64;
+#endif
 }
 
 /**
