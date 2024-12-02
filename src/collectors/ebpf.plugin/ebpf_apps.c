@@ -306,7 +306,52 @@ int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **a
 
 #define MAX_CMDLINE 16384
 
-ebpf_pid_data_t *ebpf_pids = NULL;            // to avoid allocations, we pre-allocate the entire pid space.
+Pvoid_t ebpf_pid_judyL = NULL;
+SPINLOCK ebpf_pid_spinlock = NETDATA_SPINLOCK_INITIALIZER;
+
+void ebpf_pid_del(pid_t pid)
+{
+    spinlock_lock(&ebpf_pid_spinlock);
+    (void) JudyLDel(ebpf_pid_judyL, (Word_t) pid, PJE0);
+    spinlock_unlock(&ebpf_pid_spinlock);
+}
+
+static ebpf_pid_data_t *ebpf_find_pid_data_unsafe(pid_t pid)
+{
+    ebpf_pid_data_t *pid_data = NULL;
+    Pvoid_t *Pvalue = JudyLGet(ebpf_pid_judyL, (Word_t) pid, PJE0);
+    if (Pvalue)
+        pid_data = *Pvalue;
+    return pid_data;
+}
+
+
+ebpf_pid_data_t *ebpf_find_pid_data(pid_t pid)
+{
+    spinlock_lock(&ebpf_pid_spinlock);
+    ebpf_pid_data_t *pid_data = ebpf_find_pid_data_unsafe(pid);
+    spinlock_unlock(&ebpf_pid_spinlock);
+    return pid_data;
+}
+
+ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid)
+{
+    spinlock_lock(&ebpf_pid_spinlock);
+    ebpf_pid_data_t *pid_data = ebpf_find_pid_data_unsafe(pid);
+    if (!pid_data) {
+        Pvoid_t *Pvalue = JudyLIns(&ebpf_pid_judyL, (Word_t) pid, PJE0);
+        internal_fatal(!PValue || PValue == PJERR, "EBPF: pid judy array");
+        if (likely(!*Pvalue))
+            *Pvalue = pid_data = callocz(1, sizeof(*pid_data));
+        else
+            pid_data = *Pvalue;
+    }
+    spinlock_unlock(&ebpf_pid_spinlock);
+
+    return pid_data;
+}
+
+//ebpf_pid_data_t *ebpf_pids = NULL;            // to avoid allocations, we pre-allocate the entire pid space.
 ebpf_pid_data_t *ebpf_pids_link_list = NULL;  // global list of all processes running
 
 size_t ebpf_all_pids_count = 0; // the number of processes running read from /proc
@@ -573,7 +618,8 @@ static inline void link_all_processes_to_their_parents(void)
             continue;
         }
 
-        pp = &ebpf_pids[p->ppid];
+//        pp = &ebpf_pids[p->ppid];
+        pp = ebpf_find_pid_data(p->ppid);
         if (likely(pp->pid)) {
             p->parent = pp;
             pp->children_count++;
@@ -665,10 +711,14 @@ static void apply_apps_groups_targets_inheritance(void)
     }
 
     // init goes always to default target
-    ebpf_pids[INIT_PID].target = apps_groups_default_target;
+    ebpf_pid_data_t *pid_entry = ebpf_find_or_create_pid_data(INIT_PID);
+    pid_entry->target = apps_groups_default_target;
+//    ebpf_pids[INIT_PID].target = apps_groups_default_target;
 
     // pid 0 goes always to default target
-    ebpf_pids[0].target = apps_groups_default_target;
+    pid_entry = ebpf_find_or_create_pid_data(0);
+    pid_entry->target = apps_groups_default_target;
+    //ebpf_pids[0].target = apps_groups_default_target;
 
     // give a default target on all top level processes
     if (unlikely(debug_enabled))
@@ -684,7 +734,9 @@ static void apply_apps_groups_targets_inheritance(void)
             p->sortlist = sortlist++;
     }
 
-    ebpf_pids[1].sortlist = sortlist++;
+    //ebpf_pids[1].sortlist = sortlist++;
+    pid_entry = ebpf_find_or_create_pid_data(1);
+    pid_entry->sortlist = sortlist++;
 
     // give a target to all merged child processes
     found = 1;
@@ -734,7 +786,9 @@ static inline void post_aggregate_targets(struct ebpf_target *root)
  */
 void ebpf_del_pid_entry(pid_t pid)
 {
-    ebpf_pid_data_t *p = &ebpf_pids[pid];
+
+    //ebpf_pid_data_t *p = &ebpf_pids[pid];
+    ebpf_pid_data_t *p = ebpf_find_pid_data(pid);
 
     debug_log("process %d %s exited, deleting it.", pid, p->comm);
 
@@ -745,7 +799,6 @@ void ebpf_del_pid_entry(pid_t pid)
         p->next->prev = p->prev;
     if (p->prev)
         p->prev->next = p->next;
-
 
     if ((p->thread_collecting & EBPF_PIDS_PROC_FILE) || p->has_proc_file)
         ebpf_all_pids_count--;
@@ -768,7 +821,9 @@ void ebpf_del_pid_entry(pid_t pid)
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-    memset(p, 0, sizeof(ebpf_pid_data_t));
+    freez(p);
+    //memset(p, 0, sizeof(ebpf_pid_data_t));
+    ebpf_pid_del(pid);
 }
 
 /**
