@@ -13,6 +13,9 @@
 
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
+extern uint64_t dbengine_out_of_memory_protection;
+extern bool dbengine_use_all_ram_for_caches;
+
 extern int default_rrdeng_page_cache_mb;
 extern int default_rrdeng_extent_cache_mb;
 extern int db_engine_journal_check;

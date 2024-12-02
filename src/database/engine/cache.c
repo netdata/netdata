@@ -87,6 +87,7 @@ struct pgc {
     struct {
         char name[PGC_NAME_MAX + 1];
         bool stats; // enable extended statistics
+        bool use_all_ram;
 
         size_t partitions;
         size_t clean_size;
@@ -96,6 +97,7 @@ struct pgc {
         size_t max_flushes_inline;
         size_t max_workers_evict_inline;
         size_t additional_bytes_per_page;
+        size_t out_of_memory_protection_bytes;
         free_clean_page_callback pgc_free_clean_cb;
         save_dirty_page_callback pgc_save_dirty_cb;
         save_dirty_init_callback pgc_save_init_cb;
@@ -380,17 +382,6 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
             if(wanted_cache_size_cb > wanted_cache_size)
                 wanted_cache_size = wanted_cache_size_cb;
         }
-        else {
-            // ballooning to use all RAM and out of memory protection
-            const size_t mem_available = os_mem_available();
-            const size_t min_available = 3ULL * 1024 * 1024 * 1024;
-            if(mem_available < min_available)
-                // we must shrink
-                wanted_cache_size = current_cache_size - (min_available - mem_available);
-            else
-                // we can grow
-                wanted_cache_size = current_cache_size + (mem_available - min_available);
-        }
 
         if (wanted_cache_size < hot + dirty + index + cache->config.clean_size)
             wanted_cache_size = hot + dirty + index + cache->config.clean_size;
@@ -407,6 +398,22 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     // if we don't have enough clean pages, there is no reason to be aggressive or critical
     if(current_cache_size > wanted_cache_size && wanted_cache_size < current_cache_size - clean)
         wanted_cache_size = current_cache_size - clean;
+
+    if(cache->config.out_of_memory_protection_bytes) {
+        // out of memory protection
+        OS_SYSTEM_MEMORY sm = os_system_memory(false);
+        if(sm.ram_total_bytes) {
+            // when the total exists, ram_available_bytes is also right
+
+            const size_t min_available = cache->config.out_of_memory_protection_bytes;
+            if (sm.ram_available_bytes < min_available)
+                // we must shrink
+                wanted_cache_size = current_cache_size - (min_available - sm.ram_available_bytes);
+            else if(cache->config.use_all_ram)
+                // we can grow
+                wanted_cache_size = current_cache_size + (sm.ram_available_bytes - min_available);
+        }
+    }
 
     const size_t per1000 = (size_t)((unsigned long long)current_cache_size * 1000ULL / (unsigned long long)wanted_cache_size);
 
@@ -2017,6 +2024,9 @@ PGC *pgc_create(const char *name,
     cache->config.healthy_size_per1000        =  995; // signal the eviction thread to evict immediately
     cache->config.evict_low_threshold_per1000 =  995; // when evicting, bring the size down to this threshold
 
+    cache->config.use_all_ram = dbengine_use_all_ram_for_caches;
+    cache->config.out_of_memory_protection_bytes = dbengine_out_of_memory_protection;
+
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
 
     pgc_section_pages_static_aral_init();
@@ -2259,6 +2269,8 @@ void pgc_reset_hot_max(PGC *cache) {
 
 void pgc_set_dynamic_target_cache_size_callback(PGC *cache, dynamic_target_cache_size_callback callback) {
     cache->config.dynamic_target_size_cb = callback;
+    cache->config.out_of_memory_protection_bytes = 0;
+    cache->config.use_all_ram = false;
 
     size_t size_to_evict = 0;
     cache_usage_per1000(cache, &size_to_evict);

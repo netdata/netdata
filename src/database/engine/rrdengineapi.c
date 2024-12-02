@@ -59,6 +59,8 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
         initialize_single_ctx(multidb_ctx[i]);
 }
 
+size_t dbengine_out_of_memory_protection = 0;
+bool dbengine_use_all_ram_for_caches = false;
 int db_engine_journal_check = 0;
 bool new_dbengine_defaults = false;
 bool legacy_multihost_db_space = false;

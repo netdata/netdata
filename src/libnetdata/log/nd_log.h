@@ -172,6 +172,8 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 
 void netdata_logger_fatal( const char *file, const char *function, unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
 
+#define error_report(x, args...) do { errno_clear(); netdata_log_error(x, ##args); } while(0)
+
 # ifdef __cplusplus
 }
 # endif

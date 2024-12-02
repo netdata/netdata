@@ -4,6 +4,7 @@
 #define NETDATA_COMMON_H 1
 
 #include "libnetdata/libnetdata.h"
+#include "config/netdata-conf.h"
 #include "libuv_workers.h"
 
 // ----------------------------------------------------------------------------
@@ -11,7 +12,7 @@
 
 #include "web/api/maps/maps.h"
 
-#include "daemon/config/dyncfg.h"
+#include "daemon/dyncfg/dyncfg.h"
 
 #include "daemon/telemetry/telemetry.h"
 

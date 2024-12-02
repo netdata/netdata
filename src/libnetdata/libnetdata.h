@@ -86,8 +86,6 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 #define BITS_IN_A_KILOBIT     1000
 #define KILOBITS_IN_A_MEGABIT 1000
 
-#define error_report(x, args...) do { errno_clear(); netdata_log_error(x, ##args); } while(0)
-
 #include "bitmap/bitmap64.h"
 
 #define COMPRESSION_MAX_CHUNK 0x4000

@@ -201,7 +201,7 @@ static int wait_till_agent_claim_ready()
         // We trap the impossible NULL here to keep the linter happy without using a fatal() in the code.
         const char *cloud_base_url = cloud_config_url_get();
         if (cloud_base_url == NULL) {
-            netdata_log_error("Do not move the \"url\" out of post_conf_load!!");
+            netdata_log_error("Do not move the \"url\" out of netdata_conf_section_global_run_as_user!!");
             return 1;
         }
 
@@ -559,7 +559,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
     while (service_running(SERVICE_ACLK)) {
         aclk_cloud_base_url = cloud_config_url_get();
         if (aclk_cloud_base_url == NULL) {
-            error_report("Do not move the \"url\" out of post_conf_load!!");
+            error_report("Do not move the \"url\" out of netdata_conf_section_global_run_as_user!!");
             aclk_status = ACLK_STATUS_NO_CLOUD_URL;
             return -1;
         }

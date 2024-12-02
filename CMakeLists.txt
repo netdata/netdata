@@ -1038,15 +1038,15 @@ set(DAEMON_FILES
         src/daemon/pipename.h
         src/daemon/unit_test.c
         src/daemon/unit_test.h
-        src/daemon/config/dyncfg.c
-        src/daemon/config/dyncfg.h
-        src/daemon/config/dyncfg-files.c
-        src/daemon/config/dyncfg-unittest.c
-        src/daemon/config/dyncfg-inline.c
-        src/daemon/config/dyncfg-echo.c
-        src/daemon/config/dyncfg-internals.h
-        src/daemon/config/dyncfg-intercept.c
-        src/daemon/config/dyncfg-tree.c
+        src/daemon/dyncfg/dyncfg.c
+        src/daemon/dyncfg/dyncfg.h
+        src/daemon/dyncfg/dyncfg-files.c
+        src/daemon/dyncfg/dyncfg-unittest.c
+        src/daemon/dyncfg/dyncfg-inline.c
+        src/daemon/dyncfg/dyncfg-echo.c
+        src/daemon/dyncfg/dyncfg-internals.h
+        src/daemon/dyncfg/dyncfg-intercept.c
+        src/daemon/dyncfg/dyncfg-tree.c
         src/daemon/telemetry/telemetry-http-api.c
         src/daemon/telemetry/telemetry-http-api.h
         src/daemon/telemetry/telemetry-queries.c
@@ -1077,6 +1077,20 @@ set(DAEMON_FILES
         src/daemon/telemetry/telemetry-trace-allocations.h
         src/daemon/telemetry/telemetry-aral.c
         src/daemon/telemetry/telemetry-aral.h
+        src/daemon/config/netdata-conf-db.c
+        src/daemon/config/netdata-conf-db.h
+        src/daemon/config/netdata-conf.h
+        src/daemon/config/netdata-conf-backwards-compatibility.c
+        src/daemon/config/netdata-conf-backwards-compatibility.h
+        src/daemon/config/netdata-conf-web.c
+        src/daemon/config/netdata-conf-web.h
+        src/daemon/config/netdata-conf-directories.c
+        src/daemon/config/netdata-conf-directories.h
+        src/daemon/config/netdata-conf-logs.c
+        src/daemon/config/netdata-conf-logs.h
+        src/daemon/config/netdata-conf-global.c
+        src/daemon/config/netdata-conf-global.h
+        src/daemon/config/netdata-conf.c
 )
 
 set(H2O_FILES

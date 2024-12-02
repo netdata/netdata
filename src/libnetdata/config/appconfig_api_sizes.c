@@ -19,7 +19,7 @@ static STRING *reformat_size_bytes(STRING *value) {
 
 uint64_t appconfig_get_size_bytes(struct config *root, const char *section, const char *name, uint64_t default_value) {
     char default_str[128];
-    size_snprintf_bytes(default_str, sizeof(default_str), (int)default_value);
+    size_snprintf_bytes(default_str, sizeof(default_str), default_value);
 
     struct config_option *opt =
         appconfig_get_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_SIZE_IN_BYTES, reformat_size_bytes);
@@ -60,7 +60,7 @@ static STRING *reformat_size_mb(STRING *value) {
 
 uint64_t appconfig_get_size_mb(struct config *root, const char *section, const char *name, uint64_t default_value) {
     char default_str[128];
-    size_snprintf_mb(default_str, sizeof(default_str), (int)default_value);
+    size_snprintf_mb(default_str, sizeof(default_str), default_value);
 
     struct config_option *opt =
         appconfig_get_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_SIZE_IN_MB, reformat_size_mb);
