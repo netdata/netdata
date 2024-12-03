@@ -933,8 +933,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/socket/socket-peers.c
         src/libnetdata/socket/socket-peers.h
         src/libnetdata/libjudy/judyl-typed.h
-        src/libnetdata/os/mem_available.c
-        src/libnetdata/os/mem_available.h
+        src/libnetdata/os/system_memory.c
+        src/libnetdata/os/system_memory.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
