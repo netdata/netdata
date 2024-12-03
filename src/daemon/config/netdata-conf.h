@@ -3,7 +3,7 @@
 #ifndef NETDATA_DAEMON_NETDATA_CONF_H
 #define NETDATA_DAEMON_NETDATA_CONF_H
 
-#include "daemon/common.h"
+#include "libnetdata/libnetdata.h"
 
 bool netdata_conf_load(char *filename, char overwrite_used, const char **user);
 
@@ -13,5 +13,7 @@ bool netdata_conf_load(char *filename, char overwrite_used, const char **user);
 #include "netdata-conf-global.h"
 #include "netdata-conf-logs.h"
 #include "netdata-conf-web.h"
+
+#include "daemon/common.h"
 
 #endif //NETDATA_DAEMON_NETDATA_CONF_H

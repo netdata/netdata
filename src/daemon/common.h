@@ -12,6 +12,7 @@
 
 #include "web/api/maps/maps.h"
 
+#include "daemon/config/netdata-conf.h"
 #include "daemon/dyncfg/dyncfg.h"
 
 #include "daemon/telemetry/telemetry.h"

@@ -170,11 +170,6 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type);
 
 #include "contexts/rrdcontext.h"
 
-extern bool dbengine_enabled;
-extern size_t storage_tiers;
-extern bool use_direct_io;
-extern size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
-
 typedef enum __attribute__ ((__packed__)) {
     RRD_BACKFILL_NONE = 0,
     RRD_BACKFILL_FULL,
@@ -186,11 +181,6 @@ typedef enum __attribute__ ((__packed__)) {
 
 #define RRD_DEFAULT_HISTORY_ENTRIES 3600
 #define RRD_HISTORY_ENTRIES_MAX (86400*365)
-
-extern int default_rrd_update_every;
-extern int default_rrd_history_entries;
-extern int gap_when_lost_iterations_above;
-extern time_t rrdset_free_obsolete_time_s;
 
 #if defined(ENV32BIT)
 #define MIN_LIBUV_WORKER_THREADS 8
@@ -1646,7 +1636,6 @@ void set_host_properties(
     const char *os, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
     const char *prog_name, const char *prog_version);
 
-size_t get_tier_grouping(size_t tier);
 void store_metric_collection_completed(void);
 
 static inline void rrdhost_retention(RRDHOST *host, time_t now, bool online, time_t *from, time_t *to) {
