@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Disable mimalloc by default / enable explicitly if needed [\#19118](https://github.com/netdata/netdata/pull/19118) ([stelfrag](https://github.com/stelfrag))
+- Fix undefined behaviour. [\#19116](https://github.com/netdata/netdata/pull/19116) ([vkalintiris](https://github.com/vkalintiris))
+- disable python.d/example [\#19114](https://github.com/netdata/netdata/pull/19114) ([ilyam8](https://github.com/ilyam8))
 - docs: format, typos, and some simplifications in `docs/` [\#19112](https://github.com/netdata/netdata/pull/19112) ([ilyam8](https://github.com/ilyam8))
 - change dim order because of colours in reboot\_required [\#19111](https://github.com/netdata/netdata/pull/19111) ([ilyam8](https://github.com/ilyam8))
 - fix\(proc/reboot\_required\): disable on non Debian-based systems [\#19110](https://github.com/netdata/netdata/pull/19110) ([ilyam8](https://github.com/ilyam8))
@@ -444,9 +447,6 @@
 - Windows Events Log Explorer improvements 3 [\#18564](https://github.com/netdata/netdata/pull/18564) ([ktsaou](https://github.com/ktsaou))
 - Windows Events Improvements 2 [\#18563](https://github.com/netdata/netdata/pull/18563) ([ktsaou](https://github.com/ktsaou))
 - add cpu model to host labels [\#18562](https://github.com/netdata/netdata/pull/18562) ([ilyam8](https://github.com/ilyam8))
-- go.d rename example =\> testrandom [\#18561](https://github.com/netdata/netdata/pull/18561) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18560](https://github.com/netdata/netdata/pull/18560) ([netdatabot](https://github.com/netdatabot))
-- go.d/prometheus: add label\_prefix config option [\#18559](https://github.com/netdata/netdata/pull/18559) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
