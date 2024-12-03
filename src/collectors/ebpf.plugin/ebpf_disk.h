@@ -8,7 +8,7 @@
 #define NETDATA_EBPF_DISK_MODULE_DESC "Monitor disk latency independent of filesystem."
 
 #include "libnetdata/avl/avl.h"
-#include "libnetdata/ebpf/ebpf.h"
+#include "libbpf_api/ebpf.h"
 
 #define NETDATA_EBPF_PROC_PARTITIONS "/proc/partitions"
 
