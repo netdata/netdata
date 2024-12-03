@@ -61,7 +61,7 @@ static void netdata_conf_dbengine(void) {
         char buf_total[64], buf_avail[64], buf_oom[64];
         size_snprintf(buf_total, sizeof(buf_total), sm.ram_total_bytes, "B", false);
         size_snprintf(buf_avail, sizeof(buf_avail), sm.ram_available_bytes, "B", false);
-        size_snprintf(buf_avail, sizeof(buf_oom), dbengine_out_of_memory_protection, "B", false);
+        size_snprintf(buf_oom, sizeof(buf_oom), dbengine_out_of_memory_protection, "B", false);
 
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "DBENGINE Out of Memory Protection. "
