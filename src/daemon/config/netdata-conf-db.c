@@ -48,7 +48,8 @@ static void netdata_conf_dbengine(void) {
     dbengine_out_of_memory_protection = 0; // will be calculated below
     OS_SYSTEM_MEMORY sm = os_system_memory(true);
     if(sm.ram_total_bytes && sm.ram_available_bytes && sm.ram_total_bytes > sm.ram_available_bytes) {
-        char buf[128];
+        // calculate the default out of memory protection size
+        char buf[64];
         size_snprintf(buf, sizeof(buf), sm.ram_total_bytes / 10, "B", false);
         size_parse(buf, &dbengine_out_of_memory_protection, "B");
     }
@@ -56,11 +57,24 @@ static void netdata_conf_dbengine(void) {
     if(dbengine_out_of_memory_protection) {
         dbengine_use_all_ram_for_caches = config_get_boolean(CONFIG_SECTION_DB, "dbengine use all ram for caches", dbengine_use_all_ram_for_caches);
         dbengine_out_of_memory_protection = config_get_size_bytes(CONFIG_SECTION_DB, "dbengine out of memory protection", dbengine_out_of_memory_protection);
+
+        char buf_total[64], buf_avail[64], buf_oom[64];
+        size_snprintf(buf_total, sizeof(buf_total), sm.ram_total_bytes, "B", false);
+        size_snprintf(buf_avail, sizeof(buf_avail), sm.ram_available_bytes, "B", false);
+        size_snprintf(buf_avail, sizeof(buf_oom), dbengine_out_of_memory_protection, "B", false);
+
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "DBENGINE Out of Memory Protection. "
+               "System Memory Total: %s, Currently Available: %s, Out of Memory Protection: %s, Use All RAM: %s",
+               buf_total, buf_avail, buf_oom, dbengine_use_all_ram_for_caches ? "enabled" : "disabled");
     }
     else {
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "Cannot get total and available RAM on this system, so cannot enable out of memory protection for dbengine, or to use all ram for caches.");
         dbengine_out_of_memory_protection = 0;
         dbengine_use_all_ram_for_caches = false;
+
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "DBENGINE Out of Memory Protection and Use All Ram cannot be enabled. "
+               "Failed to detect memory size on this system.");
     }
 
     // ------------------------------------------------------------------------

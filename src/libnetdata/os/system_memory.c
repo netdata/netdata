@@ -65,17 +65,75 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram) {
 
 // Linux
 #if defined(OS_LINUX)
-OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram __maybe_unused) {
+
+static OS_SYSTEM_MEMORY os_system_memory_cgroup_v1(bool query_total_ram __maybe_unused) {
     static OS_SYSTEM_MEMORY sm = {0, 0};
-    static usec_t last_ut = 0;
+    char buf[64];
 
-    usec_t now_ut = now_monotonic_usec();
-    if(sm.ram_total_bytes && sm.ram_available_bytes && last_ut + USEC_PER_MS / 2 > now_ut)
-        return sm;
+    if(query_total_ram || sm.ram_total_bytes == 0) {
+        if (read_txt_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", buf, sizeof(buf)) != 0)
+            goto failed;
 
-    last_ut = now_ut;
+        sm.ram_total_bytes = strtoull(buf, NULL, 10);
+        if(!sm.ram_total_bytes)
+            goto failed;
+    }
 
+    buf[0] = '\0';
+    if (read_txt_file("/sys/fs/cgroup/memory/memory.usage_in_bytes", buf, sizeof(buf)) != 0)
+        goto failed;
+
+    uint64_t used = strtoull(buf, NULL, 10);
+    if(!used || used > sm.ram_total_bytes)
+        goto failed;
+
+    sm.ram_available_bytes = sm.ram_total_bytes - used;
+    return sm;
+
+failed:
+    sm.ram_total_bytes = 0;
+    sm.ram_available_bytes = 0;
+    return sm;
+}
+
+static OS_SYSTEM_MEMORY os_system_memory_cgroup_v2(bool query_total_ram __maybe_unused) {
+    static OS_SYSTEM_MEMORY sm = {0, 0};
+    char buf[64];
+
+    if(query_total_ram || sm.ram_total_bytes == 0) {
+        if (read_txt_file("/sys/fs/cgroup/memory.max", buf, sizeof(buf)) != 0)
+            goto failed;
+
+        if(strcmp(buf, "max") == 0)
+            sm.ram_total_bytes = UINT64_MAX;
+        else
+            sm.ram_total_bytes = strtoull(buf, NULL, 10);
+
+        if(!sm.ram_total_bytes)
+            goto failed;
+    }
+
+    buf[0] = '\0';
+    if (read_txt_file("/sys/fs/cgroup/memory.current", buf, sizeof(buf)) != 0)
+        goto failed;
+
+    uint64_t used = strtoull(buf, NULL, 10);
+    if(!used || used > sm.ram_total_bytes)
+        goto failed;
+
+    sm.ram_available_bytes = sm.ram_total_bytes - used;
+    return sm;
+
+failed:
+    sm.ram_total_bytes = 0;
+    sm.ram_available_bytes = 0;
+    return sm;
+}
+
+OS_SYSTEM_MEMORY os_system_memory_meminfo(bool query_total_ram __maybe_unused) {
+    static OS_SYSTEM_MEMORY sm = {0, 0};
     static procfile *ff = NULL;
+
     if(unlikely(!ff)) {
         ff = procfile_open("/proc/meminfo", ": \t", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff))
@@ -100,13 +158,78 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram __maybe_unused) {
         }
 
         if(matched_total && matched_available)
-            // we keep ff open to speed up the next calls
-            return sm;
+            break;
     }
+
+    // we keep ff open to speed up the next calls
+    return sm;
 
 failed:
     sm.ram_total_bytes = 0;
     sm.ram_available_bytes = 0;
+    return sm;
+}
+
+typedef enum {
+    OS_MEM_SRC_UNKNOWN,
+    OS_MEM_SRC_CGROUP_V1,
+    OS_MEM_SRC_CGROUP_V2,
+    OS_MEM_SRC_MEMINFO,
+} OS_MEM_SRC;
+
+OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram __maybe_unused) {
+    static OS_SYSTEM_MEMORY sm = {0, 0};
+    static usec_t last_ut = 0, last_total_ut = 0;
+    static OS_MEM_SRC src = OS_MEM_SRC_UNKNOWN;
+
+    usec_t now_ut = now_monotonic_usec();
+    if(sm.ram_total_bytes && sm.ram_available_bytes && last_ut + USEC_PER_MS > now_ut)
+        return sm;
+
+    last_ut = now_ut;
+
+    if(query_total_ram)
+        // let it auto-detect
+        src = OS_MEM_SRC_UNKNOWN;
+
+    if(last_total_ut + USEC_PER_SEC > now_ut)
+        // query also the total ram
+        query_total_ram = true;
+
+    switch(src) {
+        case OS_MEM_SRC_MEMINFO:
+            sm = os_system_memory_meminfo(query_total_ram);
+            break;
+
+        case OS_MEM_SRC_CGROUP_V2:
+            sm = os_system_memory_cgroup_v2(query_total_ram);
+            break;
+
+        case OS_MEM_SRC_CGROUP_V1:
+            sm = os_system_memory_cgroup_v1(query_total_ram);
+            break;
+
+        default:
+        case OS_MEM_SRC_UNKNOWN: {
+            OS_SYSTEM_MEMORY mi = os_system_memory_meminfo(true);
+            OS_SYSTEM_MEMORY v1 = os_system_memory_cgroup_v1(true);
+            OS_SYSTEM_MEMORY v2 = os_system_memory_cgroup_v2(true);
+
+            if(v2.ram_total_bytes && v2.ram_available_bytes && v2.ram_total_bytes <= mi.ram_total_bytes && v2.ram_available_bytes < mi.ram_available_bytes) {
+                sm = v2;
+                src = OS_MEM_SRC_CGROUP_V2;
+            }
+            if(v1.ram_total_bytes && v1.ram_available_bytes && v1.ram_total_bytes <= mi.ram_total_bytes && v1.ram_available_bytes < mi.ram_available_bytes) {
+                sm = v1;
+                src = OS_MEM_SRC_CGROUP_V1;
+            }
+            else {
+                sm = mi;
+                src = OS_MEM_SRC_MEMINFO;
+            }
+        }
+    }
+
     return sm;
 }
 #endif
