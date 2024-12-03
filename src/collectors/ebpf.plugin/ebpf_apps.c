@@ -312,7 +312,7 @@ SPINLOCK ebpf_pid_spinlock = NETDATA_SPINLOCK_INITIALIZER;
 void ebpf_pid_del(pid_t pid)
 {
     spinlock_lock(&ebpf_pid_spinlock);
-    (void) JudyLDel(ebpf_pid_judyL, (Word_t) pid, PJE0);
+    (void) JudyLDel(&ebpf_pid_judyL, (Word_t) pid, PJE0);
     spinlock_unlock(&ebpf_pid_spinlock);
 }
 
