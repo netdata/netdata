@@ -1942,13 +1942,21 @@ void free_all_unreferenced_clean_pages(PGC *cache) {
     evict_pages(cache, 0, 0, true, true);
 }
 
-static void *evict_thread(void *ptr) {
+static void *pgc_evict_thread(void *ptr) {
     PGC *cache = ptr;
+
+    worker_register("PGCEVICT");
+    worker_register_job_name(0, "signaled");
+    worker_register_job_name(1, "scheduled");
 
     unsigned job_id = 0;
 
     while (true) {
-        job_id = completion_wait_for_a_job_with_timeout(&cache->evictor.completion, job_id, 50);
+        worker_is_idle();
+        unsigned new_job_id = completion_wait_for_a_job_with_timeout(&cache->evictor.completion, job_id, 50);
+        worker_is_busy(new_job_id == job_id ? 1 : 0);
+        job_id = new_job_id;
+
         if (nd_thread_signaled_to_cancel())
             return NULL;
 
@@ -1974,6 +1982,7 @@ static void *evict_thread(void *ptr) {
         spinlock_unlock(&cache->evictor.spinlock);
     }
 
+    worker_unregister();
     return NULL;
 }
 
@@ -2084,7 +2093,7 @@ PGC *pgc_create(const char *name,
     {
         spinlock_init(&cache->evictor.spinlock);
         completion_init(&cache->evictor.completion);
-        cache->evictor.thread = nd_thread_create(name, NETDATA_THREAD_OPTION_JOINABLE, evict_thread, cache);
+        cache->evictor.thread = nd_thread_create(name, NETDATA_THREAD_OPTION_JOINABLE, pgc_evict_thread, cache);
     }
 
     return cache;
