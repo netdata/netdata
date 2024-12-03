@@ -49,6 +49,9 @@ size_t aral_by_size_structures(void);
 size_t aral_by_size_overhead(void);
 struct aral_statistics *aral_by_size_statistics(void);
 
+size_t aral_by_size_used_bytes(void);
+size_t aral_used_bytes_from_stats(struct aral_statistics *stats);
+
 int aral_unittest(size_t elements);
 
 #ifdef NETDATA_TRACE_ALLOCATIONS

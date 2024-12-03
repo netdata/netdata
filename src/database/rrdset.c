@@ -498,7 +498,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 void rrdset_index_init(RRDHOST *host) {
     if(!host->rrdset_root_index) {
         host->rrdset_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                                                             &dictionary_stats_category_rrdset_rrddim, sizeof(RRDSET));
+                                                             &dictionary_stats_category_rrdset, sizeof(RRDSET));
 
         dictionary_register_insert_callback(host->rrdset_root_index, rrdset_insert_callback, NULL);
         dictionary_register_conflict_callback(host->rrdset_root_index, rrdset_conflict_callback, NULL);
@@ -509,7 +509,7 @@ void rrdset_index_init(RRDHOST *host) {
     if(!host->rrdset_root_index_name) {
         host->rrdset_root_index_name = dictionary_create_advanced(
             DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
-            &dictionary_stats_category_rrdset_rrddim, 0);
+            &dictionary_stats_category_rrdset, 0);
 
         dictionary_register_insert_callback(host->rrdset_root_index_name, rrdset_name_insert_callback, host);
         dictionary_register_delete_callback(host->rrdset_root_index_name, rrdset_name_delete_callback, host);

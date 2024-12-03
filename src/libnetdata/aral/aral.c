@@ -126,12 +126,28 @@ const char *aral_name(ARAL *ar) {
 }
 
 size_t aral_structures_from_stats(struct aral_statistics *stats) {
+    if(!stats) return 0;
     return __atomic_load_n(&stats->structures.allocated_bytes, __ATOMIC_RELAXED);
 }
 
 size_t aral_overhead_from_stats(struct aral_statistics *stats) {
-    return __atomic_load_n(&stats->malloc.allocated_bytes, __ATOMIC_RELAXED) -
-           __atomic_load_n(&stats->malloc.used_bytes, __ATOMIC_RELAXED);
+    if(!stats) return 0;
+
+    size_t allocated = __atomic_load_n(&stats->malloc.allocated_bytes, __ATOMIC_RELAXED) +
+                       __atomic_load_n(&stats->mmap.allocated_bytes, __ATOMIC_RELAXED);
+
+    size_t used = __atomic_load_n(&stats->malloc.used_bytes, __ATOMIC_RELAXED) +
+                  __atomic_load_n(&stats->mmap.used_bytes, __ATOMIC_RELAXED);
+
+    if(allocated > used) return allocated - used;
+    return allocated;
+}
+
+size_t aral_used_bytes_from_stats(struct aral_statistics *stats) {
+    size_t used = __atomic_load_n(&stats->malloc.used_bytes, __ATOMIC_RELAXED) +
+                  __atomic_load_n(&stats->mmap.used_bytes, __ATOMIC_RELAXED);
+
+    return used;
 }
 
 size_t aral_overhead(ARAL *ar) {
@@ -1063,6 +1079,10 @@ size_t aral_by_size_structures(void) {
 
 size_t aral_by_size_overhead(void) {
     return aral_overhead_from_stats(&aral_by_size_globals.shared_statistics);
+}
+
+size_t aral_by_size_used_bytes(void) {
+    return aral_used_bytes_from_stats(&aral_by_size_globals.shared_statistics);
 }
 
 ARAL *aral_by_size_acquire(size_t size) {

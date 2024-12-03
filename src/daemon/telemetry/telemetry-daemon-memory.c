@@ -13,8 +13,9 @@ void telemetry_daemon_memory_do(bool extended __maybe_unused) {
         static RRDSET *st_memory = NULL;
         static RRDDIM *rd_database = NULL;
         static RRDDIM *rd_collectors = NULL;
-        static RRDDIM *rd_hosts = NULL;
-        static RRDDIM *rd_rrd = NULL;
+        static RRDDIM *rd_rrdhosts = NULL;
+        static RRDDIM *rd_rrdsets = NULL;
+        static RRDDIM *rd_rrddims = NULL;
         static RRDDIM *rd_contexts = NULL;
         static RRDDIM *rd_health = NULL;
         static RRDDIM *rd_functions = NULL;
@@ -45,8 +46,9 @@ void telemetry_daemon_memory_do(bool extended __maybe_unused) {
 
             rd_database = rrddim_add(st_memory, "db", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_collectors = rrddim_add(st_memory, "collectors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_hosts = rrddim_add(st_memory, "hosts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_rrd = rrddim_add(st_memory, "rrdset rrddim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_rrdhosts = rrddim_add(st_memory, "hosts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_rrdsets = rrddim_add(st_memory, "rrdset", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_rrddims = rrddim_add(st_memory, "rrddim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_contexts = rrddim_add(st_memory, "contexts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_health = rrddim_add(st_memory, "health", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_functions = rrddim_add(st_memory, "functions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -80,22 +82,57 @@ void telemetry_daemon_memory_do(bool extended __maybe_unused) {
         size_t strings = 0;
         string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
 
-        rrddim_set_by_pointer(st_memory, rd_database, (collected_number)telemetry_dbengine_total_memory + (collected_number)rrddim_db_memory_size);
-        rrddim_set_by_pointer(st_memory, rd_collectors, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_collectors));
-        rrddim_set_by_pointer(st_memory, rd_hosts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhost) + (collected_number)netdata_buffers_statistics.rrdhost_allocations_size);
-        rrddim_set_by_pointer(st_memory, rd_rrd, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdset_rrddim));
-        rrddim_set_by_pointer(st_memory, rd_contexts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdcontext));
-        rrddim_set_by_pointer(st_memory, rd_health, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhealth));
-        rrddim_set_by_pointer(st_memory, rd_functions, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_functions));
-        rrddim_set_by_pointer(st_memory, rd_labels, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdlabels));
-        rrddim_set_by_pointer(st_memory, rd_strings, (collected_number)strings);
-        rrddim_set_by_pointer(st_memory, rd_streaming, (collected_number)netdata_buffers_statistics.rrdhost_senders + (collected_number)netdata_buffers_statistics.rrdhost_receivers);
-        rrddim_set_by_pointer(st_memory, rd_replication, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
-        rrddim_set_by_pointer(st_memory, rd_buffers, (collected_number)buffers);
-        rrddim_set_by_pointer(st_memory, rd_workers, (collected_number) workers_allocated_memory());
-        rrddim_set_by_pointer(st_memory, rd_aral, (collected_number) aral_by_size_structures());
-        rrddim_set_by_pointer(st_memory, rd_judy, (collected_number) judy_aral_structures());
-        rrddim_set_by_pointer(st_memory, rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
+        rrddim_set_by_pointer(st_memory, rd_database,
+                              (collected_number)telemetry_dbengine_total_memory + (collected_number)rrddim_db_memory_size);
+
+        rrddim_set_by_pointer(st_memory, rd_collectors,
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_collectors));
+
+        rrddim_set_by_pointer(st_memory,
+            rd_rrdhosts,
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhost) + (collected_number)netdata_buffers_statistics.rrdhost_allocations_size);
+
+        rrddim_set_by_pointer(st_memory, rd_rrdsets,
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdset));
+
+        rrddim_set_by_pointer(st_memory, rd_rrddims,
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrddim));
+
+        rrddim_set_by_pointer(st_memory, rd_contexts,
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdcontext));
+
+        rrddim_set_by_pointer(st_memory, rd_health,
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhealth));
+
+        rrddim_set_by_pointer(st_memory, rd_functions,
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_functions));
+
+        rrddim_set_by_pointer(st_memory, rd_labels,
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdlabels));
+
+        rrddim_set_by_pointer(st_memory, rd_strings,
+                              (collected_number)strings);
+
+        rrddim_set_by_pointer(st_memory, rd_streaming,
+                              (collected_number)netdata_buffers_statistics.rrdhost_senders + (collected_number)netdata_buffers_statistics.rrdhost_receivers);
+
+        rrddim_set_by_pointer(st_memory, rd_replication,
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
+
+        rrddim_set_by_pointer(st_memory, rd_buffers,
+                              (collected_number)buffers);
+
+        rrddim_set_by_pointer(st_memory, rd_workers,
+                              (collected_number) workers_allocated_memory());
+
+        rrddim_set_by_pointer(st_memory, rd_aral,
+                              (collected_number) aral_by_size_structures());
+
+        rrddim_set_by_pointer(st_memory,
+                              rd_judy, (collected_number) judy_aral_structures());
+
+        rrddim_set_by_pointer(st_memory,
+                              rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
 
         rrdset_done(st_memory);
     }

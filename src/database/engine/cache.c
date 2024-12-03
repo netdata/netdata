@@ -557,7 +557,7 @@ struct section_pages {
 
 static struct aral_statistics aral_statistics_for_pgc = { 0 };
 
-static ARAL *pgc_section_pages_aral = NULL;
+static ARAL *pgc_sections_aral = NULL;
 static ARAL *pgc_pages_aral = NULL;
 
 static void pgc_section_pages_static_aral_init(void) {
@@ -565,15 +565,8 @@ static void pgc_section_pages_static_aral_init(void) {
 
     spinlock_lock(&spinlock);
 
-    if(!pgc_section_pages_aral) {
-        pgc_section_pages_aral = aral_create(
-            "pgc_section",
-            sizeof(struct section_pages),
-            0,
-            0,
-            &aral_statistics_for_pgc,
-            NULL, NULL, false, false);
-    }
+    if(!pgc_sections_aral)
+        pgc_sections_aral = aral_by_size_acquire(sizeof(struct section_pages));
 
     if(!pgc_pages_aral) {
         pgc_pages_aral = aral_create(
@@ -619,6 +612,8 @@ static void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PA
                    0);
 
     if(q->linked_list_in_sections_judy) {
+        // HOT and DIRTY pages end up here.
+
         size_t mem_before_judyl, mem_after_judyl;
 
         mem_before_judyl = JudyLMemUsed(q->sections_judy);
@@ -628,7 +623,7 @@ static void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PA
         struct section_pages *sp = *section_pages_pptr;
         if(!sp) {
             // sp = callocz(1, sizeof(struct section_pages));
-            sp = aral_mallocz(pgc_section_pages_aral);
+            sp = aral_mallocz(pgc_sections_aral);
             memset(sp, 0, sizeof(struct section_pages));
 
             *section_pages_pptr = sp;
@@ -717,7 +712,7 @@ static void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PA
                 fatal("DBENGINE CACHE: cannot delete section from Judy LL");
 
             // freez(sp);
-            aral_freez(pgc_section_pages_aral, sp);
+            aral_freez(pgc_sections_aral, sp);
             mem_after_judyl -= sizeof(struct section_pages);
             pgc_stats_queue_judy_change(cache, q, mem_before_judyl, mem_after_judyl);
         }
@@ -2100,11 +2095,11 @@ PGC *pgc_create(const char *name,
 }
 
 size_t pgc_aral_structures(void) {
-    return aral_structures(pgc_section_pages_aral);
+    return aral_structures(pgc_pages_aral);
 }
 
 size_t pgc_aral_overhead(void) {
-    return aral_overhead(pgc_section_pages_aral);
+    return aral_overhead(pgc_pages_aral);
 }
 
 void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section) {

@@ -1877,8 +1877,7 @@ static void replication_main_cleanup(void *pptr) {
 }
 
 void replication_initialize(void) {
-    replication_globals.aral_rse = aral_create(
-        "rse", sizeof(struct replication_sort_entry), 0, 0, aral_by_size_statistics(), NULL, NULL, false, false);
+    replication_globals.aral_rse = aral_by_size_acquire(sizeof(struct replication_sort_entry));
 }
 
 void *replication_thread_main(void *ptr) {

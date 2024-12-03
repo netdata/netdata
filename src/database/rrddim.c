@@ -289,7 +289,7 @@ size_t rrddim_size(void) {
 void rrddim_index_init(RRDSET *st) {
     if(!st->rrddim_root_index) {
         st->rrddim_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                                                           &dictionary_stats_category_rrdset_rrddim, rrddim_size());
+                                                           &dictionary_stats_category_rrddim, rrddim_size());
 
         dictionary_register_insert_callback(st->rrddim_root_index, rrddim_insert_callback, NULL);
         dictionary_register_conflict_callback(st->rrddim_root_index, rrddim_conflict_callback, NULL);

@@ -5,7 +5,8 @@
 
 struct dictionary_stats dictionary_stats_category_collectors = { .name = "collectors" };
 struct dictionary_stats dictionary_stats_category_rrdhost = { .name = "rrdhost" };
-struct dictionary_stats dictionary_stats_category_rrdset_rrddim = { .name = "rrdset_rrddim" };
+struct dictionary_stats dictionary_stats_category_rrdset = { .name = "rrdset" };
+struct dictionary_stats dictionary_stats_category_rrddim = { .name = "rrddim" };
 struct dictionary_stats dictionary_stats_category_rrdcontext = { .name = "context" };
 struct dictionary_stats dictionary_stats_category_rrdlabels = { .name = "labels" };
 struct dictionary_stats dictionary_stats_category_rrdhealth = { .name = "health" };
@@ -59,7 +60,7 @@ struct dictionary_categories {
 } dictionary_categories[] = {
     { .stats = &dictionary_stats_category_collectors, },
     { .stats = &dictionary_stats_category_rrdhost, },
-    { .stats = &dictionary_stats_category_rrdset_rrddim, },
+    { .stats = &dictionary_stats_category_rrdset, },
     { .stats = &dictionary_stats_category_rrdcontext, },
     { .stats = &dictionary_stats_category_rrdlabels, },
     { .stats = &dictionary_stats_category_rrdhealth, },
