@@ -7,7 +7,7 @@
 #include <sys/utsname.h>
 
 #include "ebpf.h"
-#include "../libnetdata.h"
+#include "libnetdata/libnetdata.h"
 
 char *ebpf_user_config_dir = CONFIG_DIR;
 char *ebpf_stock_config_dir = LIBCONFIG_DIR;

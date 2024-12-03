@@ -7,7 +7,7 @@
 #include "libnetdata/avl/avl.h"
 #include "libnetdata/clocks/clocks.h"
 #include "libnetdata/config/appconfig.h"
-#include "libnetdata/ebpf/ebpf.h"
+#include "libbpf_api/ebpf.h"
 
 #define NETDATA_APPS_FAMILY "apps"
 #define NETDATA_APP_FAMILY "app"
