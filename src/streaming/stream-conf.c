@@ -12,7 +12,7 @@ struct _stream_send stream_send = {
     .send_charts_matching = NULL,
     .initial_clock_resync_iterations = 60,
 
-    .buffer_max_size = 10 * 1024 * 1024,
+    .buffer_max_size = CBUFFER_INITIAL_MAX_SIZE,
 
     .parents = {
         .destination = NULL,
