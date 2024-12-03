@@ -248,7 +248,7 @@ static void oom_score_adj(void) {
 
 static void process_nice_level(void) {
 #ifdef HAVE_NICE
-    int nice_level = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process nice level", 19);
+    int nice_level = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process nice level", 0);
     if(nice(nice_level) == -1)
         netdata_log_error("Cannot set netdata CPU nice level to %d.", nice_level);
     else
