@@ -7,6 +7,8 @@ static void netdata_conf_dbengine(void) {
     if(run) return;
     run = true;
 
+    errno_clear();
+
 #ifdef ENABLE_DBENGINE
     // this is required for dbegnine to work, so call it here (it is ok, it won't run twice)
     netdata_conf_section_directories();

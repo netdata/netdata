@@ -71,21 +71,30 @@ static OS_SYSTEM_MEMORY os_system_memory_cgroup_v1(bool query_total_ram __maybe_
     char buf[64];
 
     if(query_total_ram || sm.ram_total_bytes == 0) {
-        if (read_txt_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", buf, sizeof(buf)) != 0)
+        if (read_txt_file("/sys/fs/cgroup/memory/memory.limit_in_bytes", buf, sizeof(buf)) != 0) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v1: cannot read /sys/fs/cgroup/memory/memory.limit_in_bytes");
             goto failed;
+        }
 
         sm.ram_total_bytes = strtoull(buf, NULL, 10);
-        if(!sm.ram_total_bytes)
+        if(!sm.ram_total_bytes) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v1: /sys/fs/cgroup/memory/memory.limit_in_bytes is zero");
             goto failed;
+        }
     }
 
     buf[0] = '\0';
-    if (read_txt_file("/sys/fs/cgroup/memory/memory.usage_in_bytes", buf, sizeof(buf)) != 0)
+    if (read_txt_file("/sys/fs/cgroup/memory/memory.usage_in_bytes", buf, sizeof(buf)) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v1: cannot read /sys/fs/cgroup/memory/memory.usage_in_bytes");
         goto failed;
+    }
 
     uint64_t used = strtoull(buf, NULL, 10);
-    if(!used || used > sm.ram_total_bytes)
+    if(!used || used > sm.ram_total_bytes) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v1: used is %llu, total is %llu: used is invalid",
+               used, sm.ram_total_bytes);
         goto failed;
+    }
 
     sm.ram_available_bytes = sm.ram_total_bytes - used;
     return sm;
@@ -101,25 +110,34 @@ static OS_SYSTEM_MEMORY os_system_memory_cgroup_v2(bool query_total_ram __maybe_
     char buf[64];
 
     if(query_total_ram || sm.ram_total_bytes == 0) {
-        if (read_txt_file("/sys/fs/cgroup/memory.max", buf, sizeof(buf)) != 0)
+        if (read_txt_file("/sys/fs/cgroup/memory.max", buf, sizeof(buf)) != 0) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot read /sys/fs/cgroup/memory.max");
             goto failed;
+        }
 
         if(strcmp(buf, "max") == 0)
             sm.ram_total_bytes = UINT64_MAX;
         else
-            sm.ram_total_bytes = strtoull(buf, NULL, 10);
+            sm.ram_total_bytes = strtoull(buf, NULL, 0);
 
-        if(!sm.ram_total_bytes)
+        if(!sm.ram_total_bytes) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: /sys/fs/cgroup/memory.max is zero");
             goto failed;
+        }
     }
 
     buf[0] = '\0';
-    if (read_txt_file("/sys/fs/cgroup/memory.current", buf, sizeof(buf)) != 0)
+    if (read_txt_file("/sys/fs/cgroup/memory.current", buf, sizeof(buf)) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot read /sys/fs/cgroup/memory.current");
         goto failed;
+    }
 
-    uint64_t used = strtoull(buf, NULL, 10);
-    if(!used || used > sm.ram_total_bytes)
+    uint64_t used = strtoull(buf, NULL, 0);
+    if(!used || used > sm.ram_total_bytes) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: used is %llu, total is %llu: used is invalid",
+               used, sm.ram_total_bytes);
         goto failed;
+    }
 
     sm.ram_available_bytes = sm.ram_total_bytes - used;
     return sm;
@@ -219,13 +237,22 @@ OS_SYSTEM_MEMORY os_system_memory(bool query_total_ram __maybe_unused) {
                 sm = v2;
                 src = OS_MEM_SRC_CGROUP_V2;
             }
-            if(v1.ram_total_bytes && v1.ram_available_bytes && v1.ram_total_bytes <= mi.ram_total_bytes && v1.ram_available_bytes < mi.ram_available_bytes) {
-                sm = v1;
-                src = OS_MEM_SRC_CGROUP_V1;
-            }
             else {
-                sm = mi;
-                src = OS_MEM_SRC_MEMINFO;
+                if(v2.ram_total_bytes || v2.ram_available_bytes)
+                    nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroup v2 reports more memory than meminfo. Ignoring cgroup v2.");
+
+                if (v1.ram_total_bytes && v1.ram_available_bytes && v1.ram_total_bytes <= mi.ram_total_bytes &&
+                    v1.ram_available_bytes < mi.ram_available_bytes) {
+                    sm = v1;
+                    src = OS_MEM_SRC_CGROUP_V1;
+                }
+                else {
+                    if(v1.ram_total_bytes || v1.ram_available_bytes)
+                        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroup v1 reports more memory than meminfo. Ignoring cgroup v1.");
+
+                    sm = mi;
+                    src = OS_MEM_SRC_MEMINFO;
+                }
             }
         }
     }
