@@ -147,11 +147,11 @@ ssize_t entries_snprintf(char *dst, size_t dst_size, uint64_t value, const char 
 
         double converted = entries_round_to_resolution_dbl2(bytes, su->multiplier);
 
-        uint64_t reversed_bytes = (uint64_t)(converted * (double)su->multiplier);
+        uint64_t reversed_bytes = (uint64_t)round((converted * (double)su->multiplier));
 
         if(accurate) {
             // no precision loss is required
-            if (reversed_bytes == bytes)
+            if (reversed_bytes == bytes && converted > 1.0)
                 // no precision loss, this is good to use
                 su_best = su;
         }
