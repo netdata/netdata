@@ -121,6 +121,10 @@
                 <CreateFolder />
             </Component>
 
+            <Component Id="NetdataRoot" Directory="ROOTDIR" Guid="5f0b7def-c4e6-417a-a5ae-b6f9c4aff14e">
+                <CreateFolder />
+            </Component>
+
             <CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='[USRBINDIR]NetdataClaim.exe /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I [INSECURE] /P &quot;[PROXY]&quot; /F &quot;[INSTALLFOLDER]etc\netdata\claim.conf&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
             <InstallExecuteSequence>
                 <Custom Action="ClaimAgent" After="InstallFiles" />
