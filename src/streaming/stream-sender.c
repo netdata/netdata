@@ -235,7 +235,7 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
                sth->id, rrdhost_hostname(s->host), s->connected_to);
 
         stream_sender_move_running_to_connector_or_remove(
-            sth, s, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_READ_BUFFER, true);
+            sth, s, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_COMPRESSION_FAILED, true);
         return;
     }
 

@@ -71,7 +71,7 @@ static inline STREAM_HANDSHAKE read_stream_error_to_reason(ssize_t code) {
 
         case -2:
             // asked to read zero bytes
-            return STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_READ_BUFFER;
+            return STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_RECEIVER_READ_BUFFER;
 
         case -3:
             // the thread is cancelled
