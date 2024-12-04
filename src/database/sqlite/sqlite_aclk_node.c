@@ -116,20 +116,6 @@ static void build_node_info(RRDHOST *host)
     wc->node_collectors_send = now_realtime_sec();
 }
 
-static bool host_is_replicating(RRDHOST *host)
-{
-    bool replicating = false;
-    RRDSET *st;
-    rrdset_foreach_reentrant(st, host) {
-        if (rrdset_is_replicating(st)) {
-            replicating = true;
-            break;
-        }
-    }
-    rrdset_foreach_done(st);
-    return replicating;
-}
-
 void aclk_check_node_info_and_collectors(void)
 {
     RRDHOST *host;
@@ -157,7 +143,7 @@ void aclk_check_node_info_and_collectors(void)
         if (!wc->node_info_send_time && !wc->node_collectors_send)
             continue;
 
-        if (unlikely(host_is_replicating(host))) {
+        if (unlikely(rrdhost_receiver_replicating_charts(host))) {
             internal_error(true, "ACLK SYNC: Host %s is still replicating", rrdhost_hostname(host));
             replicating++;
             continue;
