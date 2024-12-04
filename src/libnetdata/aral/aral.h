@@ -52,6 +52,8 @@ struct aral_statistics *aral_by_size_statistics(void);
 size_t aral_by_size_used_bytes(void);
 size_t aral_used_bytes_from_stats(struct aral_statistics *stats);
 
+size_t aral_optimal_page_size(void);
+
 int aral_unittest(size_t elements);
 
 #ifdef NETDATA_TRACE_ALLOCATIONS

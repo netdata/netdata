@@ -61,6 +61,7 @@ void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL;
 void freez(void *ptr);
 #endif // NETDATA_TRACE_ALLOCATIONS
 
+void mallocz_release_as_much_memory_to_the_system(void);
 void posix_memfree(void *ptr);
 
 void json_escape_string(char *dst, const char *src, size_t size);

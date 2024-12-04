@@ -8,7 +8,7 @@
 
 struct netdata_buffers_statistics netdata_buffers_statistics = {};
 
-void telemetry_daemon_memory_do(bool extended __maybe_unused) {
+void telemetry_daemon_memory_do(bool extended) {
     {
         static RRDSET *st_memory = NULL;
         static RRDDIM *rd_database = NULL;
@@ -232,4 +232,12 @@ void telemetry_daemon_memory_do(bool extended __maybe_unused) {
 
         rrdset_done(st_memory_buffers);
     }
+
+    // ----------------------------------------------------------------------------------------------------------------
+
+    if(!extended)
+        return;
+
+    // ----------------------------------------------------------------------------------------------------------------
+
 }

@@ -926,6 +926,14 @@ static size_t aral_allocation_slot_size(size_t requested_element_size, bool usab
     return element_size;
 }
 
+size_t aral_optimal_page_size(void) {
+    long int page_size = sysconf(_SC_PAGE_SIZE);
+    if (unlikely(page_size < 4096))
+        page_size = 4096;
+
+    return page_size * 4;
+}
+
 static void optimal_max_page_size(ARAL *ar) {
     if(ar->config.requested_max_page_size)
         return;
@@ -935,7 +943,7 @@ static void optimal_max_page_size(ARAL *ar) {
 
     if(element_size > system_page_size) {
         size_t multiplier = system_page_size / (element_size - system_page_size);
-        if(multiplier > 5) multiplier = 4;
+        if(multiplier > 5) multiplier = 5;
         if(multiplier < 2) multiplier = 2;
 
         ar->config.requested_max_page_size = memory_alignment(system_page_size * multiplier, system_page_size);

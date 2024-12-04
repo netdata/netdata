@@ -477,6 +477,14 @@ int main() {
 " HAVE_C_MALLOPT)
 
 check_c_source_compiles("
+#include <malloc.h>
+int main() {
+        malloc_trim(0);
+        return 0;
+}
+" HAVE_C_MALLOC_TRIM)
+
+check_c_source_compiles("
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <sys/socket.h>

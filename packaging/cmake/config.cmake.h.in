@@ -96,6 +96,7 @@
 #cmakedefine STRERROR_R_CHAR_P
 #cmakedefine HAVE_C__GENERIC
 #cmakedefine HAVE_C_MALLOPT
+#cmakedefine HAVE_C_MALLOC_TRIM
 #cmakedefine HAVE_SETNS
 #cmakedefine HAVE_STRNDUP
 #cmakedefine SSL_HAS_PENDING

@@ -406,12 +406,14 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
             // when the total exists, ram_available_bytes is also right
 
             const size_t min_available = cache->config.out_of_memory_protection_bytes;
-            if (sm.ram_available_bytes < min_available)
+            if (sm.ram_available_bytes < min_available) {
                 // we must shrink
                 wanted_cache_size = current_cache_size - (min_available - sm.ram_available_bytes);
-            else if(cache->config.use_all_ram)
+            }
+            else if(cache->config.use_all_ram) {
                 // we can grow
                 wanted_cache_size = current_cache_size + (sm.ram_available_bytes - min_available);
+            }
         }
     }
 
@@ -1960,6 +1962,7 @@ static void *pgc_evict_thread(void *ptr) {
         size_t at_once = 10;
         size_t size_to_evict = 0;
         size_t per1000 = cache_usage_per1000(cache, &size_to_evict);
+        bool was_critical = per1000 > cache->config.severe_pressure_per1000;
 
         while (size_to_evict && ((--at_once && size_to_evict && per1000 > cache->config.healthy_size_per1000) || (per1000 > cache->config.aggressive_evict_per1000))) {
             if (nd_thread_signaled_to_cancel()) {
@@ -1972,6 +1975,9 @@ static void *pgc_evict_thread(void *ptr) {
 
             size_to_evict = 0;
             per1000 = cache_usage_per1000(cache, &size_to_evict);
+
+            if(was_critical && per1000 > cache->config.severe_pressure_per1000 && !cache->config.dynamic_target_size_cb)
+                mallocz_release_as_much_memory_to_the_system();
         }
 
         spinlock_unlock(&cache->evictor.spinlock);

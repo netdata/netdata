@@ -446,8 +446,28 @@ void *reallocz(void *ptr, size_t size) {
 void posix_memfree(void *ptr) {
     free(ptr);
 }
-
 #endif
+
+void mallocz_release_as_much_memory_to_the_system(void) {
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static size_t trim_threshold = 512 * 1024;
+
+    spinlock_lock(&spinlock);
+
+#ifdef HAVE_C_MALLOPT
+    mallopt(M_TRIM_THRESHOLD, (int)trim_threshold);
+#endif
+
+#ifdef HAVE_C_MALLOC_TRIM
+    malloc_trim(0);
+#endif
+
+    trim_threshold /= 2;
+    if(trim_threshold < aral_optimal_page_size())
+        trim_threshold = aral_optimal_page_size();
+
+    spinlock_unlock(&spinlock);
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 
