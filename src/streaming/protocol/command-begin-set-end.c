@@ -6,7 +6,7 @@
 
 static void
 stream_send_rrdset_metrics_v1_internal(BUFFER *wb, RRDSET *st, struct sender_state *s __maybe_unused, RRDSET_FLAGS flags) {
-    buffer_fast_strcat(wb, "BEGIN \"", 7);
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN " \"", 7);
     buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
     buffer_fast_strcat(wb, "\" ", 2);
 
@@ -23,7 +23,7 @@ stream_send_rrdset_metrics_v1_internal(BUFFER *wb, RRDSET *st, struct sender_sta
             continue;
 
         if(likely(rrddim_check_upstream_exposed_collector(rd))) {
-            buffer_fast_strcat(wb, "SET \"", 5);
+            buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET " \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
             buffer_print_int64(wb, rd->collector.collected_value);
@@ -41,7 +41,7 @@ stream_send_rrdset_metrics_v1_internal(BUFFER *wb, RRDSET *st, struct sender_sta
     if(unlikely(flags & RRDSET_FLAG_UPSTREAM_SEND_VARIABLES))
         rrdvar_print_to_streaming_custom_chart_variables(st, wb);
 
-    buffer_fast_strcat(wb, "END\n", 4);
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_END "\n", 4);
 }
 
 void stream_send_rrdset_metrics_v1(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {

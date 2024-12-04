@@ -54,19 +54,19 @@ bool stream_sender_send_rrdset_definition(BUFFER *wb, RRDSET *st) {
         wb
         , " \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s\" \"%s\" \"%s\"\n"
         , rrdset_id(st)
-            , name
+        , name
         , rrdset_title(st)
-            , rrdset_units(st)
-            , rrdset_family(st)
-            , rrdset_context(st)
-            , rrdset_type_name(st->chart_type)
-            , st->priority
+        , rrdset_units(st)
+        , rrdset_family(st)
+        , rrdset_context(st)
+        , rrdset_type_name(st->chart_type)
+        , st->priority
         , st->update_every
         , rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)?"obsolete":""
         , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
         , rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)?"hidden":""
         , rrdset_plugin_name(st)
-            , rrdset_module_name(st)
+        , rrdset_module_name(st)
     );
 
     // send the chart labels

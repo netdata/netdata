@@ -6,7 +6,7 @@
 static inline void stream_sender_add_host_variable_to_buffer(BUFFER *wb, const RRDVAR_ACQUIRED *rva) {
     buffer_sprintf(
         wb
-        , "VARIABLE HOST %s = " NETDATA_DOUBLE_FORMAT "\n"
+        , PLUGINSD_KEYWORD_VARIABLE " HOST %s = " NETDATA_DOUBLE_FORMAT "\n"
         , rrdvar_name(rva)
         , rrdvar2number(rva)
     );
