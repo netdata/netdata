@@ -26,11 +26,12 @@
 
 static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
 {
-
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_HEALTH_LOG, &res))
+    REQUIRE_DB(db_meta);
+
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_HEALTH_LOG, &res))
         return;
 
     int param = 0;
@@ -50,7 +51,7 @@ static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
+    SQLITE_RESET(res);
 }
 
 /* Health related SQL queries
@@ -148,13 +149,13 @@ static void insert_alert_queue(
     RRDCALC_STATUS old_status,
     RRDCALC_STATUS new_status)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
     if (!host->aclk_config)
         return;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &res))
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &res))
         return;
 
     int submit_delay = calculate_delay(old_status, new_status);
@@ -175,7 +176,7 @@ static void insert_alert_queue(
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
+    SQLITE_RESET(res);
 }
 
 #define SQL_INSERT_HEALTH_LOG_DETAIL                                                                                         \
@@ -188,10 +189,10 @@ done:
 
 static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_log_id, ALARM_ENTRY *ae)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &res))
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &res))
         return;
 
     int param = 0;
@@ -229,7 +230,7 @@ static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
+    SQLITE_RESET(res);
 }
 
 #define SQL_INSERT_HEALTH_LOG                                                                                          \
@@ -242,11 +243,13 @@ done:
 
 static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
     uint64_t health_log_id;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG, &res))
+    REQUIRE_DB(db_meta);
+
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG, &res))
         return;
 
     int param = 0;
@@ -274,7 +277,7 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
+    SQLITE_RESET(res);
 }
 
 void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)

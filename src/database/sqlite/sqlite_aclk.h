@@ -50,11 +50,6 @@ typedef struct aclk_sync_cfg_t {
     time_t node_collectors_send;
     char node_id[UUID_STR_LEN];
     char *alerts_snapshot_uuid;        // will contain the snapshot_uuid value if snapshot was requested
-    struct {
-        Pvoid_t JudyL;                              // alert transitions to save
-        uint32_t count;
-        SPINLOCK spinlock;
-    } alert_transition;
 } aclk_sync_cfg_t;
 
 void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid, nd_uuid_t *node_id);

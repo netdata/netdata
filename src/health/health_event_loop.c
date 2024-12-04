@@ -250,15 +250,6 @@ static void health_event_loop(void) {
             if (unlikely(!host->health.enabled))
                 continue;
 
-            if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_ALERT_TRANSITIONS_SAVE))) {
-                nd_log(
-                    NDLS_DAEMON,
-                    NDLP_DEBUG,
-                    "Host \"%s\" has pending alert transitions to save, postponing health checks",
-                    rrdhost_hostname(host));
-                continue;
-            }
-
             if (unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
                 health_initialize_rrdhost(host);
 
@@ -658,8 +649,14 @@ static void health_event_loop(void) {
                 break;
             }
         }
-
-        commit_alert_transitions(host);
+        struct aclk_sync_cfg_t *wc = host->aclk_config;
+        if (wc && wc->send_snapshot == 1) {
+            wc->send_snapshot = 2;
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+        }
+        else
+            if (process_alert_pending_queue(host))
+                rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 
         dfe_done(host);
 
