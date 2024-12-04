@@ -16,16 +16,12 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
 
     sth->messages.processed++;
 
-    if (msg->session &&                                                                         // there is a session
-        msg->snd_run_slot >= 0 && (size_t)msg->snd_run_slot < sth->snd.run.used &&              // slot is valid
-        sth->snd.run.senders[msg->snd_run_slot] &&                                              // slot is not NULL
-        msg->snd_run_slot == sth->snd.run.senders[msg->snd_run_slot]->thread.slot &&            // slot matches
-        sth->snd.run.senders[msg->snd_run_slot] == msg->sender &&                               // same sender
-        sth->snd.run.senders[msg->snd_run_slot]->thread.msg.session == msg->session &&          // same session
-        (size_t)msg->thread_slot == sth->id)                                                    // same thread
-    {
-        struct sender_state *s = sth->snd.run.senders[msg->snd_run_slot];
+    struct sender_state *s = msg->sender ? SENDERS_GET(&sth->snd.senders, (Word_t)msg->sender) : NULL;
 
+    if (msg->session &&                         // there is a session
+        s &&                                    // there is a sender
+        (size_t)msg->thread_slot == sth->id)    // same thread
+    {
         if(msg->opcode & STREAM_OPCODE_SENDER_POLLOUT) {
             struct pollfd *pfd = pfd_validate(sth, s->thread.pfd);
             pfd->events |= POLLOUT;
@@ -42,7 +38,7 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
 }
 
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_opcode msg) {
-    if (msg.snd_run_slot < 0 || !msg.session || !msg.sender)
+    if (!msg.session || !msg.sender)
         return;
 
     internal_fatal(msg.sender != s, "the sender pointer in the message does not match this sender");
@@ -258,26 +254,16 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, const siz
     switch(sth->run.meta[slot].type) {
         case POLLFD_TYPE_SENDER: {
             struct sender_state *s = sth->run.meta[slot].s;
-            int32_t sender_slot = s->thread.msg.snd_run_slot;
-            internal_fatal(sender_slot < 0 || (size_t)sender_slot >= sth->snd.run.used, "Invalid sender dispatcher slot!");
-            internal_fatal(s != sth->snd.run.senders[sender_slot], "Invalid sender dispatcher pointer!");
-
-            if(sender_slot >= 0 && (size_t)sender_slot < sth->snd.run.used && sth->snd.run.senders[sender_slot] == s)
-                stream_sender_process_poll_events(sth, s, revents, sender_slot, now_s);
-
+            internal_fatal(SENDERS_GET(&sth->snd.senders, (Word_t)s) == NULL, "Sender is not found in the senders list");
+            stream_sender_process_poll_events(sth, s, revents, now_s);
             *replay_entries += dictionary_entries(s->replication.requests);
             break;
         }
 
         case POLLFD_TYPE_RECEIVER: {
             struct receiver_state *rpt = sth->run.meta[slot].rpt;
-            int32_t receiver_slot = rpt->receiver.slot;
-            internal_fatal(receiver_slot < 0 || (size_t)receiver_slot >= sth->rcv.run.used, "Invalid receiver slot!");
-            internal_fatal(rpt != sth->rcv.run.receivers[receiver_slot], "Invalid receiver pointer!");
-
-            if(receiver_slot >= 0 && (size_t)receiver_slot < sth->rcv.run.used && sth->rcv.run.receivers[receiver_slot] == rpt)
-                stream_receive_process_poll_events(sth, rpt, revents, receiver_slot, now_s);
-
+            internal_fatal(RECEIVERS_GET(&sth->rcv.receivers, (Word_t)rpt) == NULL, "Receiver is not found in the receiver list");
+            stream_receive_process_poll_events(sth, rpt, revents, now_s);
             break;
         }
 
@@ -307,7 +293,7 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, const siz
 static struct pollfd_slotted *get_slot_pfd(struct stream_thread *sth, size_t slot) {
     switch(sth->run.meta[slot].type) {
         case POLLFD_TYPE_RECEIVER:
-            return &sth->run.meta[slot].rpt->receiver.pfd;
+            return &sth->run.meta[slot].rpt->thread.pfd;
 
         case POLLFD_TYPE_SENDER:
             return &sth->run.meta[slot].s->thread.pfd;
@@ -525,10 +511,8 @@ void *stream_thread(void *ptr) {
 
     // dequeue
     spinlock_lock(&sth->queue.spinlock);
-    while(sth->queue.senders)
-        stream_sender_move_queue_to_running_unsafe(sth);
-    while(sth->queue.receivers)
-        stream_receiver_move_queue_to_running_unsafe(sth);
+    stream_sender_move_queue_to_running_unsafe(sth);
+    stream_receiver_move_queue_to_running_unsafe(sth);
     spinlock_unlock(&sth->queue.spinlock);
 
     // cleanup receiver and dispatcher
@@ -664,7 +648,8 @@ void stream_receiver_add_to_queue(struct receiver_state *rpt) {
            sth->id, rrdhost_hostname(rpt->host));
 
     spinlock_lock(&sth->queue.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sth->queue.receivers, rpt, prev, next);
+    internal_fatal(RECEIVERS_GET(&sth->queue.receivers, (Word_t)rpt) != NULL, "Receiver is already in the receivers queue");
+    RECEIVERS_SET(&sth->queue.receivers, (Word_t)rpt, rpt);
     spinlock_unlock(&sth->queue.spinlock);
 }
 
@@ -678,7 +663,8 @@ void stream_sender_add_to_queue(struct sender_state *s) {
            sth->id, rrdhost_hostname(s->host));
 
     spinlock_lock(&sth->queue.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sth->queue.senders, s, prev, next);
+    internal_fatal(SENDERS_GET(&sth->queue.senders, (Word_t)s) != NULL, "Sender is already in the senders queue");
+    SENDERS_SET(&sth->queue.senders, (Word_t)s, s);
     spinlock_unlock(&sth->queue.spinlock);
 }
 

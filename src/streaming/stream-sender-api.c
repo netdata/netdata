@@ -31,7 +31,6 @@ void stream_sender_structures_init(RRDHOST *host, bool stream, STRING *parents, 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
 
     host->sender->connector.id = -1;
-    host->sender->thread.slot = -1;
     host->sender->host = host;
     host->sender->sbuf.cb = cbuffer_new(CBUFFER_INITIAL_SIZE, CBUFFER_INITIAL_MAX_SIZE, &netdata_buffers_statistics.cbuffers_streaming);
     host->sender->capabilities = stream_our_capabilities(host, true);

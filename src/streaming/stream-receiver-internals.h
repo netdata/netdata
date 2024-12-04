@@ -51,9 +51,8 @@ struct receiver_state {
             struct decompressor_state decompressor;
         } compressed;
 
-        size_t slot;
         struct pollfd_slotted pfd;
-    } receiver;
+    } thread;
 
     struct {
         bool shutdown;      // signal the streaming parser to exit
@@ -67,8 +66,6 @@ struct receiver_state {
 #ifdef ENABLE_H2O
     void *h2o_ctx;
 #endif
-
-    struct receiver_state *prev, *next;
 };
 
 #ifdef ENABLE_H2O

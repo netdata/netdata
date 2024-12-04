@@ -547,7 +547,7 @@ struct connector {
         // the incoming queue of the connector thread
         // all other threads leave new senders here, to be connected to their parents
         SPINLOCK spinlock;
-        struct sender_state *ll;
+        SENDERS_JudyLSet senders;
     } queue;
 };
 
@@ -596,7 +596,8 @@ void stream_connector_requeue(struct sender_state *s) {
            rrdhost_hostname(s->host));
 
     spinlock_lock(&sc->queue.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sc->queue.ll, s, prev, next);
+    internal_fatal(SENDERS_GET(&sc->queue.senders, (Word_t)s) != NULL, "Sender is already in the connector queue");
+    SENDERS_SET(&sc->queue.senders, (Word_t)s, s);
     spinlock_unlock(&sc->queue.spinlock);
 
     // signal the connector to catch the job
@@ -665,9 +666,10 @@ static void *stream_connector_thread(void *ptr) {
         size_t nodes = 0, connected_nodes = 0, failed_nodes = 0, cancelled_nodes = 0;
 
         spinlock_lock(&sc->queue.spinlock);
-        struct sender_state *next;
-        for(struct sender_state *s = sc->queue.ll; s ; s = next) {
-            next = s->next;
+        Word_t idx = 0;
+        for(struct sender_state *s = SENDERS_FIRST(&sc->queue.senders, &idx);
+             s;
+             s = SENDERS_NEXT(&sc->queue.senders, &idx)) {
             nodes++;
 
             ND_LOG_STACK lgs[] = {
@@ -679,7 +681,7 @@ static void *stream_connector_thread(void *ptr) {
 
             if(stream_connector_is_signaled_to_stop(s)) {
                 cancelled_nodes++;
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sc->queue.ll, s, prev, next);
+                SENDERS_DEL(&sc->queue.senders, (Word_t)s);
                 stream_connector_remove(s);
                 continue;
             }
@@ -694,7 +696,7 @@ static void *stream_connector_thread(void *ptr) {
                 stream_sender_on_connect(s);
 
                 worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTED);
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sc->queue.ll, s, prev, next);
+                SENDERS_DEL(&sc->queue.senders, (Word_t)s);
                 spinlock_unlock(&sc->queue.spinlock);
 
                 // do not have the connector lock when calling this

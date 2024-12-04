@@ -3,7 +3,7 @@
 #include "stream-thread.h"
 #include "stream-sender-internals.h"
 
-static void stream_sender_move_running_to_connector_or_remove(struct stream_thread *sth, struct sender_state *s, size_t slot, STREAM_HANDSHAKE reason, bool reconnect);
+static void stream_sender_move_running_to_connector_or_remove(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, bool reconnect);
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -216,14 +216,14 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
                buffer_size, buffer_max_size, buffer_available);
 
         stream_sender_move_running_to_connector_or_remove(
-            sth, s, msg->snd_run_slot, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_SEND_BUFFER, true);
+            sth, s, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_SEND_BUFFER, true);
         return;
     }
 
     if(msg->opcode & STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVER_LEFT);
         stream_sender_move_running_to_connector_or_remove(
-            sth, s, msg->snd_run_slot, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
+            sth, s, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
         return;
     }
 
@@ -235,14 +235,14 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
                sth->id, rrdhost_hostname(s->host), s->connected_to);
 
         stream_sender_move_running_to_connector_or_remove(
-            sth, s, msg->snd_run_slot, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_READ_BUFFER, true);
+            sth, s, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_READ_BUFFER, true);
         return;
     }
 
     if(msg->opcode & STREAM_OPCODE_SENDER_STOP_HOST_CLEANUP) {
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_HOST_CLEANUP);
         stream_sender_move_running_to_connector_or_remove(
-            sth, s, msg->snd_run_slot, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, false);
+            sth, s, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, false);
         return;
     }
 
@@ -253,29 +253,18 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static void stream_sender_realloc_arrays_unsafe(struct stream_thread *sth, size_t slot) {
-    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-
-    if(slot >= sth->snd.run.size) {
-        size_t new_size = sth->snd.run.size > 0 ? sth->snd.run.size * 2 : 8;
-        sth->snd.run.senders = reallocz(sth->snd.run.senders, new_size * sizeof(*sth->snd.run.senders));
-        sth->snd.run.size = new_size;
-        sth->snd.run.used = slot + 1;
-    }
-    else if(slot >= sth->snd.run.used)
-        sth->snd.run.used = slot + 1;
-}
-
 void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
-    size_t first_slot = 1;
-
     // process the queue
-    while(sth->queue.senders) {
+    Word_t idx = 0;
+    for(struct sender_state *s = SENDERS_FIRST(&sth->queue.senders, &idx);
+         s;
+         s = SENDERS_NEXT(&sth->queue.senders, &idx)) {
         worker_is_busy(WORKER_STREAM_JOB_DEQUEUE);
 
-        struct sender_state *s = sth->queue.senders;
+        SENDERS_DEL(&sth->queue.senders, (Word_t)s);
+
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
             ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
@@ -283,33 +272,17 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sth->queue.senders, s, prev, next);
-
-        // slot 0 is our pipe
-        size_t slot = sth->snd.run.used > 0 ? sth->snd.run.used : 1;
-
-        // find an empty slot
-        for(size_t i = first_slot; i < slot && i < sth->snd.run.used ;i++) {
-            if(!sth->snd.run.senders[i]) {
-                slot = i;
-                break;
-            }
-        }
-
-        stream_sender_realloc_arrays_unsafe(sth, slot);
-
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM[%zu] [%s]: moving host from dispatcher queue to dispatcher running slot %zu...",
-               sth->id, rrdhost_hostname(s->host), slot);
+               "STREAM[%zu] [%s]: moving host from dispatcher queue to dispatcher running...",
+               sth->id, rrdhost_hostname(s->host));
 
-        sth->snd.run.senders[slot] = s;
+        internal_fatal(SENDERS_GET(&sth->snd.senders, (Word_t)s) != NULL, "Sender already exists in senders list");
+        SENDERS_SET(&sth->snd.senders, (Word_t)s, s);
 
         stream_sender_lock(s);
-        s->thread.slot = (int32_t)slot;
         s->thread.pfd = stream_thread_pollfd_get(sth, s->sock.fd, POLLFD_TYPE_SENDER, NULL, s);
 
         s->thread.msg.thread_slot = (int32_t)sth->id;
-        s->thread.msg.snd_run_slot = (int32_t)slot;
         s->thread.msg.session = os_random32();
         s->thread.msg.sender = s;
 
@@ -321,8 +294,6 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         stream_sender_unlock(s);
 
         stream_sender_on_ready_to_dispatch(s);
-
-        first_slot = slot + 1;
     }
 }
 
@@ -357,43 +328,20 @@ void stream_sender_remove(struct sender_state *s) {
 #endif
 }
 
-static void stream_sender_move_running_to_connector_or_remove(struct stream_thread *sth, struct sender_state *s, size_t slot, STREAM_HANDSHAKE reason, bool reconnect) {
+static void stream_sender_move_running_to_connector_or_remove(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, bool reconnect) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
-    if(s != sth->snd.run.senders[slot]) {
-        for(size_t i = 0; i < sth->snd.run.used ; i++) {
-            if(sth->snd.run.senders[i] == s) {
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM[%zu] [%s]: tried to remove host from slot %zu (reconnect = %s), but senders do not match - the right slot is %zu",
-                       sth->id, rrdhost_hostname(s->host), slot, reconnect ? "true" : "false", i);
-                slot = i;
-                break;
-            }
-        }
-    }
-
-    if(s == sth->snd.run.senders[slot] || !sth->snd.run.senders[slot]) {
-        stream_thread_pollfd_release(sth, s->thread.pfd);
-        if (slot == sth->snd.run.used - 1)
-            sth->snd.run.used--;
-    }
-    else {
-        internal_fatal(true, "wrong sender slot");
-
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM[%zu] [%s]: tried to remove host from slot %zu (reconnect = %s), but senders do not match",
-               sth->id, rrdhost_hostname(s->host), slot, reconnect ? "true" : "false");
-    }
+    internal_fatal(SENDERS_GET(&sth->snd.senders, (Word_t)s) == NULL, "Sender to be removed is not in the list of senders");
+    SENDERS_DEL(&sth->snd.senders, (Word_t)s);
+    stream_thread_pollfd_release(sth, s->thread.pfd);
 
     // clear this flag asap, to stop other threads from pushing metrics for this node
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED | RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
     // clear these asap, to make sender_commit() stop processing data for this host
     stream_sender_lock(s);
-    s->thread.slot = -1;
     s->thread.pfd = PFD_EMPTY;
 
-    s->thread.msg.snd_run_slot = -1;
     s->thread.msg.session = 0;
     s->thread.msg.sender = NULL;
 
@@ -405,7 +353,6 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
            rrdhost_hostname(s->host), stream_handshake_error_to_string(reason));
 
     nd_sock_close(&s->sock);
-    sth->snd.run.senders[slot] = NULL;
 
     stream_parent_set_disconnect_reason(s->host->stream.snd.parents.current, reason, now_realtime_sec());
     stream_sender_on_disconnect(s);
@@ -430,11 +377,10 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
     size_t bytes_compressed = 0;
     NETDATA_DOUBLE buffer_ratio = 0.0;
 
-    for(size_t slot = 1; slot < sth->snd.run.used ; slot++) {
-        struct sender_state *s = sth->snd.run.senders[slot];
-        if(!s)
-            continue;
-
+    Word_t idx = 0;
+    for(struct sender_state *s = SENDERS_FIRST(&sth->snd.senders, &idx);
+         s;
+         s = SENDERS_NEXT(&sth->snd.senders, &idx)) {
         // the default for all nodes
         struct pollfd *pfd = pfd_validate(sth, s->thread.pfd);
         pfd->events = POLLIN;
@@ -465,8 +411,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
                    sth->id, rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
                    s->thread.bytes_sent, s->thread.sends);
 
-            stream_sender_move_running_to_connector_or_remove(
-                sth, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT, true);
+            stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT, true);
             continue;
         }
 
@@ -494,7 +439,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
     worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, buffer_ratio);
 }
 
-void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, short revents, size_t slot, time_t now_s) {
+void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, short revents, time_t now_s) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     ND_LOG_STACK lgs[] = {
@@ -528,7 +473,7 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                "STREAM[%zu] %s [send to %s]: %s restarting connection - %zu bytes transmitted.",
                sth->id, rrdhost_hostname(s->host), s->connected_to, error, s->thread.bytes_sent);
 
-        stream_sender_move_running_to_connector_or_remove(sth, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR, true);
+        stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR, true);
         return;
     }
 
@@ -570,7 +515,7 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                    "we have sent %zu bytes on this connection.",
                    sth->id, rrdhost_hostname(s->host), s->connected_to, s->thread.bytes_sent);
             stream_sender_move_running_to_connector_or_remove(
-                sth, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED, true);
+                sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED, true);
             return;
         }
     }
@@ -591,7 +536,7 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                    "STREAM[%zu] %s [send to %s]: connection (fd %d) closed by far end.",
                    sth->id, rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
             stream_sender_move_running_to_connector_or_remove(
-                sth, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_PARENT, true);
+                sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_PARENT, true);
             return;
         }
         else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
@@ -600,7 +545,7 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                    "STREAM[%zu] %s [send to %s]: error during receive (%zd, on fd %d) - restarting connection.",
                    sth->id, rrdhost_hostname(s->host), s->connected_to, bytes, s->sock.fd);
             stream_sender_move_running_to_connector_or_remove(
-                sth, s, slot, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, true);
+                sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, true);
             return;
         }
     }
@@ -613,9 +558,10 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
 
 void stream_sender_cleanup(struct stream_thread *sth) {
     // stop all hosts
-    for(size_t slot = 1; slot < sth->snd.run.used ;slot++) {
-        struct sender_state *s = sth->snd.run.senders[slot];
-        if(!s) continue;
+    Word_t idx = 0;
+    for(struct sender_state *s = SENDERS_FIRST(&sth->snd.senders, &idx);
+         s;
+         s = SENDERS_NEXT(&sth->snd.senders, &idx)) {
 
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
@@ -628,11 +574,10 @@ void stream_sender_cleanup(struct stream_thread *sth) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        stream_sender_move_running_to_connector_or_remove(sth, s, slot, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
+        stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
     }
 
     // cleanup
-    freez(sth->snd.run.senders);
-    memset(&sth->snd.run, 0, sizeof(sth->snd.run));
+    SENDERS_FREE(&sth->snd.senders, NULL);
 }
 

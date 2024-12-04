@@ -113,24 +113,24 @@ bool stream_compression_initialize(struct sender_state *s) {
 }
 
 bool stream_decompression_initialize(struct receiver_state *rpt) {
-    stream_decompressor_destroy(&rpt->receiver.compressed.decompressor);
+    stream_decompressor_destroy(&rpt->thread.compressed.decompressor);
 
     // IMPORTANT
     // KEEP THE SAME ORDER IN COMPRESSION
 
     if(stream_has_capability(rpt, STREAM_CAP_ZSTD))
-        rpt->receiver.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
+        rpt->thread.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_ZSTD;
     else if(stream_has_capability(rpt, STREAM_CAP_LZ4))
-        rpt->receiver.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
+        rpt->thread.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_LZ4;
     else if(stream_has_capability(rpt, STREAM_CAP_BROTLI))
-        rpt->receiver.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_BROTLI;
+        rpt->thread.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_BROTLI;
     else if(stream_has_capability(rpt, STREAM_CAP_GZIP))
-        rpt->receiver.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
+        rpt->thread.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_GZIP;
     else
-        rpt->receiver.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_NONE;
+        rpt->thread.compressed.decompressor.algorithm = COMPRESSION_ALGORITHM_NONE;
 
-    if(rpt->receiver.compressed.decompressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
-        stream_decompressor_init(&rpt->receiver.compressed.decompressor);
+    if(rpt->thread.compressed.decompressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
+        stream_decompressor_init(&rpt->thread.compressed.decompressor);
         return true;
     }
 

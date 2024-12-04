@@ -25,7 +25,6 @@ typedef enum __attribute__((packed)) {
 
 struct stream_opcode {
     int32_t thread_slot;                // the dispatcher id this message refers to
-    int32_t snd_run_slot;               // the run slot of the dispatcher this message refers to
     uint32_t session;                   // random number used to verify that the message the dispatcher receives is for this sender
     STREAM_OPCODE opcode;               // the actual message to be delivered
     struct sender_state *sender;
@@ -109,6 +108,9 @@ struct pollfd_meta {
     };
 };
 
+DEFINE_JUDYL_TYPED(SENDERS, struct sender_state *);
+DEFINE_JUDYL_TYPED(RECEIVERS, struct receiver_state *);
+
 struct stream_thread {
     ND_THREAD *thread;
 
@@ -117,24 +119,13 @@ struct stream_thread {
     size_t nodes_count;
 
     struct {
-        struct {
-            // private fields for the dispatcher thread only - DO NOT USE ON OTHER THREADS
-            size_t used;
-            size_t size;
-            struct sender_state **senders;  // the array of senders (may have nulls in it)
-        } run;
-
+        SENDERS_JudyLSet senders;
         size_t bytes_received;
         size_t bytes_sent;
     } snd;
 
     struct {
-        struct {
-            size_t size;
-            size_t used;
-            struct receiver_state **receivers;
-        } run;
-
+        RECEIVERS_JudyLSet receivers;
         size_t bytes_received;
         size_t bytes_received_uncompressed;
         NETDATA_DOUBLE replication_completion;
@@ -151,8 +142,8 @@ struct stream_thread {
         // the incoming queue of the dispatcher thread
         // the connector thread leaves the connected senders in this list, for the dispatcher to pick them up
         SPINLOCK spinlock;
-        struct sender_state *senders;
-        struct receiver_state *receivers;
+        SENDERS_JudyLSet senders;
+        RECEIVERS_JudyLSet receivers;
     } queue;
 
     struct {
@@ -193,8 +184,8 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth);
 void stream_receiver_add_to_queue(struct receiver_state *rpt);
 void stream_sender_add_to_connector_queue(RRDHOST *host);
 
-void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, short revents, size_t slot, time_t now_s);
-void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, short revents, size_t slot, time_t now_s);
+void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, short revents, time_t now_s);
+void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, short revents, time_t now_s);
 
 void stream_sender_cleanup(struct stream_thread *sth);
 void stream_receiver_cleanup(struct stream_thread *sth);

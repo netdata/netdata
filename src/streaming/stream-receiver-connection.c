@@ -38,7 +38,7 @@ void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, con
 
 void stream_receiver_free(struct receiver_state *rpt) {
     nd_sock_close(&rpt->sock);
-    stream_decompressor_destroy(&rpt->receiver.compressed.decompressor);
+    stream_decompressor_destroy(&rpt->thread.compressed.decompressor);
 
     if(rpt->system_info)
         rrdhost_system_info_free(rpt->system_info);
@@ -259,7 +259,6 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     rpt->connected_since_s = now_realtime_sec();
     rpt->last_msg_t = now_monotonic_sec();
     rpt->hops = 1;
-    rpt->receiver.slot = -1;
 
     rpt->capabilities = STREAM_CAP_INVALID;
 

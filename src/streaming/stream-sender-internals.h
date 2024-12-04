@@ -65,7 +65,6 @@ struct sender_state {
         size_t bytes_sent;
         size_t bytes_sent_by_type[STREAM_TRAFFIC_TYPE_MAX];
 
-        int32_t slot;
         struct pollfd_slotted pfd;
     } thread;
 
@@ -126,9 +125,6 @@ struct sender_state {
     } defer;
 
     bool parent_using_h2o;
-
-    // for the sender/connector threads
-    struct sender_state *prev, *next;
 };
 
 #define stream_sender_lock(sender) spinlock_lock(&(sender)->spinlock)

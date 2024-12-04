@@ -127,23 +127,23 @@ typedef enum {
 } decompressor_status_t;
 
 static inline void receiver_move_compressed(struct receiver_state *r) {
-    size_t remaining = r->receiver.compressed.used - r->receiver.compressed.start;
+    size_t remaining = r->thread.compressed.used - r->thread.compressed.start;
     if(remaining > 0) {
-        memmove(r->receiver.compressed.buf, r->receiver.compressed.buf + r->receiver.compressed.start, remaining);
-        r->receiver.compressed.start = 0;
-        r->receiver.compressed.used = remaining;
+        memmove(r->thread.compressed.buf, r->thread.compressed.buf + r->thread.compressed.start, remaining);
+        r->thread.compressed.start = 0;
+        r->thread.compressed.used = remaining;
     }
     else {
-        r->receiver.compressed.start = 0;
-        r->receiver.compressed.used = 0;
+        r->thread.compressed.start = 0;
+        r->thread.compressed.used = 0;
     }
 }
 
 static inline decompressor_status_t receiver_feed_decompressor(struct receiver_state *r) {
-    char *buf = r->receiver.compressed.buf;
-    size_t start = r->receiver.compressed.start;
-    size_t signature_size = r->receiver.compressed.decompressor.signature_size;
-    size_t used = r->receiver.compressed.used;
+    char *buf = r->thread.compressed.buf;
+    size_t start = r->thread.compressed.start;
+    size_t signature_size = r->thread.compressed.decompressor.signature_size;
+    size_t used = r->thread.compressed.used;
 
     if(start + signature_size > used) {
         // incomplete header, we need to wait for more data
@@ -152,7 +152,7 @@ static inline decompressor_status_t receiver_feed_decompressor(struct receiver_s
     }
 
     size_t compressed_message_size =
-        stream_decompressor_start(&r->receiver.compressed.decompressor, buf + start, signature_size);
+        stream_decompressor_start(&r->thread.compressed.decompressor, buf + start, signature_size);
 
     if (unlikely(!compressed_message_size)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "multiplexed uncompressed data in compressed stream!");
@@ -174,7 +174,7 @@ static inline decompressor_status_t receiver_feed_decompressor(struct receiver_s
     }
 
     size_t bytes_to_parse =
-        stream_decompress(&r->receiver.compressed.decompressor, buf + start + signature_size, compressed_message_size);
+        stream_decompress(&r->thread.compressed.decompressor, buf + start + signature_size, compressed_message_size);
 
     if (unlikely(!bytes_to_parse)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "no bytes to parse.");
@@ -184,19 +184,19 @@ static inline decompressor_status_t receiver_feed_decompressor(struct receiver_s
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_to_parse);
 
     // move the header to the next message
-    r->receiver.compressed.start += signature_size + compressed_message_size;
+    r->thread.compressed.start += signature_size + compressed_message_size;
 
     return DECOMPRESS_OK;
 }
 
 static inline decompressor_status_t receiver_get_decompressed(struct receiver_state *r) {
-    if (unlikely(!stream_decompressed_bytes_in_buffer(&r->receiver.compressed.decompressor)))
+    if (unlikely(!stream_decompressed_bytes_in_buffer(&r->thread.compressed.decompressor)))
         return DECOMPRESS_NEED_MORE_DATA;
 
     size_t available = sizeof(r->reader.read_buffer) - r->reader.read_len - 1;
     if (likely(available)) {
         size_t len = stream_decompressor_get(
-            &r->receiver.compressed.decompressor, r->reader.read_buffer + r->reader.read_len, available);
+            &r->thread.compressed.decompressor, r->reader.read_buffer + r->reader.read_len, available);
         if (unlikely(!len)) {
             internal_error(true, "decompressor returned zero length #1");
             return DECOMPRESS_FAILED;
@@ -218,15 +218,15 @@ static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HAN
     internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
-    int bytes_read = read_stream(r, r->receiver.compressed.buf + r->receiver.compressed.used,
-                                 sizeof(r->receiver.compressed.buf) - r->receiver.compressed.used);
+    int bytes_read = read_stream(r, r->thread.compressed.buf + r->thread.compressed.used,
+                                 sizeof(r->thread.compressed.buf) - r->thread.compressed.used);
 
     if (unlikely(bytes_read <= 0)) {
         *reason = read_stream_error_to_reason(bytes_read);
         return false;
     }
 
-    r->receiver.compressed.used += bytes_read;
+    r->thread.compressed.used += bytes_read;
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
 
     return true;
@@ -251,7 +251,7 @@ static inline bool receiver_should_stop(struct receiver_state *rpt) {
 // --------------------------------------------------------------------------------------------------------------------
 
 static void streaming_parser_init(struct receiver_state *rpt) {
-    rpt->receiver.cd = (struct plugind){
+    rpt->thread.cd = (struct plugind){
         .update_every = default_rrd_update_every,
         .unsafe = {
             .spinlock = NETDATA_SPINLOCK_INITIALIZER,
@@ -262,18 +262,18 @@ static void streaming_parser_init(struct receiver_state *rpt) {
     };
 
     // put the client IP and port into the buffers used by plugins.d
-    snprintfz(rpt->receiver.cd.id,           CONFIG_MAX_NAME,  "%s:%s", rpt->client_ip, rpt->client_port);
-    snprintfz(rpt->receiver.cd.filename,     FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
-    snprintfz(rpt->receiver.cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
-    snprintfz(rpt->receiver.cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
+    snprintfz(rpt->thread.cd.id,           CONFIG_MAX_NAME,  "%s:%s", rpt->client_ip, rpt->client_port);
+    snprintfz(rpt->thread.cd.filename,     FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
+    snprintfz(rpt->thread.cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
+    snprintfz(rpt->thread.cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
 
     PARSER *parser = NULL;
     {
         PARSER_USER_OBJECT user = {
-            .enabled = plugin_is_enabled(&rpt->receiver.cd),
+            .enabled = plugin_is_enabled(&rpt->thread.cd),
             .host = rpt->host,
             .opaque = rpt,
-            .cd = &rpt->receiver.cd,
+            .cd = &rpt->thread.cd,
             .trust_durations = 1,
             .capabilities = rpt->capabilities,
         };
@@ -289,7 +289,9 @@ static void streaming_parser_init(struct receiver_state *rpt) {
 
     rrd_collector_started();
 
-    rpt->receiver.compressed.enabled = stream_decompression_initialize(rpt);
+    rpt->thread.compressed.start = 0;
+    rpt->thread.compressed.used = 0;
+    rpt->thread.compressed.enabled = stream_decompression_initialize(rpt);
     buffered_reader_init(&rpt->reader);
 
 #ifdef NETDATA_LOG_STREAM_RECEIVE
@@ -303,10 +305,10 @@ static void streaming_parser_init(struct receiver_state *rpt) {
     }
 #endif
 
-    __atomic_store_n(&rpt->receiver.parser, parser, __ATOMIC_RELAXED);
+    __atomic_store_n(&rpt->thread.parser, parser, __ATOMIC_RELAXED);
     stream_receiver_send_node_and_claim_id_to_child(rpt->host);
 
-    rpt->receiver.buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
+    rpt->thread.buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
 
     // help rrdset_push_metric_initialize() select the right buffer
     rpt->host->stream.snd.commit.receiver_tid = gettid_cached();
@@ -334,29 +336,18 @@ static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static void stream_receiver_realloc_arrays_unsafe(struct stream_thread *sth, size_t slot) {
-    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-
-    if(slot >= sth->rcv.run.size) {
-        size_t new_size = sth->rcv.run.size > 0 ? sth->rcv.run.size * 2 : 8;
-        sth->rcv.run.receivers = reallocz(sth->rcv.run.receivers, new_size * sizeof(*sth->rcv.run.receivers));
-        sth->rcv.run.size = new_size;
-        sth->rcv.run.used = slot + 1;
-    }
-    else if(slot >= sth->rcv.run.used)
-        sth->rcv.run.used = slot + 1;
-}
-
 void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
-    size_t first_slot = 0;
-
     // process the queue
-    while(sth->queue.receivers) {
-        // worker_is_busy(WORKER_SENDER_DISPATCHER_JOB_DEQUEUE);
+    Word_t idx = 0;
+    for(struct receiver_state *rpt = RECEIVERS_FIRST(&sth->queue.receivers, &idx);
+         rpt;
+         rpt = RECEIVERS_NEXT(&sth->queue.receivers, &idx)) {
+        worker_is_busy(WORKER_STREAM_JOB_DEQUEUE);
 
-        struct receiver_state *rpt = sth->queue.receivers;
+        RECEIVERS_DEL(&sth->queue.receivers, (Word_t)rpt);
+
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
             ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
@@ -364,35 +355,17 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sth->queue.receivers, rpt, prev, next);
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "STREAM[%zu] [%s]: moving host from receiver queue to receiver running...",
+               sth->id, rrdhost_hostname(rpt->host));
 
-        // slot 0 is our pipe
-        size_t slot = sth->rcv.run.used;
-
-        // find an empty slot
-        for(size_t i = first_slot; i < slot && i < sth->rcv.run.used ;i++) {
-            if(!sth->rcv.run.receivers[i]) {
-                slot = i;
-                break;
-            }
-        }
-
-        stream_receiver_realloc_arrays_unsafe(sth, slot);
-        rpt->receiver.compressed.start = 0;
-        rpt->receiver.compressed.used = 0;
+        internal_fatal(RECEIVERS_GET(&sth->rcv.receivers, (Word_t)rpt) != NULL, "Receiver to be added is already in the list of receivers");
+        RECEIVERS_SET(&sth->rcv.receivers, (Word_t)rpt, rpt);
 
         streaming_parser_init(rpt);
 
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM[%zu] [%s]: moving host from receiver queue to receiver running slot %zu...",
-               sth->id, rrdhost_hostname(rpt->host), slot);
-
         rpt->host->stream.rcv.status.tid = gettid_cached();
-
-        sth->rcv.run.receivers[slot] = rpt;
-        rpt->receiver.slot = slot;
-        rpt->receiver.pfd = stream_thread_pollfd_get(sth, rpt->sock.fd, POLLFD_TYPE_RECEIVER, rpt, NULL);
-        first_slot = slot + 1;
+        rpt->thread.pfd = stream_thread_pollfd_get(sth, rpt->sock.fd, POLLFD_TYPE_RECEIVER, rpt, NULL);
     }
 }
 
@@ -400,11 +373,11 @@ static void stream_receiver_on_disconnect(struct stream_thread *sth __maybe_unus
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
     if(!rpt) return;
 
-    buffer_free(rpt->receiver.buffer);
-    rpt->receiver.buffer = NULL;
+    buffer_free(rpt->thread.buffer);
+    rpt->thread.buffer = NULL;
 
     size_t count = 0;
-    PARSER *parser = __atomic_load_n(&rpt->receiver.parser, __ATOMIC_RELAXED);
+    PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
     if(parser) {
         parser->user.v2.stream_buffer.wb = NULL;
 
@@ -437,7 +410,7 @@ static void stream_receiver_on_disconnect(struct stream_thread *sth __maybe_unus
     stream_receiver_free(rpt);
 }
 
-static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, size_t slot, const char *why) {
+static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, const char *why) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -448,24 +421,22 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
            , rpt->client_port ? rpt->client_port : "-"
            , why ? why : "");
 
-    stream_thread_pollfd_release(sth, rpt->receiver.pfd);
-    rpt->receiver.pfd = PFD_EMPTY;
-    rpt->receiver.slot = -1;
+    internal_fatal(RECEIVERS_GET(&sth->rcv.receivers, (Word_t)rpt) == NULL, "Receiver to be removed is not found in the list of receivers");
+    RECEIVERS_DEL(&sth->rcv.receivers, (Word_t)rpt);
+    stream_thread_pollfd_release(sth, rpt->thread.pfd);
+
+    rpt->thread.pfd = PFD_EMPTY;
     rpt->host->stream.rcv.status.tid = 0;
 
     stream_thread_node_removed(rpt->host);
 
     stream_receiver_on_disconnect(sth, rpt);
     // DO NOT USE rpt after this point
-
-    sth->rcv.run.receivers[slot] = NULL;
-    if (slot == sth->rcv.run.used - 1)
-        sth->rcv.run.used--;
 }
 
 // process poll() events for streaming receivers
-void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, short revents __maybe_unused, size_t slot, time_t now_s) {
-        PARSER *parser = __atomic_load_n(&rpt->receiver.parser, __ATOMIC_RELAXED);
+void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, short revents __maybe_unused, time_t now_s) {
+        PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
             ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
@@ -482,20 +453,20 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
         if(receiver_should_stop(rpt)) {
             receiver_set_exit_reason(rpt, rpt->exit.reason, false);
-            stream_receiver_remove(sth, rpt, slot, "received stop signal");
+            stream_receiver_remove(sth, rpt, "received stop signal");
             return;
         }
 
         rpt->last_msg_t = now_s;
 
-        if(rpt->receiver.compressed.enabled) {
+        if(rpt->thread.compressed.enabled) {
             worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
 
             STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
             if(unlikely(!receiver_read_compressed(rpt, &reason))) {
                 worker_is_busy(WORKER_STREAM_JOB_SOCKET_ERROR);
                 receiver_set_exit_reason(rpt, reason, false);
-                stream_receiver_remove(sth, rpt, slot, "socket read error");
+                stream_receiver_remove(sth, rpt, "socket read error");
                 return;
             }
 
@@ -514,16 +485,16 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
                         if (likely(rc == DECOMPRESS_OK)) {
                             // loop through all the complete lines found in the uncompressed buffer
 
-                            while (buffered_reader_next_line(&rpt->reader, rpt->receiver.buffer)) {
-                                if (unlikely(parser_action(parser, rpt->receiver.buffer->buffer))) {
+                            while (buffered_reader_next_line(&rpt->reader, rpt->thread.buffer)) {
+                                if (unlikely(parser_action(parser, rpt->thread.buffer->buffer))) {
                                     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                                    stream_receiver_remove(sth, rpt, slot, "parser failed");
+                                    stream_receiver_remove(sth, rpt, "parser failed");
                                     node_removed = true;
                                     break;
                                 }
 
-                                rpt->receiver.buffer->len = 0;
-                                rpt->receiver.buffer->buffer[0] = '\0';
+                                rpt->thread.buffer->len = 0;
+                                rpt->thread.buffer->buffer[0] = '\0';
                             }
                         }
                         else if (rc == DECOMPRESS_NEED_MORE_DATA)
@@ -531,7 +502,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
                         else {
                             receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                            stream_receiver_remove(sth, rpt, slot, "decompressor failed");
+                            stream_receiver_remove(sth, rpt, "decompressor failed");
                             node_removed = true;
                             break;
                         }
@@ -541,7 +512,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
                     break;
                 else {
                     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                    stream_receiver_remove(sth, rpt, slot, "compressed data invalid");
+                    stream_receiver_remove(sth, rpt, "compressed data invalid");
                     node_removed = true;
                     break;
                 }
@@ -549,7 +520,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
             if(!node_removed && receiver_should_stop(rpt)) {
                 receiver_set_exit_reason(rpt, rpt->exit.reason, false);
-                stream_receiver_remove(sth, rpt, slot, "received stop signal");
+                stream_receiver_remove(sth, rpt, "received stop signal");
                 return;
             }
         }
@@ -560,31 +531,31 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
             if(unlikely(!receiver_read_uncompressed(rpt, &reason))) {
                 worker_is_busy(WORKER_STREAM_JOB_SOCKET_ERROR);
                 receiver_set_exit_reason(rpt, reason, false);
-                stream_receiver_remove(sth, rpt, slot, "socker read error");
+                stream_receiver_remove(sth, rpt, "socker read error");
                 return;
             }
 
-            while(buffered_reader_next_line(&rpt->reader, rpt->receiver.buffer)) {
-                if(unlikely(parser_action(parser, rpt->receiver.buffer->buffer))) {
+            while(buffered_reader_next_line(&rpt->reader, rpt->thread.buffer)) {
+                if(unlikely(parser_action(parser, rpt->thread.buffer->buffer))) {
                     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                    stream_receiver_remove(sth, rpt, slot, "parser failed");
+                    stream_receiver_remove(sth, rpt, "parser failed");
                     break;
                 }
 
-                rpt->receiver.buffer->len = 0;
-                rpt->receiver.buffer->buffer[0] = '\0';
+                rpt->thread.buffer->len = 0;
+                rpt->thread.buffer->buffer[0] = '\0';
             }
         }
 }
 
 void stream_receiver_cleanup(struct stream_thread *sth) {
-    for(size_t i = 0; i < sth->rcv.run.used ;i++) {
-        if (sth->rcv.run.receivers[i])
-            stream_receiver_remove(sth, sth->rcv.run.receivers[i], i, "shutdown");
-    }
+    Word_t idx = 0;
+    for(struct receiver_state *rpt = RECEIVERS_FIRST(&sth->rcv.receivers, &idx);
+         rpt;
+         rpt = RECEIVERS_NEXT(&sth->rcv.receivers, &idx))
+        stream_receiver_remove(sth, rpt, "shutdown");
 
-    freez(sth->rcv.run.receivers);
-    memset(&sth->rcv.run, 0, sizeof(sth->rcv.run));
+    RECEIVERS_FREE(&sth->rcv.receivers, NULL);
 }
 
 static void stream_receiver_replication_reset(RRDHOST *host) {
@@ -696,8 +667,8 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
     }
 
     // this must be cleared with the receiver lock
-    pluginsd_process_cleanup(rpt->receiver.parser);
-    __atomic_store_n(&rpt->receiver.parser, NULL, __ATOMIC_RELAXED);
+    pluginsd_process_cleanup(rpt->thread.parser);
+    __atomic_store_n(&rpt->thread.parser, NULL, __ATOMIC_RELAXED);
 
     rrdhost_receiver_unlock(host);
 }
