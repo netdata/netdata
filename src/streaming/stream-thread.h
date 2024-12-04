@@ -14,6 +14,23 @@ struct pollfd_slotted {
 
 #define PFD_EMPTY (struct pollfd_slotted){ .sth = NULL, .fd = -1, .slot = -1, }
 
+typedef enum __attribute__((packed)) {
+    STREAM_OPCODE_NONE                                  = 0,
+    STREAM_OPCODE_SENDER_POLLOUT                        = (1 << 0), // move traffic around as soon as possible
+    STREAM_OPCODE_SENDER_BUFFER_OVERFLOW                = (1 << 1), // reconnect the node, it has buffer overflow
+    STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION  = (1 << 2), // reconnect the node, but disable compression
+    STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT             = (1 << 3), // disconnect the node, the receiver left
+    STREAM_OPCODE_SENDER_STOP_HOST_CLEANUP              = (1 << 4), // disconnect the node, it is being de-allocated
+} STREAM_OPCODE;
+
+struct stream_opcode {
+    int32_t thread_slot;                // the dispatcher id this message refers to
+    int32_t snd_run_slot;               // the run slot of the dispatcher this message refers to
+    uint32_t session;                   // random number used to verify that the message the dispatcher receives is for this sender
+    STREAM_OPCODE opcode;               // the actual message to be delivered
+    struct sender_state *sender;
+};
+
 #include "stream-sender-internals.h"
 #include "stream-receiver-internals.h"
 
@@ -195,6 +212,8 @@ static inline bool rrdhost_is_this_a_stream_thread(RRDHOST *host) {
 }
 
 static inline struct pollfd *pfd_validate(struct stream_thread *sth, struct pollfd_slotted pfd) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
     internal_fatal(pfd.sth != sth, "invalid sender PFD worker_thread");
     internal_fatal(pfd.slot < 0 || (size_t)pfd.slot >= sth->run.used, "invalid sender PFD slot");
     internal_fatal(pfd.fd != sth->run.pollfds[pfd.slot].fd, "invalid sender PFD file descriptor");
