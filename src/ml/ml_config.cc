@@ -45,7 +45,7 @@ void ml_config_load(ml_config_t *cfg) {
     std::string anomaly_detection_grouping_method = config_get(config_section_ml, "anomaly detection grouping method", "average");
     time_t anomaly_detection_query_duration = config_get_duration_seconds(config_section_ml, "anomaly detection grouping duration", 5 * 60);
 
-    size_t num_worker_threads = config_get_number(config_section_ml, "num training threads", 4);
+    size_t num_worker_threads = config_get_number(config_section_ml, "num training threads", os_get_system_cpus() / 4);
     size_t flush_models_batch_size = config_get_number(config_section_ml, "flush models batch size", 128);
 
     size_t suppression_window =
@@ -79,7 +79,7 @@ void ml_config_load(ml_config_t *cfg) {
     host_anomaly_rate_threshold = clamp(host_anomaly_rate_threshold, 0.1, 10.0);
     anomaly_detection_query_duration = clamp<time_t>(anomaly_detection_query_duration, 60, 15 * 60);
 
-    num_worker_threads = clamp<size_t>(num_worker_threads, 1, 128);
+    num_worker_threads = clamp<size_t>(num_worker_threads, 4, os_get_system_cpus());
     flush_models_batch_size = clamp<size_t>(flush_models_batch_size, 8, 512);
 
     suppression_window = clamp<size_t>(suppression_window, 1, max_train_samples);

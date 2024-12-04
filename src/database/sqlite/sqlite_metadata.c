@@ -173,8 +173,7 @@ sqlite3 *db_meta = NULL;
 #define METADATA_RUNTIME_THRESHOLD (5)              // Run time threshold for cleanup task
 
 #define METADATA_HOST_CHECK_FIRST_CHECK (5)         // First check for pending metadata
-#define METADATA_HOST_CHECK_INTERVAL (30)           // Repeat check for pending metadata
-#define METADATA_HOST_CHECK_IMMEDIATE (5)           // Repeat immediate run because we have more metadata to write
+#define METADATA_HOST_CHECK_INTERVAL (5)            // Repeat check for pending metadata
 #define MAX_METADATA_CLEANUP (500)                  // Maximum metadata write operations (e.g  deletes before retrying)
 #define METADATA_MAX_BATCH_SIZE (512)               // Maximum commands to execute before running the event loop
 
@@ -190,6 +189,8 @@ enum metadata_opcode {
     METADATA_SCAN_HOSTS,
     METADATA_LOAD_HOST_CONTEXT,
     METADATA_DELETE_HOST_CHART_LABELS,
+    METADATA_ADD_HOST_AE,
+    METADATA_DEL_HOST_AE,
     METADATA_MAINTENANCE,
     METADATA_SYNC_SHUTDOWN,
     METADATA_UNITTEST,
@@ -217,6 +218,7 @@ struct metadata_wc {
     uv_async_t async;
     uv_timer_t timer_req;
     time_t metadata_check_after;
+    Pvoid_t ae_DelJudyL;
     METADATA_FLAG flags;
     struct completion start_stop_complete;
     struct completion *scan_complete;
@@ -1749,6 +1751,17 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
     struct scan_metadata_payload *data = req->data;
     struct metadata_wc *wc = data->wc;
 
+    bool first = false;
+    Word_t Index = 0;
+    Pvoid_t *Pvalue;
+    while ((Pvalue = JudyLFirstThenNext(wc->ae_DelJudyL, &Index, &first))) {
+        ALARM_ENTRY *ae = (ALARM_ENTRY *) Index;
+        if(!__atomic_load_n(&ae->pending_save, __ATOMIC_RELAXED)) {
+            health_alarm_log_free_one_nochecks_nounlink(ae);
+            (void) JudyLDel(&wc->ae_DelJudyL, Index, PJE0);
+        }
+    }
+
     metadata_flag_clear(wc, METADATA_FLAG_PROCESSING);
 
     if (unlikely(wc->scan_complete))
@@ -1860,6 +1873,49 @@ struct host_chart_label_cleanup {
     Word_t count;
 };
 
+void do_host_ae_save(RRDHOST *host)
+{
+    usec_t started_ut = now_monotonic_usec(); (void)started_ut;
+    struct aclk_sync_cfg_t *host_aclk_sync = host->aclk_config;
+    spinlock_lock(&host_aclk_sync->alert_transition.spinlock);
+
+    size_t entries = host_aclk_sync->alert_transition.count;
+    if (entries) {
+        Word_t Index = 0;
+        bool first = true;
+        Pvoid_t *PValue;
+        while ((PValue = JudyLFirstThenNext(host_aclk_sync->alert_transition.JudyL, &Index, &first))) {
+            ALARM_ENTRY *ae = *PValue;
+            sql_health_alarm_log_save(host, ae);
+            __atomic_clear(&ae->pending_save, __ATOMIC_RELEASE);
+        }
+        (void) JudyLFreeArray(&host_aclk_sync->alert_transition.JudyL, PJE0);
+        host_aclk_sync->alert_transition.count = 0;
+    }
+
+    struct aclk_sync_cfg_t *wc = host->aclk_config;
+    if (wc && wc->send_snapshot == 1) {
+        wc->send_snapshot = 2;
+        rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+    }
+    else {
+        if (process_alert_pending_queue(host))
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+    }
+    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_ALERT_TRANSITIONS_SAVE);
+
+    spinlock_unlock(&host_aclk_sync->alert_transition.spinlock);
+    usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
+    if (entries)
+        nd_log(
+            NDLS_DAEMON,
+            NDLP_DEBUG,
+            "Stored and processed %zu alert transitions for \"%s\" in %0.2f ms",
+            entries,
+            rrdhost_hostname(host),
+            (double)(ended_ut - started_ut) / USEC_PER_MS);
+}
+
 static void do_chart_label_cleanup(struct host_chart_label_cleanup *cl_cleanup_data)
 {
     if (!cl_cleanup_data)
@@ -1909,6 +1965,8 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
         transaction_started = !db_execute(db_meta, "BEGIN TRANSACTION");
 
     dfe_start_reentrant(rrdhost_root_index, host) {
+        do_host_ae_save(host);
+
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
 
@@ -1988,12 +2046,10 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
         "Checking all hosts completed in %0.2f ms",
         (double)(all_ended_ut - all_started_ut) / USEC_PER_MS);
 
-    if (unlikely(run_again))
-        wc->metadata_check_after = now_realtime_sec() + METADATA_HOST_CHECK_IMMEDIATE;
-    else {
-        wc->metadata_check_after = now_realtime_sec() + METADATA_HOST_CHECK_INTERVAL;
+    if (likely(!run_again))
         run_metadata_cleanup(wc);
-    }
+
+    wc->metadata_check_after = now_realtime_sec() + METADATA_HOST_CHECK_INTERVAL;
     worker_is_idle();
 }
 
@@ -2050,10 +2106,12 @@ static void metadata_event_loop(void *arg)
     BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
     struct scan_metadata_payload *data;
     struct host_chart_label_cleanup *cl_cleanup_data = NULL;
+    Pvoid_t *PValue;
 
     while (shutdown == 0 || (wc->flags & METADATA_FLAG_PROCESSING)) {
         nd_uuid_t  *uuid;
         RRDHOST *host = NULL;
+        struct aclk_sync_cfg_t *host_aclk_sync;
 
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -2118,10 +2176,7 @@ static void metadata_event_loop(void *arg)
                         data->max_count = 5000;
 
                     metadata_flag_set(wc, METADATA_FLAG_PROCESSING);
-                    if (unlikely(
-                            uv_queue_work(loop,&data->request,
-                                          start_metadata_hosts,
-                                          after_metadata_hosts))) {
+                    if (uv_queue_work(loop, &data->request, start_metadata_hosts, after_metadata_hosts)) {
                         // Failed to launch worker -- let the event loop handle completion
                         cmd.completion = wc->scan_complete;
                         cl_cleanup_data = data->data;
@@ -2136,9 +2191,7 @@ static void metadata_event_loop(void *arg)
                     data = callocz(1,sizeof(*data));
                     data->request.data = data;
                     data->wc = wc;
-                    if (unlikely(
-                            uv_queue_work(loop,&data->request, start_all_host_load_context,
-                                          after_start_host_load_context))) {
+                    if (uv_queue_work(loop, &data->request, start_all_host_load_context, after_start_host_load_context)) {
                         freez(data);
                     }
                     break;
@@ -2146,10 +2199,23 @@ static void metadata_event_loop(void *arg)
                     if (!cl_cleanup_data)
                         cl_cleanup_data = callocz(1,sizeof(*cl_cleanup_data));
 
-                    Pvoid_t *PValue = JudyLIns(&cl_cleanup_data->JudyL, (Word_t) ++cl_cleanup_data->count, PJE0);
+                    PValue = JudyLIns(&cl_cleanup_data->JudyL, (Word_t) ++cl_cleanup_data->count, PJE0);
                     if (PValue)
                         *PValue = (void *) cmd.param[0];
 
+                    break;
+                case METADATA_ADD_HOST_AE:
+                    host = (RRDHOST *) cmd.param[0];
+                    host_aclk_sync = host->aclk_config;
+                    spinlock_lock(&host_aclk_sync->alert_transition.spinlock);
+                    PValue = JudyLIns(&host_aclk_sync->alert_transition.JudyL, ++host_aclk_sync->alert_transition.count, PJE0);
+                    if(unlikely(!PValue || PValue == PJERR))
+                        fatal("RRDLABELS: corrupted health transitions judyl array");
+                    *PValue = (void *)cmd.param[1];
+                    spinlock_unlock(&host_aclk_sync->alert_transition.spinlock);
+                    break;
+                case METADATA_DEL_HOST_AE:;
+                    (void) JudyLIns(&wc->ae_DelJudyL, (Word_t) (void *) cmd.param[0], PJE0);
                     break;
                 case METADATA_UNITTEST:;
                     struct thread_unittest *tu = (struct thread_unittest *) cmd.param[0];
@@ -2333,6 +2399,30 @@ void metadata_delete_host_chart_labels(char *machine_guid)
     // Node machine guid is already strdup-ed
     queue_metadata_cmd(METADATA_DELETE_HOST_CHART_LABELS, machine_guid, NULL);
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Queued command delete chart labels for host %s", machine_guid);
+}
+
+void metadata_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae)
+{
+    if (unlikely(!metasync_worker.loop))
+        return;
+    queue_metadata_cmd(METADATA_ADD_HOST_AE, host, ae);
+}
+
+void metadata_queue_ae_deletion(ALARM_ENTRY *ae)
+{
+    if (unlikely(!metasync_worker.loop))
+        return;
+
+    queue_metadata_cmd(METADATA_DEL_HOST_AE, ae, NULL);
+}
+
+void commit_alert_transitions(RRDHOST *host)
+{
+    if (unlikely(!metasync_worker.loop))
+        return;
+
+    rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_ALERT_TRANSITIONS_SAVE);
+    queue_metadata_cmd(METADATA_SCAN_HOSTS, host, NULL);
 }
 
 uint64_t sqlite_get_meta_space(void)

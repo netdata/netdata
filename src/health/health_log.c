@@ -6,7 +6,8 @@
 
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    sql_health_alarm_log_save(host, ae);
+    __atomic_test_and_set(&ae->pending_save, __ATOMIC_ACQUIRE);
+    metadata_queue_ae_save(host, ae);
 }
 
 
@@ -167,10 +168,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     return ae;
 }
 
-inline void health_alarm_log_add_entry(
-        RRDHOST *host,
-        ALARM_ENTRY *ae
-) {
+inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae)
+{
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
 
     __atomic_add_fetch(&host->health_transitions, 1, __ATOMIC_RELAXED);
@@ -209,20 +208,24 @@ inline void health_alarm_log_add_entry(
 }
 
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
-    string_freez(ae->name);
-    string_freez(ae->chart);
-    string_freez(ae->chart_context);
-    string_freez(ae->classification);
-    string_freez(ae->component);
-    string_freez(ae->type);
-    string_freez(ae->exec);
-    string_freez(ae->recipient);
-    string_freez(ae->source);
-    string_freez(ae->units);
-    string_freez(ae->info);
-    string_freez(ae->old_value_string);
-    string_freez(ae->new_value_string);
-    freez(ae);
+    if(__atomic_load_n(&ae->pending_save, __ATOMIC_RELAXED))
+        metadata_queue_ae_deletion(ae);
+    else {
+        string_freez(ae->name);
+        string_freez(ae->chart);
+        string_freez(ae->chart_context);
+        string_freez(ae->classification);
+        string_freez(ae->component);
+        string_freez(ae->type);
+        string_freez(ae->exec);
+        string_freez(ae->recipient);
+        string_freez(ae->source);
+        string_freez(ae->units);
+        string_freez(ae->info);
+        string_freez(ae->old_value_string);
+        string_freez(ae->new_value_string);
+        freez(ae);
+    }
 }
 
 inline void health_alarm_log_free(RRDHOST *host) {
