@@ -11,9 +11,7 @@ ssize_t send_to_plugin(const char *txt, PARSER *parser) {
         return h2o_stream_write(parser->h2o_ctx, txt, strlen(txt));
 #endif
 
-    errno_clear();
     spinlock_lock(&parser->writer.spinlock);
-    ssize_t bytes = -1;
 
     ND_SOCK tmp = { .fd = parser->fd_output, };
     ND_SOCK *s = parser->sock;  // try the socket
@@ -21,20 +19,14 @@ ssize_t send_to_plugin(const char *txt, PARSER *parser) {
 
     if(s->fd != -1) {
         // plugins pipe or socket (with or without SSL)
-        bytes = 0;
-        ssize_t total = (ssize_t)strlen(txt);
-        ssize_t sent;
 
-        do {
-            sent = nd_sock_write(s, &txt[bytes], total - bytes);
-            if(sent <= 0) {
-                netdata_log_error("PLUGINSD: cannot send command (fd = %d)", s->fd);
-                spinlock_unlock(&parser->writer.spinlock);
-                return -3;
-            }
-            bytes += sent;
+        size_t total = strlen(txt);
+        ssize_t bytes = nd_sock_write_persist(s, txt, total, 100);
+        if(bytes < (ssize_t)total) {
+            netdata_log_error("PLUGINSD: cannot send command (fd = %d, bytes = %zd out of %zu)", s->fd, bytes, total);
+            spinlock_unlock(&parser->writer.spinlock);
+            return -3;
         }
-        while(bytes < total);
 
         spinlock_unlock(&parser->writer.spinlock);
         return (int)bytes;

@@ -28,68 +28,52 @@ static void streaming_receiver_disconnected(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline int read_stream(struct receiver_state *r, char* buffer, size_t size) {
+static inline ssize_t read_stream(struct receiver_state *r, char* buffer, size_t size) {
     if(unlikely(!size)) {
         internal_error(true, "%s() asked to read zero bytes", __FUNCTION__);
-        return 0;
+        return -2;
     }
 
 #ifdef ENABLE_H2O
     if (is_h2o_rrdpush(r)) {
         if(nd_thread_signaled_to_cancel())
-            return -4;
+            return -3;
 
-        return (int)h2o_stream_read(r->h2o_ctx, buffer, size);
+        return (ssize_t)h2o_stream_read(r->h2o_ctx, buffer, size);
     }
 #endif
 
-    int tries = 100;
-    ssize_t bytes_read;
-
-    do {
-        errno_clear();
-        bytes_read = nd_sock_read(&r->sock, buffer, size);
-
-    } while(bytes_read < 0 && errno == EINTR && tries--);
-
-    if((bytes_read == 0 || bytes_read == -1) && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS)) {
-        netdata_log_error("STREAM: %s(): timeout while waiting for data on socket!", __FUNCTION__);
-        bytes_read = -3;
-    }
-    else if (bytes_read == 0) {
-        netdata_log_error("STREAM: %s(): EOF while reading data from socket!", __FUNCTION__);
-        bytes_read = -1;
-    }
-    else if (bytes_read < 0) {
-        netdata_log_error("STREAM: %s() failed to read from socket!", __FUNCTION__);
-        bytes_read = -2;
+    ssize_t bytes_read = nd_sock_read(&r->sock, buffer, size, 0);
+    if(bytes_read <= 0) {
+        if (bytes_read == 0)
+            netdata_log_error("STREAM: %s(): EOF while reading data from socket!", __FUNCTION__);
+        else {
+            netdata_log_error("STREAM: %s() failed to read from socket!", __FUNCTION__);
+            bytes_read = -1;
+        }
     }
 
-    return (int)bytes_read;
+    return bytes_read;
 }
 
-static inline STREAM_HANDSHAKE read_stream_error_to_reason(int code) {
+static inline STREAM_HANDSHAKE read_stream_error_to_reason(ssize_t code) {
     if(code > 0)
         return 0;
 
     switch(code) {
         case 0:
-            // asked to read zero bytes
-            return STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_READ_BUFFER;
-
-        case -1:
             // EOF
             return STREAM_HANDSHAKE_DISCONNECT_SOCKET_EOF;
 
-        case -2:
+        case -1:
             // failed to read
             return STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED;
 
-        case -3:
-            // timeout
-            return STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT;
+        case -2:
+            // asked to read zero bytes
+            return STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_READ_BUFFER;
 
-        case -4:
+        case -3:
             // the thread is cancelled
             return STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN;
 
@@ -101,23 +85,20 @@ static inline STREAM_HANDSHAKE read_stream_error_to_reason(int code) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline bool receiver_read_uncompressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
+static inline ssize_t receiver_read_uncompressed(struct receiver_state *r) {
     internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
-    int bytes_read = read_stream(r, r->reader.read_buffer + r->reader.read_len, sizeof(r->reader.read_buffer) - r->reader.read_len - 1);
-    if(unlikely(bytes_read <= 0)) {
-        *reason = read_stream_error_to_reason(bytes_read);
-        return false;
+    ssize_t bytes = read_stream(r, r->reader.read_buffer + r->reader.read_len, sizeof(r->reader.read_buffer) - r->reader.read_len - 1);
+    if(bytes > 0) {
+        worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes);
+        worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes);
+
+        r->reader.read_len += bytes;
+        r->reader.read_buffer[r->reader.read_len] = '\0';
     }
 
-    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
-    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_read);
-
-    r->reader.read_len += bytes_read;
-    r->reader.read_buffer[r->reader.read_len] = '\0';
-
-    return true;
+    return bytes;
 }
 
 typedef enum {
@@ -213,23 +194,20 @@ static inline decompressor_status_t receiver_get_decompressed(struct receiver_st
     return DECOMPRESS_OK;
 }
 
-static inline bool receiver_read_compressed(struct receiver_state *r, STREAM_HANDSHAKE *reason) {
+static inline ssize_t receiver_read_compressed(struct receiver_state *r) {
 
     internal_fatal(r->reader.read_buffer[r->reader.read_len] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
-    int bytes_read = read_stream(r, r->thread.compressed.buf + r->thread.compressed.used,
+    ssize_t bytes_read = read_stream(r, r->thread.compressed.buf + r->thread.compressed.used,
                                  sizeof(r->thread.compressed.buf) - r->thread.compressed.used);
 
-    if (unlikely(bytes_read <= 0)) {
-        *reason = read_stream_error_to_reason(bytes_read);
-        return false;
+    if(bytes_read > 0) {
+        r->thread.compressed.used += bytes_read;
+        worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
     }
 
-    r->thread.compressed.used += bytes_read;
-    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
-
-    return true;
+    return bytes_read;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -463,10 +441,13 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
         if(rpt->thread.compressed.enabled) {
             worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
 
-            STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
-            if(unlikely(!receiver_read_compressed(rpt, &reason))) {
+            ssize_t bytes = receiver_read_compressed(rpt);
+            if(unlikely(bytes <= 0)) {
+                if(bytes < 0 && (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
+                    return;
+
                 worker_is_busy(WORKER_STREAM_JOB_SOCKET_ERROR);
-                receiver_set_exit_reason(rpt, reason, false);
+                receiver_set_exit_reason(rpt, read_stream_error_to_reason(bytes), false);
                 stream_receiver_remove(sth, rpt, "socket read error");
                 return;
             }
@@ -528,10 +509,13 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
         else {
             worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
 
-            STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
-            if(unlikely(!receiver_read_uncompressed(rpt, &reason))) {
+            ssize_t bytes = receiver_read_uncompressed(rpt);
+            if(unlikely(bytes <= 0)) {
+                if(bytes < 0 && (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
+                    return;
+
                 worker_is_busy(WORKER_STREAM_JOB_SOCKET_ERROR);
-                receiver_set_exit_reason(rpt, reason, false);
+                receiver_set_exit_reason(rpt, read_stream_error_to_reason(bytes), false);
                 stream_receiver_remove(sth, rpt, "socker read error");
                 return;
             }

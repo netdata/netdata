@@ -66,18 +66,46 @@ static inline void nd_sock_close(ND_SOCK *s) {
     s->error = ND_SOCK_ERR_NONE;
 }
 
-static inline ssize_t nd_sock_read(ND_SOCK *s, void *buf, size_t num) {
-    if (nd_sock_is_ssl(s))
-        return netdata_ssl_read(&s->ssl, buf, num);
-    else
-        return read(s->fd, buf, num);
+static inline ssize_t nd_sock_read(ND_SOCK *s, void *buf, size_t num, size_t retries) {
+    ssize_t rc;
+    do {
+        if (nd_sock_is_ssl(s))
+            rc = netdata_ssl_read(&s->ssl, buf, num);
+        else
+            rc = read(s->fd, buf, num);
+    }
+    while(rc <= 0 && (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR) && retries--);
+
+    return rc;
 }
 
-static inline ssize_t nd_sock_write(ND_SOCK *s, const void *buf, size_t num) {
-    if (nd_sock_is_ssl(s))
-        return netdata_ssl_write(&s->ssl, buf, num);
-    else
-        return write(s->fd, buf, num);
+static inline ssize_t nd_sock_write(ND_SOCK *s, const void *buf, size_t num, size_t retries) {
+    ssize_t rc;
+
+    do {
+        errno_clear();
+        if (nd_sock_is_ssl(s))
+            rc = netdata_ssl_write(&s->ssl, buf, num);
+        else
+            rc = write(s->fd, buf, num);
+    }
+    while(rc <= 0 && (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR) && retries--);
+
+    return rc;
+}
+
+static inline ssize_t nd_sock_write_persist(ND_SOCK *s, const void *buf, const size_t num, size_t retries) {
+    const uint8_t *src = (const uint8_t *)buf;
+    ssize_t bytes = 0;
+
+    do {
+        ssize_t sent = nd_sock_write(s, &src[bytes], (ssize_t)num - bytes, retries);
+        if(sent <= 0) return sent;
+        bytes += sent;
+    }
+    while(bytes < (ssize_t)num && retries--);
+
+    return bytes;
 }
 
 static inline ssize_t nd_sock_revc_nowait(ND_SOCK *s, void *buf, size_t num) {
