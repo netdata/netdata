@@ -17,7 +17,6 @@ typedef enum {
 
 typedef struct {
     nd_poll_event_t events;
-    int fd;
     void *data;
 } nd_poll_result_t;
 

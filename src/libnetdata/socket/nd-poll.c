@@ -5,9 +5,14 @@
 #if defined(OS_LINUX)
 #include <sys/epoll.h>
 
+#define MAX_EVENTS_PER_CALL 100
+
 // Event poll context
 struct nd_poll_t {
     int epoll_fd;
+    struct epoll_event ev[MAX_EVENTS_PER_CALL];
+    size_t last_pos;
+    size_t used;
 };
 
 // Initialize the event poll context
@@ -46,40 +51,60 @@ bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
     return epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_MOD, fd, &ev) == 0;
 }
 
+static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *result) {
+    for(size_t i = ndpl->last_pos; i < ndpl->used ;i++) {
+        *result = (nd_poll_result_t){
+            .events = 0,
+            .data = ndpl->ev[i].data.ptr,
+        };
+
+        if (ndpl->ev[i].events & EPOLLIN)
+            result->events |= ND_POLL_READ;
+
+        if (ndpl->ev[i].events & EPOLLOUT)
+            result->events |= ND_POLL_WRITE;
+
+        if (ndpl->ev[i].events & EPOLLERR)
+            result->events |= ND_POLL_ERROR;
+
+        if (ndpl->ev[i].events & EPOLLHUP)
+            result->events |= ND_POLL_HUP;
+
+        return true;
+    }
+
+    return false;
+}
+
 // Wait for events
 int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
-    struct epoll_event ev;
-    int n = epoll_wait(ndpl->epoll_fd, &ev, 1, timeout_ms);
+    if(nd_poll_get_next_event(ndpl, result))
+        return 1;
 
-    if (n < 0) {
-        result->events = ND_POLL_OTHER_ERROR;
-        result->data = NULL;
-        return -1;
-    }
-    else if (n == 0) {
-        result->events = ND_POLL_TIMEOUT;
-        result->data = NULL;
-        return 0;
-    }
+    do {
+        errno_clear();
+        ndpl->last_pos = 0;
+        ndpl->used = 0;
+        int n = epoll_wait(ndpl->epoll_fd, &ndpl->ev[0], _countof(ndpl->ev), timeout_ms);
 
-    *result = (nd_poll_result_t){
-        .events = 0,
-        .data = ev.data.ptr,
-    };
+        if(unlikely(n <= 0)) {
+            if (n < 0) {
+                result->events = ND_POLL_OTHER_ERROR;
+                result->data = NULL;
+                return -1;
+            }
+            else {
+                result->events = ND_POLL_TIMEOUT;
+                result->data = NULL;
+                return 0;
+            }
+        }
 
-    if(ev.events & EPOLLIN)
-        result->events |= ND_POLL_READ;
+        ndpl->used = n;
+        if (nd_poll_get_next_event(ndpl, result))
+            return 1;
 
-    if(ev.events & EPOLLOUT)
-        result->events |= ND_POLL_WRITE;
-
-    if(ev.events & EPOLLERR)
-        result->events |= ND_POLL_ERROR;
-
-    if(ev.events & EPOLLHUP)
-        result->events |= ND_POLL_HUP;
-
-    return 1;
+    } while(true);
 }
 
 // Destroy the event poll context
@@ -180,8 +205,7 @@ static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *res
     for (nfds_t i = ndpl->last_pos; i < ndpl->nfds; i++) {
         if (ndpl->fds[i].revents != 0) {
 
-            result->fd = ndpl->fds[i].fd;
-            result->data = POINTERS_GET(&ndpl->pointers, result->fd);
+            result->data = POINTERS_GET(&ndpl->pointers, ndpl->fds[i].fd);
 
             result->events = 0;
             if (ndpl->fds[i].revents & (POLLIN|POLLPRI))
@@ -226,29 +250,25 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
 
     do {
         errno_clear();
+        ndpl->last_pos = 0;
         rotate_fds(ndpl); // Rotate the array on every wait
         int ret = poll(ndpl->fds, ndpl->nfds, timeout_ms);
 
-        if(ret <= 0) {
+        if(unlikely(ret <= 0)) {
             if (ret < 0) {
                 if(errno == EAGAIN || errno == EINTR)
                     continue;
 
-                result->fd = -1;
                 result->events = ND_POLL_OTHER_ERROR;
                 result->data = NULL;
                 return -1;
             }
             else {
-                result->fd = -1;
                 result->events = ND_POLL_TIMEOUT;
                 result->data = NULL;
                 return 0;
             }
         }
-
-        // Reset last_pos for iterating over events
-        ndpl->last_pos = 0;
 
         // Process the next event
         if (nd_poll_get_next_event(ndpl, result))
