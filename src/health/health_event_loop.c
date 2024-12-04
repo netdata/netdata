@@ -250,6 +250,17 @@ static void health_event_loop(void) {
             if (unlikely(!host->health.enabled))
                 continue;
 
+//#define rrdhost_pending_alert_transitions(host) (__atomic_load_n(&((host)->aclk_config.alert_transition.pending), __ATOMIC_RELAXED))
+
+            if (unlikely(__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED))) {
+                nd_log(
+                    NDLS_DAEMON,
+                    NDLP_DEBUG,
+                    "Host \"%s\" has pending alert transitions to save, postponing health checks",
+                    rrdhost_hostname(host));
+                continue;
+            }
+
             if (unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
                 health_initialize_rrdhost(host);
 
@@ -649,14 +660,21 @@ static void health_event_loop(void) {
                 break;
             }
         }
-        struct aclk_sync_cfg_t *wc = host->aclk_config;
-        if (wc && wc->send_snapshot == 1) {
-            wc->send_snapshot = 2;
-            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-        }
-        else
-            if (process_alert_pending_queue(host))
+
+        int32_t pending = __atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED);
+        if (pending)
+            commit_alert_transitions(host);
+
+        if (!__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED)) {
+            struct aclk_sync_cfg_t *wc = host->aclk_config;
+            if (wc && wc->send_snapshot == 1) {
+                wc->send_snapshot = 2;
                 rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+            } else {
+                if (process_alert_pending_queue(host))
+                    rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+            }
+        }
 
         dfe_done(host);
 
