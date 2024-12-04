@@ -77,7 +77,7 @@ class AcquiredDimension {
 public:
     AcquiredDimension(const DimensionLookupInfo &DLI) : AcqRH(nullptr), AcqRS(nullptr), AcqRD(nullptr), Dim(nullptr)
     {
-        // using dictionaries - no rrd_lock is needed
+        rrd_rdlock();
 
         AcqRH = rrdhost_find_and_acquire(DLI.machineGuid());
         if (AcqRH) {
@@ -111,6 +111,8 @@ public:
         }
         else
             acquire_failure_reason = "can't find host";
+
+        rrd_rdunlock();
     }
 
     AcquiredDimension(const AcquiredDimension &) = delete;

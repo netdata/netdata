@@ -571,6 +571,9 @@ static void ml_dimension_stream_kmeans(const ml_dimension_t *dim)
     if (!s)
         return;
 
+    if(!stream_sender_has_capabilities(dim->rd->rrdset->rrdhost, STREAM_CAP_ML_MODELS))
+        return;
+
     CLEAN_BUFFER *payload = buffer_create(0, NULL);
     ml_dimension_serialize_kmeans(dim, payload);
 
