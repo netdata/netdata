@@ -1305,7 +1305,6 @@ if(ENABLE_ML)
                 src/ml/ml_features.cc
                 src/ml/ml_kmeans.h
                 src/ml/ml_kmeans.cc
-                src/ml/ml_memory.cc
                 src/ml/ml_queue.h
                 src/ml/ml_worker.h
                 src/ml/ml_string_wrapper.h
@@ -1314,6 +1313,10 @@ if(ENABLE_ML)
                 src/ml/ml_public.h
                 src/ml/ml_public.cc
         )
+
+        if(NOT ENABLE_MIMALLOC)
+                list(APPEND ML_FILES src/ml/ml_memory.cc)
+        endif()
 else()
         set(ML_FILES
                 src/ml/ml_public.h
