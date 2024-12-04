@@ -548,7 +548,10 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
                                         uint64_t models_received,
                                         uint64_t models_sent,
                                         uint64_t models_ignored,
-                                        uint64_t models_deserialization_failures)
+                                        uint64_t models_deserialization_failures,
+                                        uint64_t memory_consumption,
+                                        uint64_t memory_new,
+                                        uint64_t memory_delete)
 {
     if (!Cfg.enable_statistics_charts)
         return;
@@ -615,6 +618,63 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
         rrddim_set_by_pointer(st, rd_ignored, (collected_number) models_ignored);
         rrddim_set_by_pointer(st, rd_deserialization_failures, (collected_number) models_deserialization_failures);
 
+        rrdset_done(st);
+    }
+
+    {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_memory_consumption = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "netdata" // type
+                    , "ml_memory_used" // id
+                    , NULL // name
+                    , NETDATA_ML_CHART_FAMILY // family
+                    , NULL // context
+                    , "ML memory usage" // title
+                    , "bytes" // units
+                    , NETDATA_ML_PLUGIN // plugin
+                    , NETDATA_ML_MODULE_DETECTION // module
+                    , NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS // priority
+                    , localhost->rrd_update_every // update_every
+                    , RRDSET_TYPE_LINE // chart_type
+            );
+
+            rd_memory_consumption = rrddim_add(st, "used", NULL, 1024, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(st, rd_memory_consumption, (collected_number) memory_consumption / (1024));
+        rrdset_done(st);
+    }
+
+    {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_memory_new = NULL;
+        static RRDDIM *rd_memory_delete = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "netdata" // type
+                    , "ml_memory_ops" // id
+                    , NULL // name
+                    , NETDATA_ML_CHART_FAMILY // family
+                    , NULL // context
+                    , "ML memory operations" // title
+                    , "count" // units
+                    , NETDATA_ML_PLUGIN // plugin
+                    , NETDATA_ML_MODULE_DETECTION // module
+                    , NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS // priority
+                    , localhost->rrd_update_every // update_every
+                    , RRDSET_TYPE_LINE // chart_type
+            );
+
+            rd_memory_new = rrddim_add(st, "new", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_memory_delete = rrddim_add(st, "delete", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st, rd_memory_new, (collected_number) memory_new);
+        rrddim_set_by_pointer(st, rd_memory_delete, (collected_number) memory_delete);
         rrdset_done(st);
     }
 }

@@ -3,6 +3,10 @@
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "libnetdata/libnetdata.h"
 #include "config/netdata-conf.h"
 #include "libuv_workers.h"
@@ -95,5 +99,9 @@ extern time_t netdata_start_time;
 long get_netdata_cpus(void);
 
 void set_environment_for_plugins_and_scripts(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* NETDATA_COMMON_H */
