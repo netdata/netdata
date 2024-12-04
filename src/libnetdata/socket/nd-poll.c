@@ -70,9 +70,11 @@ static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *res
         if (ndpl->ev[i].events & EPOLLHUP)
             result->events |= ND_POLL_HUP;
 
+        ndpl->last_pos++;
         return true;
     }
 
+    ndpl->last_pos = _countof(ndpl->ev);
     return false;
 }
 
