@@ -356,7 +356,7 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
         ND_LOG_STACK_PUSH(lgs);
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM[%zu] [%s]: moving host from receiver queue to receiver running...",
+               "STREAM RECEIVE[%zu] [%s]: moving host from receiver queue to receiver running...",
                sth->id, rrdhost_hostname(rpt->host));
 
         internal_fatal(RECEIVERS_GET(&sth->rcv.receivers, (Word_t)rpt) != NULL, "Receiver to be added is already in the list of receivers");
@@ -414,8 +414,9 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     nd_log(NDLS_DAEMON, NDLP_ERR,
-           "STREAM '%s' [receive from [%s]:%s]: "
+           "STREAM RECEIVE[%zu] '%s' [from [%s]:%s]: "
            "receiver disconnected: %s"
+           , sth->id
            , rpt->hostname ? rpt->hostname : "-"
            , rpt->client_ip ? rpt->client_ip : "-"
            , rpt->client_port ? rpt->client_port : "-"
@@ -697,7 +698,7 @@ bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE rea
     }
 
     if(host->receiver)
-        netdata_log_error("STREAM '%s' [receive from [%s]:%s]: "
+        netdata_log_error("STREAM RECEIVE[x] '%s' [from [%s]:%s]: "
               "streaming thread takes too long to stop, giving up..."
               , rrdhost_hostname(host)
               , host->receiver->client_ip, host->receiver->client_port);

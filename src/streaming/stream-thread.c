@@ -33,19 +33,21 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
     }
     else {
         // this may happen if we receive a POLLOUT opcode, but the sender has been disconnected
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM[%zu]: stream OPCODE %d ignored.", sth->id, msg->opcode);
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM THREAD[%zu]: OPCODE %u ignored.", sth->id, (unsigned)msg->opcode);
     }
 }
 
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_opcode msg) {
-    if (!msg.session || !msg.sender)
+    if (!msg.session || !msg.sender || !s)
         return;
 
     internal_fatal(msg.sender != s, "the sender pointer in the message does not match this sender");
 
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
     if(!sth || sth != stream_thread_pollfd_sth(s->thread.pfd)) {
-        internal_fatal(true, "stream thread pointer in the messages do not match");
+        internal_fatal(true,
+                       "STREAM SEND[x] [%s] thread pointer in the opcode message does not match the expected",
+                       rrdhost_hostname(s->host));
         return;
     }
 
@@ -105,7 +107,7 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_
         write(sth->pipe.fds[PIPE_WRITE], " ", 1) != 1) {
         nd_log_limit_static_global_var(erl, 1, 1 * USEC_PER_MS);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                     "STREAM %s [send]: cannot write to dispatcher pipe",
+                     "STREAM SEND [%s]: cannot write to signal pipe",
                      rrdhost_hostname(s->host));
     }
 }
@@ -114,7 +116,7 @@ static void stream_thread_read_pipe_messages(struct stream_thread *sth) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     if(read(sth->pipe.fds[PIPE_READ], sth->pipe.buffer, sth->pipe.size * sizeof(*sth->pipe.buffer)) <= 0)
-        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM[%zu]: pipe read error", sth->id);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: signal pipe read error", sth->id);
 
     size_t used = 0;
     spinlock_lock(&sth->messages.spinlock);
@@ -201,7 +203,7 @@ struct pollfd_slotted stream_thread_pollfd_get(struct stream_thread *sth, int fd
             break;
 
         default:
-            internal_fatal(true, "STREAM[%zu]: invalid POLLFD_TYPE %u", sth->id, type);
+            internal_fatal(true, "STREAM THREAD[%zu]: invalid POLLFD_TYPE %u", sth->id, type);
             break;
     }
 
@@ -275,7 +277,7 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, const siz
             else if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
                 // we have errors on this pipe
                 nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM[%zu]: got errors on pipe - exiting to be restarted.", sth->id);
+                       "STREAM THREAD[%zu]: got errors on pipe - exiting to be restarted.", sth->id);
                 return true;
             }
             break;
@@ -395,7 +397,7 @@ void *stream_thread(void *ptr) {
                                       WORKER_METRIC_INCREMENTAL_TOTAL);
 
     if(pipe(sth->pipe.fds) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM[%zu]: cannot create required pipe.", sth->id);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: cannot create required pipe.", sth->id);
         sth->pipe.fds[PIPE_READ] = -1;
         sth->pipe.fds[PIPE_WRITE] = -1;
         return NULL;
@@ -452,7 +454,7 @@ void *stream_thread(void *ptr) {
             // poll() returned an error
             worker_is_busy(WORKER_STREAM_JOB_POLL_ERROR);
             nd_log_limit_static_thread_var(erl, 1, 1 * USEC_PER_MS);
-            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "STREAM[%zu] poll() returned error", sth->id);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu] poll() returned error", sth->id);
             continue;
         }
 
@@ -602,7 +604,7 @@ static struct stream_thread * stream_thread_assign_and_start(RRDHOST *host) {
     if(!sth->thread) {
         sth->id = (sth - stream_thread_globals.threads); // find the slot number
         if(&stream_thread_globals.threads[sth->id] != sth)
-            fatal("STREAM THREAD ID and slot do not match!");
+            fatal("STREAM THREAD[x] [%s]: thread id and slot do not match!", rrdhost_hostname(host));
 
         sth->pipe.fds[PIPE_READ] = -1;
         sth->pipe.fds[PIPE_WRITE] = -1;
@@ -617,7 +619,7 @@ static struct stream_thread * stream_thread_assign_and_start(RRDHOST *host) {
 
         sth->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_thread, sth);
         if (!sth->thread)
-            nd_log_daemon(NDLP_ERR, "STREAM[%zu]: failed to create new thread for client.", sth->id);
+            nd_log_daemon(NDLP_ERR, "STREAM THREAD[%zu]: failed to create new thread for client.", sth->id);
     }
 
     spinlock_unlock(&stream_thread_globals.assign.spinlock);
@@ -644,7 +646,7 @@ void stream_receiver_add_to_queue(struct receiver_state *rpt) {
     stream_thread_node_queued(rpt->host);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM[%zu] [%s]: moving host to receiver queue...",
+           "STREAM RECEIVE[%zu] [%s]: moving host to receiver queue...",
            sth->id, rrdhost_hostname(rpt->host));
 
     spinlock_lock(&sth->queue.spinlock);
@@ -659,7 +661,7 @@ void stream_sender_add_to_queue(struct sender_state *s) {
     stream_thread_node_queued(s->host);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM[%zu] [%s]: moving host to dispatcher queue...",
+           "STREAM THREAD[%zu] [%s]: moving host to dispatcher queue...",
            sth->id, rrdhost_hostname(s->host));
 
     spinlock_lock(&sth->queue.spinlock);
