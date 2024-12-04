@@ -280,7 +280,10 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         SENDERS_SET(&sth->snd.senders, (Word_t)s, s);
 
         stream_sender_lock(s);
-        s->thread.pfd = stream_thread_pollfd_get(sth, s->sock.fd, POLLFD_TYPE_SENDER, NULL, s);
+        s->thread.meta.type = POLLFD_TYPE_SENDER;
+        s->thread.meta.s = s;
+        if(!nd_poll_add(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
+            internal_fatal(true, "Failed to add sender socket to nd_poll()");
 
         s->thread.msg.thread_slot = (int32_t)sth->id;
         s->thread.msg.session = os_random32();
@@ -333,14 +336,14 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
 
     internal_fatal(SENDERS_GET(&sth->snd.senders, (Word_t)s) == NULL, "Sender to be removed is not in the list of senders");
     SENDERS_DEL(&sth->snd.senders, (Word_t)s);
-    stream_thread_pollfd_release(sth, s->thread.pfd);
+    if(!nd_poll_del(sth->run.ndpl, s->sock.fd))
+        internal_fatal(true, "Failed to remove sender socket from nd_poll()");
 
     // clear this flag asap, to stop other threads from pushing metrics for this node
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED | RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
     // clear these asap, to make sender_commit() stop processing data for this host
     stream_sender_lock(s);
-    s->thread.pfd = PFD_EMPTY;
 
     s->thread.msg.session = 0;
     s->thread.msg.sender = NULL;
@@ -381,10 +384,6 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
     for(struct sender_state *s = SENDERS_FIRST(&sth->snd.senders, &idx);
          s;
          s = SENDERS_NEXT(&sth->snd.senders, &idx)) {
-        // the default for all nodes
-        struct pollfd *pfd = pfd_validate(sth, s->thread.pfd);
-        pfd->events = POLLIN;
-        pfd->revents = 0;
 
         // If the TCP window never opened, then something is wrong, restart connection
         if(unlikely(now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
@@ -423,8 +422,8 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
             if (s->thread.buffer_ratio > buffer_ratio)
                 buffer_ratio = s->thread.buffer_ratio;
 
-            if (outstanding)
-                pfd->events |= POLLOUT;
+            if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ | (outstanding ? ND_POLL_WRITE : 0), &s->thread.meta))
+                internal_fatal(true, "Failed to update sender socket in nd_poll()");
         }
         stream_sender_unlock(s);
     }
@@ -439,7 +438,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
     worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, buffer_ratio);
 }
 
-void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, short revents, time_t now_s) {
+void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t events, time_t now_s) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     ND_LOG_STACK lgs[] = {
@@ -453,19 +452,19 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
+    if(unlikely(events & ND_POLL_ERROR)) {
         // we have errors on this socket
 
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_ERROR);
 
         char *error = "unknown error";
 
-        if (revents & POLLERR)
-            error = "socket reports errors (POLLERR)";
-        else if (revents & POLLHUP)
-            error = "connection closed by remote end (POLLHUP)";
-        else if (revents & POLLNVAL)
-            error = "connection is invalid (POLLNVAL)";
+        if (events & ND_POLL_ERROR)
+            error = "socket reports errors";
+        else if (events & ND_POLL_HUP)
+            error = "connection closed by remote end (HUP)";
+        else if (events & ND_POLL_INVALID)
+            error = "connection is invalid";
 
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR);
 
@@ -477,7 +476,7 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
         return;
     }
 
-    if(revents & POLLOUT) {
+    if(events & ND_POLL_WRITE) {
         // we can send data on this socket
 
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
@@ -496,8 +495,8 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
 
                 if(!s->thread.bytes_outstanding) {
                     // we sent them all - remove POLLOUT
-                    struct pollfd *pfd = pfd_validate(sth, s->thread.pfd);
-                    pfd->events &= ~(POLLOUT);
+                    if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
+                        internal_fatal(true, "Failed to update sender socket in nd_poll()");
 
                     // recreate the circular buffer if we have to
                     stream_sender_cbuffer_recreate_timed_unsafe(s, now_s, false);
@@ -520,7 +519,7 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
         }
     }
 
-    if(revents & POLLIN) {
+    if(events & POLLIN) {
         // we can receive data from this socket
 
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);

@@ -49,7 +49,7 @@ static ARAL *judy_size_aral(Word_t Words) {
     return NULL;
 }
 
-static int64_t __thread judy_allocated = 0;
+static __thread int64_t judy_allocated = 0;
 
 void JudyAllocThreadTelemetryReset(void) {
     judy_allocated = 0;

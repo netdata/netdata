@@ -65,12 +65,7 @@ struct sender_state {
         size_t bytes_sent;
         size_t bytes_sent_by_type[STREAM_TRAFFIC_TYPE_MAX];
 
-        // PFD is used internally by the streaming thread to store information about
-        // the struct pollfd array slot used by this sender.
-        // The streaming thread changes this on every socket operation (rotates the slots
-        // to make sure all receivers and senders get an equal chance to be served),
-        // without any locks, making this invalid to read from other threads, at any time.
-        struct pollfd_slotted pfd;
+        struct pollfd_meta meta;
     } thread;
 
     struct {

@@ -23,8 +23,8 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
         (size_t)msg->thread_slot == sth->id)    // same thread
     {
         if(msg->opcode & STREAM_OPCODE_SENDER_POLLOUT) {
-            struct pollfd *pfd = pfd_validate(sth, s->thread.pfd);
-            pfd->events |= POLLOUT;
+            if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ|ND_POLL_WRITE, &s->thread.meta))
+                internal_fatal(true, "Failed to update sender socket in nd_poll()");
             msg->opcode &= ~(STREAM_OPCODE_SENDER_POLLOUT);
         }
 
@@ -44,7 +44,7 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_
     internal_fatal(msg.sender != s, "the sender pointer in the message does not match this sender");
 
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
-    if(!sth || sth != stream_thread_pollfd_sth(s->thread.pfd)) {
+    if(!sth) {
         internal_fatal(true,
                        "STREAM SEND[x] [%s] thread pointer in the opcode message does not match the expected",
                        rrdhost_hostname(s->host));
@@ -163,81 +163,6 @@ static int set_pipe_size(int pipe_fd, int new_size) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// pollfd array
-
-struct pollfd_slotted stream_thread_pollfd_get(struct stream_thread *sth, int fd, POLLFD_TYPE type, struct receiver_state *rpt, struct sender_state *s) {
-    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-
-    size_t i;
-    for(i = 0; i < sth->run.used ;i++)
-        if(sth->run.meta[i].type == POLLFD_TYPE_EMPTY)
-            break;
-
-    if(i >= sth->run.size) {
-        size_t new_size = sth->run.size ? sth->run.size * 2 : 2;
-        sth->run.pollfds = reallocz(sth->run.pollfds, new_size * sizeof(*sth->run.pollfds));
-        sth->run.meta = reallocz(sth->run.meta, new_size * sizeof(*sth->run.meta));
-        sth->run.size = new_size;
-    }
-
-    if(i >= sth->run.used)
-        sth->run.used = i + 1;
-
-    sth->run.pollfds[i] = (struct pollfd){
-        .fd = fd,
-        .events = POLLIN,
-        .revents = 0,
-    };
-
-    sth->run.meta[i].type = type;
-    switch(type) {
-        case POLLFD_TYPE_RECEIVER:
-            sth->run.meta[i].rpt = rpt;
-            break;
-
-        case POLLFD_TYPE_SENDER:
-            sth->run.meta[i].s = s;
-            break;
-
-        case POLLFD_TYPE_PIPE:
-            break;
-
-        default:
-            internal_fatal(true, "STREAM THREAD[%zu]: invalid POLLFD_TYPE %u", sth->id, type);
-            break;
-    }
-
-    struct pollfd_slotted rc = {
-        .sth = sth,
-        .slot = (int32_t)i,
-        .fd = fd,
-    };
-    return rc;
-}
-
-void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd_slotted pfd) {
-    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-
-    internal_fatal(pfd.sth != sth, "Invalid stream_thread slot to release");
-    internal_fatal(pfd.slot < 0 || (size_t)pfd.slot >= sth->run.used, "Invalid PFD slot to release");
-    internal_fatal(sth->run.pollfds[pfd.slot].fd != pfd.fd, "Invalid PFD fd to release");
-
-    sth->run.pollfds[pfd.slot] = (struct pollfd){
-        .fd = -1,
-        .events = 0,
-        .revents = 0,
-    };
-
-    sth->run.meta[pfd.slot] = (struct pollfd_meta){
-        .type = POLLFD_TYPE_EMPTY,
-    };
-}
-
-struct stream_thread *stream_thread_pollfd_sth(struct pollfd_slotted pfd) {
-    return pfd.sth;
-}
-
-// --------------------------------------------------------------------------------------------------------------------
 
 static void stream_thread_messages_resize_unsafe(struct stream_thread *sth) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
@@ -252,29 +177,32 @@ static void stream_thread_messages_resize_unsafe(struct stream_thread *sth) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static bool stream_thread_process_poll_slot(struct stream_thread *sth, const size_t slot, const short revents, time_t now_s, size_t *replay_entries) {
-    switch(sth->run.meta[slot].type) {
+static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_result_t *ev, time_t now_s, size_t *replay_entries) {
+    struct pollfd_meta *m = ev->data;
+    internal_fatal(!m, "Failed to get meta from event");
+
+    switch(m->type) {
         case POLLFD_TYPE_SENDER: {
-            struct sender_state *s = sth->run.meta[slot].s;
+            struct sender_state *s = m->s;
             internal_fatal(SENDERS_GET(&sth->snd.senders, (Word_t)s) == NULL, "Sender is not found in the senders list");
-            stream_sender_process_poll_events(sth, s, revents, now_s);
+            stream_sender_process_poll_events(sth, s, ev->events, now_s);
             *replay_entries += dictionary_entries(s->replication.requests);
             break;
         }
 
         case POLLFD_TYPE_RECEIVER: {
-            struct receiver_state *rpt = sth->run.meta[slot].rpt;
+            struct receiver_state *rpt = m->rpt;
             internal_fatal(RECEIVERS_GET(&sth->rcv.receivers, (Word_t)rpt) == NULL, "Receiver is not found in the receiver list");
-            stream_receive_process_poll_events(sth, rpt, revents, now_s);
+            stream_receive_process_poll_events(sth, rpt, ev->events, now_s);
             break;
         }
 
         case POLLFD_TYPE_PIPE:
-            if (likely(revents & (POLLIN | POLLPRI))) {
+            if (likely(ev->events & ND_POLL_READ)) {
                 worker_is_busy(WORKER_SENDER_JOB_PIPE_READ);
                 stream_thread_read_pipe_messages(sth);
             }
-            else if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
+            else if(unlikely(ev->events & ND_POLL_ERROR)) {
                 // we have errors on this pipe
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "STREAM THREAD[%zu]: got errors on pipe - exiting to be restarted.", sth->id);
@@ -284,29 +212,11 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, const siz
 
         case POLLFD_TYPE_EMPTY:
             // should never happen - but make sure it never happens again
-            sth->run.pollfds[slot].fd = -1;
-            sth->run.pollfds[slot].events = 0;
+            internal_fatal(true, "What is this?");
             break;
     }
 
     return false;
-}
-
-static struct pollfd_slotted *get_slot_pfd(struct stream_thread *sth, size_t slot) {
-    switch(sth->run.meta[slot].type) {
-        case POLLFD_TYPE_RECEIVER:
-            return &sth->run.meta[slot].rpt->thread.pfd;
-
-        case POLLFD_TYPE_SENDER:
-            return &sth->run.meta[slot].s->thread.pfd;
-
-        case POLLFD_TYPE_EMPTY:
-        case POLLFD_TYPE_PIPE:
-        default:
-            return NULL;
-    }
-
-    return NULL;
 }
 
 void *stream_thread(void *ptr) {
@@ -411,9 +321,21 @@ void *stream_thread(void *ptr) {
     usec_t last_check_all_nodes_ut = 0;
     usec_t last_dequeue_ut = 0;
 
-    stream_thread_pollfd_get(sth, sth->pipe.fds[PIPE_READ], POLLFD_TYPE_PIPE, NULL, NULL);
+    sth->run.pipe = (struct pollfd_meta){
+        .type = POLLFD_TYPE_PIPE,
+    };
+    sth->run.ndpl = nd_poll_create();
+    if(!sth->run.ndpl)
+        fatal("Cannot create nd_poll()");
+
+    if(!nd_poll_add(sth->run.ndpl, sth->pipe.fds[PIPE_READ], ND_POLL_READ, &sth->run.pipe))
+        internal_fatal(true, "Failed to add pipe to nd_poll()");
 
     bool exit_thread = false;
+    size_t replay_entries = 0;
+    sth->snd.bytes_received = 0;
+    sth->snd.bytes_sent = 0;
+
     while(!exit_thread && !nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
         usec_t now_ut = now_monotonic_usec();
 
@@ -437,21 +359,31 @@ void *stream_thread(void *ptr) {
             stream_sender_check_all_nodes_from_poll(sth);
             worker_set_metric(WORKER_SENDER_JOB_MESSAGES, (NETDATA_DOUBLE)(sth->messages.processed));
             worker_set_metric(WORKER_STREAM_METRIC_NODES, (NETDATA_DOUBLE)sth->nodes_count);
+
+            worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)sth->snd.bytes_received);
+            worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, (NETDATA_DOUBLE)sth->snd.bytes_sent);
+            worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
+            replay_entries = 0;
+            sth->snd.bytes_received = 0;
+            sth->snd.bytes_sent = 0;
+
             last_check_all_nodes_ut = now_ut;
         }
 
         worker_is_idle();
 
-        int poll_rc = poll(sth->run.pollfds, sth->run.used, 100);
+        nd_poll_result_t ev;
+        int poll_rc = nd_poll_wait(sth->run.ndpl, 100, &ev);
 
         worker_is_busy(WORKER_STREAM_JOB_PREP);
 
-        if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR)))
-            // timed out - just loop again
+        if (poll_rc == 0)
+            // nd_poll() timed out - just loop again
             continue;
 
         if(unlikely(poll_rc == -1)) {
-            // poll() returned an error
+            // nd_poll() returned an error
+            internal_fatal(true, "nd_poll() failed");
             worker_is_busy(WORKER_STREAM_JOB_POLL_ERROR);
             nd_log_limit_static_thread_var(erl, 1, 1 * USEC_PER_MS);
             nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu] poll() returned error", sth->id);
@@ -460,55 +392,10 @@ void *stream_thread(void *ptr) {
 
         time_t now_s = now_monotonic_sec();
 
-        size_t replay_entries = 0;
-        sth->snd.bytes_received = 0;
-        sth->snd.bytes_sent = 0;
+        if(nd_thread_signaled_to_cancel() || !service_running(SERVICE_STREAMING))
+            break;
 
-        internal_fatal(sth->run.used == 0, "used slots cannot be zero");
-
-        uint32_t slot = 0, move_to = sth->run.used - 1;
-        while(slot <= move_to && !exit_thread) {
-            short revents = sth->run.pollfds[slot].revents;
-            if(!revents) {
-                slot++;
-                continue;
-            }
-
-            if(nd_thread_signaled_to_cancel() || !service_running(SERVICE_STREAMING))
-                break;
-
-            sth->run.pollfds[slot].revents = 0;
-
-            exit_thread = stream_thread_process_poll_slot(sth, slot, revents, now_s, &replay_entries);
-
-            // SWAPPING slots
-            // poll() has the following problem:
-            // When the first few slots in the array of struct pollfd entries is too busy
-            // receiving or sending data too frequently, the later entries in the array
-            // starve, not having any chance to send or receive traffic.
-
-            // the following code swaps the struct pollfd slots, on every use.
-
-            internal_fatal(move_to >= sth->run.used, "used slots changed!");
-
-            if(slot != move_to) {
-                struct pollfd_slotted *from_pfd = get_slot_pfd(sth, slot);
-                struct pollfd_slotted *to_pfd = get_slot_pfd(sth, move_to);
-
-                SWAP(sth->run.pollfds[slot], sth->run.pollfds[move_to]);
-                SWAP(sth->run.meta[slot], sth->run.meta[move_to]);
-                if(from_pfd) from_pfd->slot = move_to;
-                if(to_pfd)     to_pfd->slot = slot;
-
-                // keep running at the same slot, which is now the swapped one
-            }
-            else
-                slot++;
-        }
-
-        worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)sth->snd.bytes_received);
-        worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, (NETDATA_DOUBLE)sth->snd.bytes_sent);
-        worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
+        exit_thread = stream_thread_process_poll_slot(sth, &ev, now_s, &replay_entries);
     }
 
     // dequeue
@@ -532,6 +419,9 @@ void *stream_thread(void *ptr) {
     freez(sth->pipe.buffer);
     sth->pipe.buffer = NULL;
     sth->pipe.size = 0;
+
+    nd_poll_destroy(sth->run.ndpl);
+    sth->run.ndpl = NULL;
 
     close(sth->pipe.fds[PIPE_READ]);
     close(sth->pipe.fds[PIPE_WRITE]);
@@ -611,7 +501,6 @@ static struct stream_thread * stream_thread_assign_and_start(RRDHOST *host) {
         spinlock_init(&sth->pipe.spinlock);
         spinlock_init(&sth->queue.spinlock);
         spinlock_init(&sth->messages.spinlock);
-        sth->run.used = 0;
         sth->messages.used = 0;
 
         char tag[NETDATA_THREAD_TAG_MAX + 1];

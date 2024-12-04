@@ -30,11 +30,6 @@ struct stream_opcode {
     struct sender_state *sender;
 };
 
-#include "stream-sender-internals.h"
-#include "stream-receiver-internals.h"
-
-#include "plugins.d/pluginsd_parser.h"
-
 // IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
 
 // stream thread events
@@ -158,10 +153,8 @@ struct stream_thread {
     } messages;
 
     struct {
-        size_t used;
-        size_t size;
-        struct pollfd *pollfds;
-        struct pollfd_meta *meta;
+        nd_poll_t *ndpl;
+        struct pollfd_meta pipe;
     } run;
 };
 
@@ -175,6 +168,7 @@ struct stream_thread_globals {
     struct stream_thread threads[STREAM_MAX_THREADS];
 };
 
+struct rrdhost;
 extern struct stream_thread_globals stream_thread_globals;
 
 void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth);
@@ -182,36 +176,27 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth);
 void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth);
 
 void stream_receiver_add_to_queue(struct receiver_state *rpt);
-void stream_sender_add_to_connector_queue(RRDHOST *host);
+void stream_sender_add_to_connector_queue(struct rrdhost *host);
 
-void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, short revents, time_t now_s);
-void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, short revents, time_t now_s);
+void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t events, time_t now_s);
+void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events, time_t now_s);
 
 void stream_sender_cleanup(struct stream_thread *sth);
 void stream_receiver_cleanup(struct stream_thread *sth);
 void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, struct stream_opcode *msg);
 
-struct pollfd_slotted stream_thread_pollfd_get(struct stream_thread *sth, int fd, POLLFD_TYPE type, struct receiver_state *rpt, struct sender_state *s);
-void stream_thread_pollfd_release(struct stream_thread *sth, struct pollfd_slotted pfd);
-struct stream_thread *stream_thread_pollfd_sth(struct pollfd_slotted pfd);
-
 struct stream_thread *stream_thread_by_slot_id(size_t thread_slot);
+
+void stream_thread_node_queued(struct rrdhost *host);
+void stream_thread_node_removed(struct rrdhost *host);
+
+#include "stream-sender-internals.h"
+#include "stream-receiver-internals.h"
+#include "plugins.d/pluginsd_parser.h"
 
 static inline bool rrdhost_is_this_a_stream_thread(RRDHOST *host) {
     pid_t tid = gettid_cached();
     return host->stream.rcv.status.tid == tid || host->stream.snd.status.tid == tid;
 }
-
-static inline struct pollfd *pfd_validate(struct stream_thread *sth, struct pollfd_slotted pfd) {
-    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-
-    internal_fatal(pfd.sth != sth, "invalid sender PFD worker_thread");
-    internal_fatal(pfd.slot < 0 || (size_t)pfd.slot >= sth->run.used, "invalid sender PFD slot");
-    internal_fatal(pfd.fd != sth->run.pollfds[pfd.slot].fd, "invalid sender PFD file descriptor");
-    return &sth->run.pollfds[pfd.slot];
-}
-
-void stream_thread_node_queued(RRDHOST *host);
-void stream_thread_node_removed(RRDHOST *host);
 
 #endif //NETDATA_STREAM_THREAD_H

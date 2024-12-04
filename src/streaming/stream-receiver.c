@@ -343,7 +343,10 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
         streaming_parser_init(rpt);
 
         rpt->host->stream.rcv.status.tid = gettid_cached();
-        rpt->thread.pfd = stream_thread_pollfd_get(sth, rpt->sock.fd, POLLFD_TYPE_RECEIVER, rpt, NULL);
+        rpt->thread.meta.type = POLLFD_TYPE_RECEIVER;
+        rpt->thread.meta.rpt = rpt;
+        if(!nd_poll_add(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
+            internal_fatal(true, "Failed to add receiver socket to nd_poll()");
     }
 }
 
@@ -402,9 +405,9 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
 
     internal_fatal(RECEIVERS_GET(&sth->rcv.receivers, (Word_t)rpt) == NULL, "Receiver to be removed is not found in the list of receivers");
     RECEIVERS_DEL(&sth->rcv.receivers, (Word_t)rpt);
-    stream_thread_pollfd_release(sth, rpt->thread.pfd);
+    if(!nd_poll_del(sth->run.ndpl, rpt->sock.fd))
+        internal_fatal(true, "Failed to remove receiver socket from nd_poll()");
 
-    rpt->thread.pfd = PFD_EMPTY;
     rpt->host->stream.rcv.status.tid = 0;
 
     stream_thread_node_removed(rpt->host);
@@ -414,7 +417,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
 }
 
 // process poll() events for streaming receivers
-void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, short revents __maybe_unused, time_t now_s) {
+void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events __maybe_unused, time_t now_s) {
         PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),

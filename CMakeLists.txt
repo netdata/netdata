@@ -934,6 +934,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/libjudy/judyl-typed.h
         src/libnetdata/os/system_memory.c
         src/libnetdata/os/system_memory.h
+        src/libnetdata/socket/nd-poll.c
+        src/libnetdata/socket/nd-poll.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
