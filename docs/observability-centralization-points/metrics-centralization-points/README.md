@@ -44,4 +44,4 @@ A Cluster consists of nodes configured as circular **Proxies**, where each node 
 
 ## Best Practices
 
-Refer to [Best Practices for Observability Centralization Points](/docs/observability-centralization-points/best-practices.md).
+Refer to [Best Practices for Observability Centralization Points](/docs/observability-centralization-points/README.md#best-practices).

@@ -120,7 +120,7 @@ No. Any or all Netdata Agents can be connected to Netdata Cloud.
 
 We recommend to create [observability centralization points](/docs/observability-centralization-points/README.md), as required for operational efficiency (ephemeral nodes, teams or services isolation, central control of alerts, production systems performance), security policies (internet isolation), or cost optimization (use existing capacities before allocating new ones).
 
-We suggest reviewing the [Best Practices for Observability Centralization Points](/docs/observability-centralization-points/best-practices.md).
+We suggest reviewing the [Best Practices for Observability Centralization Points](/docs/observability-centralization-points/README.md#best-practices).
 
 ## When I have Netdata Parents, do I need to connect Netdata Children to Netdata Cloud too?
 
