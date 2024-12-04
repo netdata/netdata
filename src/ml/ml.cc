@@ -542,8 +542,8 @@ ml_dimension_deserialize_kmeans(const char *json_str)
 
     AcquiredDimension AcqDim(DLI);
     if (!AcqDim.acquired()) {
-        netdata_log_error("Failed to deserialize kmeans: could not acquire dimension (machine-guid: %s, dimension: '%s.%s')",
-                          DLI.machineGuid(), DLI.chartId(), DLI.dimensionId());
+        netdata_log_error("Failed to deserialize kmeans: could not acquire dimension (machine-guid: %s, dimension: '%s.%s', reason: %s)",
+                          DLI.machineGuid(), DLI.chartId(), DLI.dimensionId(), AcqDim.acquire_failure());
         json_object_put(root);
         return false;
     }

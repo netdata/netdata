@@ -77,8 +77,8 @@ class AcquiredDimension {
 public:
     AcquiredDimension(const DimensionLookupInfo &DLI) : AcqRH(nullptr), AcqRS(nullptr), AcqRD(nullptr), Dim(nullptr)
     {
-        rrd_rdlock();
-
+        // using dictionaries - no rrd_lock is needed
+        
         AcqRH = rrdhost_find_and_acquire(DLI.machineGuid());
         if (AcqRH) {
             RRDHOST *RH = rrdhost_acquired_to_rrdhost(AcqRH);
@@ -90,15 +90,27 @@ public:
                         AcqRD = rrddim_find_and_acquire(RS, DLI.dimensionId());
                         if (AcqRD) {
                             RRDDIM *RD = rrddim_acquired_to_rrddim(AcqRD);
-                            if (RD)
+                            if (RD) {
                                 Dim = reinterpret_cast<ml_dimension_t *>(RD->ml_dimension);
+                                acquire_failure_reason = "ok";
+                            }
+                            else
+                                acquire_failure_reason = "no dimension";
                         }
+                        else
+                            acquire_failure_reason = "can't find dimension";
                     }
+                    else
+                        acquire_failure_reason = "chart is obsolete";
                 }
+                else
+                    acquire_failure_reason = "can't find chart";
             }
+            else
+                acquire_failure_reason = "host is orphan or obsolete";
         }
-
-        rrd_rdunlock();
+        else
+            acquire_failure_reason = "can't find host";
     }
 
     AcquiredDimension(const AcquiredDimension &) = delete;
@@ -109,6 +121,10 @@ public:
 
     bool acquired() const {
         return AcqRD != nullptr;
+    }
+
+    const char *acquire_failure() const {
+        return acquire_failure_reason;
     }
 
     ml_host_t *host() const {
@@ -140,6 +156,7 @@ public:
     }
 
 private:
+    const char *acquire_failure_reason;
     RRDHOST_ACQUIRED *AcqRH;
     RRDSET_ACQUIRED *AcqRS;
     RRDDIM_ACQUIRED *AcqRD;
