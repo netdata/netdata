@@ -51,6 +51,10 @@ void telemetry_ml_memory_freed(size_t n)
     __atomic_fetch_add(&ml_statistics.ml_memory_delete, 1, __ATOMIC_RELAXED);
 }
 
+uint64_t telemetry_ml_get_current_memory_usage(void) {
+    return __atomic_load_n(&ml_statistics.ml_memory_consumption, __ATOMIC_RELAXED);
+}
+
 static inline void ml_statistics_copy(struct ml_statistics *gs)
 {
     gs->ml_models_consulted = __atomic_load_n(&ml_statistics.ml_models_consulted, __ATOMIC_RELAXED);

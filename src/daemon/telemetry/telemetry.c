@@ -91,9 +91,6 @@ void *telemetry_thread_main(void *ptr) {
         }
         real_step = USEC_PER_SEC;
 
-        worker_is_busy(WORKER_JOB_TELEMETRY_DAEMON);
-        telemetry_daemon_do(telemetry_extended_enabled);
-
         worker_is_busy(WORKER_JOB_TELEMETRY_INGESTION);
         telemetry_ingestion_do(telemetry_extended_enabled);
 
@@ -140,6 +137,11 @@ void *telemetry_thread_main(void *ptr) {
 
         worker_is_busy(WORKER_JOB_ARAL);
         telemetry_aral_do(telemetry_extended_enabled);
+
+        // keep this last to have access to the memory counters
+        // exposed by everyone else
+        worker_is_busy(WORKER_JOB_TELEMETRY_DAEMON);
+        telemetry_daemon_do(telemetry_extended_enabled);
     }
 
     return NULL;

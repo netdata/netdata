@@ -19,6 +19,8 @@ void telemetry_ml_memory_freed(size_t n);
 
 void global_statistics_ml_models_deserialization_failures();
 
+uint64_t telemetry_ml_get_current_memory_usage(void);
+
 #if defined(TELEMETRY_INTERNALS)
 void telemetry_ml_do(bool extended);
 #endif

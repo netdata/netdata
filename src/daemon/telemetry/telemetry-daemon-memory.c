@@ -12,6 +12,7 @@ void telemetry_daemon_memory_do(bool extended __maybe_unused) {
     {
         static RRDSET *st_memory = NULL;
         static RRDDIM *rd_database = NULL;
+#ifdef DICT_WITH_STATS
         static RRDDIM *rd_collectors = NULL;
         static RRDDIM *rd_rrdhosts = NULL;
         static RRDDIM *rd_rrdsets = NULL;
@@ -19,10 +20,14 @@ void telemetry_daemon_memory_do(bool extended __maybe_unused) {
         static RRDDIM *rd_contexts = NULL;
         static RRDDIM *rd_health = NULL;
         static RRDDIM *rd_functions = NULL;
-        static RRDDIM *rd_labels = NULL;
+        static RRDDIM *rd_replication = NULL;
+#else
+        static RRDDIM *rd_metadata = NULL;
+#endif
+        static RRDDIM *rd_labels = NULL; // labels use dictionary like statistics, but it is not ARAL based dictionary
+        static RRDDIM *rd_ml = NULL;
         static RRDDIM *rd_strings = NULL;
         static RRDDIM *rd_streaming = NULL;
-        static RRDDIM *rd_replication = NULL;
         static RRDDIM *rd_buffers = NULL;
         static RRDDIM *rd_workers = NULL;
         static RRDDIM *rd_aral = NULL;
@@ -45,6 +50,8 @@ void telemetry_daemon_memory_do(bool extended __maybe_unused) {
                 RRDSET_TYPE_STACKED);
 
             rd_database = rrddim_add(st_memory, "db", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+#ifdef DICT_WITH_STATS
             rd_collectors = rrddim_add(st_memory, "collectors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_rrdhosts = rrddim_add(st_memory, "hosts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_rrdsets = rrddim_add(st_memory, "rrdset", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -52,10 +59,14 @@ void telemetry_daemon_memory_do(bool extended __maybe_unused) {
             rd_contexts = rrddim_add(st_memory, "contexts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_health = rrddim_add(st_memory, "health", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_functions = rrddim_add(st_memory, "functions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_replication = rrddim_add(st_memory, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+#else
+            rd_metadata = rrddim_add(st_memory, "metadata", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+#endif
             rd_labels = rrddim_add(st_memory, "labels", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_ml = rrddim_add(st_memory, "ML", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_strings = rrddim_add(st_memory, "strings", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_streaming = rrddim_add(st_memory, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_replication = rrddim_add(st_memory, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers = rrddim_add(st_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_workers = rrddim_add(st_memory, "workers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_aral = rrddim_add(st_memory, "aral", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -85,6 +96,7 @@ void telemetry_daemon_memory_do(bool extended __maybe_unused) {
         rrddim_set_by_pointer(st_memory, rd_database,
                               (collected_number)telemetry_dbengine_total_memory + (collected_number)rrddim_db_memory_size);
 
+#ifdef DICT_WITH_STATS
         rrddim_set_by_pointer(st_memory, rd_collectors,
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_collectors));
 
@@ -107,17 +119,35 @@ void telemetry_daemon_memory_do(bool extended __maybe_unused) {
         rrddim_set_by_pointer(st_memory, rd_functions,
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_functions));
 
+        rrddim_set_by_pointer(st_memory, rd_replication,
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
+#else
+        uint64_t metadata =
+            aral_by_size_used_bytes() +
+            dictionary_stats_category_rrdhost.memory.dict +
+            dictionary_stats_category_rrdset.memory.dict +
+            dictionary_stats_category_rrddim.memory.dict +
+            dictionary_stats_category_rrdcontext.memory.dict +
+            dictionary_stats_category_rrdhealth.memory.dict +
+            dictionary_stats_category_functions.memory.dict +
+            dictionary_stats_category_replication.memory.dict +
+            replication_allocated_memory();
+
+        rrddim_set_by_pointer(st_memory, rd_metadata, (collected_number)metadata);
+#endif
+
+        // labels use dictionary like statistics, but it is not ARAL based dictionary
         rrddim_set_by_pointer(st_memory, rd_labels,
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdlabels));
+
+        rrddim_set_by_pointer(st_memory, rd_ml,
+                              (collected_number)telemetry_ml_get_current_memory_usage());
 
         rrddim_set_by_pointer(st_memory, rd_strings,
                               (collected_number)strings);
 
         rrddim_set_by_pointer(st_memory, rd_streaming,
                               (collected_number)netdata_buffers_statistics.rrdhost_senders + (collected_number)netdata_buffers_statistics.rrdhost_receivers);
-
-        rrddim_set_by_pointer(st_memory, rd_replication,
-                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
 
         rrddim_set_by_pointer(st_memory, rd_buffers,
                               (collected_number)buffers);

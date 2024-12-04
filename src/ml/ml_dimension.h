@@ -78,7 +78,7 @@ public:
     AcquiredDimension(const DimensionLookupInfo &DLI) : AcqRH(nullptr), AcqRS(nullptr), AcqRD(nullptr), Dim(nullptr)
     {
         // using dictionaries - no rrd_lock is needed
-        
+
         AcqRH = rrdhost_find_and_acquire(DLI.machineGuid());
         if (AcqRH) {
             RRDHOST *RH = rrdhost_acquired_to_rrdhost(AcqRH);
@@ -107,7 +107,7 @@ public:
                     acquire_failure_reason = "can't find chart";
             }
             else
-                acquire_failure_reason = "host is orphan or obsolete";
+                acquire_failure_reason = "host is orphan or archived";
         }
         else
             acquire_failure_reason = "can't find host";

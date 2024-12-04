@@ -49,6 +49,18 @@ static ARAL *judy_size_aral(Word_t Words) {
     return NULL;
 }
 
+static int64_t __thread judy_allocated = 0;
+
+void JudyAllocThreadTelemetryReset(void) {
+    judy_allocated = 0;
+}
+
+int64_t JudyAllocThreadTelemetryGetAndReset(void) {
+    int64_t rc = judy_allocated;
+    judy_allocated = 0;
+    return rc;
+}
+
 inline Word_t JudyMalloc(Word_t Words) {
     Word_t Addr;
 
@@ -57,6 +69,8 @@ inline Word_t JudyMalloc(Word_t Words) {
         Addr = (Word_t) aral_mallocz(ar);
     else
         Addr = (Word_t) mallocz(Words * sizeof(Word_t));
+
+    judy_allocated += Words * sizeof(Word_t);
 
     return(Addr);
 }
@@ -67,6 +81,8 @@ inline void JudyFree(void * PWord, Word_t Words) {
         aral_freez(ar, PWord);
     else
         freez(PWord);
+
+    judy_allocated -= Words * sizeof(Word_t);
 }
 
 Word_t JudyMallocVirtual(Word_t Words) {
