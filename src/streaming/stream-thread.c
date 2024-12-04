@@ -254,6 +254,73 @@ static void stream_thread_messages_resize_unsafe(struct stream_thread *sth) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static bool stream_thread_process_poll_slot(struct stream_thread *sth, const size_t slot, const short revents, time_t now_s, size_t *replay_entries) {
+    switch(sth->run.meta[slot].type) {
+        case POLLFD_TYPE_SENDER: {
+            struct sender_state *s = sth->run.meta[slot].s;
+            int32_t sender_slot = s->thread.msg.snd_run_slot;
+            internal_fatal(sender_slot < 0 || (size_t)sender_slot >= sth->snd.run.used, "Invalid sender dispatcher slot!");
+            internal_fatal(s != sth->snd.run.senders[sender_slot], "Invalid sender dispatcher pointer!");
+
+            if(sender_slot >= 0 && (size_t)sender_slot < sth->snd.run.used && sth->snd.run.senders[sender_slot] == s)
+                stream_sender_process_poll_events(sth, s, revents, sender_slot, now_s);
+
+            *replay_entries += dictionary_entries(s->replication.requests);
+            break;
+        }
+
+        case POLLFD_TYPE_RECEIVER: {
+            struct receiver_state *rpt = sth->run.meta[slot].rpt;
+            int32_t receiver_slot = rpt->receiver.slot;
+            internal_fatal(receiver_slot < 0 || (size_t)receiver_slot >= sth->rcv.run.used, "Invalid receiver slot!");
+            internal_fatal(rpt != sth->rcv.run.receivers[receiver_slot], "Invalid receiver pointer!");
+
+            if(receiver_slot >= 0 && (size_t)receiver_slot < sth->rcv.run.used && sth->rcv.run.receivers[receiver_slot] == rpt)
+                stream_receive_process_poll_events(sth, rpt, revents, receiver_slot, now_s);
+
+            break;
+        }
+
+        case POLLFD_TYPE_PIPE:
+            if (likely(revents & (POLLIN | POLLPRI))) {
+                worker_is_busy(WORKER_SENDER_JOB_PIPE_READ);
+                stream_thread_read_pipe_messages(sth);
+            }
+            else if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
+                // we have errors on this pipe
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "STREAM[%zu]: got errors on pipe - exiting to be restarted.", sth->id);
+                return true;
+            }
+            break;
+
+        case POLLFD_TYPE_EMPTY:
+            // should never happen - but make sure it never happens again
+            sth->run.pollfds[slot].fd = -1;
+            sth->run.pollfds[slot].events = 0;
+            break;
+    }
+
+    return false;
+}
+
+static struct pollfd_slotted *get_slot_pfd(struct stream_thread *sth, size_t slot) {
+    switch(sth->run.meta[slot].type) {
+        case POLLFD_TYPE_RECEIVER:
+            return &sth->run.meta[slot].rpt->receiver.pfd;
+
+        case POLLFD_TYPE_SENDER:
+            return &sth->run.meta[slot].s->thread.pfd;
+
+        case POLLFD_TYPE_EMPTY:
+        case POLLFD_TYPE_PIPE:
+        default:
+            return NULL;
+    }
+
+    return NULL;
+}
+
 void *stream_thread(void *ptr) {
     struct stream_thread *sth = ptr;
 
@@ -409,60 +476,46 @@ void *stream_thread(void *ptr) {
         sth->snd.bytes_received = 0;
         sth->snd.bytes_sent = 0;
 
-        for(size_t slot = 0; slot < sth->run.used ;slot++) {
+        internal_fatal(sth->run.used == 0, "used slots cannot be zero");
+
+        uint32_t slot = 0, move_to = sth->run.used - 1;
+        while(slot <= move_to && !exit_thread) {
             short revents = sth->run.pollfds[slot].revents;
-            if(!revents) continue;
+            if(!revents) {
+                slot++;
+                continue;
+            }
 
             if(nd_thread_signaled_to_cancel() || !service_running(SERVICE_STREAMING))
                 break;
 
             sth->run.pollfds[slot].revents = 0;
 
-            switch(sth->run.meta[slot].type) {
-                case POLLFD_TYPE_SENDER: {
-                    struct sender_state *s = sth->run.meta[slot].s;
-                    int32_t sender_slot = s->thread.msg.snd_run_slot;
-                    internal_fatal(sender_slot < 0 || (size_t)sender_slot >= sth->snd.run.used, "Invalid sender dispatcher slot!");
-                    internal_fatal(s != sth->snd.run.senders[sender_slot], "Invalid sender dispatcher pointer!");
+            exit_thread = stream_thread_process_poll_slot(sth, slot, revents, now_s, &replay_entries);
 
-                    if(sender_slot >= 0 && (size_t)sender_slot < sth->snd.run.used && sth->snd.run.senders[sender_slot] == s)
-                        stream_sender_process_poll_events(sth, s, revents, sender_slot, now_s);
+            // SWAPPING slots
+            // poll() has the following problem:
+            // When the first few slots in the array of struct pollfd entries is too busy
+            // receiving or sending data too frequently, the later entries in the array
+            // starve, not having any chance to send or receive traffic.
 
-                    replay_entries += dictionary_entries(s->replication.requests);
-                    break;
-                }
+            // the following code swaps the struct pollfd slots, on every use.
 
-                case POLLFD_TYPE_RECEIVER: {
-                    struct receiver_state *rpt = sth->run.meta[slot].rpt;
-                    int32_t receiver_slot = rpt->receiver.slot;
-                    internal_fatal(receiver_slot < 0 || (size_t)receiver_slot >= sth->rcv.run.used, "Invalid receiver slot!");
-                    internal_fatal(rpt != sth->rcv.run.receivers[receiver_slot], "Invalid receiver pointer!");
+            internal_fatal(move_to >= sth->run.used, "used slots changed!");
 
-                    if(receiver_slot >= 0 && (size_t)receiver_slot < sth->rcv.run.used && sth->rcv.run.receivers[receiver_slot] == rpt)
-                        stream_receive_process_poll_events(sth, rpt, revents, receiver_slot, now_s);
+            if(slot != move_to) {
+                struct pollfd_slotted *from_pfd = get_slot_pfd(sth, slot);
+                struct pollfd_slotted *to_pfd = get_slot_pfd(sth, move_to);
 
-                    break;
-                }
+                SWAP(sth->run.pollfds[slot], sth->run.pollfds[move_to]);
+                SWAP(sth->run.meta[slot], sth->run.meta[move_to]);
+                if(from_pfd) from_pfd->slot = move_to;
+                if(to_pfd)     to_pfd->slot = slot;
 
-                case POLLFD_TYPE_PIPE:
-                    if (likely(revents & (POLLIN | POLLPRI))) {
-                        worker_is_busy(WORKER_SENDER_JOB_PIPE_READ);
-                        stream_thread_read_pipe_messages(sth);
-                    }
-                    else if(unlikely(revents & (POLLERR|POLLHUP|POLLNVAL))) {
-                        // we have errors on this pipe
-                        nd_log(NDLS_DAEMON, NDLP_ERR,
-                               "STREAM[%zu]: got errors on pipe - exiting to be restarted.", sth->id);
-                        exit_thread = true;
-                    }
-                    break;
-
-                case POLLFD_TYPE_EMPTY:
-                    // should never happen - but make sure it never happens again
-                    sth->run.pollfds[slot].fd = -1;
-                    sth->run.pollfds[slot].events = 0;
-                    break;
+                // keep running at the same slot, which is now the swapped one
             }
+            else
+                slot++;
         }
 
         worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)sth->snd.bytes_received);
