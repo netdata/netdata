@@ -729,7 +729,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/json/jsmn.h
         src/libnetdata/libnetdata.c
         src/libnetdata/libnetdata.h
-        src/libnetdata/line_splitter/re2c_line_splitter.c
         src/libnetdata/line_splitter/line_splitter.c
         src/libnetdata/line_splitter/line_splitter.h
         src/libnetdata/libnetdata.h

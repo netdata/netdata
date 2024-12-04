@@ -108,8 +108,6 @@ static inline size_t quoted_strings_splitter(char *str, char **words, size_t max
     return i;
 }
 
-size_t quoted_strings_splitter_pluginsd_re2c(char *start, char **words, size_t max_words);
-
 #define quoted_strings_splitter_whitespace(str, words, max_words) \
         quoted_strings_splitter(str, words, max_words, isspace_map_whitespace)
 
@@ -120,7 +118,7 @@ size_t quoted_strings_splitter_pluginsd_re2c(char *start, char **words, size_t m
         quoted_strings_splitter(str, words, max_words, isspace_map_config)
 
 #define quoted_strings_splitter_pluginsd(str, words, max_words) \
-        quoted_strings_splitter_pluginsd_re2c(str, words, max_words)
+        quoted_strings_splitter(str, words, max_words, isspace_map_pluginsd)
 
 #define quoted_strings_splitter_dyncfg_id(str, words, max_words) \
         quoted_strings_splitter(str, words, max_words, isspace_dyncfg_id_map)
