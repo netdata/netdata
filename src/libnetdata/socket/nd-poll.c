@@ -70,7 +70,7 @@ static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *res
         if (ndpl->ev[i].events & EPOLLHUP)
             result->events |= ND_POLL_HUP;
 
-        ndpl->last_pos++;
+        ndpl->last_pos = i + 1;
         return true;
     }
 
@@ -226,7 +226,7 @@ static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *res
                 result->events |= ND_POLL_INVALID;
 
             ndpl->fds[i].revents = 0; // Clear the event after handling
-            ndpl->last_pos++;
+            ndpl->last_pos = i + 1;
             return true; // Return only the first triggered event
         }
     }
