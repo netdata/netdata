@@ -946,13 +946,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/socket/nd-poll.h
 )
 
-if(ENABLE_PLUGIN_EBPF)
-        list(APPEND LIBNETDATA_FILES
-                src/libnetdata/ebpf/ebpf.c
-                src/libnetdata/ebpf/ebpf.h
-        )
-endif()
-
 set(LIBH2O_FILES
         src/web/server/h2o/libh2o/deps/cloexec/cloexec.c
         src/web/server/h2o/libh2o/deps/libgkc/gkc.c
@@ -2488,6 +2481,8 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_unittest.h
             src/collectors/ebpf.plugin/ebpf_functions.c
             src/collectors/ebpf.plugin/ebpf_functions.h
+            src/collectors/ebpf.plugin/libbpf_api/ebpf.c
+            src/collectors/ebpf.plugin/libbpf_api/ebpf.h
     )
 
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES})

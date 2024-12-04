@@ -33,6 +33,11 @@
             <Feature Id="Main">
                 <ComponentGroupRef Id="NetdataComponents" />
                 <ComponentRef Id="NetdataVarCache" />
+                <ComponentRef Id="NetdataDevShm" />
+                <ComponentRef Id="NetdataDevMqueue" />
+                <ComponentRef Id="NetdataTmp" />
+                <ComponentRef Id="NetdataHome" />
+                <ComponentRef Id="NetdataRoot" />
                 <ComponentRef Id="NetdataVarLib" />
                 <ComponentGroupRef Id="WevtComponents" />
                 <ComponentRef Id="NetdataService" />
@@ -49,6 +54,16 @@
                     </Directory>
                     <Directory Id="ETCDIR" Name="etc">
                         <Directory Id="ETCDIRNETDATA" Name="netdata" />
+                    </Directory>
+                    <Directory Id="DEVDIR" Name="dev">
+                        <Directory Id="DEVSHMDIR" Name="shm" />
+                        <Directory Id="DEVMQUEUEDIR" Name="mqueue" />
+                    </Directory>
+                    <Directory Id="TMPDIR" Name="tmp">
+                    </Directory>
+                    <Directory Id="HOMEDIR" Name="home">
+                    </Directory>
+                    <Directory Id="ROOTDIR" Name="root">
                     </Directory>
                 </Directory>
             </StandardDirectory>
@@ -87,6 +102,26 @@
             </Component>
 
             <Component Id="NetdataVarLib" Directory="VARLIBDIR" Guid="c72d7ea8-c848-46c4-a983-589044f2eec9">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataDevShm" Directory="DEVSHMDIR" Guid="cbe39d53-a5c8-4375-9b25-e24df4d411be">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataDevMqueue" Directory="DEVMQUEUEDIR" Guid="f119d45f-b4d4-4918-bf05-89ee88be951a">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataTmp" Directory="TMPDIR" Guid="19247d2f-0f9d-4891-a3b0-ffc208d8d878">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataHome" Directory="HOMEDIR" Guid="13056229-7734-45ac-a982-572fa99f8e72">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataRoot" Directory="ROOTDIR" Guid="5f0b7def-c4e6-417a-a5ae-b6f9c4aff14e">
                 <CreateFolder />
             </Component>
 

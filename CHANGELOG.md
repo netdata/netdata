@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Move eBPF code from linetdata to src/collector [\#19121](https://github.com/netdata/netdata/pull/19121) ([thiagoftsm](https://github.com/thiagoftsm))
+- change default nice level to 0 [\#19120](https://github.com/netdata/netdata/pull/19120) ([ilyam8](https://github.com/ilyam8))
 - Disable mimalloc by default / enable explicitly if needed [\#19118](https://github.com/netdata/netdata/pull/19118) ([stelfrag](https://github.com/stelfrag))
 - Fix undefined behaviour. [\#19116](https://github.com/netdata/netdata/pull/19116) ([vkalintiris](https://github.com/vkalintiris))
 - disable python.d/example [\#19114](https://github.com/netdata/netdata/pull/19114) ([ilyam8](https://github.com/ilyam8))
@@ -444,9 +446,6 @@
 - Windows Events Log improvements 4 [\#18567](https://github.com/netdata/netdata/pull/18567) ([ktsaou](https://github.com/ktsaou))
 - windows.plugin \(IIS\) [\#18566](https://github.com/netdata/netdata/pull/18566) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add check for 64bit builtin atomics [\#18565](https://github.com/netdata/netdata/pull/18565) ([kraj](https://github.com/kraj))
-- Windows Events Log Explorer improvements 3 [\#18564](https://github.com/netdata/netdata/pull/18564) ([ktsaou](https://github.com/ktsaou))
-- Windows Events Improvements 2 [\#18563](https://github.com/netdata/netdata/pull/18563) ([ktsaou](https://github.com/ktsaou))
-- add cpu model to host labels [\#18562](https://github.com/netdata/netdata/pull/18562) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
