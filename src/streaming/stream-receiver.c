@@ -377,12 +377,12 @@ static void stream_receiver_on_disconnect(struct stream_thread *sth __maybe_unus
 
     {
         char msg[100 + 1];
-        snprintfz(msg, sizeof(msg) - 1, "disconnected (completed %zu updates)", count);
+        snprintfz(msg, sizeof(msg) - 1, "receiver disconnected (completed %zu updates)", count);
         stream_receiver_log_status(rpt, msg, STREAM_STATUS_DISCONNECTED, NDLP_WARNING);
     }
 
-    // in case we have cloud connection we inform cloud
-    // a child disconnected
+    // in case we are connected to netdata cloud,
+    // we inform cloud that a child got disconnected
     uint64_t total_reboot = rrdhost_stream_path_total_reboot_time_ms(rpt->host);
     schedule_node_state_update(rpt->host, MIN((total_reboot * MAX_CHILD_DISC_TOLERANCE), MAX_CHILD_DISC_DELAY));
 
@@ -451,7 +451,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
                 worker_is_busy(WORKER_STREAM_JOB_SOCKET_ERROR);
                 receiver_set_exit_reason(rpt, read_stream_error_to_reason(bytes), false);
-                stream_receiver_remove(sth, rpt, "socket read error");
+                stream_receiver_remove(sth, rpt, "receiver socket read error");
                 return;
             }
 
@@ -473,7 +473,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
                             while (buffered_reader_next_line(&rpt->reader, rpt->thread.buffer)) {
                                 if (unlikely(parser_action(parser, rpt->thread.buffer->buffer))) {
                                     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                                    stream_receiver_remove(sth, rpt, "parser failed");
+                                    stream_receiver_remove(sth, rpt, "parser action failed");
                                     node_removed = true;
                                     break;
                                 }
@@ -487,7 +487,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
                         else {
                             receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                            stream_receiver_remove(sth, rpt, "decompressor failed");
+                            stream_receiver_remove(sth, rpt, "receiver decompressor failed");
                             node_removed = true;
                             break;
                         }
@@ -497,7 +497,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
                     break;
                 else {
                     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                    stream_receiver_remove(sth, rpt, "compressed data invalid");
+                    stream_receiver_remove(sth, rpt, "receiver compressed data invalid");
                     node_removed = true;
                     break;
                 }
@@ -526,7 +526,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
             while(buffered_reader_next_line(&rpt->reader, rpt->thread.buffer)) {
                 if(unlikely(parser_action(parser, rpt->thread.buffer->buffer))) {
                     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
-                    stream_receiver_remove(sth, rpt, "parser failed");
+                    stream_receiver_remove(sth, rpt, "parser action failed");
                     break;
                 }
 

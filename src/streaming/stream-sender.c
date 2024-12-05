@@ -352,7 +352,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     stream_sender_unlock(s);
 
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "STREAM SEND [%s]: disconnected from parent, reason: %s",
+           "STREAM SEND [%s]: sender disconnected from parent, reason: %s",
            rrdhost_hostname(s->host), stream_handshake_error_to_string(reason));
 
     nd_sock_close(&s->sock);
@@ -410,7 +410,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
                    sth->id, rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
                    s->thread.bytes_sent, s->thread.sends);
 
-            stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT, true);
+            stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_TIMEOUT, true);
             continue;
         }
 

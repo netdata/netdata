@@ -14,8 +14,12 @@ ssize_t send_to_plugin(const char *txt, PARSER *parser) {
     spinlock_lock(&parser->writer.spinlock);
 
     ND_SOCK tmp = { .fd = parser->fd_output, };
+    const char *destination = "child";
     ND_SOCK *s = parser->sock;  // try the socket
-    if(!s) s = &tmp;            // socket is not there, use the pipe
+    if(!s) {
+        destination = "plugin";
+        s = &tmp;            // socket is not there, use the pipe
+    }
 
     if(s->fd != -1) {
         // plugins pipe or socket (with or without SSL)
@@ -23,7 +27,9 @@ ssize_t send_to_plugin(const char *txt, PARSER *parser) {
         size_t total = strlen(txt);
         ssize_t bytes = nd_sock_write_persist(s, txt, total, 100);
         if(bytes < (ssize_t)total) {
-            netdata_log_error("PLUGINSD: cannot send command (fd = %d, bytes = %zd out of %zu)", s->fd, bytes, total);
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "PLUGINSD: cannot send command to %s (fd = %d, sent bytes = %zd out of %zu)",
+                   destination, s->fd, bytes, total);
             spinlock_unlock(&parser->writer.spinlock);
             return -3;
         }
@@ -33,7 +39,9 @@ ssize_t send_to_plugin(const char *txt, PARSER *parser) {
     }
 
     spinlock_unlock(&parser->writer.spinlock);
-    netdata_log_error("PLUGINSD: cannot send command (no output socket/pipe/file given to plugins.d parser)");
+    nd_log(NDLS_DAEMON, NDLP_WARNING,
+           "PLUGINSD: cannot send command to %s (probably the receiver got disconnected, since no output descriptor is available)",
+           destination);
     return -4;
 }
 

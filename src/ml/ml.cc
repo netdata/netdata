@@ -1140,8 +1140,8 @@ static enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, ml_
     AcquiredDimension AcqDim(req.DLI);
 
     if (!AcqDim.acquired()) {
-        netdata_log_error("Failed to create new model: could not acquire dimension (machine-guid: %s, dimension: '%s.%s')",
-                          req.DLI.machineGuid(), req.DLI.chartId(), req.DLI.dimensionId());
+        netdata_log_error("Failed to create new model: could not acquire dimension (machine-guid: %s, dimension: '%s.%s', reason: %s)",
+                          req.DLI.machineGuid(), req.DLI.chartId(), req.DLI.dimensionId(), AcqDim.acquire_failure());
         return ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION;
     }
 
@@ -1156,8 +1156,8 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
     AcquiredDimension AcqDim(req.DLI);
 
     if (!AcqDim.acquired()) {
-        netdata_log_error("Failed to add existing model: could not acquire dimension (machine-guid: %s, dimension: '%s.%s')",
-                          req.DLI.machineGuid(), req.DLI.chartId(), req.DLI.dimensionId());
+        netdata_log_error("Failed to add existing model: could not acquire dimension (machine-guid: %s, dimension: '%s.%s', reason: %s)",
+                          req.DLI.machineGuid(), req.DLI.chartId(), req.DLI.dimensionId(), AcqDim.acquire_failure());
         return ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION;
     }
 
