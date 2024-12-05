@@ -54,7 +54,7 @@ install_go_toolchain() {
       case "$(uname -m)" in
         i?86)
           GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.3.linux-386.tar.gz"
-          GOLANG_ARCHIVE_CHECKSUM="0c8e9f824bf443f51e06ac017b9ae402ea066d761b309d880dbb2ca5793db8a2"
+          GOLANG_ARCHIVE_CHECKSUM="3d7b00191a43c50d28e0903a0c576104bc7e171a8670de419d41111c08dfa299"
           ;;
         x86_64)
           GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.23.3.linux-amd64.tar.gz"
