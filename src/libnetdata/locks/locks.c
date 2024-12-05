@@ -253,9 +253,13 @@ static inline void spinlock_lock_internal(SPINLOCK *spinlock)
         spins++;
         #endif
 
-        if(unlikely(i == 8)) {
-            i = 0;
-            tinysleep();
+        if(unlikely(i % 8 == 0)) {
+            if(i == 8 * 4) {
+                i = 0;
+                yield_the_processor();
+            }
+            else
+                tinysleep();
         }
     }
 
@@ -387,7 +391,7 @@ void rw_spinlock_read_lock(RW_SPINLOCK *rw_spinlock) {
         }
 
         spinlock_unlock(&rw_spinlock->spinlock);
-        tinysleep(); // let the writer run
+        yield_the_processor(); // let the writer run
     }
 
     nd_thread_rwspinlock_read_locked();
@@ -407,7 +411,7 @@ void rw_spinlock_read_unlock(RW_SPINLOCK *rw_spinlock) {
 
 void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock) {
     size_t spins = 0;
-    while(1) {
+    for(size_t i = 1; true ;i++) {
         spinlock_lock(&rw_spinlock->spinlock);
 
         if(__atomic_load_n(&rw_spinlock->readers, __ATOMIC_RELAXED) == 0) {
@@ -421,7 +425,10 @@ void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock) {
 
         // Busy wait until all readers have released their locks.
         spinlock_unlock(&rw_spinlock->spinlock);
-        tinysleep();
+        if(i == 8 * 2) {
+            i = 0;
+            tinysleep();
+        }
         spins++;
     }
 

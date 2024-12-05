@@ -1391,7 +1391,7 @@ static void *cache_flush_tp_worker(struct rrdengine_instance *ctx __maybe_unused
 
     worker_is_busy(UV_EVENT_DBENGINE_FLUSH_MAIN_CACHE);
     while (pgc_flush_pages(main_cache))
-        tinysleep();
+        yield_the_processor();
 
     return data;
 }
@@ -1402,7 +1402,7 @@ static void *cache_evict_main_tp_worker(struct rrdengine_instance *ctx __maybe_u
 
     worker_is_busy(UV_EVENT_DBENGINE_EVICT_MAIN_CACHE);
     while (pgc_evict_pages(main_cache, 0, 0))
-        tinysleep();
+        yield_the_processor();
 
     return data;
 }
@@ -1413,7 +1413,7 @@ static void *cache_evict_open_tp_worker(struct rrdengine_instance *ctx __maybe_u
 
     worker_is_busy(UV_EVENT_DBENGINE_EVICT_OPEN_CACHE);
     while (pgc_evict_pages(open_cache, 0, 0))
-        tinysleep();
+        yield_the_processor();
 
     return data;
 }
@@ -1424,7 +1424,7 @@ static void *cache_evict_extent_tp_worker(struct rrdengine_instance *ctx __maybe
 
     worker_is_busy(UV_EVENT_DBENGINE_EVICT_EXTENT_CACHE);
     while (pgc_evict_pages(extent_cache, 0, 0))
-        tinysleep();
+        yield_the_processor();
 
     return data;
 }
