@@ -155,7 +155,7 @@ On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% les
 <hr class="solid">
 
 <p align="center">
-  <b>Below is an animated image, but you can see Netdata live!</b><br/>
+  <b>You can see Netdata live!</b><br/>
 	<a href="https://frankfurt.netdata.rocks"><b>FRANKFURT</b></a> |
 	<a href="https://newyork.netdata.rocks"><b>NEWYORK</b></a> |
 	<a href="https://atlanta.netdata.rocks"><b>ATLANTA</b></a> |
@@ -164,13 +164,10 @@ On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% les
 	<a href="https://singapore.netdata.rocks"><b>SINGAPORE</b></a> |
 	<a href="https://bangalore.netdata.rocks"><b>BANGALORE</b></a>
   <br/>
-  	<i>They are clustered Netdata Agent Parents. They all have the same data. <b>Select the one closer to you.</b></i>
-	<br/>
-	<i>All these run with the default configuration. We only clustered them to have multi-node dashboards.</i>
-	<br/><small>Note: These demos include the Netdata UI,<br/>which while being closed-source, is free to use with Netdata Agents and Netdata Cloud.</small>
+  	<i>We've set up multiple demo clusters around the world, each running with the default configuration and showing real monitoring data.</i>
+  <br/>
+    <i>Choose the instance closest to you for the best experience.</i>
 </p>
-
-![Netdata Agent](https://github.com/netdata/netdata/assets/2662304/af4caa23-19be-46ef-9779-8fdad8d99d2a)
 
 <hr class="solid">
 
