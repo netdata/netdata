@@ -297,7 +297,7 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
             ret = rrdeng_init(
                 (struct rrdengine_instance **)&host->db[0].si,
                 dbenginepath,
-                default_rrdeng_disk_quota_mb,
+                rrdeng_cfg.disk_quota_mb,
                 0,
                 0); // may fail here for legacy dbengine initialization
 
@@ -894,8 +894,8 @@ static void dbengine_init(const char *hostname) {
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 
-    new_dbengine_defaults =
-        (!legacy_multihost_db_space &&
+    rrdeng_cfg.new_dbengine_defaults =
+        (!rrdeng_cfg.legacy_multihost_db_space &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 update every iterations") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 update every iterations") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 update every iterations") &&
@@ -905,7 +905,7 @@ static void dbengine_init(const char *hostname) {
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 retention size") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 retention size"));
 
-    default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
+    rrdeng_cfg.backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
     char dbengineconfig[200 + 1];
 
     size_t grouping_iterations = default_rrd_update_every;
@@ -925,11 +925,11 @@ static void dbengine_init(const char *hostname) {
         storage_tiers_grouping_iterations[tier] = grouping_iterations;
     }
 
-    default_multidb_disk_quota_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine tier 0 retention size", RRDENG_DEFAULT_TIER_DISK_SPACE_MB);
-    if(default_multidb_disk_quota_mb && default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        netdata_log_error("Invalid disk space %d for tier 0 given. Defaulting to %d.", default_multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
-        default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-        config_set_size_mb(CONFIG_SECTION_DB, "dbengine tier 0 retention size", default_multidb_disk_quota_mb);
+    rrdeng_cfg.multidb_disk_quota_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine tier 0 retention size", RRDENG_DEFAULT_TIER_DISK_SPACE_MB);
+    if(rrdeng_cfg.multidb_disk_quota_mb && rrdeng_cfg.multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+        netdata_log_error("Invalid disk space %d for tier 0 given. Defaulting to %d.", rrdeng_cfg.multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+        rrdeng_cfg.multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+        config_set_size_mb(CONFIG_SECTION_DB, "dbengine tier 0 retention size", rrdeng_cfg.multidb_disk_quota_mb);
     }
 
 #ifdef OS_WINDOWS
@@ -958,13 +958,13 @@ static void dbengine_init(const char *hostname) {
             continue;
         }
 
-        int disk_space_mb = tier ? RRDENG_DEFAULT_TIER_DISK_SPACE_MB : default_multidb_disk_quota_mb;
+        int disk_space_mb = tier ? RRDENG_DEFAULT_TIER_DISK_SPACE_MB : rrdeng_cfg.multidb_disk_quota_mb;
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention size", tier);
         disk_space_mb = config_get_size_mb(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention time", tier);
         storage_tiers_retention_days[tier] = config_get_duration_days(
-            CONFIG_SECTION_DB, dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_days[tier] : 0);
+            CONFIG_SECTION_DB, dbengineconfig, rrdeng_cfg.new_dbengine_defaults ? storage_tiers_retention_days[tier] : 0);
 
         tiers_init[tier].disk_space_mb = (int) disk_space_mb;
         tiers_init[tier].tier = tier;

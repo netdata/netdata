@@ -1967,7 +1967,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
     if(unlikely(tier >= storage_tiers)) return;
 #ifdef ENABLE_DBENGINE
-    if(default_backfill == RRD_BACKFILL_NONE) return;
+    if(rrdeng_cfg.backfill == RRD_BACKFILL_NONE) return;
 #else
     return;
 #endif
@@ -1981,7 +1981,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
 
     // if the user wants only NEW backfilling, and we don't have any data
 #ifdef ENABLE_DBENGINE
-    if(default_backfill == RRD_BACKFILL_NEW && latest_time_s <= 0) return;
+    if(rrdeng_cfg.backfill == RRD_BACKFILL_NEW && latest_time_s <= 0) return;
 #else
     return;
 #endif

@@ -13,14 +13,18 @@
 
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
-extern int default_rrdeng_page_cache_mb;
-extern int default_rrdeng_extent_cache_mb;
-extern int db_engine_journal_check;
-extern int default_rrdeng_disk_quota_mb;
-extern int default_multidb_disk_quota_mb;
-extern bool new_dbengine_defaults;
-extern bool legacy_multihost_db_space;
-extern RRD_BACKFILL default_backfill;
+typedef struct rrdengine_config {
+    int page_cache_mb;
+    int extent_cache_mb;
+    int journal_check;
+    int disk_quota_mb;
+    int multidb_disk_quota_mb;
+    bool new_dbengine_defaults;
+    bool legacy_multihost_db_space;
+    RRD_BACKFILL backfill;
+} rrdengine_config_t;
+
+extern rrdengine_config_t rrdeng_cfg;
 
 extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 extern size_t page_type_size[];

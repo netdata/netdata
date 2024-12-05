@@ -937,7 +937,7 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     rc = journalfile_check_v2_extent_list(data_start, journal_v2_file_size);
     if (rc) return 1;
 
-    if (!db_engine_journal_check)
+    if (!rrdeng_cfg.journal_check)
         return 0;
 
     rc = journalfile_check_v2_metric_list(data_start, journal_v2_file_size);
@@ -1136,7 +1136,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
 
     // Initialize the journal file to be able to access the data
 
-    if (!db_engine_journal_check)
+    if (!rrdeng_cfg.journal_check)
         journalfile->v2.flags |= JOURNALFILE_FLAG_METRIC_CRC_CHECK;
     journalfile_v2_data_set(journalfile, fd, data_start, journal_v2_file_size);
 

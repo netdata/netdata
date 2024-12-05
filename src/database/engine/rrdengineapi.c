@@ -59,20 +59,21 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
         initialize_single_ctx(multidb_ctx[i]);
 }
 
-int db_engine_journal_check = 0;
-bool new_dbengine_defaults = false;
-bool legacy_multihost_db_space = false;
-int default_rrdeng_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
-int default_multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
-RRD_BACKFILL default_backfill = RRD_BACKFILL_NEW;
 
+rrdengine_config_t rrdeng_cfg = {
 #if defined(ENV32BIT)
-int default_rrdeng_page_cache_mb = 16;
-int default_rrdeng_extent_cache_mb = 0;
+    .page_cache_mb = 16,
 #else
-int default_rrdeng_page_cache_mb = 32;
-int default_rrdeng_extent_cache_mb = 0;
+    .page_cache_mb = 32,
 #endif
+    .extent_cache_mb = 0,
+    .journal_check = 0,
+    .disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB,
+    .multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB,
+    .new_dbengine_defaults = false,
+    .legacy_multihost_db_space = false,
+    .backfill = RRD_BACKFILL_NEW,
+};
 
 // ----------------------------------------------------------------------------
 // metrics groups
