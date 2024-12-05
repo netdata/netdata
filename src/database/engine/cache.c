@@ -1962,7 +1962,7 @@ static void *pgc_evict_thread(void *ptr) {
         size_t at_once = 10;
         size_t size_to_evict = 0;
         size_t per1000 = cache_usage_per1000(cache, &size_to_evict);
-        bool was_critical = per1000 > cache->config.severe_pressure_per1000;
+        bool was_aggressive = per1000 > cache->config.aggressive_evict_per1000;
 
         while (size_to_evict && ((--at_once && size_to_evict && per1000 > cache->config.healthy_size_per1000) || (per1000 > cache->config.aggressive_evict_per1000))) {
             if (nd_thread_signaled_to_cancel()) {
@@ -1971,13 +1971,14 @@ static void *pgc_evict_thread(void *ptr) {
             }
 
             evict_pages(cache, 0, 0, true, false);
+
+            if(was_aggressive)
+                mallocz_release_as_much_memory_to_the_system();
+
             tinysleep();
 
             size_to_evict = 0;
             per1000 = cache_usage_per1000(cache, &size_to_evict);
-
-            if(was_critical && per1000 > cache->config.severe_pressure_per1000 && !cache->config.dynamic_target_size_cb)
-                mallocz_release_as_much_memory_to_the_system();
         }
 
         spinlock_unlock(&cache->evictor.spinlock);
