@@ -105,19 +105,6 @@ struct dbengine_initialization {
     int ret;
 };
 
-typedef struct rrd_alert_prototype {
-    struct rrd_alert_match match;
-    struct rrd_alert_config config;
-
-    struct {
-        uint32_t uses;
-        bool enabled;
-        bool is_on_disk;
-        SPINLOCK spinlock;
-        struct rrd_alert_prototype *prev, *next;
-    } _internal;
-} RRD_ALERT_PROTOTYPE;
-
 void *dbengine_tier_init(void *ptr) {
     struct dbengine_initialization *dbi = ptr;
     dbi->ret = rrdeng_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier, dbi->retention_seconds);

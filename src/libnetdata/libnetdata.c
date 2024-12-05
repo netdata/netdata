@@ -449,13 +449,12 @@ void posix_memfree(void *ptr) {
 #endif
 
 void mallocz_release_as_much_memory_to_the_system(void) {
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
-    size_t trim_threshold = aral_optimal_page_size();
-
 #if defined(HAVE_C_MALLOPT) || defined(HAVE_C_MALLOC_TRIM)
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
 
 #ifdef HAVE_C_MALLOPT
+    size_t trim_threshold = aral_optimal_page_size();
     mallopt(M_TRIM_THRESHOLD, (int)trim_threshold);
 #endif
 

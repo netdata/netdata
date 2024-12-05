@@ -81,8 +81,8 @@ struct stream_opcode {
 #define WORKER_SENDER_JOB_REPLAY_DICT_SIZE                              (WORKER_PARSER_FIRST_JOB - 1)
 #define WORKER_SENDER_JOB_MESSAGES                                      (WORKER_PARSER_FIRST_JOB - 0)
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 29
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 25
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 35
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 34
 #endif
 
 #define STREAM_MAX_THREADS 2048

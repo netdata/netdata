@@ -1,4 +1,4 @@
-### Notes on Netdata Active-Active Parent Clusters
+# Notes on Netdata Active-Active Parent Clusters
 
 #### **Streaming Connection Overview**
 

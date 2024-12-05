@@ -31,7 +31,7 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, path, sizeof(addr.sun_path)-1);
+    strncpyz(addr.sun_path, path, sizeof(addr.sun_path) - 1);
 
     if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR,

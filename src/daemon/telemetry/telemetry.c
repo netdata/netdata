@@ -20,7 +20,7 @@
 #define WORKER_JOB_ARAL                 14
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 15
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 14
+#error "WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 14"
 #endif
 
 bool telemetry_enabled = true;

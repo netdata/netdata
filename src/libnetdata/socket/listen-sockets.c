@@ -77,7 +77,7 @@ static int create_listen_socket_unix(const char *path, int listen_backlog) {
     struct sockaddr_un name;
     memset(&name, 0, sizeof(struct sockaddr_un));
     name.sun_family = AF_UNIX;
-    strncpy(name.sun_path, path, sizeof(name.sun_path)-1);
+    strncpyz(name.sun_path, path, sizeof(name.sun_path) - 1);
 
     errno_clear();
     if (unlink(path) == -1 && errno != ENOENT)
