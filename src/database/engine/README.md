@@ -159,7 +159,7 @@ Then `x 2` is the worst case estimate for the dirty queue. If all collected metr
 
 The memory we saved with the above is used to improve the LRU cache. So, although we reserved 32MiB for the LRU, in bigger setups (Netdata Parents) the LRU grows a lot more, within the limits of the equation.
 
-In practice, the main cache sizes itself with `hot x 1.5` instead of `host x 2`. The reason is that 5% of the main cache is reserved for expanding open cache, 5% for expanding extent cache, and we need Room for the extensive buffers that are allocated in these setups. When the main cache exceeds `hot x 1.5` it enters a mode of critical evictions, and aggressively frees pages from the LRU to maintain a healthy memory footprint within its design limits.
+In practice, the main cache sizes itself with `hot x 1.5` instead of `hot x 2`. The reason is that 5% of the main cache is reserved for expanding open cache, 5% for expanding extent cache, and we need Room for the extensive buffers that are allocated in these setups. When the main cache exceeds `hot x 1.5` it enters a mode of critical evictions, and aggressively frees pages from the LRU to maintain a healthy memory footprint within its design limits.
 
 #### Open Cache
 

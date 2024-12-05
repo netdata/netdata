@@ -14,50 +14,12 @@
 int rrd_delete_unupdated_dimensions = 0;
 */
 
-int default_rrd_update_every = UPDATE_EVERY;
-int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 #ifdef ENABLE_DBENGINE
 RRD_MEMORY_MODE default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
 #else
 RRD_MEMORY_MODE default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
 #endif
 int gap_when_lost_iterations_above = 1;
-
-
-// ----------------------------------------------------------------------------
-// RRD - memory modes
-
-inline const char *rrd_memory_mode_name(RRD_MEMORY_MODE id) {
-    switch(id) {
-        case RRD_MEMORY_MODE_RAM:
-            return RRD_MEMORY_MODE_RAM_NAME;
-
-        case RRD_MEMORY_MODE_NONE:
-            return RRD_MEMORY_MODE_NONE_NAME;
-
-        case RRD_MEMORY_MODE_ALLOC:
-            return RRD_MEMORY_MODE_ALLOC_NAME;
-
-        case RRD_MEMORY_MODE_DBENGINE:
-            return RRD_MEMORY_MODE_DBENGINE_NAME;
-    }
-
-    STORAGE_ENGINE* eng = storage_engine_get(id);
-    if (eng) {
-        return eng->name;
-    }
-
-    return RRD_MEMORY_MODE_RAM_NAME;
-}
-
-RRD_MEMORY_MODE rrd_memory_mode_id(const char *name) {
-    STORAGE_ENGINE* eng = storage_engine_find(name);
-    if (eng) {
-        return eng->id;
-    }
-
-    return RRD_MEMORY_MODE_RAM;
-}
 
 
 // ----------------------------------------------------------------------------
@@ -108,6 +70,9 @@ inline RRDSET_TYPE rrdset_type_id(const char *name) {
     else if(unlikely(strcmp(name, RRDSET_TYPE_STACKED_NAME) == 0))
         return RRDSET_TYPE_STACKED;
 
+    else if(unlikely(strcmp(name, RRDSET_TYPE_HEATMAP_NAME) == 0))
+        return RRDSET_TYPE_HEATMAP;
+
     else // if(unlikely(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0))
         return RRDSET_TYPE_LINE;
 }
@@ -123,6 +88,9 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type) {
 
         case RRDSET_TYPE_STACKED:
             return RRDSET_TYPE_STACKED_NAME;
+
+        case RRDSET_TYPE_HEATMAP:
+            return RRDSET_TYPE_HEATMAP_NAME;
     }
 }
 

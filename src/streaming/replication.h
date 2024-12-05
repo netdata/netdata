@@ -26,7 +26,7 @@ bool replicate_chart_request(send_command callback, struct parser *parser,
                              time_t child_first_entry, time_t child_last_entry, time_t child_wall_clock_time,
                              time_t response_first_start_time, time_t response_last_end_time);
 
-void replication_init_sender(struct sender_state *sender);
+void replication_sender_init(struct sender_state *sender);
 void replication_cleanup_sender(struct sender_state *sender);
 void replication_sender_delete_pending_requests(struct sender_state *sender);
 void replication_add_request(struct sender_state *sender, const char *chart_id, time_t after, time_t before, bool start_streaming);

@@ -77,7 +77,8 @@
 
 #define PLUGINSD_KEYWORD_JSON                   "JSON"
 #define PLUGINSD_KEYWORD_JSON_END               "JSON_PAYLOAD_END"
-#define PLUGINSD_KEYWORD_STREAM_PATH            "STREAM_PATH"
+#define PLUGINSD_KEYWORD_JSON_CMD_STREAM_PATH   "STREAM_PATH"
+#define PLUGINSD_KEYWORD_JSON_CMD_ML_MODEL      "ML_MODEL"
 
 typedef void (*functions_evloop_worker_execute_t)(const char *transaction, char *function, usec_t *stop_monotonic_ut,
                                                   bool *cancelled, BUFFER *payload, HTTP_ACCESS access,

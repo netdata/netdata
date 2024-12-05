@@ -223,9 +223,7 @@ void worker_is_busy(size_t job_id) {
 }
 
 void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
-    if(unlikely(!worker)) return;
-
-    if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
+    if(unlikely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         return;
 
     switch(worker->per_job_type[job_id].type) {

@@ -1188,14 +1188,14 @@ static inline void local_sockets_init(LS_STATE *ls) {
     ls->local_socket_aral = aral_create(
         "local-sockets",
         sizeof(LOCAL_SOCKET),
-        65536,
+        65536 / sizeof(LOCAL_SOCKET),
         65536,
         NULL, NULL, NULL, false, true);
 
     ls->pid_socket_aral = aral_create(
         "pid-sockets",
         sizeof(struct pid_socket),
-        65536,
+        65536 / sizeof(struct pid_socket),
         65536,
         NULL, NULL, NULL, false, true);
 

@@ -438,6 +438,7 @@ check_function_exists(backtrace HAVE_BACKTRACE)
 check_function_exists(arc4random_buf HAVE_ARC4RANDOM_BUF)
 check_function_exists(arc4random_uniform HAVE_ARC4RANDOM_UNIFORM)
 check_function_exists(getrandom HAVE_GETRANDOM)
+check_function_exists(sysinfo HAVE_SYSINFO)
 
 #
 # check source compilation
@@ -474,6 +475,14 @@ int main() {
         return 0;
 }
 " HAVE_C_MALLOPT)
+
+check_c_source_compiles("
+#include <malloc.h>
+int main() {
+        malloc_trim(0);
+        return 0;
+}
+" HAVE_C_MALLOC_TRIM)
 
 check_c_source_compiles("
 #define _GNU_SOURCE
@@ -920,6 +929,21 @@ set(LIBNETDATA_FILES
         src/libnetdata/xxHash/xxhash.h
         src/libnetdata/os/random.c
         src/libnetdata/os/random.h
+        src/libnetdata/socket/nd-sock.c
+        src/libnetdata/socket/nd-sock.h
+        src/libnetdata/socket/listen-sockets.c
+        src/libnetdata/socket/listen-sockets.h
+        src/libnetdata/socket/poll-events.c
+        src/libnetdata/socket/poll-events.h
+        src/libnetdata/socket/connect-to.c
+        src/libnetdata/socket/connect-to.h
+        src/libnetdata/socket/socket-peers.c
+        src/libnetdata/socket/socket-peers.h
+        src/libnetdata/libjudy/judyl-typed.h
+        src/libnetdata/os/system_memory.c
+        src/libnetdata/os/system_memory.h
+        src/libnetdata/socket/nd-poll.c
+        src/libnetdata/socket/nd-poll.h
 )
 
 set(LIBH2O_FILES
@@ -1013,8 +1037,8 @@ set(DAEMON_FILES
         src/daemon/daemon.h
         src/daemon/libuv_workers.c
         src/daemon/libuv_workers.h
-        src/daemon/global_statistics.c
-        src/daemon/global_statistics.h
+        src/daemon/telemetry/telemetry.c
+        src/daemon/telemetry/telemetry.h
         src/daemon/analytics.c
         src/daemon/analytics.h
         src/daemon/main.c
@@ -1035,15 +1059,59 @@ set(DAEMON_FILES
         src/daemon/pipename.h
         src/daemon/unit_test.c
         src/daemon/unit_test.h
-        src/daemon/config/dyncfg.c
-        src/daemon/config/dyncfg.h
-        src/daemon/config/dyncfg-files.c
-        src/daemon/config/dyncfg-unittest.c
-        src/daemon/config/dyncfg-inline.c
-        src/daemon/config/dyncfg-echo.c
-        src/daemon/config/dyncfg-internals.h
-        src/daemon/config/dyncfg-intercept.c
-        src/daemon/config/dyncfg-tree.c
+        src/daemon/dyncfg/dyncfg.c
+        src/daemon/dyncfg/dyncfg.h
+        src/daemon/dyncfg/dyncfg-files.c
+        src/daemon/dyncfg/dyncfg-unittest.c
+        src/daemon/dyncfg/dyncfg-inline.c
+        src/daemon/dyncfg/dyncfg-echo.c
+        src/daemon/dyncfg/dyncfg-internals.h
+        src/daemon/dyncfg/dyncfg-intercept.c
+        src/daemon/dyncfg/dyncfg-tree.c
+        src/daemon/telemetry/telemetry-http-api.c
+        src/daemon/telemetry/telemetry-http-api.h
+        src/daemon/telemetry/telemetry-queries.c
+        src/daemon/telemetry/telemetry-queries.h
+        src/daemon/telemetry/telemetry-ingestion.c
+        src/daemon/telemetry/telemetry-ingestion.h
+        src/daemon/telemetry/telemetry-ml.c
+        src/daemon/telemetry/telemetry-ml.h
+        src/daemon/telemetry/telemetry-gorilla.c
+        src/daemon/telemetry/telemetry-gorilla.h
+        src/daemon/telemetry/telemetry-daemon.c
+        src/daemon/telemetry/telemetry-daemon.h
+        src/daemon/telemetry/telemetry-daemon-memory.c
+        src/daemon/telemetry/telemetry-daemon-memory.h
+        src/daemon/telemetry/telemetry-sqlite3.c
+        src/daemon/telemetry/telemetry-sqlite3.h
+        src/daemon/telemetry/telemetry-dbengine.c
+        src/daemon/telemetry/telemetry-dbengine.h
+        src/daemon/telemetry/telemetry-string.c
+        src/daemon/telemetry/telemetry-string.h
+        src/daemon/telemetry/telemetry-heartbeat.c
+        src/daemon/telemetry/telemetry-heartbeat.h
+        src/daemon/telemetry/telemetry-dictionary.c
+        src/daemon/telemetry/telemetry-dictionary.h
+        src/daemon/telemetry/telemetry-workers.c
+        src/daemon/telemetry/telemetry-workers.h
+        src/daemon/telemetry/telemetry-trace-allocations.c
+        src/daemon/telemetry/telemetry-trace-allocations.h
+        src/daemon/telemetry/telemetry-aral.c
+        src/daemon/telemetry/telemetry-aral.h
+        src/daemon/config/netdata-conf-db.c
+        src/daemon/config/netdata-conf-db.h
+        src/daemon/config/netdata-conf.h
+        src/daemon/config/netdata-conf-backwards-compatibility.c
+        src/daemon/config/netdata-conf-backwards-compatibility.h
+        src/daemon/config/netdata-conf-web.c
+        src/daemon/config/netdata-conf-web.h
+        src/daemon/config/netdata-conf-directories.c
+        src/daemon/config/netdata-conf-directories.h
+        src/daemon/config/netdata-conf-logs.c
+        src/daemon/config/netdata-conf-logs.h
+        src/daemon/config/netdata-conf-global.c
+        src/daemon/config/netdata-conf-global.h
+        src/daemon/config/netdata-conf.c
 )
 
 set(H2O_FILES
@@ -1227,15 +1295,34 @@ if(ENABLE_ML)
         set(ML_FILES
                 src/ml/ad_charts.h
                 src/ml/ad_charts.cc
-                src/ml/Config.cc
                 src/ml/dlib/dlib/all/source.cpp
-                src/ml/ml.h
                 src/ml/ml.cc
-                src/ml/ml-private.h
+                src/ml/ml_calculated_number.h
+                src/ml/ml_host.h
+                src/ml/ml_config.h
+                src/ml/ml_config.cc
+                src/ml/ml_dimension.h
+                src/ml/ml_enums.h
+                src/ml/ml_enums.cc
+                src/ml/ml_features.h
+                src/ml/ml_features.cc
+                src/ml/ml_kmeans.h
+                src/ml/ml_kmeans.cc
+                src/ml/ml_queue.h
+                src/ml/ml_worker.h
+                src/ml/ml_string_wrapper.h
+                src/ml/ml_queue.cc
+                src/ml/ml_private.h
+                src/ml/ml_public.h
+                src/ml/ml_public.cc
         )
+
+        if(NOT ENABLE_MIMALLOC)
+                list(APPEND ML_FILES src/ml/ml_memory.cc)
+        endif()
 else()
         set(ML_FILES
-                src/ml/ml.h
+                src/ml/ml_public.h
                 src/ml/ml-dummy.c
         )
 endif()
@@ -1338,6 +1425,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions-exporters.h
         src/database/rrdfunctions-internals.h
         src/database/rrdcollector-internals.h
+        src/database/rrd-database-mode.h
+        src/database/rrd-database-mode.c
 )
 
 if(ENABLE_DBENGINE)
@@ -1405,7 +1494,7 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
 )
 
 set(STREAMING_PLUGIN_FILES
-        src/streaming/rrdpush.h
+        src/streaming/stream.h
         src/streaming/stream-compression/compression.c
         src/streaming/stream-compression/compression.h
         src/streaming/stream-compression/brotli.c
@@ -1416,8 +1505,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-compression/lz4.h
         src/streaming/stream-compression/zstd.c
         src/streaming/stream-compression/zstd.h
-        src/streaming/receiver.c
-        src/streaming/sender.c
+        src/streaming/stream-receiver.c
+        src/streaming/stream-sender.c
         src/streaming/replication.c
         src/streaming/replication.h
         src/streaming/h2o-common.h
@@ -1429,11 +1518,11 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-path.h
         src/streaming/stream-capabilities.c
         src/streaming/stream-capabilities.h
-        src/streaming/sender-connect.c
-        src/streaming/sender-internals.h
-        src/streaming/sender-execute.c
-        src/streaming/sender-commit.c
-        src/streaming/sender-destinations.c
+        src/streaming/stream-connector.c
+        src/streaming/stream-sender-internals.h
+        src/streaming/stream-sender-execute.c
+        src/streaming/stream-sender-commit.c
+        src/streaming/stream-parents.c
         src/streaming/stream-handshake.c
         src/streaming/protocol/command-function.c
         src/streaming/protocol/command-host-labels.c
@@ -1443,11 +1532,17 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-conf.c
         src/streaming/stream-conf.h
         src/streaming/stream-handshake.h
-        src/streaming/sender.h
-        src/streaming/sender-destinations.h
+        src/streaming/stream-parents.h
         src/streaming/rrdhost-status.c
         src/streaming/rrdhost-status.h
-        src/streaming/receiver.h
+        src/streaming/stream-sender-api.c
+        src/streaming/stream-receiver-internals.h
+        src/streaming/stream-receiver-api.c
+        src/streaming/stream-thread.c
+        src/streaming/stream-thread.h
+        src/streaming/stream-receiver-connection.c
+        src/streaming/stream-sender-commit.h
+        src/streaming/stream-traffic-types.h
 )
 
 set(WEB_PLUGIN_FILES
@@ -1459,6 +1554,7 @@ set(WEB_PLUGIN_FILES
         src/web/server/static/static-threaded.h
         src/web/server/web_client_cache.c
         src/web/server/web_client_cache.h
+        src/web/api/v3/api_v3_stream_info.c
         src/web/api/v3/api_v3_stream_path.c
 )
 

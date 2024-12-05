@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "commands.h"
+#include "../stream-sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
 
-static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s __maybe_unused, RRDSET_FLAGS flags) {
-    buffer_fast_strcat(wb, "BEGIN \"", 7);
+static void
+stream_send_rrdset_metrics_v1_internal(BUFFER *wb, RRDSET *st, struct sender_state *s __maybe_unused, RRDSET_FLAGS flags) {
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN " \"", 7);
     buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
     buffer_fast_strcat(wb, "\" ", 2);
 
-    if(st->last_collected_time.tv_sec > st->rrdpush.sender.resync_time_s)
+    if(st->last_collected_time.tv_sec > st->stream.snd.resync_time_s)
         buffer_print_uint64(wb, st->usec_since_last_update);
     else
         buffer_fast_strcat(wb, "0", 1);
@@ -21,7 +23,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
             continue;
 
         if(likely(rrddim_check_upstream_exposed_collector(rd))) {
-            buffer_fast_strcat(wb, "SET \"", 5);
+            buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET " \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
             buffer_print_int64(wb, rd->collector.collected_value);
@@ -39,15 +41,15 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
     if(unlikely(flags & RRDSET_FLAG_UPSTREAM_SEND_VARIABLES))
         rrdvar_print_to_streaming_custom_chart_variables(st, wb);
 
-    buffer_fast_strcat(wb, "END\n", 4);
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_END "\n", 4);
 }
 
-void rrdset_push_metrics_v1(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
+void stream_send_rrdset_metrics_v1(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
     RRDHOST *host = st->rrdhost;
-    rrdpush_send_chart_metrics(rsb->wb, st, host->sender, rsb->rrdset_flags);
+    stream_send_rrdset_metrics_v1_internal(rsb->wb, st, host->sender, rsb->rrdset_flags);
 }
 
-void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
+void stream_send_rrddim_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
     if(!rsb->wb || !rsb->v2 || !netdata_double_isnumber(n) || !does_storage_number_exist(flags))
         return;
 
@@ -65,7 +67,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
 
         if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->rrdpush.sender.chart_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->stream.snd.chart_slot);
         }
 
         buffer_fast_strcat(wb, " '", 2);
@@ -89,7 +91,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
 
     if(with_slots) {
         buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-        buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush.sender.dim_slot);
+        buffer_print_uint64_encoded(wb, integer_encoding, rd->stream.snd.dim_slot);
     }
 
     buffer_fast_strcat(wb, " '", 2);
@@ -108,7 +110,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     buffer_fast_strcat(wb, "\n", 1);
 }
 
-void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
+void stream_send_rrdset_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
     if(!rsb->wb)
         return;
 

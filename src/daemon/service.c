@@ -166,7 +166,7 @@ static void svc_rrdhost_detect_obsolete_charts(RRDHOST *host) {
     time_t last_entry_t;
     RRDSET *st;
 
-    time_t child_connect_time = host->child_connect_time;
+    time_t child_connect_time = host->stream.rcv.status.last_connected;
 
     rrdset_foreach_read(st, host) {
         if(rrdset_is_replicating(st))
@@ -203,19 +203,19 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
         if (host == localhost)
             continue;
 
-        spinlock_lock(&host->receiver_lock);
+        rrdhost_receiver_lock(host);
 
         time_t now = now_realtime_sec();
 
-        if (host->trigger_chart_obsoletion_check &&
-            ((host->child_last_chart_command &&
-              host->child_last_chart_command + host->health.health_delay_up_to < now) ||
-             (host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now))) {
+        if (host->stream.rcv.status.check_obsolete &&
+            ((host->stream.rcv.status.last_chart &&
+              host->stream.rcv.status.last_chart + host->health.delay_up_to < now) ||
+             (host->stream.rcv.status.last_connected + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now))) {
             svc_rrdhost_detect_obsolete_charts(host);
-            host->trigger_chart_obsoletion_check = 0;
+            host->stream.rcv.status.check_obsolete = false;
         }
 
-        spinlock_unlock(&host->receiver_lock);
+        rrdhost_receiver_unlock(host);
     }
 
     rrd_rdunlock();
@@ -235,7 +235,8 @@ restart_after_removal:
             continue;
 
         bool force = false;
-        if (rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST) && now - host->last_connected > rrdhost_free_ephemeral_time_s)
+        if (rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST) &&
+            now - host->stream.snd.status.last_connected > rrdhost_free_ephemeral_time_s)
             force = true;
 
         bool is_archived = rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED);

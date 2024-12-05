@@ -282,34 +282,34 @@ static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st,
 
     RRDHOST *host = st->rrdhost;
 
-    if(unlikely((size_t)slot > host->rrdpush.receive.pluginsd_chart_slots.size)) {
-        spinlock_lock(&host->rrdpush.receive.pluginsd_chart_slots.spinlock);
-        size_t old_slots = host->rrdpush.receive.pluginsd_chart_slots.size;
+    if(unlikely((size_t)slot > host->stream.rcv.pluginsd_chart_slots.size)) {
+        spinlock_lock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
+        size_t old_slots = host->stream.rcv.pluginsd_chart_slots.size;
         size_t new_slots = (old_slots < PLUGINSD_MIN_RRDSET_POINTERS_CACHE) ? PLUGINSD_MIN_RRDSET_POINTERS_CACHE : old_slots * 2;
 
         if(new_slots < (size_t)slot)
             new_slots = slot;
 
-        host->rrdpush.receive.pluginsd_chart_slots.array =
-                reallocz(host->rrdpush.receive.pluginsd_chart_slots.array, new_slots * sizeof(RRDSET *));
+        host->stream.rcv.pluginsd_chart_slots.array =
+                reallocz(host->stream.rcv.pluginsd_chart_slots.array, new_slots * sizeof(RRDSET *));
 
         for(size_t i = old_slots; i < new_slots ;i++)
-            host->rrdpush.receive.pluginsd_chart_slots.array[i] = NULL;
+            host->stream.rcv.pluginsd_chart_slots.array[i] = NULL;
 
-        host->rrdpush.receive.pluginsd_chart_slots.size = new_slots;
-        spinlock_unlock(&host->rrdpush.receive.pluginsd_chart_slots.spinlock);
+        host->stream.rcv.pluginsd_chart_slots.size = new_slots;
+        spinlock_unlock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
     }
 
-    host->rrdpush.receive.pluginsd_chart_slots.array[slot - 1] = st;
+    host->stream.rcv.pluginsd_chart_slots.array[slot - 1] = st;
     st->pluginsd.last_slot = (int32_t)slot - 1;
     parser->user.cleanup_slots = obsolete;
 }
 
 static inline RRDSET *pluginsd_rrdset_cache_get_from_slot(PARSER *parser, RRDHOST *host, const char *id, ssize_t slot, const char *keyword) {
-    if(unlikely(slot < 1 || (size_t)slot > host->rrdpush.receive.pluginsd_chart_slots.size))
+    if(unlikely(slot < 1 || (size_t)slot > host->stream.rcv.pluginsd_chart_slots.size))
         return pluginsd_find_chart(host, id, keyword);
 
-    RRDSET *st = host->rrdpush.receive.pluginsd_chart_slots.array[slot - 1];
+    RRDSET *st = host->stream.rcv.pluginsd_chart_slots.array[slot - 1];
 
     if(!st) {
         st = pluginsd_find_chart(host, id, keyword);

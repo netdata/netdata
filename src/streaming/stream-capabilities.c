@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrdpush.h"
+#include "stream.h"
+#include "stream-receiver-internals.h"
+#include "stream-sender-internals.h"
 
-static STREAM_CAPABILITIES globally_disabled_capabilities = STREAM_CAP_NONE;
+static STREAM_CAPABILITIES globally_disabled_capabilities = STREAM_CAP_ALWAYS_DISABLED;
 
 static struct {
     STREAM_CAPABILITIES cap;
     const char *str;
 } capability_names[] = {
+    // DO NOT CHANGE NAMES
+    // THEY ARE USED BY STREAM_PATH, SO CONNECTING OF DIFFERENT NODES WILL BREAK
+
     {STREAM_CAP_V1,           "V1" },
     {STREAM_CAP_V2,           "V2" },
     {STREAM_CAP_VN,           "VN" },
@@ -21,7 +26,8 @@ static struct {
     {STREAM_CAP_BINARY,       "BINARY" },
     {STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
     {STREAM_CAP_IEEE754,      "IEEE754" },
-    {STREAM_CAP_DATA_WITH_ML, "ML" },
+    {STREAM_CAP_DATA_WITH_ML, "ML"},            // do not remove this - stream_path fails to parse old nodes
+    {STREAM_CAP_ML_MODELS,    "MLMODELS" },
     {STREAM_CAP_DYNCFG,       "DYNCFG" },
     {STREAM_CAP_SLOTS,        "SLOTS" },
     {STREAM_CAP_ZSTD,         "ZSTD" },
@@ -30,6 +36,8 @@ static struct {
     {STREAM_CAP_PROGRESS,     "PROGRESS" },
     {STREAM_CAP_NODE_ID,      "NODEID" },
     {STREAM_CAP_PATHS,        "PATHS" },
+
+    // terminator
     {0 , NULL },
 };
 
@@ -95,12 +103,12 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
         // we have DATA_WITH_ML capability
         // we should remove the DATA_WITH_ML capability if our database does not have anomaly info
         // this can happen under these conditions: 1. we don't run ML, and 2. we don't receive ML
-        spinlock_lock(&host->receiver_lock);
+        rrdhost_receiver_lock(host);
 
-        if(!ml_host_running(host) && !stream_has_capability(host->receiver, STREAM_CAP_DATA_WITH_ML))
-            disabled_capabilities |= STREAM_CAP_DATA_WITH_ML;
+        if (!ml_host_running(host) && !stream_has_capability(host->receiver, STREAM_CAP_ML_MODELS))
+            disabled_capabilities |= STREAM_CAP_ML_MODELS;
 
-        spinlock_unlock(&host->receiver_lock);
+        rrdhost_receiver_unlock(host);
 
         if(host->sender)
             disabled_capabilities |= host->sender->disabled_capabilities;
@@ -124,7 +132,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_NODE_ID |
             STREAM_CAP_PATHS |
             STREAM_CAP_IEEE754 |
-            STREAM_CAP_DATA_WITH_ML |
+            STREAM_CAP_ML_MODELS |
             0) & ~disabled_capabilities;
 }
 
@@ -151,7 +159,7 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version, RRDH
 
     if(!(common_caps & STREAM_CAP_INTERPOLATED))
         // DATA WITH ML requires INTERPOLATED
-        common_caps &= ~STREAM_CAP_DATA_WITH_ML;
+        common_caps &= ~(STREAM_CAP_ML_MODELS);
 
     return common_caps;
 }

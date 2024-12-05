@@ -73,6 +73,7 @@
 #cmakedefine HAVE_ARC4RANDOM_UNIFORM
 #cmakedefine HAVE_RAND_S
 #cmakedefine HAVE_GETRANDOM
+#cmakedefine HAVE_SYSINFO
 
 #cmakedefine HAVE_BACKTRACE
 #cmakedefine HAVE_CLOSE_RANGE
@@ -95,6 +96,7 @@
 #cmakedefine STRERROR_R_CHAR_P
 #cmakedefine HAVE_C__GENERIC
 #cmakedefine HAVE_C_MALLOPT
+#cmakedefine HAVE_C_MALLOC_TRIM
 #cmakedefine HAVE_SETNS
 #cmakedefine HAVE_STRNDUP
 #cmakedefine SSL_HAS_PENDING

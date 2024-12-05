@@ -201,7 +201,7 @@ static int wait_till_agent_claim_ready()
         // We trap the impossible NULL here to keep the linter happy without using a fatal() in the code.
         const char *cloud_base_url = cloud_config_url_get();
         if (cloud_base_url == NULL) {
-            netdata_log_error("Do not move the \"url\" out of post_conf_load!!");
+            netdata_log_error("Do not move the \"url\" out of netdata_conf_section_global_run_as_user!!");
             return 1;
         }
 
@@ -559,7 +559,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
     while (service_running(SERVICE_ACLK)) {
         aclk_cloud_base_url = cloud_config_url_get();
         if (aclk_cloud_base_url == NULL) {
-            error_report("Do not move the \"url\" out of post_conf_load!!");
+            error_report("Do not move the \"url\" out of netdata_conf_section_global_run_as_user!!");
             aclk_status = ACLK_STATUS_NO_CLOUD_URL;
             return -1;
         }
@@ -868,7 +868,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
             create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
             create_query->data.bin_payload.msg_name = "CreateNodeInstance";
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "Registering host=%s, hops=%u", host->machine_guid, host->system_info->hops);
+                   "Registering host=%s, hops=%d", host->machine_guid, host->system_info->hops);
 
             aclk_execute_query(create_query);
             return;
@@ -892,7 +892,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
     query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "Queuing status update for node=%s, live=%d, hops=%u, queryable=%d",
+           "Queuing status update for node=%s, live=%d, hops=%d, queryable=%d",
            (char*)node_state_update.node_id, cmd, host->system_info->hops, queryable);
     freez((void*)node_state_update.node_id);
     query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";

@@ -115,7 +115,7 @@ context, charttype]`, where:
 - `family`: An identifier used to group charts together (can be null).
 - `context`: An identifier used to group contextually similar charts together. The best practice is to provide a context
   that is `A.B`, with `A` being the name of the collector, and `B` being the name of the specific metric.
-- `charttype`: Either `line`, `area`, or `stacked`. If null line is the default value.
+- `charttype`: Either `line`, `area`, `stacked` or `heatmap`. If null line is the default value.
 
 You can read more about `family` and `context` in the [Netdata Charts](/docs/dashboards-and-charts/netdata-charts.md) doc.
 

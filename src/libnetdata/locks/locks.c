@@ -253,9 +253,13 @@ static inline void spinlock_lock_internal(SPINLOCK *spinlock)
         spins++;
         #endif
 
-        if(unlikely(i == 8)) {
-            i = 0;
-            tinysleep();
+        if(unlikely(i % 8 == 0)) {
+            if(i == 8 * 4) {
+                i = 0;
+                yield_the_processor();
+            }
+            else
+                tinysleep();
         }
     }
 
@@ -373,13 +377,22 @@ bool spinlock_trylock_cancelable(SPINLOCK *spinlock)
 
 void rw_spinlock_init(RW_SPINLOCK *rw_spinlock) {
     rw_spinlock->readers = 0;
+    rw_spinlock->writers_waiting = 0;
     spinlock_init(&rw_spinlock->spinlock);
 }
 
 void rw_spinlock_read_lock(RW_SPINLOCK *rw_spinlock) {
-    spinlock_lock(&rw_spinlock->spinlock);
-    __atomic_add_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
-    spinlock_unlock(&rw_spinlock->spinlock);
+    while(1) {
+        spinlock_lock(&rw_spinlock->spinlock);
+        if (!rw_spinlock->writers_waiting) {
+            __atomic_add_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
+            spinlock_unlock(&rw_spinlock->spinlock);
+            break;
+        }
+
+        spinlock_unlock(&rw_spinlock->spinlock);
+        yield_the_processor(); // let the writer run
+    }
 
     nd_thread_rwspinlock_read_locked();
 }
@@ -398,16 +411,25 @@ void rw_spinlock_read_unlock(RW_SPINLOCK *rw_spinlock) {
 
 void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock) {
     size_t spins = 0;
-    while(1) {
-        spins++;
+    for(size_t i = 1; true ;i++) {
         spinlock_lock(&rw_spinlock->spinlock);
 
-        if(__atomic_load_n(&rw_spinlock->readers, __ATOMIC_RELAXED) == 0)
+        if(__atomic_load_n(&rw_spinlock->readers, __ATOMIC_RELAXED) == 0) {
+            if(spins != 0)
+                rw_spinlock->writers_waiting--;
             break;
+        }
+
+        if(spins == 0)
+            rw_spinlock->writers_waiting++;
 
         // Busy wait until all readers have released their locks.
         spinlock_unlock(&rw_spinlock->spinlock);
-        tinysleep();
+        if(i == 8 * 2) {
+            i = 0;
+            tinysleep();
+        }
+        spins++;
     }
 
     (void)spins;

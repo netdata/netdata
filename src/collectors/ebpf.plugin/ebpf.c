@@ -739,7 +739,7 @@ ARAL *ebpf_allocate_pid_aral(char *name, size_t size)
     }
 
     return aral_create(name, size,
-        0, max_elements,
+        0, 0,
         NULL, NULL, NULL, false, false);
 }
 

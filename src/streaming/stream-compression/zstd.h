@@ -7,12 +7,12 @@
 
 #ifdef ENABLE_ZSTD
 
-void rrdpush_compressor_init_zstd(struct compressor_state *state);
-void rrdpush_compressor_destroy_zstd(struct compressor_state *state);
-size_t rrdpush_compress_zstd(struct compressor_state *state, const char *data, size_t size, const char **out);
-size_t rrdpush_decompress_zstd(struct decompressor_state *state, const char *compressed_data, size_t compressed_size);
-void rrdpush_decompressor_init_zstd(struct decompressor_state *state);
-void rrdpush_decompressor_destroy_zstd(struct decompressor_state *state);
+void stream_compressor_init_zstd(struct compressor_state *state);
+void stream_compressor_destroy_zstd(struct compressor_state *state);
+size_t stream_compress_zstd(struct compressor_state *state, const char *data, size_t size, const char **out);
+size_t stream_decompress_zstd(struct decompressor_state *state, const char *compressed_data, size_t compressed_size);
+void stream_decompressor_init_zstd(struct decompressor_state *state);
+void stream_decompressor_destroy_zstd(struct decompressor_state *state);
 
 #endif // ENABLE_ZSTD
 

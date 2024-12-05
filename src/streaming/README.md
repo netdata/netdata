@@ -59,7 +59,7 @@ This section defines an API key for other Agents to connect to this Netdata.
 | [`allow from`](#allow-from)  | `*`        | A space-separated list of [Netdata simple patterns](/src/libnetdata/simple_pattern/README.md) matching the IPs of nodes that will stream metrics using this API key. [Read more &rarr;](#allow-from)     |
 | `retention`                  | `1h`       | The default amount of child metrics history to retain when using the `ram` db.                                                                                                                           |
 | [`db`](#default-memory-mode) | `dbengine` | The [database](/src/database/README.md) to use for all nodes using this `API_KEY`. Valid settings are `dbengine`, `ram`, or `none`. [Read more &rarr;](#default-memory-mode)                             |
-| `health enabled by default`  | `auto`     | Whether alerts and notifications should be enabled for nodes using this `API_KEY`. `auto` enables alerts when the child is connected. `yes` enables alerts always, and `no` disables alerts.             |
+| `health enabled`             | `auto`     | Whether alerts and notifications should be enabled for nodes using this `API_KEY`. `auto` enables alerts when the child is connected. `yes` enables alerts always, and `no` disables alerts.             |
 | `postpone alerts on connect` | `1m`       | Postpone alerts and notifications for a period of time after the child connects.                                                                                                                         |
 | `health log retention`       | `5d`       | History of health log events (in seconds) kept in the database.                                                                                                                                          |
 | `proxy enabled`              |            | Route metrics through a proxy.                                                                                                                                                                           |
@@ -461,7 +461,7 @@ On the parent, set the following in `stream.conf`:
     default memory = ram
 
     # alerts checks, only while the child is connected
-    health enabled by default = auto
+    health enabled = auto
 ```
 
 On the child nodes, set the following in `stream.conf`:

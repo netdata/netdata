@@ -800,6 +800,9 @@ static inline void buffer_json_member_add_string_or_empty(BUFFER *wb, const char
     buffer_json_member_add_string(wb, key, value);
 }
 
+void buffer_json_member_add_datetime_rfc3339(BUFFER *wb, const char *key, uint64_t datetime_ut, bool utc);
+void buffer_json_member_add_duration_ut(BUFFER *wb, const char *key, int64_t duration_ut);
+
 static inline void buffer_json_member_add_quoted_string(BUFFER *wb, const char *key, const char *value) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);

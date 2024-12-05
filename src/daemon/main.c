@@ -361,6 +361,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     service_wait_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS);
 
+    stream_threads_cancel();
     service_wait_exit(SERVICE_COLLECTORS | SERVICE_STREAMING, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS);
 
@@ -499,117 +500,6 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 #endif
 
     exit(ret);
-}
-
-void web_server_threading_selection(void) {
-    web_server_mode = web_server_mode_id(config_get(CONFIG_SECTION_WEB, "mode", web_server_mode_name(web_server_mode)));
-
-    int static_threaded = (web_server_mode == WEB_SERVER_MODE_STATIC_THREADED);
-
-    int i;
-    for (i = 0; static_threads[i].name; i++) {
-        if (static_threads[i].start_routine == socket_listen_main_static_threaded)
-            static_threads[i].enabled = static_threaded;
-    }
-}
-
-int make_dns_decision(const char *section_name, const char *config_name, const char *default_value, SIMPLE_PATTERN *p)
-{
-    const char *value = config_get(section_name,config_name,default_value);
-    if(!strcmp("yes",value))
-        return 1;
-    if(!strcmp("no",value))
-        return 0;
-    if(strcmp("heuristic",value) != 0)
-        netdata_log_error("Invalid configuration option '%s' for '%s'/'%s'. Valid options are 'yes', 'no' and 'heuristic'. Proceeding with 'heuristic'",
-              value, section_name, config_name);
-
-    return simple_pattern_is_potential_name(p);
-}
-
-void web_server_config_options(void)
-{
-    web_client_timeout =
-        (int)config_get_duration_seconds(CONFIG_SECTION_WEB, "disconnect idle clients after", web_client_timeout);
-
-    web_client_first_request_timeout =
-        (int)config_get_duration_seconds(CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
-
-    web_client_streaming_rate_t =
-        config_get_duration_seconds(CONFIG_SECTION_WEB, "accept a streaming request every", web_client_streaming_rate_t);
-
-    respect_web_browser_do_not_track_policy =
-        config_get_boolean(CONFIG_SECTION_WEB, "respect do not track policy", respect_web_browser_do_not_track_policy);
-    web_x_frame_options = config_get(CONFIG_SECTION_WEB, "x-frame-options response header", "");
-    if(!*web_x_frame_options)
-        web_x_frame_options = NULL;
-
-    web_allow_connections_from =
-            simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "localhost *"),
-                                  NULL, SIMPLE_PATTERN_EXACT, true);
-    web_allow_connections_dns  =
-        make_dns_decision(CONFIG_SECTION_WEB, "allow connections by dns", "heuristic", web_allow_connections_from);
-    web_allow_dashboard_from   =
-            simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"),
-                                  NULL, SIMPLE_PATTERN_EXACT, true);
-    web_allow_dashboard_dns    =
-        make_dns_decision(CONFIG_SECTION_WEB, "allow dashboard by dns", "heuristic", web_allow_dashboard_from);
-    web_allow_badges_from      =
-            simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT,
-                                  true);
-    web_allow_badges_dns       =
-        make_dns_decision(CONFIG_SECTION_WEB, "allow badges by dns", "heuristic", web_allow_badges_from);
-    web_allow_registry_from    =
-            simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT,
-                                  true);
-    web_allow_registry_dns     = make_dns_decision(CONFIG_SECTION_REGISTRY, "allow by dns", "heuristic",
-                                                   web_allow_registry_from);
-    web_allow_streaming_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow streaming from", "*"),
-                                                       NULL, SIMPLE_PATTERN_EXACT, true);
-    web_allow_streaming_dns    = make_dns_decision(CONFIG_SECTION_WEB, "allow streaming by dns", "heuristic",
-                                                   web_allow_streaming_from);
-    // Note the default is not heuristic, the wildcards could match DNS but the intent is ip-addresses.
-    web_allow_netdataconf_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow netdata.conf from",
-                                                                  "localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.*"
-                                                                  " 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.*"
-                                                                  " 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.*"
-                                                                  " 172.31.* UNKNOWN"), NULL, SIMPLE_PATTERN_EXACT,
-                                                       true);
-    web_allow_netdataconf_dns  =
-        make_dns_decision(CONFIG_SECTION_WEB, "allow netdata.conf by dns", "no", web_allow_netdataconf_from);
-    web_allow_mgmt_from        =
-            simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow management from", "localhost"),
-                                  NULL, SIMPLE_PATTERN_EXACT, true);
-    web_allow_mgmt_dns         =
-        make_dns_decision(CONFIG_SECTION_WEB, "allow management by dns","heuristic",web_allow_mgmt_from);
-
-    web_enable_gzip = config_get_boolean(CONFIG_SECTION_WEB, "enable gzip compression", web_enable_gzip);
-
-    const char *s = config_get(CONFIG_SECTION_WEB, "gzip compression strategy", "default");
-    if(!strcmp(s, "default"))
-        web_gzip_strategy = Z_DEFAULT_STRATEGY;
-    else if(!strcmp(s, "filtered"))
-        web_gzip_strategy = Z_FILTERED;
-    else if(!strcmp(s, "huffman only"))
-        web_gzip_strategy = Z_HUFFMAN_ONLY;
-    else if(!strcmp(s, "rle"))
-        web_gzip_strategy = Z_RLE;
-    else if(!strcmp(s, "fixed"))
-        web_gzip_strategy = Z_FIXED;
-    else {
-        netdata_log_error("Invalid compression strategy '%s'. Valid strategies are 'default', 'filtered', 'huffman only', 'rle' and 'fixed'. Proceeding with 'default'.", s);
-        web_gzip_strategy = Z_DEFAULT_STRATEGY;
-    }
-
-    web_gzip_level = (int)config_get_number(CONFIG_SECTION_WEB, "gzip compression level", 3);
-    if(web_gzip_level < 1) {
-        netdata_log_error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 1 (fastest compression).", web_gzip_level);
-        web_gzip_level = 1;
-    }
-    else if(web_gzip_level > 9) {
-        netdata_log_error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 9 (best compression).", web_gzip_level);
-        web_gzip_level = 9;
-    }
 }
 
 static void set_nofile_limit(struct rlimit *rl) {
@@ -813,597 +703,6 @@ int help(int exitcode) {
     return exitcode;
 }
 
-static void security_init(){
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
-    netdata_ssl_security_key = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
-
-    snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
-    netdata_ssl_security_cert = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
-
-    tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  "1.3");
-    tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
-
-    netdata_ssl_initialize_openssl();
-}
-
-static void log_init(void) {
-    nd_log_set_facility(config_get(CONFIG_SECTION_LOGS, "facility", "daemon"));
-
-    time_t period = ND_LOG_DEFAULT_THROTTLE_PERIOD;
-    size_t logs = ND_LOG_DEFAULT_THROTTLE_LOGS;
-    period = config_get_duration_seconds(CONFIG_SECTION_LOGS, "logs flood protection period", period);
-    logs = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "logs to trigger flood protection", (long long int)logs);
-    nd_log_set_flood_protection(logs, period);
-
-    const char *netdata_log_level = getenv("NETDATA_LOG_LEVEL");
-    netdata_log_level = netdata_log_level ? nd_log_id2priority(nd_log_priority2id(netdata_log_level)) : NDLP_INFO_STR;
-
-    nd_log_set_priority_level(config_get(CONFIG_SECTION_LOGS, "level", netdata_log_level));
-
-    char filename[FILENAME_MAX + 1];
-    char* os_default_method = NULL;
-#if defined(OS_LINUX)
-    os_default_method = is_stderr_connected_to_journal() /* || nd_log_journal_socket_available() */ ? "journal" : NULL;
-#elif defined(OS_WINDOWS)
-#if defined(HAVE_ETW)
-    os_default_method = "etw";
-#elif defined(HAVE_WEL)
-    os_default_method = "wel";
-#endif
-#endif
-
-#if defined(OS_WINDOWS)
-    // on windows, debug log goes to windows events
-    snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
-#else
-    snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
-#endif
-
-    nd_log_set_user_settings(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", filename));
-
-    if(os_default_method)
-        snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
-    else
-        snprintfz(filename, FILENAME_MAX, "%s/daemon.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_DAEMON, config_get(CONFIG_SECTION_LOGS, "daemon", filename));
-
-    if(os_default_method)
-        snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
-    else
-        snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
-
-#if defined(OS_WINDOWS)
-    // on windows, access log goes to windows events
-    snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
-#else
-    snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
-#endif
-    nd_log_set_user_settings(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
-
-    if(os_default_method)
-        snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
-    else
-        snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_HEALTH, config_get(CONFIG_SECTION_LOGS, "health", filename));
-
-    aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
-    if (aclklog_enabled) {
-#if defined(OS_WINDOWS)
-        // on windows, aclk log goes to windows events
-        snprintfz(filename, FILENAME_MAX, "%s", os_default_method);
-#else
-        snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
-#endif
-        nd_log_set_user_settings(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
-    }
-
-    aclk_config_get_query_scope();
-}
-
-static const char *get_varlib_subdir_from_config(const char *prefix, const char *dir) {
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/%s", prefix, dir);
-    return config_get(CONFIG_SECTION_DIRECTORIES, dir, filename);
-}
-
-static void backwards_compatible_config() {
-    // move [global] options to the [web] section
-
-    config_move(CONFIG_SECTION_GLOBAL, "http port listen backlog",
-                CONFIG_SECTION_WEB,    "listen backlog");
-
-    config_move(CONFIG_SECTION_GLOBAL, "bind socket to IP",
-                CONFIG_SECTION_WEB,    "bind to");
-
-    config_move(CONFIG_SECTION_GLOBAL, "bind to",
-                CONFIG_SECTION_WEB,    "bind to");
-
-    config_move(CONFIG_SECTION_GLOBAL, "port",
-                CONFIG_SECTION_WEB,    "default port");
-
-    config_move(CONFIG_SECTION_GLOBAL, "default port",
-                CONFIG_SECTION_WEB,    "default port");
-
-    config_move(CONFIG_SECTION_GLOBAL, "disconnect idle web clients after seconds",
-                CONFIG_SECTION_WEB,    "disconnect idle clients after seconds");
-
-    config_move(CONFIG_SECTION_GLOBAL, "respect web browser do not track policy",
-                CONFIG_SECTION_WEB,    "respect do not track policy");
-
-    config_move(CONFIG_SECTION_GLOBAL, "web x-frame-options header",
-                CONFIG_SECTION_WEB,    "x-frame-options response header");
-
-    config_move(CONFIG_SECTION_GLOBAL, "enable web responses gzip compression",
-                CONFIG_SECTION_WEB,    "enable gzip compression");
-
-    config_move(CONFIG_SECTION_GLOBAL, "web compression strategy",
-                CONFIG_SECTION_WEB,    "gzip compression strategy");
-
-    config_move(CONFIG_SECTION_GLOBAL, "web compression level",
-                CONFIG_SECTION_WEB,    "gzip compression level");
-
-    config_move(CONFIG_SECTION_GLOBAL,      "config directory",
-                CONFIG_SECTION_DIRECTORIES, "config");
-
-    config_move(CONFIG_SECTION_GLOBAL,      "stock config directory",
-                CONFIG_SECTION_DIRECTORIES, "stock config");
-
-    config_move(CONFIG_SECTION_GLOBAL,      "log directory",
-                CONFIG_SECTION_DIRECTORIES, "log");
-
-    config_move(CONFIG_SECTION_GLOBAL,      "web files directory",
-                CONFIG_SECTION_DIRECTORIES, "web");
-
-    config_move(CONFIG_SECTION_GLOBAL,      "cache directory",
-                CONFIG_SECTION_DIRECTORIES, "cache");
-
-    config_move(CONFIG_SECTION_GLOBAL,      "lib directory",
-                CONFIG_SECTION_DIRECTORIES, "lib");
-
-    config_move(CONFIG_SECTION_GLOBAL,      "home directory",
-                CONFIG_SECTION_DIRECTORIES, "home");
-
-    config_move(CONFIG_SECTION_GLOBAL,      "lock directory",
-                CONFIG_SECTION_DIRECTORIES, "lock");
-
-    config_move(CONFIG_SECTION_GLOBAL,      "plugins directory",
-                CONFIG_SECTION_DIRECTORIES, "plugins");
-
-    config_move(CONFIG_SECTION_HEALTH,      "health configuration directory",
-                CONFIG_SECTION_DIRECTORIES, "health config");
-
-    config_move(CONFIG_SECTION_HEALTH,      "stock health configuration directory",
-                CONFIG_SECTION_DIRECTORIES, "stock health config");
-
-    config_move(CONFIG_SECTION_REGISTRY,    "registry db directory",
-                CONFIG_SECTION_DIRECTORIES, "registry");
-
-    config_move(CONFIG_SECTION_GLOBAL, "debug log",
-                CONFIG_SECTION_LOGS,   "debug");
-
-    config_move(CONFIG_SECTION_GLOBAL, "error log",
-                CONFIG_SECTION_LOGS,   "error");
-
-    config_move(CONFIG_SECTION_GLOBAL, "access log",
-                CONFIG_SECTION_LOGS,   "access");
-
-    config_move(CONFIG_SECTION_GLOBAL, "facility log",
-                CONFIG_SECTION_LOGS,   "facility");
-
-    config_move(CONFIG_SECTION_GLOBAL, "errors flood protection period",
-                CONFIG_SECTION_LOGS,   "errors flood protection period");
-
-    config_move(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection",
-                CONFIG_SECTION_LOGS,   "errors to trigger flood protection");
-
-    config_move(CONFIG_SECTION_GLOBAL, "debug flags",
-                CONFIG_SECTION_LOGS,   "debug flags");
-
-    config_move(CONFIG_SECTION_GLOBAL,   "TZ environment variable",
-                CONFIG_SECTION_ENV_VARS, "TZ");
-
-    config_move(CONFIG_SECTION_PLUGINS,  "PATH environment variable",
-                CONFIG_SECTION_ENV_VARS, "PATH");
-
-    config_move(CONFIG_SECTION_PLUGINS,  "PYTHONPATH environment variable",
-                CONFIG_SECTION_ENV_VARS, "PYTHONPATH");
-
-    config_move(CONFIG_SECTION_STATSD,  "enabled",
-                CONFIG_SECTION_PLUGINS, "statsd");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "memory mode",
-                CONFIG_SECTION_DB,      "db");
-
-    config_move(CONFIG_SECTION_DB,      "mode",
-                CONFIG_SECTION_DB,      "db");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "history",
-                CONFIG_SECTION_DB,      "retention");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "update every",
-                CONFIG_SECTION_DB,      "update every");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "page cache size",
-                CONFIG_SECTION_DB,      "dbengine page cache size");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine page cache size MB",
-                CONFIG_SECTION_DB,      "dbengine page cache size");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine extent cache size MB",
-                CONFIG_SECTION_DB,      "dbengine extent cache size");
-
-    config_move(CONFIG_SECTION_DB,      "page cache size",
-                CONFIG_SECTION_DB,      "dbengine page cache size MB");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "page cache uses malloc",
-                CONFIG_SECTION_DB,      "dbengine page cache with malloc");
-
-    config_move(CONFIG_SECTION_DB,      "page cache with malloc",
-                CONFIG_SECTION_DB,      "dbengine page cache with malloc");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "memory deduplication (ksm)",
-                CONFIG_SECTION_DB,      "memory deduplication (ksm)");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "dbengine page fetch timeout",
-                CONFIG_SECTION_DB,      "dbengine page fetch timeout secs");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "dbengine page fetch retries",
-                CONFIG_SECTION_DB,      "dbengine page fetch retries");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "dbengine extent pages",
-                CONFIG_SECTION_DB,      "dbengine pages per extent");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "cleanup obsolete charts after seconds",
-                CONFIG_SECTION_DB,      "cleanup obsolete charts after");
-
-    config_move(CONFIG_SECTION_DB,      "cleanup obsolete charts after secs",
-                CONFIG_SECTION_DB,      "cleanup obsolete charts after");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "gap when lost iterations above",
-                CONFIG_SECTION_DB,      "gap when lost iterations above");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "cleanup orphan hosts after seconds",
-                CONFIG_SECTION_DB,      "cleanup orphan hosts after");
-
-    config_move(CONFIG_SECTION_DB,      "cleanup orphan hosts after secs",
-                CONFIG_SECTION_DB,      "cleanup orphan hosts after");
-
-    config_move(CONFIG_SECTION_DB,      "cleanup ephemeral hosts after secs",
-                CONFIG_SECTION_DB,      "cleanup ephemeral hosts after");
-
-    config_move(CONFIG_SECTION_DB,      "seconds to replicate",
-                CONFIG_SECTION_DB,      "replication period");
-
-    config_move(CONFIG_SECTION_DB,      "seconds per replication step",
-                CONFIG_SECTION_DB,      "replication step");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
-                CONFIG_SECTION_DB,      "enable zero metrics");
-
-    // ----------------------------------------------------------------------------------------------------------------
-
-    config_move(CONFIG_SECTION_GLOBAL,  "dbengine disk space",
-                CONFIG_SECTION_DB,      "dbengine tier 0 retention size");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "dbengine multihost disk space",
-                CONFIG_SECTION_DB,      "dbengine tier 0 retention size");
-
-    config_move(CONFIG_SECTION_DB,      "dbengine disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 0 retention size");
-
-    for(size_t tier = 0; tier < RRD_STORAGE_TIERS ;tier++) {
-        char old_config[128], new_config[128];
-
-        snprintfz(old_config, sizeof(old_config), "dbengine tier %zu retention days", tier);
-        snprintfz(new_config, sizeof(new_config), "dbengine tier %zu retention time", tier);
-        config_move(CONFIG_SECTION_DB, old_config,
-                    CONFIG_SECTION_DB, new_config);
-
-        if(tier == 0)
-            snprintfz(old_config, sizeof(old_config), "dbengine multihost disk space MB");
-        else
-            snprintfz(old_config, sizeof(old_config), "dbengine tier %zu multihost disk space MB", tier);
-        snprintfz(new_config, sizeof(new_config), "dbengine tier %zu retention size", tier);
-        config_move(CONFIG_SECTION_DB, old_config,
-                    CONFIG_SECTION_DB, new_config);
-
-        snprintfz(old_config, sizeof(old_config), "dbengine tier %zu disk space MB", tier);
-        snprintfz(new_config, sizeof(new_config), "dbengine tier %zu retention size", tier);
-        config_move(CONFIG_SECTION_DB, old_config,
-                    CONFIG_SECTION_DB, new_config);
-    }
-
-    // ----------------------------------------------------------------------------------------------------------------
-
-    config_move(CONFIG_SECTION_LOGS,   "error",
-                CONFIG_SECTION_LOGS,   "daemon");
-
-    config_move(CONFIG_SECTION_LOGS,   "severity level",
-                CONFIG_SECTION_LOGS,   "level");
-
-    config_move(CONFIG_SECTION_LOGS,   "errors to trigger flood protection",
-                CONFIG_SECTION_LOGS,   "logs to trigger flood protection");
-
-    config_move(CONFIG_SECTION_LOGS,   "errors flood protection period",
-                CONFIG_SECTION_LOGS,   "logs flood protection period");
-
-    config_move(CONFIG_SECTION_HEALTH, "is ephemeral",
-                CONFIG_SECTION_GLOBAL, "is ephemeral node");
-
-    config_move(CONFIG_SECTION_HEALTH, "has unstable connection",
-                CONFIG_SECTION_GLOBAL, "has unstable connection");
-
-    config_move(CONFIG_SECTION_HEALTH, "run at least every seconds",
-                CONFIG_SECTION_HEALTH, "run at least every");
-
-    config_move(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds",
-                CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for");
-
-    config_move(CONFIG_SECTION_HEALTH, "health log history",
-                CONFIG_SECTION_HEALTH, "health log retention");
-
-    config_move(CONFIG_SECTION_REGISTRY, "registry expire idle persons days",
-                CONFIG_SECTION_REGISTRY, "registry expire idle persons");
-
-    config_move(CONFIG_SECTION_WEB, "disconnect idle clients after seconds",
-                CONFIG_SECTION_WEB, "disconnect idle clients after");
-
-    config_move(CONFIG_SECTION_WEB, "accept a streaming request every seconds",
-                CONFIG_SECTION_WEB, "accept a streaming request every");
-
-    config_move(CONFIG_SECTION_STATSD, "set charts as obsolete after secs",
-                CONFIG_SECTION_STATSD, "set charts as obsolete after");
-
-    config_move(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after seconds",
-                CONFIG_SECTION_STATSD, "disconnect idle tcp clients after");
-
-    config_move("plugin:idlejitter", "loop time in ms",
-                "plugin:idlejitter", "loop time");
-
-    config_move("plugin:proc:/sys/class/infiniband", "refresh ports state every seconds",
-                "plugin:proc:/sys/class/infiniband", "refresh ports state every");
-}
-
-static int get_hostname(char *buf, size_t buf_size) {
-    if (netdata_configured_host_prefix && *netdata_configured_host_prefix) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/etc/hostname", netdata_configured_host_prefix);
-
-        if (!read_txt_file(filename, buf, buf_size)) {
-            trim(buf);
-            return 0;
-        }
-    }
-
-    return gethostname(buf, buf_size);
-}
-
-static void get_netdata_configured_variables()
-{
-#ifdef ENABLE_DBENGINE
-    legacy_multihost_db_space = config_exists(CONFIG_SECTION_DB, "dbengine multihost disk space MB");
-    if (!legacy_multihost_db_space)
-        legacy_multihost_db_space = config_exists(CONFIG_SECTION_GLOBAL, "dbengine multihost disk space");
-    if (!legacy_multihost_db_space)
-        legacy_multihost_db_space = config_exists(CONFIG_SECTION_GLOBAL, "dbengine disk space");
-#endif
-
-    backwards_compatible_config();
-
-    // ------------------------------------------------------------------------
-    // get the hostname
-
-    netdata_configured_host_prefix = config_get(CONFIG_SECTION_GLOBAL, "host access prefix", "");
-    (void) verify_netdata_host_prefix(true);
-
-    char buf[HOSTNAME_MAX + 1];
-    if (get_hostname(buf, HOSTNAME_MAX))
-        netdata_log_error("Cannot get machine hostname.");
-
-    netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
-    netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
-
-    // ------------------------------------------------------------------------
-    // get default database update frequency
-
-    default_rrd_update_every = (int) config_get_duration_seconds(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
-    if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
-        netdata_log_error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY);
-        default_rrd_update_every = UPDATE_EVERY;
-        config_set_duration_seconds(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
-    }
-
-    // ------------------------------------------------------------------------
-    // get the database selection
-
-    {
-        const char *mode = config_get(CONFIG_SECTION_DB, "db", rrd_memory_mode_name(default_rrd_memory_mode));
-        default_rrd_memory_mode = rrd_memory_mode_id(mode);
-        if(strcmp(mode, rrd_memory_mode_name(default_rrd_memory_mode)) != 0) {
-            netdata_log_error("Invalid memory mode '%s' given. Using '%s'", mode, rrd_memory_mode_name(default_rrd_memory_mode));
-            config_set(CONFIG_SECTION_DB, "db", rrd_memory_mode_name(default_rrd_memory_mode));
-        }
-    }
-
-    // ------------------------------------------------------------------------
-    // get default database size
-
-    if(default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && default_rrd_memory_mode != RRD_MEMORY_MODE_NONE) {
-        default_rrd_history_entries = (int)config_get_number(
-            CONFIG_SECTION_DB, "retention",
-            align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
-
-        long h = align_entries_to_pagesize(default_rrd_memory_mode, default_rrd_history_entries);
-        if (h != default_rrd_history_entries) {
-            config_set_number(CONFIG_SECTION_DB, "retention", h);
-            default_rrd_history_entries = (int)h;
-        }
-    }
-
-    // ------------------------------------------------------------------------
-    // get system paths
-
-    netdata_configured_user_config_dir  = config_get(CONFIG_SECTION_DIRECTORIES, "config",       netdata_configured_user_config_dir);
-    netdata_configured_stock_config_dir = config_get(CONFIG_SECTION_DIRECTORIES, "stock config", netdata_configured_stock_config_dir);
-    netdata_configured_log_dir          = config_get(CONFIG_SECTION_DIRECTORIES, "log",          netdata_configured_log_dir);
-    netdata_configured_web_dir          = config_get(CONFIG_SECTION_DIRECTORIES, "web",          netdata_configured_web_dir);
-    netdata_configured_cache_dir        = config_get(CONFIG_SECTION_DIRECTORIES, "cache",        netdata_configured_cache_dir);
-    netdata_configured_varlib_dir       = config_get(CONFIG_SECTION_DIRECTORIES, "lib",          netdata_configured_varlib_dir);
-
-    netdata_configured_lock_dir = get_varlib_subdir_from_config(netdata_configured_varlib_dir, "lock");
-    netdata_configured_cloud_dir = get_varlib_subdir_from_config(netdata_configured_varlib_dir, "cloud.d");
-
-    {
-        pluginsd_initialize_plugin_directories();
-        netdata_configured_primary_plugins_dir = plugin_directories[PLUGINSD_STOCK_PLUGINS_DIRECTORY_PATH];
-    }
-
-#ifdef ENABLE_DBENGINE
-    // ------------------------------------------------------------------------
-    // get default Database Engine page type
-
-    const char *page_type = config_get(CONFIG_SECTION_DB, "dbengine page type", "gorilla");
-    if (strcmp(page_type, "gorilla") == 0)
-        tier_page_type[0] = RRDENG_PAGE_TYPE_GORILLA_32BIT;
-    else if (strcmp(page_type, "raw") == 0)
-        tier_page_type[0] = RRDENG_PAGE_TYPE_ARRAY_32BIT;
-    else {
-        tier_page_type[0] = RRDENG_PAGE_TYPE_ARRAY_32BIT;
-        netdata_log_error("Invalid dbengine page type ''%s' given. Defaulting to 'raw'.", page_type);
-    }
-
-    // ------------------------------------------------------------------------
-    // get default Database Engine page cache size in MiB
-
-    default_rrdeng_page_cache_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
-    default_rrdeng_extent_cache_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
-    db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
-
-    if(default_rrdeng_extent_cache_mb < 0) {
-        default_rrdeng_extent_cache_mb = 0;
-        config_set_size_mb(CONFIG_SECTION_DB, "dbengine extent cache size", default_rrdeng_extent_cache_mb);
-    }
-
-    if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
-        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
-        default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-        config_set_size_mb(CONFIG_SECTION_DB, "dbengine page cache size", default_rrdeng_page_cache_mb);
-    }
-
-    // ------------------------------------------------------------------------
-    // get default Database Engine disk space quota in MiB
-//
-//    //    if (!config_exists(CONFIG_SECTION_DB, "dbengine disk space MB") && !config_exists(CONFIG_SECTION_DB, "dbengine multihost disk space MB"))
-//
-//    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
-//    if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-//        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
-//        default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-//        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
-//    }
-//
-//    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
-//    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-//        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
-//        default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
-//        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
-//    }
-
-#else
-    if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-       error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
-       default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
-    }
-#endif
-
-    // --------------------------------------------------------------------
-    // get KSM settings
-
-#ifdef MADV_MERGEABLE
-    enable_ksm = config_get_boolean_ondemand(CONFIG_SECTION_DB, "memory deduplication (ksm)", enable_ksm);
-#endif
-
-    // --------------------------------------------------------------------
-
-    rrdhost_free_ephemeral_time_s =
-        config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup ephemeral hosts after", rrdhost_free_ephemeral_time_s);
-
-    rrdset_free_obsolete_time_s =
-        config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);
-
-    // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
-    // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
-    // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
-    if (rrdset_free_obsolete_time_s < 10) {
-        rrdset_free_obsolete_time_s = 10;
-        netdata_log_info("The \"cleanup obsolete charts after\" option was set to 10 seconds.");
-        config_set_duration_seconds(CONFIG_SECTION_DB, "cleanup obsolete charts after", rrdset_free_obsolete_time_s);
-    }
-
-    gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
-    if (gap_when_lost_iterations_above < 1) {
-        gap_when_lost_iterations_above = 1;
-        config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
-    }
-    gap_when_lost_iterations_above += 2;
-
-    // --------------------------------------------------------------------
-    // get various system parameters
-
-    os_get_system_cpus_uncached();
-    os_get_system_pid_max();
-
-
-}
-
-static void post_conf_load(const char **user)
-{
-    // --------------------------------------------------------------------
-    // get the user we should run
-
-    // IMPORTANT: this is required before web_files_uid()
-    if(getuid() == 0) {
-        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
-    }
-    else {
-        struct passwd *passwd = getpwuid(getuid());
-        *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
-    }
-}
-
-static bool load_netdata_conf(char *filename, char overwrite_used, const char **user) {
-    errno_clear();
-
-    int ret = 0;
-
-    if(filename && *filename) {
-        ret = config_load(filename, overwrite_used, NULL);
-        if(!ret)
-            netdata_log_error("CONFIG: cannot load config file '%s'.", filename);
-    }
-    else {
-        filename = filename_from_path_entry_strdupz(netdata_configured_user_config_dir, "netdata.conf");
-
-        ret = config_load(filename, overwrite_used, NULL);
-        if(!ret) {
-            netdata_log_info("CONFIG: cannot load user config '%s'. Will try the stock version.", filename);
-            freez(filename);
-
-            filename = filename_from_path_entry_strdupz(netdata_configured_stock_config_dir, "netdata.conf");
-            ret = config_load(filename, overwrite_used, NULL);
-            if(!ret)
-                netdata_log_info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
-        }
-
-        freez(filename);
-    }
-
-    post_conf_load(user);
-    return ret;
-}
-
 // coverity[ +tainted_string_sanitize_content : arg-0 ]
 static inline void coverity_remove_taint(char *s)
 {
@@ -1476,7 +775,7 @@ int julytest(void);
 int pluginsd_parser_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
-int unittest_rrdpush_compressions(void);
+int unittest_stream_compressions(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
@@ -1487,8 +786,8 @@ int windows_perflib_dump(const char *key);
 #endif
 
 int unittest_prepare_rrd(const char **user) {
-    post_conf_load(user);
-    get_netdata_configured_variables();
+    netdata_conf_section_global_run_as_user(user);
+    netdata_conf_section_global();
     default_rrd_update_every = 1;
     default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
     health_plugin_disable();
@@ -1498,7 +797,7 @@ int unittest_prepare_rrd(const char **user) {
         fprintf(stderr, "rrd_init failed for unittest\n");
         return 1;
     }
-    stream_conf_send_enabled = 0;
+    stream_send.enabled = false;
 
     return 0;
 }
@@ -1554,7 +853,7 @@ int netdata_main(int argc, char **argv) {
         while( (opt = getopt(argc, argv, optstring)) != -1 ) {
             switch(opt) {
                 case 'c':
-                    if(!load_netdata_conf(optarg, 1, &user)) {
+                    if(!netdata_conf_load(optarg, 1, &user)) {
                         netdata_log_error("Cannot load configuration file %s.", optarg);
                         return 1;
                     }
@@ -1725,9 +1024,9 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return pluginsd_parser_unittest();
                         }
-                        else if(strcmp(optarg, "rrdpush_compressions_test") == 0) {
+                        else if(strcmp(optarg, "stream_compressions_test") == 0) {
                             unittest_running = true;
-                            return unittest_rrdpush_compressions();
+                            return unittest_stream_compressions();
                         }
                         else if(strcmp(optarg, "progresstest") == 0) {
                             unittest_running = true;
@@ -1742,8 +1041,8 @@ int netdata_main(int argc, char **argv) {
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
-                            post_conf_load(&user);
-                            get_netdata_configured_variables();
+                            netdata_conf_section_global_run_as_user(&user);
+                            netdata_conf_section_global();
                             default_rrd_update_every = 1;
                             registry_init();
                             if(rrd_init("dbengine-dataset", NULL, true)) {
@@ -1917,10 +1216,10 @@ int netdata_main(int argc, char **argv) {
 
                             if(!config_loaded) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
-                                load_netdata_conf(NULL, 0, &user);
+                                netdata_conf_load(NULL, 0, &user);
                             }
 
-                            get_netdata_configured_variables();
+                            netdata_conf_section_global();
 
                             const char *section = argv[optind];
                             const char *key = argv[optind + 1];
@@ -1944,11 +1243,11 @@ int netdata_main(int argc, char **argv) {
 
                             if(!config_loaded) {
                                 fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
-                                load_netdata_conf(NULL, 0, &user);
+                                netdata_conf_load(NULL, 0, &user);
                                 cloud_conf_load(1);
                             }
 
-                            get_netdata_configured_variables();
+                            netdata_conf_section_global();
 
                             const char *conf_file = argv[optind]; /* "cloud" is cloud.conf, otherwise netdata.conf */
                             struct config *tmp_config = strcmp(conf_file, "cloud") ? &netdata_config : &cloud_config;
@@ -1994,7 +1293,7 @@ int netdata_main(int argc, char **argv) {
     }
 
     if(!config_loaded) {
-        load_netdata_conf(NULL, 0, &user);
+        netdata_conf_load(NULL, 0, &user);
         cloud_conf_load(0);
     }
 
@@ -2040,7 +1339,7 @@ int netdata_main(int argc, char **argv) {
         }
 
         // prepare configuration environment variables for the plugins
-        get_netdata_configured_variables();
+        netdata_conf_section_global();
         set_environment_for_plugins_and_scripts();
         analytics_reset();
 
@@ -2078,7 +1377,7 @@ int netdata_main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // get log filenames and settings
 
-        log_init();
+        netdata_conf_section_logs();
         nd_log_limits_unlimited();
 
         // initialize the log files
@@ -2096,7 +1395,7 @@ int netdata_main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // get the certificate and start security
 
-        security_init();
+        netdata_conf_web_security_init();
 
         // --------------------------------------------------------------------
         // This is the safest place to start the SILENCERS structure
@@ -2125,11 +1424,14 @@ int netdata_main(int argc, char **argv) {
             default_stacksize = 1 * 1024 * 1024;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        config_set_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring", true);
-        config_set_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring extended", true);
+        telemetry_enabled = true;
+        telemetry_extended_enabled = true;
 #endif
 
-        if(config_get_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring extended", false))
+        telemetry_extended_enabled =
+            config_get_boolean(CONFIG_SECTION_TELEMETRY, "extended telemetry", telemetry_extended_enabled);
+
+        if(telemetry_extended_enabled)
             // this has to run before starting any other threads that use workers
             workers_utilization_enable();
 
@@ -2239,7 +1541,7 @@ int netdata_main(int argc, char **argv) {
     netdata_random_session_id_generate();
 
     // ------------------------------------------------------------------------
-    // initialize rrd, registry, health, rrdpush, etc.
+    // initialize rrd, registry, health, streaming, etc.
 
     delta_startup_time("collecting system info");
 
@@ -2295,11 +1597,12 @@ int netdata_main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // spawn the threads
 
+    get_agent_event_time_median_init();
     bearer_tokens_init();
 
     delta_startup_time("start the static threads");
 
-    web_server_config_options();
+    netdata_conf_section_web();
 
     set_late_analytics_variables(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {

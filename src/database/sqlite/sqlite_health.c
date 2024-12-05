@@ -26,12 +26,11 @@
 
 static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    static __thread sqlite3_stmt *res = NULL;
+
+    sqlite3_stmt *res = NULL;
     int rc;
 
-    REQUIRE_DB(db_meta);
-
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_HEALTH_LOG, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_HEALTH_LOG, &res))
         return;
 
     int param = 0;
@@ -51,7 +50,7 @@ static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 /* Health related SQL queries
@@ -149,13 +148,13 @@ static void insert_alert_queue(
     RRDCALC_STATUS old_status,
     RRDCALC_STATUS new_status)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
     int rc;
 
     if (!host->aclk_config)
         return;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &res))
         return;
 
     int submit_delay = calculate_delay(old_status, new_status);
@@ -176,7 +175,7 @@ static void insert_alert_queue(
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 #define SQL_INSERT_HEALTH_LOG_DETAIL                                                                                         \
@@ -189,10 +188,10 @@ done:
 
 static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_log_id, ALARM_ENTRY *ae)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
     int rc;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &res))
         return;
 
     int param = 0;
@@ -230,7 +229,7 @@ static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 #define SQL_INSERT_HEALTH_LOG                                                                                          \
@@ -243,13 +242,11 @@ done:
 
 static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
     int rc;
     uint64_t health_log_id;
 
-    REQUIRE_DB(db_meta);
-
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG, &res))
         return;
 
     int param = 0;
@@ -277,7 +274,7 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
@@ -1020,8 +1017,8 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
                 buffer_json_member_add_boolean(wb, "updated",              (sqlite3_column_int64(stmt_query, 9) & HEALTH_ENTRY_FLAG_UPDATED));
                   buffer_json_member_add_int64(wb, "exec_run",             (int64_t)sqlite3_column_int64(stmt_query, 10));
                 buffer_json_member_add_boolean(wb, "exec_failed",          (sqlite3_column_int64(stmt_query, 9) & HEALTH_ENTRY_FLAG_EXEC_FAILED));
-        buffer_json_member_add_string_or_empty(wb, "exec",                 sqlite3_column_text(stmt_query, 14) ? (const char *) sqlite3_column_text(stmt_query, 14) : string2str(host->health.health_default_exec));
-        buffer_json_member_add_string_or_empty(wb, "recipient",            sqlite3_column_text(stmt_query, 15) ? (const char *) sqlite3_column_text(stmt_query, 15) : string2str(host->health.health_default_recipient));
+        buffer_json_member_add_string_or_empty(wb, "exec",                 sqlite3_column_text(stmt_query, 14) ? (const char *) sqlite3_column_text(stmt_query, 14) : string2str(host->health.default_exec));
+        buffer_json_member_add_string_or_empty(wb, "recipient",            sqlite3_column_text(stmt_query, 15) ? (const char *) sqlite3_column_text(stmt_query, 15) : string2str(host->health.default_recipient));
                   buffer_json_member_add_int64(wb, "exec_code",            sqlite3_column_int(stmt_query, 19));
         buffer_json_member_add_string_or_empty(wb, "source",               sqlite3_column_text(stmt_query, 16) ? (const char *) sqlite3_column_text(stmt_query, 16) : (char *) "Unknown");
         buffer_json_member_add_string_or_empty(wb, "command",              edit_command);

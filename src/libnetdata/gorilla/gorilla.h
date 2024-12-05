@@ -56,19 +56,27 @@ void gorilla_writer_add_buffer(gorilla_writer_t *gw, gorilla_buffer_t *gbuf, siz
 bool gorilla_writer_write(gorilla_writer_t *gw, uint32_t number);
 uint32_t gorilla_writer_entries(const gorilla_writer_t *gw);
 
+struct aral;
+void gorilla_writer_aral_unmark(const gorilla_writer_t *gw, struct aral *ar);
+
 gorilla_reader_t gorilla_writer_get_reader(const gorilla_writer_t *gw);
 
 gorilla_buffer_t *gorilla_writer_drop_head_buffer(gorilla_writer_t *gw);
 
-uint32_t gorilla_writer_nbytes(const gorilla_writer_t *gw);
+uint32_t gorilla_writer_actual_nbytes(const gorilla_writer_t *gw);
+uint32_t gorilla_writer_optimal_nbytes(const gorilla_writer_t *gw);
 bool gorilla_writer_serialize(const gorilla_writer_t *gw, uint8_t *dst, uint32_t dst_size);
 
 uint32_t gorilla_buffer_patch(gorilla_buffer_t *buf);
+size_t gorilla_buffer_unpatched_nbuffers(const gorilla_buffer_t *gbuf);
+size_t gorilla_buffer_unpatched_nbytes(const gorilla_buffer_t *gbuf);
 gorilla_reader_t gorilla_reader_init(gorilla_buffer_t *buf);
 bool gorilla_reader_read(gorilla_reader_t *gr, uint32_t *number);
 
+#define RRDENG_GORILLA_32BIT_SLOT_BYTES sizeof(uint32_t)
+#define RRDENG_GORILLA_32BIT_SLOT_BITS (RRDENG_GORILLA_32BIT_SLOT_BYTES * CHAR_BIT)
 #define RRDENG_GORILLA_32BIT_BUFFER_SLOTS 128
-#define RRDENG_GORILLA_32BIT_BUFFER_SIZE (RRDENG_GORILLA_32BIT_BUFFER_SLOTS * sizeof(uint32_t))
+#define RRDENG_GORILLA_32BIT_BUFFER_SIZE (RRDENG_GORILLA_32BIT_BUFFER_SLOTS * RRDENG_GORILLA_32BIT_SLOT_BYTES)
 
 #ifdef __cplusplus
 }

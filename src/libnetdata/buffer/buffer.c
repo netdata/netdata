@@ -351,6 +351,20 @@ __attribute__((constructor)) void initialize_ascii_maps(void) {
 }
 
 // ----------------------------------------------------------------------------
+
+void buffer_json_member_add_datetime_rfc3339(BUFFER *wb, const char *key, uint64_t datetime_ut, bool utc) {
+    char buf[RFC3339_MAX_LENGTH];
+    rfc3339_datetime_ut(buf, sizeof(buf), datetime_ut, 2, utc);
+    buffer_json_member_add_string(wb, key, buf);
+}
+
+void buffer_json_member_add_duration_ut(BUFFER *wb, const char *key, int64_t duration_ut) {
+    char buf[64];
+    duration_snprintf(buf, sizeof(buf), duration_ut, "us", true);
+    buffer_json_member_add_string(wb, key, buf);
+}
+
+// ----------------------------------------------------------------------------
 // unit test
 
 static int buffer_expect(BUFFER *wb, const char *expected) {

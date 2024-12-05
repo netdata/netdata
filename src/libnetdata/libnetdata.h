@@ -61,6 +61,7 @@ void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL;
 void freez(void *ptr);
 #endif // NETDATA_TRACE_ALLOCATIONS
 
+void mallocz_release_as_much_memory_to_the_system(void);
 void posix_memfree(void *ptr);
 
 void json_escape_string(char *dst, const char *src, size_t size);
@@ -86,8 +87,6 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 #define BITS_IN_A_KILOBIT     1000
 #define KILOBITS_IN_A_MEGABIT 1000
 
-#define error_report(x, args...) do { errno_clear(); netdata_log_error(x, ##args); } while(0)
-
 #include "bitmap/bitmap64.h"
 
 #define COMPRESSION_MAX_CHUNK 0x4000
@@ -109,6 +108,7 @@ extern const char *netdata_configured_host_prefix;
 // safe includes before O/S specific functions
 #include "template-enum.h"
 #include "libjudy/src/Judy.h"
+#include "libjudy/judyl-typed.h"
 #include "july/july.h"
 
 #include "string/string.h"
@@ -134,6 +134,12 @@ extern const char *netdata_configured_host_prefix;
 #include "os/os.h"
 
 #include "socket/socket.h"
+#include "socket/nd-sock.h"
+#include "socket/nd-poll.h"
+#include "socket/listen-sockets.h"
+#include "socket/poll-events.h"
+#include "socket/connect-to.h"
+#include "socket/socket-peers.h"
 #include "avl/avl.h"
 
 #include "line_splitter/line_splitter.h"
@@ -290,6 +296,28 @@ typedef enum {
     TIMING_STEP_FREEIPMI_READ_event_offset_string,
     TIMING_STEP_FREEIPMI_READ_manufacturer_id,
 
+    TIMING_STEP_DBENGINE_EVICT_LOCK,
+    TIMING_STEP_DBENGINE_EVICT_SELECT,
+    TIMING_STEP_DBENGINE_EVICT_SELECT_PAGE,
+    TIMING_STEP_DBENGINE_EVICT_RELOCATE_PAGE,
+    TIMING_STEP_DBENGINE_EVICT_SORT,
+    TIMING_STEP_DBENGINE_EVICT_DEINDEX,
+    TIMING_STEP_DBENGINE_EVICT_DEINDEX_PAGE,
+    TIMING_STEP_DBENGINE_EVICT_FINISHED,
+    TIMING_STEP_DBENGINE_EVICT_FREE_LOOP,
+    TIMING_STEP_DBENGINE_EVICT_FREE_PAGE,
+    TIMING_STEP_DBENGINE_EVICT_FREE_ATOMICS,
+    TIMING_STEP_DBENGINE_EVICT_FREE_CB,
+    TIMING_STEP_DBENGINE_EVICT_FREE_ATOMICS2,
+    TIMING_STEP_DBENGINE_EVICT_FREE_ARAL,
+    TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_DATA,
+    TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_ARAL,
+    TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_TIER1_ARAL,
+    TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GLIVE,
+    TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GWORKER,
+    TIMING_STEP_DBENGINE_EVICT_FREE_OPEN,
+    TIMING_STEP_DBENGINE_EVICT_FREE_EXTENT,
+
     // terminator
     TIMING_STEP_MAX,
 } TIMING_STEP;
@@ -304,11 +332,21 @@ typedef enum {
 #define timing_init() timing_action(TIMING_ACTION_INIT, TIMING_STEP_INTERNAL)
 #define timing_step(step) timing_action(TIMING_ACTION_STEP, step)
 #define timing_report() timing_action(TIMING_ACTION_FINISH, TIMING_STEP_INTERNAL)
+
+#define timing_dbengine_evict_init() timing_action(TIMING_ACTION_INIT, TIMING_STEP_INTERNAL)
+#define timing_dbengine_evict_step(step) timing_action(TIMING_ACTION_STEP, step)
+#define timing_dbengine_evict_report() timing_action(TIMING_ACTION_FINISH, TIMING_STEP_INTERNAL)
 #else
 #define timing_init() debug_dummy()
 #define timing_step(step) debug_dummy()
 #define timing_report() debug_dummy()
+
+#define timing_dbengine_evict_init() debug_dummy()
+#define timing_dbengine_evict_step(step) debug_dummy()
+#define timing_dbengine_evict_report() debug_dummy()
 #endif
+
+
 void timing_action(TIMING_ACTION action, TIMING_STEP step);
 
 int hash256_string(const unsigned char *string, size_t size, char *hash);

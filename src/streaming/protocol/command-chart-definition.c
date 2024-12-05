@@ -1,25 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "commands.h"
+#include "../stream-sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
 
 // chart labels
-static int send_clabels_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+static int stream_send_clabels_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     BUFFER *wb = (BUFFER *)data;
     buffer_sprintf(wb, PLUGINSD_KEYWORD_CLABEL " \"%s\" \"%s\" %d\n", name, value, ls & ~(RRDLABEL_FLAG_INTERNAL));
     return 1;
 }
 
-static void rrdpush_send_clabels(BUFFER *wb, RRDSET *st) {
+static void stream_send_clabels(BUFFER *wb, RRDSET *st) {
     if (st->rrdlabels) {
-        if(rrdlabels_walkthrough_read(st->rrdlabels, send_clabels_callback, wb) > 0)
+        if(rrdlabels_walkthrough_read(st->rrdlabels, stream_send_clabels_callback, wb) > 0)
             buffer_sprintf(wb, PLUGINSD_KEYWORD_CLABEL_COMMIT "\n");
     }
 }
 
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
-bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
+bool stream_sender_send_rrdset_definition(BUFFER *wb, RRDSET *st) {
     uint32_t version = rrdset_metadata_version(st);
 
     RRDHOST *host = st->rrdhost;
@@ -45,7 +46,7 @@ bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 
     if(with_slots) {
         buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-        buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush.sender.chart_slot);
+        buffer_print_uint64_encoded(wb, integer_encoding, st->stream.snd.chart_slot);
     }
 
     // send the chart
@@ -53,24 +54,24 @@ bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
         wb
         , " \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s\" \"%s\" \"%s\"\n"
         , rrdset_id(st)
-            , name
+        , name
         , rrdset_title(st)
-            , rrdset_units(st)
-            , rrdset_family(st)
-            , rrdset_context(st)
-            , rrdset_type_name(st->chart_type)
-            , st->priority
+        , rrdset_units(st)
+        , rrdset_family(st)
+        , rrdset_context(st)
+        , rrdset_type_name(st->chart_type)
+        , st->priority
         , st->update_every
         , rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)?"obsolete":""
         , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
         , rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)?"hidden":""
         , rrdset_plugin_name(st)
-            , rrdset_module_name(st)
+        , rrdset_module_name(st)
     );
 
     // send the chart labels
     if (stream_has_capability(host->sender, STREAM_CAP_CLABELS))
-        rrdpush_send_clabels(wb, st);
+        stream_send_clabels(wb, st);
 
     // send the dimensions
     RRDDIM *rd;
@@ -79,7 +80,7 @@ bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 
         if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush.sender.dim_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->stream.snd.dim_slot);
         }
 
         buffer_sprintf(
@@ -99,7 +100,7 @@ bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 
     // send the chart functions
     if(stream_has_capability(host->sender, STREAM_CAP_FUNCTIONS))
-        rrd_chart_functions_expose_rrdpush(st, wb);
+        stream_sender_send_rrdset_functions(st, wb);
 
     // send the chart local custom variables
     rrdvar_print_to_streaming_custom_chart_variables(st, wb);
@@ -128,8 +129,6 @@ bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 #endif
     }
 
-    sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
-
     // we can set the exposed flag, after we commit the buffer
     // because replication may pick it up prematurely
     rrddim_foreach_read(rd, st) {
@@ -138,11 +137,11 @@ bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     rrddim_foreach_done(rd);
     rrdset_metadata_exposed_upstream(st, version);
 
-    st->rrdpush.sender.resync_time_s = st->last_collected_time.tv_sec + (stream_conf_initial_clock_resync_iterations * st->update_every);
+    st->stream.snd.resync_time_s = st->last_collected_time.tv_sec + (stream_send.initial_clock_resync_iterations * st->update_every);
     return replication_progress;
 }
 
-bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
+bool should_send_rrdset_matching(RRDSET *st, RRDSET_FLAGS flags) {
     if(!(flags & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
         return false;
 
@@ -159,18 +158,18 @@ bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
             int negative = 0, positive = 0;
             SIMPLE_PATTERN_RESULT r;
 
-            r = simple_pattern_matches_string_extract(host->rrdpush.send.charts_matching, st->context, NULL, 0);
+            r = simple_pattern_matches_string_extract(host->stream.snd.charts_matching, st->context, NULL, 0);
             if(r == SP_MATCHED_POSITIVE) positive++;
             else if(r == SP_MATCHED_NEGATIVE) negative++;
 
             if(!negative) {
-                r = simple_pattern_matches_string_extract(host->rrdpush.send.charts_matching, st->name, NULL, 0);
+                r = simple_pattern_matches_string_extract(host->stream.snd.charts_matching, st->name, NULL, 0);
                 if (r == SP_MATCHED_POSITIVE) positive++;
                 else if (r == SP_MATCHED_NEGATIVE) negative++;
             }
 
             if(!negative) {
-                r = simple_pattern_matches_string_extract(host->rrdpush.send.charts_matching, st->id, NULL, 0);
+                r = simple_pattern_matches_string_extract(host->stream.snd.charts_matching, st->id, NULL, 0);
                 if (r == SP_MATCHED_POSITIVE) positive++;
                 else if (r == SP_MATCHED_NEGATIVE) negative++;
             }
@@ -189,18 +188,15 @@ bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
 }
 
 // Called from the internal collectors to mark a chart obsolete.
-bool rrdset_push_chart_definition_now(RRDSET *st) {
+bool stream_sender_send_rrdset_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)
-                 || !should_send_chart_matching(st, rrdset_flag_get(st)))) {
+    if(unlikely(!rrdhost_can_stream_metadata_to_parent(host) || !should_send_rrdset_matching(st, rrdset_flag_get(st))))
         return false;
-    }
 
-    BUFFER *wb = sender_start(host->sender);
-    rrdpush_send_chart_definition(wb, st);
-    sender_thread_buffer_free();
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    stream_sender_send_rrdset_definition(wb, st);
+    sender_commit_clean_buffer(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
 
     return true;
 }
-

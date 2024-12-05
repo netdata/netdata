@@ -14,7 +14,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 }
 
 void rrdset_thread_rda_free(void){}
-void sender_thread_buffer_free(void){}
+void sender_commit_thread_buffer_free(void){}
 void query_target_free(void){}
 void service_exits(void){}
 void rrd_collector_finished(void){}

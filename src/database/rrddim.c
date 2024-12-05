@@ -53,7 +53,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rd->rrdset = st;
 
-    rd->rrdpush.sender.dim_slot = __atomic_add_fetch(&st->rrdpush.sender.dim_last_slot_used, 1, __ATOMIC_RELAXED);
+    rd->stream.snd.dim_slot = __atomic_add_fetch(&st->stream.snd.dim_last_slot_used, 1, __ATOMIC_RELAXED);
 
     if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
         rd->collector.counter = 1;
@@ -289,7 +289,7 @@ size_t rrddim_size(void) {
 void rrddim_index_init(RRDSET *st) {
     if(!st->rrddim_root_index) {
         st->rrddim_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                                                           &dictionary_stats_category_rrdset_rrddim, rrddim_size());
+                                                           &dictionary_stats_category_rrddim, rrddim_size());
 
         dictionary_register_insert_callback(st->rrddim_root_index, rrddim_insert_callback, NULL);
         dictionary_register_conflict_callback(st->rrddim_root_index, rrddim_conflict_callback, NULL);

@@ -49,7 +49,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                 available_instances += __atomic_load_n(&host->rrdctx.instances_count, __ATOMIC_RELAXED);
                 available_contexts += __atomic_load_n(&host->rrdctx.contexts_count, __ATOMIC_RELAXED);
 
-                if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED))
+                if(rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED))
                     sending++;
 
                 if (rrdhost_is_online(host)) {
@@ -103,12 +103,12 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
         buffer_json_object_close(wb); // api
 
         buffer_json_member_add_array(wb, "db_size");
-        size_t group_seconds = localhost->rrd_update_every;
+        size_t group_seconds;
         for (size_t tier = 0; tier < storage_tiers; tier++) {
             STORAGE_ENGINE *eng = localhost->db[tier].eng;
             if (!eng) continue;
 
-            group_seconds *= storage_tiers_grouping_iterations[tier];
+            group_seconds = get_tier_grouping(tier) * localhost->rrd_update_every;
             uint64_t max = storage_engine_disk_space_max(eng->seb, localhost->db[tier].si);
             uint64_t used = storage_engine_disk_space_used(eng->seb, localhost->db[tier].si);
 #ifdef ENABLE_DBENGINE

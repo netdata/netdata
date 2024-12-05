@@ -88,8 +88,8 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , (rc->rrdset)?"true":"false"
                    , (rc->run_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
                    , (rc->run_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
-                   , rc->config.exec?rrdcalc_exec(rc):string2str(host->health.health_default_exec)
-                   , rc->config.recipient?rrdcalc_recipient(rc):string2str(host->health.health_default_recipient)
+                   , rc->config.exec?rrdcalc_exec(rc):string2str(host->health.default_exec)
+                   , rc->config.recipient?rrdcalc_recipient(rc):string2str(host->health.default_recipient)
                    , rrdcalc_source(rc)
                    , rrdcalc_units(rc)
                    , string2str(rc->summary)
@@ -238,7 +238,7 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
                     "\n\t\"alarms\": {\n",
                    rrdhost_hostname(host),
                    (host->health_log.next_log_id > 0)?(host->health_log.next_log_id - 1):0,
-                   host->health.health_enabled?"true":"false",
+                   host->health.enabled ?"true":"false",
                    (unsigned long)now_realtime_sec());
 
     health_alarms2json_fill_alarms(host, wb, all,  health_rrdcalc2json_nolock);

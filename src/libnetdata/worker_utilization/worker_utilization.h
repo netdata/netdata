@@ -5,7 +5,7 @@
 
 // workers interfaces
 
-#define WORKER_UTILIZATION_MAX_JOB_TYPES 50
+#define WORKER_UTILIZATION_MAX_JOB_TYPES 80
 
 typedef enum __attribute__((packed)) {
     WORKER_METRIC_EMPTY = 0,
