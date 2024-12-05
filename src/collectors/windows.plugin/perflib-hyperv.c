@@ -331,12 +331,12 @@ static bool do_hyperv_health_summary(PERF_DATA_BLOCK *pDataBlock, int update_eve
             update_every,
             RRDSET_TYPE_STACKED);
 
-        p->rd_HealthCritical = rrddim_add(p->st_health, "critical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         p->rd_HealthOk = rrddim_add(p->st_health, "ok", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        p->rd_HealthCritical = rrddim_add(p->st_health, "critical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    SETP_DIM_VALUE(st_health, HealthCritical);
     SETP_DIM_VALUE(st_health, HealthOk);
+    SETP_DIM_VALUE(st_health, HealthCritical);
 
     rrdset_done(p->st_health);
     return true;
@@ -584,7 +584,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_device_interrupt_errors",
-                "Root partition illegal interrupt requestss",
+                "Root partition illegal interrupt requests",
                 "requests",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
@@ -1454,7 +1454,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 NULL,
                 HYPERV,
                 HYPERV ".vm_net_interface_ipsec_traffic",
-                "VM interface traffic",
+                "VM interface IPSec traffic",
                 "kilobits/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
@@ -1475,7 +1475,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 NULL,
                 HYPERV,
                 HYPERV ".vm_net_interface_directed_packets",
-                "VM interface traffic",
+                "VM interface directed packets",
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
@@ -1659,7 +1659,7 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
                 _COMMON_PLUGIN_MODULE_NAME,
                 NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_CPU_USAGE,
                 update_every,
-                RRDSET_TYPE_STACKED);
+                RRDSET_TYPE_AREA);
 
             p->rd_TotalRunTime =
                 rrddim_add(p->st_HypervisorProcessorTotal, "usage", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
