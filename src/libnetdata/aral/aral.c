@@ -927,34 +927,16 @@ static size_t aral_allocation_slot_size(size_t requested_element_size, bool usab
 }
 
 size_t aral_optimal_page_size(void) {
-    long int page_size = sysconf(_SC_PAGE_SIZE);
-    if (unlikely(page_size < 4096))
-        page_size = 4096;
-
-    return page_size * 4;
+    // for allocations above 128KiB, glibc gives them back to the system
+    // immediately when freed.
+    return 256 * 1024;
 }
 
 static void optimal_max_page_size(ARAL *ar) {
     if(ar->config.requested_max_page_size)
         return;
 
-    size_t element_size = ar->config.element_size;
-    size_t system_page_size = ar->config.system_page_size;
-
-    if(element_size > system_page_size) {
-        size_t multiplier = system_page_size / (element_size - system_page_size);
-        if(multiplier > 5) multiplier = 5;
-        if(multiplier < 2) multiplier = 2;
-
-        ar->config.requested_max_page_size = memory_alignment(system_page_size * multiplier, system_page_size);
-        return;
-    }
-
-    size_t multiplier = (system_page_size * 4) / element_size;
-    if(multiplier > 200)
-        multiplier = 200;
-
-    ar->config.requested_max_page_size = memory_alignment(element_size * multiplier, system_page_size);
+    ar->config.requested_max_page_size = aral_optimal_page_size();
 }
 
 ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size,
