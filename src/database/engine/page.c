@@ -28,12 +28,6 @@ typedef struct {
 } page_gorilla_t;
 
 struct pgd {
-    // last storage number we've seen in gorilla pages
-    storage_number last_sn;
-
-    // how many times we've seen the last storage number
-    uint16_t last_sn_count;
-
     // the used number of slots in the page
     uint16_t used;
 
@@ -286,35 +280,12 @@ static size_t pgd_data_footprint(size_t size, size_t partition) {
 // ----------------------------------------------------------------------------
 // management api
 
-// Helper function to write the last storage numbers we've tracked
-static void gorilla_flush_last_sn(PGD *pg) {
-    // write any `last_sn`, `last_sn_count` times
-    for (uint16_t i = 0; i != pg->last_sn_count; i++) {
-        bool ok = gorilla_writer_write(pg->gorilla.writer, pg->last_sn);
-        if (!ok) {
-            gorilla_buffer_t *new_buffer = pgd_gorilla_buffer_alloc(pg->partition);
-            memset(new_buffer, 0, RRDENG_GORILLA_32BIT_BUFFER_SIZE);
-
-            gorilla_writer_add_buffer(pg->gorilla.writer, new_buffer, RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
-            pg->gorilla.num_buffers += 1;
-            telemetry_gorilla_hot_buffer_added();
-
-            ok = gorilla_writer_write(pg->gorilla.writer, pg->last_sn);
-            internal_fatal(ok == false, "Failed to writer value in newly allocated gorilla buffer.");
-        }
-    }
-
-    pg->last_sn_count = 0;
-}
-
 PGD *pgd_create(uint8_t type, uint32_t slots) {
 
     PGD *pg = pgd_alloc(true); // this is malloc'd !
     pg->type = type;
     pg->states = PGD_STATE_CREATED_FROM_COLLECTOR;
     pg->options = PAGE_OPTION_ALL_VALUES_EMPTY | PAGE_OPTION_ARAL_MARKED;
-    pg->last_sn = 0;
-    pg->last_sn_count = 0;
 
     pg->used = 0;
     pg->slots = slots;
@@ -367,8 +338,6 @@ PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size) {
     pg->type = type;
     pg->states = PGD_STATE_CREATED_FROM_DISK;
     pg->options = PAGE_OPTION_ARAL_UNMARKED;
-    pg->last_sn = 0;
-    pg->last_sn_count = 0;
 
     switch (type)
     {
@@ -678,7 +647,6 @@ uint32_t pgd_disk_footprint(PGD *pg)
                 internal_fatal(pg->gorilla.num_buffers == 0,
                                "Gorilla writer does not have any buffers");
 
-                gorilla_flush_last_sn(pg);
                 size = pg->gorilla.num_buffers * RRDENG_GORILLA_32BIT_BUFFER_SIZE;
 
                 if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR)
@@ -797,28 +765,11 @@ size_t pgd_append_point(PGD *pg,
             break;
         }
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
+            pg->used++;
             storage_number t = pack_storage_number(n, flags);
 
             if ((pg->options & PAGE_OPTION_ALL_VALUES_EMPTY) && does_storage_number_exist(t))
                 pg->options &= ~PAGE_OPTION_ALL_VALUES_EMPTY;
-
-            if (unlikely(pg->used == 0)) {
-                // initialize the last storage number field
-                pg->last_sn = t;
-                pg->last_sn_count = 0;
-                pg->used++;
-            } else if (pg->last_sn == t) {
-                // this is not the first number and it's the same as the last one
-                pg->last_sn = t;
-                pg->last_sn_count++;
-                pg->used++;
-                break;
-            } else if (pg->last_sn != t) {
-                gorilla_flush_last_sn(pg);
-                pg->last_sn = t;
-                pg->last_sn_count = 0;
-                pg->used++;
-            }
 
             bool ok = gorilla_writer_write(pg->gorilla.writer, t);
             if (!ok) {
@@ -870,16 +821,14 @@ static void pgdc_seek(PGDC *pgdc, uint32_t position)
                 if (!pg->gorilla.writer)
                     fatal("Seeking from a page without an active gorilla writer is not supported (yet).");
 
-                pgdc->slots = gorilla_writer_entries(pg->gorilla.writer) + pg->last_sn_count;
+                pgdc->slots = gorilla_writer_entries(pg->gorilla.writer);
                 pgdc->gr = gorilla_writer_get_reader(pg->gorilla.writer);
             }
 
             if (position > pgdc->slots)
                 position = pgdc->slots;
 
-            uint32_t flushed_sns_count = pgdc->slots - pg->last_sn_count;
-            uint32_t n = MIN(position, flushed_sns_count);
-            for (uint32_t i = 0; i != n; i++) {
+            for (uint32_t i = 0; i != position; i++) {
                 uint32_t value;
 
                 bool ok = gorilla_reader_read(&pgdc->gr, &value);
@@ -953,18 +902,10 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
             return true;
         }
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
-            assert(pgdc->slots >= pgdc->pgd->last_sn_count);
-            uint32_t flushed_sns_count = pgdc->slots - pgdc->pgd->last_sn_count;
+            pgdc->position++;
 
-            bool ok = false;
             uint32_t n = 666666666;
-
-            if (pgdc->position < flushed_sns_count) {
-                ok = gorilla_reader_read(&pgdc->gr, &n);
-            } else if (pgdc->position < flushed_sns_count + pgdc->pgd->last_sn_count) {
-                n = pgdc->pgd->last_sn;
-                ok = true;
-            }
+            bool ok = gorilla_reader_read(&pgdc->gr, &n);
 
             if (ok) {
                 sp->min = sp->max = sp->sum = unpack_storage_number(n);
@@ -975,7 +916,6 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
                 storage_point_empty(*sp, sp->start_time_s, sp->end_time_s);
             }
 
-            pgdc->position++;
             return ok;
         }
         default: {
