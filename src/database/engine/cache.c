@@ -1951,7 +1951,8 @@ static void *pgc_evict_thread(void *ptr) {
     while (true) {
         worker_is_idle();
         unsigned new_job_id = completion_wait_for_a_job_with_timeout(&cache->evictor.completion, job_id, 50);
-        worker_is_busy(new_job_id == job_id ? 1 : 0);
+        bool was_signaled = new_job_id > job_id;
+        worker_is_busy(was_signaled ? 1 : 0);
         job_id = new_job_id;
 
         if (nd_thread_signaled_to_cancel())
@@ -1972,7 +1973,7 @@ static void *pgc_evict_thread(void *ptr) {
 
             evict_pages(cache, 0, 0, true, false);
 
-            if(was_aggressive)
+            if(was_signaled || was_aggressive)
                 mallocz_release_as_much_memory_to_the_system();
 
             tinysleep();
