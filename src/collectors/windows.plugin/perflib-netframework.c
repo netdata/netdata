@@ -1473,10 +1473,15 @@ struct netdata_netframework_objects {
     char *object;
     void (*fnct)(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int);
 } netframewrk_obj[NETDATA_NETFRAMEWORK_END] = {
-    {.fnct = netdata_framework_clr_exceptions, .object = ".NET CLR Exceptions"},
-    {.fnct = netdata_framework_clr_interop, .object = ".NET CLR Interop"},
-    {.fnct = netdata_framework_clr_jit, .object = ".NET CLR Jit"},
-    {.fnct = netdata_framework_clr_loading, .object = ".NET CLR Loading"}};
+    {.fnct = netdata_framework_clr_exceptions, .object = ".NET CLR Exceptions" },
+    {.fnct = netdata_framework_clr_interop, .object = ".NET CLR Interop" },
+    {.fnct = netdata_framework_clr_jit, .object = ".NET CLR Jit" },
+    {.fnct = netdata_framework_clr_loading, .object = ".NET CLR Loading" },
+    {.fnct = netdata_framework_clr_remoting, .object = ".NET CLR Remoting" },
+    {.fnct = netdata_framework_clr_security, .object = ".NET CLR Security" }
+    {.fnct = netdata_framework_clr_locks_and_threads, .object = ".NET CLR LocksAndThreads" }
+
+};
 
 int do_PerflibNetFramework(int update_every, usec_t dt __maybe_unused) {
     static bool initialized = false;
