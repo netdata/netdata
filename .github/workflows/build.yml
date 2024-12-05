@@ -434,7 +434,6 @@ jobs:
           mv ../dist-artifacts/* . || exit 1
           ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
           cp ../packaging/version ./latest-version.txt || exit 1
-          cp ../integrations/integrations.js ./integrations.js || exit 1
           sha256sum -b ./* > sha256sums.txt || exit 1
           cat sha256sums.txt
       - name: Store Artifacts
