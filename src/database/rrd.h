@@ -936,7 +936,6 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     // Health
     RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 17), // contains charts and dims with uninitialized variables
     RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 18), // the host has initialized health structures
-
     // Exporting
     RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 19), // send it to external databases
     RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 20), // don't send it to external databases
@@ -1038,6 +1037,7 @@ struct alarm_entry {
     RRDCALC_STATUS new_status;
 
     uint32_t flags;
+    bool pending_save;
 
     int delay;
     time_t delay_up_to_timestamp;
@@ -1084,6 +1084,7 @@ typedef struct health {
     STRING *default_recipient;                      // the default recipient for all alarms
     bool enabled;                                   // 1 when this host has health enabled
     bool use_summary_for_notifications;             // whether to use the summary field as a subject for notifications
+    int32_t pending_transitions;                    // pending alert transitions to store
 } HEALTH;
 
 // ----------------------------------------------------------------------------
