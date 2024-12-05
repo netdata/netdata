@@ -6,10 +6,8 @@
 
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    __atomic_test_and_set(&ae->pending_save, __ATOMIC_ACQUIRE);
     metadata_queue_ae_save(host, ae);
 }
-
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function) {
     if(!host || !ae) return;
@@ -161,6 +159,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->flags |= flags;
 
     ae->last_repeat = 0;
+    ae->pending_save_count = 0;
 
     if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
         ae->non_clear_duration += ae->duration;
@@ -208,7 +207,7 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae)
 }
 
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
-    if(__atomic_load_n(&ae->pending_save, __ATOMIC_RELAXED))
+    if(__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED))
         metadata_queue_ae_deletion(ae);
     else {
         string_freez(ae->name);

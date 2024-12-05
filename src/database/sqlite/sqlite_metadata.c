@@ -1757,7 +1757,7 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
     Pvoid_t *Pvalue;
     while ((Pvalue = JudyLFirstThenNext(wc->ae_DelJudyL, &Index, &first))) {
         ALARM_ENTRY *ae = (ALARM_ENTRY *) Index;
-        if(!__atomic_load_n(&ae->pending_save, __ATOMIC_RELAXED)) {
+        if(!__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED)) {
             health_alarm_log_free_one_nochecks_nounlink(ae);
             (void) JudyLDel(&wc->ae_DelJudyL, Index, PJE0);
             first = false;
@@ -1895,7 +1895,7 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list)
 
         sql_health_alarm_log_save(host, ae);
 
-        __atomic_clear(&ae->pending_save, __ATOMIC_RELEASE);
+        __atomic_add_fetch(&ae->pending_save_count, -1, __ATOMIC_RELAXED);
         __atomic_add_fetch(&host->health.pending_transitions, -1, __ATOMIC_RELAXED);
     }
     (void) JudyLFreeArray(&pending_alert_list->JudyL, PJE0);
@@ -2410,6 +2410,7 @@ void metadata_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae)
     if (unlikely(!metasync_worker.loop))
         return;
     __atomic_add_fetch(&host->health.pending_transitions, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
     queue_metadata_cmd(METADATA_ADD_HOST_AE, host, ae);
 }
 
