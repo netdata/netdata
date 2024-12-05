@@ -6,9 +6,14 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#19126](https://github.com/netdata/netdata/pull/19126) ([netdatabot](https://github.com/netdatabot))
+- Integrations gha, remove .js and .json files after the process [\#19125](https://github.com/netdata/netdata/pull/19125) ([Ancairon](https://github.com/Ancairon))
+- Avoid scanning charts for replication status [\#19124](https://github.com/netdata/netdata/pull/19124) ([stelfrag](https://github.com/stelfrag))
+- Address installer minor issues \(Windows\) [\#19122](https://github.com/netdata/netdata/pull/19122) ([thiagoftsm](https://github.com/thiagoftsm))
 - Move eBPF code from linetdata to src/collector [\#19121](https://github.com/netdata/netdata/pull/19121) ([thiagoftsm](https://github.com/thiagoftsm))
 - change default nice level to 0 [\#19120](https://github.com/netdata/netdata/pull/19120) ([ilyam8](https://github.com/ilyam8))
 - Disable mimalloc by default / enable explicitly if needed [\#19118](https://github.com/netdata/netdata/pull/19118) ([stelfrag](https://github.com/stelfrag))
+- Reduce EBPF memory usage [\#19117](https://github.com/netdata/netdata/pull/19117) ([stelfrag](https://github.com/stelfrag))
 - Fix undefined behaviour. [\#19116](https://github.com/netdata/netdata/pull/19116) ([vkalintiris](https://github.com/vkalintiris))
 - disable python.d/example [\#19114](https://github.com/netdata/netdata/pull/19114) ([ilyam8](https://github.com/ilyam8))
 - docs: format, typos, and some simplifications in `docs/` [\#19112](https://github.com/netdata/netdata/pull/19112) ([ilyam8](https://github.com/ilyam8))
@@ -440,12 +445,6 @@
 - Regenerate integrations.js [\#18574](https://github.com/netdata/netdata/pull/18574) ([netdatabot](https://github.com/netdatabot))
 - go.d portcheck update meta [\#18573](https://github.com/netdata/netdata/pull/18573) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#18571](https://github.com/netdata/netdata/pull/18571) ([netdatabot](https://github.com/netdatabot))
-- go.d sd docker: remove unnecessary info message [\#18570](https://github.com/netdata/netdata/pull/18570) ([ilyam8](https://github.com/ilyam8))
-- go.d/portcheck: add UDP support [\#18569](https://github.com/netdata/netdata/pull/18569) ([ilyam8](https://github.com/ilyam8))
-- Reduce connection timeout and fallback to IPV4 for ACLK connections [\#18568](https://github.com/netdata/netdata/pull/18568) ([stelfrag](https://github.com/stelfrag))
-- Windows Events Log improvements 4 [\#18567](https://github.com/netdata/netdata/pull/18567) ([ktsaou](https://github.com/ktsaou))
-- windows.plugin \(IIS\) [\#18566](https://github.com/netdata/netdata/pull/18566) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add check for 64bit builtin atomics [\#18565](https://github.com/netdata/netdata/pull/18565) ([kraj](https://github.com/kraj))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
