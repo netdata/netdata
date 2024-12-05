@@ -1157,6 +1157,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 ### Windows Systems
 
+- [Hyper-V](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/hyper-v.md)
+
 - [IIS](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/iis.md)
 
 - [Memory statistics](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/memory_statistics.md)
