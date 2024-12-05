@@ -444,3 +444,371 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibHyperV
+      monitored_instance:
+        name: Hyper-V
+        link: "https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/about/"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - hyperv
+        - virtualization
+        - vm
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors website requests and logins.
+        method_description: |
+          It queries the 'HyperV' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibHyperV
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the Hyper-V instance."
+          labels: []
+          metrics:
+            - name: hyperv.vms_health
+              description: Virtual machines health status
+              unit: "vms"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: critical
+            - name: hyperv.root_partition_io_tlb_flush
+              description: Root partition flushes of I/O TLBs
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: gpa
+            - name: hyperv.root_partition_virtual_tlb_flush_entries
+              description: Root partition flushes of the entire virtual TLB
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: hyperv.root_partition_virtual_tlb_pages
+              description: Root partition pages used by the virtual TLB
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: hyperv.root_partition_address_space
+              description: Root partition address spaces in the virtual TLB
+              unit: "address spaces"
+              chart_type: line
+              dimensions:
+                - name: address_spaces
+            - name: hyperv.root_partition_attached_devices
+              description: Root partition attached devices
+              unit: "devices"
+              chart_type: line
+              dimensions:
+                - name: attached
+            - name: hyperv.root_partition_device_dma_errors
+              description: Root partition illegal DMA requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: illegal_dma
+            - name: hyperv.root_partition_device_interrupt_errors
+              description: Root partition illegal interrupt requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: illegal_interrupt
+            - name: hyperv.root_partition_device_interrupt_throttle_events
+              description: Root partition throttled interrupts
+              unit: "events"
+              chart_type: line
+              dimensions:
+                - name: throttling
+            - name: hyperv.root_partition_deposited_pages
+              description: Root partition deposited pages
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: gpa
+            - name: hyperv.root_partition_device_space_pages
+              description: Root partition device space pages
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: 4K
+                - name: 2M
+                - name: 1G
+            - name: hyperv.root_partition_gpa_space_pages
+              description: Root partition GPA space pages
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: 4K
+                - name: 2M
+                - name: 1G
+            - name: hyperv.root_partition_gpa_space_modifications
+              description: Root partition GPA space modifications
+              unit: "modifications/s"
+              chart_type: line
+              dimensions:
+                - name: gpa
+
+        - name: Virtual Machine
+          description: "These metrics refer to the Virtual Machine."
+          labels:
+            - name: vm_name
+              description: The name of the Virtual Machine.
+          metrics:
+            - name: hyperv.vm_cpu_usage
+              description: VM CPU usage
+              unit: "percentage"
+              chart_type: area
+              dimensions:
+                - name: usage
+            - name: hyperv.vm_cpu_usage_by_run_context
+              description: VM CPU usage by run context
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: guest
+                - name: hypervisor
+                - name: remote
+            - name: hyperv.vm_memory_physical
+              description: VM assigned memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: assigned
+            - name: hyperv.vm_memory_physical_guest_visible
+              description: VM guest visible memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: visible
+                - name: available
+            - name: hyperv.vm_memory_pressure_current
+              description: VM Memory Pressure
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: pressure
+            - name: hyperv.vm_vid_physical_pages_allocated
+              description: VM physical pages allocated
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: allocated
+            - name: hyperv.vm_vid_remote_physical_pages
+              description: VM physical pages not allocated from the preferred NUMA node
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: remote_physical
+        - name: Virtual Machine Storage Device
+          description: "These metrics refer to the Virtual Machine Storage Device."
+          labels:
+            - name: vm_storage_device
+              description: The name of the Storage Device.
+          metrics:
+            - name: hyperv.vm_storage_device_bytes
+              description: VM storage device IO
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: hyperv.vm_storage_device_operations
+              description: VM storage device IOPS"
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: hyperv.vm_storage_device_errors
+              description: VM storage device errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: errors
+        - name: Virtual Machine Network Interface
+          description: "These metrics refer to the Virtual Machine Network Interface."
+          labels:
+            - name: vm_net_interface
+              description: The name of the Network Interface.
+          metrics:
+            - name: hyperv.vm_net_interface_traffic
+              description: VM interface traffic
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vm_net_interface_ipsec_traffic
+              description: VM interface traffic
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vm_net_interface_packets
+              description: VM interface packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vm_net_interface_directed_packets
+              description: VM interface directed packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vm_net_interface_broadcast_packets
+              description: VM interface broadcast
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vm_net_interface_multicast_packets
+              description: VM interface multicast
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vm_net_interface_packets_dropped
+              description: VM interface packets dropped
+              unit: "drops/s"
+              chart_type: line
+              dimensions:
+                - name: incoming
+                - name: outgoing
+        - name: Virtual Switch
+          description: "These metrics refer to the Virtual Switch."
+          labels:
+            - name: vswitch
+              description: The name of the Virtual Switch.
+          metrics:
+            - name: hyperv.vswitch_traffic
+              description: Virtual switch traffic
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vswitch_packets
+              description: Virtual switch packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vswitch_directed_packets
+              description: Virtual switch directed packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vswitch_broadcast_packets
+              description: Virtual switch broadcast packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vswitch_multicast_packets
+              description: Virtual switch multicast packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vswitch_dropped_packets
+              description: Virtual switch dropped packets
+              unit: "drops/s"
+              chart_type: line
+              dimensions:
+                - name: incoming
+                - name: outgoing
+            - name: hyperv.vswitch_extensions_dropped_packets
+              description: Virtual switch extensions dropped packets
+              unit: "drops/s"
+              chart_type: line
+              dimensions:
+                - name: incoming
+                - name: outgoing
+            - name: hyperv.vswitch_packets_flooded
+              description: Virtual switch flooded packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: flooded
+            - name: hyperv.vswitch_learned_mac_addresses
+              description: Virtual switch learned MAC addresses
+              unit: "mac addresses/s"
+              chart_type: line
+              dimensions:
+                - name: learned
+            - name: hyperv.vswitch_purged_mac_addresses
+              description: Virtual switch purged MAC addresses
+              unit: "mac addresses/s"
+              chart_type: line
+              dimensions:
+                - name: purged
