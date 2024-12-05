@@ -24,13 +24,17 @@ RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t wall_clock_time
 
         if(unlikely(!(host_flags & RRDHOST_FLAG_STREAM_SENDER_LOGGED_STATUS))) {
             rrdhost_flag_set(host, RRDHOST_FLAG_STREAM_SENDER_LOGGED_STATUS);
-            nd_log_daemon(NDLP_NOTICE, "STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
+            nd_log(NDLS_DAEMON, NDLP_INFO,
+                   "STREAM SEND %s: connected but streaming is not ready yet...",
+                   rrdhost_hostname(host));
         }
 
         return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
     }
     else if(unlikely(host_flags & RRDHOST_FLAG_STREAM_SENDER_LOGGED_STATUS)) {
-        nd_log_daemon(NDLP_INFO, "STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "STREAM SEND %s: streaming is ready, sending metrics to parent...",
+               rrdhost_hostname(host));
         rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_SENDER_LOGGED_STATUS);
     }
 
