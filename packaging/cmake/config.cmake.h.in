@@ -69,11 +69,6 @@
 #cmakedefine HAVE_DLSYM
 #cmakedefine HAVE_LIBCURL
 
-#cmakedefine HAVE_ARC4RANDOM_BUF
-#cmakedefine HAVE_ARC4RANDOM_UNIFORM
-#cmakedefine HAVE_RAND_S
-#cmakedefine HAVE_GETRANDOM
-
 #cmakedefine HAVE_BACKTRACE
 #cmakedefine HAVE_CLOSE_RANGE
 #cmakedefine HAVE_SCHED_GETSCHEDULER
