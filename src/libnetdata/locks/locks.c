@@ -254,12 +254,8 @@ static inline void spinlock_lock_internal(SPINLOCK *spinlock)
         #endif
 
         if(unlikely(i % 8 == 0)) {
-            if(i == 8 * 4) {
-                i = 0;
-                yield_the_processor();
-            }
-            else
-                tinysleep();
+            i = 0;
+            tinysleep();
         }
     }
 

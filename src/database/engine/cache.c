@@ -1534,7 +1534,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
             if(unlikely(!page)) {
                 // now that we don't have the lock,
                 // give it some time for the old page to go away
-                yield_the_processor();
+                tinysleep();
             }
         }
 
@@ -1976,7 +1976,7 @@ static void *pgc_evict_thread(void *ptr) {
             if(was_signaled || was_aggressive)
                 mallocz_release_as_much_memory_to_the_system();
 
-            yield_the_processor();
+            tinysleep();
 
             size_to_evict = 0;
             per1000 = cache_usage_per1000(cache, &size_to_evict);
@@ -2397,7 +2397,7 @@ PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id,
         if(page || !retry)
             break;
 
-        yield_the_processor();
+        tinysleep();
     }
 
     if(page) {
