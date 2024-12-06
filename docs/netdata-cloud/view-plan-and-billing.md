@@ -1,23 +1,23 @@
 # Netdata Plans & Billing
 
-Netdata offers a **Community plan**, a free SaaS and Open Source Agent, and paid subscriptions — **Homelab**, **Business**, and **Enterprise On-Premise** — providing key business features and unlimited access to your dashboards.
+Netdata offers a **Community plan**, a free SaaS, Open Source Agent, and paid subscriptions — **Homelab**, **Business**, and **Enterprise On-Premise** — providing key business features and unlimited access to your dashboards.
 
 For more info visit the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page.
 
 ## Plans
 
-Plans define the features and customization options available within Space. Different Spaces can have different plans, giving you flexibility based on your needs.
+Plans define the features and customization options available within a Space. Different Spaces can have different plans, giving you flexibility based on your needs.
 
 Netdata Cloud plans (excluding Community) involve:
 
 - A yearly flat fee for [committed nodes](#committed-nodes)
-- An on-demand metered component based on the [number of running nodes](#running-nodes-and-billing)
+- An on-demand metered component based on the [number of running nodes](#active-nodes-and-billing)
 
 Billing options include monthly (pay-as-you-go) and yearly (annual prepayment).
 
 ### Technical Details
 
-#### Running Nodes and Billing
+#### Active Nodes and Billing
 
 Billing is based solely on active nodes, excluding offline or stale instances. Daily and P90 metrics ensure fair pricing by mitigating transient increases in node activity.
 
@@ -71,10 +71,11 @@ Please refer to the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page 
 
 > **Note**
 >
-> - Checkout is performed directly if there's an active plan.
-> - Plan changes, including downgrades or cancellations, may impact notification settings or user access. More details on [Plan changes and credit balance](/docs/netdata-cloud/view-plan-and-billing.md#plan-changes-and-credit-balance).
+> Checkout is performed directly if there's an active plan.
 
 ## FAQ
+
+<details><summary>details</summary>
 
 ### What Payment Methods are Accepted?
 
@@ -116,6 +117,4 @@ The total before tax is calculated by:
 3. Subtracting credit from your balance, if necessary.
 4. Applying tax to the final amount, if positive. Negative results adjust your customer credit balance.
 
-> **Note**
->
-> A move to single-invoice billing is expected in the future, although a specific timeline is not set.
+</details>
