@@ -32,16 +32,17 @@ typedef struct ml_queue_item {
     ml_request_add_existing_model add_existing_model;
 } ml_queue_item_t;
 
-struct ml_queue_t {
-    std::queue<ml_queue_item_t> internal;
-    netdata_mutex_t mutex;
-    pthread_cond_t cond_var;
-    std::atomic<bool> exit;
-};
+typedef struct {
+    size_t create_new_model;
+    size_t add_exisiting_model;
+} ml_queue_size_t;
 
 typedef struct {
-    size_t queue_size;
-    size_t num_popped_items;
+    size_t total_create_new_model_requests_pushed;
+    size_t total_create_new_model_requests_popped;
+
+    size_t total_add_existing_model_requests_pushed;
+    size_t total_add_existing_model_requests_popped;
 
     usec_t allotted_ut;
     usec_t consumed_ut;
@@ -54,6 +55,16 @@ typedef struct {
     size_t item_result_chart_under_replication;
 } ml_queue_stats_t;
 
+struct ml_queue_t {
+    std::queue<ml_request_add_existing_model_t> add_model_queue;
+    std::queue<ml_request_create_new_model_t> create_model_queue;
+    ml_queue_stats_t stats;
+
+    netdata_mutex_t mutex;
+    pthread_cond_t cond_var;
+    std::atomic<bool> exit;
+};
+
 ml_queue_t *ml_queue_init();
 
 void ml_queue_destroy(ml_queue_t *q);
@@ -62,7 +73,9 @@ void ml_queue_push(ml_queue_t *q, const ml_queue_item_t req);
 
 ml_queue_item_t ml_queue_pop(ml_queue_t *q);
 
-size_t ml_queue_size(ml_queue_t *q);
+ml_queue_size_t ml_queue_size(ml_queue_t *q);
+
+ml_queue_stats_t ml_queue_stats(ml_queue_t *q);
 
 void ml_queue_signal(ml_queue_t *q);
 

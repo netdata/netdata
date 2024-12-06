@@ -25,8 +25,13 @@ typedef struct {
     std::vector<ml_model_info_t> pending_model_info;
 
     RRDSET *queue_stats_rs;
-    RRDDIM *queue_stats_queue_size_rd;
-    RRDDIM *queue_stats_popped_items_rd;
+    RRDDIM *queue_stats_num_create_new_model_requests_rd;
+    RRDDIM *queue_stats_num_add_existing_model_requests_rd;
+    RRDDIM *queue_stats_num_create_new_model_requests_completed_rd;
+    RRDDIM *queue_stats_num_add_existing_model_requests_completed_rd;
+
+    RRDSET *queue_size_rs;
+    RRDDIM *queue_size_rd;
 
     RRDSET *training_time_stats_rs;
     RRDDIM *training_time_stats_allotted_rd;
