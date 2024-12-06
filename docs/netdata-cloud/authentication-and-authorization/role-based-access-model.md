@@ -1,4 +1,4 @@
-# Role-Based Access model
+# Role-Based Access model (RBAC)
 
 Netdata Cloud's role-based-access mechanism allows you to control what functionalities in the app users can access. Each user can be assigned only one role, which fully specifies all the capabilities they are afforded.
 
