@@ -890,7 +890,7 @@ modules:
           description: "These metrics refer to the Microsoft SQL Servers instances defined on host."
           labels:
             - name: mssql_instance
-              description: The instanace name.
+              description: The instance name.
           metrics:
             - name: mssql.instance_accessmethods_page_splits
               description: Pages split
@@ -1036,3 +1036,47 @@ modules:
               chart_type: line
               dimensions:
                 - name: recompiles
+        - name: Databases
+          description: "These metrics refer to Microsoft SQL Server databases."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: database
+              description: The database name.
+          metrics:
+            - name: mssql.database_active_transactions
+              description: Active transactions per database
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: mssql.database_backup_restore_operations
+              description: Backup IO per database
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: backup
+            - name: mssql.database_log_flushed
+              description: Log flushed
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: flushed
+            - name: mssql.database_log_flushes
+              description: Log flushes
+              unit: flushes/s
+              chart_type: line
+              dimensions:
+                - name: log
+            - name: mssql.database_transactions
+              description: Transactions
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: transactions
+            - name: mssql.database_write_transactions
+              description: Write transactions
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: writes
