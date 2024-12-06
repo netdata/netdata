@@ -7,39 +7,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static void stream_sender_cbuffer_recreate_timed_unsafe(struct sender_state *s, usec_t now_ut, bool force) {
-    static __thread usec_t last_reset_time_ut = 0;
-
-    if(!force && now_ut - last_reset_time_ut < 300 * USEC_PER_SEC)
-        return;
-
-    last_reset_time_ut = now_ut;
-
-    s->sbuf.recreates++; // we increase even if we don't do it, to have sender_start() recreate its buffers
-
-    if(s->sbuf.cb && s->sbuf.cb->size > CBUFFER_INITIAL_SIZE) {
-        cbuffer_free(s->sbuf.cb);
-        s->sbuf.cb = cbuffer_new(CBUFFER_INITIAL_SIZE, stream_send.buffer_max_size, &netdata_buffers_statistics.cbuffers_streaming);
-    }
-}
-
-static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
-    stream_sender_set_flush_time(host->sender);
-
-    stream_sender_lock(host->sender);
-
-    // flush the output buffer from any data it may have
-    cbuffer_flush(host->sender->sbuf.cb);
-    stream_sender_cbuffer_recreate_timed_unsafe(host->sender, now_monotonic_usec(), true);
-
-    stream_sender_unlock(host->sender);
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-
-static void rrdpush_sender_charts_and_replication_reset(struct sender_state *s) {
-    stream_sender_set_flush_time(s);
-
+static void stream_sender_charts_and_replication_reset(struct sender_state *s) {
     // stop all replication commands inflight
     replication_sender_delete_pending_requests(s);
 
@@ -73,13 +41,14 @@ void stream_sender_on_connect(struct sender_state *s) {
 
     rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED);
 
-    rrdpush_sender_charts_and_replication_reset(s);
-    rrdpush_sender_cbuffer_flush(s->host);
+    stream_sender_charts_and_replication_reset(s);
+
+    stream_sender_lock(s);
+    stream_circular_buffer_flush_unsafe(s->sbuf);
+    stream_sender_unlock(s);
 
     s->thread.last_traffic_ut = now_monotonic_usec();
     s->rbuf.read_len = 0;
-    s->sbuf.cb->read = 0;
-    s->sbuf.cb->write = 0;
 }
 
 static void stream_sender_on_ready_to_dispatch(struct sender_state *s) {
@@ -103,8 +72,12 @@ static void stream_sender_on_disconnect(struct sender_state *s) {
            "STREAM SEND [%s]: running on-disconnect hooks...",
            rrdhost_hostname(s->host));
 
+    stream_sender_lock(s);
+    stream_circular_buffer_flush_unsafe(s->sbuf);
+    stream_sender_unlock(s);
+
     stream_sender_execute_commands_cleanup(s);
-    rrdpush_sender_charts_and_replication_reset(s);
+    stream_sender_charts_and_replication_reset(s);
     stream_sender_clear_parent_claim_id(s->host);
     stream_receiver_send_node_and_claim_id_to_child(s->host);
     stream_path_parent_disconnected(s->host);
@@ -157,32 +130,24 @@ static void stream_sender_thread_data_reset_unsafe(struct sender_state *s) {
 
     s->thread.bytes_uncompressed = 0;
     s->thread.bytes_compressed = 0;
-    s->thread.bytes_outstanding = 0;
-    s->thread.bytes_available = 0;
-    s->thread.buffer_ratio = 0.0;
     s->thread.sends = 0;
     s->thread.bytes_sent = 0;
+
+    stream_circular_buffer_flush_unsafe(s->sbuf);
     replication_recalculate_buffer_used_ratio_unsafe(s);
 }
 
 static void stream_sender_thread_data_sent_data_unsafe(struct sender_state *s, uint64_t bytes_sent) {
     s->thread.sends++;
     s->thread.bytes_sent += bytes_sent;
-    s->thread.bytes_outstanding = cbuffer_next_unsafe(s->sbuf.cb, NULL);
-    s->thread.bytes_available = cbuffer_available_size_unsafe(s->sbuf.cb);
-    s->thread.buffer_ratio = (NETDATA_DOUBLE)(s->sbuf.cb->max_size -  s->thread.bytes_available) * 100.0 / (NETDATA_DOUBLE)s->sbuf.cb->max_size;
     replication_recalculate_buffer_used_ratio_unsafe(s);
 }
 
 void stream_sender_thread_data_added_data_unsafe(struct sender_state *s, STREAM_TRAFFIC_TYPE type, uint64_t bytes_compressed, uint64_t bytes_uncompressed) {
     // calculate the statistics for our dispatcher
     s->thread.bytes_sent_by_type[type] += bytes_compressed;
-
     s->thread.bytes_uncompressed += bytes_uncompressed;
     s->thread.bytes_compressed += bytes_compressed;
-    s->thread.bytes_outstanding = cbuffer_next_unsafe(s->sbuf.cb, NULL);
-    s->thread.bytes_available = cbuffer_available_size_unsafe(s->sbuf.cb);
-    s->thread.buffer_ratio = (NETDATA_DOUBLE)(s->sbuf.cb->max_size -  s->thread.bytes_available) * 100.0 / (NETDATA_DOUBLE)s->sbuf.cb->max_size;
     replication_recalculate_buffer_used_ratio_unsafe(s);
 }
 
@@ -205,15 +170,13 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW);
         errno_clear();
         stream_sender_lock(s);
-        size_t buffer_size = s->sbuf.cb->size;
-        size_t buffer_max_size = s->sbuf.cb->max_size;
-        size_t buffer_available = cbuffer_available_size_unsafe(s->sbuf.cb);
+        STREAM_CIRCULAR_BUFFER_STATS stats = stream_circular_buffer_stats_unsafe(s->sbuf);
         stream_sender_unlock(s);
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SEND[%zu] %s [to %s]: send buffer is full (buffer size %zu, max %zu, available %zu). "
+               "STREAM SEND[%zu] %s [to %s]: send buffer is full (buffer size %zu, max %zu, used %zu, available %zu). "
                "Restarting connection.",
                sth->id, rrdhost_hostname(s->host), s->connected_to,
-               buffer_size, buffer_max_size, buffer_available);
+               stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
 
         stream_sender_move_running_to_connector_or_remove(
             sth, s, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_SEND_BUFFER, true);
@@ -383,12 +346,11 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
          s = SENDERS_NEXT(&sth->snd.senders, &idx)) {
 
         stream_sender_lock(s);
-        size_t outstanding = cbuffer_next_unsafe(s->sbuf.cb, NULL);
-        NETDATA_DOUBLE buffer_ratio = s->thread.buffer_ratio;
+        STREAM_CIRCULAR_BUFFER_STATS stats = stream_circular_buffer_stats_unsafe(s->sbuf);
         stream_sender_unlock(s);
 
-        if (buffer_ratio > overall_buffer_ratio)
-            overall_buffer_ratio = buffer_ratio;
+        if (stats.buffer_ratio > overall_buffer_ratio)
+            overall_buffer_ratio = stats.buffer_ratio;
 
         if(unlikely(s->thread.last_traffic_ut + stream_send.parents.timeout_s * USEC_PER_SEC < now_ut &&
                      !stream_sender_pending_replication_requests(s) &&
@@ -412,14 +374,14 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
             rfc3339_datetime_ut(since, sizeof(since), s->thread.last_traffic_ut, 2, false);
 
             char pending[64];
-            size_snprintf(pending, sizeof(pending), outstanding, "B", false);
+            size_snprintf(pending, sizeof(pending), stats.bytes_outstanding, "B", false);
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM SEND[%zu] %s [send to %s]: could not send data for %ld seconds - closing connection - "
                    "we have sent %zu bytes in %zu operations, it is idle since: %s, and we have %s pending to send "
                    "(buffer is used %.2f%%).",
                    sth->id, rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
-                   s->thread.bytes_sent, s->thread.sends, since, pending, buffer_ratio);
+                   s->thread.bytes_sent, s->thread.sends, since, pending, stats.buffer_ratio);
 
             stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_TIMEOUT, true);
             continue;
@@ -428,7 +390,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
         bytes_compressed += s->thread.bytes_compressed;
         bytes_uncompressed += s->thread.bytes_uncompressed;
 
-        if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ | (outstanding ? ND_POLL_WRITE : 0), &s->thread.meta))
+        if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0), &s->thread.meta))
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM SEND[%zu] %s [send to %s]: failed to update nd_poll().",
                    sth->id, rrdhost_hostname(s->host), s->connected_to);
@@ -491,15 +453,16 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
         stream_sender_lock(s);
         {
             char *chunk;
-            size_t outstanding = cbuffer_next_unsafe(s->sbuf.cb, &chunk);
+            size_t outstanding = stream_circular_buffer_get_unsafe(s->sbuf, &chunk);
             ssize_t bytes = nd_sock_send_nowait(&s->sock, chunk, outstanding);
             if (likely(bytes > 0)) {
-                cbuffer_remove_unsafe(s->sbuf.cb, bytes);
+                stream_circular_buffer_del_unsafe(s->sbuf, bytes);
                 stream_sender_thread_data_sent_data_unsafe(s, bytes);
                 s->thread.last_traffic_ut = now_ut;
                 sth->snd.bytes_sent += bytes;
 
-                if(!s->thread.bytes_outstanding) {
+                STREAM_CIRCULAR_BUFFER_STATS stats = stream_circular_buffer_stats_unsafe(s->sbuf);
+                if(!stats.bytes_outstanding) {
                     // we sent them all - remove ND_POLL_WRITE
                     if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
                         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -507,7 +470,7 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                                sth->id, rrdhost_hostname(s->host), s->connected_to);
 
                     // recreate the circular buffer if we have to
-                    stream_sender_cbuffer_recreate_timed_unsafe(s, now_ut, false);
+                    stream_circular_buffer_recreate_timed_unsafe(s->sbuf, now_ut, false);
                 }
             }
             else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)

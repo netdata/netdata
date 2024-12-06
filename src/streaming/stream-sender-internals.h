@@ -8,6 +8,7 @@
 #include "h2o-common.h"
 #include "aclk/https_client.h"
 #include "stream-parents.h"
+#include "stream-circular-buffer.h"
 
 // connector thread
 #define WORKER_SENDER_CONNECTOR_JOB_CONNECTING                          0
@@ -21,10 +22,6 @@
 #define WORKER_SENDER_CONNECTOR_JOB_CANCELLED_NODES                     8
 
 #define CONNECTED_TO_SIZE 100
-
-#define CBUFFER_INITIAL_SIZE (16 * 1024)
-#define CBUFFER_INITIAL_MAX_SIZE (10 * 1024 * 1024)
-#define THREAD_BUFFER_INITIAL_SIZE (CBUFFER_INITIAL_SIZE / 2)
 
 #include "stream-compression/compression.h"
 #include "stream-conf.h"
@@ -54,13 +51,6 @@ struct sender_state {
         size_t bytes_compressed;
         size_t bytes_uncompressed;
 
-        // the current buffer statistics
-        // these SHOULD ALWAYS BE CALCULATED ON EVERY stream_sender_unlock() IF THE BUFFER WAS MODIFIED
-        // stream_sender_lock() IS REQUIRED TO READ/WRITE THESE
-        size_t bytes_outstanding;
-        size_t bytes_available;
-        NETDATA_DOUBLE buffer_ratio;
-
         // statistics about successful sends
         size_t sends;
         size_t bytes_sent;
@@ -78,10 +68,7 @@ struct sender_state {
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
     time_t last_state_since_t;                  // the timestamp of the last state (online/offline) change
 
-    struct {
-        struct circular_buffer *cb;
-        size_t recreates;
-    } sbuf;
+    STREAM_CIRCULAR_BUFFER *sbuf;
 
     struct {
         char b[PLUGINSD_LINE_MAX + 1];
@@ -114,11 +101,6 @@ struct sender_state {
     } replication;
 
     struct {
-        size_t buffer_used_percentage;          // the current utilization of the sending buffer
-        usec_t last_flush_time_ut;              // the last time the sender flushed the sending buffer in USEC
-    } atomic;
-
-    struct {
         const char *end_keyword;
         BUFFER *payload;
         stream_defer_action_t action;
@@ -134,12 +116,6 @@ struct sender_state {
 
 #define stream_sender_replication_buffer_full_set(sender, value) __atomic_store_n(&((sender)->replication.atomic.reached_max), value, __ATOMIC_SEQ_CST)
 #define stream_sender_replication_buffer_full_get(sender) __atomic_load_n(&((sender)->replication.atomic.reached_max), __ATOMIC_SEQ_CST)
-
-#define stream_sender_set_buffer_used_percent(sender, value) __atomic_store_n(&((sender)->atomic.buffer_used_percentage), value, __ATOMIC_RELAXED)
-#define stream_sender_get_buffer_used_percent(sender) __atomic_load_n(&((sender)->atomic.buffer_used_percentage), __ATOMIC_RELAXED)
-
-#define stream_sender_set_flush_time(sender) __atomic_store_n(&((sender)->atomic.last_flush_time_ut), now_realtime_usec(), __ATOMIC_RELAXED)
-#define stream_sender_get_flush_time(sender) __atomic_load_n(&((sender)->atomic.last_flush_time_ut), __ATOMIC_RELAXED)
 
 #define stream_sender_replicating_charts(sender) __atomic_load_n(&((sender)->replication.atomic.charts_replicating), __ATOMIC_RELAXED)
 #define stream_sender_replicating_charts_plus_one(sender) __atomic_add_fetch(&((sender)->replication.atomic.charts_replicating), 1, __ATOMIC_RELAXED)

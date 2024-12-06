@@ -2,8 +2,6 @@
 
 #include "stream-thread.h"
 
-#define SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
-
 static __thread struct sender_buffer commit___thread = { 0 };
 
 void sender_buffer_destroy(struct sender_buffer *commit) {
@@ -73,8 +71,9 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     stream_sender_lock(s);
 
     // copy the sequence number of sender buffer recreates, while having our lock
+    STREAM_CIRCULAR_BUFFER_STATS stats = stream_circular_buffer_stats_unsafe(s->sbuf);
     if(commit)
-        commit->sender_recreates = s->sbuf.recreates;
+        commit->sender_recreates = stats.recreates;
 
     if (!s->thread.msg.session) {
         // the dispatcher is not there anymore - ignore these data
@@ -84,22 +83,18 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
         return;
     }
 
-    if (unlikely(s->sbuf.cb->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
+    if (unlikely(stream_circular_buffer_set_max_size_unsafe(s->sbuf, src_len, false))) {
         // adaptive sizing of the circular buffer is needed to get this.
 
         nd_log(
             NDLS_DAEMON,
             NDLP_NOTICE,
             "STREAM %s [send to %s]: max buffer size of %zu is too small "
-            "for a data message of size %zu. Increasing the max buffer size "
-            "to %d times the max data message size.",
+            "for a data message of size %zu. Increased the max buffer size.",
             rrdhost_hostname(s->host),
             s->connected_to,
-            s->sbuf.cb->max_size,
-            buffer_strlen(wb) + 1,
-            SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE);
-
-        s->sbuf.cb->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
+            stream_circular_buffer_get_max_size_unsafe(s->sbuf),
+            buffer_strlen(wb) + 1);
     }
 
 #ifdef NETDATA_LOG_STREAM_SENDER
@@ -171,15 +166,15 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
             size_t decoded_dst_len = stream_decompress_decode_signature((const char *)&signature, sizeof(signature));
             if (decoded_dst_len != dst_len)
                 fatal(
-                    "RRDPUSH COMPRESSION: invalid signature, original payload %zu bytes, "
+                    "STREAM COMPRESSION: invalid signature, original payload %zu bytes, "
                     "compressed payload length %zu bytes, but signature says payload is %zu bytes",
                     size_to_compress, dst_len, decoded_dst_len);
 #endif
 
             total_compressed_len += dst_len + sizeof(signature);
 
-            if (cbuffer_add_unsafe(s->sbuf.cb, (const char *)&signature, sizeof(signature)) ||
-                cbuffer_add_unsafe(s->sbuf.cb, dst, dst_len))
+            if (!stream_circular_buffer_add_unsafe(s->sbuf, (const char *)&signature, sizeof(signature), sizeof(signature)) ||
+                !stream_circular_buffer_add_unsafe(s->sbuf, dst, dst_len, size_to_compress))
                 goto overflow_with_lock;
 
             src = src + size_to_compress;
@@ -191,12 +186,13 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
 
         total_compressed_len = src_len;
 
-        if (cbuffer_add_unsafe(s->sbuf.cb, src, src_len))
+        if (!stream_circular_buffer_add_unsafe(s->sbuf, src, src_len, src_len))
             goto overflow_with_lock;
     }
 
     // update s->dispatcher entries
-    bool enable_sending = s->thread.bytes_outstanding == 0;
+    stats = stream_circular_buffer_stats_unsafe(s->sbuf);;
+    bool enable_sending = stats.bytes_outstanding == 0;
     stream_sender_thread_data_added_data_unsafe(s, type, total_compressed_len, total_uncompressed_len);
 
     if (enable_sending)
@@ -212,23 +208,21 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     return;
 
 overflow_with_lock: {
-        size_t buffer_size = s->sbuf.cb->size;
-        size_t buffer_max_size = s->sbuf.cb->max_size;
-        size_t buffer_available = cbuffer_available_size_unsafe(s->sbuf.cb);
+        stats = stream_circular_buffer_stats_unsafe(s->sbuf);;
         msg = s->thread.msg;
         stream_sender_unlock(s);
         msg.opcode = STREAM_OPCODE_SENDER_BUFFER_OVERFLOW;
         stream_sender_send_msg_to_dispatcher(s, msg);
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM %s [send to %s]: buffer overflow while adding %zu bytes (buffer size %zu, max size %zu, available %zu). "
+               "STREAM %s [send to %s]: buffer overflow while adding %zu bytes (buffer size %zu, max size %zu, used %zu, available %zu). "
                "Restarting connection.",
                rrdhost_hostname(s->host), s->connected_to,
-               total_compressed_len, buffer_size, buffer_max_size, buffer_available);
+               total_compressed_len, stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
         return;
     }
 
 compression_failed_with_lock: {
-    stream_compression_deactivate(s);
+        stream_compression_deactivate(s);
         msg = s->thread.msg;
         stream_sender_unlock(s);
         msg.opcode = STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION;

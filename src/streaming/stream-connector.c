@@ -232,7 +232,7 @@ static int stream_connect_upgrade_prelude(RRDHOST *host __maybe_unused, struct s
         error_report("Missing \"connection\" header in reply");
         goto err_cleanup;
     }
-    if (strncmp(hdr, CONN_UPGRADE_VAL, strlen(CONN_UPGRADE_VAL))) {
+    if (strncmp(hdr, CONN_UPGRADE_VAL, strlen(CONN_UPGRADE_VAL)) != 0) {
         error_report("Expected \"connection: " CONN_UPGRADE_VAL "\"");
         goto err_cleanup;
     }
@@ -242,7 +242,7 @@ static int stream_connect_upgrade_prelude(RRDHOST *host __maybe_unused, struct s
         error_report("Missing \"upgrade\" header in reply");
         goto err_cleanup;
     }
-    if (strncmp(hdr, NETDATA_STREAM_PROTO_NAME, strlen(NETDATA_STREAM_PROTO_NAME))) {
+    if (strncmp(hdr, NETDATA_STREAM_PROTO_NAME, strlen(NETDATA_STREAM_PROTO_NAME)) != 0) {
         error_report("Expected \"upgrade: " NETDATA_STREAM_PROTO_NAME "\"");
         goto err_cleanup;
     }
@@ -624,7 +624,7 @@ void stream_connector_add(struct sender_state *s) {
     stream_sender_unlock(s);
 
     nd_sock_close(&s->sock);
-    s->sbuf.cb->max_size = stream_send.buffer_max_size;
+    stream_circular_buffer_set_max_size_unsafe(s->sbuf, stream_send.buffer_max_size, true);
     s->parent_using_h2o = stream_send.parents.h2o;
 
     // do not call this with any locks held

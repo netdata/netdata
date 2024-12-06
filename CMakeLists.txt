@@ -1547,6 +1547,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-receiver-connection.c
         src/streaming/stream-sender-commit.h
         src/streaming/stream-traffic-types.h
+        src/streaming/stream-circular-buffer.c
+        src/streaming/stream-circular-buffer.h
 )
 
 set(WEB_PLUGIN_FILES

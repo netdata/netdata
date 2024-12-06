@@ -4,6 +4,7 @@
 #define NETDATA_STREAM_THREAD_H
 
 #include "libnetdata/libnetdata.h"
+#include "stream-circular-buffer.h"
 
 struct stream_thread;
 struct pollfd_slotted {
