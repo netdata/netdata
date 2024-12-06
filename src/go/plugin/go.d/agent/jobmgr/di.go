@@ -3,6 +3,7 @@
 package jobmgr
 
 import (
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
@@ -32,8 +33,8 @@ type FunctionRegistry interface {
 }
 
 type dyncfgAPI interface {
-	CONFIGCREATE(id, status, configType, path, sourceType, source, supportedCommands string)
+	CONFIGCREATE(opts netdataapi.ConfigOpts)
 	CONFIGDELETE(id string)
 	CONFIGSTATUS(id, status string)
-	FUNCRESULT(uid, contentType, payload, code, expireTimestamp string)
+	FUNCRESULT(result netdataapi.FunctionResult)
 }
