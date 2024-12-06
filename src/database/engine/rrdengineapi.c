@@ -455,7 +455,7 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, use
     if(slots < 3)
         slots = 3;
 
-    size_t size = slots * CTX_POINT_SIZE_BYTES(ctx);
+    size_t size = slots * CTX_POINT_SIZE_BYTES(ctx); (void)size;
 
     // internal_error(true, "PAGE ALLOC %zu bytes (%zu max)", size, max_size);
 

@@ -7,13 +7,13 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static void stream_sender_cbuffer_recreate_timed_unsafe(struct sender_state *s, time_t now_s, bool force) {
-    static __thread time_t last_reset_time_s = 0;
+static void stream_sender_cbuffer_recreate_timed_unsafe(struct sender_state *s, usec_t now_ut, bool force) {
+    static __thread usec_t last_reset_time_ut = 0;
 
-    if(!force && now_s - last_reset_time_s < 300)
+    if(!force && now_ut - last_reset_time_ut < 300 * USEC_PER_SEC)
         return;
 
-    last_reset_time_s = now_s;
+    last_reset_time_ut = now_ut;
 
     s->sbuf.recreates++; // we increase even if we don't do it, to have sender_start() recreate its buffers
 
@@ -30,7 +30,7 @@ static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
 
     // flush the output buffer from any data it may have
     cbuffer_flush(host->sender->sbuf.cb);
-    stream_sender_cbuffer_recreate_timed_unsafe(host->sender, now_monotonic_sec(), true);
+    stream_sender_cbuffer_recreate_timed_unsafe(host->sender, now_monotonic_usec(), true);
 
     stream_sender_unlock(host->sender);
 }
@@ -76,7 +76,7 @@ void stream_sender_on_connect(struct sender_state *s) {
     rrdpush_sender_charts_and_replication_reset(s);
     rrdpush_sender_cbuffer_flush(s->host);
 
-    s->last_traffic_seen_t = now_monotonic_sec();
+    s->thread.last_traffic_ut = now_monotonic_usec();
     s->rbuf.read_len = 0;
     s->sbuf.cb->read = 0;
     s->sbuf.cb->write = 0;
@@ -370,23 +370,27 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
         stream_connector_requeue(s);
 }
 
-void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
+void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-
-    usec_t now_ut = now_monotonic_usec();
-    time_t now_s = (time_t)(now_ut / USEC_PER_SEC);
 
     size_t bytes_uncompressed = 0;
     size_t bytes_compressed = 0;
-    NETDATA_DOUBLE buffer_ratio = 0.0;
+    NETDATA_DOUBLE overall_buffer_ratio = 0.0;
 
     Word_t idx = 0;
     for(struct sender_state *s = SENDERS_FIRST(&sth->snd.senders, &idx);
          s;
          s = SENDERS_NEXT(&sth->snd.senders, &idx)) {
 
-        // If the TCP window never opened, then something is wrong, restart connection
-        if(unlikely(now_s - s->last_traffic_seen_t > stream_send.parents.timeout_s &&
+        stream_sender_lock(s);
+        size_t outstanding = cbuffer_next_unsafe(s->sbuf.cb, NULL);
+        NETDATA_DOUBLE buffer_ratio = s->thread.buffer_ratio;
+        stream_sender_unlock(s);
+
+        if (buffer_ratio > overall_buffer_ratio)
+            overall_buffer_ratio = buffer_ratio;
+
+        if(unlikely(s->thread.last_traffic_ut + stream_send.parents.timeout_s * USEC_PER_SEC < now_ut &&
                      !stream_sender_pending_replication_requests(s) &&
                      !stream_sender_replicating_charts(s)
                          )) {
@@ -404,28 +408,30 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
 
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
 
+            char since[RFC3339_MAX_LENGTH];
+            rfc3339_datetime_ut(since, sizeof(since), s->thread.last_traffic_ut, 2, false);
+
+            char pending[64];
+            size_snprintf(pending, sizeof(pending), outstanding, "B", false);
+
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SEND[%zu] %s [send to %s]: could not send metrics for %ld seconds - closing connection - "
-                   "we have sent %zu bytes on this connection via %zu send attempts.",
+                   "STREAM SEND[%zu] %s [send to %s]: could not send data for %ld seconds - closing connection - "
+                   "we have sent %zu bytes in %zu operations, it is idle since: %s, and we have %s pending to send "
+                   "(buffer is used %.2f%%).",
                    sth->id, rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
-                   s->thread.bytes_sent, s->thread.sends);
+                   s->thread.bytes_sent, s->thread.sends, since, pending, buffer_ratio);
 
             stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_TIMEOUT, true);
             continue;
         }
 
-        stream_sender_lock(s);
-        {
-            bytes_compressed += s->thread.bytes_compressed;
-            bytes_uncompressed += s->thread.bytes_uncompressed;
-            uint64_t outstanding = s->thread.bytes_outstanding;
-            if (s->thread.buffer_ratio > buffer_ratio)
-                buffer_ratio = s->thread.buffer_ratio;
+        bytes_compressed += s->thread.bytes_compressed;
+        bytes_uncompressed += s->thread.bytes_uncompressed;
 
-            if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ | (outstanding ? ND_POLL_WRITE : 0), &s->thread.meta))
-                internal_fatal(true, "Failed to update sender socket in nd_poll()");
-        }
-        stream_sender_unlock(s);
+        if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ | (outstanding ? ND_POLL_WRITE : 0), &s->thread.meta))
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM SEND[%zu] %s [send to %s]: failed to update nd_poll().",
+                   sth->id, rrdhost_hostname(s->host), s->connected_to);
     }
 
     if (bytes_compressed && bytes_uncompressed) {
@@ -435,10 +441,10 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth) {
 
     worker_set_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
     worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
-    worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, buffer_ratio);
+    worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, overall_buffer_ratio);
 }
 
-void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t events, time_t now_s) {
+void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t events, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     ND_LOG_STACK lgs[] = {
@@ -490,16 +496,18 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
             if (likely(bytes > 0)) {
                 cbuffer_remove_unsafe(s->sbuf.cb, bytes);
                 stream_sender_thread_data_sent_data_unsafe(s, bytes);
-                s->last_traffic_seen_t = now_s;
+                s->thread.last_traffic_ut = now_ut;
                 sth->snd.bytes_sent += bytes;
 
                 if(!s->thread.bytes_outstanding) {
-                    // we sent them all - remove POLLOUT
+                    // we sent them all - remove ND_POLL_WRITE
                     if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
-                        internal_fatal(true, "Failed to update sender socket in nd_poll()");
+                        nd_log(NDLS_DAEMON, NDLP_ERR,
+                               "STREAM SEND[%zu] %s [send to %s]: failed to update nd_poll().",
+                               sth->id, rrdhost_hostname(s->host), s->connected_to);
 
                     // recreate the circular buffer if we have to
-                    stream_sender_cbuffer_recreate_timed_unsafe(s, now_s, false);
+                    stream_sender_cbuffer_recreate_timed_unsafe(s, now_ut, false);
                 }
             }
             else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
@@ -519,14 +527,14 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
         }
     }
 
-    if(events & POLLIN) {
+    if(events & ND_POLL_READ) {
         // we can receive data from this socket
 
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
         ssize_t bytes = nd_sock_revc_nowait(&s->sock, s->rbuf.b + s->rbuf.read_len, sizeof(s->rbuf.b) - s->rbuf.read_len - 1);
         if (bytes > 0) {
             s->rbuf.read_len += bytes;
-            s->last_traffic_seen_t = now_s;
+            s->thread.last_traffic_ut = now_ut;
             sth->snd.bytes_received += bytes;
         }
         else if (bytes == 0 || errno == ECONNRESET) {

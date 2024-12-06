@@ -417,7 +417,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
 }
 
 // process poll() events for streaming receivers
-void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events __maybe_unused, time_t now_s) {
+void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events __maybe_unused, usec_t now_ut) {
         PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
@@ -439,7 +439,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
             return;
         }
 
-        rpt->last_msg_t = now_s;
+        rpt->last_msg_t = (time_t)(now_ut / USEC_PER_SEC);
 
         if(rpt->thread.compressed.enabled) {
             worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);

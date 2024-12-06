@@ -177,7 +177,7 @@ static void stream_thread_messages_resize_unsafe(struct stream_thread *sth) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_result_t *ev, time_t now_s, size_t *replay_entries) {
+static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_result_t *ev, usec_t now_ut, size_t *replay_entries) {
     struct pollfd_meta *m = ev->data;
     internal_fatal(!m, "Failed to get meta from event");
 
@@ -185,7 +185,7 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_r
         case POLLFD_TYPE_SENDER: {
             struct sender_state *s = m->s;
             internal_fatal(SENDERS_GET(&sth->snd.senders, (Word_t)s) == NULL, "Sender is not found in the senders list");
-            stream_sender_process_poll_events(sth, s, ev->events, now_s);
+            stream_sender_process_poll_events(sth, s, ev->events, now_ut);
             *replay_entries += dictionary_entries(s->replication.requests);
             break;
         }
@@ -193,7 +193,7 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_r
         case POLLFD_TYPE_RECEIVER: {
             struct receiver_state *rpt = m->rpt;
             internal_fatal(RECEIVERS_GET(&sth->rcv.receivers, (Word_t)rpt) == NULL, "Receiver is not found in the receiver list");
-            stream_receive_process_poll_events(sth, rpt, ev->events, now_s);
+            stream_receive_process_poll_events(sth, rpt, ev->events, now_ut);
             break;
         }
 
@@ -356,7 +356,7 @@ void *stream_thread(void *ptr) {
 
             // periodically check the entire list of nodes
             // this detects unresponsive parents too (timeout)
-            stream_sender_check_all_nodes_from_poll(sth);
+            stream_sender_check_all_nodes_from_poll(sth, now_ut);
             worker_set_metric(WORKER_SENDER_JOB_MESSAGES, (NETDATA_DOUBLE)(sth->messages.processed));
             worker_set_metric(WORKER_STREAM_METRIC_NODES, (NETDATA_DOUBLE)sth->nodes_count);
 
@@ -390,12 +390,11 @@ void *stream_thread(void *ptr) {
             continue;
         }
 
-        time_t now_s = now_monotonic_sec();
-
         if(nd_thread_signaled_to_cancel() || !service_running(SERVICE_STREAMING))
             break;
 
-        exit_thread = stream_thread_process_poll_slot(sth, &ev, now_s, &replay_entries);
+        now_ut = now_monotonic_usec();
+        exit_thread = stream_thread_process_poll_slot(sth, &ev, now_ut, &replay_entries);
     }
 
     // dequeue
