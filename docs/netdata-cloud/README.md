@@ -1,8 +1,13 @@
 # Netdata Cloud
 
-Netdata Cloud is a service that complements Agent installations. It is a key part in achieving optimal cost structure for large scale observability.
+Netdata Cloud is a powerful service that transforms standalone Netdata Agent installations into a unified, scalable observability solution. It achieves this without centralizing metric storage, ensuring optimal performance and cost-effectiveness even at enterprise scale.
 
-Technically, Netdata Cloud is a thin control plane that allows the Netdata ecosystem to virtually be an unlimited scalable and flexible observability pipeline. It can span multiple teams, cloud providers, data centers and services, while remaining a uniform and highly integrated infrastructure, providing real-time and high-fidelity insights.
+By serving as a lightweight control plane, Netdata Cloud provides:
+
+- Seamless coordination across multiple teams and environments
+- Unified visibility across cloud providers and data centers
+- Real-time, high-fidelity monitoring at any scale
+- Flexible observability pipelines that grow with your infrastructure
 
 ```mermaid
 flowchart TB
@@ -39,37 +44,46 @@ flowchart TB
     NC <-->|secure connection| Agents
 ```
 
-The Cloud provides the following features, on top of what the Agents already provide:
+Netdata Cloud provides the following features, on top of what the Agents already provide:
 
-| feature                                                                                                                 | description                                                                                                                                                                                                                                                                                               |
-|:------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Horizontal scalability**                                                                                              | Your observability infrastructure can be scaled horizontally, by adding more [Parents and Children](/docs/observability-centralization-points/README.md). All can be accessed from the same [Space](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#spaces).                         |
-| [**Role-Based Access Control (RBAC)**](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) | You can manage the access privileges of your team members across your Space.                                                                                                                                                                                                                              |
-| **Access from anywhere**                                                                                                | The Agents are installed locally on your premises, and this is where all your data is always stored. Using the Cloud you can access these dashboards from anywhere, without setting up VPNs in order to connect to your various local dashboards.                                                         |
-| **Central dispatch of Alert notifications**                                                                             | Alerts produced by Agents are centrally dispatched from the Cloud. Netdata Cloud also produces it's own Alerts and utilizes the [**Netdata Mobile App**](/integrations/cloud-notifications/integrations/netdata_mobile_app.md) in order to provide mobile push notifications for all users in paid plans. |
-| [**Custom Dashboards**](/docs/dashboards-and-charts/dashboards-tab.md)                                                  | The Cloud enables creating, storing and sharing custom dashboards                                                                                                                                                                                                                                         |
-| **Advanced customization**                                                                                              | Each user in a Space can customize various visualization settings, to better tailor the dashboard to their needs.                                                                                                                                                                                         |
+| Feature                                                                                                                 | Description                                                                                                                                                                                                                                                                      |
+|:------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Horizontal Scalability**                                                                                              | • Scale your observability infrastructure effortlessly<br/>• Add [Parents and Children](/docs/observability-centralization-points/README.md) as needed<br/>• Manage all nodes from a single [Space](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#spaces) |
+| [**Role-Based Access Control (RBAC)**](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) | • Fine-grained access management<br/>• Control team member privileges across your Space<br/>• Secure, role-appropriate access to monitoring data                                                                                                                                 |
+| **Global Remote Access**                                                                                                | • Access your monitoring from anywhere<br/>• No VPN configuration required<br/>• Secure access to local dashboards while data stays on premises                                                                                                                                  |
+| **Centralized Alert Management**                                                                                        | • Unified alert dispatch from a central location<br/>• Cloud-specific alerts and monitoring<br/>• Mobile push notifications via [Netdata Mobile App](/integrations/cloud-notifications/integrations/netdata_mobile_app.md) (paid plans)                                          |
+| [**Custom Dashboards**](/docs/dashboards-and-charts/dashboards-tab.md)                                                  | • Create and save custom views<br/>• Share dashboards across teams<br/>• Build focused views for specific needs                                                                                                                                                                  |
+| **Personal Customization**                                                                                              | • Individual user visualization preferences<br/>• Tailored dashboard experiences<br/>• Flexible viewing options for different roles                                                                                                                                              |
 
 ## Stored metadata
 
-The Cloud does not receive collected metrics, or the logs that Agents maintain.
+Netdata Cloud doesn't store your metrics or logs.
 
-Netdata's design deliberately avoids centralizing raw data. This prevents the common constraints of traditional observability solutions like reduced metric resolution, forced data filtering, and higher costs.
-
-Instead, the Cloud only stores metadata such as:
+**What Netdata Cloud Does Store**:
 
 - Node information and labels
 - Metric names, labels, and retention periods
-- Active collectors and modules
+- Active collectors
 - Alert configurations and state changes
 
-This information is a small fraction of the total information maintained by the Agents, allowing the Cloud to remain high-resolution, high-fidelity and real-time, while being able to centrally dispatch alerts and to know which Agents to query when users view the dashboards.
+**How Data Flows**:
 
-Metric samples and logs are transferred via the Cloud to your web browser only when you view them. Even then, no information is stored. The responses of multiple Agents are aggregated to a single response for your web browser to visualize.
+1. Metadata (listed above) is synchronized between Agents and Cloud
+2. Metric data and logs remain stored locally on your Agents
+3. When you view dashboards:
+    - Data is transferred directly from Agents to your browser via Cloud
+    - Cloud aggregates responses from multiple Agents into a unified view
+    - No metric or log data is stored in Cloud during this process
 
 ## Fidelity and Resolution
 
-As the Cloud queries the Agents, it receives exactly the same fidelity and resolution metrics that the Agents provide. Dashboards have the same resolution, the same number of metrics and exactly the same data.
+Netdata Cloud delivers the exact same high-quality data that Agents collect. When you view dashboards through the Cloud:
+
+- No reduction in metric resolution
+- No loss of data fidelity
+- No compromise in data granularity
+
+The data you see is identical to what you would get by accessing Agents directly.
 
 ## FAQ
 
