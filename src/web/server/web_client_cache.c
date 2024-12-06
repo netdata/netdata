@@ -33,14 +33,14 @@ static struct clients_cache {
     } avail;
 } web_clients_cache = {
         .used = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .spinlock = SPINLOCK_INITIALIZER,
                 .head = NULL,
                 .count = 0,
                 .reused = 0,
                 .allocated = 0,
         },
         .avail = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .spinlock = SPINLOCK_INITIALIZER,
                 .head = NULL,
                 .count = 0,
         },

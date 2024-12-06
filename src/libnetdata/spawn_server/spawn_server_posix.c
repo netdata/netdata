@@ -22,7 +22,7 @@ static struct {
     SPINLOCK spinlock;
     SPAWN_INSTANCE *instances;
 } spawn_globals = {
-    .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+    .spinlock = SPINLOCK_INITIALIZER,
     .instances = NULL,
 };
 
@@ -163,7 +163,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
 
     // unfortunately, on CYGWIN/MSYS posix_spawn() is not thread safe
     // so, we run it one by one.
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
 
     int fds[3] = { stdin_pipe[PIPE_READ], stdout_pipe[PIPE_WRITE], stderr_fd };

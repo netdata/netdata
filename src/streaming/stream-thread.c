@@ -4,7 +4,7 @@
 
 struct stream_thread_globals stream_thread_globals = {
     .assign = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .spinlock = SPINLOCK_INITIALIZER,
     }
 };
 

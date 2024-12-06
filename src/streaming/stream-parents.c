@@ -54,7 +54,7 @@ struct blocked_parent {
 
 DEFINE_JUDYL_TYPED(BLOCKED_PARENTS, struct blocked_parent *);
 static BLOCKED_PARENTS_JudyLSet blocked_parents_set = { 0 };
-static RW_SPINLOCK blocked_parents_spinlock = NETDATA_RW_SPINLOCK_INITIALIZER;
+static RW_SPINLOCK blocked_parents_spinlock = RW_SPINLOCK_INITIALIZER;
 
 static void block_parent_for_all_nodes(STREAM_PARENT *d, time_t duration_s) {
     rw_spinlock_write_lock(&blocked_parents_spinlock);
@@ -195,7 +195,7 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
 }
 
 void rrdhost_stream_parent_ssl_init(struct sender_state *s) {
-    static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK sp = SPINLOCK_INITIALIZER;
     spinlock_lock(&sp);
 
     if(netdata_ssl_streaming_sender_ctx || !s->host) {

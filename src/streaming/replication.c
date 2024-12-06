@@ -37,7 +37,7 @@
 #define REQUESTS_AHEAD_PER_THREAD 1 // 1 = enable synchronous queries
 
 static struct replication_query_statistics replication_queries = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .spinlock = SPINLOCK_INITIALIZER,
         .queries_started = 0,
         .queries_finished = 0,
         .points_read = 0,
@@ -1051,7 +1051,7 @@ static struct replication_thread {
 
 } replication_globals = {
         .aral_rse = NULL,
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .spinlock = SPINLOCK_INITIALIZER,
         .unsafe = {
                 .pending = 0,
 

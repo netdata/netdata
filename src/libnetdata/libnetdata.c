@@ -450,7 +450,7 @@ void posix_memfree(void *ptr) {
 
 void mallocz_release_as_much_memory_to_the_system(void) {
 #if defined(HAVE_C_MALLOPT) || defined(HAVE_C_MALLOC_TRIM)
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
 
 #ifdef HAVE_C_MALLOPT

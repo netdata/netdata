@@ -58,7 +58,7 @@ static struct workers_globals {
 
 } workers_globals = {                               // workers globals, the base of all worknames
     .enabled = false,
-    .spinlock = NETDATA_SPINLOCK_INITIALIZER,   // a lock for the worknames index
+    .spinlock = SPINLOCK_INITIALIZER,   // a lock for the worknames index
     .worknames_JudyHS = NULL,                   // the worknames index
 };
 

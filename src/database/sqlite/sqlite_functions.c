@@ -402,7 +402,7 @@ int sqlite_library_init(void)
     return (SQLITE_OK != rc);
 }
 
-SPINLOCK sqlite_spinlock = NETDATA_SPINLOCK_INITIALIZER;
+SPINLOCK sqlite_spinlock = SPINLOCK_INITIALIZER;
 
 void sqlite_library_shutdown(void)
 {

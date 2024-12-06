@@ -10,8 +10,7 @@ struct {
     SPINLOCK spinlock;
 } global_labels = {
     .JudyHS = (Pvoid_t) NULL,
-    .spinlock = NETDATA_SPINLOCK_INITIALIZER
-};
+    .spinlock = SPINLOCK_INITIALIZER};
 
 typedef struct label_registry_idx {
     STRING *key;

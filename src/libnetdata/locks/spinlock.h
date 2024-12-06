@@ -22,9 +22,9 @@ typedef struct netdata_spinlock
 #endif
 
 #ifdef SPINLOCK_IMPL_WITH_MUTEX
-#define NETDATA_SPINLOCK_INITIALIZER { .inner = PTHREAD_MUTEX_INITIALIZER }
+#define SPINLOCK_INITIALIZER { .inner = PTHREAD_MUTEX_INITIALIZER }
 #else
-#define NETDATA_SPINLOCK_INITIALIZER { .locked = false }
+#define SPINLOCK_INITIALIZER { .locked = false }
 #endif
 
 void spinlock_init(SPINLOCK *spinlock);

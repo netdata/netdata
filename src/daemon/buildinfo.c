@@ -1263,7 +1263,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 int get_system_info(struct rrdhost_system_info *system_info);
 static void populate_system_info(void) {
     static bool populated = false;
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
     if(populated)
         return;

@@ -232,7 +232,7 @@ static void streaming_parser_init(struct receiver_state *rpt) {
     rpt->thread.cd = (struct plugind){
         .update_every = default_rrd_update_every,
         .unsafe = {
-            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+            .spinlock = SPINLOCK_INITIALIZER,
             .running = true,
             .enabled = true,
         },

@@ -53,11 +53,11 @@ static struct {
     pthread_attr_t *attr;
 } threads_globals = {
     .exited = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .spinlock = SPINLOCK_INITIALIZER,
         .list = NULL,
     },
     .running = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .spinlock = SPINLOCK_INITIALIZER,
         .list = NULL,
     },
     .attr = NULL,

@@ -12,8 +12,7 @@ typedef struct netdata_rw_spinlock {
     SPINLOCK spinlock;
 } RW_SPINLOCK;
 
-#define NETDATA_RW_SPINLOCK_INITIALIZER \
-    { .readers = 0, .spinlock = NETDATA_SPINLOCK_INITIALIZER }
+#define RW_SPINLOCK_INITIALIZER { .readers = 0, .spinlock = SPINLOCK_INITIALIZER}
 
 void rw_spinlock_init(RW_SPINLOCK *rw_spinlock);
 void rw_spinlock_read_lock(RW_SPINLOCK *rw_spinlock);

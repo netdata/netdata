@@ -33,7 +33,7 @@ static struct {
     struct simple_hashtable_PERFLIB hashtable;
     FILETIME lastWriteTime;
 } names_globals = {
-    .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+    .spinlock = SPINLOCK_INITIALIZER,
     .size = 0,
     .array = NULL,
 };

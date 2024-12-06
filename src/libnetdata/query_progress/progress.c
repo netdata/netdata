@@ -72,7 +72,7 @@ static struct progress {
 
 } progress = {
     .initialized = false,
-    .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+    .spinlock = SPINLOCK_INITIALIZER,
 };
 
 SIMPLE_HASHTABLE_HASH query_hash(nd_uuid_t *transaction) {

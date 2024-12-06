@@ -566,7 +566,7 @@ struct connector *stream_connector_get(struct sender_state *s) {
     if(s->connector.id < 0 || s->connector.id >= MAX_CONNECTORS) {
         // assign this to the dispatcher with fewer nodes
 
-        static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+        static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
         spinlock_lock(&spinlock);
         int min_slot = 0;
         size_t min_nodes = __atomic_load_n(&connector_globals.connectors[0].nodes, __ATOMIC_RELAXED);
@@ -721,7 +721,7 @@ static void *stream_connector_thread(void *ptr) {
 }
 
 bool stream_connector_init(struct sender_state *s) {
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     if(!s) return false;
 
     spinlock_lock(&spinlock);

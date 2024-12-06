@@ -563,7 +563,7 @@ static ARAL *pgc_sections_aral = NULL;
 static ARAL *pgc_pages_aral = NULL;
 
 static void pgc_section_pages_static_aral_init(void) {
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
     spinlock_lock(&spinlock);
 

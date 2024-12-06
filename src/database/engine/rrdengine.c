@@ -95,7 +95,7 @@ struct rrdeng_main {
 
         .cmd_queue = {
                 .unsafe = {
-                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                        .spinlock = SPINLOCK_INITIALIZER,
                 },
         }
 };
@@ -348,7 +348,7 @@ static struct {
     } atomics;
 } wal_globals = {
         .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .spinlock = SPINLOCK_INITIALIZER,
                 .available_items = NULL,
                 .available = 0,
         },
@@ -1745,7 +1745,7 @@ static void dbengine_initialize_structures(void) {
 
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
     static bool spawned = false;
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
     spinlock_lock(&spinlock);
 

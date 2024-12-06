@@ -122,7 +122,7 @@ struct config {
 
 #define APPCONFIG_INITIALIZER (struct config) {         \
         .sections = NULL,                               \
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,       \
+        .spinlock = SPINLOCK_INITIALIZER,       \
         .index = {                                      \
             .avl_tree = {                               \
                 .root = NULL,                           \

@@ -9,7 +9,7 @@ struct popen_instance {
 };
 
 SPAWN_SERVER *netdata_main_spawn_server = NULL;
-static SPINLOCK netdata_main_spawn_server_spinlock = NETDATA_SPINLOCK_INITIALIZER;
+static SPINLOCK netdata_main_spawn_server_spinlock = SPINLOCK_INITIALIZER;
 
 bool netdata_main_spawn_server_init(const char *name, int argc, const char **argv) {
     if(netdata_main_spawn_server == NULL) {
