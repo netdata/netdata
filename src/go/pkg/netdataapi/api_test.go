@@ -6,260 +6,283 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestAPI_CHART(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestNew(t *testing.T) {
+	t.Run("valid writer", func(t *testing.T) {
+		require.NotNil(t, New(&bytes.Buffer{}))
+	})
 
-	_ = a.CHART(
-		"",
-		"id",
-		"name",
-		"title",
-		"units",
-		"family",
-		"context",
-		"line",
-		1,
-		1,
-		"",
-		"plugin",
-		"module",
-	)
-
-	assert.Equal(
-		t,
-		"CHART '.id' 'name' 'title' 'units' 'family' 'context' 'line' '1' '1' '' 'plugin' 'module'\n",
-		buf.String(),
-	)
+	t.Run("nil writer", func(t *testing.T) {
+		require.Panics(t, func() { New(nil) })
+	})
 }
 
-func TestAPI_DIMENSION(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestChart(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
 
-	_ = a.DIMENSION(
-		"id",
-		"name",
-		"absolute",
-		1,
-		1,
-		"",
-	)
+	opts := ChartOpts{
+		TypeID:      "system",
+		ID:          "cpu",
+		Name:        "cpu_system",
+		Title:       "CPU Usage",
+		Units:       "percentage",
+		Family:      "cpu",
+		Context:     "system.cpu",
+		ChartType:   "line",
+		Priority:    1000,
+		UpdateEvery: 1,
+		Options:     "",
+		Plugin:      "system",
+		Module:      "cpu",
+	}
 
-	assert.Equal(
-		t,
-		"DIMENSION 'id' 'name' 'absolute' '1' '1' ''\n",
-		buf.String(),
-	)
+	api.CHART(opts)
+
+	expected := "CHART 'system.cpu' 'cpu_system' 'CPU Usage' 'percentage' 'cpu' 'system.cpu' " +
+		"'line' '1000' '1' '' 'system' 'cpu'\n"
+
+	require.Equal(t, expected, w.String())
 }
 
-func TestAPI_BEGIN(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestDimension(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
 
-	_ = a.BEGIN(
-		"typeID",
-		"id",
-		0,
-	)
+	opts := DimensionOpts{
+		ID:         "user",
+		Name:       "user",
+		Algorithm:  "absolute",
+		Multiplier: 1,
+		Divisor:    1,
+		Options:    "",
+	}
 
-	assert.Equal(
-		t,
-		"BEGIN 'typeID.id'\n",
-		buf.String(),
-	)
+	api.DIMENSION(opts)
 
-	buf.Reset()
+	expected := "DIMENSION 'user' 'user' 'absolute' '1' '1' ''\n"
 
-	_ = a.BEGIN(
-		"typeID",
-		"id",
-		1,
-	)
-
-	assert.Equal(
-		t,
-		"BEGIN 'typeID.id' 1\n",
-		buf.String(),
-	)
+	require.Equal(t, expected, w.String())
 }
 
-func TestAPI_SET(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestCLABEL(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
 
-	_ = a.SET("id", 100)
+	api.CLABEL("key1", "value1", 1)
 
-	assert.Equal(
-		t,
-		"SET 'id' = 100\n",
-		buf.String(),
-	)
+	expected := "CLABEL 'key1' 'value1' '1'\n"
+
+	require.Equal(t, expected, w.String())
 }
 
-func TestAPI_SETEMPTY(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestCLABELCOMMIT(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
 
-	_ = a.SETEMPTY("id")
+	api.CLABELCOMMIT()
 
-	assert.Equal(
-		t,
-		"SET 'id' = \n",
-		buf.String(),
-	)
+	expected := "CLABEL_COMMIT\n"
+
+	require.Equal(t, expected, w.String())
 }
 
-func TestAPI_VARIABLE(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestBEGIN(t *testing.T) {
 
-	_ = a.VARIABLE("id", 100)
+	tests := map[string]struct {
+		name     string
+		typeID   string
+		ID       string
+		msSince  int
+		expected string
+	}{
+		"without msSince": {
+			typeID:   "system",
+			ID:       "cpu",
+			msSince:  0,
+			expected: "BEGIN 'system.cpu'\n",
+		},
+		"with msSince": {
+			typeID:   "system",
+			ID:       "cpu",
+			msSince:  1000,
+			expected: "BEGIN 'system.cpu' 1000\n",
+		},
+	}
 
-	assert.Equal(
-		t,
-		"VARIABLE CHART 'id' = 100\n",
-		buf.String(),
-	)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			api := New(w)
+
+			api.BEGIN(test.typeID, test.ID, test.msSince)
+
+			require.Equal(t, test.expected, w.String())
+		})
+	}
 }
 
-func TestAPI_END(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestSET(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
 
-	_ = a.END()
+	api.SET("cpu_user", 42)
 
-	assert.Equal(
-		t,
-		"END\n\n",
-		buf.String(),
-	)
+	expected := "SET 'cpu_user' = 42\n"
+
+	require.Equal(t, expected, w.String())
 }
 
-func TestAPI_CLABEL(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestSETEMPTY(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
 
-	_ = a.CLABEL("key", "value", 1)
+	api.SETEMPTY("cpu_user")
 
-	assert.Equal(
-		t,
-		"CLABEL 'key' 'value' '1'\n",
-		buf.String(),
-	)
+	expected := "SET 'cpu_user' = \n"
+
+	require.Equal(t, expected, w.String())
 }
 
-func TestAPI_CLABELCOMMIT(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestVARIABLE(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
 
-	_ = a.CLABELCOMMIT()
+	api.VARIABLE("var1", 100)
 
-	assert.Equal(
-		t,
-		"CLABEL_COMMIT\n",
-		buf.String(),
-	)
+	expected := "VARIABLE CHART 'var1' = 100\n"
+
+	require.Equal(t, expected, w.String())
 }
 
-func TestAPI_DISABLE(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestEND(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
 
-	_ = a.DISABLE()
+	api.END()
 
-	assert.Equal(
-		t,
-		"DISABLE\n",
-		buf.String(),
-	)
+	expected := "END\n\n"
+
+	require.Equal(t, expected, w.String())
 }
 
-func TestAPI_EMPTYLINE(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestDISABLE(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
 
-	_ = a.EMPTYLINE()
+	api.DISABLE()
 
-	assert.Equal(
-		t,
-		"\n",
-		buf.String(),
-	)
+	expected := "DISABLE\n"
+
+	require.Equal(t, expected, w.String())
 }
 
-func TestAPI_HOST(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestEMPTYLINE(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
 
-	_ = a.HOST("guid")
+	require.NoError(t, api.EMPTYLINE())
 
-	assert.Equal(
-		t,
-		"HOST 'guid'\n\n",
-		buf.String(),
-	)
+	expected := "\n"
+
+	require.Equal(t, expected, w.String())
 }
 
-func TestAPI_HOSTDEFINE(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
+func TestHOSTINFO(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
 
-	_ = a.HOSTDEFINE("guid", "hostname")
+	info := HostInfo{
+		GUID:     "test-guid",
+		Hostname: "test-host",
+		Labels: map[string]string{
+			"label1": "value1",
+		},
+	}
 
-	assert.Equal(
-		t,
-		"HOST_DEFINE 'guid' 'hostname'\n",
-		buf.String(),
-	)
-}
+	api.HOSTINFO(info)
 
-func TestAPI_HOSTLABEL(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
-
-	_ = a.HOSTLABEL("name", "value")
-
-	assert.Equal(
-		t,
-		"HOST_LABEL 'name' 'value'\n",
-		buf.String(),
-	)
-}
-
-func TestAPI_HOSTDEFINEEND(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
-
-	_ = a.HOSTDEFINEEND()
-
-	assert.Equal(
-		t,
-		"HOST_DEFINE_END\n\n",
-		buf.String(),
-	)
-}
-
-func TestAPI_HOSTINFO(t *testing.T) {
-	buf := &bytes.Buffer{}
-	a := API{Writer: buf}
-
-	_ = a.HOSTINFO("guid", "hostname", map[string]string{"label1": "value1"})
-
-	assert.Equal(
-		t,
-		`HOST_DEFINE 'guid' 'hostname'
+	expected := `
+HOST_DEFINE 'test-guid' 'test-host'
 HOST_LABEL 'label1' 'value1'
 HOST_DEFINE_END
 
-`,
-		buf.String(),
-	)
+`[1:]
+
+	require.Equal(t, expected, w.String())
 }
 
-func TestAPI_FUNCRESULT(t *testing.T) {
+func TestHOST(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
 
+	api.HOST("test-guid")
+
+	expected := "HOST 'test-guid'\n\n"
+
+	require.Equal(t, expected, w.String())
+}
+
+func TestFUNCRESULT(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
+
+	result := FunctionResult{
+		UID:             "test-uid",
+		ContentType:     "text/plain",
+		Payload:         "test payload",
+		Code:            "200",
+		ExpireTimestamp: "1234567890",
+	}
+
+	api.FUNCRESULT(result)
+
+	expected := "FUNCTION_RESULT_BEGIN test-uid 200 text/plain 1234567890\ntest payload\nFUNCTION_RESULT_END\n\n"
+
+	require.Equal(t, expected, w.String())
+}
+
+func TestCONFIGCREATE(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
+
+	opts := ConfigOpts{
+		ID:                "test-config",
+		Status:            "active",
+		ConfigType:        "test",
+		Path:              "/test/path",
+		SourceType:        "file",
+		Source:            "test.conf",
+		SupportedCommands: "read,write",
+	}
+
+	api.CONFIGCREATE(opts)
+
+	expected := "CONFIG test-config create active test /test/path file 'test.conf' 'read,write' 0x0000 0x0000\n\n"
+
+	require.Equal(t, expected, w.String())
+}
+
+func TestCONFIGDELETE(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
+
+	api.CONFIGDELETE("test-config")
+
+	expected := "CONFIG test-config delete\n\n"
+
+	require.Equal(t, expected, w.String())
+}
+
+func TestCONFIGSTATUS(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
+
+	api.CONFIGSTATUS("test-config", "inactive")
+
+	expected := "CONFIG test-config status inactive\n\n"
+
+	require.Equal(t, expected, w.String())
 }

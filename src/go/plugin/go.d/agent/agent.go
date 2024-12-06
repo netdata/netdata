@@ -163,7 +163,7 @@ func (a *Agent) run(ctx context.Context) {
 		if isTerminal {
 			os.Exit(0)
 		}
-		_ = a.api.DISABLE()
+		a.api.DISABLE()
 		return
 	}
 
@@ -173,7 +173,7 @@ func (a *Agent) run(ctx context.Context) {
 		if isTerminal {
 			os.Exit(0)
 		}
-		_ = a.api.DISABLE()
+		a.api.DISABLE()
 		return
 	}
 
