@@ -33,7 +33,7 @@ When the context is clear, we can omit the "Netdata" prefix for brevity.
 
 | Term                     | Definition                                                  |
 |--------------------------|-------------------------------------------------------------|
-| **Parent** (**Parents**) | An Agent that receives metrics from other Agents (Children) |
+| **Parent** (**Parents**) or **Observability Centralization Point(s)** (**OCPs**) | An Agent that receives metrics from other Agents (Children) |
 | **Child** (**Children**) | An Agent that streams metrics to another Agent (Parent)     |
 
 ## Machine Learning
