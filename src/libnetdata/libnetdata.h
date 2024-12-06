@@ -123,6 +123,8 @@ extern const char *netdata_configured_host_prefix;
 
 #include "threads/threads.h"
 #include "locks/locks.h"
+#include "locks/spinlock.h"
+#include "locks/rw-spinlock.h"
 #include "completion/completion.h"
 #include "clocks/clocks.h"
 #include "simple_pattern/simple_pattern.h"

@@ -944,6 +944,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/system_memory.h
         src/libnetdata/socket/nd-poll.c
         src/libnetdata/socket/nd-poll.h
+        src/libnetdata/locks/spinlock.c
+        src/libnetdata/locks/spinlock.h
+        src/libnetdata/locks/rw-spinlock.c
+        src/libnetdata/locks/rw-spinlock.h
 )
 
 set(LIBH2O_FILES
