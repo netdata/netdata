@@ -58,8 +58,8 @@ func TestAgent_loadConfig(t *testing.T) {
 	}{
 		"valid config file": {
 			agent: Agent{
-				Name:    "agent-valid",
-				ConfDir: []string{"testdata"},
+				Name:      "agent-valid",
+				ConfigDir: []string{"testdata"},
 			},
 			wantCfg: config{
 				Enabled:    true,
@@ -77,22 +77,22 @@ func TestAgent_loadConfig(t *testing.T) {
 		},
 		"config file not found": {
 			agent: Agent{
-				Name:    "agent",
-				ConfDir: []string{"testdata/not-exist"},
+				Name:      "agent",
+				ConfigDir: []string{"testdata/not-exist"},
 			},
 			wantCfg: defaultConfig(),
 		},
 		"empty config file": {
 			agent: Agent{
-				Name:    "agent-empty",
-				ConfDir: []string{"testdata"},
+				Name:      "agent-empty",
+				ConfigDir: []string{"testdata"},
 			},
 			wantCfg: defaultConfig(),
 		},
 		"invalid syntax config file": {
 			agent: Agent{
-				Name:    "agent-invalid-syntax",
-				ConfDir: []string{"testdata"},
+				Name:      "agent-invalid-syntax",
+				ConfigDir: []string{"testdata"},
 			},
 			wantCfg: defaultConfig(),
 		},
