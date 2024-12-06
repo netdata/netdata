@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- minor beatification of log messages [\#19135](https://github.com/netdata/netdata/pull/19135) ([ktsaou](https://github.com/ktsaou))
+- docs: restructure readme intro for better readability [\#19134](https://github.com/netdata/netdata/pull/19134) ([ilyam8](https://github.com/ilyam8))
+- ci: fix build/Prepare Artifacts [\#19133](https://github.com/netdata/netdata/pull/19133) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19131](https://github.com/netdata/netdata/pull/19131) ([netdatabot](https://github.com/netdatabot))
+- chore\(windows/hyperv\): small Hyper-V fixes [\#19130](https://github.com/netdata/netdata/pull/19130) ([ilyam8](https://github.com/ilyam8))
+- docs\(windows/hyperv\): add Hyper-V metadata [\#19129](https://github.com/netdata/netdata/pull/19129) ([ilyam8](https://github.com/ilyam8))
+- fix\(system-info\): change id\_like and name mac -\> macOS [\#19128](https://github.com/netdata/netdata/pull/19128) ([ilyam8](https://github.com/ilyam8))
+- fix\(packaging\): correct go linux 386 checksum [\#19127](https://github.com/netdata/netdata/pull/19127) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19126](https://github.com/netdata/netdata/pull/19126) ([netdatabot](https://github.com/netdatabot))
 - Integrations gha, remove .js and .json files after the process [\#19125](https://github.com/netdata/netdata/pull/19125) ([Ancairon](https://github.com/Ancairon))
 - Avoid scanning charts for replication status [\#19124](https://github.com/netdata/netdata/pull/19124) ([stelfrag](https://github.com/stelfrag))
@@ -129,6 +137,7 @@
 - Regenerate integrations.js [\#18966](https://github.com/netdata/netdata/pull/18966) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/rabbitmq\): add cluster support [\#18965](https://github.com/netdata/netdata/pull/18965) ([ilyam8](https://github.com/ilyam8))
 - Tidy up CI to improve overall run times. [\#18957](https://github.com/netdata/netdata/pull/18957) ([Ferroin](https://github.com/Ferroin))
+- Balance streaming parents [\#18945](https://github.com/netdata/netdata/pull/18945) ([ktsaou](https://github.com/ktsaou))
 - added /api/v3/stream\_path [\#18943](https://github.com/netdata/netdata/pull/18943) ([ktsaou](https://github.com/ktsaou))
 - Update Windows Documentation [\#18928](https://github.com/netdata/netdata/pull/18928) ([thiagoftsm](https://github.com/thiagoftsm))
 - IIS Metadata [\#18765](https://github.com/netdata/netdata/pull/18765) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -436,15 +445,6 @@
 - Remove python ceph collector implementation [\#18584](https://github.com/netdata/netdata/pull/18584) ([Ancairon](https://github.com/Ancairon))
 - Add ceph commands to ndsudo [\#18583](https://github.com/netdata/netdata/pull/18583) ([Ancairon](https://github.com/Ancairon))
 - Port Ceph collector to Go [\#18582](https://github.com/netdata/netdata/pull/18582) ([Ancairon](https://github.com/Ancairon))
-- go.d/sensors refactor [\#18581](https://github.com/netdata/netdata/pull/18581) ([ilyam8](https://github.com/ilyam8))
-- go.d move packages [\#18580](https://github.com/netdata/netdata/pull/18580) ([ilyam8](https://github.com/ilyam8))
-- WEIGHTS: use node\_id when available, otherwise host\_id [\#18579](https://github.com/netdata/netdata/pull/18579) ([ktsaou](https://github.com/ktsaou))
-- go.d/portcheck: update status duration calculation [\#18577](https://github.com/netdata/netdata/pull/18577) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18576](https://github.com/netdata/netdata/pull/18576) ([netdatabot](https://github.com/netdatabot))
-- go.d/portcheck schema add tabs [\#18575](https://github.com/netdata/netdata/pull/18575) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18574](https://github.com/netdata/netdata/pull/18574) ([netdatabot](https://github.com/netdatabot))
-- go.d portcheck update meta [\#18573](https://github.com/netdata/netdata/pull/18573) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18571](https://github.com/netdata/netdata/pull/18571) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
