@@ -3,7 +3,7 @@
 The Agent-Cloud Link (ACLK) provides secure communication between your Netdata Agents and Cloud. This connection:
 
 - Uses outgoing secure WebSocket (WSS) on port `443`
-- Activates only after you [connect a node](/src/claim/README.md)) to your Space
+- Activates only after you [connect a node](/src/claim/README.md) to your Space
 - Ensures encrypted, safe data transmission
 
 For ACLK to function properly, your Agents need outbound access to Netdata Cloud services.
