@@ -1478,7 +1478,7 @@ struct netdata_netframework_objects {
     {.fnct = netdata_framework_clr_jit, .object = ".NET CLR Jit" },
     {.fnct = netdata_framework_clr_loading, .object = ".NET CLR Loading" },
     {.fnct = netdata_framework_clr_remoting, .object = ".NET CLR Remoting" },
-    {.fnct = netdata_framework_clr_security, .object = ".NET CLR Security" }
+    {.fnct = netdata_framework_clr_security, .object = ".NET CLR Security" },
     {.fnct = netdata_framework_clr_locks_and_threads, .object = ".NET CLR LocksAndThreads" }
 
 };
