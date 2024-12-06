@@ -55,7 +55,8 @@ struct sender_state {
         size_t bytes_uncompressed;
 
         // the current buffer statistics
-        // these SHOULD ALWAYS BE CALCULATED ON EVERY sender_unlock() IF THE BUFFER WAS MODIFIED
+        // these SHOULD ALWAYS BE CALCULATED ON EVERY stream_sender_unlock() IF THE BUFFER WAS MODIFIED
+        // stream_sender_lock() IS REQUIRED TO READ/WRITE THESE
         size_t bytes_outstanding;
         size_t bytes_available;
         NETDATA_DOUBLE buffer_ratio;
@@ -65,6 +66,8 @@ struct sender_state {
         size_t bytes_sent;
         size_t bytes_sent_by_type[STREAM_TRAFFIC_TYPE_MAX];
 
+        usec_t last_traffic_ut;
+
         struct pollfd_meta meta;
     } thread;
 
@@ -73,7 +76,6 @@ struct sender_state {
     } connector;
 
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
-    time_t last_traffic_seen_t;
     time_t last_state_since_t;                  // the timestamp of the last state (online/offline) change
 
     struct {

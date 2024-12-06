@@ -173,13 +173,13 @@ extern struct stream_thread_globals stream_thread_globals;
 
 void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth);
 void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth);
-void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth);
+void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t now_ut);
 
 void stream_receiver_add_to_queue(struct receiver_state *rpt);
 void stream_sender_add_to_connector_queue(struct rrdhost *host);
 
-void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t events, time_t now_s);
-void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events, time_t now_s);
+void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t events, usec_t now_ut);
+void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events, usec_t now_ut);
 
 void stream_sender_cleanup(struct stream_thread *sth);
 void stream_receiver_cleanup(struct stream_thread *sth);
