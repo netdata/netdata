@@ -104,6 +104,7 @@ struct sender_state {
 
 #define stream_sender_lock(sender) spinlock_lock(&(sender)->spinlock)
 #define stream_sender_unlock(sender) spinlock_unlock(&(sender)->spinlock)
+#define stream_sender_trylock(sender) spinlock_trylock(&(sender)->spinlock)
 
 #define stream_sender_replication_buffer_full_set(sender, value) __atomic_store_n(&((sender)->replication.atomic.reached_max), value, __ATOMIC_SEQ_CST)
 #define stream_sender_replication_buffer_full_get(sender) __atomic_load_n(&((sender)->replication.atomic.reached_max), __ATOMIC_SEQ_CST)

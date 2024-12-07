@@ -432,46 +432,49 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
     if(events & ND_POLL_WRITE) {
         // we can send data on this socket
 
-        worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
+        if(stream_sender_trylock(s)) {
+            worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
 
-        bool disconnect = false;
-        stream_sender_lock(s);
-        STREAM_CIRCULAR_BUFFER_STATS *stats = stream_circular_buffer_stats_unsafe(s->scb);
-        {
-            char *chunk;
-            size_t outstanding = stream_circular_buffer_get_unsafe(s->scb, &chunk);
-            ssize_t bytes = nd_sock_send_nowait(&s->sock, chunk, outstanding);
-            if (likely(bytes > 0)) {
-                stream_circular_buffer_del_unsafe(s->scb, bytes);
-                replication_recalculate_buffer_used_ratio_unsafe(s);
-                s->thread.last_traffic_ut = now_ut;
-                sth->snd.bytes_sent += bytes;
+            bool disconnect = false;
+            STREAM_CIRCULAR_BUFFER_STATS *stats = stream_circular_buffer_stats_unsafe(s->scb);
+            {
+                char *chunk;
+                size_t outstanding = stream_circular_buffer_get_unsafe(s->scb, &chunk);
+                ssize_t bytes = nd_sock_send_nowait(&s->sock, chunk, outstanding);
+                if (likely(bytes > 0)) {
+                    stream_circular_buffer_del_unsafe(s->scb, bytes);
+                    replication_recalculate_buffer_used_ratio_unsafe(s);
+                    s->thread.last_traffic_ut = now_ut;
+                    sth->snd.bytes_sent += bytes;
 
-                if(!stats->bytes_outstanding) {
-                    // we sent them all - remove ND_POLL_WRITE
-                    if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
-                        nd_log(NDLS_DAEMON, NDLP_ERR,
-                               "STREAM SEND[%zu] %s [send to %s]: failed to update nd_poll().",
-                               sth->id, rrdhost_hostname(s->host), s->connected_to);
+                    if (!stats->bytes_outstanding) {
+                        // we sent them all - remove ND_POLL_WRITE
+                        if (!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
+                            nd_log(NDLS_DAEMON, NDLP_ERR,
+                                   "STREAM SEND[%zu] %s [send to %s]: failed to update nd_poll().",
+                                   sth->id, rrdhost_hostname(s->host), s->connected_to);
 
-                    // recreate the circular buffer if we have to
-                    stream_circular_buffer_recreate_timed_unsafe(s->scb, now_ut, false);
+                        // recreate the circular buffer if we have to
+                        stream_circular_buffer_recreate_timed_unsafe(s->scb, now_ut, false);
+                    }
                 }
+                else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
+                    disconnect = true;
             }
-            else if (bytes < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
-                disconnect = true;
-        }
-        stream_sender_unlock(s);
+            stream_sender_unlock(s);
 
-        if(disconnect) {
-            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR);
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SEND[%zu] %s [send to %s]: failed to send metrics - restarting connection - "
-                   "we have sent %zu bytes in %zu operations.",
-                   sth->id, rrdhost_hostname(s->host), s->connected_to, stats->bytes_sent, stats->sends);
-            stream_sender_move_running_to_connector_or_remove(
-                sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED, true);
-            return;
+            if (disconnect) {
+                worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR);
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "STREAM SEND[%zu] %s [send to %s]: failed to send metrics - restarting connection - "
+                       "we have sent %zu bytes in %zu operations.",
+                       sth->id, rrdhost_hostname(s->host), s->connected_to, stats->bytes_sent, stats->sends);
+
+                stream_sender_move_running_to_connector_or_remove(
+                    sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED, true);
+
+                return;
+            }
         }
     }
 
