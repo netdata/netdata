@@ -55,8 +55,9 @@ func (l *Locker) Unlock(name string) {
 }
 
 func (l *Locker) UnlockAll() {
-	for name := range l.locks {
-		l.Unlock(name)
+	for key, locker := range l.locks {
+		delete(l.locks, key)
+		_ = locker.Close()
 	}
 }
 
