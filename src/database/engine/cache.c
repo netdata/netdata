@@ -560,7 +560,6 @@ struct section_pages {
 static struct aral_statistics aral_statistics_for_pgc = { 0 };
 
 static ARAL *pgc_sections_aral = NULL;
-static ARAL *pgc_pages_aral = NULL;
 
 static void pgc_section_pages_static_aral_init(void) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
@@ -569,16 +568,6 @@ static void pgc_section_pages_static_aral_init(void) {
 
     if(!pgc_sections_aral)
         pgc_sections_aral = aral_by_size_acquire(sizeof(struct section_pages));
-
-    if(!pgc_pages_aral) {
-        pgc_pages_aral = aral_create(
-            "pgc_pages",
-            sizeof(PGC_PAGE),
-            0,
-            0,
-            &aral_statistics_for_pgc,
-            NULL, NULL, false, false);
-    }
 
     spinlock_unlock(&spinlock);
 }
@@ -2053,19 +2042,17 @@ PGC *pgc_create(const char *name,
         rw_spinlock_init(&cache->index[part].rw_spinlock);
 
 #ifdef PGC_WITH_ARAL
-    if(cache->config.additional_bytes_per_page) {
+    {
         char buf[100];
         snprintfz(buf, sizeof(buf), "%s", name);
         cache->aral = aral_create(
             buf,
             sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
             0,
-            16364,
+            0,
             &aral_statistics_for_pgc,
             NULL, NULL, false, false);
     }
-    else
-        cache->aral = pgc_pages_aral;
 
     telemetry_aral_register(cache->aral, "pgc");
 #endif
@@ -2103,11 +2090,11 @@ PGC *pgc_create(const char *name,
 }
 
 size_t pgc_aral_structures(void) {
-    return aral_structures(pgc_pages_aral);
+    return aral_structures_from_stats(&aral_statistics_for_pgc);
 }
 
 size_t pgc_aral_overhead(void) {
-    return aral_overhead(pgc_pages_aral);
+    return aral_overhead_from_stats(&aral_statistics_for_pgc);
 }
 
 void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section) {

@@ -74,7 +74,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
 
     if(!UUIDiszero(s->host->node_id) && !UUIDeq(s->host->node_id, node_id)) {
         if(claimed) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "STREAM %s [send to %s] parent reports different node id '%s', but we are claimed. Ignoring it.",
                    rrdhost_hostname(s->host), s->connected_to,
                    node_id_str ? node_id_str : "(unset)");
