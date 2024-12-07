@@ -33,6 +33,7 @@ func main() {
 	_, _ = maxprocs.Set(maxprocs.Logger(func(s string, args ...interface{}) {}))
 
 	opts := parseCLI()
+
 	if opts.Version {
 		fmt.Printf("go.d.plugin, version: %s\n", buildinfo.Version)
 		return
@@ -41,8 +42,8 @@ func main() {
 	env := newEnvConfig()
 	cfg := newConfig(opts, env)
 
-	if env.envLogLevel != "" {
-		logger.Level.SetByName(env.envLogLevel)
+	if env.logLevel != "" {
+		logger.Level.SetByName(env.logLevel)
 	}
 	if opts.Debug {
 		logger.Level.Set(slog.LevelDebug)
@@ -68,8 +69,6 @@ func main() {
 
 	proxyCfg := httpproxy.FromEnvironment()
 	a.Infof("env HTTP_PROXY '%s', HTTPS_PROXY '%s'", proxyCfg.HTTPProxy, proxyCfg.HTTPSProxy)
-
-	a.Infof("%+v", cfg)
 
 	a.Run()
 }

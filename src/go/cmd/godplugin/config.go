@@ -15,24 +15,24 @@ import (
 )
 
 type envConfig struct {
-	cygwinBase  string
-	userDir     string
-	stockDir    string
-	varLibDir   string
-	lockDir     string
-	watchPath   string
-	envLogLevel string
+	cygwinBase string
+	userDir    string
+	stockDir   string
+	varLibDir  string
+	lockDir    string
+	watchPath  string
+	logLevel   string
 }
 
 func newEnvConfig() *envConfig {
 	cfg := &envConfig{
-		cygwinBase:  os.Getenv("NETDATA_CYGWIN_BASE_PATH"),
-		userDir:     os.Getenv("NETDATA_USER_CONFIG_DIR"),
-		stockDir:    os.Getenv("NETDATA_STOCK_CONFIG_DIR"),
-		varLibDir:   os.Getenv("NETDATA_LIB_DIR"),
-		lockDir:     os.Getenv("NETDATA_LOCK_DIR"),
-		watchPath:   os.Getenv("NETDATA_PLUGINS_GOD_WATCH_PATH"),
-		envLogLevel: os.Getenv("NETDATA_LOG_LEVEL"),
+		cygwinBase: os.Getenv("NETDATA_CYGWIN_BASE_PATH"),
+		userDir:    os.Getenv("NETDATA_USER_CONFIG_DIR"),
+		stockDir:   os.Getenv("NETDATA_STOCK_CONFIG_DIR"),
+		varLibDir:  os.Getenv("NETDATA_LIB_DIR"),
+		lockDir:    os.Getenv("NETDATA_LOCK_DIR"),
+		watchPath:  os.Getenv("NETDATA_PLUGINS_GOD_WATCH_PATH"),
+		logLevel:   os.Getenv("NETDATA_LOG_LEVEL"),
 	}
 
 	cfg.userDir = cfg.handleDirOnWin(cfg.userDir)
