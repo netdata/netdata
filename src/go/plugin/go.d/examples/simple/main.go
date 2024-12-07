@@ -107,12 +107,12 @@ func main() {
 	)
 
 	p := agent.New(agent.Config{
-		Name:                 name,
-		ConfDir:              confDir(opt.ConfDir),
-		ModulesConfDir:       modulesConfDir(opt.ConfDir),
-		ModulesConfWatchPath: opt.WatchPath,
-		RunModule:            opt.Module,
-		MinUpdateEvery:       opt.UpdateEvery,
+		Name:                      name,
+		PluginConfigDir:           confDir(opt.ConfDir),
+		CollectorsConfigDir:       modulesConfDir(opt.ConfDir),
+		CollectorsConfigWatchPath: opt.WatchPath,
+		RunModule:                 opt.Module,
+		MinUpdateEvery:            opt.UpdateEvery,
 	})
 
 	p.Run()

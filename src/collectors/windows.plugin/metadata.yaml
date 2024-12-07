@@ -812,3 +812,268 @@ modules:
               chart_type: line
               dimensions:
                 - name: purged
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibMSSQL
+      monitored_instance:
+        name: MS SQL Server
+        link: "https://www.microsoft.com/en-us/sql-server/"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - sql
+        - queries
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Microsoft SQL Server statistics.
+        method_description: |
+          It queries different SQL objects per instance from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibMSSQL
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: MSSQL instance
+          description: "These metrics refer to the Microsoft SQL Servers instances defined on host."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+          metrics:
+            - name: mssql.instance_user_connections
+              description: User connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: user
+            - name: mssql.instance_sqlstats_batch_requests
+              description: Total of batches requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: batch
+            - name: mssql.instance_sql_errors
+              description: Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: errors
+            - name: mssql.instance_sqlstats_sql_compilations
+              description: SQL compilations
+              unit: compilations/s
+              chart_type: line
+              dimensions:
+                - name: compilations
+            - name: mssql.instance_sqlstats_sql_recompilations
+              description: SQL re-compilations
+              unit: recompiles/s
+              chart_type: line
+              dimensions:
+                - name: recompiles
+            - name: mssql.instance_sqlstats_auto_parameterization_attempts
+              description: Failed auto-parameterization attempts
+              unit: attempts/s
+              chart_type: line
+              dimensions:
+                - name: failed
+            - name: mssql.instance_sqlstats_safe_auto_parameterization_attempts
+              description: Safe auto-parameterization attempts
+              unit: attempts/s
+              chart_type: line
+              dimensions:
+                - name: safe
+            - name: mssql.instance_accessmethods_page_splits
+              description: Pages splits
+              unit: splits/s
+              chart_type: line
+              dimensions:
+                - name: page
+            - name: mssql.instance_cache_hit_ratio
+              description: Buffer Cache hit ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hit_ratio
+            - name: mssql.instance_bufman_iops
+              description: Number of pages input and output
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: mssql.instance_bufman_checkpoint_pages
+              description: Flushed pages
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: log
+            - name: mssql.instance_bufman_page_life_expectancy
+              description: Page life expectancy
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: life_expectancy
+            - name: mssql.instance_memmgr_server_memory
+              description: Memory committed
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: memory
+            - name: mssql.instance_memmgr_connection_memory_bytes
+              description: Amount of dynamic memory to maintain connections
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: memory
+            - name: mssql.instance_memmgr_pending_memory_grants
+              description: Process waiting for memory grant
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: mssql.instance_memmgr_external_benefit_of_memory
+              description: Performance benefit from adding memory to a specific cache
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: benefit
+            - name: mssql.instance_locks_deadlocks
+              description: Lock requests that resulted in deadlock
+              unit: deadlocks/s
+              chart_type: line
+              dimensions:
+                - name: alloc_unit
+                - name: application
+                - name: database
+                - name: extent
+                - name: file
+                - name: hobt
+                - name: key
+                - name: metadata
+                - name: oib
+                - name: object
+                - name: page
+                - name: rid
+                - name: row_group
+                - name: xact
+            - name: mssql.instance_locks_lock_wait
+              description: Lock requests that required the caller to wait
+              unit: locks/s
+              chart_type: line
+              dimensions:
+                - name: alloc_unit
+                - name: application
+                - name: database
+                - name: extent
+                - name: file
+                - name: hobt
+                - name: key
+                - name: metadata
+                - name: oib
+                - name: object
+                - name: page
+                - name: rid
+                - name: row_group
+                - name: xact
+            - name: mssql.instance_blocked_processes
+              description: Blocked processes
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: blocked
+        - name: Database
+          description: "These metrics refer to Microsoft SQL Server databases."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: database
+              description: The database name.
+          metrics:
+            - name: mssql.database_active_transactions
+              description: Active transactions per database
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: mssql.database_transactions
+              description: Transactions
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: transactions
+            - name: mssql.database_write_transactions
+              description: Write transactions
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: write
+            - name: mssql.database_backup_restore_operations
+              description: Backup IO per database
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: backup
+            - name: mssql.database_log_flushes
+              description: Log flushes
+              unit: flushes/s
+              chart_type: line
+              dimensions:
+                - name: log
+            - name: mssql.database_log_flushed
+              description: Log flushed
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: flushed

@@ -31,35 +31,39 @@ var isTerminal = isatty.IsTerminal(os.Stdout.Fd())
 
 // Config is an Agent configuration.
 type Config struct {
-	Name                 string
-	ConfDir              []string
-	ModulesConfDir       []string
-	ModulesConfSDDir     []string
-	ModulesConfWatchPath []string
-	VnodesConfDir        []string
-	StateFile            string
-	LockDir              string
-	ModuleRegistry       module.Registry
-	RunModule            string
-	MinUpdateEvery       int
+	Name                      string
+	PluginConfigDir           []string
+	CollectorsConfigDir       []string
+	CollectorsConfigWatchPath []string
+	ServiceDiscoveryConfigDir []string
+	VnodesConfigDir           []string
+	StateFile                 string
+	LockDir                   string
+	ModuleRegistry            module.Registry
+	RunModule                 string
+	MinUpdateEvery            int
 }
 
 // Agent represents orchestrator.
 type Agent struct {
 	*logger.Logger
 
-	Name              string
-	ConfDir           multipath.MultiPath
-	ModulesConfDir    multipath.MultiPath
-	ModulesConfSDDir  multipath.MultiPath
-	ModulesSDConfPath []string
-	VnodesConfDir     multipath.MultiPath
-	StateFile         string
-	LockDir           string
-	RunModule         string
-	MinUpdateEvery    int
-	ModuleRegistry    module.Registry
-	Out               io.Writer
+	Name string
+
+	ConfigDir                 multipath.MultiPath
+	CollectorsConfDir         multipath.MultiPath
+	CollectorsConfigWatchPath []string
+	ServiceDiscoveryConfigDir multipath.MultiPath
+	VnodesConfigDir           multipath.MultiPath
+
+	StateFile string
+	LockDir   string
+
+	RunModule      string
+	MinUpdateEvery int
+
+	ModuleRegistry module.Registry
+	Out            io.Writer
 
 	api *netdataapi.API
 
@@ -72,20 +76,20 @@ func New(cfg Config) *Agent {
 		Logger: logger.New().With(
 			slog.String("component", "agent"),
 		),
-		Name:              cfg.Name,
-		ConfDir:           cfg.ConfDir,
-		ModulesConfDir:    cfg.ModulesConfDir,
-		ModulesConfSDDir:  cfg.ModulesConfSDDir,
-		ModulesSDConfPath: cfg.ModulesConfWatchPath,
-		VnodesConfDir:     cfg.VnodesConfDir,
-		StateFile:         cfg.StateFile,
-		LockDir:           cfg.LockDir,
-		RunModule:         cfg.RunModule,
-		MinUpdateEvery:    cfg.MinUpdateEvery,
-		ModuleRegistry:    module.DefaultRegistry,
-		Out:               safewriter.Stdout,
-		api:               netdataapi.New(safewriter.Stdout),
-		quitCh:            make(chan struct{}),
+		Name:                      cfg.Name,
+		ConfigDir:                 cfg.PluginConfigDir,
+		CollectorsConfDir:         cfg.CollectorsConfigDir,
+		ServiceDiscoveryConfigDir: cfg.ServiceDiscoveryConfigDir,
+		CollectorsConfigWatchPath: cfg.CollectorsConfigWatchPath,
+		VnodesConfigDir:           cfg.VnodesConfigDir,
+		StateFile:                 cfg.StateFile,
+		LockDir:                   cfg.LockDir,
+		RunModule:                 cfg.RunModule,
+		MinUpdateEvery:            cfg.MinUpdateEvery,
+		ModuleRegistry:            module.DefaultRegistry,
+		Out:                       safewriter.Stdout,
+		api:                       netdataapi.New(safewriter.Stdout),
+		quitCh:                    make(chan struct{}),
 	}
 }
 

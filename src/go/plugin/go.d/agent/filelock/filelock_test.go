@@ -97,3 +97,34 @@ func TestLocker_Unlock(t *testing.T) {
 		})
 	}
 }
+
+func TestLocker_UnlockAll(t *testing.T) {
+	tests := map[string]func(t *testing.T, dir string){
+		"unlock all": func(t *testing.T, dir string) {
+			reg := New(dir)
+
+			ok, err := reg.Lock("name1")
+			require.True(t, ok)
+			require.NoError(t, err)
+
+			ok, err = reg.Lock("name2")
+			require.True(t, ok)
+			require.NoError(t, err)
+
+			reg.UnlockAll()
+
+			assert.False(t, reg.isLocked("name1"))
+			assert.False(t, reg.isLocked("name2"))
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir, err := os.MkdirTemp(os.TempDir(), "netdata-go-test-file-lock-registry")
+			require.NoError(t, err)
+			defer func() { require.NoError(t, os.RemoveAll(dir)) }()
+
+			test(t, dir)
+		})
+	}
+}
