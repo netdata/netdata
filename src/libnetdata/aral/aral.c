@@ -17,7 +17,7 @@
 // max malloc size
 // optimal at current versions of libc is up to 256k
 // ideal to have the same overhead as libc is 4k
-#define ARAL_MAX_PAGE_SIZE_MALLOC (256ULL * 1024)
+#define ARAL_MAX_PAGE_SIZE_MALLOC (128ULL * 1024)
 
 // we don't need alignof(max_align_t) for normal C structures
 // alignof(uintptr_r) is sufficient for our use cases
