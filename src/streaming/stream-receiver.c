@@ -232,7 +232,7 @@ static inline ssize_t receiver_read_compressed(struct receiver_state *r) {
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
     ssize_t bytes_read = read_stream(r, r->thread.compressed.buf + r->thread.compressed.used,
-                                 sizeof(r->thread.compressed.buf) - r->thread.compressed.used);
+                                 r->thread.compressed.size - r->thread.compressed.used);
 
     if(bytes_read > 0) {
         r->thread.compressed.used += bytes_read;

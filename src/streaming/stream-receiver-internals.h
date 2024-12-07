@@ -47,7 +47,8 @@ struct receiver_state {
             bool enabled;
             size_t start;
             size_t used;
-            char buf[COMPRESSION_MAX_CHUNK * 2];
+            size_t size;
+            char *buf;
             struct decompressor_state decompressor;
         } compressed;
 
