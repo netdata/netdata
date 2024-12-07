@@ -66,15 +66,6 @@ static inline ssize_t write_stream(struct receiver_state *r, char* buffer, size_
 #endif
 
     ssize_t bytes_written = nd_sock_send_nowait(&r->sock, buffer, size);
-    if(bytes_written <= 0) {
-        if (bytes_written == 0)
-            netdata_log_error("STREAM: %s(): EOF while writing data to socket!", __FUNCTION__);
-        else {
-            netdata_log_error("STREAM: %s() failed to write to socket!", __FUNCTION__);
-            bytes_written = -1;
-        }
-    }
-
     return bytes_written;
 }
 
@@ -94,15 +85,6 @@ static inline ssize_t read_stream(struct receiver_state *r, char* buffer, size_t
 #endif
 
     ssize_t bytes_read = nd_sock_revc_nowait(&r->sock, buffer, size);
-    if(bytes_read <= 0) {
-        if (bytes_read == 0)
-            netdata_log_error("STREAM: %s(): EOF while reading data from socket!", __FUNCTION__);
-        else {
-            netdata_log_error("STREAM: %s() failed to read from socket!", __FUNCTION__);
-            bytes_read = -1;
-        }
-    }
-
     return bytes_read;
 }
 
@@ -620,7 +602,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
             ssize_t bytes = receiver_read_compressed(rpt);
             if(unlikely(bytes <= 0)) {
-                if(bytes < 0 && (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
+                if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
                     return;
 
                 worker_is_busy(WORKER_STREAM_JOB_SOCKET_ERROR);
@@ -688,7 +670,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
             ssize_t bytes = receiver_read_uncompressed(rpt);
             if(unlikely(bytes <= 0)) {
-                if(bytes < 0 && (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
+                if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
                     return;
 
                 worker_is_busy(WORKER_STREAM_JOB_SOCKET_ERROR);
