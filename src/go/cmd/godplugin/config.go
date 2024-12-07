@@ -150,7 +150,7 @@ func (c *config) initServiceDiscoveryConfigDir() multipath.MultiPath {
 	var mpath multipath.MultiPath
 
 	for _, v := range c.pluginDir {
-		mpath = append(mpath, filepath.Join(v, "sd"))
+		mpath = append(mpath, filepath.Join(v, c.name, "sd"))
 	}
 
 	return mpath
