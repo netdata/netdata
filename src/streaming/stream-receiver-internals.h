@@ -51,6 +51,13 @@ struct receiver_state {
             struct decompressor_state decompressor;
         } compressed;
 
+        struct {
+            SPINLOCK spinlock;
+            struct stream_opcode msg;
+            uint32_t msg_slot;
+            STREAM_CIRCULAR_BUFFER *scb;
+        } send_to_child;
+
         struct pollfd_meta meta;
     } thread;
 
@@ -80,5 +87,8 @@ void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, con
 void stream_receiver_free(struct receiver_state *rpt);
 bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE reason);
 
+ssize_t send_to_child(const char *txt, void *data, STREAM_TRAFFIC_TYPE type);
+void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcode msg);
+void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state *rpt, struct stream_opcode *msg);
 
 #endif //NETDATA_STREAM_RECEIVER_INTERNALS_H

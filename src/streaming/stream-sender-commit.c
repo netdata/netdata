@@ -193,7 +193,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
 
     if (enable_sending) {
         msg.opcode = STREAM_OPCODE_SENDER_POLLOUT;
-        stream_sender_send_msg_to_dispatcher(s, msg);
+        stream_sender_send_opcode(s, msg);
     }
 
     return;
@@ -202,7 +202,7 @@ overflow_with_lock: {
         msg = s->thread.msg;
         stream_sender_unlock(s);
         msg.opcode = STREAM_OPCODE_SENDER_BUFFER_OVERFLOW;
-        stream_sender_send_msg_to_dispatcher(s, msg);
+        stream_sender_send_opcode(s, msg);
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s]: buffer overflow (buffer size %u, max size %u, used %u, available %u). "
                "Restarting connection.",
@@ -216,7 +216,7 @@ compression_failed_with_lock: {
         msg = s->thread.msg;
         stream_sender_unlock(s);
         msg.opcode = STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION;
-        stream_sender_send_msg_to_dispatcher(s, msg);
+        stream_sender_send_opcode(s, msg);
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM %s [send to %s]: COMPRESSION failed (twice). Deactivating compression and restarting connection.",
                rrdhost_hostname(s->host), s->connected_to);

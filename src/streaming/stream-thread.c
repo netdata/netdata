@@ -25,14 +25,26 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
         ((m->type == POLLFD_TYPE_SENDER && m == &m->s->thread.meta) ||          // sender matches
          (m->type == POLLFD_TYPE_RECEIVER && m == &m->rpt->thread.meta)))       // receiver matches
     {
-        if(msg->opcode & STREAM_OPCODE_SENDER_POLLOUT) {
-            if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, ND_POLL_READ|ND_POLL_WRITE, &m->s->thread.meta))
-                internal_fatal(true, "Failed to update sender socket in nd_poll()");
-            msg->opcode &= ~(STREAM_OPCODE_SENDER_POLLOUT);
-        }
+        if(m->type == POLLFD_TYPE_SENDER) {
+            if(msg->opcode & STREAM_OPCODE_SENDER_POLLOUT) {
+                if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, ND_POLL_READ|ND_POLL_WRITE, m))
+                    internal_fatal(true, "Failed to update sender socket in nd_poll()");
+                msg->opcode &= ~(STREAM_OPCODE_SENDER_POLLOUT);
+            }
 
-        if(m->type == POLLFD_TYPE_SENDER && msg->opcode)
-            stream_sender_handle_op(sth, m->s, msg);
+            if(msg->opcode)
+                stream_sender_handle_op(sth, m->s, msg);
+        }
+        else if(m->type == POLLFD_TYPE_RECEIVER) {
+            if (msg->opcode & STREAM_OPCODE_RECEIVER_POLLOUT) {
+                if (!nd_poll_upd(sth->run.ndpl, m->rpt->sock.fd, ND_POLL_READ | ND_POLL_WRITE, m))
+                    internal_fatal(true, "Failed to update receiver socket in nd_poll()");
+                msg->opcode &= ~(STREAM_OPCODE_RECEIVER_POLLOUT);
+            }
+
+            if (msg->opcode)
+                stream_receiver_handle_op(sth, m->rpt, msg);
+        }
     }
     else {
         // this may happen if we receive a POLLOUT opcode, but the sender has been disconnected
@@ -40,21 +52,27 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
     }
 }
 
-void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_opcode msg) {
-    if (!msg.session || !msg.meta || !s)
+static void stream_thread_send_pipe_signal(struct stream_thread *sth) {
+    if(sth->pipe.fds[PIPE_WRITE] != -1 &&
+        write(sth->pipe.fds[PIPE_WRITE], " ", 1) != 1) {
+        nd_log_limit_static_global_var(erl, 1, 1 * USEC_PER_MS);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                     "STREAM THREAD[%zu]: cannot write to signal pipe", sth->id);
+    }
+}
+
+void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcode msg) {
+    if (!msg.session || !msg.meta || !rpt)
         return;
 
-    internal_fatal(msg.meta != &s->thread.meta, "the sender pointer in the message does not match this sender");
-
+    internal_fatal(msg.meta != &rpt->thread.meta, "the receiver pointer in the message does not match this receiver");
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
     if(!sth) {
         internal_fatal(true,
-                       "STREAM SEND[x] [%s] thread pointer in the opcode message does not match the expected",
-                       rrdhost_hostname(s->host));
+                       "STREAM RECEIVE[x] [%s] thread pointer in the opcode message does not match the expected",
+                       rrdhost_hostname(rpt->host));
         return;
     }
-
-    bool send_pipe_msg = false;
 
     // check if we can execute the message now
     if(sth->tid == gettid_cached()) {
@@ -64,6 +82,76 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_
         stream_thread_handle_op(sth, &msg);
         return;
     }
+
+    bool send_pipe_msg = false;
+
+    // add it to the message queue of the thread
+    spinlock_lock(&sth->messages.spinlock);
+    {
+        sth->messages.added++;
+        if (rpt->thread.send_to_child.msg_slot >= sth->messages.used || sth->messages.array[rpt->thread.send_to_child.msg_slot].meta != &rpt->thread.meta) {
+            if (unlikely(sth->messages.used >= sth->messages.size)) {
+                // this should never happen, but let's find the root cause
+
+                if (!sth->messages.size) {
+                    // we are exiting
+                    spinlock_unlock(&sth->messages.spinlock);
+                    return;
+                }
+
+                // try to find us in the list
+                for (size_t i = 0; i < sth->messages.size; i++) {
+                    if (sth->messages.array[i].meta == &rpt->thread.meta) {
+                        rpt->thread.send_to_child.msg_slot = i;
+                        sth->messages.array[rpt->thread.send_to_child.msg_slot].opcode |= msg.opcode;
+                        spinlock_unlock(&sth->messages.spinlock);
+                        internal_fatal(true, "the stream opcode queue is full, but this receiver is already on slot %zu", i);
+                        return;
+                    }
+                }
+
+                fatal("The streaming opcode queue is full, but this should never happen");
+            }
+
+            // let's use a new slot
+            send_pipe_msg = !sth->messages.used; // write to the pipe, only when the queue was empty before this msg
+            rpt->thread.send_to_child.msg_slot = sth->messages.used++;
+            sth->messages.array[rpt->thread.send_to_child.msg_slot] = msg;
+        }
+        else
+            // the existing slot is good
+            sth->messages.array[rpt->thread.send_to_child.msg_slot].opcode |= msg.opcode;
+    }
+    spinlock_unlock(&sth->messages.spinlock);
+
+    // signal the streaming thread to wake up and process messages
+    if(send_pipe_msg)
+        stream_thread_send_pipe_signal(sth);
+}
+
+void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg) {
+    if (!msg.session || !msg.meta || !s)
+        return;
+
+    internal_fatal(msg.meta != &s->thread.meta, "the sender pointer in the message does not match this sender");
+    struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
+    if(!sth) {
+        internal_fatal(true,
+                       "STREAM SEND[x] [%s] thread pointer in the opcode message does not match the expected",
+                       rrdhost_hostname(s->host));
+        return;
+    }
+
+    // check if we can execute the message now
+    if(sth->tid == gettid_cached()) {
+        // we are running at the dispatcher thread
+        // no need for locks or queuing
+        sth->messages.bypassed++;
+        stream_thread_handle_op(sth, &msg);
+        return;
+    }
+
+    bool send_pipe_msg = false;
 
     // add it to the message queue of the thread
     spinlock_lock(&sth->messages.spinlock);
@@ -90,7 +178,7 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_
                     }
                 }
 
-                fatal("the dispatcher message queue is full, but this should never happen");
+                fatal("the streaming opcode queue is full, but this should never happen");
             }
 
             // let's use a new slot
@@ -105,14 +193,8 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_
     spinlock_unlock(&sth->messages.spinlock);
 
     // signal the streaming thread to wake up and process messages
-    if(send_pipe_msg &&
-        sth->pipe.fds[PIPE_WRITE] != -1 &&
-        write(sth->pipe.fds[PIPE_WRITE], " ", 1) != 1) {
-        nd_log_limit_static_global_var(erl, 1, 1 * USEC_PER_MS);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                     "STREAM SEND [%s]: cannot write to signal pipe",
-                     rrdhost_hostname(s->host));
-    }
+    if(send_pipe_msg)
+        stream_thread_send_pipe_signal(sth);
 }
 
 static void stream_thread_read_pipe_messages(struct stream_thread *sth) {

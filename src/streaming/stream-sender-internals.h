@@ -45,7 +45,7 @@ struct sender_state {
         // this is a property of stream_sender_send_msg_to_dispatcher()
         // protected by dispatcher->messages.spinlock
         // DO NOT READ OR WRITE ANYWHERE
-        uint32_t msg_slot;      // ensures a dispatcher queue that can never get full
+        uint32_t msg_slot;      // ensures a opcode queue that can never get full
 
         usec_t last_traffic_ut;
 
@@ -127,7 +127,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
 bool stream_sender_is_host_stopped(struct sender_state *s);
 
-void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_opcode msg);
+void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg);
 
 void stream_sender_add_to_queue(struct sender_state *s);
 

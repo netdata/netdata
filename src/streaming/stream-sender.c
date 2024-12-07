@@ -133,7 +133,7 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
         ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
         ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
         ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
-        ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
+        ND_LOG_FIELD_CB(NDF_DST_CAPABILITIES, stream_sender_log_capabilities, s),
         ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
         ND_LOG_FIELD_END(),
     };
@@ -400,7 +400,7 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    if(unlikely(events & ND_POLL_ERROR)) {
+    if(unlikely(events & (ND_POLL_ERROR|ND_POLL_HUP|ND_POLL_INVALID))) {
         // we have errors on this socket
 
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_ERROR);

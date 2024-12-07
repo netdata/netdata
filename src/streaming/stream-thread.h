@@ -18,10 +18,12 @@ struct pollfd_slotted {
 typedef enum __attribute__((packed)) {
     STREAM_OPCODE_NONE                                  = 0,
     STREAM_OPCODE_SENDER_POLLOUT                        = (1 << 0), // move traffic around as soon as possible
-    STREAM_OPCODE_SENDER_BUFFER_OVERFLOW                = (1 << 1), // reconnect the node, it has buffer overflow
-    STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION  = (1 << 2), // reconnect the node, but disable compression
-    STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT             = (1 << 3), // disconnect the node, the receiver left
-    STREAM_OPCODE_SENDER_STOP_HOST_CLEANUP              = (1 << 4), // disconnect the node, it is being de-allocated
+    STREAM_OPCODE_RECEIVER_POLLOUT                      = (1 << 1), // disconnect the node, it has buffer overflow
+    STREAM_OPCODE_SENDER_BUFFER_OVERFLOW                = (1 << 2), // reconnect the node, it has buffer overflow
+    STREAM_OPCODE_RECEIVER_BUFFER_OVERFLOW              = (1 << 3), // reconnect the node, it has buffer overflow
+    STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION  = (1 << 4), // reconnect the node, but disable compression
+    STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT             = (1 << 5), // disconnect the node, the receiver left
+    STREAM_OPCODE_SENDER_STOP_HOST_CLEANUP              = (1 << 6), // disconnect the node, it is being de-allocated
 } STREAM_OPCODE;
 
 struct stream_opcode {

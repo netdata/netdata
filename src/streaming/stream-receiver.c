@@ -5,6 +5,8 @@
 #include "stream-receiver-internals.h"
 #include "web/server/h2o/http_server.h"
 
+static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, const char *why);
+
 // When a child disconnects this is the maximum we will wait
 // before we update the cloud that the child is offline
 #define MAX_CHILD_DISC_DELAY (30000)
@@ -27,6 +29,54 @@ static void streaming_receiver_disconnected(void) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+
+static bool stream_receiver_log_capabilities(BUFFER *wb, void *ptr) {
+    struct receiver_state *rpt = ptr;
+    if(!rpt)
+        return false;
+
+    stream_capabilities_to_string(wb, rpt->capabilities);
+    return true;
+}
+
+static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
+    struct receiver_state *rpt = ptr;
+    if(!rpt)
+        return false;
+
+    buffer_strcat(wb, nd_sock_is_ssl(&rpt->sock) ? "https" : "http");
+    return true;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+static inline ssize_t write_stream(struct receiver_state *r, char* buffer, size_t size) {
+    if(unlikely(!size)) {
+        internal_error(true, "%s() asked to read zero bytes", __FUNCTION__);
+        return -2;
+    }
+
+#ifdef ENABLE_H2O
+    if (is_h2o_rrdpush(r)) {
+        if(nd_thread_signaled_to_cancel())
+            return -3;
+
+        return (ssize_t)h2o_stream_write(r->h2o_ctx, buffer, size);
+    }
+#endif
+
+    ssize_t bytes_written = nd_sock_write(&r->sock, buffer, size, 0);
+    if(bytes_written <= 0) {
+        if (bytes_written == 0)
+            netdata_log_error("STREAM: %s(): EOF while writing data to socket!", __FUNCTION__);
+        else {
+            netdata_log_error("STREAM: %s() failed to write to socket!", __FUNCTION__);
+            bytes_written = -1;
+        }
+    }
+
+    return bytes_written;
+}
 
 static inline ssize_t read_stream(struct receiver_state *r, char* buffer, size_t size) {
     if(unlikely(!size)) {
@@ -228,6 +278,68 @@ static inline bool receiver_should_stop(struct receiver_state *rpt) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state *rpt, struct stream_opcode *msg) {
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
+        ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
+        ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
+        ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
+        ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    if(msg->opcode & STREAM_OPCODE_RECEIVER_BUFFER_OVERFLOW) {
+        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW);
+        errno_clear();
+        spinlock_lock(&rpt->thread.send_to_child.spinlock);
+        // copy the statistics
+        STREAM_CIRCULAR_BUFFER_STATS stats = *stream_circular_buffer_stats_unsafe(rpt->thread.send_to_child.scb);
+        spinlock_unlock(&rpt->thread.send_to_child.spinlock);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM RECEIVE[%zu] %s [from %s]: send buffer is full (buffer size %u, max %u, used %u, available %u). "
+               "Restarting connection.",
+               sth->id, rrdhost_hostname(rpt->host), rpt->client_ip,
+               stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
+
+        stream_receiver_remove(sth, rpt, "receiver send buffer overflow");
+        return;
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "STREAM RECEIVE[%zu]: invalid msg id %u", sth->id, (unsigned)msg->opcode);
+}
+
+ssize_t send_to_child(const char *txt, void *data, STREAM_TRAFFIC_TYPE type) {
+    struct receiver_state *rpt = data;
+    if(!rpt || rpt->thread.meta.type != POLLFD_TYPE_RECEIVER || !rpt->thread.send_to_child.scb)
+        return 0;
+
+    spinlock_lock(&rpt->thread.send_to_child.spinlock);
+    STREAM_CIRCULAR_BUFFER *scb = rpt->thread.send_to_child.scb;
+    STREAM_CIRCULAR_BUFFER_STATS *stats = stream_circular_buffer_stats_unsafe(scb);
+    bool was_empty = stats->bytes_outstanding == 0;
+    struct stream_opcode msg = rpt->thread.send_to_child.msg;
+    msg.opcode = STREAM_OPCODE_NONE;
+
+    size_t size = strlen(txt);
+    ssize_t rc = (ssize_t)size;
+    if(!stream_circular_buffer_add_unsafe(scb, txt, size, size, type)) {
+        msg.opcode = STREAM_OPCODE_RECEIVER_BUFFER_OVERFLOW;
+        rc = -1;
+    }
+    else if(was_empty)
+        msg.opcode = STREAM_OPCODE_RECEIVER_POLLOUT;
+
+    spinlock_unlock(&rpt->thread.send_to_child.spinlock);
+
+    if(msg.opcode != STREAM_OPCODE_NONE)
+        stream_receiver_send_opcode(rpt, msg);
+
+    return rc;
+}
+
 static void streaming_parser_init(struct receiver_state *rpt) {
     rpt->thread.cd = (struct plugind){
         .update_every = default_rrd_update_every,
@@ -272,6 +384,8 @@ static void streaming_parser_init(struct receiver_state *rpt) {
         };
 
         parser = parser_init(&user, -1, -1, PARSER_INPUT_SPLIT, &rpt->sock);
+        parser->send_to_plugin_data = rpt;
+        parser->send_to_plugin_cb = send_to_child;
     }
 
 #ifdef ENABLE_H2O
@@ -309,26 +423,6 @@ static void streaming_parser_init(struct receiver_state *rpt) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static bool stream_receiver_log_capabilities(BUFFER *wb, void *ptr) {
-    struct receiver_state *rpt = ptr;
-    if(!rpt)
-        return false;
-
-    stream_capabilities_to_string(wb, rpt->capabilities);
-    return true;
-}
-
-static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
-    struct receiver_state *rpt = ptr;
-    if(!rpt)
-        return false;
-
-    buffer_strcat(wb, nd_sock_is_ssl(&rpt->sock) ? "https" : "http");
-    return true;
-}
-
-// --------------------------------------------------------------------------------------------------------------------
-
 void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
@@ -352,17 +446,25 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
                "STREAM RECEIVE[%zu] [%s]: moving host from receiver queue to receiver running...",
                sth->id, rrdhost_hostname(rpt->host));
 
-        streaming_parser_init(rpt);
-
         rpt->host->stream.rcv.status.tid = gettid_cached();
         rpt->thread.meta.type = POLLFD_TYPE_RECEIVER;
         rpt->thread.meta.rpt = rpt;
+
+        spinlock_lock(&rpt->thread.send_to_child.spinlock);
+        rpt->thread.send_to_child.scb = stream_circular_buffer_create();
+        rpt->thread.send_to_child.msg.thread_slot = (int32_t)sth->id;
+        rpt->thread.send_to_child.msg.session = os_random32();
+        rpt->thread.send_to_child.msg.meta = &rpt->thread.meta;
+        spinlock_unlock(&rpt->thread.send_to_child.spinlock);
 
         internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) != NULL, "Receiver to be added is already in the list of receivers");
         META_SET(&sth->run.meta, (Word_t)&rpt->thread.meta, &rpt->thread.meta);
 
         if(!nd_poll_add(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
             internal_fatal(true, "Failed to add receiver socket to nd_poll()");
+
+        // keep this last, since it sends commands back to the child
+        streaming_parser_init(rpt);
     }
 }
 
@@ -427,6 +529,13 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
 
     rpt->host->stream.rcv.status.tid = 0;
 
+    spinlock_lock(&rpt->thread.send_to_child.spinlock);
+    rpt->thread.send_to_child.msg.session = 0;
+    rpt->thread.send_to_child.msg.meta = NULL;
+    stream_circular_buffer_destroy(rpt->thread.send_to_child.scb);
+    rpt->thread.send_to_child.scb = NULL;
+    spinlock_unlock(&rpt->thread.send_to_child.spinlock);
+
     stream_thread_node_removed(rpt->host);
 
     stream_receiver_on_disconnect(sth, rpt);
@@ -434,7 +543,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
 }
 
 // process poll() events for streaming receivers
-void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events __maybe_unused, usec_t now_ut) {
+void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
         PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
@@ -456,6 +565,50 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
             receiver_set_exit_reason(rpt, rpt->exit.reason, false);
             stream_receiver_remove(sth, rpt, "received stop signal");
             return;
+        }
+
+        if(events & (ND_POLL_ERROR|ND_POLL_HUP|ND_POLL_INVALID)) {
+            // we have errors on this socket
+
+            worker_is_busy(WORKER_STREAM_JOB_SOCKET_ERROR);
+
+            char *error = "unknown error";
+
+            if (events & ND_POLL_ERROR)
+                error = "socket reports errors";
+            else if (events & ND_POLL_HUP)
+                error = "connection closed by remote end (HUP)";
+            else if (events & ND_POLL_INVALID)
+                error = "connection is invalid";
+
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM RECEIVE[%zu] %s [from %s]: %s",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, error);
+
+            stream_receiver_remove(sth, rpt, error);
+            return;
+        }
+
+        if(events & ND_POLL_WRITE) {
+            spinlock_lock(&rpt->thread.send_to_child.spinlock);
+            char *chunk;
+            STREAM_CIRCULAR_BUFFER *scb = rpt->thread.send_to_child.scb;
+            STREAM_CIRCULAR_BUFFER_STATS *stats = stream_circular_buffer_stats_unsafe(scb);
+            size_t outstanding = stream_circular_buffer_get_unsafe(scb, &chunk);
+            ssize_t rc = write_stream(rpt, chunk, outstanding);
+            if(rc > 0) {
+                stream_circular_buffer_del_unsafe(scb, rc);
+                if(!stats->bytes_outstanding) {
+                    if(!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
+                        internal_fatal(true, "cannot update nd_poll()");
+                }
+            }
+            spinlock_unlock(&rpt->thread.send_to_child.spinlock);
+
+            if(rc <= 0) {
+                stream_receiver_remove(sth, rpt, "cannot write to socket");
+                return;
+            }
         }
 
         rpt->last_msg_t = (time_t)(now_ut / USEC_PER_SEC);

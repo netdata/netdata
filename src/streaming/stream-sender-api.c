@@ -112,7 +112,7 @@ void stream_sender_signal_to_stop_and_wait(struct rrdhost *host, STREAM_HANDSHAK
         msg.opcode = STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT;
     else
         msg.opcode = STREAM_OPCODE_SENDER_STOP_HOST_CLEANUP;
-    stream_sender_send_msg_to_dispatcher(host->sender, msg);
+    stream_sender_send_opcode(host->sender, msg);
 
     while(wait && rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_ADDED))
         sleep_usec(10 * USEC_PER_MS);

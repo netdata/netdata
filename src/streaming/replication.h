@@ -20,7 +20,7 @@ struct replication_query_statistics replication_get_query_statistics(void);
 
 bool replicate_chart_response(RRDHOST *rh, RRDSET *rs, bool start_streaming, time_t after, time_t before);
 
-typedef ssize_t (*send_command)(const char *txt, struct parser *parser);
+typedef ssize_t (*send_command)(const char *txt, struct parser *parser, STREAM_TRAFFIC_TYPE type);
 
 bool replicate_chart_request(send_command callback, struct parser *parser,
                              RRDHOST *rh, RRDSET *rs,
