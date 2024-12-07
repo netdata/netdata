@@ -966,7 +966,7 @@ ml_host_detect_once(ml_host_t *host)
             host->mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
             host->mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
 
-            if (spinlock_trylock_cancelable(&host->type_anomaly_rate_spinlock))
+            if (spinlock_trylock(&host->type_anomaly_rate_spinlock))
             {
                 STRING *key = rs->parts.type;
                 auto &um = host->type_anomaly_rate;
@@ -982,7 +982,7 @@ ml_host_detect_once(ml_host_t *host)
 
                 it->second.anomalous_dimensions += chart_mls.num_anomalous_dimensions;
                 it->second.normal_dimensions += chart_mls.num_normal_dimensions;
-                spinlock_unlock_cancelable(&host->type_anomaly_rate_spinlock);
+                spinlock_unlock(&host->type_anomaly_rate_spinlock);
             }
         }
         rrdset_foreach_done(rsp);

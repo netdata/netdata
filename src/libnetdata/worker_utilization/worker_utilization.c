@@ -20,6 +20,15 @@ struct worker_job_type {
     NETDATA_DOUBLE custom_value;
 };
 
+struct worker_spinlock {
+    const char *function;
+    size_t locks;
+    size_t spins;
+
+    size_t statistics_last_locks;
+    size_t statistics_last_spins;
+};
+
 struct worker {
     pid_t pid;
     const char *tag;
@@ -40,6 +49,9 @@ struct worker {
 
     struct worker_job_type per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
 
+    size_t spinlocks_used;
+    struct worker_spinlock spinlocks[WORKER_SPINLOCK_CONTENTION_FUNCTIONS];
+
     struct worker *next;
     struct worker *prev;
 };
@@ -56,9 +68,9 @@ static struct workers_globals {
     Pvoid_t worknames_JudyHS;
     size_t memory;
 
-} workers_globals = {                               // workers globals, the base of all worknames
+} workers_globals = {                           // workers globals, the base of all worknames
     .enabled = false,
-    .spinlock = SPINLOCK_INITIALIZER,   // a lock for the worknames index
+    .spinlock = SPINLOCK_INITIALIZER,           // a lock for the worknames index
     .worknames_JudyHS = NULL,                   // the worknames index
 };
 
@@ -239,30 +251,61 @@ void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
     }
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+
+static inline size_t pointer_hash_function(const char *func) {
+    uintptr_t addr = (uintptr_t)func;
+    return (size_t)(((addr >> 4) | (addr >> 16)) + func[0]) % WORKER_SPINLOCK_CONTENTION_FUNCTIONS;
+}
+
+void worker_spinlock_contention(const char *func, size_t spins) {
+    if(unlikely(!worker))
+        return;
+
+    size_t hash = pointer_hash_function(func);
+    for (size_t i = 0; i < WORKER_SPINLOCK_CONTENTION_FUNCTIONS; i++) {
+        size_t slot = (hash + i) % WORKER_SPINLOCK_CONTENTION_FUNCTIONS;
+        if (worker->spinlocks[slot].function == func || worker->spinlocks[slot].function == NULL) {
+            // Either an empty slot or a matching slot
+
+            worker->spinlocks[slot].function = func;
+            worker->spinlocks[slot].locks++;
+            worker->spinlocks[slot].spins += spins;
+
+            return;
+        }
+    }
+
+    // Array is full - do nothing
+}
+
 // statistics interface
 
 void workers_foreach(const char *name, void (*callback)(
-                                               void *data
-                                               , pid_t pid
-                                               , const char *thread_tag
-                                               , size_t max_job_id
-                                               , size_t utilization_usec
-                                               , size_t duration_usec
-                                               , size_t jobs_started, size_t is_running
-                                               , STRING **job_types_names
-                                               , STRING **job_types_units
-                                               , WORKER_METRIC_TYPE *job_metric_types
-                                               , size_t *job_types_jobs_started
-                                               , usec_t *job_types_busy_time
-                                               , NETDATA_DOUBLE *job_custom_values
-                                               )
-                                               , void *data) {
+                                           void *data
+                                           , pid_t pid
+                                           , const char *thread_tag
+                                           , size_t max_job_id
+                                           , size_t utilization_usec
+                                           , size_t duration_usec
+                                           , size_t jobs_started, size_t is_running
+                                           , STRING **job_types_names
+                                           , STRING **job_types_units
+                                           , WORKER_METRIC_TYPE *job_metric_types
+                                           , size_t *job_types_jobs_started
+                                           , usec_t *job_types_busy_time
+                                           , NETDATA_DOUBLE *job_custom_values
+                                           , const char *spinlock_functions[]
+                                           , size_t *spinlock_locks
+                                           , size_t *spinlock_spins
+                                           )
+                                           , void *data) {
     if(!workers_globals.enabled)
         return;
 
     spinlock_lock(&workers_globals.spinlock);
     usec_t busy_time, delta;
-    size_t i, jobs_started, jobs_running;
+    size_t jobs_started, jobs_running;
 
     size_t workname_size = strlen(name) + 1;
     struct workers_workname *workname;
@@ -291,8 +334,12 @@ void workers_foreach(const char *name, void (*callback)(
         usec_t per_job_type_busy_time[WORKER_UTILIZATION_MAX_JOB_TYPES];
         NETDATA_DOUBLE per_job_custom_values[WORKER_UTILIZATION_MAX_JOB_TYPES];
 
+        const char *spinlock_functions[WORKER_SPINLOCK_CONTENTION_FUNCTIONS];
+        size_t spinlock_locks[WORKER_SPINLOCK_CONTENTION_FUNCTIONS];
+        size_t spinlock_spins[WORKER_SPINLOCK_CONTENTION_FUNCTIONS];
+
         size_t max_job_id = p->worker_max_job_id;
-        for(i  = 0; i <= max_job_id ;i++) {
+        for(size_t i  = 0; i <= max_job_id ;i++) {
             per_job_type_name[i] = p->per_job_type[i].name;
             per_job_type_units[i] = p->per_job_type[i].units;
             per_job_metric_type[i] = p->per_job_type[i].type;
@@ -375,6 +422,29 @@ void workers_foreach(const char *name, void (*callback)(
             jobs_running = 1;
         }
 
+        size_t t = 0;
+        for(size_t i = 0; i < WORKER_SPINLOCK_CONTENTION_FUNCTIONS ;i++) {
+            if(!p->spinlocks[i].function) continue;
+
+            spinlock_functions[t] = p->spinlocks[i].function;
+
+            size_t tmp = p->spinlocks[i].locks;
+            spinlock_locks[t] = tmp - p->spinlocks[i].statistics_last_locks;
+            p->spinlocks[i].statistics_last_locks = tmp;
+
+            tmp = p->spinlocks[i].spins;
+            spinlock_spins[t] = tmp - p->spinlocks[i].statistics_last_spins;
+            p->spinlocks[i].statistics_last_spins = tmp;
+
+            t++;
+        }
+
+        for(; t < WORKER_SPINLOCK_CONTENTION_FUNCTIONS ;t++) {
+            spinlock_functions[t] = NULL;
+            spinlock_locks[t] = 0;
+            spinlock_spins[t] = 0;
+        }
+
         callback(data
                  , p->pid
                  , p->tag
@@ -389,6 +459,9 @@ void workers_foreach(const char *name, void (*callback)(
                  , per_job_type_jobs_started
                  , per_job_type_busy_time
                  , per_job_custom_values
+                 , spinlock_functions
+                 , spinlock_locks
+                 , spinlock_spins
                  );
     }
 

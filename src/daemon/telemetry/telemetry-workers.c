@@ -5,6 +5,16 @@
 
 #define WORKERS_MIN_PERCENT_DEFAULT 10000.0
 
+struct worker_spinlocks {
+    size_t locks;
+    size_t spins;
+
+    RRDDIM *rd_locks;
+    RRDDIM *rd_spins;
+};
+
+DEFINE_JUDYL_TYPED(SPINLOCKS, struct worker_spinlocks *);
+
 struct worker_job_type_gs {
     STRING *name;
     STRING *units;
@@ -94,6 +104,10 @@ struct worker_utilization {
     RRDSET *st_workers_busy_per_job_type;
 
     RRDDIM *rd_total_cpu_utilizaton;
+
+    RRDSET *st_spinlocks_locks;
+    RRDSET *st_spinlocks_spins;
+    SPINLOCKS_JudyLSet spinlocks;
 };
 
 static struct worker_utilization all_workers_utilization[] = {
@@ -406,6 +420,85 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     }
 
     // ----------------------------------------------------------------------
+    // spinlocks
+
+    {
+        if(unlikely(!wu->st_spinlocks_locks)) {
+            char name[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(name, RRD_ID_LENGTH_MAX, "workers_spinlock_locks_%s", wu->name_lowercase);
+
+            char context[RRD_ID_LENGTH_MAX + 1];
+            snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.spinlock_locks", wu->name_lowercase);
+
+            wu->st_spinlocks_locks = rrdset_create_localhost(
+                "netdata"
+                , name
+                , NULL
+                , wu->family
+                , context
+                , "Netdata Spinlock Locks"
+                , "locks"
+                , "netdata"
+                , "stats"
+                , wu->priority + 5
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+        }
+
+        Word_t idx = 0;
+        for(struct worker_spinlocks *wusp = SPINLOCKS_FIRST(&wu->spinlocks, &idx);
+             wusp;
+             wusp = SPINLOCKS_NEXT(&wu->spinlocks, &idx)) {
+            const char *func = (const char *)idx;
+            if(!wusp->rd_locks)
+                wusp->rd_locks = rrddim_add(wu->st_spinlocks_locks, func, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrddim_set_by_pointer(wu->st_spinlocks_locks, wusp->rd_locks, (collected_number)wusp->locks);
+        }
+
+        rrdset_done(wu->st_spinlocks_locks);
+    }
+
+    {
+        if(unlikely(!wu->st_spinlocks_spins)) {
+            char name[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(name, RRD_ID_LENGTH_MAX, "workers_spinlock_spins_%s", wu->name_lowercase);
+
+            char context[RRD_ID_LENGTH_MAX + 1];
+            snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.spinlock_spins", wu->name_lowercase);
+
+            wu->st_spinlocks_spins = rrdset_create_localhost(
+                "netdata"
+                , name
+                , NULL
+                , wu->family
+                , context
+                , "Netdata Spinlock Spins"
+                , "spins"
+                , "netdata"
+                , "stats"
+                , wu->priority + 6
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+        }
+
+        Word_t idx = 0;
+        for(struct worker_spinlocks *wusp = SPINLOCKS_FIRST(&wu->spinlocks, &idx);
+             wusp;
+             wusp = SPINLOCKS_NEXT(&wu->spinlocks, &idx)) {
+            const char *func = (const char *)idx;
+            if(!wusp->rd_spins)
+                wusp->rd_spins = rrddim_add(wu->st_spinlocks_spins, func, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            rrddim_set_by_pointer(wu->st_spinlocks_spins, wusp->rd_spins, (collected_number)wusp->spins);
+        }
+
+        rrdset_done(wu->st_spinlocks_spins);
+    }
+
+    // ----------------------------------------------------------------------
     // custom metric types WORKER_METRIC_ABSOLUTE
 
     {
@@ -443,7 +536,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                     , (wu->per_job_type[i].units)?string2str(wu->per_job_type[i].units):"value"
                     , "netdata"
                     , "stats"
-                    , wu->priority + 5 + i
+                    , wu->priority + 10 + i
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
                 );
@@ -499,7 +592,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                     , (wu->per_job_type[i].units)?string2str(wu->per_job_type[i].units):"rate"
                     , "netdata"
                     , "stats"
-                    , wu->priority + 5 + i
+                    , wu->priority + 10 + i
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
                 );
@@ -519,6 +612,14 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 }
 
 static void workers_utilization_reset_statistics(struct worker_utilization *wu) {
+    Word_t idx = 0;
+    for(struct worker_spinlocks *wusp = SPINLOCKS_FIRST(&wu->spinlocks, &idx);
+         wusp;
+         wusp = SPINLOCKS_NEXT(&wu->spinlocks, &idx)) {
+        wusp->locks = 0;
+        wusp->spins = 0;
+    }
+
     wu->workers_registered = 0;
     wu->workers_busy = 0;
     wu->workers_total_busy_time = 0;
@@ -646,19 +747,22 @@ static struct worker_thread *worker_thread_find_or_create(struct worker_utilizat
 }
 
 static void worker_utilization_charts_callback(void *ptr
-                                               , pid_t pid __maybe_unused
+                                               , pid_t pid
                                                , const char *thread_tag __maybe_unused
-                                               , size_t max_job_id __maybe_unused
-                                               , size_t utilization_usec __maybe_unused
-                                               , size_t duration_usec __maybe_unused
-                                               , size_t jobs_started __maybe_unused
-                                               , size_t is_running __maybe_unused
-                                               , STRING **job_types_names __maybe_unused
-                                               , STRING **job_types_units __maybe_unused
-                                               , WORKER_METRIC_TYPE *job_types_metric_types __maybe_unused
-                                               , size_t *job_types_jobs_started __maybe_unused
-                                               , usec_t *job_types_busy_time __maybe_unused
-                                               , NETDATA_DOUBLE *job_types_custom_metrics __maybe_unused
+                                               , size_t max_job_id
+                                               , size_t utilization_usec
+                                               , size_t duration_usec
+                                               , size_t jobs_started
+                                               , size_t is_running
+                                               , STRING **job_types_names
+                                               , STRING **job_types_units
+                                               , WORKER_METRIC_TYPE *job_types_metric_types
+                                               , size_t *job_types_jobs_started
+                                               , usec_t *job_types_busy_time
+                                               , NETDATA_DOUBLE *job_types_custom_metrics
+                                               , const char *spinlock_functions[]
+                                               , size_t *spinlock_locks
+                                               , size_t *spinlock_spins
 ) {
     struct worker_utilization *wu = (struct worker_utilization *)ptr;
 
@@ -693,8 +797,7 @@ static void worker_utilization_charts_callback(void *ptr
         wu->workers_min_busy_time = util;
 
     // accumulate per job type statistics
-    size_t i;
-    for(i = 0; i <= max_job_id ;i++) {
+    for(size_t i = 0; i <= max_job_id ;i++) {
         if(!wu->per_job_type[i].name && job_types_names[i])
             wu->per_job_type[i].name = string_dup(job_types_names[i]);
 
@@ -739,6 +842,18 @@ static void worker_utilization_charts_callback(void *ptr
         if(cpu > wu->workers_cpu_max) wu->workers_cpu_max = cpu;
     }
     wu->workers_cpu_registered += (wt->cpu_enabled) ? 1 : 0;
+
+    // spinlocks
+    for(size_t i = 0; i < WORKER_SPINLOCK_CONTENTION_FUNCTIONS && spinlock_functions[i] ;i++) {
+        struct worker_spinlocks *wusp = SPINLOCKS_GET(&wu->spinlocks, (Word_t)spinlock_functions[i]);
+        if(!wusp) {
+            wusp = callocz(1, sizeof(*wusp));
+            SPINLOCKS_SET(&wu->spinlocks, (Word_t)spinlock_functions[i], wusp);
+        }
+
+        wusp->locks = spinlock_locks[i];
+        wusp->spins = spinlock_spins[i];
+    }
 }
 
 void telemetry_workers_cleanup(void) {
