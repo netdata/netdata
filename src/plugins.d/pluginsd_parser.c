@@ -784,7 +784,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
     // ------------------------------------------------------------------------
     // prepare our state
 
-    pluginsd_lock_rrdset_data_collection(parser);
+    rrdset_data_collection_lock(parser);
 
     parser->user.v2.update_every = update_every;
     parser->user.v2.end_time = end_time;
@@ -1035,7 +1035,7 @@ static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_
     // ------------------------------------------------------------------------
     // unblock data collection
 
-    pluginsd_unlock_previous_scope_chart(parser, PLUGINSD_KEYWORD_END_V2, false);
+    rrdset_previous_scope_chart_unlock(parser, PLUGINSD_KEYWORD_END_V2, false);
     rrdcontext_collected_rrdset(st);
     store_metric_collection_completed();
 
