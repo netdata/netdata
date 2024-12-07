@@ -175,15 +175,18 @@ static size_t aral_align_alloc_size(ARAL *ar, uint64_t size) {
     return size;
 }
 
-static inline void aral_lock(ARAL *ar) {
+static inline void aral_lock_with_trace(ARAL *ar, const char *func) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
-        spinlock_lock(&ar->aral_lock.spinlock);
+        spinlock_lock_with_trace(&ar->aral_lock.spinlock, func);
 }
 
-static inline void aral_unlock(ARAL *ar) {
+static inline void aral_unlock_with_trace(ARAL *ar, const char *func) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
-        spinlock_unlock(&ar->aral_lock.spinlock);
+        spinlock_unlock_with_trace(&ar->aral_lock.spinlock, func);
 }
+
+#define aral_lock(ar) aral_lock_with_trace(ar, __FUNCTION__)
+#define aral_unlock(ar) aral_unlock_with_trace(ar, __FUNCTION__)
 
 static inline void aral_page_free_lock(ARAL *ar, ARAL_PAGE *page) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
