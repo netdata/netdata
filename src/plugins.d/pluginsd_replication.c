@@ -2,6 +2,7 @@
 
 #include "pluginsd_replication.h"
 #include "streaming/stream-receiver-internals.h"
+#include "streaming/replication.h"
 
 PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;

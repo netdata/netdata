@@ -4,6 +4,7 @@
 #define REPLICATION_H
 
 #include "daemon/common.h"
+#include "stream-circular-buffer.h"
 
 struct parser;
 

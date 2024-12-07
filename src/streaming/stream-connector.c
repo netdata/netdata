@@ -624,7 +624,6 @@ void stream_connector_add(struct sender_state *s) {
     stream_sender_unlock(s);
 
     nd_sock_close(&s->sock);
-    stream_circular_buffer_set_max_size_unsafe(s->sbuf, stream_send.buffer_max_size, true);
     s->parent_using_h2o = stream_send.parents.h2o;
 
     // do not call this with any locks held

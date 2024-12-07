@@ -2,6 +2,7 @@
 
 #define TELEMETRY_INTERNALS 1
 #include "telemetry-queries.h"
+#include "streaming/replication.h"
 
 static struct query_statistics {
     uint64_t api_data_queries_made;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "pluginsd_internals.h"
+#include "streaming/replication.h"
 
 static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;

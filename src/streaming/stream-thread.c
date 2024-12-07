@@ -184,7 +184,6 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_r
     switch(m->type) {
         case POLLFD_TYPE_SENDER: {
             struct sender_state *s = m->s;
-            internal_fatal(SENDERS_GET(&sth->snd.senders, (Word_t)s) == NULL, "Sender is not found in the senders list");
             stream_sender_process_poll_events(sth, s, ev->events, now_ut);
             *replay_entries += dictionary_entries(s->replication.requests);
             break;
@@ -192,7 +191,6 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_r
 
         case POLLFD_TYPE_RECEIVER: {
             struct receiver_state *rpt = m->rpt;
-            internal_fatal(RECEIVERS_GET(&sth->rcv.receivers, (Word_t)rpt) == NULL, "Receiver is not found in the receiver list");
             stream_receive_process_poll_events(sth, rpt, ev->events, now_ut);
             break;
         }

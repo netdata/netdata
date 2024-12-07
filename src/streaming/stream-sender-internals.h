@@ -47,15 +47,6 @@ struct sender_state {
         // DO NOT READ OR WRITE ANYWHERE
         uint32_t msg_slot;      // ensures a dispatcher queue that can never get full
 
-        // statistics about our compression efficiency
-        size_t bytes_compressed;
-        size_t bytes_uncompressed;
-
-        // statistics about successful sends
-        size_t sends;
-        size_t bytes_sent;
-        size_t bytes_sent_by_type[STREAM_TRAFFIC_TYPE_MAX];
-
         usec_t last_traffic_ut;
 
         struct pollfd_meta meta;
@@ -68,7 +59,7 @@ struct sender_state {
     char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
     time_t last_state_since_t;                  // the timestamp of the last state (online/offline) change
 
-    STREAM_CIRCULAR_BUFFER *sbuf;
+    STREAM_CIRCULAR_BUFFER *scb;
 
     struct {
         char b[PLUGINSD_LINE_MAX + 1];
@@ -137,8 +128,6 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 bool stream_sender_is_host_stopped(struct sender_state *s);
 
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_opcode msg);
-
-void stream_sender_thread_data_added_data_unsafe(struct sender_state *s, STREAM_TRAFFIC_TYPE type, uint64_t bytes_compressed, uint64_t bytes_uncompressed);
 
 void stream_sender_add_to_queue(struct sender_state *s);
 

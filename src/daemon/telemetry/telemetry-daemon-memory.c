@@ -2,6 +2,7 @@
 
 #define TELEMETRY_INTERNALS 1
 #include "telemetry-daemon-memory.h"
+#include "streaming/replication.h"
 
 #define dictionary_stats_memory_total(stats) \
     ((stats).memory.dict + (stats).memory.values + (stats).memory.index)

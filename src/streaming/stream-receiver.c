@@ -418,6 +418,9 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
 
 // process poll() events for streaming receivers
 void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events __maybe_unused, usec_t now_ut) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+    internal_fatal(RECEIVERS_GET(&sth->rcv.receivers, (Word_t)rpt) == NULL, "Receiver is not found in the receiver list");
+
         PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),

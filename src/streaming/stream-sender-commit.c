@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "stream-thread.h"
+#include "replication.h"
 
 static __thread struct sender_buffer commit___thread = { 0 };
 
@@ -65,15 +66,12 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     if (unlikely(!src || !src_len))
         return;
 
-    size_t total_uncompressed_len = src_len;
-    size_t total_compressed_len = 0;
-
     stream_sender_lock(s);
 
     // copy the sequence number of sender buffer recreates, while having our lock
-    STREAM_CIRCULAR_BUFFER_STATS stats = stream_circular_buffer_stats_unsafe(s->sbuf);
+    STREAM_CIRCULAR_BUFFER_STATS *stats = stream_circular_buffer_stats_unsafe(s->scb);
     if(commit)
-        commit->sender_recreates = stats.recreates;
+        commit->sender_recreates = stats->recreates;
 
     if (!s->thread.msg.session) {
         // the dispatcher is not there anymore - ignore these data
@@ -83,17 +81,16 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
         return;
     }
 
-    if (unlikely(stream_circular_buffer_set_max_size_unsafe(s->sbuf, src_len, false))) {
-        // adaptive sizing of the circular buffer is needed to get this.
+    if (unlikely(stream_circular_buffer_set_max_size_unsafe(s->scb, src_len, false))) {
+        // adaptive sizing of the circular buffer
 
         nd_log(
             NDLS_DAEMON,
             NDLP_NOTICE,
-            "STREAM %s [send to %s]: max buffer size of %zu is too small "
-            "for a data message of size %zu. Increased the max buffer size.",
+            "STREAM SEND %s [to %s]: Increased max buffer size to %u (message size %zu).",
             rrdhost_hostname(s->host),
             s->connected_to,
-            stream_circular_buffer_get_max_size_unsafe(s->sbuf),
+            stats->bytes_max_size,
             buffer_strlen(wb) + 1);
     }
 
@@ -171,10 +168,8 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
                     size_to_compress, dst_len, decoded_dst_len);
 #endif
 
-            total_compressed_len += dst_len + sizeof(signature);
-
-            if (!stream_circular_buffer_add_unsafe(s->sbuf, (const char *)&signature, sizeof(signature), sizeof(signature)) ||
-                !stream_circular_buffer_add_unsafe(s->sbuf, dst, dst_len, size_to_compress))
+            if (!stream_circular_buffer_add_unsafe(s->scb, (const char *)&signature, sizeof(signature), sizeof(signature), type) ||
+                !stream_circular_buffer_add_unsafe(s->scb, dst, dst_len, size_to_compress, type))
                 goto overflow_with_lock;
 
             src = src + size_to_compress;
@@ -184,16 +179,12 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     else {
         // uncompressed traffic
 
-        total_compressed_len = src_len;
-
-        if (!stream_circular_buffer_add_unsafe(s->sbuf, src, src_len, src_len))
+        if (!stream_circular_buffer_add_unsafe(s->scb, src, src_len, src_len, type))
             goto overflow_with_lock;
     }
 
-    // update s->dispatcher entries
-    stats = stream_circular_buffer_stats_unsafe(s->sbuf);;
-    bool enable_sending = stats.bytes_outstanding == 0;
-    stream_sender_thread_data_added_data_unsafe(s, type, total_compressed_len, total_uncompressed_len);
+    bool enable_sending = stats->bytes_outstanding == 0;
+    replication_recalculate_buffer_used_ratio_unsafe(s);
 
     if (enable_sending)
         msg = s->thread.msg;
@@ -208,16 +199,15 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     return;
 
 overflow_with_lock: {
-        stats = stream_circular_buffer_stats_unsafe(s->sbuf);;
         msg = s->thread.msg;
         stream_sender_unlock(s);
         msg.opcode = STREAM_OPCODE_SENDER_BUFFER_OVERFLOW;
         stream_sender_send_msg_to_dispatcher(s, msg);
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM %s [send to %s]: buffer overflow while adding %zu bytes (buffer size %zu, max size %zu, used %zu, available %zu). "
+               "STREAM %s [send to %s]: buffer overflow (buffer size %u, max size %u, used %u, available %u). "
                "Restarting connection.",
                rrdhost_hostname(s->host), s->connected_to,
-               total_compressed_len, stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
+               stats->bytes_size, stats->bytes_max_size, stats->bytes_outstanding, stats->bytes_available);
         return;
     }
 
