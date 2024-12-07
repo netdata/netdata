@@ -590,6 +590,8 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
         }
 
         if(events & ND_POLL_WRITE) {
+            worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
+
             spinlock_lock(&rpt->thread.send_to_child.spinlock);
             char *chunk;
             STREAM_CIRCULAR_BUFFER *scb = rpt->thread.send_to_child.scb;
