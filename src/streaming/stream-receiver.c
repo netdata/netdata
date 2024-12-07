@@ -65,7 +65,7 @@ static inline ssize_t write_stream(struct receiver_state *r, char* buffer, size_
     }
 #endif
 
-    ssize_t bytes_written = nd_sock_write(&r->sock, buffer, size, 0);
+    ssize_t bytes_written = nd_sock_send_nowait(&r->sock, buffer, size);
     if(bytes_written <= 0) {
         if (bytes_written == 0)
             netdata_log_error("STREAM: %s(): EOF while writing data to socket!", __FUNCTION__);
@@ -93,7 +93,7 @@ static inline ssize_t read_stream(struct receiver_state *r, char* buffer, size_t
     }
 #endif
 
-    ssize_t bytes_read = nd_sock_read(&r->sock, buffer, size, 0);
+    ssize_t bytes_read = nd_sock_revc_nowait(&r->sock, buffer, size);
     if(bytes_read <= 0) {
         if (bytes_read == 0)
             netdata_log_error("STREAM: %s(): EOF while reading data from socket!", __FUNCTION__);
