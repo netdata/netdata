@@ -240,10 +240,25 @@ static void streaming_parser_init(struct receiver_state *rpt) {
     };
 
     // put the client IP and port into the buffers used by plugins.d
-    snprintfz(rpt->thread.cd.id,           CONFIG_MAX_NAME,  "%s:%s", rpt->client_ip, rpt->client_port);
-    snprintfz(rpt->thread.cd.filename,     FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
-    snprintfz(rpt->thread.cd.fullfilename, FILENAME_MAX,     "%s:%s", rpt->client_ip, rpt->client_port);
-    snprintfz(rpt->thread.cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", rpt->client_ip, rpt->client_port);
+    {
+        char buf[CONFIG_MAX_NAME];
+        snprintfz(buf, sizeof(buf),  "%s:%s", rpt->client_ip, rpt->client_port);
+        string_freez(rpt->thread.cd.id);
+        rpt->thread.cd.id = string_strdupz(buf);
+    }
+
+    {
+        char buf[FILENAME_MAX + 1];
+        snprintfz(buf, sizeof(buf), "%s:%s", rpt->client_ip, rpt->client_port);
+        string_freez(rpt->thread.cd.filename);
+        rpt->thread.cd.filename = string_strdupz(buf);
+
+        string_freez(rpt->thread.cd.fullfilename);
+        rpt->thread.cd.fullfilename = string_strdupz(buf);
+
+        string_freez(rpt->thread.cd.cmd);
+        rpt->thread.cd.cmd = string_strdupz(buf);
+    }
 
     PARSER *parser = NULL;
     {

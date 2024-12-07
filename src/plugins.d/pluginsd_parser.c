@@ -328,7 +328,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
 
     st = rrdset_create(
         host, type, id, name, family, context, title, units,
-        (plugin && *plugin) ? plugin : parser->user.cd->filename,
+        (plugin && *plugin) ? plugin : string2str(parser->user.cd->filename),
         module, priority, update_every,
         chart_type);
 
