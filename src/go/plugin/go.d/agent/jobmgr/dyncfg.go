@@ -15,6 +15,7 @@ import (
 	"unicode"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 
@@ -73,20 +74,27 @@ func dyncfgJobCmds(cfg confgroup.Config) string {
 }
 
 func (m *Manager) dyncfgModuleCreate(name string) {
-	id := dyncfgModID(name)
-	path := dyncfgPath
-	cmds := dyncfgModCmds()
-	typ := "template"
-	src := "internal"
-	m.api.CONFIGCREATE(id, dyncfgAccepted.String(), typ, path, src, src, cmds)
+	m.api.CONFIGCREATE(netdataapi.ConfigOpts{
+		ID:                dyncfgModID(name),
+		Status:            dyncfgAccepted.String(),
+		ConfigType:        "template",
+		Path:              dyncfgPath,
+		SourceType:        "internal",
+		Source:            "internal",
+		SupportedCommands: dyncfgModCmds(),
+	})
 }
 
 func (m *Manager) dyncfgJobCreate(cfg confgroup.Config, status dyncfgStatus) {
-	id := dyncfgJobID(cfg)
-	path := dyncfgPath
-	cmds := dyncfgJobCmds(cfg)
-	typ := "job"
-	m.api.CONFIGCREATE(id, status.String(), typ, path, cfg.SourceType(), cfg.Source(), cmds)
+	m.api.CONFIGCREATE(netdataapi.ConfigOpts{
+		ID:                dyncfgJobID(cfg),
+		Status:            status.String(),
+		ConfigType:        "job",
+		Path:              dyncfgPath,
+		SourceType:        cfg.SourceType(),
+		Source:            cfg.Source(),
+		SupportedCommands: dyncfgJobCmds(cfg),
+	})
 }
 
 func (m *Manager) dyncfgJobRemove(cfg confgroup.Config) {
@@ -735,8 +743,13 @@ func (m *Manager) dyncfgRespPayloadYAML(fn functions.Function, payload string) {
 }
 
 func (m *Manager) dyncfgRespPayload(fn functions.Function, payload string, contentType string) {
-	ts := strconv.FormatInt(time.Now().Unix(), 10)
-	m.api.FUNCRESULT(fn.UID, contentType, payload, "200", ts)
+	m.api.FUNCRESULT(netdataapi.FunctionResult{
+		UID:             fn.UID,
+		ContentType:     contentType,
+		Payload:         payload,
+		Code:            "200",
+		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
+	})
 }
 
 func (m *Manager) dyncfgRespf(fn functions.Function, code int, msgf string, a ...any) {
@@ -750,8 +763,13 @@ func (m *Manager) dyncfgRespf(fn functions.Function, code int, msgf string, a ..
 		Status:  code,
 		Message: fmt.Sprintf(msgf, a...),
 	})
-	ts := strconv.FormatInt(time.Now().Unix(), 10)
-	m.api.FUNCRESULT(fn.UID, "application/json", string(bs), strconv.Itoa(code), ts)
+	m.api.FUNCRESULT(netdataapi.FunctionResult{
+		UID:             fn.UID,
+		ContentType:     "application/json",
+		Payload:         string(bs),
+		Code:            strconv.Itoa(code),
+		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
+	})
 }
 
 func userConfigFromPayload(cfg any, jobName string, fn functions.Function) ([]byte, error) {

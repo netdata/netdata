@@ -6,9 +6,17 @@
 
 **Merged pull requests:**
 
+- chore\(go.d.plugin\): simplify netdataapi pkg [\#19145](https://github.com/netdata/netdata/pull/19145) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d.plugin\): improve function parser [\#19143](https://github.com/netdata/netdata/pull/19143) ([ilyam8](https://github.com/ilyam8))
+- docs: fix a typo in aclk readme [\#19141](https://github.com/netdata/netdata/pull/19141) ([ilyam8](https://github.com/ilyam8))
+- docs: Plans and ACLK docs edits [\#19140](https://github.com/netdata/netdata/pull/19140) ([Ancairon](https://github.com/Ancairon))
+- docs: Edits in the main Netdata Cloud readme [\#19139](https://github.com/netdata/netdata/pull/19139) ([Ancairon](https://github.com/Ancairon))
+- ci: fix build/create release [\#19138](https://github.com/netdata/netdata/pull/19138) ([ilyam8](https://github.com/ilyam8))
+- fixed bug in streaming sender read [\#19136](https://github.com/netdata/netdata/pull/19136) ([ktsaou](https://github.com/ktsaou))
 - minor beatification of log messages [\#19135](https://github.com/netdata/netdata/pull/19135) ([ktsaou](https://github.com/ktsaou))
 - docs: restructure readme intro for better readability [\#19134](https://github.com/netdata/netdata/pull/19134) ([ilyam8](https://github.com/ilyam8))
 - ci: fix build/Prepare Artifacts [\#19133](https://github.com/netdata/netdata/pull/19133) ([ilyam8](https://github.com/ilyam8))
+- Modify Claim Screen \(Windows Installer\) [\#19132](https://github.com/netdata/netdata/pull/19132) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations docs [\#19131](https://github.com/netdata/netdata/pull/19131) ([netdatabot](https://github.com/netdatabot))
 - chore\(windows/hyperv\): small Hyper-V fixes [\#19130](https://github.com/netdata/netdata/pull/19130) ([ilyam8](https://github.com/ilyam8))
 - docs\(windows/hyperv\): add Hyper-V metadata [\#19129](https://github.com/netdata/netdata/pull/19129) ([ilyam8](https://github.com/ilyam8))
@@ -438,13 +446,6 @@
 - apps.plugin for windows [\#18594](https://github.com/netdata/netdata/pull/18594) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#18592](https://github.com/netdata/netdata/pull/18592) ([netdatabot](https://github.com/netdatabot))
 - Add MSSQL metrics \(Part I\). [\#18591](https://github.com/netdata/netdata/pull/18591) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add DLLs to CmakeLists.txt [\#18590](https://github.com/netdata/netdata/pull/18590) ([thiagoftsm](https://github.com/thiagoftsm))
-- Bump go.mongodb.org/mongo-driver from 1.16.1 to 1.17.0 in /src/go [\#18589](https://github.com/netdata/netdata/pull/18589) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/docker/docker from 27.2.1+incompatible to 27.3.0+incompatible in /src/go [\#18588](https://github.com/netdata/netdata/pull/18588) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Update kickstart.sh [\#18587](https://github.com/netdata/netdata/pull/18587) ([eya46](https://github.com/eya46))
-- Remove python ceph collector implementation [\#18584](https://github.com/netdata/netdata/pull/18584) ([Ancairon](https://github.com/Ancairon))
-- Add ceph commands to ndsudo [\#18583](https://github.com/netdata/netdata/pull/18583) ([Ancairon](https://github.com/Ancairon))
-- Port Ceph collector to Go [\#18582](https://github.com/netdata/netdata/pull/18582) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

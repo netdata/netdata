@@ -114,6 +114,12 @@ func (m *Manager) respf(fn *Function, code int, msgf string, a ...any) {
 		Status:  code,
 		Message: fmt.Sprintf(msgf, a...),
 	})
-	ts := strconv.FormatInt(time.Now().Unix(), 10)
-	m.api.FUNCRESULT(fn.UID, "application/json", string(bs), strconv.Itoa(code), ts)
+
+	m.api.FUNCRESULT(netdataapi.FunctionResult{
+		UID:             fn.UID,
+		ContentType:     "application/json",
+		Payload:         string(bs),
+		Code:            strconv.Itoa(code),
+		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
+	})
 }
