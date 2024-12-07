@@ -28,7 +28,7 @@ struct stream_opcode {
     int32_t thread_slot;                // the dispatcher id this message refers to
     uint32_t session;                   // random number used to verify that the message the dispatcher receives is for this sender
     STREAM_OPCODE opcode;               // the actual message to be delivered
-    struct sender_state *sender;
+    struct pollfd_meta *meta;
 };
 
 // IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
@@ -106,6 +106,7 @@ struct pollfd_meta {
 
 DEFINE_JUDYL_TYPED(SENDERS, struct sender_state *);
 DEFINE_JUDYL_TYPED(RECEIVERS, struct receiver_state *);
+DEFINE_JUDYL_TYPED(META, struct pollfd_meta *);
 
 struct stream_thread {
     ND_THREAD *thread;
@@ -115,13 +116,11 @@ struct stream_thread {
     size_t nodes_count;
 
     struct {
-        SENDERS_JudyLSet senders;
         size_t bytes_received;
         size_t bytes_sent;
     } snd;
 
     struct {
-        RECEIVERS_JudyLSet receivers;
         size_t bytes_received;
         size_t bytes_received_uncompressed;
         NETDATA_DOUBLE replication_completion;
@@ -156,6 +155,7 @@ struct stream_thread {
     struct {
         nd_poll_t *ndpl;
         struct pollfd_meta pipe;
+        META_JudyLSet meta;
     } run;
 };
 

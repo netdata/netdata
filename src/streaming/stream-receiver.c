@@ -337,14 +337,15 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
                "STREAM RECEIVE[%zu] [%s]: moving host from receiver queue to receiver running...",
                sth->id, rrdhost_hostname(rpt->host));
 
-        internal_fatal(RECEIVERS_GET(&sth->rcv.receivers, (Word_t)rpt) != NULL, "Receiver to be added is already in the list of receivers");
-        RECEIVERS_SET(&sth->rcv.receivers, (Word_t)rpt, rpt);
-
         streaming_parser_init(rpt);
 
         rpt->host->stream.rcv.status.tid = gettid_cached();
         rpt->thread.meta.type = POLLFD_TYPE_RECEIVER;
         rpt->thread.meta.rpt = rpt;
+
+        internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) != NULL, "Receiver to be added is already in the list of receivers");
+        META_SET(&sth->run.meta, (Word_t)&rpt->thread.meta, &rpt->thread.meta);
+
         if(!nd_poll_add(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
             internal_fatal(true, "Failed to add receiver socket to nd_poll()");
     }
@@ -403,8 +404,9 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
            , rpt->client_port ? rpt->client_port : "-"
            , why ? why : "");
 
-    internal_fatal(RECEIVERS_GET(&sth->rcv.receivers, (Word_t)rpt) == NULL, "Receiver to be removed is not found in the list of receivers");
-    RECEIVERS_DEL(&sth->rcv.receivers, (Word_t)rpt);
+    internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) == NULL, "Receiver to be removed is not found in the list of receivers");
+    META_DEL(&sth->run.meta, (Word_t)&rpt->thread.meta);
+
     if(!nd_poll_del(sth->run.ndpl, rpt->sock.fd))
         internal_fatal(true, "Failed to remove receiver socket from nd_poll()");
 
@@ -419,7 +421,6 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
 // process poll() events for streaming receivers
 void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events __maybe_unused, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-    internal_fatal(RECEIVERS_GET(&sth->rcv.receivers, (Word_t)rpt) == NULL, "Receiver is not found in the receiver list");
 
         PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
         ND_LOG_STACK lgs[] = {
@@ -541,12 +542,13 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
 void stream_receiver_cleanup(struct stream_thread *sth) {
     Word_t idx = 0;
-    for(struct receiver_state *rpt = RECEIVERS_FIRST(&sth->rcv.receivers, &idx);
-         rpt;
-         rpt = RECEIVERS_NEXT(&sth->rcv.receivers, &idx))
+    for(struct pollfd_meta *m = META_FIRST(&sth->run.meta, &idx);
+         m;
+         m = META_NEXT(&sth->run.meta, &idx)) {
+        if (m->type != POLLFD_TYPE_RECEIVER) continue;
+        struct receiver_state *rpt = m->rpt;
         stream_receiver_remove(sth, rpt, "shutdown");
-
-    RECEIVERS_FREE(&sth->rcv.receivers, NULL);
+    }
 }
 
 static void stream_receiver_replication_reset(RRDHOST *host) {

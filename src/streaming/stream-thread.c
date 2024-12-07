@@ -16,20 +16,23 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
 
     sth->messages.processed++;
 
-    struct sender_state *s = msg->sender ? SENDERS_GET(&sth->snd.senders, (Word_t)msg->sender) : NULL;
-
-    if (msg->session &&                         // there is a session
-        s &&                                    // there is a sender
-        (size_t)msg->thread_slot == sth->id)    // same thread
+    struct pollfd_meta *m = META_GET(&sth->run.meta, (Word_t)msg->meta);
+    if (m &&                                                                    // there is a meta
+        m == msg->meta &&                                                       // the meta are equal
+        msg->session &&                                                         // there is a session
+        (size_t)msg->thread_slot == sth->id &&                                  // the right thread
+        (m->type == POLLFD_TYPE_SENDER || m->type == POLLFD_TYPE_RECEIVER) &&   // it is either sender or receiver
+        ((m->type == POLLFD_TYPE_SENDER && m == &m->s->thread.meta) ||          // sender matches
+         (m->type == POLLFD_TYPE_RECEIVER && m == &m->rpt->thread.meta)))       // receiver matches
     {
         if(msg->opcode & STREAM_OPCODE_SENDER_POLLOUT) {
-            if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ|ND_POLL_WRITE, &s->thread.meta))
+            if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, ND_POLL_READ|ND_POLL_WRITE, &m->s->thread.meta))
                 internal_fatal(true, "Failed to update sender socket in nd_poll()");
             msg->opcode &= ~(STREAM_OPCODE_SENDER_POLLOUT);
         }
 
-        if(msg->opcode)
-            stream_sender_handle_op(sth, s, msg);
+        if(m->type == POLLFD_TYPE_SENDER && msg->opcode)
+            stream_sender_handle_op(sth, m->s, msg);
     }
     else {
         // this may happen if we receive a POLLOUT opcode, but the sender has been disconnected
@@ -38,10 +41,10 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
 }
 
 void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_opcode msg) {
-    if (!msg.session || !msg.sender || !s)
+    if (!msg.session || !msg.meta || !s)
         return;
 
-    internal_fatal(msg.sender != s, "the sender pointer in the message does not match this sender");
+    internal_fatal(msg.meta != &s->thread.meta, "the sender pointer in the message does not match this sender");
 
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
     if(!sth) {
@@ -66,7 +69,7 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_
     spinlock_lock(&sth->messages.spinlock);
     {
         sth->messages.added++;
-        if (s->thread.msg_slot >= sth->messages.used || sth->messages.array[s->thread.msg_slot].sender != s) {
+        if (s->thread.msg_slot >= sth->messages.used || sth->messages.array[s->thread.msg_slot].meta != &s->thread.meta) {
             if (unlikely(sth->messages.used >= sth->messages.size)) {
                 // this should never happen, but let's find the root cause
 
@@ -78,7 +81,7 @@ void stream_sender_send_msg_to_dispatcher(struct sender_state *s, struct stream_
 
                 // try to find us in the list
                 for (size_t i = 0; i < sth->messages.size; i++) {
-                    if (sth->messages.array[i].sender == s) {
+                    if (sth->messages.array[i].meta == &s->thread.meta) {
                         s->thread.msg_slot = i;
                         sth->messages.array[s->thread.msg_slot].opcode |= msg.opcode;
                         spinlock_unlock(&sth->messages.spinlock);
@@ -326,6 +329,8 @@ void *stream_thread(void *ptr) {
     if(!sth->run.ndpl)
         fatal("Cannot create nd_poll()");
 
+    META_SET(&sth->run.meta, (Word_t)&sth->run.pipe, &sth->run.pipe);
+
     if(!nd_poll_add(sth->run.ndpl, sth->pipe.fds[PIPE_READ], ND_POLL_READ, &sth->run.pipe))
         internal_fatal(true, "Failed to add pipe to nd_poll()");
 
@@ -391,6 +396,11 @@ void *stream_thread(void *ptr) {
         if(nd_thread_signaled_to_cancel() || !service_running(SERVICE_STREAMING))
             break;
 
+        // nd_poll() may have received events for a socket we have already removed
+        // so, if we don't find it in our meta index, do not access it - it has been removed
+        if(META_GET(&sth->run.meta, (Word_t)ev.data) != ev.data)
+            continue;
+
         now_ut = now_monotonic_usec();
         exit_thread = stream_thread_process_poll_slot(sth, &ev, now_ut, &replay_entries);
     }
@@ -404,6 +414,7 @@ void *stream_thread(void *ptr) {
     // cleanup receiver and dispatcher
     stream_sender_cleanup(sth);
     stream_receiver_cleanup(sth);
+    META_FREE(&sth->run.meta, NULL);
 
     // cleanup the thread structures
     spinlock_lock(&sth->messages.spinlock);

@@ -213,19 +213,13 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
                "STREAM SEND[%zu] [%s]: moving host from dispatcher queue to dispatcher running...",
                sth->id, rrdhost_hostname(s->host));
 
-        internal_fatal(SENDERS_GET(&sth->snd.senders, (Word_t)s) != NULL, "Sender already exists in senders list");
-        SENDERS_SET(&sth->snd.senders, (Word_t)s, s);
-        internal_fatal(SENDERS_GET(&sth->snd.senders, (Word_t)s) == NULL, "Cannot add sender in senders list");
-
         stream_sender_lock(s);
         s->thread.meta.type = POLLFD_TYPE_SENDER;
         s->thread.meta.s = s;
-        if(!nd_poll_add(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
-            internal_fatal(true, "Failed to add sender socket to nd_poll()");
 
         s->thread.msg.thread_slot = (int32_t)sth->id;
         s->thread.msg.session = os_random32();
-        s->thread.msg.sender = s;
+        s->thread.msg.meta = &s->thread.meta;
 
         s->host->stream.snd.status.tid = gettid_cached();
         s->host->stream.snd.status.connections++;
@@ -234,6 +228,12 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         stream_circular_buffer_flush_unsafe(s->scb, stream_send.buffer_max_size);
         replication_recalculate_buffer_used_ratio_unsafe(s);
         stream_sender_unlock(s);
+
+        internal_fatal(META_GET(&sth->run.meta, (Word_t)&s->thread.meta) != NULL, "Sender already exists in meta list");
+        META_SET(&sth->run.meta, (Word_t)&s->thread.meta, &s->thread.meta);
+
+        if(!nd_poll_add(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
+            internal_fatal(true, "Failed to add sender socket to nd_poll()");
 
         stream_sender_on_ready_to_dispatch(s);
     }
@@ -273,8 +273,9 @@ void stream_sender_remove(struct sender_state *s) {
 static void stream_sender_move_running_to_connector_or_remove(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, bool reconnect) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
-    internal_fatal(SENDERS_GET(&sth->snd.senders, (Word_t)s) == NULL, "Sender to be removed is not in the list of senders");
-    SENDERS_DEL(&sth->snd.senders, (Word_t)s);
+    internal_fatal(META_GET(&sth->run.meta, (Word_t)&s->thread.meta) == NULL, "Sender to be removed is not in the list of senders");
+    META_DEL(&sth->run.meta, (Word_t)&s->thread.meta);
+
     if(!nd_poll_del(sth->run.ndpl, s->sock.fd))
         internal_fatal(true, "Failed to remove sender socket from nd_poll()");
 
@@ -285,7 +286,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     stream_sender_lock(s);
 
     s->thread.msg.session = 0;
-    s->thread.msg.sender = NULL;
+    s->thread.msg.meta = NULL;
 
     s->host->stream.snd.status.tid = 0;
     stream_sender_unlock(s);
@@ -317,9 +318,11 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
     NETDATA_DOUBLE overall_buffer_ratio = 0.0;
 
     Word_t idx = 0;
-    for(struct sender_state *s = SENDERS_FIRST(&sth->snd.senders, &idx);
-         s;
-         s = SENDERS_NEXT(&sth->snd.senders, &idx)) {
+    for(struct pollfd_meta *m = META_FIRST(&sth->run.meta, &idx);
+         m;
+         m = META_NEXT(&sth->run.meta, &idx)) {
+        if(m->type != POLLFD_TYPE_SENDER) continue;
+        struct sender_state *s = m->s;
 
         stream_sender_lock(s);
         // copy the statistics
@@ -385,7 +388,6 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
 
 void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t events, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-    internal_fatal(SENDERS_GET(&sth->snd.senders, (Word_t)s) == NULL, "Sender is not found in the senders list");
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
@@ -512,9 +514,11 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
 void stream_sender_cleanup(struct stream_thread *sth) {
     // stop all hosts
     Word_t idx = 0;
-    for(struct sender_state *s = SENDERS_FIRST(&sth->snd.senders, &idx);
-         s;
-         s = SENDERS_NEXT(&sth->snd.senders, &idx)) {
+    for(struct pollfd_meta *m = META_FIRST(&sth->run.meta, &idx);
+         m;
+         m = META_NEXT(&sth->run.meta, &idx)) {
+        if(m->type != POLLFD_TYPE_SENDER) continue;
+        struct sender_state *s = m->s;
 
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
@@ -529,8 +533,4 @@ void stream_sender_cleanup(struct stream_thread *sth) {
 
         stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
     }
-
-    // cleanup
-    SENDERS_FREE(&sth->snd.senders, NULL);
 }
-
