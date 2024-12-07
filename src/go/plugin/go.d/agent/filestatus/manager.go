@@ -87,12 +87,5 @@ func (m *Manager) flush() {
 	if err != nil {
 		return
 	}
-
-	f, err := os.Create(m.path)
-	if err != nil {
-		return
-	}
-	defer func() { _ = f.Close() }()
-
-	_, _ = f.Write(bs)
+	_ = os.WriteFile(m.path, bs, 0644)
 }

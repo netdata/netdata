@@ -12,6 +12,7 @@ import (
 type FileLocker interface {
 	Lock(name string) (bool, error)
 	Unlock(name string)
+	UnlockAll()
 }
 
 type FileStatus interface {

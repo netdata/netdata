@@ -257,6 +257,7 @@ func (m *Manager) stopRunningJob(name string) {
 }
 
 func (m *Manager) cleanup() {
+	m.FileLock.UnlockAll()
 	m.FnReg.Unregister("config")
 
 	m.runningJobs.lock()
