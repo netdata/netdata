@@ -63,6 +63,8 @@
 #define PLUGINSD_CALL_FUNCTION_CANCEL           "FUNCTION_CANCEL"           // cancel a running function transaction
 #define PLUGINSD_CALL_FUNCTION_PROGRESS         "FUNCTION_PROGRESS"         // let the function know the user is waiting
 
+#define PLUGINSD_CALL_QUIT                      "QUIT"                      // ask the plugin to quit
+
 // dyncfg
 // enabled with STREAM_CAP_DYNCFG
 #define PLUGINSD_KEYWORD_CONFIG                 "CONFIG"

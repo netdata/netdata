@@ -312,17 +312,24 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
             else
                 nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received PROGRESS for transaction '%s', but it not available here", transaction);
         }
+        else if(keyword && strcmp(keyword, PLUGINSD_CALL_QUIT) == 0) {
+            *wg->plugin_should_exit = true;
+            break;
+        }
         else
             nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received unknown command: %s", keyword ? keyword : "(unset)");
 
         buffer_flush(buffer);
     }
 
-    if(!(*wg->plugin_should_exit))
+    int status = 0;
+    if(!(*wg->plugin_should_exit)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Read error on stdin");
+        status = 1;
+    }
 
     *wg->plugin_should_exit = true;
-    exit(1);
+    exit(status);
 }
 
 void worker_queue_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {

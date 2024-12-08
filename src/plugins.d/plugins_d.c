@@ -76,7 +76,7 @@ static void pluginsd_worker_thread_cleanup(void *pptr) {
     spinlock_unlock(&cd->unsafe.spinlock);
 
     if (pi)
-        spawn_popen_kill(pi);
+        spawn_popen_kill(pi, 3 * MSEC_PER_SEC);
 }
 
 #define SERIAL_FAILURES_THRESHOLD 10
@@ -190,7 +190,7 @@ static void *pluginsd_worker_thread(void *arg) {
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections.",
                rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, count);
 
-        int worker_ret_code = spawn_popen_kill(cd->unsafe.pi);
+        int worker_ret_code = spawn_popen_kill(cd->unsafe.pi, 3 * MSEC_PER_SEC);
         cd->unsafe.pi = NULL;
 
         if(likely(worker_ret_code == 0))

@@ -393,22 +393,20 @@ int map_status_code_to_signal(DWORD status_code) {
     }
 }
 
-int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
-    if(si->child_pid != -1 && kill(si->child_pid, SIGTERM) != 0)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be killed",
-               si->request_id, (int)si->child_pid, si->dwProcessId);
-
+int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms __maybe_unused) {
     // this gives some warnings at the spawn-tester, but it is generally better
     // to have them, to avoid abnormal shutdown of the plugins
     if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
-    if(si->stderr_fd != -1) {
-        if(!log_forwarder_del_and_close_fd(server->log_forwarder, si->stderr_fd))
-            close(si->stderr_fd);
 
-        si->stderr_fd = -1;
-    }
+    if(timeout_ms > 0)
+        WaitForSingleObject(si->process_handle, timeout_ms);
+
+    errno_clear();
+    if(si->child_pid != -1 && kill(si->child_pid, SIGTERM) != 0)
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be killed",
+               si->request_id, (int)si->child_pid, si->dwProcessId);
 
     errno_clear();
     if(TerminateProcess(si->process_handle, STATUS_CONTROL_C_EXIT) == 0)
@@ -419,18 +417,19 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     errno_clear();
     TerminateChildProcesses(si);
 
-    return spawn_server_exec_wait(server, si);
-}
-
-int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
-    if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
-    if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
     if(si->stderr_fd != -1) {
         if(!log_forwarder_del_and_close_fd(server->log_forwarder, si->stderr_fd))
             close(si->stderr_fd);
 
         si->stderr_fd = -1;
     }
+
+    return spawn_server_exec_wait(server, si);
+}
+
+int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
+    if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
+    if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
 
     // wait for the process to end
     WaitForSingleObject(si->process_handle, INFINITE);
@@ -448,6 +447,13 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 
     if(err)
         LocalFree(err);
+
+    if(si->stderr_fd != -1) {
+        if(!log_forwarder_del_and_close_fd(server->log_forwarder, si->stderr_fd))
+            close(si->stderr_fd);
+
+        si->stderr_fd = -1;
+    }
 
     freez(si);
     return map_status_code_to_signal(exit_code);

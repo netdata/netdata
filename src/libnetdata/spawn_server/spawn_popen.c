@@ -180,11 +180,11 @@ int spawn_popen_wait(POPEN_INSTANCE *pi) {
     return spawn_popen_status_rc(status);
 }
 
-int spawn_popen_kill(POPEN_INSTANCE *pi) {
+int spawn_popen_kill(POPEN_INSTANCE *pi, int timeout_ms) {
     if(!pi) return -1;
 
     spawn_popen_close_files(pi);
-    int status = spawn_server_exec_kill(netdata_main_spawn_server, pi->si);
+    int status = spawn_server_exec_kill(netdata_main_spawn_server, pi->si, timeout_ms);
     freez(pi);
     return spawn_popen_status_rc(status);
 }

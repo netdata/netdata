@@ -208,7 +208,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     return si;
 }
 
-int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si) {
+int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms __maybe_unused) {
     if (!si) return -1;
 
     if (kill(si->child_pid, SIGTERM))
