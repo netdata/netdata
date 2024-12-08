@@ -422,7 +422,7 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
         META_SET(&sth->run.meta, (Word_t)&rpt->thread.meta, &rpt->thread.meta);
 
         if(!nd_poll_add(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
-            internal_fatal(true, "Failed to add receiver socket to nd_poll()");
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to add receiver socket to nd_poll()");
 
         // keep this last, since it sends commands back to the child
         streaming_parser_init(rpt);
@@ -486,7 +486,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
     META_DEL(&sth->run.meta, (Word_t)&rpt->thread.meta);
 
     if(!nd_poll_del(sth->run.ndpl, rpt->sock.fd))
-        internal_fatal(true, "Failed to remove receiver socket from nd_poll()");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to delete receiver socket from nd_poll()");
 
     rpt->host->stream.rcv.status.tid = 0;
 

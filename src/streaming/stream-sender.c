@@ -233,7 +233,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         META_SET(&sth->run.meta, (Word_t)&s->thread.meta, &s->thread.meta);
 
         if(!nd_poll_add(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
-            internal_fatal(true, "Failed to add sender socket to nd_poll()");
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to add sender socket to nd_poll()");
 
         stream_sender_on_ready_to_dispatch(s);
     }
@@ -277,7 +277,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     META_DEL(&sth->run.meta, (Word_t)&s->thread.meta);
 
     if(!nd_poll_del(sth->run.ndpl, s->sock.fd))
-        internal_fatal(true, "Failed to remove sender socket from nd_poll()");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to delete sender socket from nd_poll()");
 
     // clear this flag asap, to stop other threads from pushing metrics for this node
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED | RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);

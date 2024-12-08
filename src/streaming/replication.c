@@ -769,7 +769,7 @@ static void replicate_log_request(struct replication_request_details *r, const c
     internal_error(true,
 #else
     nd_log_limit_static_global_var(erl, 1, 0);
-    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+    nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
 #endif
                 "REPLAY ERROR: 'host:%s/chart:%s' child sent: "
                 "db from %ld to %ld%s, wall clock time %ld, "
@@ -961,7 +961,7 @@ bool replicate_chart_request(send_command callback, struct parser *parser, RRDHO
         r.wanted.after = 0;
         r.wanted.before = 0;
         r.wanted.start_streaming = true;
-        return send_replay_chart_cmd(&r, "empty replication request, wanted after computed bigger than wanted before", true);
+        return send_replay_chart_cmd(&r, "empty replication request, wanted 'after' computed bigger than wanted 'before'", true);
     }
 
     // the child should start streaming immediately if the wanted duration is small, or we reached the last entry of the child
