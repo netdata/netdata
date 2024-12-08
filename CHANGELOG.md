@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- fix\(go.d\): correct sd dir [\#19155](https://github.com/netdata/netdata/pull/19155) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d\): correct unlockall impl [\#19154](https://github.com/netdata/netdata/pull/19154) ([ilyam8](https://github.com/ilyam8))
+- fix\(go.d\): unlock job files on quit/restart [\#19153](https://github.com/netdata/netdata/pull/19153) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19152](https://github.com/netdata/netdata/pull/19152) ([netdatabot](https://github.com/netdatabot))
+- build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.0 to 0.2.1 in /src/go [\#19151](https://github.com/netdata/netdata/pull/19151) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump golang.org/x/net from 0.31.0 to 0.32.0 in /src/go [\#19149](https://github.com/netdata/netdata/pull/19149) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/prometheus/common from 0.60.1 to 0.61.0 in /src/go [\#19148](https://github.com/netdata/netdata/pull/19148) ([dependabot[bot]](https://github.com/apps/dependabot))
+- MSSQL Metadatas \(windows.plugin\) [\#19147](https://github.com/netdata/netdata/pull/19147) ([thiagoftsm](https://github.com/thiagoftsm))
+- chore\(go.d.plugin\): simplify main [\#19146](https://github.com/netdata/netdata/pull/19146) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d.plugin\): simplify netdataapi pkg [\#19145](https://github.com/netdata/netdata/pull/19145) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d.plugin\): improve function parser [\#19143](https://github.com/netdata/netdata/pull/19143) ([ilyam8](https://github.com/ilyam8))
 - docs: fix a typo in aclk readme [\#19141](https://github.com/netdata/netdata/pull/19141) ([ilyam8](https://github.com/ilyam8))
@@ -438,14 +447,6 @@
 - feat: HW req for onprem installation. [\#18608](https://github.com/netdata/netdata/pull/18608) ([M4itee](https://github.com/M4itee))
 - WEB SERVER: retry sending data when errno is EAGAIN [\#18607](https://github.com/netdata/netdata/pull/18607) ([ktsaou](https://github.com/ktsaou))
 - Publish Windows installers on nightly builds. [\#18603](https://github.com/netdata/netdata/pull/18603) ([Ferroin](https://github.com/Ferroin))
-- Bump github.com/docker/docker from 27.3.0+incompatible to 27.3.1+incompatible in /src/go [\#18600](https://github.com/netdata/netdata/pull/18600) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Windows Plugin metadata [\#18599](https://github.com/netdata/netdata/pull/18599) ([thiagoftsm](https://github.com/thiagoftsm))
-- Regenerate integrations.js [\#18598](https://github.com/netdata/netdata/pull/18598) ([netdatabot](https://github.com/netdatabot))
-- go.d/sensors fix meta [\#18597](https://github.com/netdata/netdata/pull/18597) ([ilyam8](https://github.com/ilyam8))
-- go.d/sensors update meta [\#18595](https://github.com/netdata/netdata/pull/18595) ([ilyam8](https://github.com/ilyam8))
-- apps.plugin for windows [\#18594](https://github.com/netdata/netdata/pull/18594) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#18592](https://github.com/netdata/netdata/pull/18592) ([netdatabot](https://github.com/netdatabot))
-- Add MSSQL metrics \(Part I\). [\#18591](https://github.com/netdata/netdata/pull/18591) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
