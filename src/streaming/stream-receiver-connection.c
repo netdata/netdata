@@ -265,7 +265,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         return stream_receiver_response_too_busy_now(w);
 
     struct receiver_state *rpt = callocz(1, sizeof(*rpt));
-    rpt->thread.compressed.size = COMPRESSION_MAX_CHUNK * 2;
+    rpt->thread.compressed.size = COMPRESSION_MAX_CHUNK;
     rpt->thread.compressed.buf = mallocz(rpt->thread.compressed.size);
     rpt->connected_since_s = now_realtime_sec();
     rpt->last_msg_t = now_monotonic_sec();
