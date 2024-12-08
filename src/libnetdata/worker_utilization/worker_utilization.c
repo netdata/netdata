@@ -422,6 +422,9 @@ void workers_foreach(const char *name, void (*callback)(
             jobs_running = 1;
         }
 
+        // ------------------------------------------------------------------------------------------------------------
+        // spinlock contention
+
         size_t t = 0;
         for(size_t i = 0; i < WORKER_SPINLOCK_CONTENTION_FUNCTIONS ;i++) {
             if(!p->spinlocks[i].function) continue;
@@ -444,6 +447,8 @@ void workers_foreach(const char *name, void (*callback)(
             spinlock_locks[t] = 0;
             spinlock_spins[t] = 0;
         }
+
+        // ------------------------------------------------------------------------------------------------------------
 
         callback(data
                  , p->pid
