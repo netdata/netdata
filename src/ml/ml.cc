@@ -443,7 +443,7 @@ static void ml_dimension_serialize_kmeans(const ml_dimension_t *dim, BUFFER *wb)
 {
     RRDDIM *rd = dim->rd;
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_string(wb, "version", "1");
     buffer_json_member_add_string(wb, "machine-guid", rd->rrdset->rrdhost->machine_guid);
     buffer_json_member_add_string(wb, "chart", rrdset_id(rd->rrdset));
@@ -571,7 +571,9 @@ static void ml_dimension_stream_kmeans(const ml_dimension_t *dim)
     if (!s)
         return;
 
-    if(!stream_sender_has_capabilities(dim->rd->rrdset->rrdhost, STREAM_CAP_ML_MODELS))
+    if(!stream_sender_has_capabilities(dim->rd->rrdset->rrdhost, STREAM_CAP_ML_MODELS) ||
+        !rrdset_check_upstream_exposed(dim->rd->rrdset) ||
+        !rrddim_check_upstream_exposed(dim->rd))
         return;
 
     CLEAN_BUFFER *payload = buffer_create(0, NULL);
