@@ -121,11 +121,10 @@ struct pgc {
     struct pgc_index {
         alignas(64) RW_SPINLOCK rw_spinlock;
         Pvoid_t sections_judy;
-    } *index;
-
 #ifdef PGC_WITH_ARAL
-    ARAL *aral;
+        ARAL *aral;
 #endif
+    } *index;
 
     struct {
         alignas(64) SPINLOCK spinlock;
@@ -1026,7 +1025,7 @@ static inline void free_this_page(PGC *cache, PGC_PAGE *page, size_t partition _
 
     // free our memory
 #ifdef PGC_WITH_ARAL
-    aral_freez(cache->aral, page);
+    aral_freez(cache->index[partition].aral, page);
 #else
     freez(page);
 #endif
@@ -1420,7 +1419,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     size_t partition = pgc_indexing_partition(cache, entry->metric_id);
 
 #ifdef PGC_WITH_ARAL
-    PGC_PAGE *allocation = aral_mallocz(cache->aral);
+    PGC_PAGE *allocation = aral_mallocz(cache->index[partition].aral);
 #endif
     PGC_PAGE *page;
     size_t spins = 0;
@@ -1531,7 +1530,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 
 #ifdef PGC_WITH_ARAL
     if(allocation)
-        aral_freez(cache->aral, allocation);
+        aral_freez(cache->index[partition].aral, allocation);
 #endif
 
     __atomic_sub_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
@@ -2041,23 +2040,26 @@ PGC *pgc_create(const char *name,
 
     pgc_section_pages_static_aral_init();
 
-    for(size_t part = 0; part < cache->config.partitions ; part++)
+    for(size_t part = 0; part < cache->config.partitions ; part++) {
         rw_spinlock_init(&cache->index[part].rw_spinlock);
-
 #ifdef PGC_WITH_ARAL
-    {
-        char buf[100];
-        snprintfz(buf, sizeof(buf), "%s", name);
-        cache->aral = aral_create(
-            buf,
-            sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
-            0,
-            0,
-            &aral_statistics_for_pgc,
-            NULL, NULL, false, false);
+        {
+            char buf[100];
+            snprintfz(buf, sizeof(buf), "%s", name);
+            cache->index[part].aral = aral_create(
+                buf,
+                sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
+                0,
+                0,
+                &aral_statistics_for_pgc,
+                NULL,
+                NULL,
+                false,
+                false);
+        }
     }
 
-    pulse_aral_register(cache->aral, "pgc");
+    pulse_aral_register(cache->index[0].aral, "pgc");
 #endif
 
 
@@ -2128,13 +2130,13 @@ void pgc_destroy(PGC *cache) {
     else {
         pointer_destroy_index(cache);
 
-//        for(size_t part = 0; part < cache->config.partitions ; part++)
-//            netdata_rwlock_destroy(&cache->index[part].rw_spinlock);
-
+        for(size_t part = 0; part < cache->config.partitions ;part++) {
+            //  netdata_rwlock_destroy(&cache->index[part].rw_spinlock);
 #ifdef PGC_WITH_ARAL
-        if(cache->config.additional_bytes_per_page)
-            aral_destroy(cache->aral);
+            aral_destroy(cache->index[part].aral);
 #endif
+        }
+
         freez(cache->index);
         freez(cache);
     }

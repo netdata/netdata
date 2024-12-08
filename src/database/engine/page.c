@@ -55,7 +55,7 @@ struct pgd {
 // memory management
 
 #define ARAL_TOLERANCE_TO_DEDUP 7           // deduplicate aral sizes, if the delta is below this number of bytes
-#define PGD_ARAL_PARTITIONS     4
+#define PGD_ARAL_PARTITIONS     8
 
 struct {
     size_t sizeof_pgd;
