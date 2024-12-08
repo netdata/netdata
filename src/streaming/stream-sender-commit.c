@@ -83,36 +83,12 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
 
     if (unlikely(stream_circular_buffer_set_max_size_unsafe(s->scb, src_len, false))) {
         // adaptive sizing of the circular buffer
-
-        nd_log(
-            NDLS_DAEMON,
-            NDLP_NOTICE,
-            "STREAM SEND %s [to %s]: Increased max buffer size to %u (message size %zu).",
-            rrdhost_hostname(s->host),
-            s->connected_to,
-            stats->bytes_max_size,
-            buffer_strlen(wb) + 1);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "STREAM SEND %s [to %s]: Increased max buffer size to %u (message size %zu).",
+               rrdhost_hostname(s->host), s->connected_to, stats->bytes_max_size, buffer_strlen(wb) + 1);
     }
 
-#ifdef NETDATA_LOG_STREAM_SENDER
-    if (type == STREAM_TRAFFIC_TYPE_METADATA) {
-        if (!s->stream_log_fp) {
-            char filename[FILENAME_MAX + 1];
-            snprintfz(
-                filename, FILENAME_MAX, "/tmp/stream-sender-%s.txt", s->host ? rrdhost_hostname(s->host) : "unknown");
-
-            s->stream_log_fp = fopen(filename, "w");
-        }
-
-        fprintf(
-            s->stream_log_fp,
-            "\n--- SEND MESSAGE START: %s ----\n"
-            "%s"
-            "--- SEND MESSAGE END ----------------------------------------\n",
-            rrdhost_hostname(s->host),
-            src);
-    }
-#endif
+    stream_sender_log_payload(s, wb, type, false);
 
     if (s->compressor.initialized) {
         // compressed traffic

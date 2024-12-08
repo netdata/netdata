@@ -70,7 +70,11 @@ struct sender_state {
     struct compressor_state compressor;
 
 #ifdef NETDATA_LOG_STREAM_SENDER
-    FILE *stream_log_fp;
+    struct {
+        SPINLOCK spinlock;
+        BUFFER *received;
+        FILE *fp;
+    } log;
 #endif
 
     struct {
@@ -142,5 +146,11 @@ bool stream_connector_is_signaled_to_stop(struct sender_state *s);
 void stream_sender_on_connect(struct sender_state *s);
 
 void stream_sender_remove(struct sender_state *s);
+
+#ifdef NETDATA_LOG_STREAM_SENDER
+void stream_sender_log_payload(struct sender_state *s, BUFFER *payload, STREAM_TRAFFIC_TYPE type, bool inbound);
+#else
+#define stream_sender_log_payload(s, payload, type, inbound) debug_dummy()
+#endif
 
 #endif //NETDATA_STREAM_SENDER_INTERNALS_H

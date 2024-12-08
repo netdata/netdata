@@ -8,6 +8,41 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
 
 // --------------------------------------------------------------------------------------------------------------------
 
+#ifdef NETDATA_LOG_STREAM_SENDER
+void stream_sender_log_payload(struct sender_state *s, BUFFER *payload, STREAM_TRAFFIC_TYPE type __maybe_unused, bool inbound) {
+    spinlock_lock(&s->log.spinlock);
+
+    if (!s->log.fp) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(
+            filename, FILENAME_MAX, "/tmp/stream-sender-%s.txt", s->host ? rrdhost_hostname(s->host) : "unknown");
+
+        s->log.fp = fopen(filename, "w");
+    }
+
+    if(inbound) {
+        fprintf(
+            s->log.fp,
+            "\n--- RECEIVE MESSAGE START: %s => %s ----\n"
+            "%s"
+            "--- RECEIVE MESSAGE END ----------------------------------------\n",
+            s->connected_to, rrdhost_hostname(s->host), buffer_tostring(payload));
+    }
+    else {
+        fprintf(
+            s->log.fp,
+            "\n--- SEND MESSAGE START: %s => %s ----\n"
+            "%s"
+            "--- SEND MESSAGE END ----------------------------------------\n",
+            rrdhost_hostname(s->host), s->connected_to, buffer_tostring(payload));
+    }
+
+    spinlock_unlock(&s->log.spinlock);
+}
+#endif
+
+// --------------------------------------------------------------------------------------------------------------------
+
 static void stream_sender_charts_and_replication_reset(struct sender_state *s) {
     // stop all replication commands inflight
     replication_sender_delete_pending_requests(s);
@@ -263,10 +298,14 @@ void stream_sender_remove(struct sender_state *s) {
     rrdhost_stream_parents_reset(s->host, STREAM_HANDSHAKE_EXITING);
 
 #ifdef NETDATA_LOG_STREAM_SENDER
-    if (s->stream_log_fp) {
-        fclose(s->stream_log_fp);
-        s->stream_log_fp = NULL;
+    spinlock_lock(&s->log.spinlock);
+    if (s->log.fp) {
+        fclose(s->log.fp);
+        s->log.fp = NULL;
     }
+    buffer_free(s->log.received);
+    s->log.received = NULL;
+    spinlock_unlock(&s->log.spinlock);
 #endif
 }
 
