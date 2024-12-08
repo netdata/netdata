@@ -398,6 +398,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     if(current_cache_size > wanted_cache_size && wanted_cache_size < current_cache_size - clean)
         wanted_cache_size = current_cache_size - clean;
 
+    bool signal_the_evictor = false;
     if(cache->config.out_of_memory_protection_bytes) {
         // out of memory protection
         OS_SYSTEM_MEMORY sm = os_system_memory(false);
@@ -408,6 +409,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
             if (sm.ram_available_bytes < min_available) {
                 // we must shrink
                 wanted_cache_size = current_cache_size - (min_available - sm.ram_available_bytes);
+                signal_the_evictor = true;
             }
             else if(cache->config.use_all_ram) {
                 // we can grow
@@ -442,6 +444,12 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     else if(per1000 >= cache->config.aggressive_evict_per1000)
         __atomic_add_fetch(&cache->stats.events_cache_needs_space_aggressively, 1, __ATOMIC_RELAXED);
 
+    if (signal_the_evictor && spinlock_trylock(&cache->evictor.spinlock)) {
+        completion_mark_complete_a_job(&cache->evictor.completion);
+        spinlock_unlock(&cache->evictor.spinlock);
+        __atomic_add_fetch(&cache->stats.waste_evict_thread_signals, 1, __ATOMIC_RELAXED);
+    }
+
     return per1000;
 }
 
@@ -462,12 +470,6 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
 
 static void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
     const size_t per1000 = cache_usage_per1000(cache, NULL);
-
-    if (per1000 >= cache->config.healthy_size_per1000 && spinlock_trylock(&cache->evictor.spinlock)) {
-        __atomic_add_fetch(&cache->stats.waste_evict_thread_signals, 1, __ATOMIC_RELAXED);
-        completion_mark_complete_a_job(&cache->evictor.completion);
-        spinlock_unlock(&cache->evictor.spinlock);
-    }
 
     if(!(cache->config.options & PGC_OPTIONS_EVICT_PAGES_NO_INLINE)) {
         if (per1000 > cache->config.aggressive_evict_per1000 && !on_release) {
@@ -634,14 +636,12 @@ static void pgc_queue_add(PGC *cache __maybe_unused, struct pgc_queue *q, PGC_PA
         // - New pages created as CLEAN, always have 1 access.
         // - DIRTY pages made CLEAN, depending on their accesses may be appended (accesses > 0) or prepended (accesses = 0).
 
-        // FIXME - is it better for fragmentation to always append?
-
-//        if(page->accesses || page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
+        if(page->accesses || page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(q->base, page, link.prev, link.next);
             page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
-//        }
-//        else
-//            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(q->base, page, link.prev, link.next);
+        }
+        else
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(q->base, page, link.prev, link.next);
 
         q->version++;
     }
@@ -1938,7 +1938,9 @@ static void *pgc_evict_thread(void *ptr) {
 
     while (true) {
         worker_is_idle();
-        unsigned new_job_id = completion_wait_for_a_job_with_timeout(&cache->evictor.completion, job_id, 50);
+        unsigned new_job_id = completion_wait_for_a_job_with_timeout(
+            &cache->evictor.completion, job_id, 100);
+
         bool was_signaled = new_job_id > job_id;
         worker_is_busy(was_signaled ? 1 : 0);
         job_id = new_job_id;
@@ -1946,31 +1948,16 @@ static void *pgc_evict_thread(void *ptr) {
         if (nd_thread_signaled_to_cancel())
             return NULL;
 
-        spinlock_lock(&cache->evictor.spinlock);
-
-        size_t at_once = 10;
         size_t size_to_evict = 0;
         size_t per1000 = cache_usage_per1000(cache, &size_to_evict);
-        bool was_aggressive = per1000 > cache->config.aggressive_evict_per1000;
+        bool was_critical = per1000 >= cache->config.severe_pressure_per1000;
 
-        while (size_to_evict && ((--at_once && size_to_evict && per1000 > cache->config.healthy_size_per1000) || (per1000 > cache->config.aggressive_evict_per1000))) {
-            if (nd_thread_signaled_to_cancel()) {
-                spinlock_unlock(&cache->evictor.spinlock);
-                return NULL;
-            }
-
+        if(size_to_evict > 0) {
             evict_pages(cache, 0, 0, true, false);
 
-            if(was_signaled || was_aggressive)
+            if (was_signaled || was_critical)
                 mallocz_release_as_much_memory_to_the_system();
-
-            tinysleep();
-
-            size_to_evict = 0;
-            per1000 = cache_usage_per1000(cache, &size_to_evict);
         }
-
-        spinlock_unlock(&cache->evictor.spinlock);
     }
 
     worker_unregister();
@@ -2023,9 +2010,11 @@ PGC *pgc_create(const char *name,
     cache->config.max_pages_per_inline_eviction = max_pages_per_inline_eviction;
     cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 2) ? 2 : max_skip_pages_per_inline_eviction;
     cache->config.severe_pressure_per1000       = 1010; // INLINE: use releasers to evict pages (up to max_pages_per_inline_eviction)
-    cache->config.aggressive_evict_per1000      =  990; // INLINE: use adders to evict page (up to max_pages_per_inline_eviction)
-    cache->config.healthy_size_per1000          =  980; // signal the eviction thread to evict immediately
+    cache->config.aggressive_evict_per1000      =  990; // INLINE: use adders to evict pages (up to max_pages_per_inline_eviction)
+    cache->config.healthy_size_per1000          =  980; // no evictions happen below this threshold
     cache->config.evict_low_threshold_per1000   =  970; // when evicting, bring the size down to this threshold
+                                                        // the eviction thread is signaled ONLY if we run out of memory
+                                                        // otherwise, it runs by itself every 100ms
 
     // use all ram and protection from out of memory
     cache->config.use_all_ram                       = dbengine_use_all_ram_for_caches;
@@ -2292,12 +2281,10 @@ void pgc_set_nominal_page_size_callback(PGC *cache, nominal_page_size_callback c
 }
 
 size_t pgc_get_current_cache_size(PGC *cache) {
-    cache_usage_per1000(cache, NULL);
     return __atomic_load_n(&cache->stats.current_cache_size, __ATOMIC_RELAXED);
 }
 
 size_t pgc_get_wanted_cache_size(PGC *cache) {
-    cache_usage_per1000(cache, NULL);
     return __atomic_load_n(&cache->stats.wanted_cache_size, __ATOMIC_RELAXED);
 }
 
