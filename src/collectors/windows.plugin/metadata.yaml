@@ -1223,3 +1223,39 @@ modules:
               chart_type: line
               dimensions:
                 - name: compiled_msil
+            - name: netframework.clrloading_loader_heap_size
+              description: Memory committed by class loader
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: committed
+            - name: netframework.clrloading_appdomains_loaded
+              description: Loaded application domains
+              unit: domain/s
+              chart_type: line
+              dimensions:
+                - name: loaded
+            - name: netframework.clrloading_appdomains_unloaded
+              description: Unloaded application domains
+              unit: domain/s
+              chart_type: line
+              dimensions:
+                - name: unloaded
+            - name: netframework.clrloading_assemblies_loaded
+              description: Loaded assemblies
+              unit: assemblies/s
+              chart_type: line
+              dimensions:
+                - name: loaded
+            - name: netframework.clrloading_classes_loaded
+              description: Loaded classes in all assemblies
+              unit: classes/s
+              chart_type: line
+              dimensions:
+                - name: loaded
+            - name: netframework.clrloading_class_load_failures
+              description: Class load failures
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: class_load
