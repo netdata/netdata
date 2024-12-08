@@ -421,6 +421,11 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
         internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) != NULL, "Receiver to be added is already in the list of receivers");
         META_SET(&sth->run.meta, (Word_t)&rpt->thread.meta, &rpt->thread.meta);
 
+        if(sock_setnonblock(rpt->sock.fd) < 0)
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM RECEIVE '%s' [from [%s]:%s]: cannot set the non-blocking flag from socket %d",
+                   rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->sock.fd);
+
         if(!nd_poll_add(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
             nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to add receiver socket to nd_poll()");
 
@@ -429,9 +434,34 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
     }
 }
 
-static void stream_receiver_on_disconnect(struct stream_thread *sth __maybe_unused, struct receiver_state *rpt) {
+static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, const char *why) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-    if(!rpt) return;
+
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "STREAM RECEIVE[%zu] '%s' [from [%s]:%s]: "
+           "receiver disconnected: %s"
+           , sth->id
+           , rpt->hostname ? rpt->hostname : "-"
+           , rpt->client_ip ? rpt->client_ip : "-"
+           , rpt->client_port ? rpt->client_port : "-"
+           , why ? why : "");
+
+    internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) == NULL, "Receiver to be removed is not found in the list of receivers");
+    META_DEL(&sth->run.meta, (Word_t)&rpt->thread.meta);
+
+    if(!nd_poll_del(sth->run.ndpl, rpt->sock.fd))
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to delete receiver socket from nd_poll()");
+
+    rpt->host->stream.rcv.status.tid = 0;
+
+    spinlock_lock(&rpt->thread.send_to_child.spinlock);
+    rpt->thread.send_to_child.msg.session = 0;
+    rpt->thread.send_to_child.msg.meta = NULL;
+    stream_circular_buffer_destroy(rpt->thread.send_to_child.scb);
+    rpt->thread.send_to_child.scb = NULL;
+    spinlock_unlock(&rpt->thread.send_to_child.spinlock);
+
+    stream_thread_node_removed(rpt->host);
 
     buffer_free(rpt->thread.buffer);
     rpt->thread.buffer = NULL;
@@ -467,39 +497,8 @@ static void stream_receiver_on_disconnect(struct stream_thread *sth __maybe_unus
 
     rrdhost_clear_receiver(rpt);
     rrdhost_set_is_parent_label();
+
     stream_receiver_free(rpt);
-}
-
-static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, const char *why) {
-    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-
-    nd_log(NDLS_DAEMON, NDLP_ERR,
-           "STREAM RECEIVE[%zu] '%s' [from [%s]:%s]: "
-           "receiver disconnected: %s"
-           , sth->id
-           , rpt->hostname ? rpt->hostname : "-"
-           , rpt->client_ip ? rpt->client_ip : "-"
-           , rpt->client_port ? rpt->client_port : "-"
-           , why ? why : "");
-
-    internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) == NULL, "Receiver to be removed is not found in the list of receivers");
-    META_DEL(&sth->run.meta, (Word_t)&rpt->thread.meta);
-
-    if(!nd_poll_del(sth->run.ndpl, rpt->sock.fd))
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to delete receiver socket from nd_poll()");
-
-    rpt->host->stream.rcv.status.tid = 0;
-
-    spinlock_lock(&rpt->thread.send_to_child.spinlock);
-    rpt->thread.send_to_child.msg.session = 0;
-    rpt->thread.send_to_child.msg.meta = NULL;
-    stream_circular_buffer_destroy(rpt->thread.send_to_child.scb);
-    rpt->thread.send_to_child.scb = NULL;
-    spinlock_unlock(&rpt->thread.send_to_child.spinlock);
-
-    stream_thread_node_removed(rpt->host);
-
-    stream_receiver_on_disconnect(sth, rpt);
     // DO NOT USE rpt after this point
 }
 
