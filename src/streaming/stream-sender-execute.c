@@ -175,11 +175,13 @@ void stream_sender_execute_commands(struct sender_state *s) {
 
         if(s->defer.end_keyword) {
             if(strcmp(start, s->defer.end_keyword) == 0) {
+#ifdef NETDATA_LOG_STREAM_SENDER
                 buffer_strcat(s->log.received, buffer_tostring(s->defer.payload));
                 buffer_strcat(s->log.received, "\n");
                 buffer_strcat(s->log.received, s->defer.end_keyword);
                 buffer_strcat(s->log.received, "\n");
                 stream_sender_log_payload(s, s->log.received, STREAM_TRAFFIC_TYPE_METADATA, true);
+#endif
                 s->defer.action(s, s->defer.action_data);
                 cleanup_deferred_data(s);
             }
@@ -201,8 +203,9 @@ void stream_sender_execute_commands(struct sender_state *s) {
         const char *command = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 0);
 
         if(command && strcmp(command, PLUGINSD_CALL_FUNCTION) == 0) {
+#ifdef NETDATA_LOG_STREAM_SENDER
             stream_sender_log_payload(s, s->log.received, STREAM_TRAFFIC_TYPE_FUNCTIONS, true);
-
+#endif
             char *transaction  = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
             char *timeout_s    = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 2);
             char *function     = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 3);
@@ -236,7 +239,9 @@ void stream_sender_execute_commands(struct sender_state *s) {
         }
         else if(command && strcmp(command, PLUGINSD_CALL_FUNCTION_CANCEL) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE_FUNCTION);
+#ifdef NETDATA_LOG_STREAM_SENDER
             stream_sender_log_payload(s, s->log.received, STREAM_TRAFFIC_TYPE_FUNCTIONS, true);
+#endif
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
             char *transaction = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
@@ -245,7 +250,9 @@ void stream_sender_execute_commands(struct sender_state *s) {
         }
         else if(command && strcmp(command, PLUGINSD_CALL_FUNCTION_PROGRESS) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE_FUNCTION);
+#ifdef NETDATA_LOG_STREAM_SENDER
             stream_sender_log_payload(s, s->log.received, STREAM_TRAFFIC_TYPE_FUNCTIONS, true);
+#endif
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
             char *transaction = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
@@ -254,7 +261,9 @@ void stream_sender_execute_commands(struct sender_state *s) {
         }
         else if (command && strcmp(command, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE_REPLAY);
+#ifdef NETDATA_LOG_STREAM_SENDER
             stream_sender_log_payload(s, s->log.received, STREAM_TRAFFIC_TYPE_REPLICATION, true);
+#endif
 
             // do not log replication commands received - way too many!
             // nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
@@ -284,7 +293,9 @@ void stream_sender_execute_commands(struct sender_state *s) {
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_NODE_ID) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE_META);
+#ifdef NETDATA_LOG_STREAM_SENDER
             stream_sender_log_payload(s, s->log.received, STREAM_TRAFFIC_TYPE_METADATA, true);
+#endif
             stream_sender_get_node_and_claim_id_from_parent(s);
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_JSON) == 0) {
