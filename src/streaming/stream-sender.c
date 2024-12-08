@@ -537,36 +537,41 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
     // we can receive data from this socket
 
     worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
-    ssize_t rc = nd_sock_revc_nowait(&s->sock, s->rbuf.b + s->rbuf.read_len, sizeof(s->rbuf.b) - s->rbuf.read_len - 1);
-    if (likely(rc > 0)) {
-        s->rbuf.read_len += rc;
-        s->thread.last_traffic_ut = now_ut;
-        sth->snd.bytes_received += rc;
+    while(true) {
+        // we have to drain the socket!
 
-        worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
-        stream_sender_execute_commands(s);
-    }
-    else if (rc == 0 || errno == ECONNRESET) {
-        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED);
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SEND[%zu] %s [to %s]: socket %d reports EOF (closed by parent).",
-               sth->id, rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
-        stream_sender_move_running_to_connector_or_remove(
-            sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END, true);
-        return;
-    }
-    else if (rc < 0) {
-        if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
-            // will try later
-            ;
-        else {
-            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
+        ssize_t rc = nd_sock_revc_nowait(&s->sock, s->rbuf.b + s->rbuf.read_len, sizeof(s->rbuf.b) - s->rbuf.read_len - 1);
+        if (likely(rc > 0)) {
+            s->rbuf.read_len += rc;
+
+            s->thread.last_traffic_ut = now_ut;
+            sth->snd.bytes_received += rc;
+
+            worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
+            stream_sender_execute_commands(s);
+        }
+        else if (rc == 0 || errno == ECONNRESET) {
+            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED);
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SEND[%zu] %s [to %s]: error during receive (%zd, on fd %d) - restarting connection.",
-                   sth->id, rrdhost_hostname(s->host), s->connected_to, rc, s->sock.fd);
+                   "STREAM SEND[%zu] %s [to %s]: socket %d reports EOF (closed by parent).",
+                   sth->id, rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
             stream_sender_move_running_to_connector_or_remove(
-                sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, true);
+                sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END, true);
             return;
+        }
+        else if (rc < 0) {
+            if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
+                // will try later
+                break;
+            else {
+                worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "STREAM SEND[%zu] %s [to %s]: error during receive (%zd, on fd %d) - restarting connection.",
+                       sth->id, rrdhost_hostname(s->host), s->connected_to, rc, s->sock.fd);
+                stream_sender_move_running_to_connector_or_remove(
+                    sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, true);
+                return;
+            }
         }
     }
 }

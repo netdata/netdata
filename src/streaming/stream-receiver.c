@@ -503,7 +503,8 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
     // DO NOT USE rpt after this point
 }
 
-static ssize_t stream_receive_read(struct stream_thread *sth, struct receiver_state *rpt, PARSER *parser, bool *removed) {
+static ssize_t
+stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt, PARSER *parser, bool *removed) {
     ssize_t rc;
     if(rpt->thread.compressed.enabled) {
         rc = receiver_read_compressed(rpt);
@@ -694,33 +695,37 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
     // we can receive data from this socket
 
     worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
-    bool removed = false;
-    ssize_t rc = stream_receive_read(sth, rpt, parser, &removed);
-    if (likely(rc > 0)) {
-        rpt->last_msg_t = (time_t)(now_ut / USEC_PER_SEC);
-    }
-    else if (rc == 0 || errno == ECONNRESET) {
-        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED);
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM RECEIVE[%zu] %s [from %s]: socket %d reports EOF (closed by child).",
-               sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->sock.fd);
-        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END, false);
-        stream_receiver_remove(sth, rpt, "socket reports EOF (closed by child)");
-        return;
-    } else if (rc < 0) {
-        if(removed)
-            return;
-        else if ((errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
-            // will try later
-            ;
-        else {
-            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
+    while(true) {
+        bool removed = false;
+        ssize_t rc = stream_receive_and_process(sth, rpt, parser, &removed);
+        if (likely(rc > 0)) {
+            rpt->last_msg_t = (time_t)(now_ut / USEC_PER_SEC);
+        }
+        else if (rc == 0 || errno == ECONNRESET) {
+            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED);
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM RECEIVE[%zu] %s [from %s]: error during receive (%zd, on fd %d) - closing connection.",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rc, rpt->sock.fd);
-            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, false);
-            stream_receiver_remove(sth, rpt, "error during receive");
+                   "STREAM RECEIVE[%zu] %s [from %s]: socket %d reports EOF (closed by child).",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->sock.fd);
+            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END, false);
+            stream_receiver_remove(sth, rpt, "socket reports EOF (closed by child)");
             return;
+        }
+        else if (rc < 0) {
+            if(removed)
+                return;
+
+            else if ((errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
+                // will try later
+                break;
+            else {
+                worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "STREAM RECEIVE[%zu] %s [from %s]: error during receive (%zd, on fd %d) - closing connection.",
+                       sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rc, rpt->sock.fd);
+                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, false);
+                stream_receiver_remove(sth, rpt, "error during receive");
+                return;
+            }
         }
     }
 }
