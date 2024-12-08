@@ -2009,7 +2009,7 @@ PGC *pgc_create(const char *name,
 
     cache->config.options = options;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
-    cache->config.stats = telemetry_enabled;
+    cache->config.stats = pulse_enabled;
 
     // flushing
     cache->config.max_flushes_inline            = (max_flushes_inline == 0) ? 2 : max_flushes_inline;
@@ -2057,7 +2057,7 @@ PGC *pgc_create(const char *name,
             NULL, NULL, false, false);
     }
 
-    telemetry_aral_register(cache->aral, "pgc");
+    pulse_aral_register(cache->aral, "pgc");
 #endif
 
 

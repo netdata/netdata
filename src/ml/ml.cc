@@ -113,7 +113,7 @@ ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim, const 
     }
     storage_engine_query_finalize(&handle);
 
-    telemetry_queries_ml_query_completed(/* points_read */ idx);
+    pulse_queries_ml_query_completed(/* points_read */ idx);
 
     training_response.total_values = idx;
     if (training_response.collected_values < min_n) {
@@ -550,7 +550,7 @@ ml_dimension_deserialize_kmeans(const char *json_str)
 
     ml_dimension_t *Dim = reinterpret_cast<ml_dimension_t *>(AcqDim.dimension());
     if (!Dim) {
-        telemetry_ml_models_ignored();
+        pulse_ml_models_ignored();
         return true;
     }
 
@@ -584,7 +584,7 @@ static void ml_dimension_stream_kmeans(const ml_dimension_t *dim)
         buffer_tostring(payload));
 
     sender_commit_clean_buffer(s, wb, STREAM_TRAFFIC_TYPE_METADATA);
-    telemetry_ml_models_sent();
+    pulse_ml_models_sent();
 }
 
 static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
@@ -830,7 +830,7 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
             continue;
 
         if (anomaly_score < (100 * Cfg.dimension_anomaly_score_threshold)) {
-            telemetry_ml_models_consulted(models_consulted);
+            pulse_ml_models_consulted(models_consulted);
             spinlock_unlock(&dim->slock);
             return false;
         }
@@ -847,7 +847,7 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
 
     spinlock_unlock(&dim->slock);
 
-    telemetry_ml_models_consulted(models_consulted);
+    pulse_ml_models_consulted(models_consulted);
     return sum;
 }
 
@@ -1144,13 +1144,13 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
 
     ml_dimension_t *Dim = reinterpret_cast<ml_dimension_t *>(AcqDim.dimension());
     if (!Dim) {
-        telemetry_ml_models_ignored();
+        pulse_ml_models_ignored();
         return ML_WORKER_RESULT_OK;
     }
 
     Dim->kmeans = req.inlined_km;
     ml_dimension_update_models(worker, Dim);
-    telemetry_ml_models_received();
+    pulse_ml_models_received();
     return ML_WORKER_RESULT_OK;
 }
 

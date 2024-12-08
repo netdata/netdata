@@ -6,7 +6,7 @@
 
 #include "aclk_util.h"
 
-#include "daemon/telemetry/telemetry.h"
+#include "daemon/pulse/pulse.h"
 
 static const char *http_req_type_to_str(http_req_type_t req) {
     switch (req) {

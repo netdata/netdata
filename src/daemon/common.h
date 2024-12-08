@@ -19,7 +19,7 @@ extern "C" {
 #include "daemon/config/netdata-conf.h"
 #include "daemon/dyncfg/dyncfg.h"
 
-#include "daemon/telemetry/telemetry.h"
+#include "daemon/pulse/pulse.h"
 
 // health monitoring and alarm notifications
 #include "health/health.h"

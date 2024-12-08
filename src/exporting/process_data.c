@@ -139,7 +139,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
         counter += sp.count;
     }
     storage_engine_query_finalize(&handle);
-    telemetry_queries_exporters_query_completed(points_read);
+    pulse_queries_exporters_query_completed(points_read);
 
     if (unlikely(!counter)) {
         netdata_log_debug(

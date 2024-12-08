@@ -1,7 +1,7 @@
 #include <cstdlib>
 #include <memory>
 
-#include "daemon/telemetry/telemetry-ml.h"
+#include "daemon/pulse/pulse-ml.h"
 
 void *operator new(size_t size)
 {
@@ -9,7 +9,7 @@ void *operator new(size_t size)
     if (!ptr)
         throw std::bad_alloc();
 
-    telemetry_ml_memory_allocated(size);
+    pulse_ml_memory_allocated(size);
     return ptr;
 }
 
@@ -19,14 +19,14 @@ void *operator new[](size_t size)
     if (!ptr)
         throw std::bad_alloc();
 
-    telemetry_ml_memory_allocated(size);
+    pulse_ml_memory_allocated(size);
     return ptr;
 }
 
 void operator delete(void *ptr, size_t size) noexcept
 {
     if (ptr) {
-        telemetry_ml_memory_freed(size);
+        pulse_ml_memory_freed(size);
         free(ptr);
     }
 }
@@ -34,7 +34,7 @@ void operator delete(void *ptr, size_t size) noexcept
 void operator delete[](void *ptr, size_t size) noexcept
 {
     if (ptr) {
-        telemetry_ml_memory_freed(size);
+        pulse_ml_memory_freed(size);
         free(ptr);
     }
 }

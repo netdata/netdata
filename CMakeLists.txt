@@ -1041,8 +1041,8 @@ set(DAEMON_FILES
         src/daemon/daemon.h
         src/daemon/libuv_workers.c
         src/daemon/libuv_workers.h
-        src/daemon/telemetry/telemetry.c
-        src/daemon/telemetry/telemetry.h
+        src/daemon/pulse/pulse.c
+        src/daemon/pulse/pulse.h
         src/daemon/analytics.c
         src/daemon/analytics.h
         src/daemon/main.c
@@ -1072,36 +1072,36 @@ set(DAEMON_FILES
         src/daemon/dyncfg/dyncfg-internals.h
         src/daemon/dyncfg/dyncfg-intercept.c
         src/daemon/dyncfg/dyncfg-tree.c
-        src/daemon/telemetry/telemetry-http-api.c
-        src/daemon/telemetry/telemetry-http-api.h
-        src/daemon/telemetry/telemetry-queries.c
-        src/daemon/telemetry/telemetry-queries.h
-        src/daemon/telemetry/telemetry-ingestion.c
-        src/daemon/telemetry/telemetry-ingestion.h
-        src/daemon/telemetry/telemetry-ml.c
-        src/daemon/telemetry/telemetry-ml.h
-        src/daemon/telemetry/telemetry-gorilla.c
-        src/daemon/telemetry/telemetry-gorilla.h
-        src/daemon/telemetry/telemetry-daemon.c
-        src/daemon/telemetry/telemetry-daemon.h
-        src/daemon/telemetry/telemetry-daemon-memory.c
-        src/daemon/telemetry/telemetry-daemon-memory.h
-        src/daemon/telemetry/telemetry-sqlite3.c
-        src/daemon/telemetry/telemetry-sqlite3.h
-        src/daemon/telemetry/telemetry-dbengine.c
-        src/daemon/telemetry/telemetry-dbengine.h
-        src/daemon/telemetry/telemetry-string.c
-        src/daemon/telemetry/telemetry-string.h
-        src/daemon/telemetry/telemetry-heartbeat.c
-        src/daemon/telemetry/telemetry-heartbeat.h
-        src/daemon/telemetry/telemetry-dictionary.c
-        src/daemon/telemetry/telemetry-dictionary.h
-        src/daemon/telemetry/telemetry-workers.c
-        src/daemon/telemetry/telemetry-workers.h
-        src/daemon/telemetry/telemetry-trace-allocations.c
-        src/daemon/telemetry/telemetry-trace-allocations.h
-        src/daemon/telemetry/telemetry-aral.c
-        src/daemon/telemetry/telemetry-aral.h
+        src/daemon/pulse/pulse-http-api.c
+        src/daemon/pulse/pulse-http-api.h
+        src/daemon/pulse/pulse-queries.c
+        src/daemon/pulse/pulse-queries.h
+        src/daemon/pulse/pulse-ingestion.c
+        src/daemon/pulse/pulse-ingestion.h
+        src/daemon/pulse/pulse-ml.c
+        src/daemon/pulse/pulse-ml.h
+        src/daemon/pulse/pulse-gorilla.c
+        src/daemon/pulse/pulse-gorilla.h
+        src/daemon/pulse/pulse-daemon.c
+        src/daemon/pulse/pulse-daemon.h
+        src/daemon/pulse/pulse-daemon-memory.c
+        src/daemon/pulse/pulse-daemon-memory.h
+        src/daemon/pulse/pulse-sqlite3.c
+        src/daemon/pulse/pulse-sqlite3.h
+        src/daemon/pulse/pulse-dbengine.c
+        src/daemon/pulse/pulse-dbengine.h
+        src/daemon/pulse/pulse-string.c
+        src/daemon/pulse/pulse-string.h
+        src/daemon/pulse/pulse-heartbeat.c
+        src/daemon/pulse/pulse-heartbeat.h
+        src/daemon/pulse/pulse-dictionary.c
+        src/daemon/pulse/pulse-dictionary.h
+        src/daemon/pulse/pulse-workers.c
+        src/daemon/pulse/pulse-workers.h
+        src/daemon/pulse/pulse-trace-allocations.c
+        src/daemon/pulse/pulse-trace-allocations.h
+        src/daemon/pulse/pulse-aral.c
+        src/daemon/pulse/pulse-aral.h
         src/daemon/config/netdata-conf-db.c
         src/daemon/config/netdata-conf-db.h
         src/daemon/config/netdata-conf.h
