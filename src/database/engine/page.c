@@ -54,18 +54,24 @@ struct pgd {
 // ----------------------------------------------------------------------------
 // memory management
 
-#define ARAL_TOLERANCE_TO_DEDUP 7           // deduplicate aral sizes, if the delta is below this number of bytes
-#define PGD_ARAL_PARTITIONS     8
+// deduplicate aral sizes, if the delta is below this number of bytes
+#define ARAL_TOLERANCE_TO_DEDUP 7
+
+// max, we use as many as the cpu cores
+// cannot be bigger than 256, due to struct pgd->partition (uint8_t)
+#define PGD_ARAL_PARTITIONS_MAX 256
 
 struct {
+    size_t partitions;
+
     size_t sizeof_pgd;
     size_t sizeof_gorilla_writer_t;
     size_t sizeof_gorilla_buffer_32bit;
 
-    ARAL *aral_pgd[PGD_ARAL_PARTITIONS];
-    ARAL *aral_gorilla_buffer[PGD_ARAL_PARTITIONS];
-    ARAL *aral_gorilla_writer[PGD_ARAL_PARTITIONS];
-} pgd_alloc_globals = {};
+    ARAL *aral_pgd[PGD_ARAL_PARTITIONS_MAX];
+    ARAL *aral_gorilla_buffer[PGD_ARAL_PARTITIONS_MAX];
+    ARAL *aral_gorilla_writer[PGD_ARAL_PARTITIONS_MAX];
+} pgd_alloc_globals = { 0 };
 
 #if RRD_STORAGE_TIERS != 5
 #error "You need to update the slots reserved for storage tiers"
@@ -110,6 +116,11 @@ int aral_size_sort_compare(const void *a, const void *b) {
 }
 
 void pgd_init_arals(void) {
+    size_t partitions = get_netdata_cpus();
+    if(partitions < 4) partitions = 4;
+    if(partitions > PGD_ARAL_PARTITIONS_MAX) partitions = PGD_ARAL_PARTITIONS_MAX;
+    pgd_alloc_globals.partitions = partitions;
+
     aral_sizes_count = _countof(aral_sizes);
 
     for(size_t i = 0; i < RRD_STORAGE_TIERS ;i++)
@@ -145,9 +156,9 @@ void pgd_init_arals(void) {
         aral_sizes[i] = 0;
 
     // allocate all the arals
-    arals = callocz(aral_sizes_count * PGD_ARAL_PARTITIONS, sizeof(ARAL *));
+    arals = callocz(aral_sizes_count * pgd_alloc_globals.partitions, sizeof(ARAL *));
     for(size_t slot = 0; slot < aral_sizes_count ; slot++) {
-        for(size_t partition = 0; partition < PGD_ARAL_PARTITIONS; partition++) {
+        for(size_t partition = 0; partition < pgd_alloc_globals.partitions; partition++) {
 
             if(partition > 0 && aral_sizes[slot] > 128) {
                 // do not create partitions for sizes above 128 bytes
@@ -169,7 +180,7 @@ void pgd_init_arals(void) {
         }
     }
 
-    for(size_t p = 0; p < PGD_ARAL_PARTITIONS ;p++) {
+    for(size_t p = 0; p < pgd_alloc_globals.partitions ;p++) {
         pgd_alloc_globals.aral_pgd[p] = pgd_get_aral_by_size_and_partition(sizeof(PGD), p);
         pgd_alloc_globals.aral_gorilla_writer[p] = pgd_get_aral_by_size_and_partition(sizeof(gorilla_writer_t), p);
         pgd_alloc_globals.aral_gorilla_buffer[p] = pgd_get_aral_by_size_and_partition(RRDENG_GORILLA_32BIT_BUFFER_SIZE, p);
@@ -188,7 +199,7 @@ void pgd_init_arals(void) {
 }
 
 static ARAL *pgd_get_aral_by_size_and_partition(size_t size, size_t partition) {
-    internal_fatal(partition >= PGD_ARAL_PARTITIONS, "Wrong partition %zu", partition);
+    internal_fatal(partition >= pgd_alloc_globals.partitions, "Wrong partition %zu", partition);
 
     size_t slot;
 
@@ -218,17 +229,17 @@ static ARAL *pgd_get_aral_by_size_and_partition(size_t size, size_t partition) {
 }
 
 static inline gorilla_writer_t *pgd_gorilla_writer_alloc(size_t partition) {
-    internal_fatal(partition >= PGD_ARAL_PARTITIONS, "invalid gorilla writer partition %zu", partition);
+    internal_fatal(partition >= pgd_alloc_globals.partitions, "invalid gorilla writer partition %zu", partition);
     return aral_mallocz_marked(pgd_alloc_globals.aral_gorilla_writer[partition]);
 }
 
 static inline gorilla_buffer_t *pgd_gorilla_buffer_alloc(size_t partition) {
-    internal_fatal(partition >= PGD_ARAL_PARTITIONS, "invalid gorilla buffer partition %zu", partition);
+    internal_fatal(partition >= pgd_alloc_globals.partitions, "invalid gorilla buffer partition %zu", partition);
     return aral_mallocz_marked(pgd_alloc_globals.aral_gorilla_buffer[partition]);
 }
 
 static inline PGD *pgd_alloc(bool for_collector) {
-    size_t partition = gettid_cached() % PGD_ARAL_PARTITIONS;
+    size_t partition = gettid_cached() % pgd_alloc_globals.partitions;
     PGD *pgd;
 
     if(for_collector)
@@ -381,7 +392,7 @@ void pgd_free(PGD *pg) {
     if (!pg || pg == PGD_EMPTY)
         return;
 
-    internal_fatal(pg->partition >= PGD_ARAL_PARTITIONS,
+    internal_fatal(pg->partition >= pgd_alloc_globals.partitions,
                    "PGD partition is invalid %u", pg->partition);
 
     switch (pg->type)
@@ -457,7 +468,7 @@ static void pgd_aral_unmark(PGD *pg) {
         !(pg->options & PAGE_OPTION_ARAL_MARKED))
         return;
 
-    internal_fatal(pg->partition >= PGD_ARAL_PARTITIONS,
+    internal_fatal(pg->partition >= pgd_alloc_globals.partitions,
                    "PGD partition is invalid %u", pg->partition);
 
     switch (pg->type)
