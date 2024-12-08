@@ -14,6 +14,7 @@ struct worker_spinlocks {
 };
 
 DEFINE_JUDYL_TYPED(SPINLOCKS, struct worker_spinlocks *);
+SPINLOCKS_JudyLSet ALL_SPINLOCKS = { 0 };
 
 struct worker_job_type_gs {
     STRING *name;
@@ -145,6 +146,108 @@ static struct worker_utilization all_workers_utilization[] = {
     // has to be terminated with a NULL
     { .name = NULL,          .family = NULL       }
 };
+
+static void workers_total_spinlock_contention_chart(void) {
+    {
+        static RRDSET *st = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                "netdata"
+                , "spinlock_total_locks"
+                , NULL
+                , "spinlocks"
+                , "netdata.spinlock_total_locks"
+                , "Netdata Total Spinlock Locks"
+                , "locks"
+                , "netdata"
+                , "pulse"
+                , 920000
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+        }
+
+        Word_t idx = 0;
+        for(struct worker_spinlocks *wusp = SPINLOCKS_FIRST(&ALL_SPINLOCKS, &idx);
+             wusp;
+             wusp = SPINLOCKS_NEXT(&ALL_SPINLOCKS, &idx)) {
+            const char *func = (const char *)idx;
+            RRDDIM *rd = rrddim_find(st, func);
+            if(!rd) rd = rrddim_add(st, func, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_set_by_pointer(st, rd, (collected_number)wusp->locks);
+        }
+
+        rrdset_done(st);
+    }
+
+    {
+        static RRDSET *st = NULL;
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                "netdata"
+                , "spinlock_total_spins"
+                , NULL
+                , "spinlocks"
+                , "netdata.spinlock_total_spins"
+                , "Netdata Total Spinlock Spins"
+                , "spins"
+                , "netdata"
+                , "pulse"
+                , 920001
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+        }
+
+        Word_t idx = 0;
+        for(struct worker_spinlocks *wusp = SPINLOCKS_FIRST(&ALL_SPINLOCKS, &idx);
+             wusp;
+             wusp = SPINLOCKS_NEXT(&ALL_SPINLOCKS, &idx)) {
+            const char *func = (const char *)idx;
+            RRDDIM *rd = rrddim_find(st, func);
+            if(!rd) rd = rrddim_add(st, func, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_set_by_pointer(st, rd, (collected_number)wusp->spins);
+        }
+
+        rrdset_done(st);
+    }
+
+    {
+        static RRDSET *st = NULL;
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                "netdata"
+                , "spinlock_total_spins_per_lock"
+                , NULL
+                , "spinlocks"
+                , "netdata.spinlock_total_spins_per_lock"
+                , "Netdata Average Spinlock Spins Per Lock"
+                , "spins"
+                , "netdata"
+                , "pulse"
+                , 920002
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_LINE
+            );
+        }
+
+        Word_t idx = 0;
+        for(struct worker_spinlocks *wusp = SPINLOCKS_FIRST(&ALL_SPINLOCKS, &idx);
+             wusp;
+             wusp = SPINLOCKS_NEXT(&ALL_SPINLOCKS, &idx)) {
+            const char *func = (const char *)idx;
+            RRDDIM *rd = rrddim_find(st, func);
+            if(!rd) rd = rrddim_add(st, func, NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+            if(!wusp->locks)
+                rrddim_set_by_pointer(st, rd, 0);
+            else
+                rrddim_set_by_pointer(st, rd, (collected_number)((uint64_t)wusp->spins * 10000ULL / (uint64_t)wusp->locks));
+        }
+
+        rrdset_done(st);
+    }
+}
 
 static void workers_total_cpu_utilization_chart(void) {
     size_t i, cpu_enabled = 0;
@@ -843,6 +946,9 @@ static void worker_utilization_charts_callback(void *ptr
     }
     wu->workers_cpu_registered += (wt->cpu_enabled) ? 1 : 0;
 
+    // ----------------------------------------------------------------------------------------------------------------
+    // spinlock contention
+
     // spinlocks
     for(size_t i = 0; i < WORKER_SPINLOCK_CONTENTION_FUNCTIONS && spinlock_functions[i] ;i++) {
         struct worker_spinlocks *wusp = SPINLOCKS_GET(&wu->spinlocks, (Word_t)spinlock_functions[i]);
@@ -850,9 +956,16 @@ static void worker_utilization_charts_callback(void *ptr
             wusp = callocz(1, sizeof(*wusp));
             SPINLOCKS_SET(&wu->spinlocks, (Word_t)spinlock_functions[i], wusp);
         }
+        wusp->locks += spinlock_locks[i];
+        wusp->spins += spinlock_spins[i];
 
-        wusp->locks = spinlock_locks[i];
-        wusp->spins = spinlock_spins[i];
+        wusp = SPINLOCKS_GET(&ALL_SPINLOCKS, (Word_t)spinlock_functions[i]);
+        if(!wusp) {
+            wusp = callocz(1, sizeof(*wusp));
+            SPINLOCKS_SET(&ALL_SPINLOCKS, (Word_t)spinlock_functions[i], wusp);
+        }
+        wusp->locks += spinlock_locks[i];
+        wusp->spins += spinlock_spins[i];
     }
 }
 
@@ -890,6 +1003,14 @@ void pulse_workers_do(bool extended) {
     static size_t iterations = 0;
     iterations++;
 
+    Word_t idx = 0;
+    for(struct worker_spinlocks *wusp = SPINLOCKS_FIRST(&ALL_SPINLOCKS, &idx);
+         wusp;
+         wusp = SPINLOCKS_NEXT(&ALL_SPINLOCKS, &idx)) {
+        wusp->locks = 0;
+        wusp->spins = 0;
+    }
+
     for(int i = 0; all_workers_utilization[i].name ;i++) {
         workers_utilization_reset_statistics(&all_workers_utilization[i]);
 
@@ -903,4 +1024,5 @@ void pulse_workers_do(bool extended) {
     }
 
     workers_total_cpu_utilization_chart();
+    workers_total_spinlock_contention_chart();
 }
