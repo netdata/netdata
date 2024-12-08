@@ -1199,3 +1199,27 @@ modules:
               chart_type: line
               dimensions:
                 - name: created
+            - name: netframework.clrjit_methods
+              description: JIT-compiled methods
+              unit: methods/s
+              chart_type: line
+              dimensions:
+                - name: jit-compiled
+            - name: netframework.clrjit_time
+              description: Time spent in JIT compilation
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: netframework.clrjit_standard_failures
+              description: JIT compiler failures
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: netframework.clrjit_il_bytes
+              description: Compiled Microsoft intermediate language (MSIL) bytes
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: compiled_msil
