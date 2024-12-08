@@ -31,6 +31,7 @@ typedef struct aral_free {
 
 typedef struct aral_page {
     bool marked;
+    bool mapped;
     uint32_t size;                      // the allocation size of the page
     const char *filename;
     uint8_t *data;
@@ -424,7 +425,20 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
 #ifdef NETDATA_TRACE_ALLOCATIONS
         page->data = mallocz_int(page->size TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
 #else
-        page->data = mallocz(page->size);
+        size_t aligned_size = memory_alignment(page->size, ar->config.system_page_size);
+        if(aligned_size >= ar->config.system_page_size * 16) {
+            page->data = netdata_mmap(NULL, aligned_size, MAP_PRIVATE, 1, false, NULL);
+            if (page->data)
+                page->mapped = true;
+            else {
+                page->data = mallocz(page->size);
+                page->mapped = false;
+            }
+        }
+        else {
+            page->data = mallocz(page->size);
+            page->mapped = false;
+        }
 #endif
 
         __atomic_add_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
@@ -461,7 +475,12 @@ void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_
 #ifdef NETDATA_TRACE_ALLOCATIONS
         freez_int(page->data TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
 #else
-        freez(page->data);
+        if(page->mapped) {
+            size_t aligned_size = memory_alignment(page->size, ar->config.system_page_size);
+            netdata_munmap(page->data, aligned_size);
+        }
+        else
+            freez(page->data);
 #endif
         __atomic_sub_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
         __atomic_sub_fetch(&ar->stats->malloc.allocated_bytes, page->size, __ATOMIC_RELAXED);
