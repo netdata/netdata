@@ -332,7 +332,8 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
         if (stats.buffer_ratio > overall_buffer_ratio)
             overall_buffer_ratio = stats.buffer_ratio;
 
-        if(unlikely(s->thread.last_traffic_ut + stream_send.parents.timeout_s * USEC_PER_SEC < now_ut &&
+        if(unlikely(stats.bytes_outstanding &&
+                     s->thread.last_traffic_ut + stream_send.parents.timeout_s * USEC_PER_SEC < now_ut &&
                      !stream_sender_pending_replication_requests(s) &&
                      !stream_sender_replicating_charts(s)
                          )) {
@@ -350,18 +351,20 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
 
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
 
-            char since[RFC3339_MAX_LENGTH];
-            rfc3339_datetime_ut(since, sizeof(since), s->thread.last_traffic_ut, 2, false);
+            char duration[RFC3339_MAX_LENGTH];
+            duration_snprintf(duration, sizeof(duration), (int64_t)(now_monotonic_usec() - s->thread.last_traffic_ut), "us", true);
 
-            char pending[64];
-            size_snprintf(pending, sizeof(pending), stats.bytes_outstanding, "B", false);
+            char pending[64] = "0";
+            if(stats.bytes_outstanding)
+                size_snprintf(pending, sizeof(pending), stats.bytes_outstanding, "B", false);
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM SEND[%zu] %s [send to %s]: could not send data for %ld seconds - closing connection - "
-                   "we have sent %zu bytes in %zu operations, it is idle since: %s, and we have %s pending to send "
+                   "we have sent %zu bytes in %zu operations, it is idle for %s, and we have %s pending to send "
                    "(buffer is used %.2f%%).",
                    sth->id, rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
-                   stats.bytes_sent, stats.sends, since, pending, stats.buffer_ratio);
+                   stats.bytes_sent, stats.sends,
+                duration, pending, stats.buffer_ratio);
 
             stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_TIMEOUT, true);
             continue;

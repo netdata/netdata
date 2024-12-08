@@ -83,7 +83,6 @@ static inline ssize_t nd_sock_write(ND_SOCK *s, const void *buf, size_t num, siz
     ssize_t rc;
 
     do {
-        errno_clear();
         if (nd_sock_is_ssl(s))
             rc = netdata_ssl_write(&s->ssl, buf, num);
         else
