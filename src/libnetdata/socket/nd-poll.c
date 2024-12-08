@@ -5,7 +5,7 @@
 #if defined(OS_LINUX)
 #include <sys/epoll.h>
 
-#define MAX_EVENTS_PER_CALL 100
+#define MAX_EVENTS_PER_CALL 10
 
 // Event poll context
 struct nd_poll_t {
