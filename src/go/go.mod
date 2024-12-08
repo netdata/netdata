@@ -10,7 +10,7 @@ require (
 	github.com/Wing924/ltsv v0.4.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
-	github.com/axiomhq/hyperloglog v0.2.1
+	github.com/axiomhq/hyperloglog v0.2.0
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bmatcuk/doublestar/v4 v4.7.1
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
@@ -108,7 +108,6 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kamstrup/intmap v0.5.0 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/likexian/gokit v0.25.15 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
