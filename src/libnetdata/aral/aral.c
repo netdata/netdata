@@ -21,7 +21,7 @@
 
 // in malloc mode, when the page is bigger than this
 // use anonymous private mmap pages
-#define ARAL_MMAP_PAGES_ABOVE (32768ULL * 1024)
+#define ARAL_MMAP_PAGES_ABOVE (32ULL * 1024)
 
 typedef struct aral_free {
     size_t size;
@@ -30,6 +30,7 @@ typedef struct aral_free {
 
 typedef struct aral_page {
     bool marked;
+    bool started_marked;
     bool mapped;
     uint32_t size;                      // the allocation size of the page
     const char *filename;
@@ -62,6 +63,7 @@ struct aral_ops {
     struct {
         alignas(64) size_t allocators; // the number of threads currently trying to allocate memory
         alignas(64) size_t deallocators; // the number of threads currently trying to deallocate memory
+        alignas(64) bool last_allocated_or_deallocated; // stability detector, true when was last allocated
     } atomic;
 
     struct {
@@ -306,7 +308,7 @@ static inline ARAL_PAGE *find_page_with_allocation_internal_check(ARAL *ar, void
 }
 #endif
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // Tagging the pointer with the 'marked' flag
 
 // Retrieving the pointer and the 'marked' flag
@@ -352,7 +354,7 @@ static void aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar
     __atomic_store_n(page_ptr, tagged_page, __ATOMIC_RELEASE);  // Atomically store the tagged pointer
 }
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // check a free slot
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -428,10 +430,12 @@ static size_t aral_next_allocation_size___adders_lock_needed(ARAL *ar, bool mark
     size_t idx = mark_to_idx(marked);
     size_t size = ar->ops[idx].adders.allocation_size;
 
-    if(size < ar->config.max_allocation_size) {
-        ar->ops[idx].adders.allocation_size *= 2;
-        if(ar->ops[idx].adders.allocation_size > ar->config.max_allocation_size)
-            ar->ops[idx].adders.allocation_size = ar->config.max_allocation_size;
+    bool last_allocated = __atomic_load_n(&ar->ops[idx].atomic.last_allocated_or_deallocated, __ATOMIC_RELAXED);
+    if(last_allocated) {
+        size *= 2;
+        if(size > ar->config.max_allocation_size)
+            size = ar->config.max_allocation_size;
+        ar->ops[idx].adders.allocation_size = size;
     }
 
     if(!ar->config.mmap.enabled && size < ARAL_MMAP_PAGES_ABOVE) {
@@ -440,6 +444,8 @@ static size_t aral_next_allocation_size___adders_lock_needed(ARAL *ar, bool mark
             aral_elements_in_page_size(ar, size) * ar->config.element_size +
             memory_alignment(sizeof(ARAL_PAGE), SYSTEM_REQUIRED_ALIGNMENT);
     }
+
+    __atomic_store_n(&ar->ops[idx].atomic.last_allocated_or_deallocated, true, __ATOMIC_RELAXED);
 
     return size;
 }
@@ -536,6 +542,9 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
 }
 
 void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
+    size_t idx = mark_to_idx(page->started_marked);
+    __atomic_store_n(&ar->ops[idx].atomic.last_allocated_or_deallocated, true, __ATOMIC_RELAXED);
+
     size_t data_size, structures_size;
 
     // free it
@@ -624,7 +633,7 @@ static inline ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, bool mar
 
         if(can_add) {
             page = aral_create_page___no_lock_needed(ar, page_allocation_size TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
-            page->marked = marked;
+            page->marked = page->started_marked = marked;
 
             aral_lock(ar);
 
@@ -1064,7 +1073,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
     return ar;
 }
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // global aral caching
 
 #define ARAL_BY_SIZE_MAX_SIZE 1024
@@ -1155,7 +1164,7 @@ void aral_by_size_release(ARAL *ar) {
         aral_destroy(ar);
 }
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // unittest
 
 struct aral_unittest_config {
