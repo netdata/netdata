@@ -1955,8 +1955,11 @@ static void *pgc_evict_thread(void *ptr) {
         if(size_to_evict > 0) {
             evict_pages(cache, 0, 0, true, false);
 
-            if (was_signaled || was_critical)
-                mallocz_release_as_much_memory_to_the_system();
+            // this LOCKS everything while trimming
+            // introducing gaps at the changes of localhost
+
+//            if (was_signaled || was_critical)
+//                mallocz_release_as_much_memory_to_the_system();
         }
     }
 
