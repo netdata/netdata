@@ -283,8 +283,8 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_r
         case POLLFD_TYPE_SENDER: {
             struct sender_state *s = m->s;
             s->thread.draining_input = true;
-            stream_sender_process_poll_events(sth, s, ev->events, now_ut);
-            s->thread.draining_input = false;
+            if(stream_sender_process_poll_events(sth, s, ev->events, now_ut))
+                s->thread.draining_input = false;
             *replay_entries += dictionary_entries(s->replication.requests);
             break;
         }
@@ -292,8 +292,8 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_r
         case POLLFD_TYPE_RECEIVER: {
             struct receiver_state *rpt = m->rpt;
             rpt->thread.draining_input = true;
-            stream_receive_process_poll_events(sth, rpt, ev->events, now_ut);
-            rpt->thread.draining_input = false;
+            if(stream_receive_process_poll_events(sth, rpt, ev->events, now_ut))
+                rpt->thread.draining_input = false;
             break;
         }
 

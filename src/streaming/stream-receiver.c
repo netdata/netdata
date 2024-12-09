@@ -587,7 +587,8 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
 }
 
 // process poll() events for streaming receivers
-void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events, usec_t now_ut)
+// returns true when the receiver is still there, false if it removed it
+bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events, usec_t now_ut)
 {
     internal_fatal(
         sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
@@ -610,7 +611,7 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
     if (receiver_should_stop(rpt)) {
         receiver_set_exit_reason(rpt, rpt->exit.reason, false);
         stream_receiver_remove(sth, rpt, "received stop signal");
-        return;
+        return false;
     }
 
     if (unlikely(events & (ND_POLL_ERROR | ND_POLL_HUP | ND_POLL_INVALID))) {
@@ -629,18 +630,13 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR);
 
-        nd_log(
-            NDLS_DAEMON,
-            NDLP_ERR,
-            "STREAM RECEIVE[%zu] %s [from %s]: %s - closing connection",
-            sth->id,
-            rrdhost_hostname(rpt->host),
-            rpt->client_ip,
-            error);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM RECEIVE[%zu] %s [from %s]: %s - closing connection",
+               sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, error);
 
         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR, false);
         stream_receiver_remove(sth, rpt, error);
-        return;
+        return false;
     }
 
     if (events & ND_POLL_WRITE) {
@@ -688,13 +684,13 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
                 receiver_set_exit_reason(rpt, reason, false);
                 stream_receiver_remove(sth, rpt, disconnect_reason);
-                return;
+                return false;
             }
         }
     }
 
     if (!(events & ND_POLL_READ))
-        return;
+        return true;
 
     // we can receive data from this socket
 
@@ -712,11 +708,11 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
                    sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->sock.fd);
             receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END, false);
             stream_receiver_remove(sth, rpt, "socket reports EOF (closed by child)");
-            return;
+            return false;
         }
         else if (rc < 0) {
             if(removed)
-                return;
+                return false;
 
             else if ((errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
                 // will try later
@@ -728,10 +724,12 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
                        sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rc, rpt->sock.fd);
                 receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, false);
                 stream_receiver_remove(sth, rpt, "error during receive");
-                return;
+                return false;
             }
         }
     }
+
+    return !removed;
 }
 
 void stream_receiver_cleanup(struct stream_thread *sth) {

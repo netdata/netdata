@@ -428,7 +428,9 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
     worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, overall_buffer_ratio);
 }
 
-void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t events, usec_t now_ut) {
+// process poll() events for streaming senders
+// returns true when the sender is still there, false if it removed it
+bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t events, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     ND_LOG_STACK lgs[] = {
@@ -468,7 +470,7 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                sth->id, rrdhost_hostname(s->host), s->connected_to, error, stats.bytes_sent, stats.sends);
 
         stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR, true);
-        return;
+        return false;
     }
 
     if(events & ND_POLL_WRITE) {
@@ -525,14 +527,13 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                        stats->bytes_sent, stats->sends);
 
                 stream_sender_move_running_to_connector_or_remove(sth, s, reason, true);
-
-                return;
+                return false;
             }
         }
     }
 
     if(!(events & ND_POLL_READ))
-        return;
+        return true;
 
     // we can receive data from this socket
 
@@ -557,7 +558,7 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                    sth->id, rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
             stream_sender_move_running_to_connector_or_remove(
                 sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END, true);
-            return;
+            return false;
         }
         else if (rc < 0) {
             if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
@@ -570,10 +571,12 @@ void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                        sth->id, rrdhost_hostname(s->host), s->connected_to, rc, s->sock.fd);
                 stream_sender_move_running_to_connector_or_remove(
                     sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, true);
-                return;
+                return false;
             }
         }
     }
+
+    return true;
 }
 
 void stream_sender_cleanup(struct stream_thread *sth) {
