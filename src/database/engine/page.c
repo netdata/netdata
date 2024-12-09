@@ -95,6 +95,8 @@ static size_t aral_sizes[] = {
     // our structures
     sizeof(gorilla_writer_t),
     sizeof(PGD),
+
+    16384, 32768, 65536,
 };
 static ARAL **arals = NULL;
 
