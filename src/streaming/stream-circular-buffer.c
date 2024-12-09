@@ -78,8 +78,9 @@ void stream_circular_buffer_recreate_timed_unsafe(STREAM_CIRCULAR_BUFFER *scb, u
     scb->stats.recreates++; // we increase even if we don't do it, to have sender_start() recreate its buffers
 
     if(scb->cb && scb->cb->size > CBUFFER_INITIAL_SIZE) {
+        size_t max_size = scb->cb->max_size;
         cbuffer_free(scb->cb);
-        scb->cb = cbuffer_new(CBUFFER_INITIAL_SIZE, scb->cb->max_size, &netdata_buffers_statistics.cbuffers_streaming);
+        scb->cb = cbuffer_new(CBUFFER_INITIAL_SIZE, max_size, &netdata_buffers_statistics.cbuffers_streaming);
     }
 }
 
