@@ -58,7 +58,7 @@ static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *res
             .data = ndpl->ev[i].data.ptr,
         };
 
-        if (ndpl->ev[i].events & (EPOLLIN|EPOLLPRI))
+        if (ndpl->ev[i].events & EPOLLIN)
             result->events |= ND_POLL_READ;
 
         if (ndpl->ev[i].events & EPOLLOUT)
@@ -76,29 +76,6 @@ static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *res
 
     ndpl->last_pos = _countof(ndpl->ev);
     return false;
-}
-
-static inline int epoll_event_priority(const struct epoll_event *ev) {
-    // Write-only events
-    if (ev->events == EPOLLOUT) return 1;
-
-    // Mixed read and write
-    if (ev->events & EPOLLOUT) return 2;
-
-    // Read-only events
-    if (ev->events & (EPOLLIN | EPOLLPRI)) return 3;
-
-    // Errors or hangups (rare, but the first priority)
-    if (ev->events & (EPOLLERR | EPOLLHUP)) return 0;
-
-    // Default case: Lowest priority
-    return 4;
-}
-
-static int epoll_event_priority_cmp(const void *a, const void *b) {
-    const struct epoll_event *ev1 = (const struct epoll_event *)a;
-    const struct epoll_event *ev2 = (const struct epoll_event *)b;
-    return epoll_event_priority(ev1) - epoll_event_priority(ev2);
 }
 
 // Wait for events
@@ -126,9 +103,6 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
             result->data = NULL;
             return -1;
         }
-
-        if(n > 1)
-            qsort(ndpl->ev, n, sizeof(struct epoll_event), epoll_event_priority_cmp);
 
         ndpl->used = n;
         if (nd_poll_get_next_event(ndpl, result))
