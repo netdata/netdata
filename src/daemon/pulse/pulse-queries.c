@@ -182,12 +182,12 @@ void pulse_queries_do(bool extended __maybe_unused) {
         if (unlikely(!st_points_read)) {
             st_points_read = rrdset_create_localhost(
                 "netdata"
-                , "db_points_read"
+                , "db_samples_read"
                 , NULL
                 , "Time-Series Queries"
                 , NULL
                 , "Netdata Time-Series DB Samples Read"
-                , "points/s"
+                , "samples/s"
                 , "netdata"
                 , "pulse"
                 , 131001
@@ -233,7 +233,7 @@ void pulse_queries_do(bool extended __maybe_unused) {
                 , NULL
                 , "Time-Series Queries"
                 , NULL
-                , "Netdata Time-Series Samples Generated"
+                , "Netdata Time-Series Points Generated"
                 , "points/s"
                 , "netdata"
                 , "pulse"
