@@ -415,7 +415,10 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
         rpt->thread.send_to_child.scb = stream_circular_buffer_create();
 
         // this should be big enough to fit all the replies to the replication requests we may receive in a batch
-        stream_circular_buffer_set_max_size_unsafe(rpt->thread.send_to_child.scb, 100 * 1024 * 1024, true);
+        stream_circular_buffer_set_max_size_unsafe(
+            rpt->thread.send_to_child.scb,
+            stream_send.buffer_max_size * STREAM_RECEIVER_SEND_BUFFER_MULTIPLIER, true);
+
         rpt->thread.send_to_child.msg.thread_slot = (int32_t)sth->id;
         rpt->thread.send_to_child.msg.session = os_random32();
         rpt->thread.send_to_child.msg.meta = &rpt->thread.meta;

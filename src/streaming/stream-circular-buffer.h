@@ -10,6 +10,9 @@
 #define CBUFFER_INITIAL_MAX_SIZE (10 * 1024 * 1024)
 #define THREAD_BUFFER_INITIAL_SIZE (8192)
 
+#define STREAM_CIRCULAR_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
+#define STREAM_RECEIVER_SEND_BUFFER_MULTIPLIER 10
+
 typedef struct stream_circular_buffer_stats {
     size_t adds;
     size_t sends;
@@ -48,7 +51,7 @@ void stream_circular_buffer_recreate_timed_unsafe(STREAM_CIRCULAR_BUFFER *scb, u
 
 // returns true if it increased the buffer size
 // if it changes the size, it updates the statistics
-bool stream_circular_buffer_set_max_size_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t uncompressed_msg_size, bool force);
+bool stream_circular_buffer_set_max_size_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t max_size, bool force);
 
 // returns a pointer to the current circular buffer statistics
 // copy it if you plan to use it without a lock

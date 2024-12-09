@@ -81,11 +81,12 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
         return;
     }
 
-    if (unlikely(stream_circular_buffer_set_max_size_unsafe(s->scb, src_len, false))) {
+    if (unlikely(stream_circular_buffer_set_max_size_unsafe(
+            s->scb, src_len * STREAM_CIRCULAR_BUFFER_ADAPT_TO_TIMES_MAX_SIZE, false))) {
         // adaptive sizing of the circular buffer
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "STREAM SEND %s [to %s]: Increased max buffer size to %u (message size %zu).",
-               rrdhost_hostname(s->host), s->connected_to, stats->bytes_max_size, buffer_strlen(wb) + 1);
+               rrdhost_hostname(s->host), s->connected_to, stats->bytes_max_size, src_len + 1);
     }
 
     stream_sender_log_payload(s, wb, type, false);
