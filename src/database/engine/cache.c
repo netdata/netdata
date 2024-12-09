@@ -1935,13 +1935,16 @@ static void *pgc_evict_thread(void *ptr) {
     worker_register_job_name(1, "scheduled");
 
     unsigned job_id = 0;
+    bool was_signaled = false;
+    bool was_critical = false;
 
     while (true) {
         worker_is_idle();
         unsigned new_job_id = completion_wait_for_a_job_with_timeout(
-            &cache->evictor.completion, job_id, 100);
+            &cache->evictor.completion, job_id,
+            was_signaled || was_critical ? 100 : 1000);
 
-        bool was_signaled = new_job_id > job_id;
+        was_signaled = new_job_id > job_id;
         worker_is_busy(was_signaled ? 1 : 0);
         job_id = new_job_id;
 
@@ -1950,7 +1953,7 @@ static void *pgc_evict_thread(void *ptr) {
 
         size_t size_to_evict = 0;
         size_t per1000 = cache_usage_per1000(cache, &size_to_evict);
-        bool was_critical = per1000 >= cache->config.severe_pressure_per1000;
+        was_critical = per1000 >= cache->config.severe_pressure_per1000;
 
         if(size_to_evict > 0) {
             evict_pages(cache, 0, 0, true, false);
