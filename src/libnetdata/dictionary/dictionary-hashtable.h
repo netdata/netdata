@@ -112,8 +112,13 @@ static inline size_t hashtable_destroy_judy(DICTIONARY *dict) {
 
     pointer_destroy_index(dict);
 
+    JudyAllocThreadPulseReset();
+
     JError_t J_Error;
     Word_t ret = JudyHSFreeArray(&dict->index.JudyHSArray, &J_Error);
+
+    __atomic_add_fetch(&dict->stats->memory.index, JudyAllocThreadPulseGetAndReset(), __ATOMIC_RELAXED);
+
     if(unlikely(ret == (Word_t) JERR)) {
         netdata_log_error("DICTIONARY: Cannot destroy JudyHS, JU_ERRNO_* == %u, ID == %d",
                           JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
@@ -126,8 +131,13 @@ static inline size_t hashtable_destroy_judy(DICTIONARY *dict) {
 }
 
 static inline void *hashtable_insert_judy(DICTIONARY *dict, const char *name, size_t name_len) {
+    JudyAllocThreadPulseReset();
+
     JError_t J_Error;
     Pvoid_t *Rc = JudyHSIns(&dict->index.JudyHSArray, (void *)name, name_len, &J_Error);
+
+    __atomic_add_fetch(&dict->stats->memory.index, JudyAllocThreadPulseGetAndReset(), __ATOMIC_RELAXED);
+
     if (unlikely(Rc == PJERR)) {
         netdata_log_error("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
                           name, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
@@ -159,8 +169,13 @@ static inline int hashtable_delete_judy(DICTIONARY *dict, const char *name, size
     (void)item;
     if(unlikely(!dict->index.JudyHSArray)) return 0;
 
+    JudyAllocThreadPulseReset();
+
     JError_t J_Error;
     int ret = JudyHSDel(&dict->index.JudyHSArray, (void *)name, name_len, &J_Error);
+
+    __atomic_add_fetch(&dict->stats->memory.index, JudyAllocThreadPulseGetAndReset(), __ATOMIC_RELAXED);
+
     if(unlikely(ret == JERR)) {
         netdata_log_error("DICTIONARY: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
                           name,

@@ -65,9 +65,9 @@ typedef struct rrdlabels {
     }                                                                                                                  \
     while (0)
 
-static inline void STATS_PLUS_MEMORY(struct dictionary_stats *stats, size_t key_size, size_t item_size, size_t value_size) {
-    if(key_size)
-        __atomic_fetch_add(&stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
+static inline void STATS_PLUS_MEMORY(struct dictionary_stats *stats, int64_t judy_mem, size_t item_size, size_t value_size) {
+    if(judy_mem)
+        __atomic_fetch_add(&stats->memory.index, judy_mem, __ATOMIC_RELAXED);
 
     if(item_size)
         __atomic_fetch_add(&stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
@@ -76,9 +76,9 @@ static inline void STATS_PLUS_MEMORY(struct dictionary_stats *stats, size_t key_
         __atomic_fetch_add(&stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
 }
 
-static inline void STATS_MINUS_MEMORY(struct dictionary_stats *stats, size_t key_size, size_t item_size, size_t value_size) {
-    if(key_size)
-        __atomic_fetch_sub(&stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
+static inline void STATS_MINUS_MEMORY(struct dictionary_stats *stats, int64_t judy_mem, size_t item_size, size_t value_size) {
+    if(judy_mem)
+        __atomic_fetch_add(&stats->memory.index, judy_mem, __ATOMIC_RELAXED);
 
     if(item_size)
         __atomic_fetch_sub(&stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
@@ -131,7 +131,12 @@ static RRDLABEL *add_label_name_value(const char *name, const char *value)
 
     spinlock_lock(&global_labels.spinlock);
 
+    JudyAllocThreadPulseReset();
+
     Pvoid_t *PValue = JudyHSIns(&global_labels.JudyHS, (void *)&label_index, sizeof(label_index), PJE0);
+
+    int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+
     if(unlikely(!PValue || PValue == PJERR))
         fatal("RRDLABELS: corrupted judyHS array");
 
@@ -139,11 +144,12 @@ static RRDLABEL *add_label_name_value(const char *name, const char *value)
         rrdlabel = *PValue;
         string_freez(label_index.key);
         string_freez(label_index.value);
+        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, judy_mem, 0, 0);
     } else {
         rrdlabel = callocz(1, sizeof(*rrdlabel));
         rrdlabel->label.index = label_index;
         *PValue = rrdlabel;
-        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, sizeof(LABEL_REGISTRY_IDX), sizeof(RRDLABEL_IDX), 0);
+        STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, judy_mem, sizeof(RRDLABEL_IDX), 0);
     }
     __atomic_add_fetch(&rrdlabel->refcount, 1, __ATOMIC_RELAXED);
 
@@ -160,11 +166,16 @@ static void delete_label(RRDLABEL *label)
         RRDLABEL_IDX *rrdlabel = *PValue;
         size_t refcount = __atomic_sub_fetch(&rrdlabel->refcount, 1, __ATOMIC_RELAXED);
         if (refcount == 0) {
+            JudyAllocThreadPulseReset();
+
             int ret = JudyHSDel(&global_labels.JudyHS, (void *)label, sizeof(*label), PJE0);
+
+            int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+
             if (unlikely(ret == JERR))
-                STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, sizeof(*rrdlabel), 0);
+                STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, judy_mem, sizeof(*rrdlabel), 0);
             else
-                STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, sizeof(LABEL_REGISTRY_IDX), sizeof(*rrdlabel), 0);
+                STATS_MINUS_MEMORY(&dictionary_stats_category_rrdlabels, judy_mem, sizeof(*rrdlabel), 0);
             string_freez(label->index.key);
             string_freez(label->index.value);
             freez(rrdlabel);
