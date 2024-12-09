@@ -1081,11 +1081,11 @@ modules:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework
       monitored_instance:
-        name: MS SQL Server
-        link: "https://dotnet.microsoft.com/en-us/?icid=SSM_Search_.NET_CTA1"
+        name: NET Framework
+        link: "https://dotnet.microsoft.com/en-us/learn/dotnet/what-is-dotnet-framework"
         categories:
           - data-collection.windows-systems
-        icon_filename: "windows.svg"
+        icon_filename: "dotnet.svg"
       related_resources:
         integrations:
           list: []
@@ -1095,7 +1095,7 @@ modules:
         - windows
         - microsoft
         - netframework
-        - .NET
+        - dotnet
       most_popular: false
     overview:
       data_collection:
