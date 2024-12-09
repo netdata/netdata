@@ -53,6 +53,11 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
 }
 
 static void stream_thread_send_pipe_signal(struct stream_thread *sth) {
+    if(sth->tid == gettid_cached())
+        // no need for this if we are the same thread
+        // we will process all the events shortly
+        return;
+
     if(sth->pipe.fds[PIPE_WRITE] != -1 &&
         write(sth->pipe.fds[PIPE_WRITE], " ", 1) != 1) {
         nd_log_limit_static_global_var(erl, 1, 1 * USEC_PER_MS);
@@ -75,9 +80,13 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
     }
 
     // check if we can execute the message now
-    if(sth->tid == gettid_cached()) {
-        // we are running at the dispatcher thread
-        // no need for locks or queuing
+    if(msg.opcode == STREAM_OPCODE_RECEIVER_POLLOUT && sth->tid == gettid_cached()) {
+        // we are running at the stream thread, and the request is about enabling POLLOUT,
+        // we can do this synchronously.
+        // IMPORTANT: DO NOT HANDLE FAILURES THAT REMOVE THE RECEIVER OR THE SENDER THIS WAY
+        //            THE EVENT LOOP DRAINS THE INPUT SOCKET (BOTH RECEIVER AND SENDER)
+        //            AND THE LOOP WILL CRASH IF THE RECEIVER OR THE SENDER VANISH WHILE IT
+        //            WORKS WITH THEM!
         sth->messages.bypassed++;
         stream_thread_handle_op(sth, &msg);
         return;
@@ -143,9 +152,13 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
     }
 
     // check if we can execute the message now
-    if(sth->tid == gettid_cached()) {
-        // we are running at the dispatcher thread
-        // no need for locks or queuing
+    if(msg.opcode == STREAM_OPCODE_SENDER_POLLOUT && sth->tid == gettid_cached()) {
+        // we are running at the stream thread, and the request is about enabling POLLOUT,
+        // we can do this synchronously.
+        // IMPORTANT: DO NOT HANDLE FAILURES THAT REMOVE THE RECEIVER OR THE SENDER THIS WAY
+        //            THE EVENT LOOP DRAINS THE INPUT SOCKET (BOTH RECEIVER AND SENDER)
+        //            AND THE LOOP WILL CRASH IF THE RECEIVER OR THE SENDER VANISH WHILE IT
+        //            WORKS WITH THEM!
         sth->messages.bypassed++;
         stream_thread_handle_op(sth, &msg);
         return;

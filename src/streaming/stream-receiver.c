@@ -413,7 +413,7 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
 
         spinlock_lock(&rpt->thread.send_to_child.spinlock);
         rpt->thread.send_to_child.scb = stream_circular_buffer_create();
-        
+
         // this should be big enough to fit all the replies to the replication requests we may receive in a batch
         stream_circular_buffer_set_max_size_unsafe(rpt->thread.send_to_child.scb, 100 * 1024 * 1024, true);
         rpt->thread.send_to_child.msg.thread_slot = (int32_t)sth->id;
@@ -513,15 +513,14 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
         if(unlikely(rc <= 0))
             return rc;
 
-        bool node_removed = false;
-        while(!node_removed && !nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING) && !receiver_should_stop(rpt)) {
+        while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING) && !receiver_should_stop(rpt)) {
             worker_is_busy(WORKER_STREAM_JOB_DECOMPRESS);
 
             // feed the decompressor with the new data we just read
             decompressor_status_t feed_rc = receiver_feed_decompressor(rpt);
 
             if(likely(feed_rc == DECOMPRESS_OK)) {
-                while (!node_removed) {
+                while (true) {
                     // feed our uncompressed data buffer with new data
                     decompressor_status_t decompress_rc = receiver_get_decompressed(rpt);
 
@@ -532,8 +531,8 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
                             if (unlikely(parser_action(parser, rpt->thread.buffer->buffer))) {
                                 receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
                                 stream_receiver_remove(sth, rpt, "parser action failed");
-                                node_removed = true;
-                                break;
+                                *removed = true;
+                                return -1;
                             }
 
                             rpt->thread.buffer->len = 0;
@@ -546,8 +545,8 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
                     else {
                         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
                         stream_receiver_remove(sth, rpt, "receiver decompressor failed");
-                        node_removed = true;
-                        break;
+                        *removed = true;
+                        return -1;
                     }
                 }
             }
@@ -556,12 +555,12 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
             else {
                 receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
                 stream_receiver_remove(sth, rpt, "receiver compressed data invalid");
-                node_removed = true;
-                break;
+                *removed = true;
+                return -1;
             }
         }
 
-        if(!node_removed && receiver_should_stop(rpt)) {
+        if(receiver_should_stop(rpt)) {
             receiver_set_exit_reason(rpt, rpt->exit.reason, false);
             stream_receiver_remove(sth, rpt, "received stop signal");
             *removed = true;
@@ -576,7 +575,8 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
             if(unlikely(parser_action(parser, rpt->thread.buffer->buffer))) {
                 receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
                 stream_receiver_remove(sth, rpt, "parser action failed");
-                break;
+                *removed = true;
+                return -1;
             }
 
             rpt->thread.buffer->len = 0;
