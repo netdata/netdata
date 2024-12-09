@@ -4,7 +4,7 @@
 #define NETDATA_SQLITE_HEALTH_H
 
 #include "daemon/common.h"
-#include "sqlite3.h"
+#include "database/sqlite/vendored/sqlite3.h"
 
 #define ALERT_TRANSITION_DELAY_LONG  (600)
 #define ALERT_TRANSITION_DELAY_SHORT (10)

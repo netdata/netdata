@@ -59,6 +59,7 @@ struct context_v2_entry {
     size_t count;
     STRING *id;
     STRING *family;
+    STRING *units;
     uint32_t priority;
     time_t first_time_s;
     time_t last_time_s;
@@ -174,6 +175,7 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
                 .count = 1,
                 .id = rc->id,
                 .family = string_dup(rc->family),
+                .units = string_dup(rc->units),
                 .priority = rc->priority,
                 .first_time_s = rc->first_time_s,
                 .last_time_s = rc->last_time_s,
@@ -672,6 +674,21 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
         }
     }
 
+    if(o->units != n->units) {
+        if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
+            // keep old
+            ;
+        else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
+            // keep new
+            string_freez(o->units);
+            o->units = string_dup(n->units);
+        }
+        else {
+            // keep old
+            ;
+        }
+    }
+
     if(o->priority != n->priority) {
         if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
             // keep o
@@ -705,6 +722,7 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
 static void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct context_v2_entry *z = value;
     string_freez(z->family);
+    string_freez((z->units));
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode) {
@@ -946,6 +964,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                     buffer_json_member_add_object(wb, string2str(z->id));
                     {
                         buffer_json_member_add_string(wb, "family", string2str(z->family));
+                        buffer_json_member_add_string(wb, "units", string2str(z->units));
                         buffer_json_member_add_uint64(wb, "priority", z->priority);
                         buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
                         buffer_json_member_add_time_t(wb, "last_entry", collected ? ctl.now : z->last_time_s);

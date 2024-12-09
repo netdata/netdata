@@ -653,40 +653,40 @@ netdata_detect_protobuf()
 #
 
 set(LIBJUDY_PREV_FILES
-        src/libnetdata/libjudy/src/JudyL/JudyLPrev.c
-        src/libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLPrev.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLPrevEmpty.c
 )
 
 set(LIBJUDY_NEXT_FILES
-        src/libnetdata/libjudy/src/JudyL/JudyLNext.c
-        src/libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLNext.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLNextEmpty.c
 )
 
 set(LIBJUDY_SOURCES
-        src/libnetdata/libjudy/src/Judy.h
-        src/libnetdata/libjudy/src/JudyCommon/JudyMalloc.c
-        src/libnetdata/libjudy/src/JudyCommon/JudyPrivate.h
-        src/libnetdata/libjudy/src/JudyCommon/JudyPrivate1L.h
-        src/libnetdata/libjudy/src/JudyCommon/JudyPrivateBranch.h
-        src/libnetdata/libjudy/src/JudyL/JudyL.h
-        src/libnetdata/libjudy/src/JudyL/JudyLByCount.c
-        src/libnetdata/libjudy/src/JudyL/JudyLCascade.c
-        src/libnetdata/libjudy/src/JudyL/JudyLCount.c
-        src/libnetdata/libjudy/src/JudyL/JudyLCreateBranch.c
-        src/libnetdata/libjudy/src/JudyL/JudyLDecascade.c
-        src/libnetdata/libjudy/src/JudyL/JudyLDel.c
-        src/libnetdata/libjudy/src/JudyL/JudyLFirst.c
-        src/libnetdata/libjudy/src/JudyL/JudyLFreeArray.c
-        src/libnetdata/libjudy/src/JudyL/j__udyLGet.c
-        src/libnetdata/libjudy/src/JudyL/JudyLGet.c
-        src/libnetdata/libjudy/src/JudyL/JudyLInsArray.c
-        src/libnetdata/libjudy/src/JudyL/JudyLIns.c
-        src/libnetdata/libjudy/src/JudyL/JudyLInsertBranch.c
-        src/libnetdata/libjudy/src/JudyL/JudyLMallocIF.c
-        src/libnetdata/libjudy/src/JudyL/JudyLMemActive.c
-        src/libnetdata/libjudy/src/JudyL/JudyLMemUsed.c
-        src/libnetdata/libjudy/src/JudyL/JudyLTables.c
-        src/libnetdata/libjudy/src/JudyHS/JudyHS.c
+        src/libnetdata/libjudy/vendored/Judy.h
+        src/libnetdata/libjudy/vendored/JudyCommon/JudyMalloc.c
+        src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivate.h
+        src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivate1L.h
+        src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivateBranch.h
+        src/libnetdata/libjudy/vendored/JudyL/JudyL.h
+        src/libnetdata/libjudy/vendored/JudyL/JudyLByCount.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLCascade.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLCount.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLCreateBranch.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLDecascade.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLDel.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLFirst.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLFreeArray.c
+        src/libnetdata/libjudy/vendored/JudyL/j__udyLGet.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLGet.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLInsArray.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLIns.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLInsertBranch.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLMallocIF.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLMemActive.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLMemUsed.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLTables.c
+        src/libnetdata/libjudy/vendored/JudyHS/JudyHS.c
         ${LIBJUDY_PREV_FILES}
         ${LIBJUDY_NEXT_FILES}
 )
@@ -733,8 +733,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/inlined.h
         src/libnetdata/json/json.c
         src/libnetdata/json/json.h
-        src/libnetdata/json/jsmn.c
-        src/libnetdata/json/jsmn.h
+        src/libnetdata/json/vendored/jsmn.c
+        src/libnetdata/json/vendored/jsmn.h
         src/libnetdata/libnetdata.c
         src/libnetdata/libnetdata.h
         src/libnetdata/line_splitter/line_splitter.c
@@ -1416,11 +1416,11 @@ set(RRD_PLUGIN_FILES
         src/database/sqlite/sqlite_aclk_node.h
         src/database/sqlite/sqlite_aclk_alert.c
         src/database/sqlite/sqlite_aclk_alert.h
-        src/database/sqlite/sqlite3.c
-        src/database/sqlite/sqlite3.h
-        src/database/sqlite/sqlite3recover.c
-        src/database/sqlite/sqlite3recover.h
-        src/database/sqlite/dbdata.c
+        src/database/sqlite/vendored/sqlite3.c
+        src/database/sqlite/vendored/sqlite3.h
+        src/database/sqlite/vendored/sqlite3recover.c
+        src/database/sqlite/vendored/sqlite3recover.h
+        src/database/sqlite/vendored/dbdata.c
         src/database/KolmogorovSmirnovDist.c
         src/database/KolmogorovSmirnovDist.h
         src/database/rrdfunctions-inflight.c
@@ -1926,14 +1926,14 @@ target_compile_definitions(judy PRIVATE
 )
 
 target_include_directories(judy PUBLIC
-        src/libnetdata/libjudy/src
-        src/libnetdata/libjudy/src/JudyCommon
+        src/libnetdata/libjudy/vendored
+        src/libnetdata/libjudy/vendored/JudyCommon
 )
 
 set_source_files_properties(${LIBJUDY_PREV_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYPREV")
 set_source_files_properties(${LIBJUDY_NEXT_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYNEXT")
-set_source_files_properties(src/libnetdata/libjudy/src/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
-set_source_files_properties(src/libnetdata/libjudy/src/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
+set_source_files_properties(src/libnetdata/libjudy/vendored/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
+set_source_files_properties(src/libnetdata/libjudy/vendored/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
 set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/src/libnetdata/libjudy/src/JudyL")
 
 #
