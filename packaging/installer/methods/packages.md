@@ -18,7 +18,7 @@ and fail if it cannot do so.
 
 ## Manual setup of RPM packages
 
-Netdata’s official RPM repositories are hosted at <https://repository.netdata.cloud/repos>. We provide four groups of
+Netdata’s official RPM repositories are hosted at <https://repository.netdata.cloud/repos/index.html>. We provide four groups of
 repositories at that top level:
 
 - `stable`: Contains packages for stable releases of the Netdata Agent.
@@ -46,9 +46,10 @@ current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The assoc
 `https://repository.netdata.cloud/netdatabot.gpg.key`.
 
 If you are explicitly configuring a system to use our repositories, the recommended setup is to download the
-appropriate repository configuration package from <https://repository.netdata.cloud/repos/repoconfig> and install it
-directly on the target system using the system package manager. This will ensure any packages needed to use the
-repository are also installed, and will help enable a seamless transition if we ever need to change our infrastructure.
+appropriate repository configuration package from <https://repository.netdata.cloud/repos/repoconfig/index.html>
+and install it directly on the target system using the system package manager. This will ensure any packages
+needed to use the repository are also installed, and will help enable a seamless transition if we ever need to
+change our infrastructure.
 
 > **Note**
 >
@@ -59,7 +60,7 @@ repository are also installed, and will help enable a seamless transition if we 
 
 ## Manual setup of DEB packages
 
-Netdata’s official DEB repositories are hosted at <https://repository.netdata.cloud/repos>. We provide four groups of
+Netdata’s official DEB repositories are hosted at <https://repository.netdata.cloud/repos/index.html>. We provide four groups of
 repositories at that top level:
 
 - `stable`: Contains packages for stable releases of the Netdata Agent.
@@ -102,7 +103,7 @@ current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The assoc
 `https://repository.netdata.cloud/netdatabot.gpg.key`.
 
 If you are explicitly configuring a system to use our repositories, the recommended setup is to download the
-appropriate repository configuration package from <https://repository.netdata.cloud/repos/repoconfig> and install it
+appropriate repository configuration package from <https://repository.netdata.cloud/repos/repoconfig/index.html> and install it
 directly on the target system using the system package manager. This will ensure any packages needed to use the
 repository are also installed, and will help enable a seamless transition if we ever need to change our infrastructure.
 
