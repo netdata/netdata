@@ -1,31 +1,36 @@
 # API Tokens
 
-## Overview
+API tokens (Bearer tokens) enable programmatic access to Netdata resources. These tokens authenticate and authorize API requests, allowing you to interact with Netdata services securely from external applications, scripts, or integrations.
 
-Every single user can get access to the Netdata resource programmatically. It is done through the API Token, also called Bearer Token. This token is used for authentication and authorization, it can be issued in the Netdata UI under the user Settings:
+> **Important**: API tokens never expire but should be managed carefully as they grant access to your Netdata resources.
 
-<img width="316" alt="image" src="https://github.com/netdata/netdata/assets/14999928/b0846076-afae-47ab-92df-c24967305ab9"/>
+## Token Generation
 
-The API Tokens are not going to expire and can be limited to a few scopes:
+**Location**:
 
-* `scope:all`
+Access token management through the Netdata UI:
 
-  this token is given the same level of action as the user has, the use-case for it is Netdata terraform provider
+1. Click your profile picture in the bottom-left corner
+2. Select "User Settings"
+3. Navigate to the API Tokens section
 
-* `scope:agent-ui`
+**Available Scopes**:
 
-  this token is mainly used by the local Netdata Agent accessing the Cloud UI
+Each token can be limited to specific scopes that define its access permissions:
 
-* `scope:grafana-plugin`
+| Scope                  | Description                                                                                                                                        |
+|:-----------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|
+| `scope:all`            | Grants the same permissions as the user who created the token. Use case: Terraform provider integration.                                           |
+| `scope:agent-ui`       | Used by Agent for accessing the Cloud UI                                                                                                           |
+| `scope:grafana-plugin` | Used for the [Netdata Grafana plugin](https://github.com/netdata/netdata-grafana-datasource-plugin/blob/master/README.md) to access Netdata charts |
 
-  this token is used for the [Netdata Grafana plugin](https://github.com/netdata/netdata-grafana-datasource-plugin/blob/master/README.md)
-  to access Netdata charts
-
-Currently, Netdata Cloud is not exposing the stable API.
+> **Info**
+>
+> Currently, Netdata Cloud is not exposing the stable API.
 
 ## Example usage
 
-* get the Netdata Cloud space list
+**get the Netdata Cloud space list**
 
 ```console
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/spaces
