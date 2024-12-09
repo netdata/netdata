@@ -766,7 +766,7 @@ void *aral_mallocz_internal(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEF
     // put the page pointer after the element
     aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ar, page, found_fr, marked);
 
-    if(unlikely(ar->config.mmap.enabled))
+    if(unlikely(ar->config.mmap.enabled || page->mapped))
         __atomic_add_fetch(&ar->stats->mmap.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
     else
         __atomic_add_fetch(&ar->stats->malloc.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
@@ -827,17 +827,17 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
 
     if(unlikely(!ptr)) return;
 
-    if(unlikely(ar->config.mmap.enabled))
-        __atomic_sub_fetch(&ar->stats->mmap.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
-    else
-        __atomic_sub_fetch(&ar->stats->malloc.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
-
     // get the page pointer
     bool marked;
     ARAL_PAGE *page = aral_get_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, &marked);
 
     size_t idx = mark_to_idx(marked);
     __atomic_add_fetch(&ar->ops[idx].atomic.deallocators, 1, __ATOMIC_RELAXED);
+
+    if(unlikely(ar->config.mmap.enabled || page->mapped))
+        __atomic_sub_fetch(&ar->stats->mmap.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
+    else
+        __atomic_sub_fetch(&ar->stats->malloc.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
 
     // make this element available
     ARAL_FREE *fr = (ARAL_FREE *)ptr;
