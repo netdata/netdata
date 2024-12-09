@@ -1197,9 +1197,20 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     return rc;
 }
 
-int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance) {
+int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms) {
+    if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
+    if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
+
+    if(timeout_ms > 0) {
+        short revents;
+        NETDATA_SSL ssl = { 0 };
+        wait_on_socket_or_cancel_with_timeout(&ssl, instance->sock, timeout_ms, POLLIN, &revents);
+    }
+
     // kill the child, if it is still running
-    if(instance->child_pid) kill(instance->child_pid, SIGTERM);
+    if(instance->child_pid)
+        kill(instance->child_pid, SIGTERM);
+
     return spawn_server_exec_wait(server, instance);
 }
 

@@ -264,7 +264,7 @@ void sleep_to_absolute_time(usec_t usec) {
 #define HEARTBEAT_RANDOM_OFFSET_UT  (350 * USEC_PER_MS)
 
 #define HEARTBEAT_ALIGNMENT_STATISTICS_SIZE 20
-static SPINLOCK heartbeat_alignment_spinlock = NETDATA_SPINLOCK_INITIALIZER;
+static SPINLOCK heartbeat_alignment_spinlock = SPINLOCK_INITIALIZER;
 static size_t heartbeat_alignment_id = 0;
 
 struct heartbeat_thread_statistics {

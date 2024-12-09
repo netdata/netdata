@@ -692,7 +692,7 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch
 // query ops
 
 #ifdef NETDATA_INTERNAL_CHECKS
-SPINLOCK global_query_handle_spinlock = NETDATA_SPINLOCK_INITIALIZER;
+SPINLOCK global_query_handle_spinlock = SPINLOCK_INITIALIZER;
 static struct rrdeng_query_handle *global_query_handle_ll = NULL;
 static void register_query_handle(struct rrdeng_query_handle *handle) {
     handle->query_pid = gettid_cached();

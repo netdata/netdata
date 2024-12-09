@@ -307,7 +307,7 @@ int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **a
 #define MAX_CMDLINE 16384
 
 Pvoid_t ebpf_pid_judyL = NULL;
-SPINLOCK ebpf_pid_spinlock = NETDATA_SPINLOCK_INITIALIZER;
+SPINLOCK ebpf_pid_spinlock = SPINLOCK_INITIALIZER;
 
 void ebpf_pid_del(pid_t pid)
 {

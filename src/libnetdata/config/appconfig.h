@@ -100,7 +100,7 @@
 #define CONFIG_SECTION_PROMETHEUS         "prometheus:exporter"
 #define CONFIG_SECTION_HOST_LABEL         "host labels"
 #define EXPORTING_CONF                    "exporting.conf"
-#define CONFIG_SECTION_TELEMETRY          "telemetry"
+#define CONFIG_SECTION_PULSE              "pulse"
 #define CONFIG_SECTION_DB                 "db"
 
 // these are used to limit the configuration names and values lengths
@@ -122,7 +122,7 @@ struct config {
 
 #define APPCONFIG_INITIALIZER (struct config) {         \
         .sections = NULL,                               \
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,       \
+        .spinlock = SPINLOCK_INITIALIZER,       \
         .index = {                                      \
             .avl_tree = {                               \
                 .root = NULL,                           \

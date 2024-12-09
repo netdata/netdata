@@ -76,7 +76,8 @@ struct rrdengine_datafile {
 };
 
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
-void datafile_release(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
+void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason, const char *func);
+#define datafile_release(df, reason) datafile_release_with_trace(df, reason, __FUNCTION__)
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdown);
 
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool having_lock);

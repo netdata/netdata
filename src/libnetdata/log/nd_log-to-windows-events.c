@@ -439,7 +439,7 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
 
     CLEAN_BUFFER *tmp = NULL;
 
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
     wevt_generate_all_fields_unsafe(fields, fields_max, &tmp);
 

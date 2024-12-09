@@ -7,7 +7,7 @@ static struct {
     ND_UUID claim_uuid;
     ND_UUID claim_uuid_saved;
 } claim = {
-    .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+    .spinlock = SPINLOCK_INITIALIZER,
 };
 
 void claim_id_clear_previous_working(void) {

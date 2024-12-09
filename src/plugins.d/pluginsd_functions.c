@@ -51,7 +51,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
 
     // send the command to the plugin
     // IMPORTANT: make sure all commands are sent in 1 call, because in streaming they may interfere with others
-    ssize_t ret = send_to_plugin(buffer_tostring(buffer), parser);
+    ssize_t ret = send_to_plugin(buffer_tostring(buffer), parser, STREAM_TRAFFIC_TYPE_FUNCTIONS);
     pf->sent_monotonic_ut = now_monotonic_usec();
 
     if(ret < 0) {
@@ -155,7 +155,7 @@ static void pluginsd_function_cancel(void *data) {
             snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_CANCEL " %s\n", transaction);
 
             // send the command to the plugin
-            ssize_t ret = send_to_plugin(buffer, t->parser);
+            ssize_t ret = send_to_plugin(buffer, t->parser, STREAM_TRAFFIC_TYPE_FUNCTIONS);
             if(ret < 0)
                 sent = true;
 
@@ -183,7 +183,7 @@ static void pluginsd_function_progress_to_plugin(void *data) {
             snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_PROGRESS " %s\n", transaction);
 
             // send the command to the plugin
-            ssize_t ret = send_to_plugin(buffer, t->parser);
+            ssize_t ret = send_to_plugin(buffer, t->parser, STREAM_TRAFFIC_TYPE_FUNCTIONS);
             if(ret < 0)
                 sent = true;
 

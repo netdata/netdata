@@ -4,6 +4,7 @@
 #define NETDATA_STREAM_THREAD_H
 
 #include "libnetdata/libnetdata.h"
+#include "stream-circular-buffer.h"
 
 struct stream_thread;
 struct pollfd_slotted {
@@ -17,17 +18,19 @@ struct pollfd_slotted {
 typedef enum __attribute__((packed)) {
     STREAM_OPCODE_NONE                                  = 0,
     STREAM_OPCODE_SENDER_POLLOUT                        = (1 << 0), // move traffic around as soon as possible
-    STREAM_OPCODE_SENDER_BUFFER_OVERFLOW                = (1 << 1), // reconnect the node, it has buffer overflow
-    STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION  = (1 << 2), // reconnect the node, but disable compression
-    STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT             = (1 << 3), // disconnect the node, the receiver left
-    STREAM_OPCODE_SENDER_STOP_HOST_CLEANUP              = (1 << 4), // disconnect the node, it is being de-allocated
+    STREAM_OPCODE_RECEIVER_POLLOUT                      = (1 << 1), // disconnect the node, it has buffer overflow
+    STREAM_OPCODE_SENDER_BUFFER_OVERFLOW                = (1 << 2), // reconnect the node, it has buffer overflow
+    STREAM_OPCODE_RECEIVER_BUFFER_OVERFLOW              = (1 << 3), // reconnect the node, it has buffer overflow
+    STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION  = (1 << 4), // reconnect the node, but disable compression
+    STREAM_OPCODE_SENDER_STOP_RECEIVER_LEFT             = (1 << 5), // disconnect the node, the receiver left
+    STREAM_OPCODE_SENDER_STOP_HOST_CLEANUP              = (1 << 6), // disconnect the node, it is being de-allocated
 } STREAM_OPCODE;
 
 struct stream_opcode {
     int32_t thread_slot;                // the dispatcher id this message refers to
     uint32_t session;                   // random number used to verify that the message the dispatcher receives is for this sender
     STREAM_OPCODE opcode;               // the actual message to be delivered
-    struct sender_state *sender;
+    struct pollfd_meta *meta;
 };
 
 // IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
@@ -61,7 +64,7 @@ struct stream_opcode {
 #define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW                           (WORKER_PARSER_FIRST_JOB - 18)
 #define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT                            (WORKER_PARSER_FIRST_JOB - 17)
 #define WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR                       (WORKER_PARSER_FIRST_JOB - 16)
-#define WORKER_SENDER_JOB_DISCONNECT_PARENT_CLOSED                      (WORKER_PARSER_FIRST_JOB - 15)
+#define WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED                      (WORKER_PARSER_FIRST_JOB - 15)
 #define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR                      (WORKER_PARSER_FIRST_JOB - 14)
 #define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR                         (WORKER_PARSER_FIRST_JOB - 13)
 #define WORKER_SENDER_JOB_DISCONNECT_COMPRESSION_ERROR                  (WORKER_PARSER_FIRST_JOB - 12)
@@ -105,6 +108,7 @@ struct pollfd_meta {
 
 DEFINE_JUDYL_TYPED(SENDERS, struct sender_state *);
 DEFINE_JUDYL_TYPED(RECEIVERS, struct receiver_state *);
+DEFINE_JUDYL_TYPED(META, struct pollfd_meta *);
 
 struct stream_thread {
     ND_THREAD *thread;
@@ -114,13 +118,11 @@ struct stream_thread {
     size_t nodes_count;
 
     struct {
-        SENDERS_JudyLSet senders;
         size_t bytes_received;
         size_t bytes_sent;
     } snd;
 
     struct {
-        RECEIVERS_JudyLSet receivers;
         size_t bytes_received;
         size_t bytes_received_uncompressed;
         NETDATA_DOUBLE replication_completion;
@@ -155,6 +157,7 @@ struct stream_thread {
     struct {
         nd_poll_t *ndpl;
         struct pollfd_meta pipe;
+        META_JudyLSet meta;
     } run;
 };
 

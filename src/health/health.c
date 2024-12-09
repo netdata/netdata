@@ -5,7 +5,7 @@
 
 struct health_plugin_globals health_globals = {
     .initialization = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .spinlock = SPINLOCK_INITIALIZER,
         .done = false,
     },
     .config = {

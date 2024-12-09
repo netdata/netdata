@@ -11,7 +11,7 @@
  */
 void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_system)
 {
-    if (!telemetry_enabled)
+    if (!pulse_enabled)
         return;
         
     if (*st_rusage && *rd_user && *rd_system)
@@ -44,7 +44,7 @@ void create_main_rusage_chart(RRDSET **st_rusage, RRDDIM **rd_user, RRDDIM **rd_
  */
 void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system)
 {
-    if (!telemetry_enabled)
+    if (!pulse_enabled)
         return;
 
     struct rusage thread;
@@ -65,7 +65,7 @@ void send_main_rusage(RRDSET *st_rusage, RRDDIM *rd_user, RRDDIM *rd_system)
  */
 void send_internal_metrics(struct instance *instance)
 {
-    if (!telemetry_enabled)
+    if (!pulse_enabled)
         return;
 
     struct stats *stats = &instance->stats;

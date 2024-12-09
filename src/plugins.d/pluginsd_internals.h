@@ -13,7 +13,7 @@
 
 PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const char *msg);
 
-ssize_t send_to_plugin(const char *txt, PARSER *parser);
+ssize_t send_to_plugin(const char *txt, PARSER *parser, STREAM_TRAFFIC_TYPE type);
 
 static inline RRDHOST *pluginsd_require_scope_host(PARSER *parser, const char *cmd) {
     RRDHOST *host = parser->user.host;
@@ -37,16 +37,16 @@ static inline RRDSET *pluginsd_get_scope_chart(PARSER *parser) {
     return parser->user.st;
 }
 
-static inline void pluginsd_lock_rrdset_data_collection(PARSER *parser) {
+static inline void rrdset_data_collection_lock_with_trace(PARSER *parser, const char *func) {
     if(parser->user.st && !parser->user.v2.locked_data_collection) {
-        spinlock_lock(&parser->user.st->data_collection_lock);
+        spinlock_lock_with_trace(&parser->user.st->data_collection_lock, func);
         parser->user.v2.locked_data_collection = true;
     }
 }
 
-static inline bool pluginsd_unlock_rrdset_data_collection(PARSER *parser) {
+static inline bool rrdset_data_collection_unlock_with_trace(PARSER *parser, const char *func) {
     if(parser->user.st && parser->user.v2.locked_data_collection) {
-        spinlock_unlock(&parser->user.st->data_collection_lock);
+        spinlock_unlock_with_trace(&parser->user.st->data_collection_lock, func);
         parser->user.v2.locked_data_collection = false;
         return true;
     }
@@ -54,8 +54,11 @@ static inline bool pluginsd_unlock_rrdset_data_collection(PARSER *parser) {
     return false;
 }
 
-static inline void pluginsd_unlock_previous_scope_chart(PARSER *parser, const char *keyword, bool stale) {
-    if(unlikely(pluginsd_unlock_rrdset_data_collection(parser))) {
+#define rrdset_data_collection_lock(parser) rrdset_data_collection_lock_with_trace(parser, __FUNCTION__)
+#define rrdset_data_collection_unlock(parser) rrdset_data_collection_unlock_with_trace(parser, __FUNCTION__)
+
+static inline void rrdset_previous_scope_chart_unlock(PARSER *parser, const char *keyword, bool stale) {
+    if(unlikely(rrdset_data_collection_unlock(parser))) {
         if(stale)
             netdata_log_error("PLUGINSD: 'host:%s/chart:%s/' stale data collection lock found during %s; it has been unlocked",
                               rrdhost_hostname(parser->user.st->rrdhost),
@@ -76,7 +79,7 @@ static inline void pluginsd_unlock_previous_scope_chart(PARSER *parser, const ch
 }
 
 static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keyword) {
-    pluginsd_unlock_previous_scope_chart(parser, keyword, true);
+    rrdset_previous_scope_chart_unlock(parser, keyword, true);
 
     if(parser->user.cleanup_slots && parser->user.st)
         rrdset_pluginsd_receive_unslot(parser->user.st);

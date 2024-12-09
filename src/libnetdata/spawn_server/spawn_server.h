@@ -42,7 +42,7 @@ void spawn_server_destroy(SPAWN_SERVER *server);
 pid_t spawn_server_pid(SPAWN_SERVER *server);
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type);
-int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si);
+int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms);
 int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *si);
 
 int spawn_server_instance_read_fd(SPAWN_INSTANCE *si);

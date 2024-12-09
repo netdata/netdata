@@ -606,7 +606,7 @@ static SSL_CTX * netdata_ssl_create_server_ctx(unsigned long mode) {
  *      NETDATA_SSL_CONTEXT_EXPORTING - Starts the OpenTSDB context
  */
 void netdata_ssl_initialize_ctx(int selector) {
-    static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK sp = SPINLOCK_INITIALIZER;
     spinlock_lock(&sp);
 
     switch (selector) {

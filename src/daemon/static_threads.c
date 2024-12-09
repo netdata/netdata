@@ -12,7 +12,7 @@ void *statsd_main(void *ptr);
 void *profile_main(void *ptr);
 void *replication_thread_main(void *ptr);
 
-extern bool telemetry_enabled;
+extern bool pulse_enabled;
 
 const struct netdata_static_thread static_threads_common[] = {
     {
@@ -43,26 +43,26 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = analytics_main
     },
     {
-        .name = "TELEMETRY",
+        .name = "PULSE",
         .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "netdata telemetry",
+        .config_name = "netdata pulse",
         .env_name = "NETDATA_INTERNALS_MONITORING",
-        .global_variable = &telemetry_enabled,
+        .global_variable = &pulse_enabled,
         .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = telemetry_thread_main
+        .start_routine = pulse_thread_main
     },
     {
-        .name = "TLMTRY-SQLITE3",
-        .config_section = CONFIG_SECTION_TELEMETRY,
-        .config_name = "extended telemetry",
+        .name = "PULSE-SQLITE3",
+        .config_section = CONFIG_SECTION_PULSE,
+        .config_name = "extended",
         .env_name = NULL,
-        .global_variable = &telemetry_extended_enabled,
+        .global_variable = &pulse_extended_enabled,
         .enabled = 0, // the default value - it uses netdata.conf for users to enable it
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = telemetry_thread_sqlite3_main
+        .start_routine = pulse_thread_sqlite3_main
     },
     {
         .name = "PLUGINSD",

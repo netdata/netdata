@@ -241,7 +241,7 @@ void stream_path_send_to_child(RRDHOST *host) {
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         buffer_sprintf(wb, PLUGINSD_KEYWORD_JSON " " PLUGINSD_KEYWORD_JSON_CMD_STREAM_PATH "\n%s\n" PLUGINSD_KEYWORD_JSON_END "\n", buffer_tostring(payload));
-        send_to_plugin(buffer_tostring(wb), __atomic_load_n(&host->receiver->thread.parser, __ATOMIC_RELAXED));
+        send_to_plugin(buffer_tostring(wb), __atomic_load_n(&host->receiver->thread.parser, __ATOMIC_RELAXED), STREAM_TRAFFIC_TYPE_METADATA);
     }
     rrdhost_receiver_unlock(host);
 }

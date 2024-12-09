@@ -361,7 +361,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 }
 
 bool claim_agent(const char *url, const char *token, const char *rooms, const char *proxy, bool insecure) {
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
 
     if (!check_and_generate_certificates()) {
@@ -411,7 +411,7 @@ bool claim_agent_from_environment(void) {
 
 bool claim_agent_from_claim_conf(void) {
     static struct config claim_config = APPCONFIG_INITIALIZER;
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     bool ret = false;
 
     spinlock_lock(&spinlock);

@@ -484,7 +484,7 @@ cleanup:
 }
 
 void wevt_sources_scan(void) {
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     LPWSTR channel = NULL;
     EVT_HANDLE hChannelEnum = NULL;
 

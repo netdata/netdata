@@ -58,7 +58,7 @@ void pdc_init(void) {
             NULL, NULL, false, false
             );
 
-    telemetry_aral_register(pdc_globals.pdc.ar, "pdc");
+    pulse_aral_register(pdc_globals.pdc.ar, "pdc");
 }
 
 PDC *pdc_get(void) {
@@ -87,7 +87,7 @@ void page_details_init(void) {
             NULL,
             NULL, NULL, false, false
     );
-    telemetry_aral_register(pdc_globals.pd.ar, "pd");
+    pulse_aral_register(pdc_globals.pd.ar, "pd");
 }
 
 struct page_details *page_details_get(void) {
@@ -116,7 +116,7 @@ void epdl_init(void) {
             NULL,
             NULL, NULL, false, false
     );
-    telemetry_aral_register(pdc_globals.epdl.ar, "epdl");
+    pulse_aral_register(pdc_globals.epdl.ar, "epdl");
 }
 
 static EPDL *epdl_get(void) {
@@ -146,7 +146,7 @@ void deol_init(void) {
             NULL, NULL, false, false
     );
 
-    telemetry_aral_register(pdc_globals.deol.ar, "deol");
+    pulse_aral_register(pdc_globals.deol.ar, "deol");
 }
 
 static DEOL *deol_get(void) {
@@ -182,7 +182,7 @@ static struct {
 
 } extent_buffer_globals = {
         .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .spinlock = SPINLOCK_INITIALIZER,
                 .available_items = NULL,
                 .available = 0,
         },

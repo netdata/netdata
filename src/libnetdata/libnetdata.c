@@ -450,11 +450,11 @@ void posix_memfree(void *ptr) {
 
 void mallocz_release_as_much_memory_to_the_system(void) {
 #if defined(HAVE_C_MALLOPT) || defined(HAVE_C_MALLOC_TRIM)
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
 
 #ifdef HAVE_C_MALLOPT
-    size_t trim_threshold = aral_optimal_page_size();
+    size_t trim_threshold = aral_optimal_malloc_page_size();
     mallopt(M_TRIM_THRESHOLD, (int)trim_threshold);
 #endif
 
@@ -799,7 +799,7 @@ BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_l
             buffer[max_line_length] = '\0';
             buffer_strcat(wb, buffer);
         }
-        spawn_popen_kill(pi);
+        spawn_popen_kill(pi, 0);
     }
     else {
         buffer_free(wb);
@@ -818,7 +818,7 @@ bool run_command_and_copy_output_to_stdout(const char *command, int max_line_len
         while (fgets(buffer, max_line_length, spawn_popen_stdout(pi)))
             fprintf(stdout, "%s", buffer);
 
-        spawn_popen_kill(pi);
+        spawn_popen_kill(pi, 0);
     }
     else {
         netdata_log_error("Failed to execute command '%s'.", command);

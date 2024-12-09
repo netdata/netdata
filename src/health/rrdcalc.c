@@ -329,15 +329,18 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     if(!rc->config.units)
         rc->config.units = string_dup(st->units);
 
-    if(rc->config.update_every < rc->rrdset->update_every) {
-        netdata_log_info(
-            "HEALTH: alert '%s.%s' has update every %d, less than chart update every %d. "
-            "Setting alarm update frequency to %d.",
-            string2str(st->id), string2str(rc->config.name),
-            rc->config.update_every, rc->rrdset->update_every, rc->rrdset->update_every);
-
-        rc->config.update_every = st->update_every;
-    }
+    // the following interferes with replication, changing the alert frequency to unexpected values
+    // let's respect user configuration, so we disable it
+    
+//    if(rc->config.update_every < rc->rrdset->update_every) {
+//        netdata_log_info(
+//            "HEALTH: alert '%s.%s' has update every %d, less than chart update every %d. "
+//            "Setting alarm update frequency to %d.",
+//            string2str(st->id), string2str(rc->config.name),
+//            rc->config.update_every, rc->rrdset->update_every, rc->rrdset->update_every);
+//
+//        rc->config.update_every = st->update_every;
+//    }
 
     rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->config.name, &rc->next_event_id, &rc->config.hash_id);
 

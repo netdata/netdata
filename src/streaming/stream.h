@@ -38,7 +38,6 @@ void stream_receiver_free(struct receiver_state *rpt);
 bool stream_receiver_signal_to_stop_and_wait(struct rrdhost *host, STREAM_HANDSHAKE reason);
 char *stream_receiver_program_version_strdupz(struct rrdhost *host);
 
-#include "replication.h"
 #include "rrdhost-status.h"
 #include "protocol/commands.h"
 #include "stream-path.h"

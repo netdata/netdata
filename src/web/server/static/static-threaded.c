@@ -123,7 +123,7 @@ static void web_server_file_del_callback(POLLINFO *pi) {
         web_server_log_connection(w, "DISCONNECTED");
         web_client_request_done(w);
         web_client_release_to_cache(w);
-        telemetry_web_client_disconnected();
+        pulse_web_client_disconnected();
     }
 
     worker_is_idle();
@@ -269,7 +269,7 @@ static void web_server_del_callback(POLLINFO *pi) {
         web_server_log_connection(w, "DISCONNECTED");
         web_client_request_done(w);
         web_client_release_to_cache(w);
-        telemetry_web_client_disconnected();
+        pulse_web_client_disconnected();
     }
 
     worker_is_idle();
@@ -509,7 +509,8 @@ void *socket_listen_main_static_threaded(void *ptr) {
     // 6 threads is the optimal value
     // since 6 are the parallel connections browsers will do
     // so, if the machine has more CPUs, avoid using resources unnecessarily
-    int def_thread_count = MIN(get_netdata_cpus(), 6);
+    int def_thread_count = (int)get_netdata_cpus();
+    if(def_thread_count < 6) def_thread_count = 6;
 
     if (!strcmp(config_get(CONFIG_SECTION_WEB, "mode", ""),"single-threaded")) {
                 netdata_log_info("Running web server with one thread, because mode is single-threaded");

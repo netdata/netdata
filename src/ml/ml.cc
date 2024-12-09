@@ -113,7 +113,7 @@ ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim, const 
     }
     storage_engine_query_finalize(&handle);
 
-    telemetry_queries_ml_query_completed(/* points_read */ idx);
+    pulse_queries_ml_query_completed(/* points_read */ idx);
 
     training_response.total_values = idx;
     if (training_response.collected_values < min_n) {
@@ -443,7 +443,7 @@ static void ml_dimension_serialize_kmeans(const ml_dimension_t *dim, BUFFER *wb)
 {
     RRDDIM *rd = dim->rd;
 
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_string(wb, "version", "1");
     buffer_json_member_add_string(wb, "machine-guid", rd->rrdset->rrdhost->machine_guid);
     buffer_json_member_add_string(wb, "chart", rrdset_id(rd->rrdset));
@@ -550,7 +550,7 @@ ml_dimension_deserialize_kmeans(const char *json_str)
 
     ml_dimension_t *Dim = reinterpret_cast<ml_dimension_t *>(AcqDim.dimension());
     if (!Dim) {
-        telemetry_ml_models_ignored();
+        pulse_ml_models_ignored();
         return true;
     }
 
@@ -571,7 +571,9 @@ static void ml_dimension_stream_kmeans(const ml_dimension_t *dim)
     if (!s)
         return;
 
-    if(!stream_sender_has_capabilities(dim->rd->rrdset->rrdhost, STREAM_CAP_ML_MODELS))
+    if(!stream_sender_has_capabilities(dim->rd->rrdset->rrdhost, STREAM_CAP_ML_MODELS) ||
+        !rrdset_check_upstream_exposed(dim->rd->rrdset) ||
+        !rrddim_check_upstream_exposed(dim->rd))
         return;
 
     CLEAN_BUFFER *payload = buffer_create(0, NULL);
@@ -584,7 +586,7 @@ static void ml_dimension_stream_kmeans(const ml_dimension_t *dim)
         buffer_tostring(payload));
 
     sender_commit_clean_buffer(s, wb, STREAM_TRAFFIC_TYPE_METADATA);
-    telemetry_ml_models_sent();
+    pulse_ml_models_sent();
 }
 
 static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
@@ -830,7 +832,7 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
             continue;
 
         if (anomaly_score < (100 * Cfg.dimension_anomaly_score_threshold)) {
-            telemetry_ml_models_consulted(models_consulted);
+            pulse_ml_models_consulted(models_consulted);
             spinlock_unlock(&dim->slock);
             return false;
         }
@@ -847,7 +849,7 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
 
     spinlock_unlock(&dim->slock);
 
-    telemetry_ml_models_consulted(models_consulted);
+    pulse_ml_models_consulted(models_consulted);
     return sum;
 }
 
@@ -966,7 +968,7 @@ ml_host_detect_once(ml_host_t *host)
             host->mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
             host->mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
 
-            if (spinlock_trylock_cancelable(&host->type_anomaly_rate_spinlock))
+            if (spinlock_trylock(&host->type_anomaly_rate_spinlock))
             {
                 STRING *key = rs->parts.type;
                 auto &um = host->type_anomaly_rate;
@@ -982,7 +984,7 @@ ml_host_detect_once(ml_host_t *host)
 
                 it->second.anomalous_dimensions += chart_mls.num_anomalous_dimensions;
                 it->second.normal_dimensions += chart_mls.num_normal_dimensions;
-                spinlock_unlock_cancelable(&host->type_anomaly_rate_spinlock);
+                spinlock_unlock(&host->type_anomaly_rate_spinlock);
             }
         }
         rrdset_foreach_done(rsp);
@@ -1053,26 +1055,7 @@ ml_detect_main(void *arg)
 
                 netdata_mutex_lock(&worker->nd_mutex);
                 ml_queue_stats_t queue_stats = worker->queue_stats;
-                worker->queue_stats = {};
                 netdata_mutex_unlock(&worker->nd_mutex);
-
-                // calc the avg values
-                if (queue_stats.num_popped_items) {
-                    queue_stats.queue_size /= queue_stats.num_popped_items;
-                    queue_stats.allotted_ut /= queue_stats.num_popped_items;
-                    queue_stats.consumed_ut /= queue_stats.num_popped_items;
-                    queue_stats.remaining_ut /= queue_stats.num_popped_items;
-                } else {
-                    queue_stats.queue_size = ml_queue_size(worker->queue);
-                    queue_stats.consumed_ut = 0;
-                    queue_stats.remaining_ut = queue_stats.allotted_ut;
-
-                    queue_stats.item_result_ok = 0;
-                    queue_stats.item_result_invalid_query_time_range = 0;
-                    queue_stats.item_result_not_enough_collected_values = 0;
-                    queue_stats.item_result_null_acquired_dimension = 0;
-                    queue_stats.item_result_chart_under_replication = 0;
-                }
 
                 ml_update_training_statistics_chart(worker, queue_stats);
             }
@@ -1163,13 +1146,13 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
 
     ml_dimension_t *Dim = reinterpret_cast<ml_dimension_t *>(AcqDim.dimension());
     if (!Dim) {
-        telemetry_ml_models_ignored();
+        pulse_ml_models_ignored();
         return ML_WORKER_RESULT_OK;
     }
 
     Dim->kmeans = req.inlined_km;
     ml_dimension_update_models(worker, Dim);
-    telemetry_ml_models_received();
+    pulse_ml_models_received();
     return ML_WORKER_RESULT_OK;
 }
 
@@ -1192,14 +1175,16 @@ void *ml_train_main(void *arg) {
     while (!Cfg.training_stop) {
         worker_is_busy(WORKER_TRAIN_QUEUE_POP);
 
+        ml_queue_stats_t loop_stats{};
+
         ml_queue_item_t item = ml_queue_pop(worker->queue);
         if (item.type == ML_QUEUE_ITEM_STOP_REQUEST) {
             break;
         }
 
-        size_t queue_size = ml_queue_size(worker->queue) + 1;
+        ml_queue_size_t queue_size = ml_queue_size(worker->queue);
 
-        usec_t allotted_ut = (Cfg.train_every * USEC_PER_SEC) / queue_size;
+        usec_t allotted_ut = (Cfg.train_every * USEC_PER_SEC) / (queue_size.create_new_model + 1);
         if (allotted_ut > USEC_PER_SEC)
             allotted_ut = USEC_PER_SEC;
 
@@ -1230,43 +1215,72 @@ void *ml_train_main(void *arg) {
         if (Cfg.enable_statistics_charts) {
             worker_is_busy(WORKER_TRAIN_UPDATE_HOST);
 
-            netdata_mutex_lock(&worker->nd_mutex);
+            ml_queue_stats_t queue_stats = ml_queue_stats(worker->queue);
 
-            worker->queue_stats.queue_size += queue_size;
-            worker->queue_stats.num_popped_items += 1;
+            loop_stats.total_add_existing_model_requests_pushed = queue_stats.total_add_existing_model_requests_pushed;
+            loop_stats.total_add_existing_model_requests_popped = queue_stats.total_add_existing_model_requests_popped;
+            loop_stats.total_create_new_model_requests_pushed = queue_stats.total_create_new_model_requests_pushed;
+            loop_stats.total_create_new_model_requests_popped = queue_stats.total_create_new_model_requests_popped;
 
-            worker->queue_stats.allotted_ut += allotted_ut;
-            worker->queue_stats.consumed_ut += consumed_ut;
-            worker->queue_stats.remaining_ut += remaining_ut;
+            loop_stats.allotted_ut = allotted_ut;
+            loop_stats.consumed_ut = consumed_ut;
+            loop_stats.remaining_ut = remaining_ut;
 
             switch (worker_res) {
                 case ML_WORKER_RESULT_OK:
-                    worker->queue_stats.item_result_ok += 1;
+                    loop_stats.item_result_ok = 1;
                     break;
                 case ML_WORKER_RESULT_INVALID_QUERY_TIME_RANGE:
-                    worker->queue_stats.item_result_invalid_query_time_range += 1;
+                    loop_stats.item_result_invalid_query_time_range = 1;
                     break;
                 case ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES:
-                    worker->queue_stats.item_result_not_enough_collected_values += 1;
+                    loop_stats.item_result_not_enough_collected_values = 1;
                     break;
                 case ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION:
-                    worker->queue_stats.item_result_null_acquired_dimension += 1;
+                    loop_stats.item_result_null_acquired_dimension = 1;
                     break;
                 case ML_WORKER_RESULT_CHART_UNDER_REPLICATION:
-                    worker->queue_stats.item_result_chart_under_replication += 1;
+                    loop_stats.item_result_chart_under_replication = 1;
                     break;
             }
 
+            netdata_mutex_lock(&worker->nd_mutex);
+
+            worker->queue_stats.total_add_existing_model_requests_pushed = loop_stats.total_add_existing_model_requests_pushed;
+            worker->queue_stats.total_add_existing_model_requests_popped = loop_stats.total_add_existing_model_requests_popped;
+
+            worker->queue_stats.total_create_new_model_requests_pushed = loop_stats.total_create_new_model_requests_pushed;
+            worker->queue_stats.total_create_new_model_requests_popped = loop_stats.total_create_new_model_requests_popped;
+
+            worker->queue_stats.allotted_ut += loop_stats.allotted_ut;
+            worker->queue_stats.consumed_ut += loop_stats.consumed_ut;
+            worker->queue_stats.remaining_ut += loop_stats.remaining_ut;
+
+            worker->queue_stats.item_result_ok += loop_stats.item_result_ok;
+            worker->queue_stats.item_result_invalid_query_time_range += loop_stats.item_result_invalid_query_time_range;
+            worker->queue_stats.item_result_not_enough_collected_values += loop_stats.item_result_not_enough_collected_values;
+            worker->queue_stats.item_result_null_acquired_dimension += loop_stats.item_result_null_acquired_dimension;
+            worker->queue_stats.item_result_chart_under_replication += loop_stats.item_result_chart_under_replication;
+
             netdata_mutex_unlock(&worker->nd_mutex);
         }
+
+        bool should_sleep = true;
 
         if (worker->pending_model_info.size() >= Cfg.flush_models_batch_size) {
             worker_is_busy(WORKER_TRAIN_FLUSH_MODELS);
             netdata_mutex_lock(&db_mutex);
             ml_flush_pending_models(worker);
             netdata_mutex_unlock(&db_mutex);
-            continue;
+            should_sleep = false;
         }
+
+        if (item.type == ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL) {
+           should_sleep = false;
+        }
+
+        if (!should_sleep)
+            continue;
 
         worker_is_idle();
         std::this_thread::sleep_for(std::chrono::microseconds{remaining_ut});
