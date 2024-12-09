@@ -21,14 +21,14 @@ void sender_commit_thread_buffer_free(void) {
 // Collector thread starting a transmission
 BUFFER *sender_commit_start_with_trace(struct sender_state *s __maybe_unused, struct sender_buffer *commit, const char *func) {
     if(unlikely(commit->used))
-        fatal("STREAMING: thread buffer is used multiple times concurrently (%u). "
+        fatal("STREAM SEND[x]: thread buffer is used multiple times concurrently (%u). "
               "It is already being used by '%s()', and now is called by '%s()'",
               (unsigned)commit->used,
               commit->last_function ? commit->last_function : "(null)",
               func ? func : "(null)");
 
     if(unlikely(commit->receiver_tid && commit->receiver_tid != gettid_cached()))
-        fatal("STREAMING: thread buffer is reserved for tid %d, but it used by thread %d function '%s()'.",
+        fatal("STREAM SEND[x]: thread buffer is reserved for tid %d, but it used by thread %d function '%s()'.",
               commit->receiver_tid, gettid_cached(), func ? func : "(null)");
 
     if(unlikely(commit->wb &&
@@ -124,7 +124,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
             size_t dst_len = stream_compress(&s->compressor, src, size_to_compress, &dst);
             if (!dst_len) {
                 nd_log(NDLS_DAEMON, NDLP_ERR,
-                    "STREAM %s [send to %s]: COMPRESSION failed. Resetting compressor and re-trying",
+                    "STREAM SEND[x] %s [to %s]: COMPRESSION failed. Resetting compressor and re-trying",
                     rrdhost_hostname(s->host), s->connected_to);
 
                 stream_compression_initialize(s);
@@ -184,7 +184,7 @@ overflow_with_lock: {
         msg.opcode = STREAM_OPCODE_SENDER_BUFFER_OVERFLOW;
         stream_sender_send_opcode(s, msg);
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM %s [send to %s]: buffer overflow (buffer size %u, max size %u, used %u, available %u). "
+               "STREAM SEND[x] %s [to %s]: buffer overflow (buffer size %u, max size %u, used %u, available %u). "
                "Restarting connection.",
                rrdhost_hostname(s->host), s->connected_to,
                stats->bytes_size, stats->bytes_max_size, stats->bytes_outstanding, stats->bytes_available);
@@ -198,7 +198,7 @@ compression_failed_with_lock: {
         msg.opcode = STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION;
         stream_sender_send_opcode(s, msg);
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM %s [send to %s]: COMPRESSION failed (twice). Deactivating compression and restarting connection.",
+               "STREAM SEND[x] %s [to %s]: COMPRESSION failed (twice). Deactivating compression and restarting connection.",
                rrdhost_hostname(s->host), s->connected_to);
     }
 }
@@ -207,10 +207,10 @@ void sender_thread_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYP
     struct sender_buffer *commit = (wb == commit___thread.wb) ? & commit___thread : &s->host->stream.snd.commit;
 
     if (unlikely(wb != commit->wb))
-        fatal("STREAMING: function '%s()' is trying to commit an unknown commit buffer.", func);
+        fatal("STREAM SEND[x]: function '%s()' is trying to commit an unknown commit buffer.", func);
 
     if (unlikely(!commit->used))
-        fatal("STREAMING: function '%s()' is committing a sender buffer twice.", func);
+        fatal("STREAM SEND[x]: function '%s()' is committing a sender buffer twice.", func);
 
     commit->used = false;
     commit->last_function = NULL;
