@@ -77,19 +77,19 @@ void pulse_aral_do(bool extended) {
         size_t malloc_allocated_bytes = __atomic_load_n(&stats->malloc.allocated_bytes, __ATOMIC_RELAXED);
         size_t malloc_used_bytes = __atomic_load_n(&stats->malloc.used_bytes, __ATOMIC_RELAXED);
         if(malloc_used_bytes > malloc_allocated_bytes)
-            malloc_used_bytes = malloc_allocated_bytes;
+            malloc_allocated_bytes = malloc_used_bytes;
         size_t malloc_free_bytes = malloc_allocated_bytes - malloc_used_bytes;
 
         size_t mmap_allocated_bytes = __atomic_load_n(&stats->mmap.allocated_bytes, __ATOMIC_RELAXED);
         size_t mmap_used_bytes = __atomic_load_n(&stats->mmap.used_bytes, __ATOMIC_RELAXED);
         if(mmap_used_bytes > mmap_allocated_bytes)
-            mmap_used_bytes = mmap_allocated_bytes;
+            mmap_allocated_bytes = mmap_used_bytes;
         size_t mmap_free_bytes = mmap_allocated_bytes - mmap_used_bytes;
 
         size_t structures_bytes = __atomic_load_n(&stats->structures.allocated_bytes, __ATOMIC_RELAXED);
 
         NETDATA_DOUBLE utilization;
-        if(malloc_used_bytes + mmap_used_bytes != 0 && malloc_allocated_bytes + mmap_allocated_bytes != 0)
+        if((malloc_used_bytes + mmap_used_bytes != 0) && (malloc_allocated_bytes + mmap_allocated_bytes != 0))
             utilization = 100.0 * (NETDATA_DOUBLE)(malloc_used_bytes + mmap_used_bytes) / (NETDATA_DOUBLE)(malloc_allocated_bytes + mmap_allocated_bytes);
         else
             utilization = 100.0;
@@ -124,9 +124,9 @@ void pulse_aral_do(bool extended) {
                 ai->rd_structures  = rrddim_add(ai->st_memory, "structures", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
 
-            rrddim_set_by_pointer(ai->st_memory, ai->rd_malloc_used, (collected_number)malloc_allocated_bytes);
+            rrddim_set_by_pointer(ai->st_memory, ai->rd_malloc_used, (collected_number)malloc_used_bytes);
             rrddim_set_by_pointer(ai->st_memory, ai->rd_malloc_free, (collected_number)malloc_free_bytes);
-            rrddim_set_by_pointer(ai->st_memory, ai->rd_mmap_used, (collected_number)mmap_allocated_bytes);
+            rrddim_set_by_pointer(ai->st_memory, ai->rd_mmap_used, (collected_number)mmap_used_bytes);
             rrddim_set_by_pointer(ai->st_memory, ai->rd_mmap_free, (collected_number)mmap_free_bytes);
             rrddim_set_by_pointer(ai->st_memory, ai->rd_structures, (collected_number)structures_bytes);
             rrdset_done(ai->st_memory);
