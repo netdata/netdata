@@ -413,6 +413,9 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
 
         spinlock_lock(&rpt->thread.send_to_child.spinlock);
         rpt->thread.send_to_child.scb = stream_circular_buffer_create();
+        
+        // this should be big enough to fit all the replies to the replication requests we may receive in a batch
+        stream_circular_buffer_set_max_size_unsafe(rpt->thread.send_to_child.scb, 100 * 1024 * 1024, true);
         rpt->thread.send_to_child.msg.thread_slot = (int32_t)sth->id;
         rpt->thread.send_to_child.msg.session = os_random32();
         rpt->thread.send_to_child.msg.meta = &rpt->thread.meta;
@@ -658,6 +661,9 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
                 if (!stats->bytes_outstanding) {
                     if (!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
                         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM RECEIVE: cannot update nd_poll()");
+
+                    // recreate the circular buffer if we have to
+                    stream_circular_buffer_recreate_timed_unsafe(rpt->thread.send_to_child.scb, now_ut, false);
                 }
             } else if (rc == 0 || errno == ECONNRESET) {
                 disconnect_reason = "socket reports EOF (closed by child)";
