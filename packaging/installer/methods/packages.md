@@ -18,7 +18,7 @@ and fail if it cannot do so.
 
 ## Manual setup of RPM packages
 
-Netdata’s official RPM repositories are hosted at <https://repository.netdata.cloud/repos>. We provide four groups of
+Netdata’s official RPM repositories are hosted at <https://repo.netdata.cloud/repos>. We provide four groups of
 repositories at that top level:
 
 - `stable`: Contains packages for stable releases of the Netdata Agent.
@@ -39,14 +39,14 @@ Under each of those directories is a directory for each supported release of tha
 directory for each supported CPU architecture which contains the actual repository.
 
 For example, for stable release packages for RHEL 9 on 64-bit x86, the full URL for the repository would be
-<https://repository.netdata.cloud/repos/stable/el/9/x86_64/>
+<https://repo.netdata.cloud/repos/stable/el/9/x86_64/>
 
 Our RPM packages and repository metadata are signed using a GPG key with a user name of ‘Netdatabot’. The
 current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The associated public key can be fetched from
-`https://repository.netdata.cloud/netdatabot.gpg.key`.
+`https://repo.netdata.cloud/netdatabot.gpg.key`.
 
 If you are explicitly configuring a system to use our repositories, the recommended setup is to download the
-appropriate repository configuration package from <https://repository.netdata.cloud/repos/repoconfig> and install it
+appropriate repository configuration package from <https://repo.netdata.cloud/repos/repoconfig> and install it
 directly on the target system using the system package manager. This will ensure any packages needed to use the
 repository are also installed, and will help enable a seamless transition if we ever need to change our infrastructure.
 
@@ -59,7 +59,7 @@ repository are also installed, and will help enable a seamless transition if we 
 
 ## Manual setup of DEB packages
 
-Netdata’s official DEB repositories are hosted at <https://repository.netdata.cloud/repos>. We provide four groups of
+Netdata’s official DEB repositories are hosted at <https://repo.netdata.cloud/repos>. We provide four groups of
 repositories at that top level:
 
 - `stable`: Contains packages for stable releases of the Netdata Agent.
@@ -76,20 +76,20 @@ Under each of these directories is a directory for each supported release, corre
 
 These repositories are set up as what Debian calls ‘flat repositories’, and are available via both HTTP and HTTPS.
 Additionally, our repositories support acquiring repository metadata by-hash, which leads to use of URLs similar to
-`http://repository.netdata.cloud/repos/edge/ubuntu/focal/by-hash/SHA256/91ccff6523a3c4483ebb539ff2b4adcd3b6b5d0c0c2c9573c5a6947a127819bc`,
+`http://repo.netdata.cloud/repos/edge/ubuntu/focal/by-hash/SHA256/91ccff6523a3c4483ebb539ff2b4adcd3b6b5d0c0c2c9573c5a6947a127819bc`,
 and this is the preferred method for updating metadata as it is more reliable.
 
 As a result of this structure, the required APT sources.list entry for stable packages for Debian 11 (Bullseye) is:
 
 ```text
-deb by-hash=yes http://repository.netdata.cloud/repos/stable/debian/ bullseye/
+deb by-hash=yes http://repo.netdata.cloud/repos/stable/debian/ bullseye/
 ```
 
 And the equivalent required deb822 style entry for stable packages for Debian 11 (Bullseye) is:
 
 ```text
 Types: deb
-URIs: http://repository.netdata.cloud/repos/stable/debian/
+URIs: http://repo.netdata.cloud/repos/stable/debian/
 Suites: bullseye/
 By-Hash: Yes
 Enabled: Yes
@@ -99,10 +99,10 @@ Note the `/` at the end of the codename, this is required for the repository to 
 
 Our DEB packages and repository metadata are signed using a GPG key with a user name of ‘Netdatabot’. The
 current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The associated public key can be fetched from
-`https://repository.netdata.cloud/netdatabot.gpg.key`.
+`https://repo.netdata.cloud/netdatabot.gpg.key`.
 
 If you are explicitly configuring a system to use our repositories, the recommended setup is to download the
-appropriate repository configuration package from <https://repository.netdata.cloud/repos/repoconfig> and install it
+appropriate repository configuration package from <https://repo.netdata.cloud/repos/repoconfig> and install it
 directly on the target system using the system package manager. This will ensure any packages needed to use the
 repository are also installed, and will help enable a seamless transition if we ever need to change our infrastructure.
 
@@ -114,7 +114,7 @@ Local mirrors of our official repositories can be created in one of two ways:
    APT repositories, or reposync for RPM repositories. For this approach, please consult the documentation for
    the specific tool you are using for info on how to mirror the repositories.
 2. Using a regular website mirroring tool, such as GNU wget’s `--mirror` option. For this approach, simply point
-   your mirroring tool at `https://repository.netdata.cloud/repos/`, and everything should just work.
+   your mirroring tool at `https://repo.netdata.cloud/repos/`, and everything should just work.
 
 We do not provide official support for mirroring our repositories, but we do have some tips for anyone looking to do so:
 
@@ -134,7 +134,7 @@ We do not provide official support for mirroring our repositories, but we do hav
   time to do so, as publishing nightly packages will almost always be done by this point, and publishing of stable
   releases typically happens after that time window.
 - If you intend to use our existing GPG signatures on the repository metadata and packages, you probably also want
-  a local copy of our public GPG key, which can be fetched from `https://repository.netdata.cloud/netdatabot.gpg.key`.
+  a local copy of our public GPG key, which can be fetched from `https://repo.netdata.cloud/netdatabot.gpg.key`.
 
 ## Public mirrors of the official Netdata repositories
 
