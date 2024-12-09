@@ -35,6 +35,8 @@ struct receiver_state {
     struct buffered_reader reader;
 
     struct {
+        bool draining_input;        // used exclusively by the stream thread
+
         // The parser pointer is safe to read and use, only when having the host receiver lock.
         // Without this lock, the data pointed by the pointer may vanish randomly.
         // Also, since the receiver sets it when it starts, it should be read with
