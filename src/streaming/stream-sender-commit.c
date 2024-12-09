@@ -145,8 +145,10 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
                     size_to_compress, dst_len, decoded_dst_len);
 #endif
 
-            if (!stream_circular_buffer_add_unsafe(s->scb, (const char *)&signature, sizeof(signature), sizeof(signature), type) ||
-                !stream_circular_buffer_add_unsafe(s->scb, dst, dst_len, size_to_compress, type))
+            if (!stream_circular_buffer_add_unsafe(s->scb, (const char *)&signature, sizeof(signature),
+                                                   sizeof(signature), type, false) ||
+                !stream_circular_buffer_add_unsafe(s->scb, dst, dst_len,
+                                                   size_to_compress, type, false))
                 goto overflow_with_lock;
 
             src = src + size_to_compress;
@@ -156,7 +158,8 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     else {
         // uncompressed traffic
 
-        if (!stream_circular_buffer_add_unsafe(s->scb, src, src_len, src_len, type))
+        if (!stream_circular_buffer_add_unsafe(s->scb, src, src_len,
+                                               src_len, type, false))
             goto overflow_with_lock;
     }
 

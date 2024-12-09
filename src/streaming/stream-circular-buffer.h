@@ -11,7 +11,6 @@
 #define THREAD_BUFFER_INITIAL_SIZE (8192)
 
 #define STREAM_CIRCULAR_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
-#define STREAM_RECEIVER_SEND_BUFFER_MULTIPLIER 10
 
 typedef struct stream_circular_buffer_stats {
     size_t adds;
@@ -74,7 +73,9 @@ usec_t stream_circular_buffer_get_since_ut(STREAM_CIRCULAR_BUFFER *scb);
 
 // adds data to the end of the circular buffer, returns false when it can't (buffer is full)
 // it updates the statistics
-bool stream_circular_buffer_add_unsafe(STREAM_CIRCULAR_BUFFER *scb, const char *data, size_t bytes_actual, size_t bytes_uncompressed, STREAM_TRAFFIC_TYPE type);
+bool stream_circular_buffer_add_unsafe(
+    STREAM_CIRCULAR_BUFFER *scb, const char *data, size_t bytes_actual, size_t bytes_uncompressed,
+    STREAM_TRAFFIC_TYPE type, bool autoscale);
 
 // returns a pointer to the beginning of the buffer, and its size in bytes
 size_t stream_circular_buffer_get_unsafe(STREAM_CIRCULAR_BUFFER *scb, char **chunk);

@@ -93,15 +93,22 @@ void stream_circular_buffer_destroy(STREAM_CIRCULAR_BUFFER *scb) {
 }
 
 // adds data to the circular buffer, returns false when it can't (buffer is full)
-bool stream_circular_buffer_add_unsafe(STREAM_CIRCULAR_BUFFER *scb, const char *data, size_t bytes_actual, size_t bytes_uncompressed, STREAM_TRAFFIC_TYPE type) {
+bool stream_circular_buffer_add_unsafe(
+    STREAM_CIRCULAR_BUFFER *scb, const char *data,
+    size_t bytes_actual, size_t bytes_uncompressed, STREAM_TRAFFIC_TYPE type, bool autoscale) {
     scb->stats.adds++;
     scb->stats.bytes_added += bytes_actual;
     scb->stats.bytes_uncompressed += bytes_uncompressed;
     scb->stats.bytes_sent_by_type[type] += bytes_actual;
-    bool rc = cbuffer_add_unsafe(scb->cb, data, bytes_actual) == 0;
-    if(rc)
-        stream_circular_buffer_stats_update_unsafe(scb);
-    return rc;
+
+    if(unlikely(autoscale && cbuffer_available_size_unsafe(scb->cb) < bytes_actual))
+        stream_circular_buffer_set_max_size_unsafe(scb, scb->cb->max_size * 2, true);
+
+    if(unlikely(cbuffer_add_unsafe(scb->cb, data, bytes_actual) != 0))
+        return false;
+
+    stream_circular_buffer_stats_update_unsafe(scb);
+    return true;
 }
 
 // return the first available chunk at the beginning of the buffer
