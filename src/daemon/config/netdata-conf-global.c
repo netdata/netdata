@@ -13,7 +13,9 @@ static int get_hostname(char *buf, size_t buf_size) {
         }
     }
 
-    return gethostname(buf, buf_size);
+    int rc = gethostname(buf, buf_size);
+    buf[buf_size - 1] = '\0';
+    return rc;
 }
 
 void netdata_conf_section_global(void) {
@@ -26,7 +28,7 @@ void netdata_conf_section_global(void) {
     (void) verify_netdata_host_prefix(true);
 
     char buf[HOSTNAME_MAX + 1];
-    if (get_hostname(buf, HOSTNAME_MAX))
+    if (get_hostname(buf, sizeof(buf)))
         netdata_log_error("Cannot get machine hostname.");
 
     netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
