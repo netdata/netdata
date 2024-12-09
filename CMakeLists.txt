@@ -1416,11 +1416,11 @@ set(RRD_PLUGIN_FILES
         src/database/sqlite/sqlite_aclk_node.h
         src/database/sqlite/sqlite_aclk_alert.c
         src/database/sqlite/sqlite_aclk_alert.h
-        src/database/sqlite/sqlite3.c
-        src/database/sqlite/sqlite3.h
-        src/database/sqlite/sqlite3recover.c
-        src/database/sqlite/sqlite3recover.h
-        src/database/sqlite/dbdata.c
+        src/database/sqlite/sqlite3/sqlite3.c
+        src/database/sqlite/sqlite3/sqlite3.h
+        src/database/sqlite/sqlite3/sqlite3recover.c
+        src/database/sqlite/sqlite3/sqlite3recover.h
+        src/database/sqlite/sqlite3/dbdata.c
         src/database/KolmogorovSmirnovDist.c
         src/database/KolmogorovSmirnovDist.h
         src/database/rrdfunctions-inflight.c

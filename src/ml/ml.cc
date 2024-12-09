@@ -5,7 +5,7 @@
 #include <array>
 
 #include "ad_charts.h"
-#include "database/sqlite/sqlite3.h"
+#include "database/sqlite/sqlite3/sqlite3.h"
 
 #define WORKER_TRAIN_QUEUE_POP         0
 #define WORKER_TRAIN_ACQUIRE_DIMENSION 1

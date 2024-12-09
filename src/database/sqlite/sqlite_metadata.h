@@ -3,7 +3,7 @@
 #ifndef NETDATA_SQLITE_METADATA_H
 #define NETDATA_SQLITE_METADATA_H
 
-#include "sqlite3.h"
+#include "database/sqlite/sqlite3/sqlite3.h"
 #include "sqlite_functions.h"
 
 typedef enum event_log_type {

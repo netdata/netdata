@@ -4,7 +4,7 @@
 #define NETDATA_SQLITE_CONTEXT_H
 
 #include "daemon/common.h"
-#include "sqlite3.h"
+#include "database/sqlite/sqlite3/sqlite3.h"
 
 int sql_context_cache_stats(int op);
 typedef struct ctx_chart {
