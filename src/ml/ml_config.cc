@@ -46,7 +46,7 @@ void ml_config_load(ml_config_t *cfg) {
     time_t anomaly_detection_query_duration = config_get_duration_seconds(config_section_ml, "anomaly detection grouping duration", 5 * 60);
 
     size_t num_worker_threads = config_get_number(config_section_ml, "num training threads", os_get_system_cpus() / 4);
-    size_t flush_models_batch_size = config_get_number(config_section_ml, "flush models batch size", 128);
+    size_t flush_models_batch_size = config_get_number(config_section_ml, "flush models batch size", 256);
 
     size_t suppression_window =
         config_get_duration_seconds(config_section_ml, "dimension anomaly rate suppression window", 900);

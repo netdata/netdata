@@ -64,70 +64,6 @@ void ml_host_delete(RRDHOST *rh)
     rh->ml_host = NULL;
 }
 
-void ml_host_start(RRDHOST *rh) {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
-    if (!host)
-        return;
-
-    host->ml_running = true;
-}
-
-void ml_host_stop(RRDHOST *rh) {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
-    if (!host || !host->ml_running)
-        return;
-
-    netdata_mutex_lock(&host->mutex);
-
-    // reset host stats
-    host->mls = ml_machine_learning_stats_t();
-
-    // reset charts/dims
-    void *rsp = NULL;
-    rrdset_foreach_read(rsp, host->rh) {
-        RRDSET *rs = static_cast<RRDSET *>(rsp);
-
-        ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
-        if (!chart)
-            continue;
-
-        // reset chart
-        chart->mls = ml_machine_learning_stats_t();
-
-        void *rdp = NULL;
-        rrddim_foreach_read(rdp, rs) {
-            RRDDIM *rd = static_cast<RRDDIM *>(rdp);
-
-            ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
-            if (!dim)
-                continue;
-
-            spinlock_lock(&dim->slock);
-
-            // reset dim
-            // TODO: should we drop in-mem models, or mark them as stale? Is it
-            // okay to resume training straight away?
-
-            dim->mt = METRIC_TYPE_CONSTANT;
-            dim->ts = TRAINING_STATUS_UNTRAINED;
-            dim->last_training_time = 0;
-            dim->suppression_anomaly_counter = 0;
-            dim->suppression_window_counter = 0;
-            dim->cns.clear();
-
-            ml_kmeans_init(&dim->kmeans);
-
-            spinlock_unlock(&dim->slock);
-        }
-        rrddim_foreach_done(rdp);
-    }
-    rrdset_foreach_done(rsp);
-
-    netdata_mutex_unlock(&host->mutex);
-
-    host->ml_running = false;
-}
-
 void ml_host_get_info(RRDHOST *rh, BUFFER *wb)
 {
     ml_host_t *host = (ml_host_t *) rh->ml_host;
@@ -290,6 +226,25 @@ void ml_dimension_new(RRDDIM *rd)
     rd->ml_dimension = (rrd_ml_dimension_t *) dim;
 
     metaqueue_ml_load_models(rd);
+
+    // add to worker queue
+    {
+        RRDHOST *rh = rd->rrdset->rrdhost;
+        ml_host_t *host = (ml_host_t *) rh->ml_host;
+
+        ml_queue_item_t item;
+        item.type = ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL;
+
+        ml_request_create_new_model_t req;
+        req.DLI = DimensionLookupInfo(
+            &rh->machine_guid[0],
+            rd->rrdset->id,
+            rd->id
+        );
+        item.create_new_model = req;
+
+        ml_queue_push(host->queue, item);
+    }
 }
 
 void ml_dimension_delete(RRDDIM *rd)
@@ -318,6 +273,8 @@ void ml_dimension_received_anomaly(RRDDIM *rd, bool is_anomalous) {
 
 bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool exists)
 {
+    UNUSED(curr_time);
+
     ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
     if (!dim)
         return false;
@@ -328,7 +285,7 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
 
     ml_chart_t *chart = (ml_chart_t *) rd->rrdset->ml_chart;
 
-    bool is_anomalous = ml_dimension_predict(dim, curr_time, value, exists);
+    bool is_anomalous = ml_dimension_predict(dim, value, exists);
     ml_chart_update_dimension(chart, dim, is_anomalous);
 
     return is_anomalous;

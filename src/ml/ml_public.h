@@ -24,9 +24,6 @@ void ml_stop_threads(void);
 void ml_host_new(RRDHOST *rh);
 void ml_host_delete(RRDHOST *rh);
 
-void ml_host_start(RRDHOST *RH);
-void ml_host_stop(RRDHOST *RH);
-
 void ml_host_get_info(RRDHOST *RH, BUFFER *wb);
 void ml_host_get_detection_info(RRDHOST *RH, BUFFER *wb);
 void ml_host_get_models(RRDHOST *RH, BUFFER *wb);

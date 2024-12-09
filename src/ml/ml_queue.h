@@ -10,14 +10,6 @@
 
 typedef struct ml_request_create_new_model {
     DimensionLookupInfo DLI;
-
-    // Creation time of request
-    time_t request_time;
-
-    // First/last entry of this dimension in DB
-    // at the point the request was made
-    time_t first_entry_on_request;
-    time_t last_entry_on_request;
 } ml_request_create_new_model_t;
 
 typedef struct ml_request_add_existing_model {
