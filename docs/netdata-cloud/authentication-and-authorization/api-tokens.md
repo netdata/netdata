@@ -1,15 +1,27 @@
 # API Tokens
 
-Every user can get access to the Netdata resource programmatically. It is done through an API Token, also called "Bearer Token". This token is used for authentication and authorization, and it can be issued in the Netdata UI under the User Settings (at the profile picture on the bottom-left):
+API tokens (Bearer tokens) enable programmatic access to Netdata resources. These tokens authenticate and authorize API requests, allowing you to interact with Netdata services securely from external applications, scripts, or integrations.
 
-<img width="316" alt="image" src="https://github.com/netdata/netdata/assets/14999928/b0846076-afae-47ab-92df-c24967305ab9"/>
+> **Important**: API tokens never expire but should be managed carefully as they grant access to your Netdata resources.
 
-The API Tokens are not going to expire and can be limited to a few scopes:
+## Token Generation
 
-| scope                  | description                                                                                                                                        |
+**Location**:
+
+Access token management through the Netdata UI:
+
+1. Click your profile picture in the bottom-left corner
+2. Select "User Settings"
+3. Navigate to the API Tokens section
+
+**Available Scopes**:
+
+Each token can be limited to specific scopes that define its access permissions:
+
+| Scope                  | Description                                                                                                                                        |
 |:-----------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|
-| `scope:all`            | Token is given the same level of action as the user has, the use-case for it is Netdata terraform provider                                         |
-| `scope:agent-ui`       | this token is mainly used by the local Agent for accessing the Cloud UI                                                                            |
+| `scope:all`            | Grants the same permissions as the user who created the token. Use case: Terraform provider integration.                                           |
+| `scope:agent-ui`       | Used by Agent for accessing the Cloud UI                                                                                                           |
 | `scope:grafana-plugin` | Used for the [Netdata Grafana plugin](https://github.com/netdata/netdata-grafana-datasource-plugin/blob/master/README.md) to access Netdata charts |
 
 > **Info**
