@@ -219,7 +219,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     rrdcontext_host_child_connected(host);
-    schedule_node_state_update(host, 100);
+    aclk_queue_node_info(host, true);
 
     return PARSER_RC_OK;
 }
