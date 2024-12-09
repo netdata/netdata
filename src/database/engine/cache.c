@@ -2458,6 +2458,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
         if(!page_acquire(cache, page)) {
             internal_fatal(true, "Migration to journal v2: cannot acquire page for migration to v2");
+            page_transition_unlock(cache, page);
             continue;
         }
 
@@ -2564,8 +2565,17 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
             Word_t start_time = 0;
             while ((PValue2 = JudyLFirstThenNext(mi->JudyL_pages_by_start_time, &start_time, &start_time_first))) {
                 struct jv2_page_info *pi = *PValue2;
+
+                // balance-parents: transition from hot to clean directly
+                page_set_clean(cache, pi->page, true, false);
                 page_transition_unlock(cache, pi->page);
-                pgc_page_hot_to_dirty_and_release(cache, pi->page, true);
+                page_release(cache, pi->page, true);
+
+                // before balance-parents:
+                // page_transition_unlock(cache, pi->page);
+                // pgc_page_hot_to_dirty_and_release(cache, pi->page, true);
+
+                // old test - don't enable:
                 // make_acquired_page_clean_and_evict_or_page_release(cache, pi->page);
                 aral_freez(ar_pi, pi);
             }
@@ -2593,7 +2603,8 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
     __atomic_sub_fetch(&cache->stats.workers_jv2_flush, 1, __ATOMIC_RELAXED);
 
-    flush_pages(cache, cache->config.max_flushes_inline, PGC_SECTION_ALL, false, false);
+    // balance-parents: do not flush, there is nothing dirty
+    // flush_pages(cache, cache->config.max_flushes_inline, PGC_SECTION_ALL, false, false);
 }
 
 static bool match_page_data(PGC_PAGE *page, void *data) {
