@@ -440,6 +440,7 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
 static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, const char *why) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
+    errno_clear();
     nd_log(NDLS_DAEMON, NDLP_ERR,
            "STREAM RECEIVE[%zu] '%s' [from [%s]:%s]: "
            "receiver disconnected: %s"
@@ -700,8 +701,8 @@ void stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
     // we can receive data from this socket
 
     worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
-    while(true) {
-        bool removed = false;
+    bool removed = false;
+    while(!removed) {
         ssize_t rc = stream_receive_and_process(sth, rpt, parser, &removed);
         if (likely(rc > 0)) {
             rpt->last_msg_t = (time_t)(now_ut / USEC_PER_SEC);
