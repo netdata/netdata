@@ -37,7 +37,7 @@
 
 // we need an r/w spinlock to ensure that reads and write do not happen
 // concurrently for settings files
-static RW_SPINLOCK settings_spinlock = NETDATA_RW_SPINLOCK_INITIALIZER;
+static RW_SPINLOCK settings_spinlock = RW_SPINLOCK_INITIALIZER;
 
 static inline void settings_path(char out[FILENAME_MAX]) {
     filename_from_path_entry(out, netdata_configured_varlib_dir, "settings", NULL);

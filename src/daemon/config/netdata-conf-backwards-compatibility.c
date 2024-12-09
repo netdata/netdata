@@ -181,14 +181,26 @@ void netdata_conf_backwards_compatibility(void) {
     config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
                 CONFIG_SECTION_DB,      "enable zero metrics");
 
-    config_move("global statistics",        "update every",
-                CONFIG_SECTION_TELEMETRY,   "update every");
+    // ----------------------------------------------------------------------------------------------------------------
+    // global statistics -> telemetry -> pulse
 
     config_move(CONFIG_SECTION_PLUGINS, "netdata monitoring",
-                CONFIG_SECTION_PLUGINS, "netdata telemetry");
+                CONFIG_SECTION_PLUGINS, "netdata pulse");
+
+    config_move(CONFIG_SECTION_PLUGINS, "netdata telemetry",
+                CONFIG_SECTION_PLUGINS, "netdata pulse");
 
     config_move(CONFIG_SECTION_PLUGINS, "netdata monitoring extended",
-                CONFIG_SECTION_TELEMETRY, "extended telemetry");
+                CONFIG_SECTION_PULSE,   "extended");
+
+    config_move("telemetry",            "extended telemetry",
+                CONFIG_SECTION_PULSE,   "extended");
+
+    config_move("global statistics",    "update every",
+                CONFIG_SECTION_PULSE,   "update every");
+
+    config_move("telemetry",            "update every",
+                CONFIG_SECTION_PULSE,   "update every");
 
 
     // ----------------------------------------------------------------------------------------------------------------

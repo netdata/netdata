@@ -11,18 +11,17 @@
 #define TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS
 #endif
 
-// max file size
+// max mapped file size
 #define ARAL_MAX_PAGE_SIZE_MMAP (1ULL * 1024 * 1024 * 1024)
 
 // max malloc size
 // optimal at current versions of libc is up to 256k
 // ideal to have the same overhead as libc is 4k
-#define ARAL_MAX_PAGE_SIZE_MALLOC (256ULL * 1024)
+#define ARAL_MAX_PAGE_SIZE_MALLOC (1ULL * 1024 * 1024)
 
-// we don't need alignof(max_align_t) for normal C structures
-// alignof(uintptr_r) is sufficient for our use cases
-// #define SYSTEM_REQUIRED_ALIGNMENT (alignof(max_align_t))
-#define SYSTEM_REQUIRED_ALIGNMENT (alignof(uintptr_t))
+// in malloc mode, when the page is bigger than this
+// use anonymous private mmap pages
+#define ARAL_MMAP_PAGES_ABOVE (32ULL * 1024)
 
 typedef struct aral_free {
     size_t size;
@@ -31,6 +30,8 @@ typedef struct aral_free {
 
 typedef struct aral_page {
     bool marked;
+    bool started_marked;
+    bool mapped;
     uint32_t size;                      // the allocation size of the page
     const char *filename;
     uint8_t *data;
@@ -62,6 +63,7 @@ struct aral_ops {
     struct {
         alignas(64) size_t allocators; // the number of threads currently trying to allocate memory
         alignas(64) size_t deallocators; // the number of threads currently trying to deallocate memory
+        alignas(64) bool last_allocated_or_deallocated; // stability detector, true when was last allocated
     } atomic;
 
     struct {
@@ -80,8 +82,7 @@ struct aral {
 
         size_t element_size;            // calculated to take into account ARAL overheads
         size_t max_allocation_size;     // calculated in bytes
-        size_t max_page_elements;       // calculated
-        size_t page_ptr_offset;         // calculated
+        size_t element_ptr_offset;      // calculated
         size_t system_page_size;        // calculated
 
         size_t initial_page_elements;
@@ -161,29 +162,18 @@ struct aral_statistics *aral_get_statistics(ARAL *ar) {
     return ar->stats;
 }
 
-static inline size_t memory_alignment(size_t size, size_t alignment) {
-    // return (size + alignment - 1) & ~(alignment - 1); // assumees alignment is power of 2
-    return ((size + alignment - 1) / alignment) * alignment;
-}
-
-static size_t aral_align_alloc_size(ARAL *ar, uint64_t size) {
-    size = memory_alignment(size, ar->config.system_page_size);
-
-    if(size % ar->config.element_size)
-        size -= size % ar->config.element_size;
-
-    return size;
-}
-
-static inline void aral_lock(ARAL *ar) {
+static inline void aral_lock_with_trace(ARAL *ar, const char *func) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
-        spinlock_lock(&ar->aral_lock.spinlock);
+        spinlock_lock_with_trace(&ar->aral_lock.spinlock, func);
 }
 
-static inline void aral_unlock(ARAL *ar) {
+static inline void aral_unlock_with_trace(ARAL *ar, const char *func) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
-        spinlock_unlock(&ar->aral_lock.spinlock);
+        spinlock_unlock_with_trace(&ar->aral_lock.spinlock, func);
 }
+
+#define aral_lock(ar) aral_lock_with_trace(ar, __FUNCTION__)
+#define aral_unlock(ar) aral_unlock_with_trace(ar, __FUNCTION__)
 
 static inline void aral_page_free_lock(ARAL *ar, ARAL_PAGE *page) {
     if(likely(!(ar->config.options & ARAL_LOCKLESS)))
@@ -318,13 +308,13 @@ static inline ARAL_PAGE *find_page_with_allocation_internal_check(ARAL *ar, void
 }
 #endif
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // Tagging the pointer with the 'marked' flag
 
 // Retrieving the pointer and the 'marked' flag
 static ARAL_PAGE *aral_get_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar, void *ptr, bool *marked) {
     uint8_t *data = ptr;
-    uintptr_t *page_ptr = (uintptr_t *)&data[ar->config.page_ptr_offset];
+    uintptr_t *page_ptr = (uintptr_t *)&data[ar->config.element_ptr_offset];
     uintptr_t tagged_page = __atomic_load_n(page_ptr, __ATOMIC_ACQUIRE);  // Atomically load the tagged pointer
     *marked = (tagged_page & 1) != 0;  // Extract the LSB as the 'marked' flag
     ARAL_PAGE *page = (ARAL_PAGE *)(tagged_page & ~1);  // Mask out the LSB to get the original pointer
@@ -358,13 +348,13 @@ static ARAL_PAGE *aral_get_page_pointer_after_element___do_NOT_have_aral_lock(AR
 
 static void aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ARAL *ar, void *page, void *ptr, bool marked) {
     uint8_t *data = ptr;
-    uintptr_t *page_ptr = (uintptr_t *)&data[ar->config.page_ptr_offset];
+    uintptr_t *page_ptr = (uintptr_t *)&data[ar->config.element_ptr_offset];
     uintptr_t tagged_page = (uintptr_t)page;  // Cast the pointer to an integer
     if (marked) tagged_page |= 1; // Set the LSB to 1 if 'marked' is true
     __atomic_store_n(page_ptr, tagged_page, __ATOMIC_RELEASE);  // Atomically store the tagged pointer
 }
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // check a free slot
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -381,57 +371,168 @@ static inline void aral_free_validate_internal_check(ARAL *ar, ARAL_FREE *fr) {
 #define aral_free_validate_internal_check(ar, fr) debug_dummy()
 #endif
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
+// page size management
 
-size_t aral_next_allocation_size___adders_lock_needed(ARAL *ar, bool marked) {
+static inline size_t memory_alignment(size_t size, size_t alignment) {
+    // return (size + alignment - 1) & ~(alignment - 1); // assumees alignment is power of 2
+    return ((size + alignment - 1) / alignment) * alignment;
+}
+
+static size_t aral_get_system_page_size(void) {
+    long int page_size = sysconf(_SC_PAGE_SIZE);
+    if (unlikely(page_size <= 4096))
+        return 4096;
+    else
+        return page_size;
+}
+
+// we don't need alignof(max_align_t) for normal C structures
+// alignof(uintptr_r) is sufficient for our use cases
+// #define SYSTEM_REQUIRED_ALIGNMENT (alignof(max_align_t))
+#define SYSTEM_REQUIRED_ALIGNMENT (alignof(uintptr_t))
+
+static size_t aral_element_slot_size(size_t requested_element_size, bool usable) {
+    // we need to add a page pointer after the element
+    // so, first align the element size to the pointer size
+    size_t element_size = memory_alignment(requested_element_size, sizeof(uintptr_t));
+
+    // then add the size of a pointer to it
+    element_size += sizeof(uintptr_t);
+
+    // make sure it is at least what we need for an ARAL_FREE slot
+    if (element_size < sizeof(ARAL_FREE))
+        element_size = sizeof(ARAL_FREE);
+
+    // and finally align it to the natural alignment
+    element_size = memory_alignment(element_size, SYSTEM_REQUIRED_ALIGNMENT);
+
+    if(usable)
+        return element_size - sizeof(uintptr_t);
+
+    return element_size;
+}
+
+size_t aral_optimal_malloc_page_size(void) {
+    return ARAL_MAX_PAGE_SIZE_MALLOC;
+}
+
+static size_t aral_elements_in_page_size(ARAL *ar, size_t page_size) {
+    if(ar->config.mmap.enabled)
+        return page_size / ar->config.element_size;
+
+    size_t aral_page_size = memory_alignment(sizeof(ARAL_PAGE), SYSTEM_REQUIRED_ALIGNMENT);
+    size_t remaining = page_size - aral_page_size;
+    return remaining / ar->config.element_size;
+}
+
+static size_t aral_next_allocation_size___adders_lock_needed(ARAL *ar, bool marked) {
     size_t idx = mark_to_idx(marked);
     size_t size = ar->ops[idx].adders.allocation_size;
 
-    if(size > ar->config.max_allocation_size)
-        size = ar->config.max_allocation_size;
-    else
-        ar->ops[idx].adders.allocation_size = aral_align_alloc_size(ar, (uint64_t)ar->ops[idx].adders.allocation_size * 2);
+    bool last_allocated = __atomic_load_n(&ar->ops[idx].atomic.last_allocated_or_deallocated, __ATOMIC_RELAXED);
+    if(last_allocated) {
+        size *= 2;
+        if(size > ar->config.max_allocation_size)
+            size = ar->config.max_allocation_size;
+        ar->ops[idx].adders.allocation_size = size;
+    }
+
+    if(!ar->config.mmap.enabled && size < ARAL_MMAP_PAGES_ABOVE) {
+        // when doing malloc, don't allocate entire pages, but only what needed
+        size =
+            aral_elements_in_page_size(ar, size) * ar->config.element_size +
+            memory_alignment(sizeof(ARAL_PAGE), SYSTEM_REQUIRED_ALIGNMENT);
+    }
+
+    __atomic_store_n(&ar->ops[idx].atomic.last_allocated_or_deallocated, true, __ATOMIC_RELAXED);
 
     return size;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+
 static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
-    ARAL_PAGE *page = callocz(1, sizeof(ARAL_PAGE));
-    spinlock_init(&page->free.spinlock);
-    page->size = size;
-    page->max_elements = page->size / ar->config.element_size;
-    page->aral_lock.free_elements = page->max_elements;
-
-    __atomic_add_fetch(&ar->stats->structures.allocations, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&ar->stats->structures.allocated_bytes, sizeof(ARAL_PAGE), __ATOMIC_RELAXED);
-
-    if(unlikely(ar->config.mmap.enabled)) {
+    size_t data_size, structures_size;
+    ARAL_PAGE *page;
+    if(ar->config.mmap.enabled) {
+        page = callocz(1, sizeof(ARAL_PAGE));
         ar->aral_lock.file_number++;
+
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/array_alloc.mmap/%s.%zu", *ar->config.mmap.cache_dir, ar->config.mmap.filename, ar->aral_lock.file_number);
         page->filename = strdupz(filename);
-        page->data = netdata_mmap(page->filename, page->size, MAP_SHARED, 0, false, NULL);
+        page->mapped = true;
+
+        page->data = netdata_mmap(page->filename, size, MAP_SHARED, 0, false, NULL);
         if (unlikely(!page->data))
-            fatal("ARAL: '%s' cannot allocate aral buffer of size %u on filename '%s'",
-                  ar->config.name, page->size, page->filename);
+            fatal("ARAL: '%s' cannot allocate aral buffer of size %zu on filename '%s'",
+                  ar->config.name, size, page->filename);
+
         __atomic_add_fetch(&ar->stats->mmap.allocations, 1, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&ar->stats->mmap.allocated_bytes, page->size, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ar->stats->mmap.allocated_bytes, size, __ATOMIC_RELAXED);
+        data_size = size;
+        structures_size = sizeof(ARAL_PAGE);
     }
-    else {
 #ifdef NETDATA_TRACE_ALLOCATIONS
-        page->data = mallocz_int(page->size TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
+    else {
+        page = callocz(1, sizeof(ARAL_PAGE));
+        page->data = mallocz_int(size TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
+        page->mapped = false;
+        __atomic_add_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ar->stats->malloc.allocated_bytes, size, __ATOMIC_RELAXED);
+    }
 #else
-        page->data = mallocz(page->size);
+    else {
+        size_t ARAL_PAGE_size = memory_alignment(sizeof(ARAL_PAGE), SYSTEM_REQUIRED_ALIGNMENT);
+        size_t max_elements = aral_elements_in_page_size(ar, size);
+        data_size = max_elements * ar->config.element_size;
+        structures_size = size - data_size;
+
+        if (size >= ARAL_MMAP_PAGES_ABOVE) {
+            bool mapped;
+            uint8_t *ptr = netdata_mmap(NULL, size, MAP_PRIVATE, 1, false, NULL);
+            if (ptr) {
+                mapped = true;
+                __atomic_add_fetch(&ar->stats->mmap.allocations, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&ar->stats->mmap.allocated_bytes, data_size, __ATOMIC_RELAXED);
+            }
+            else {
+                ptr = mallocz(size);
+                mapped = false;
+                __atomic_add_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&ar->stats->malloc.allocated_bytes, data_size, __ATOMIC_RELAXED);
+            }
+            page = (ARAL_PAGE *)ptr;
+            memset(page, 0, ARAL_PAGE_size);
+            page->data = &ptr[ARAL_PAGE_size];
+            page->mapped = mapped;
+        }
+        else {
+            uint8_t *ptr = mallocz(size);
+            page = (ARAL_PAGE *)ptr;
+            memset(page, 0, ARAL_PAGE_size);
+            page->data = &ptr[ARAL_PAGE_size];
+            page->mapped = false;
+
+            __atomic_add_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&ar->stats->malloc.allocated_bytes, data_size, __ATOMIC_RELAXED);
+        }
+    }
 #endif
 
-        __atomic_add_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&ar->stats->malloc.allocated_bytes, page->size, __ATOMIC_RELAXED);
-    }
+    spinlock_init(&page->free.spinlock);
+    page->size = size;
+    page->max_elements = aral_elements_in_page_size(ar, page->size);
+    page->aral_lock.free_elements = page->max_elements;
+
+    __atomic_add_fetch(&ar->stats->structures.allocations, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ar->stats->structures.allocated_bytes, structures_size, __ATOMIC_RELAXED);
 
     // link the free space to its page
     ARAL_FREE *fr = (ARAL_FREE *)page->data;
 
-    fr->size = page->size;
+    fr->size = data_size;
     fr->next = NULL;
     page->free.list = fr;
 
@@ -441,33 +542,55 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
 }
 
 void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
+    size_t idx = mark_to_idx(page->started_marked);
+    __atomic_store_n(&ar->ops[idx].atomic.last_allocated_or_deallocated, true, __ATOMIC_RELAXED);
+
+    size_t data_size, structures_size;
 
     // free it
     if (ar->config.mmap.enabled) {
+        data_size = page->size;
+        structures_size = sizeof(ARAL_PAGE);
+
+        __atomic_sub_fetch(&ar->stats->mmap.allocations, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&ar->stats->mmap.allocated_bytes, page->size, __ATOMIC_RELAXED);
+
         netdata_munmap(page->data, page->size);
 
         if (unlikely(unlink(page->filename) == 1))
             netdata_log_error("Cannot delete file '%s'", page->filename);
 
         freez((void *)page->filename);
-
-        __atomic_sub_fetch(&ar->stats->mmap.allocations, 1, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&ar->stats->mmap.allocated_bytes, page->size, __ATOMIC_RELAXED);
+        freez(page);
     }
     else {
 #ifdef NETDATA_TRACE_ALLOCATIONS
-        freez_int(page->data TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
-#else
-        freez(page->data);
-#endif
         __atomic_sub_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&ar->stats->malloc.allocated_bytes, page->size, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&ar->stats->malloc.allocated_bytes, page->size - sizeof(ARAL_PAGE), __ATOMIC_RELAXED);
+
+        freez_int(page->data TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
+        freez(page);
+#else
+        data_size = page->max_elements * ar->config.element_size;
+        structures_size = page->size - data_size;
+
+        if(page->mapped) {
+            __atomic_sub_fetch(&ar->stats->mmap.allocations, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&ar->stats->mmap.allocated_bytes, data_size, __ATOMIC_RELAXED);
+
+            netdata_munmap(page, page->size);
+        }
+        else {
+            __atomic_sub_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&ar->stats->malloc.allocated_bytes, data_size, __ATOMIC_RELAXED);
+
+            freez(page);
+        }
+#endif
     }
 
-    freez(page);
-
     __atomic_sub_fetch(&ar->stats->structures.allocations, 1, __ATOMIC_RELAXED);
-    __atomic_sub_fetch(&ar->stats->structures.allocated_bytes, sizeof(ARAL_PAGE), __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&ar->stats->structures.allocated_bytes, structures_size, __ATOMIC_RELAXED);
 }
 
 static inline ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
@@ -502,7 +625,7 @@ static inline ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, bool mar
             if(ar->ops[idx].adders.allocating_elements + threads_currently_deallocating < threads_currently_allocating) {
                 can_add = true;
                 page_allocation_size = aral_next_allocation_size___adders_lock_needed(ar, marked);
-                ar->ops[idx].adders.allocating_elements += page_allocation_size / ar->config.element_size;
+                ar->ops[idx].adders.allocating_elements += aral_elements_in_page_size(ar, page_allocation_size);
             }
             aral_adders_unlock(ar, marked);
         }
@@ -510,7 +633,7 @@ static inline ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, bool mar
 
         if(can_add) {
             page = aral_create_page___no_lock_needed(ar, page_allocation_size TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
-            page->marked = marked;
+            page->marked = page->started_marked = marked;
 
             aral_lock(ar);
 
@@ -521,7 +644,7 @@ static inline ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, bool mar
 //#endif
 
             aral_adders_lock(ar, marked);
-            ar->ops[idx].adders.allocating_elements -= page_allocation_size / ar->config.element_size;
+            ar->ops[idx].adders.allocating_elements -= aral_elements_in_page_size(ar, page_allocation_size);
             aral_adders_unlock(ar, marked);
 
             // we have a page that is all empty
@@ -836,38 +959,6 @@ size_t aral_actual_element_size(ARAL *ar) {
     return ar->config.element_size;
 }
 
-static size_t aral_allocation_slot_size(size_t requested_element_size, bool usable) {
-    // we need to add a page pointer after the element
-    // so, first align the element size to the pointer size
-    size_t element_size = memory_alignment(requested_element_size, sizeof(uintptr_t));
-
-    // then add the size of a pointer to it
-    element_size += sizeof(uintptr_t);
-
-    // make sure it is at least what we need for an ARAL_FREE slot
-    if (element_size < sizeof(ARAL_FREE))
-        element_size = sizeof(ARAL_FREE);
-
-    // and finally align it to the natural alignment
-    element_size = memory_alignment(element_size, SYSTEM_REQUIRED_ALIGNMENT);
-
-    if(usable)
-        return element_size - sizeof(uintptr_t);
-
-    return element_size;
-}
-
-size_t aral_optimal_page_size(void) {
-    return ARAL_MAX_PAGE_SIZE_MALLOC;
-}
-
-static void optimal_max_page_size(ARAL *ar) {
-    if(ar->config.requested_max_page_size)
-        return;
-
-    ar->config.requested_max_page_size = aral_optimal_page_size();
-}
-
 ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size,
                   struct aral_statistics *stats, const char *filename, const char **cache_dir, bool mmap, bool lockless) {
     ARAL *ar = callocz(1, sizeof(ARAL));
@@ -892,34 +983,8 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
         ar->config.options |= ARAL_ALLOCATED_STATS;
     }
 
-    long int page_size = sysconf(_SC_PAGE_SIZE);
-    if (unlikely(page_size == -1))
-        ar->config.system_page_size = 4096;
-    else
-        ar->config.system_page_size = page_size;
-
-    ar->config.element_size = aral_allocation_slot_size(ar->config.requested_element_size, false);
-    optimal_max_page_size(ar);
-
-    ar->config.max_page_elements = ar->config.requested_max_page_size / ar->config.element_size;
-
-    // we write the page pointer just after each element
-    ar->config.page_ptr_offset = ar->config.element_size - sizeof(uintptr_t);
-
-    if(ar->config.requested_element_size + sizeof(uintptr_t) > ar->config.element_size)
-        fatal("ARAL: '%s' failed to calculate properly page_ptr_offset: "
-              "element size %zu, sizeof(uintptr_t) %zu, natural alignment %zu, "
-              "final element size %zu, page_ptr_offset %zu",
-              ar->config.name, ar->config.requested_element_size, sizeof(uintptr_t),
-              SYSTEM_REQUIRED_ALIGNMENT,
-              ar->config.element_size, ar->config.page_ptr_offset);
-
-    //netdata_log_info("ARAL: element size %zu, sizeof(uintptr_t) %zu, natural alignment %zu, final element size %zu, page_ptr_offset %zu",
-    //      ar->element_size, sizeof(uintptr_t), ARAL_NATURAL_ALIGNMENT, ar->internal.element_size, ar->internal.page_ptr_offset);
-
-
-    if (ar->config.initial_page_elements < 2)
-        ar->config.initial_page_elements = 2;
+    // ----------------------------------------------------------------------------------------------------------------
+    // disable mmap if the directories are not given
 
     if(ar->config.mmap.enabled && (!ar->config.mmap.cache_dir || !*ar->config.mmap.cache_dir)) {
         netdata_log_error("ARAL: '%s' mmap cache directory is not configured properly, disabling mmap.", ar->config.name);
@@ -927,19 +992,55 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
         internal_fatal(true, "ARAL: '%s' mmap cache directory is not configured properly", ar->config.name);
     }
 
-    uint64_t max_alloc_size;
-    if(!ar->config.max_page_elements)
-        max_alloc_size = ar->config.mmap.enabled ? ARAL_MAX_PAGE_SIZE_MMAP : ARAL_MAX_PAGE_SIZE_MALLOC;
-    else
-        max_alloc_size = ar->config.max_page_elements * ar->config.element_size;
+    // ----------------------------------------------------------------------------------------------------------------
+    // calculate element size, after adding our pointer
 
-    ar->config.max_allocation_size = aral_align_alloc_size(ar, max_alloc_size);
-    ar->ops[0].adders.allocation_size =
-        ar->ops[1].adders.allocation_size =
-        aral_align_alloc_size(ar, (uint64_t)ar->config.element_size * ar->config.initial_page_elements);
+    ar->config.element_size = aral_element_slot_size(ar->config.requested_element_size, false);
+
+    // we write the page pointer just after each element
+    ar->config.element_ptr_offset = ar->config.element_size - sizeof(uintptr_t);
+
+    if(ar->config.requested_element_size + sizeof(uintptr_t) > ar->config.element_size)
+        fatal("ARAL: '%s' failed to calculate properly page_ptr_offset: "
+              "element size %zu, sizeof(uintptr_t) %zu, natural alignment %zu, "
+              "final element size %zu, page_ptr_offset %zu",
+              ar->config.name, ar->config.requested_element_size, sizeof(uintptr_t),
+              SYSTEM_REQUIRED_ALIGNMENT,
+              ar->config.element_size, ar->config.element_ptr_offset);
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // calculate allocation sizes
+
+    ar->config.system_page_size = aral_get_system_page_size();
+
+    if (ar->config.initial_page_elements < 2)
+        ar->config.initial_page_elements = 2;
+
+    if(!ar->config.requested_max_page_size)
+        ar->config.requested_max_page_size = ar->config.mmap.enabled ? ARAL_MAX_PAGE_SIZE_MMAP : ARAL_MAX_PAGE_SIZE_MALLOC;
+
+    // calculate the maximum allocation size we will do
+    ar->config.max_allocation_size =
+        memory_alignment(ar->config.requested_max_page_size, ar->config.system_page_size);
+
+    // find the minimum page size we will use
+    size_t min_required_page_size = memory_alignment(sizeof(ARAL_PAGE), SYSTEM_REQUIRED_ALIGNMENT) + 2 * ar->config.element_size;
+    min_required_page_size = memory_alignment(min_required_page_size, ar->config.system_page_size);
+
+    // make sure the maximum is enough
+    if(ar->config.max_allocation_size < min_required_page_size)
+        ar->config.max_allocation_size = min_required_page_size;
+
+    // set the starting allocation size for both marked and unmarked partitions
+    ar->ops[0].adders.allocation_size = ar->ops[1].adders.allocation_size = min_required_page_size;
+
+    // ----------------------------------------------------------------------------------------------------------------
+
     ar->aral_lock.pages_free = NULL;
     ar->aral_lock.pages_marked_free = NULL;
     ar->aral_lock.file_number = 0;
+
+    // ----------------------------------------------------------------------------------------------------------------
 
     if(ar->config.mmap.enabled) {
         char directory_name[FILENAME_MAX + 1];
@@ -972,7 +1073,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
     return ar;
 }
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // global aral caching
 
 #define ARAL_BY_SIZE_MAX_SIZE 1024
@@ -1063,7 +1164,7 @@ void aral_by_size_release(ARAL *ar) {
         aral_destroy(ar);
 }
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // unittest
 
 struct aral_unittest_config {
@@ -1159,10 +1260,11 @@ static void *aral_test_thread(void *ptr) {
             pointers[i] = unittest_aral_malloc(ar, marked);
         }
 
-        size_t increment = elements / ar->config.max_page_elements;
+        size_t max_page_elements = aral_elements_in_page_size(ar, ar->config.max_allocation_size);
+        size_t increment = elements / max_page_elements;
         for (size_t all = increment; all <= elements / 2; all += increment) {
 
-            size_t to_free = (all % ar->config.max_page_elements) + 1;
+            size_t to_free = (all % max_page_elements) + 1;
             size_t step = elements / to_free;
             if(!step) step = 1;
 

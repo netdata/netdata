@@ -1587,7 +1587,7 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         spinlock_unlock(&ls->spinlock);
     }
 
-    spawn_server_exec_kill(ls->spawn_server, si);
+    spawn_server_exec_kill(ls->spawn_server, si, 0);
 
     if(ls->config.report && received == 0)
         __atomic_add_fetch(&ls->stats.namespaces_forks_unresponsive, 1, __ATOMIC_RELAXED);

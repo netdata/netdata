@@ -2,9 +2,12 @@
 
 #include "pluginsd_internals.h"
 
-ssize_t send_to_plugin(const char *txt, PARSER *parser) {
+ssize_t send_to_plugin(const char *txt, PARSER *parser, STREAM_TRAFFIC_TYPE type) {
     if(!txt || !*txt || !parser)
         return 0;
+
+    if(parser->send_to_plugin_cb)
+        return parser->send_to_plugin_cb(txt, parser->send_to_plugin_data, type);
 
 #ifdef ENABLE_H2O
     if(parser->h2o_ctx)

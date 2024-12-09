@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "pluginsd_internals.h"
+#include "streaming/replication.h"
 
 static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
@@ -327,7 +328,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
 
     st = rrdset_create(
         host, type, id, name, family, context, title, units,
-        (plugin && *plugin) ? plugin : parser->user.cd->filename,
+        (plugin && *plugin) ? plugin : string2str(parser->user.cd->filename),
         module, priority, update_every,
         chart_type);
 
@@ -783,7 +784,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
     // ------------------------------------------------------------------------
     // prepare our state
 
-    pluginsd_lock_rrdset_data_collection(parser);
+    rrdset_data_collection_lock(parser);
 
     parser->user.v2.update_every = update_every;
     parser->user.v2.end_time = end_time;
@@ -1034,7 +1035,7 @@ static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_
     // ------------------------------------------------------------------------
     // unblock data collection
 
-    pluginsd_unlock_previous_scope_chart(parser, PLUGINSD_KEYWORD_END_V2, false);
+    rrdset_previous_scope_chart_unlock(parser, PLUGINSD_KEYWORD_END_V2, false);
     rrdcontext_collected_rrdset(st);
     store_metric_collection_completed();
 
@@ -1222,6 +1223,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     CLEANUP_FUNCTION_REGISTER(pluginsd_process_thread_cleanup) cleanup_parser = parser;
     buffered_reader_init(&parser->reader);
     CLEAN_BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
+    bool send_quit = true;
     while(likely(service_running(SERVICE_COLLECTORS))) {
 
         if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
@@ -1231,6 +1233,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
 
             if(unlikely(ret != BUFFERED_READER_READ_OK)) {
                 nd_log(NDLS_COLLECTORS, NDLP_INFO, "Buffered reader not OK");
+                send_quit = false;
                 break;
             }
 
@@ -1243,6 +1246,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
         buffer->len = 0;
         buffer->buffer[0] = '\0';
     }
+
+    if(send_quit)
+        send_to_plugin(PLUGINSD_CALL_QUIT, parser, STREAM_TRAFFIC_TYPE_METADATA);
 
     cd->unsafe.enabled = parser->user.enabled;
     count = parser->user.data_collections_count;

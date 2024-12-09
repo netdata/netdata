@@ -3,7 +3,7 @@
 #include "libnetdata/libnetdata.h"
 
 #if !defined(HAVE_ARC4RANDOM_BUF) && !defined(HAVE_RAND_S)
-static SPINLOCK random_lock = NETDATA_SPINLOCK_INITIALIZER;
+static SPINLOCK random_lock = SPINLOCK_INITIALIZER;
 static __attribute__((constructor)) void random_seed() {
     // Use current time and process ID to create a high-entropy seed
     struct timeval tv;

@@ -94,6 +94,8 @@ typedef struct parser_user_object {
 } PARSER_USER_OBJECT;
 
 typedef void (*parser_deferred_action_t)(struct parser *parser, void *action_data);
+struct parser;
+typedef ssize_t (*send_to_plugin_callback_t)(const char *txt, void *data, STREAM_TRAFFIC_TYPE type);
 
 struct parser {
     uint8_t version;                // Parser version
@@ -102,6 +104,8 @@ struct parser {
     int fd_input;
     int fd_output;
     ND_SOCK *sock;
+    send_to_plugin_callback_t send_to_plugin_cb;
+    void *send_to_plugin_data;
 
 #ifdef ENABLE_H2O
     void *h2o_ctx;                  // if set we use h2o_stream functions to send data

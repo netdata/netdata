@@ -1,27 +1,18 @@
 # Authentication & Authorization
 
-This section contains documentation about how Netdata allows users to Authenticate with Netdata Cloud, as well as the Authorization flows that control the access and actions of their teammates in Netdata Cloud.
+This documentation covers the authentication methods available in Netdata Cloud and explains how authorization controls access and permissions for team members.
 
 ## Authentication
 
-### Email
+| Method         | Description                                                                                                                                                                                                                   | Setup Process                                                                                                              |
+|:---------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| Email          | • Standard email and password authentications<br/>• Recommended for individual user                                                                                                                                           | 1. Visit Netdata Cloud<br/>2. Enter email address<br/>3. Follow verification process<br/>4. Set up password (new accounts) |
+| Google OAuth   | • Authentication using Google account credentials<br/>• Account will be linked to your Google email address                                                                                                                   | 1. Visit Netdata Cloud<br/>2. Click Google sign-in<br/>3. Complete Google authentication flow                              |
+| GitHub OAuth   | • Authentication using GitHub account credentials<br/>• Account will be linked to your GitHub email address                                                                                                                   | 1. Visit Netdata Cloud<br/>2. Click GitHub sign-in<br/>3. Complete GitHub authentication flow                              |
+| Enterprise SSO | • Advanced authentication for organizations using identity providers<br/>• Features:<br/>&emsp; - Identity provider integration<br/>&emsp; - Centralized management<br/>&emsp; - Enhanced security<br/>&emsp; - Audit logging | See [Enterprise SSO documentation](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md)  |
 
-To sign in/sign up using email, visit [Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_email_section), enter your email address, and click the **Sign in by email** button.
-
-Click the **Verify** button in the email you received to start using Netdata Cloud.
-
-### Google and GitHub OAuth
-
-When you use Google/GitHub OAuth, your Netdata Cloud account is associated with the email address that Netdata Cloud receives through OAuth.
-
-To sign in/sign up using Google or GitHub OAuth, visit [Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_google_github_section) select the method you want to use. After the verification steps, you will be signed in to Netdata Cloud.
-
-### Enterprise SSO Authentication
-
-Netdata integrates with SSO tools, allowing you to control how your team connects and authenticates to Netdata Cloud.
-
-For more information, see [Enterprise SSO Authentication](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md).
+> **Important**: When using OAuth, your Netdata Cloud account will be automatically associated with the email address provided by the OAuth provider. Ensure you have access to this email address.
 
 ## Authorization
 
-Once logged in, you can manage role-based access in your space to give each team member the appropriate role. For more information, see [Role-Based Access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+Once logged in, you can manage role-based access in your Space to give each team member the appropriate role. For more information, see [Role-Based Access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).

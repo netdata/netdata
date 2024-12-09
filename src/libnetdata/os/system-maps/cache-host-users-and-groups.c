@@ -53,7 +53,7 @@ static size_t read_passwd_or_group(const char *filename, struct timespec *last_m
 void update_cached_host_users(void) {
     if(!netdata_configured_host_prefix || !*netdata_configured_host_prefix) return;
 
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     if(!spinlock_trylock(&spinlock)) return;
 
     char filename[FILENAME_MAX];
@@ -78,7 +78,7 @@ void update_cached_host_users(void) {
 void update_cached_host_groups(void) {
     if(!netdata_configured_host_prefix || !*netdata_configured_host_prefix) return;
     
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     if(!spinlock_trylock(&spinlock)) return;
 
     char filename[FILENAME_MAX];

@@ -13,54 +13,6 @@
 typedef pthread_mutex_t netdata_mutex_t;
 #define NETDATA_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 
-#ifdef SPINLOCK_IMPL_WITH_MUTEX
-    typedef struct netdata_spinlock
-    {
-        netdata_mutex_t inner;
-    } SPINLOCK;
-#else
-    typedef struct netdata_spinlock
-    {
-        bool locked;
-    #ifdef NETDATA_INTERNAL_CHECKS
-        pid_t locker_pid;
-        size_t spins;
-    #endif
-    } SPINLOCK;
-#endif
-
-#ifdef SPINLOCK_IMPL_WITH_MUTEX
-#define NETDATA_SPINLOCK_INITIALIZER { .inner = PTHREAD_MUTEX_INITIALIZER }
-#else
-#define NETDATA_SPINLOCK_INITIALIZER { .locked = false }
-#endif
-
-void spinlock_init(SPINLOCK *spinlock);
-void spinlock_lock(SPINLOCK *spinlock);
-void spinlock_unlock(SPINLOCK *spinlock);
-bool spinlock_trylock(SPINLOCK *spinlock);
-
-void spinlock_lock_cancelable(SPINLOCK *spinlock);
-void spinlock_unlock_cancelable(SPINLOCK *spinlock);
-bool spinlock_trylock_cancelable(SPINLOCK *spinlock);
-
-typedef struct netdata_rw_spinlock {
-    int32_t readers;
-    int32_t writers_waiting;
-    SPINLOCK spinlock;
-} RW_SPINLOCK;
-
-#define NETDATA_RW_SPINLOCK_INITIALIZER \
-    { .readers = 0, .spinlock = NETDATA_SPINLOCK_INITIALIZER }
-
-void rw_spinlock_init(RW_SPINLOCK *rw_spinlock);
-void rw_spinlock_read_lock(RW_SPINLOCK *rw_spinlock);
-void rw_spinlock_read_unlock(RW_SPINLOCK *rw_spinlock);
-void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock);
-void rw_spinlock_write_unlock(RW_SPINLOCK *rw_spinlock);
-bool rw_spinlock_tryread_lock(RW_SPINLOCK *rw_spinlock);
-bool rw_spinlock_trywrite_lock(RW_SPINLOCK *rw_spinlock);
-
 #ifdef NETDATA_TRACE_RWLOCKS
 
 typedef enum {

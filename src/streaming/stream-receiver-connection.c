@@ -57,6 +57,10 @@ void stream_receiver_free(struct receiver_state *rpt) {
     freez(rpt->program_name);
     freez(rpt->program_version);
 
+    freez(rpt->thread.compressed.buf);
+    rpt->thread.compressed.buf = NULL;
+    rpt->thread.compressed.size = 0;
+
     string_freez(rpt->config.send.api_key);
     string_freez(rpt->config.send.parents);
     string_freez(rpt->config.send.charts_matching);
@@ -261,6 +265,8 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         return stream_receiver_response_too_busy_now(w);
 
     struct receiver_state *rpt = callocz(1, sizeof(*rpt));
+    rpt->thread.compressed.size = COMPRESSION_MAX_CHUNK;
+    rpt->thread.compressed.buf = mallocz(rpt->thread.compressed.size);
     rpt->connected_since_s = now_realtime_sec();
     rpt->last_msg_t = now_monotonic_sec();
     rpt->hops = 1;
@@ -531,7 +537,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     }
 
     if(unlikely(web_client_streaming_rate_t > 0)) {
-        static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+        static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
         static time_t last_stream_accepted_t = 0;
 
         time_t now = now_realtime_sec();

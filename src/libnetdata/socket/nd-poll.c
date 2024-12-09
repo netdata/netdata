@@ -90,16 +90,18 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
         int n = epoll_wait(ndpl->epoll_fd, &ndpl->ev[0], _countof(ndpl->ev), timeout_ms);
 
         if(unlikely(n <= 0)) {
-            if (n < 0) {
-                result->events = ND_POLL_OTHER_ERROR;
-                result->data = NULL;
-                return -1;
-            }
-            else {
+            if (n == 0) {
                 result->events = ND_POLL_TIMEOUT;
                 result->data = NULL;
                 return 0;
             }
+
+            if(errno == EINTR || errno == EAGAIN)
+                continue;
+
+            result->events = ND_POLL_OTHER_ERROR;
+            result->data = NULL;
+            return -1;
         }
 
         ndpl->used = n;

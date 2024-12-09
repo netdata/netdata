@@ -1135,7 +1135,7 @@ void *tc_main(void *ptr) {
         }
 
         // fgets() failed or loop broke
-        int code = spawn_popen_kill(tc_child_instance);
+        int code = spawn_popen_kill(tc_child_instance, 0);
         tc_child_instance = NULL;
 
         if(unlikely(device)) {

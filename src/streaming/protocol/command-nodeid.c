@@ -34,7 +34,7 @@ void stream_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
                   PLUGINSD_KEYWORD_NODE_ID " '%s' '%s' '%s'\n",
                   claim_id.str, node_id_str, cloud_config_url_get());
 
-        send_to_plugin(buf, __atomic_load_n(&host->receiver->thread.parser, __ATOMIC_RELAXED));
+        send_to_plugin(buf, __atomic_load_n(&host->receiver->thread.parser, __ATOMIC_RELAXED), STREAM_TRAFFIC_TYPE_METADATA);
     }
     rrdhost_receiver_unlock(host);
 }
@@ -74,7 +74,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
 
     if(!UUIDiszero(s->host->node_id) && !UUIDeq(s->host->node_id, node_id)) {
         if(claimed) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "STREAM %s [send to %s] parent reports different node id '%s', but we are claimed. Ignoring it.",
                    rrdhost_hostname(s->host), s->connected_to,
                    node_id_str ? node_id_str : "(unset)");

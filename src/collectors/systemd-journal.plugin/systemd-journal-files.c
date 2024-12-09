@@ -704,7 +704,7 @@ int filenames_compar(const void *a, const void *b) {
 }
 
 void journal_files_registry_update(void) {
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
     if(spinlock_trylock(&spinlock)) {
         usec_t scan_monotonic_ut = now_monotonic_usec();

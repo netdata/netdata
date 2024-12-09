@@ -1424,14 +1424,14 @@ int netdata_main(int argc, char **argv) {
             default_stacksize = 1 * 1024 * 1024;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        telemetry_enabled = true;
-        telemetry_extended_enabled = true;
+        pulse_enabled = true;
+        pulse_extended_enabled = true;
 #endif
 
-        telemetry_extended_enabled =
-            config_get_boolean(CONFIG_SECTION_TELEMETRY, "extended telemetry", telemetry_extended_enabled);
+        pulse_extended_enabled =
+            config_get_boolean(CONFIG_SECTION_PULSE, "extended", pulse_extended_enabled);
 
-        if(telemetry_extended_enabled)
+        if(pulse_extended_enabled)
             // this has to run before starting any other threads that use workers
             workers_utilization_enable();
 

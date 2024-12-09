@@ -5,7 +5,6 @@
 #include "replication.h"
 #include "Judy.h"
 
-#define STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED 50ULL
 #define MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER 25ULL
 #define MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED 50ULL
 #define MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED 10ULL
@@ -37,7 +36,7 @@
 #define REQUESTS_AHEAD_PER_THREAD 1 // 1 = enable synchronous queries
 
 static struct replication_query_statistics replication_queries = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .spinlock = SPINLOCK_INITIALIZER,
         .queries_started = 0,
         .queries_finished = 0,
         .points_read = 0,
@@ -770,7 +769,7 @@ static void replicate_log_request(struct replication_request_details *r, const c
     internal_error(true,
 #else
     nd_log_limit_static_global_var(erl, 1, 0);
-    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+    nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
 #endif
                 "REPLAY ERROR: 'host:%s/chart:%s' child sent: "
                 "db from %ld to %ld%s, wall clock time %ld, "
@@ -837,7 +836,7 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
               rrdset_id(st), r->wanted.start_streaming ? "true" : "false",
               (unsigned long long)r->wanted.after, (unsigned long long)r->wanted.before);
 
-    ssize_t ret = r->caller.callback(buffer, r->caller.parser);
+    ssize_t ret = r->caller.callback(buffer, r->caller.parser, STREAM_TRAFFIC_TYPE_REPLICATION);
     if (ret < 0) {
         netdata_log_error("REPLAY ERROR: 'host:%s/chart:%s' failed to send replication request to child (error %zd)",
               rrdhost_hostname(r->host), rrdset_id(r->st), ret);
@@ -962,7 +961,7 @@ bool replicate_chart_request(send_command callback, struct parser *parser, RRDHO
         r.wanted.after = 0;
         r.wanted.before = 0;
         r.wanted.start_streaming = true;
-        return send_replay_chart_cmd(&r, "empty replication request, wanted after computed bigger than wanted before", true);
+        return send_replay_chart_cmd(&r, "empty replication request, wanted 'after' computed bigger than wanted 'before'", true);
     }
 
     // the child should start streaming immediately if the wanted duration is small, or we reached the last entry of the child
@@ -987,7 +986,7 @@ struct replication_request {
     time_t after;                       // the start time of the query (maybe zero) key for sorting (JudyL)
     time_t before;                      // the end time of the query (maybe zero)
 
-    usec_t sender_last_flush_ut;        // the timestamp of the sender, at the time we indexed this request
+    usec_t sender_circular_buffer_since_ut;        // the timestamp of the sender, at the time we indexed this request
     Word_t unique_id;                   // auto-increment, later requests have bigger
 
     bool start_streaming;               // true, when the parent wants to send the rest of the data (before is overwritten) and enable normal streaming
@@ -1051,7 +1050,7 @@ static struct replication_thread {
 
 } replication_globals = {
         .aral_rse = NULL,
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .spinlock = SPINLOCK_INITIALIZER,
         .unsafe = {
                 .pending = 0,
 
@@ -1434,7 +1433,7 @@ static void replication_request_delete_callback(const DICTIONARY_ITEM *item __ma
 }
 
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq) {
-    return rq->sender_last_flush_ut == stream_sender_get_flush_time(rq->sender);
+    return rq->sender_circular_buffer_since_ut == stream_circular_buffer_get_since_ut(rq->sender->scb);
 }
 
 static bool replication_execute_request(struct replication_request *rq, bool workers) {
@@ -1467,7 +1466,8 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     // send the replication data
     rq->q->rq = rq;
     replication_response_execute_and_finalize(
-            rq->q, (size_t)((unsigned long long)rq->sender->host->sender->sbuf.cb->max_size * MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER / 100ULL), workers);
+            rq->q,
+        (size_t)((unsigned long long)stream_circular_buffer_get_max_size(rq->sender->scb) * MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER / 100ULL), workers);
 
     rq->q = NULL;
 
@@ -1496,7 +1496,7 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
             .after = after,
             .before = before,
             .start_streaming = start_streaming,
-            .sender_last_flush_ut = stream_sender_get_flush_time(sender),
+            .sender_circular_buffer_since_ut = stream_circular_buffer_get_since_ut(sender->scb),
             .indexed_in_judy = false,
             .not_indexed_buffer_full = false,
             .not_indexed_preprocessing = false,
@@ -1505,10 +1505,6 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
     if(!sender->replication.oldest_request_after_t || rq.after < sender->replication.oldest_request_after_t)
         sender->replication.oldest_request_after_t = rq.after;
 
-//    if(start_streaming && rrdpush_sender_get_buffer_used_percent(sender) <= STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)
-//        replication_execute_request(&rq, false);
-//
-//    else
     dictionary_set(sender->replication.requests, chart_id, &rq, sizeof(struct replication_request));
 }
 
@@ -1535,8 +1531,7 @@ void replication_cleanup_sender(struct sender_state *sender) {
 }
 
 void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
-    size_t available = cbuffer_available_size_unsafe(s->host->sender->sbuf.cb);
-    size_t percentage = (s->sbuf.cb->max_size - available) * 100 / s->sbuf.cb->max_size;
+    size_t percentage = stream_sender_get_buffer_used_percent(s->scb);
 
     if(unlikely(percentage > MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED && !stream_sender_replication_buffer_full_get(s))) {
         stream_sender_replication_buffer_full_set(s, true);
@@ -1568,8 +1563,6 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
         // replication_set_next_point_in_time(0, 0);
         replication_recursive_unlock();
     }
-
-    stream_sender_set_buffer_used_percent(s, percentage);
 }
 
 // ----------------------------------------------------------------------------
@@ -1775,7 +1768,7 @@ static int replication_pipeline_execute_next(void) {
         if(rq->found) {
             internal_fatal(rq->executed, "REPLAY FATAL: query has already been executed!");
 
-            if (rq->sender_last_flush_ut != stream_sender_get_flush_time(rq->sender)) {
+            if (rq->sender_circular_buffer_since_ut != stream_circular_buffer_get_since_ut(rq->sender->scb)) {
                 // the sender has reconnected since this request was queued,
                 // we can safely throw it away, since the parent will resend it
                 replication_response_cancel_and_finalize(rq->q);
@@ -1887,7 +1880,7 @@ void *replication_thread_main(void *ptr) {
 
     int nodes = (int)dictionary_entries(rrdhost_root_index);
     int cpus = (int)get_netdata_cpus();
-    int threads = MIN(cpus * 2 / 3, nodes / 5);
+    int threads = MIN(cpus * 1 / 3, nodes / 10);
     if (threads < 1) threads = 1;
     else if (threads > MAX_REPLICATION_THREADS) threads = MAX_REPLICATION_THREADS;
 

@@ -14,11 +14,10 @@ struct rrdhost;
 extern char *plugin_directories[PLUGINSD_MAX_DIRECTORIES];
 
 struct plugind {
-    char id[CONFIG_MAX_NAME+1];         // config node id
-
-    char filename[FILENAME_MAX+1];      // just the filename
-    char fullfilename[FILENAME_MAX+1];  // with path
-    char cmd[PLUGINSD_CMD_MAX+1];       // the command that it executes
+    STRING *id;                         // config node id
+    STRING *filename;                   // just the filename
+    STRING *fullfilename;               // with path
+    STRING *cmd;                        // the command that it executes
 
     size_t successful_collections;      // the number of times we have seen
                                         // values collected from this plugin
@@ -26,7 +25,7 @@ struct plugind {
     size_t serial_failures;             // the number of times the plugin started
                                         // without collecting values
 
-    struct rrdhost *host;                      // the host the plugin collects data for
+    struct rrdhost *host;               // the host the plugin collects data for
     int update_every;                   // the plugin default data collection frequency
 
     struct {

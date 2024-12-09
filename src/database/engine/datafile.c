@@ -56,10 +56,11 @@ bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS re
     return ret;
 }
 
-void datafile_release(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
+void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason, const char *func) {
     spinlock_lock(&df->users.spinlock);
     if(!df->users.lockers)
-        fatal("DBENGINE DATAFILE: cannot release a datafile that is not acquired");
+        fatal("DBENGINE DATAFILE: cannot release datafile %u of tier %u - it is not acquired, called from %s() with reason %u",
+              df->fileno, df->tier, func, reason);
 
     df->users.lockers--;
     df->users.lockers_by_reason[reason]--;

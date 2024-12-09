@@ -554,7 +554,7 @@ static void read_from_spawned(SPAWN_INSTANCE *si, const char *name __maybe_unuse
     }
     fclose(fp);
     spawn_server_instance_read_fd_unset(si);
-    spawn_server_exec_kill(spawn_server, si);
+    spawn_server_exec_kill(spawn_server, si, 0);
 }
 
 void detect_veth_interfaces_spawn(pid_t pid) {
