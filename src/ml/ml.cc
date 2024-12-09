@@ -83,7 +83,7 @@ ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim, const 
 
     storage_engine_query_init(dim->rd->tiers[0].seb, dim->rd->tiers[0].smh, &handle,
               training_response.query_after_t, training_response.query_before_t,
-              STORAGE_PRIORITY_BEST_EFFORT);
+              STORAGE_PRIORITY_SYNCHRONOUS);
 
     size_t idx = 0;
     memset(worker->training_cns, 0, sizeof(calculated_number_t) * max_n * (Cfg.lag_n + 1));
