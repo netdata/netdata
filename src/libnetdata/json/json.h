@@ -10,7 +10,7 @@
 #endif // error_description
 #endif // ENABLE_JSONC
 
-#include "jsmn.h"
+#include "libnetdata/json/vendored/jsmn.h"
 
 //https://www.ibm.com/support/knowledgecenter/en/SS9H2Y_7.6.0/com.ibm.dp.doc/json_parserlimits.html
 #define JSON_NAME_LEN 256

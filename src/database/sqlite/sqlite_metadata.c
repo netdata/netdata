@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sqlite_metadata.h"
-#include "database/sqlite/sqlite3/sqlite3recover.h"
+#include "database/sqlite/vendored/sqlite3recover.h"
 //#include "sqlite_db_migration.h"
 
 #define DB_METADATA_VERSION 18
