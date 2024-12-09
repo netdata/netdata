@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix\(build\): fix building go.d on 32bit [\#19156](https://github.com/netdata/netdata/pull/19156) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d\): correct sd dir [\#19155](https://github.com/netdata/netdata/pull/19155) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d\): correct unlockall impl [\#19154](https://github.com/netdata/netdata/pull/19154) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d\): unlock job files on quit/restart [\#19153](https://github.com/netdata/netdata/pull/19153) ([ilyam8](https://github.com/ilyam8))
@@ -446,7 +447,6 @@
 - Correctly include Windows installer in release creation. [\#18609](https://github.com/netdata/netdata/pull/18609) ([Ferroin](https://github.com/Ferroin))
 - feat: HW req for onprem installation. [\#18608](https://github.com/netdata/netdata/pull/18608) ([M4itee](https://github.com/M4itee))
 - WEB SERVER: retry sending data when errno is EAGAIN [\#18607](https://github.com/netdata/netdata/pull/18607) ([ktsaou](https://github.com/ktsaou))
-- Publish Windows installers on nightly builds. [\#18603](https://github.com/netdata/netdata/pull/18603) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
