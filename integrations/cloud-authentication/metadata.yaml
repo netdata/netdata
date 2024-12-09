@@ -46,7 +46,7 @@
 
       ### SP-initiated SSO
 
-      If you start your authentication flow from Netdata sign-in page please check [these steps](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md#from-netdata-sign-up-page).
+      If you start your authentication flow from Netdata sign-in page please check [these steps](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md).
 
 - id: 'oidc-authentication'
   meta:
@@ -98,7 +98,7 @@
 
       ### SP-initiated SSO
 
-      If you start your authentication flow from Netdata sign-in page please check [these steps](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md#from-netdata-sign-up-page).
+      If you start your authentication flow from Netdata sign-in page please check [these steps](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md).
 
 
       ### Reference
