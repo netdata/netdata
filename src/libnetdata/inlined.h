@@ -622,9 +622,14 @@ static inline char *strsep_skip_consecutive_separators(char **ptr, char *s) {
 
 // remove leading and trailing spaces; may return NULL
 static inline char *trim(char *s) {
+    char *buf = s;
+
     // skip leading spaces
     while (*s && isspace((uint8_t)*s)) s++;
-    if (!*s) return NULL;
+    if (!*s) {
+        *buf = '\0';
+        return NULL;
+    }
 
     // skip tailing spaces
     // this way is way faster. Writes only one NUL char.
@@ -635,7 +640,10 @@ static inline char *trim(char *s) {
         *++p = '\0';
     }
 
-    if (!*s) return NULL;
+    if (!*s) {
+        *buf = '\0';
+        return NULL;
+    }
 
     return s;
 }
