@@ -342,6 +342,20 @@ static inline void pgc_size_histogram_del(PGC *cache, struct pgc_size_histogram 
 // ----------------------------------------------------------------------------
 // evictions control
 
+static inline uint64_t pgc_threshold(size_t threshold, uint64_t wanted, uint64_t current, uint64_t clean) {
+    if(current < clean)
+        current = clean;
+
+    if(wanted < current - clean)
+        wanted = current - clean;
+
+    uint64_t ret = wanted * threshold / 1000ULL;
+    if(ret < current - clean)
+        ret = current - clean;
+
+    return ret;
+}
+
 static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
 
     if(size_to_evict)
@@ -394,7 +408,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
         wanted_cache_size = referenced_size + dirty;
 
     // if we don't have enough clean pages, there is no reason to be aggressive or critical
-    if(current_cache_size > wanted_cache_size && wanted_cache_size < current_cache_size - clean)
+    if(wanted_cache_size < current_cache_size - clean)
         wanted_cache_size = current_cache_size - clean;
 
     if(cache->config.out_of_memory_protection_bytes) {
@@ -420,16 +434,13 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     __atomic_store_n(&cache->stats.wanted_cache_size, wanted_cache_size, __ATOMIC_RELAXED);
     __atomic_store_n(&cache->stats.current_cache_size, current_cache_size, __ATOMIC_RELAXED);
 
-    uint64_t healthy_target = wanted_cache_size * cache->config.healthy_size_per1000 / 1000ULL;
-    if(healthy_target < wanted_cache_size - clean)
-        healthy_target = wanted_cache_size - clean;
-
+    uint64_t healthy_target = pgc_threshold(cache->config.healthy_size_per1000, wanted_cache_size, current_cache_size, clean);
     if(current_cache_size > healthy_target) {
-        uint64_t low_watermark_target = wanted_cache_size * cache->config.evict_low_threshold_per1000 / 1000ULL;
-        if(low_watermark_target < wanted_cache_size - clean)
-            low_watermark_target = wanted_cache_size - clean;
+        uint64_t low_watermark_target = pgc_threshold(cache->config.evict_low_threshold_per1000, wanted_cache_size, current_cache_size, clean);
 
         uint64_t size_to_evict_now = current_cache_size - low_watermark_target;
+        if(size_to_evict_now > clean)
+            size_to_evict_now = clean;
 
         if(size_to_evict)
             *size_to_evict = (size_t)size_to_evict_now;
