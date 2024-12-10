@@ -179,7 +179,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics refer to the entire monitored instance"
+          description: "These metrics refer to the entire system."
           labels: []
           metrics:
             - name: mem.swap_iops
@@ -277,7 +277,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics refer to the entire monitored instance."
+          description: "These metrics refer to the entire system."
           labels: []
           metrics:
             - name: system.processes
@@ -319,14 +319,11 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          IPC stands for Inter-Process Communication. It is a mechanism which allows processes to communicate with each
-          other and synchronize their actions.
+          Inter-Process Communication (IPC) enables different processes to communicate and coordinate with each other. This collector monitors IPC semaphores, which are synchronization tools that:
 
-          This collector exposes information about:
-
-          - Semaphores: They are used to synchronize the operations performed by independent processes. So, if multiple
-            processes are trying to access a single shared resource, semaphores can ensure that only one process
-            accesses the resource at a given time.
+          - Control access to shared resources (like files, memory, or devices).
+          - Ensure only one process can access a resource at a time.
+          - Prevent conflicts between competing processes.
         method_description: |
           It queries for the 'Objects' object from Perflib in order to gather the metrics.
       supported_platforms:
@@ -378,7 +375,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics refer to the entire monitored instance"
+          description: "These metrics refer to the entire system."
           labels: []
           metrics:
             - name: system.ipc_semaphores
