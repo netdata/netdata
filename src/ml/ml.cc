@@ -1089,8 +1089,9 @@ void *ml_train_main(void *arg) {
     worker_register_job_name(WORKER_TRAIN_FLUSH_MODELS, "flush models");
 
     while (!Cfg.training_stop) {
-        if(!stream_ml_should_be_running()) {
-            sleep_usec(50 * USEC_PER_MS);
+        if(!stream_control_ml_should_be_running()) {
+            worker_is_idle();
+            stream_control_throttle();
             continue;
         }
 

@@ -154,7 +154,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
         rpt->system_info = NULL;
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD) ||
-                     !stream_children_should_be_accepted())) {
+                     !stream_control_children_should_be_accepted())) {
             stream_receiver_log_status(
                 rpt,
                 "host is initializing, retry later",

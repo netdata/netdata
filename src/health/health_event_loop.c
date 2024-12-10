@@ -213,8 +213,9 @@ static void health_event_loop(void) {
     unsigned int loop = 0;
 
     while(service_running(SERVICE_HEALTH)) {
-        if(!stream_health_should_be_running()) {
-            sleep_usec(50 * USEC_PER_MS);
+        if(!stream_control_health_should_be_running()) {
+            worker_is_idle();
+            stream_control_throttle();
             continue;
         }
 

@@ -307,7 +307,7 @@ int stream_info_to_json_v1(BUFFER *wb, const char *machine_guid) {
 
     if(ret == HTTP_RESP_OK) {
         if((status.ingest.status == RRDHOST_INGEST_STATUS_ARCHIVED || status.ingest.status == RRDHOST_INGEST_STATUS_OFFLINE) &&
-            !stream_children_should_be_accepted())
+            !stream_control_children_should_be_accepted())
            status.ingest.status = RRDHOST_INGEST_STATUS_INITIALIZING;
 
         buffer_json_member_add_string(wb, "db_status", rrdhost_db_status_to_string(status.db.status));
