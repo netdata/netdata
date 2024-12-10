@@ -208,27 +208,35 @@ struct rrdeng_cache_efficiency_stats {
     size_t metrics_retention_started;
 };
 
+typedef enum rrdeng_mem {
+    RRDENG_MEM_PGC = 0,
+    RRDENG_MEM_PGD,
+    RRDENG_MEM_MRG,
+    RRDENG_MEM_OPCODES,
+    RRDENG_MEM_HANDLES,
+    RRDENG_MEM_DESCRIPTORS,
+    RRDENG_MEM_WORKERS,
+    RRDENG_MEM_PDC,
+    RRDENG_MEM_XT_IO,
+    RRDENG_MEM_EPDL,
+    RRDENG_MEM_DEOL,
+    RRDENG_MEM_PD,
+
+    // terminator
+    RRDENG_MEM_MAX,
+} RRDENG_MEM;
+
 struct rrdeng_buffer_sizes {
-    size_t workers;
-    size_t pdc;
+    struct aral_statistics *as[RRDENG_MEM_MAX];
+
     size_t wal;
-    size_t descriptors;
-    size_t xt_io;
     size_t xt_buf;
-    size_t handles;
-    size_t opcodes;
-    size_t epdl;
-    size_t deol;
-    size_t pd;
-    size_t pgc;
-    size_t pgd;
-    size_t mrg;
 #ifdef PDC_USE_JULYL
     size_t julyl;
 #endif
 };
 
-struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void);
+struct rrdeng_buffer_sizes rrdeng_pulse_memory_sizes(void);
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);

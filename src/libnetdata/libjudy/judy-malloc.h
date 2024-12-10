@@ -5,7 +5,7 @@
 
 #include "../libnetdata.h"
 
-size_t judy_aral_overhead(void);
+size_t judy_aral_free_bytes(void);
 size_t judy_aral_structures(void);
 
 void JudyAllocThreadPulseReset(void);

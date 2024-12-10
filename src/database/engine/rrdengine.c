@@ -1587,25 +1587,27 @@ static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unu
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
-struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
+struct rrdeng_buffer_sizes rrdeng_pulse_memory_sizes(void) {
     return (struct rrdeng_buffer_sizes) {
-            .pgc         = pgc_aral_overhead() + pgc_aral_structures(),
-            .pgd         = pgd_aral_overhead() + pgd_aral_structures(),
-            .mrg         = mrg_aral_overhead() + mrg_aral_structures(),
-            .opcodes     = aral_overhead(rrdeng_main.cmd_queue.ar) + aral_structures(rrdeng_main.cmd_queue.ar),
-            .handles     = aral_overhead(rrdeng_main.handles.ar) + aral_structures(rrdeng_main.handles.ar),
-            .descriptors = aral_overhead(rrdeng_main.descriptors.ar) + aral_structures(rrdeng_main.descriptors.ar),
-            .wal         = __atomic_load_n(&wal_globals.atomics.allocated, __ATOMIC_RELAXED) * (sizeof(WAL) + RRDENG_BLOCK_SIZE),
-            .workers     = aral_overhead(rrdeng_main.work_cmd.ar),
-            .pdc         = pdc_cache_size(),
-            .xt_io       = aral_overhead(rrdeng_main.xt_io_descr.ar) + aral_structures(rrdeng_main.xt_io_descr.ar),
-            .xt_buf      = extent_buffer_cache_size(),
-            .epdl        = epdl_cache_size(),
-            .deol        = deol_cache_size(),
-            .pd          = pd_cache_size(),
+        .as = {
+            [RRDENG_MEM_PGC]            = pgc_aral_stats(),
+            [RRDENG_MEM_PGD]            = pgd_aral_stats(),
+            [RRDENG_MEM_MRG]            = mrg_aral_stats(),
+            [RRDENG_MEM_PDC]            = pdc_aral_stats(),
+            [RRDENG_MEM_EPDL]           = epdl_aral_stats(),
+            [RRDENG_MEM_DEOL]           = deol_aral_stats(),
+            [RRDENG_MEM_PD]             = pd_aral_stats(),
+            [RRDENG_MEM_OPCODES]        = aral_get_statistics(rrdeng_main.cmd_queue.ar),
+            [RRDENG_MEM_HANDLES]        = aral_get_statistics(rrdeng_main.handles.ar),
+            [RRDENG_MEM_DESCRIPTORS]    = aral_get_statistics(rrdeng_main.descriptors.ar),
+            [RRDENG_MEM_WORKERS]        = aral_get_statistics(rrdeng_main.work_cmd.ar),
+            [RRDENG_MEM_XT_IO]          = aral_get_statistics(rrdeng_main.xt_io_descr.ar),
+        },
+        .wal    = __atomic_load_n(&wal_globals.atomics.allocated, __ATOMIC_RELAXED) * (sizeof(WAL) + RRDENG_BLOCK_SIZE),
+        .xt_buf = extent_buffer_cache_size(),
 
 #ifdef PDC_USE_JULYL
-            .julyl       = julyl_cache_size(),
+        .julyl  = julyl_cache_size(),
 #endif
     };
 }

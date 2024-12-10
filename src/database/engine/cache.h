@@ -248,8 +248,7 @@ bool pgc_flush_pages(PGC *cache);
 struct pgc_statistics pgc_get_statistics(PGC *cache);
 size_t pgc_hot_and_dirty_entries(PGC *cache);
 
-size_t pgc_aral_structures(void);
-size_t pgc_aral_overhead(void);
+struct aral_statistics *pgc_aral_stats(void);
 
 static inline size_t indexing_partition(Word_t ptr, Word_t modulo) __attribute__((const));
 static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {

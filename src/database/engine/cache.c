@@ -571,7 +571,7 @@ struct section_pages {
     PGC_PAGE *base;
 };
 
-static struct aral_statistics aral_statistics_for_pgc = { 0 };
+static struct aral_statistics pgc_aral_statistics = { 0 };
 
 static ARAL *pgc_sections_aral = NULL;
 
@@ -2044,7 +2044,7 @@ PGC *pgc_create(const char *name,
                 sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
                 0,
                 0,
-                &aral_statistics_for_pgc,
+                &pgc_aral_statistics,
                 NULL,
                 NULL,
                 false,
@@ -2086,12 +2086,8 @@ PGC *pgc_create(const char *name,
     return cache;
 }
 
-size_t pgc_aral_structures(void) {
-    return aral_structures_from_stats(&aral_statistics_for_pgc);
-}
-
-size_t pgc_aral_overhead(void) {
-    return aral_overhead_from_stats(&aral_statistics_for_pgc);
+struct aral_statistics *pgc_aral_stats(void) {
+    return &pgc_aral_statistics;
 }
 
 void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section) {

@@ -38,9 +38,8 @@ uint32_t pgd_memory_footprint(PGD *pg);
 uint32_t pgd_capacity(PGD *pg);
 uint32_t pgd_disk_footprint(PGD *pg);
 
-size_t pgd_aral_structures(void);
-size_t pgd_aral_overhead(void);
-size_t pgd_aral_padding(void);
+struct aral_statistics *pgd_aral_stats(void);
+size_t pgd_padding_bytes(void);
 
 void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size);
 

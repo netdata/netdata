@@ -71,8 +71,8 @@ static void pdc_release(PDC *pdc) {
     aral_freez(pdc_globals.pdc.ar, pdc);
 }
 
-size_t pdc_cache_size(void) {
-    return aral_overhead(pdc_globals.pdc.ar) + aral_structures(pdc_globals.pdc.ar);
+struct aral_statistics *pdc_aral_stats(void) {
+    return aral_get_statistics(pdc_globals.pdc.ar);
 }
 
 // ----------------------------------------------------------------------------
@@ -100,8 +100,8 @@ static void page_details_release(struct page_details *pd) {
     aral_freez(pdc_globals.pd.ar, pd);
 }
 
-size_t pd_cache_size(void) {
-    return aral_overhead(pdc_globals.pd.ar) + aral_structures(pdc_globals.pd.ar);
+struct aral_statistics *pd_aral_stats(void) {
+    return aral_get_statistics(pdc_globals.pd.ar);
 }
 
 // ----------------------------------------------------------------------------
@@ -129,8 +129,8 @@ static void epdl_release(EPDL *epdl) {
     aral_freez(pdc_globals.epdl.ar, epdl);
 }
 
-size_t epdl_cache_size(void) {
-    return aral_overhead(pdc_globals.epdl.ar) + aral_structures(pdc_globals.epdl.ar);
+struct aral_statistics *epdl_aral_stats(void) {
+    return aral_get_statistics(pdc_globals.epdl.ar);
 }
 
 // ----------------------------------------------------------------------------
@@ -159,8 +159,8 @@ static void deol_release(DEOL *deol) {
     aral_freez(pdc_globals.deol.ar, deol);
 }
 
-size_t deol_cache_size(void) {
-    return aral_overhead(pdc_globals.deol.ar) + aral_structures(pdc_globals.deol.ar);
+struct aral_statistics *deol_aral_stats(void) {
+    return aral_get_statistics(pdc_globals.deol.ar);
 }
 
 // ----------------------------------------------------------------------------

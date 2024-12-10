@@ -34,12 +34,12 @@ __attribute__((constructor)) void aral_judy_init(void) {
         }
 }
 
-size_t judy_aral_overhead(void) {
-    return aral_overhead_from_stats(&judy_sizes_aral_statistics);
+size_t judy_aral_free_bytes(void) {
+    return aral_free_bytes_from_stats(&judy_sizes_aral_statistics);
 }
 
 size_t judy_aral_structures(void) {
-    return aral_structures_from_stats(&judy_sizes_aral_statistics);
+    return aral_structures_bytes_from_stats(&judy_sizes_aral_statistics);
 }
 
 static ARAL *judy_size_aral(Word_t Words) {

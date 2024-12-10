@@ -78,7 +78,7 @@ struct {
 #error "You need to update the slots reserved for storage tiers"
 #endif
 
-static struct aral_statistics aral_statistics_for_pgd = { 0 };
+static struct aral_statistics pgd_aral_statistics = { 0 };
 
 static size_t aral_sizes_delta;
 static size_t aral_sizes_count;
@@ -104,17 +104,13 @@ static ARAL **arals = NULL;
 #define arals_slot(slot, partition) ((partition) * aral_sizes_count + (slot))
 static ARAL *pgd_get_aral_by_size_and_partition(size_t size, size_t partition);
 
-size_t pgd_aral_padding(void) {
+size_t pgd_padding_bytes(void) {
     int64_t x = __atomic_load_n(&pgd_alloc_globals.padding_used, __ATOMIC_RELAXED);
     return (x > 0) ? x : 0;
 }
 
-size_t pgd_aral_structures(void) {
-    return aral_structures(pgd_alloc_globals.aral_pgd[0]);
-}
-
-size_t pgd_aral_overhead(void) {
-    return aral_overhead(pgd_alloc_globals.aral_pgd[0]);
+struct aral_statistics *pgd_aral_stats(void) {
+    return &pgd_aral_statistics;
 }
 
 int aral_size_sort_compare(const void *a, const void *b) {
@@ -183,7 +179,7 @@ void pgd_init_arals(void) {
                 aral_sizes[slot],
                 0,
                 0,
-                &aral_statistics_for_pgd,
+                &pgd_aral_statistics,
                 NULL, NULL, false, false);
         }
     }

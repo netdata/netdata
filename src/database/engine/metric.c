@@ -385,12 +385,8 @@ inline MRG *mrg_create(ssize_t partitions) {
     return mrg;
 }
 
-inline size_t mrg_aral_structures(void) {
-    return aral_structures_from_stats(&mrg_aral_statistics);
-}
-
-inline size_t mrg_aral_overhead(void) {
-    return aral_overhead_from_stats(&mrg_aral_statistics);
+struct aral_statistics *mrg_aral_stats(void) {
+    return &mrg_aral_statistics;
 }
 
 inline void mrg_destroy(MRG *mrg __maybe_unused) {

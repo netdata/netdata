@@ -6,7 +6,7 @@
 struct aral_info {
     const char *name;
     RRDSET *st_memory;
-    RRDDIM *rd_malloc_used, *rd_malloc_free, *rd_mmap_used, *rd_mmap_free, *rd_structures;
+    RRDDIM *rd_malloc_used, *rd_malloc_free, *rd_mmap_used, *rd_mmap_free, *rd_structures, *rd_padding;
 
     RRDSET *st_utilization;
     RRDDIM *rd_utilization;
@@ -88,6 +88,9 @@ void pulse_aral_do(bool extended) {
 
         size_t structures_bytes = __atomic_load_n(&stats->structures.allocated_bytes, __ATOMIC_RELAXED);
 
+        size_t padding_bytes = __atomic_load_n(&stats->malloc.padding_bytes, __ATOMIC_RELAXED) +
+                               __atomic_load_n(&stats->mmap.padding_bytes, __ATOMIC_RELAXED);
+
         NETDATA_DOUBLE utilization;
         if((malloc_used_bytes + mmap_used_bytes != 0) && (malloc_allocated_bytes + mmap_allocated_bytes != 0))
             utilization = 100.0 * (NETDATA_DOUBLE)(malloc_used_bytes + mmap_used_bytes) / (NETDATA_DOUBLE)(malloc_allocated_bytes + mmap_allocated_bytes);
@@ -122,6 +125,7 @@ void pulse_aral_do(bool extended) {
                 ai->rd_malloc_used = rrddim_add(ai->st_memory, "malloc used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 ai->rd_mmap_used   = rrddim_add(ai->st_memory, "mmap used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 ai->rd_structures  = rrddim_add(ai->st_memory, "structures", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                ai->rd_padding     = rrddim_add(ai->st_memory, "padding", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
 
             rrddim_set_by_pointer(ai->st_memory, ai->rd_malloc_used, (collected_number)malloc_used_bytes);
@@ -129,6 +133,7 @@ void pulse_aral_do(bool extended) {
             rrddim_set_by_pointer(ai->st_memory, ai->rd_mmap_used, (collected_number)mmap_used_bytes);
             rrddim_set_by_pointer(ai->st_memory, ai->rd_mmap_free, (collected_number)mmap_free_bytes);
             rrddim_set_by_pointer(ai->st_memory, ai->rd_structures, (collected_number)structures_bytes);
+            rrddim_set_by_pointer(ai->st_memory, ai->rd_padding, (collected_number)padding_bytes);
             rrdset_done(ai->st_memory);
         }
 
