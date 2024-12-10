@@ -11,6 +11,12 @@
 #define TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS
 #endif
 
+#if ENV32BIT
+#define SYSTEM_REQUIRED_ALIGNMENT (sizeof(uintptr_t) * 2)
+#else
+#define SYSTEM_REQUIRED_ALIGNMENT (alignof(uintptr_t))
+#endif
+
 // max mapped file size
 #define ARAL_MAX_PAGE_SIZE_MMAP (1ULL * 1024 * 1024 * 1024)
 
@@ -359,6 +365,8 @@ static ARAL_PAGE *aral_get_page_pointer_after_element___do_NOT_have_aral_lock(AR
     }
 #endif
 
+    internal_fatal((uintptr_t)page % SYSTEM_REQUIRED_ALIGNMENT != 0, "Pointer is not aligned properly");
+
     return page;
 }
 
@@ -402,12 +410,6 @@ static size_t aral_get_system_page_size(void) {
     else
         return page_size;
 }
-
-#if ENV32BIT
-#define SYSTEM_REQUIRED_ALIGNMENT (sizeof(uintptr_t) * 2)
-#else
-#define SYSTEM_REQUIRED_ALIGNMENT (alignof(uintptr_t))
-#endif
 
 static size_t aral_element_slot_size(size_t requested_element_size, bool usable) {
     // we need to add a page pointer after the element
@@ -791,6 +793,8 @@ void *aral_mallocz_internal(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEF
         __atomic_add_fetch(&ar->stats->mmap.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
     else
         __atomic_add_fetch(&ar->stats->malloc.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+
+    internal_fatal((uintptr_t)found_fr % SYSTEM_REQUIRED_ALIGNMENT != 0, "Pointer is not aligned properly");
 
     return (void *)found_fr;
 }
