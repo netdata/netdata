@@ -19,7 +19,8 @@ RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t wall_clock_time
     // check if we are not connected
     if(unlikely(!(host_flags & RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS))) {
 
-        if(unlikely(!(host_flags & (RRDHOST_FLAG_STREAM_SENDER_ADDED | RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED))))
+        if(unlikely((host_flags & RRDHOST_FLAG_COLLECTOR_ONLINE) &&
+                     !(host_flags & RRDHOST_FLAG_STREAM_SENDER_ADDED)))
             stream_sender_start_host(host);
 
         if(unlikely(!(host_flags & RRDHOST_FLAG_STREAM_SENDER_LOGGED_STATUS))) {

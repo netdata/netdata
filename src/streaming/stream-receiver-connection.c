@@ -149,7 +149,8 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INTERNAL_ERROR);
             return false;
         }
-
+        // IMPORTANT: KEEP THIS FIRST AFTER CHECKING host RESPONSE!
+        // THIS IS HOW WE KNOW THE system_info IS GONE NOW...
         // system_info has been consumed by the host structure
         rpt->system_info = NULL;
 

@@ -807,7 +807,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         signal_rrdcontext = true;
         stream_receiver_replication_reset(host);
 
-        rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED);
+        rrdhost_flag_set(rpt->host, RRDHOST_FLAG_COLLECTOR_ONLINE);
         aclk_queue_node_info(rpt->host, true);
 
         rrdhost_stream_parents_reset(host, STREAM_HANDSHAKE_PREPARING);
@@ -832,7 +832,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
 
         if (host->receiver == rpt) {
-            rrdhost_flag_set(host, RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED);
+            rrdhost_flag_clear(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
             rrdhost_receiver_unlock(host);
             {
                 // run all these without having the receiver lock

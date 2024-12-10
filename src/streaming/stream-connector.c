@@ -576,16 +576,11 @@ static void *stream_connector_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_CANCELLED_NODES, "cancelled nodes", "nodes", WORKER_METRIC_ABSOLUTE);
 
     unsigned job_id = 0;
-    size_t iterations = 0;
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
-        iterations++;
 
         worker_is_idle();
         job_id = completion_wait_for_a_job_with_timeout(&sc->completion, job_id, 1000);
         size_t nodes = 0, connected_nodes = 0, failed_nodes = 0, cancelled_nodes = 0;
-
-        nd_log(NDLS_DAEMON, NDLP_INFO,
-               "STREAM CONNECT: iteration %zu, job_id %u started...", iterations, job_id);
 
         spinlock_lock(&sc->queue.spinlock);
         Word_t idx = 0;
@@ -602,19 +597,11 @@ static void *stream_connector_thread(void *ptr) {
             ND_LOG_STACK_PUSH(lgs);
 
             if(stream_connector_is_signaled_to_stop(s)) {
-                nd_log(NDLS_DAEMON, NDLP_INFO,
-                       "STREAM CONNECT: iteration %zu, job_id %u cancelled node %s...",
-                       iterations, job_id, rrdhost_hostname(s->host));
-
                 cancelled_nodes++;
                 SENDERS_DEL(&sc->queue.senders, (Word_t)s);
                 stream_connector_remove(s);
                 continue;
             }
-
-            nd_log(NDLS_DAEMON, NDLP_INFO,
-                   "STREAM CONNECT: iteration %zu, job_id %u trying node %s...",
-                   iterations, job_id, rrdhost_hostname(s->host));
 
             spinlock_unlock(&sc->queue.spinlock);
             worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
@@ -622,10 +609,6 @@ static void *stream_connector_thread(void *ptr) {
             spinlock_lock(&sc->queue.spinlock);
 
             if(move_to_sender) {
-                nd_log(NDLS_DAEMON, NDLP_INFO,
-                       "STREAM CONNECT: iteration %zu, job_id %u connected node %s...",
-                       iterations, job_id, rrdhost_hostname(s->host));
-
                 connected_nodes++;
                 stream_sender_on_connect(s);
 
@@ -638,21 +621,12 @@ static void *stream_connector_thread(void *ptr) {
 
                 spinlock_lock(&sc->queue.spinlock);
             }
-            else {
-                nd_log(NDLS_DAEMON, NDLP_INFO,
-                       "STREAM CONNECT: iteration %zu, job_id %u failed node %s...",
-                       iterations, job_id, rrdhost_hostname(s->host));
+            else
                 failed_nodes++;
-            }
 
             worker_is_idle();
         }
         spinlock_unlock(&sc->queue.spinlock);
-
-        nd_log(NDLS_DAEMON, NDLP_INFO,
-               "STREAM CONNECT: iteration %zu, job_id %u, evaluated %zu nodes, connected %zu, failed %zu",
-               iterations, job_id, nodes, connected_nodes, failed_nodes);
-
 
         worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_QUEUED_NODES, (NETDATA_DOUBLE)nodes);
         worker_set_metric(WORKER_SENDER_CONNECTOR_JOB_CONNECTED_NODES, (NETDATA_DOUBLE)connected_nodes);

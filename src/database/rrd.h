@@ -921,8 +921,23 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     // Careful not to overlap with rrdhost_options to avoid bugs if
     // rrdhost_flags_xxx is used instead of rrdhost_option_xxx or vice-versa
     // Orphan, Archived and Obsolete flags
+
+    /*
+     * 3 BASE FLAGS FOR HOSTS:
+     *
+     * - COLLECTOR_ONLINE = the collector is currently collecting data for this node
+     *                      this is true FOR ALL KINDS OF NODES (including localhost, virtual hosts, children)
+     *
+     * - ORPHAN           = the node had a collector online recently, but does not have it now
+     *
+     * - ARCHIVED         = the node does not have data collection structures attached to it
+     *
+     */
+
+    RRDHOST_FLAG_COLLECTOR_ONLINE               = (1 << 7), // the collector of this host is online
     RRDHOST_FLAG_ORPHAN                         = (1 << 8), // this host is orphan (not receiving data)
     RRDHOST_FLAG_ARCHIVED                       = (1 << 9), // The host is archived, no collected charts yet
+
     RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS        = (1 << 10), // the host has pending chart obsoletions
     RRDHOST_FLAG_PENDING_OBSOLETE_DIMENSIONS    = (1 << 11), // the host has pending dimension obsoletions
 
@@ -951,7 +966,6 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     RRDHOST_FLAG_PENDING_CONTEXT_LOAD           = (1 << 26), // Context needs to be loaded
 
     RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 27), // metadata needs to be stored in the database
-    RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED   = (1 << 28), // set when the receiver part is disconnected
 
     RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 29), // set when the host has updated global functions
 } RRDHOST_FLAGS;
@@ -990,7 +1004,7 @@ typedef enum __attribute__ ((__packed__)) {
 #define rrdhost_can_stream_metadata_to_parent(host)                                 \
     (rrdhost_has_stream_sender_enabled(host) &&                                     \
      rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS) &&        \
-     !rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED)          \
+     rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE)                  \
     )
 
 // ----------------------------------------------------------------------------
@@ -1358,7 +1372,12 @@ extern RRDHOST *localhost;
 #define rrdhost_sender_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->stream.snd.status.replication.charts), 1, __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_zero(host) (__atomic_store_n(&((host)->stream.snd.status.replication.charts), 0, __ATOMIC_RELAXED))
 
-#define rrdhost_is_online(host) ((host) == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED))
+#define rrdhost_is_online(host) (                                                                                       \
+    (host) == localhost ||                                                                                              \
+    rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) ||                                                          \
+    (rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE) && !!rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))  \
+ )
+
 bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now);
 
 extern DICTIONARY *rrdhost_root_index;
