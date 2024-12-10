@@ -9,6 +9,18 @@
 
 #define stream_control_throttle() microsleep(STREAM_CONTROL_SLEEP_UT)
 
+void stream_control_backfill_query_started(void);
+void stream_control_backfill_query_finished(void);
+
+void stream_control_replication_query_started(void);
+void stream_control_replication_query_finished(void);
+
+void stream_control_user_weights_query_started(void);
+void stream_control_user_data_weights_finished(void);
+
+void stream_control_user_data_query_started(void);
+void stream_control_user_data_query_finished(void);
+
 bool stream_control_ml_should_be_running(void);
 bool stream_control_children_should_be_accepted(void);
 bool stream_control_replication_should_be_running(void);

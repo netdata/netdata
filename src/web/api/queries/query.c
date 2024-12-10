@@ -1964,12 +1964,6 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
 
-static size_t backfill_runners = 0;
-
-bool rrdr_backfill_running(void) {
-    return __atomic_load_n(&backfill_runners, __ATOMIC_RELAXED) > 0;
-}
-
 void backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
     if(unlikely(tier >= storage_tiers)) return;
 #ifdef ENABLE_DBENGINE
@@ -1995,11 +1989,10 @@ void backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
     // there is really nothing we can do
     if(now_s <= latest_time_s || time_diff < granularity) return;
 
-    struct storage_engine_query_handle seqh;
-
-    __atomic_add_fetch(&backfill_runners, 1, __ATOMIC_RELAXED);
+    stream_control_backfill_query_started();
 
     // for each lower tier
+    struct storage_engine_query_handle seqh;
     for(int read_tier = (int)tier - 1; read_tier >= 0 ; read_tier--){
         time_t smaller_tier_first_time = storage_engine_oldest_time_s(rd->tiers[read_tier].seb, rd->tiers[read_tier].smh);
         time_t smaller_tier_last_time = storage_engine_latest_time_s(rd->tiers[read_tier].seb, rd->tiers[read_tier].smh);
@@ -2032,7 +2025,7 @@ void backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
         //               rd->rrdset->name, rd->name, tier, after_wanted, before_wanted, points, tr);
     }
 
-    __atomic_sub_fetch(&backfill_runners, 1, __ATOMIC_RELAXED);
+    stream_control_backfill_query_finished();
 }
 
 // ----------------------------------------------------------------------------

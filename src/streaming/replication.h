@@ -40,8 +40,6 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s);
 size_t replication_allocated_memory(void);
 size_t replication_allocated_buffers(void);
 
-bool replication_queries_running(void);
-
 #ifdef __cplusplus
 }
 #endif

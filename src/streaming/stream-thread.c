@@ -89,7 +89,7 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
     if(!sth) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RECEIVE[x] [%s] the opcode (%u) message cannot be verified. Ignoring it.",
-               msg.opcode, rrdhost_hostname(rpt->host));
+               rrdhost_hostname(rpt->host), msg.opcode);
         return;
     }
 
@@ -169,7 +169,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
     if(!sth) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SEND[x] [%s] the opcode (%u) message cannot be verified. Ignoring it.",
-               msg.opcode, rrdhost_hostname(s->host));
+               rrdhost_hostname(s->host), msg.opcode);
         return;
     }
 
