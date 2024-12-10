@@ -152,7 +152,7 @@ static struct {
         .dynamic = false,
         .error = "remote server is initializing, we should try later",
         .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
-        .postpone_reconnect_seconds = 2 * 60, // 2 minute
+        .postpone_reconnect_seconds = 30, // 30 seconds
         .priority = NDLP_NOTICE,
     },
 
