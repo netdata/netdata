@@ -213,7 +213,7 @@ Leaf |< 3 >   |  3     |  2     |  3     |  1     |  2     |  3     |  3
 typedef int bool_t;
 #endif
 
-#define FUNCTION                // null; easy to find functions.
+#define FUNCTION __attribute__((no_sanitize("shift"))) // null; easy to find functions.
 
 #ifndef TRUE
 #define TRUE 1

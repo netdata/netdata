@@ -750,8 +750,8 @@ static size_t mqtt_ng_connect_size(struct mqtt_auth_properties *auth,
     memcpy(WRITE_POS(frag), &temp, sizeof(uint16_t)); \
     DATA_ADVANCE(buffer, sizeof(uint16_t), frag); \
 }
-//#define PACK_2B_INT(buffer, integer, frag) { *(uint16_t *)WRITE_POS(frag) = htobe16((integer)); \
-//            DATA_ADVANCE(buffer, sizeof(uint16_t), frag); }
+// #define PACK_2B_INT(buffer, integer, frag) { *(uint16_t *)WRITE_POS(frag) = htobe16((integer));
+//             DATA_ADVANCE(buffer, sizeof(uint16_t), frag); }
 
 static int _optimized_add(struct header_buffer *buf, void *data, size_t data_len, free_fnc_t data_free_fnc, struct buffer_fragment **frag)
 {
