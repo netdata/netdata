@@ -19,7 +19,7 @@ char to_hex(char code) {
 
 /* Returns an url-encoded version of str */
 /* IMPORTANT: be sure to free() the returned string after use */
-char *url_encode(char *str) {
+char *url_encode(const char *str) {
     char *buf, *pbuf;
 
     pbuf = buf = mallocz(strlen(str) * 3 + 1);

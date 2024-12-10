@@ -6,7 +6,7 @@
 
 #include "ad_charts.h"
 #include "database/sqlite/vendored/sqlite3.h"
-#include "streaming/replication.h"
+#include "streaming/stream-control.h"
 
 #define WORKER_TRAIN_QUEUE_POP         0
 #define WORKER_TRAIN_ACQUIRE_DIMENSION 1
@@ -1089,7 +1089,7 @@ void *ml_train_main(void *arg) {
     worker_register_job_name(WORKER_TRAIN_FLUSH_MODELS, "flush models");
 
     while (!Cfg.training_stop) {
-        if(rrdr_backfill_running() || replication_queries_running()) {
+        if(!stream_ml_should_be_running()) {
             sleep_usec(1 * USEC_PER_SEC);
             continue;
         }

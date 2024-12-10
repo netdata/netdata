@@ -27,8 +27,12 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
     {
         if(m->type == POLLFD_TYPE_SENDER) {
             if(msg->opcode & STREAM_OPCODE_SENDER_POLLOUT) {
-                if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, ND_POLL_READ|ND_POLL_WRITE, m))
-                    internal_fatal(true, "Failed to update sender socket in nd_poll()");
+                if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, ND_POLL_READ|ND_POLL_WRITE, m)) {
+                    nd_log_limit_static_global_var(erl, 1, 0);
+                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
+                                 "STREAM RECEIVE[%zu] %s: cannot enable output on sender socket %d.",
+                                 sth->id, rrdhost_hostname(m->s->host), m->s->sock.fd);
+                }
                 msg->opcode &= ~(STREAM_OPCODE_SENDER_POLLOUT);
             }
 
@@ -37,8 +41,12 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
         }
         else if(m->type == POLLFD_TYPE_RECEIVER) {
             if (msg->opcode & STREAM_OPCODE_RECEIVER_POLLOUT) {
-                if (!nd_poll_upd(sth->run.ndpl, m->rpt->sock.fd, ND_POLL_READ | ND_POLL_WRITE, m))
-                    internal_fatal(true, "Failed to update receiver socket in nd_poll()");
+                if (!nd_poll_upd(sth->run.ndpl, m->rpt->sock.fd, ND_POLL_READ | ND_POLL_WRITE, m)) {
+                    nd_log_limit_static_global_var(erl, 1, 0);
+                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
+                                 "STREAM SEND[%zu] %s: cannot enable output on receiver socket %d.",
+                                 sth->id, rrdhost_hostname(m->rpt->host), m->rpt->sock.fd);
+                }
                 msg->opcode &= ~(STREAM_OPCODE_RECEIVER_POLLOUT);
             }
 
@@ -71,12 +79,17 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
     if (!msg.session || !msg.meta || !rpt)
         return;
 
-    internal_fatal(msg.meta != &rpt->thread.meta, "the receiver pointer in the message does not match this receiver");
+    if(msg.meta != &rpt->thread.meta) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM THREAD[x]: the receiver in the opcode the message does not match this receiver. "
+               "Ignoring opcode.");
+        return;
+    }
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
     if(!sth) {
-        internal_fatal(true,
-                       "STREAM RECEIVE[x] [%s] thread pointer in the opcode message does not match the expected",
-                       rrdhost_hostname(rpt->host));
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM RECEIVE[x] [%s] the opcode (%u) message cannot be verified. Ignoring it.",
+               msg.opcode, rrdhost_hostname(rpt->host));
         return;
     }
 
@@ -109,6 +122,7 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
                     return;
                 }
 
+#ifdef NETDATA_INTERNAL_CHECKS
                 // try to find us in the list
                 for (size_t i = 0; i < sth->messages.size; i++) {
                     if (sth->messages.array[i].meta == &rpt->thread.meta) {
@@ -119,8 +133,9 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
                         return;
                     }
                 }
+#endif
 
-                fatal("The streaming opcode queue is full, but this should never happen");
+                fatal("STREAM RECEIVE[x]: The streaming opcode queue is full, but this should never happen...");
             }
 
             // let's use a new slot
@@ -143,12 +158,18 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
     if (!msg.session || !msg.meta || !s)
         return;
 
-    internal_fatal(msg.meta != &s->thread.meta, "the sender pointer in the message does not match this sender");
+    if(msg.meta != &s->thread.meta) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM THREAD[x]: the receiver in the opcode the message does not match this receiver. "
+               "Ignoring opcode.");
+        return;
+    }
+
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
     if(!sth) {
-        internal_fatal(true,
-                       "STREAM SEND[x] [%s] thread pointer in the opcode message does not match the expected",
-                       rrdhost_hostname(s->host));
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM SEND[x] [%s] the opcode (%u) message cannot be verified. Ignoring it.",
+               msg.opcode, rrdhost_hostname(s->host));
         return;
     }
 
@@ -181,6 +202,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
                     return;
                 }
 
+#ifdef NETDATA_INTERNAL_CHECKS
                 // try to find us in the list
                 for (size_t i = 0; i < sth->messages.size; i++) {
                     if (sth->messages.array[i].meta == &s->thread.meta) {
@@ -191,8 +213,9 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
                         return;
                     }
                 }
+#endif
 
-                fatal("the streaming opcode queue is full, but this should never happen");
+                fatal("STREAM SEND[x]: The streaming opcode queue is full, but this should never happen...");
             }
 
             // let's use a new slot
@@ -287,8 +310,14 @@ static void stream_thread_messages_resize_unsafe(struct stream_thread *sth) {
 // --------------------------------------------------------------------------------------------------------------------
 
 static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_result_t *ev, usec_t now_ut, size_t *replay_entries) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
     struct pollfd_meta *m = ev->data;
-    internal_fatal(!m, "Failed to get meta from event");
+    if(!m) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM THREAD[%zu]: cannot get meta from nd_poll() event. Ignoring event.", sth->id);
+        return false;
+    }
 
     switch(m->type) {
         case POLLFD_TYPE_SENDER: {
@@ -442,7 +471,7 @@ void *stream_thread(void *ptr) {
     META_SET(&sth->run.meta, (Word_t)&sth->run.pipe, &sth->run.pipe);
 
     if(!nd_poll_add(sth->run.ndpl, sth->pipe.fds[PIPE_READ], ND_POLL_READ, &sth->run.pipe))
-        internal_fatal(true, "Failed to add pipe to nd_poll()");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: failed to add pipe to nd_poll()", sth->id);
 
     bool exit_thread = false;
     size_t replay_entries = 0;
@@ -499,7 +528,7 @@ void *stream_thread(void *ptr) {
             internal_fatal(true, "nd_poll() failed");
             worker_is_busy(WORKER_STREAM_JOB_POLL_ERROR);
             nd_log_limit_static_thread_var(erl, 1, 1 * USEC_PER_MS);
-            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu] poll() returned error", sth->id);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu] nd_poll() returned error", sth->id);
             continue;
         }
 
@@ -612,7 +641,8 @@ static struct stream_thread * stream_thread_assign_and_start(RRDHOST *host) {
     if(!sth->thread) {
         sth->id = (sth - stream_thread_globals.threads); // find the slot number
         if(&stream_thread_globals.threads[sth->id] != sth)
-            fatal("STREAM THREAD[x] [%s]: thread id and slot do not match!", rrdhost_hostname(host));
+            fatal("STREAM THREAD[x] [%s]: thread and slot owner do not match!",
+                  rrdhost_hostname(host));
 
         sth->pipe.fds[PIPE_READ] = -1;
         sth->pipe.fds[PIPE_WRITE] = -1;
@@ -626,7 +656,7 @@ static struct stream_thread * stream_thread_assign_and_start(RRDHOST *host) {
 
         sth->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_thread, sth);
         if (!sth->thread)
-            nd_log_daemon(NDLP_ERR, "STREAM THREAD[%zu]: failed to create new thread for client.", sth->id);
+            nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: failed to create new thread for client.", sth->id);
     }
 
     spinlock_unlock(&stream_thread_globals.assign.spinlock);
@@ -668,7 +698,7 @@ void stream_sender_add_to_queue(struct sender_state *s) {
     stream_thread_node_queued(s->host);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM THREAD[%zu] [%s]: moving host to dispatcher queue...",
+           "STREAM THREAD[%zu] [%s]: moving host to sender queue...",
            sth->id, rrdhost_hostname(s->host));
 
     spinlock_lock(&sth->queue.spinlock);

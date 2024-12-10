@@ -150,8 +150,11 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             return false;
         }
 
+        // system_info has been consumed by the host structure
+        rpt->system_info = NULL;
+
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD) ||
-                     rrdr_backfill_running() || replication_queries_running())) {
+                     !stream_children_should_be_accepted())) {
             stream_receiver_log_status(
                 rpt,
                 "host is initializing, retry later",
@@ -160,9 +163,6 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INITIALIZATION);
             return false;
         }
-
-        // system_info has been consumed by the host structure
-        rpt->system_info = NULL;
 
         if(!rrdhost_set_receiver(host, rpt)) {
             stream_receiver_log_status(

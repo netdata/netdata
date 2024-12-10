@@ -1837,7 +1837,7 @@ static void *replication_worker_thread(void *ptr __maybe_unused) {
     replication_initialize_workers(false);
 
     while (service_running(SERVICE_REPLICATION)) {
-        if(rrdr_backfill_running()) {
+        if(!stream_replication_should_be_running()) {
             sleep_usec(1 * USEC_PER_SEC);
             continue;
         }
@@ -1938,7 +1938,7 @@ void *replication_thread_main(void *ptr) {
 
     while(service_running(SERVICE_REPLICATION)) {
 
-        if(rrdr_backfill_running()) {
+        if(!stream_replication_should_be_running()) {
             sleep_usec(1 * USEC_PER_SEC);
             continue;
         }
