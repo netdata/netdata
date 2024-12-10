@@ -113,7 +113,6 @@ struct pgc {
     } config;
 
     struct {
-        SPINLOCK spinlock;  // when locked, the evict_thread is currently evicting pages
         ND_THREAD *thread;              // the thread
         struct completion completion;   // signal the thread to wake up
     } evictor;
@@ -398,7 +397,6 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     if(current_cache_size > wanted_cache_size && wanted_cache_size < current_cache_size - clean)
         wanted_cache_size = current_cache_size - clean;
 
-    bool signal_the_evictor = false;
     if(cache->config.out_of_memory_protection_bytes) {
         // out of memory protection
         OS_SYSTEM_MEMORY sm = os_system_memory(false);
@@ -409,7 +407,6 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
             if (sm.ram_available_bytes < min_available) {
                 // we must shrink
                 wanted_cache_size = current_cache_size - (min_available - sm.ram_available_bytes);
-                signal_the_evictor = true;
             }
             else if(cache->config.use_all_ram) {
                 // we can grow
@@ -419,36 +416,35 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     }
 
     const size_t per1000 = (size_t)((unsigned long long)current_cache_size * 1000ULL / (unsigned long long)wanted_cache_size);
-
     __atomic_store_n(&cache->usage.per1000, per1000, __ATOMIC_RELAXED);
     __atomic_store_n(&cache->stats.wanted_cache_size, wanted_cache_size, __ATOMIC_RELAXED);
     __atomic_store_n(&cache->stats.current_cache_size, current_cache_size, __ATOMIC_RELAXED);
 
-    spinlock_unlock(&cache->usage.spinlock);
+    size_t healthy_target = (size_t)((uint64_t)wanted_cache_size * (uint64_t)cache->config.healthy_size_per1000 / 1000ULL);
+    if(healthy_target < wanted_cache_size - clean)
+        healthy_target = wanted_cache_size - clean;
 
-    if(size_to_evict) {
-        size_t target = (size_t)((uint64_t)wanted_cache_size * (uint64_t)cache->config.evict_low_threshold_per1000 / 1000ULL);
+    if(current_cache_size > healthy_target) {
+        size_t low_watermark_target = (size_t)((uint64_t)wanted_cache_size * (uint64_t)cache->config.evict_low_threshold_per1000 / 1000ULL);
+        if(low_watermark_target < wanted_cache_size - clean)
+            low_watermark_target = wanted_cache_size - clean;
 
-        if(target < wanted_cache_size - clean)
-            target = wanted_cache_size - clean;
+        size_t size_to_evict_now = current_cache_size - low_watermark_target;
 
-        if(current_cache_size > target)
-            *size_to_evict = current_cache_size - target;
-        else
-            *size_to_evict = 0;
-    }
+        if(size_to_evict)
+            *size_to_evict = size_to_evict_now;
 
-    if(per1000 >= cache->config.severe_pressure_per1000)
-        __atomic_add_fetch(&cache->stats.events_cache_under_severe_pressure, 1, __ATOMIC_RELAXED);
+        if(per1000 >= cache->config.severe_pressure_per1000)
+            __atomic_add_fetch(&cache->stats.events_cache_under_severe_pressure, 1, __ATOMIC_RELAXED);
 
-    else if(per1000 >= cache->config.aggressive_evict_per1000)
-        __atomic_add_fetch(&cache->stats.events_cache_needs_space_aggressively, 1, __ATOMIC_RELAXED);
+        else if(per1000 >= cache->config.aggressive_evict_per1000)
+            __atomic_add_fetch(&cache->stats.events_cache_needs_space_aggressively, 1, __ATOMIC_RELAXED);
 
-    if (signal_the_evictor && spinlock_trylock(&cache->evictor.spinlock)) {
         completion_mark_complete_a_job(&cache->evictor.completion);
-        spinlock_unlock(&cache->evictor.spinlock);
         __atomic_add_fetch(&cache->stats.waste_evict_thread_signals, 1, __ATOMIC_RELAXED);
     }
+
+    spinlock_unlock(&cache->usage.spinlock);
 
     return per1000;
 }
@@ -1951,19 +1947,16 @@ static void *pgc_evict_thread(void *ptr) {
         if (nd_thread_signaled_to_cancel())
             return NULL;
 
-        size_t size_to_evict = 0;
-        size_t per1000 = cache_usage_per1000(cache, &size_to_evict);
+        size_t per1000 = cache_usage_per1000(cache, NULL);
         was_critical = per1000 >= cache->config.severe_pressure_per1000;
 
-        if(size_to_evict > 0) {
-            evict_pages(cache, 0, 0, true, false);
+        evict_pages(cache, 0, 0, true, false);
 
-            // this LOCKS everything while trimming
-            // introducing gaps at the changes of localhost
+        // this LOCKS everything while trimming
+        // introducing gaps at the changes of localhost
 
-//            if (was_signaled || was_critical)
-//                mallocz_release_as_much_memory_to_the_system();
-        }
+//        if (was_signaled || was_critical)
+//            mallocz_release_as_much_memory_to_the_system();
     }
 
     worker_unregister();
@@ -2081,7 +2074,6 @@ PGC *pgc_create(const char *name,
 
     // last create the eviction thread
     {
-        spinlock_init(&cache->evictor.spinlock);
         completion_init(&cache->evictor.completion);
         cache->evictor.thread = nd_thread_create(name, NETDATA_THREAD_OPTION_JOINABLE, pgc_evict_thread, cache);
     }
