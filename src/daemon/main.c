@@ -406,15 +406,44 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
+            nd_log(NDLS_DAEMON, NDLP_INFO, "Preparing DBENGINE shutdown...");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
 
-            for (size_t tier = 0; tier < storage_tiers; tier++) {
-                if (!multidb_ctx[tier])
-                    continue;
-                completion_wait_for(&multidb_ctx[tier]->quiesce.completion);
-                completion_destroy(&multidb_ctx[tier]->quiesce.completion);
-            }
+            struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
+            nd_log(NDLS_DAEMON, NDLP_INFO, "Waiting for DBENGINE to commit unsaved data to disk (%zu pages, %zu bytes)...",
+                   pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries,
+                   pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size);
+
+            bool finished_tiers[RRD_STORAGE_TIERS] = { 0 };
+            size_t waiting_tiers, iterations = 0;
+            do {
+                waiting_tiers = 0;
+                iterations++;
+
+                for (size_t tier = 0; tier < storage_tiers; tier++) {
+                    if (!multidb_ctx[tier] || finished_tiers[tier])
+                        continue;
+
+                    waiting_tiers++;
+                    if (completion_timedwait_for(&multidb_ctx[tier]->quiesce.completion, 1)) {
+                        completion_destroy(&multidb_ctx[tier]->quiesce.completion);
+                        finished_tiers[tier] = true;
+                        waiting_tiers--;
+                        nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE tier %zu finished!", tier);
+                    }
+                    else if(iterations % 10 == 0) {
+                        pgc_main_stats = pgc_get_statistics(main_cache);
+                        nd_log(NDLS_DAEMON, NDLP_INFO,
+                               "Still waiting for DBENGINE tier %zu to finish "
+                               "(cache still has %zu pages, %zu bytes hot, for all tiers)...",
+                               tier,
+                               pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries,
+                               pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size);
+                    }
+                }
+            } while(waiting_tiers);
+            nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE shutdown completed...");
         }
 #endif
         watcher_step_complete(WATCHER_STEP_ID_FLUSH_DBENGINE_TIERS);
