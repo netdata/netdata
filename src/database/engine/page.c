@@ -90,14 +90,15 @@ static size_t aral_sizes[] = {
     [RRD_STORAGE_TIERS - 2] = 0,
     [RRD_STORAGE_TIERS - 1] = 0,
 
-    // gorilla buffer size
+    // gorilla buffer sizes
     RRDENG_GORILLA_32BIT_BUFFER_SIZE,
+    RRDENG_GORILLA_32BIT_BUFFER_SIZE * 2,
+    RRDENG_GORILLA_32BIT_BUFFER_SIZE * 3,
+    RRDENG_GORILLA_32BIT_BUFFER_SIZE * 4,
 
     // our structures
     sizeof(gorilla_writer_t),
     sizeof(PGD),
-
-    8192, 16384, 32768, 65536,
 };
 static ARAL **arals = NULL;
 
