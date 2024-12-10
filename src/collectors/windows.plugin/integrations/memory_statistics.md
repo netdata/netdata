@@ -60,7 +60,7 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 ### Per Memory statistics instance
 
-These metrics refer to the entire monitored instance
+These metrics refer to the entire system.
 
 This scope has no labels.
 
