@@ -151,7 +151,7 @@ void rrdhost_stream_parents_to_json(BUFFER *wb, RRDHOST_STATUS *s) {
     STREAM_PARENT *d;
     for (d = s->host->stream.snd.parents.all; d; d = d->next) {
         buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_uint64(wb, "attempts", d->attempts);
+        buffer_json_member_add_uint64(wb, "attempts", d->attempts + 1);
         {
             if (d->ssl) {
                 snprintfz(buf, sizeof(buf) - 1, "%s:SSL", string2str(d->destination));
