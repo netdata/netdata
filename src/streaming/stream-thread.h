@@ -91,6 +91,8 @@ struct stream_opcode {
 #define STREAM_MAX_THREADS 2048
 #define THREAD_TAG_STREAM "STREAM"
 
+#define MAX_IO_ITERATIONS_PER_EVENT 10
+
 typedef enum {
     POLLFD_TYPE_EMPTY,
     POLLFD_TYPE_SENDER,
