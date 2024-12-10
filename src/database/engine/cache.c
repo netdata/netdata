@@ -445,14 +445,20 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
         if(size_to_evict)
             *size_to_evict = (size_t)size_to_evict_now;
 
-        if(per1000 >= cache->config.severe_pressure_per1000)
+        bool signal = false;
+        if(per1000 >= cache->config.severe_pressure_per1000) {
             __atomic_add_fetch(&cache->stats.events_cache_under_severe_pressure, 1, __ATOMIC_RELAXED);
-
-        else if(per1000 >= cache->config.aggressive_evict_per1000)
+            signal = true;
+        }
+        else if(per1000 >= cache->config.aggressive_evict_per1000) {
             __atomic_add_fetch(&cache->stats.events_cache_needs_space_aggressively, 1, __ATOMIC_RELAXED);
+            signal = true;
+        }
 
-        completion_mark_complete_a_job(&cache->evictor.completion);
-        __atomic_add_fetch(&cache->stats.waste_evict_thread_signals, 1, __ATOMIC_RELAXED);
+        if(signal) {
+            completion_mark_complete_a_job(&cache->evictor.completion);
+            __atomic_add_fetch(&cache->stats.waste_evict_thread_signals, 1, __ATOMIC_RELAXED);
+        }
     }
 
     spinlock_unlock(&cache->usage.spinlock);
