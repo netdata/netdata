@@ -676,7 +676,8 @@ void pulse_dbengine_do(bool extended) {
     buffers_total_size += buffers.julyl;
 #endif
 
-    pulse_dbengine_total_memory = pgc_main_stats.size + pgc_open_stats.size + pgc_extent_stats.size + mrg_stats.size + buffers_total_size;
+    size_t pgd_padding = pgd_aral_padding();
+    pulse_dbengine_total_memory = pgc_main_stats.size + pgc_open_stats.size + pgc_extent_stats.size + mrg_stats.size + buffers_total_size + pgd_padding;
 
     size_t priority = 135000;
 
@@ -687,6 +688,7 @@ void pulse_dbengine_do(bool extended) {
         static RRDDIM *rd_pgc_memory_extent = NULL;  // extent compresses cache memory
         static RRDDIM *rd_pgc_memory_metrics = NULL;  // metric registry memory
         static RRDDIM *rd_pgc_memory_buffers = NULL;
+        static RRDDIM *rd_pgc_memory_padding = NULL;
 
         if (unlikely(!st_pgc_memory)) {
             st_pgc_memory = rrdset_create_localhost(
@@ -708,6 +710,7 @@ void pulse_dbengine_do(bool extended) {
             rd_pgc_memory_extent  = rrddim_add(st_pgc_memory, "extent cache",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_metrics = rrddim_add(st_pgc_memory, "metrics registry", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_buffers = rrddim_add(st_pgc_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_padding = rrddim_add(st_pgc_memory, "pgd padding", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         priority++;
 
@@ -717,6 +720,7 @@ void pulse_dbengine_do(bool extended) {
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_extent, (collected_number)pgc_extent_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_metrics, (collected_number)mrg_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_buffers, (collected_number)buffers_total_size);
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_padding, (collected_number)pgd_padding);
 
         rrdset_done(st_pgc_memory);
     }
@@ -756,9 +760,9 @@ void pulse_dbengine_do(bool extended) {
                 localhost->rrd_update_every,
                 RRDSET_TYPE_STACKED);
 
-            rd_pgc_buffers_pgc         = rrddim_add(st_pgc_buffers, "pgc", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_pgc_buffers_pgd         = rrddim_add(st_pgc_buffers, "pgd", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_pgc_buffers_mrg         = rrddim_add(st_pgc_buffers, "mrg", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_pgc         = rrddim_add(st_pgc_buffers, "pgc",            NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_pgd         = rrddim_add(st_pgc_buffers, "pgd",            NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_mrg         = rrddim_add(st_pgc_buffers, "mrg",            NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_opcodes     = rrddim_add(st_pgc_buffers, "opcodes",        NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_handles     = rrddim_add(st_pgc_buffers, "query handles",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_descriptors = rrddim_add(st_pgc_buffers, "descriptors",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
