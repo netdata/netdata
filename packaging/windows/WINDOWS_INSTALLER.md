@@ -42,7 +42,7 @@ msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
 
 Replace `<YOUR_TOKEN>` and `<YOUR_ROOMS>` with your Space claim token and Room ID, respectively.
 
-A complete command, where it also downloads the installer and then proceeds with the installation would look like this:
+A complete command, where it downloads the installer and then proceeds with the installation would look like this:
 
 ```powershell
 $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile "netdata-x64.msi"; msiexec /qn /i netdata-x64.msi TOKEN=<YOUR_TOKEN> ROOMS=<YOUR_ROOMS>
