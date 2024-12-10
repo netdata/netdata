@@ -913,6 +913,12 @@ ml_host_detect_once(ml_host_t *host)
         mls_copy = host->mls;
 
         netdata_mutex_unlock(&host->mutex);
+
+        worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
+        ml_update_dimensions_chart(host, mls_copy);
+
+        worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
+        ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0);
     } else {
         host->host_anomaly_rate = 0.0;
 
@@ -925,12 +931,6 @@ ml_host_detect_once(ml_host_t *host)
             };
         }
     }
-
-    worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
-    ml_update_dimensions_chart(host, mls_copy);
-
-    worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
-    ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0);
 }
 
 void *
