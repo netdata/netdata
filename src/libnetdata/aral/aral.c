@@ -403,10 +403,11 @@ static size_t aral_get_system_page_size(void) {
         return page_size;
 }
 
-// we don't need alignof(max_align_t) for normal C structures
-// alignof(uintptr_r) is sufficient for our use cases
-// #define SYSTEM_REQUIRED_ALIGNMENT (alignof(max_align_t))
+#if ENV32BIT
+#define SYSTEM_REQUIRED_ALIGNMENT (sizeof(uintptr_t) * 2)
+#else
 #define SYSTEM_REQUIRED_ALIGNMENT (alignof(uintptr_t))
+#endif
 
 static size_t aral_element_slot_size(size_t requested_element_size, bool usable) {
     // we need to add a page pointer after the element
