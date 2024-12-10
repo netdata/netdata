@@ -642,8 +642,9 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
     if (events & ND_POLL_WRITE) {
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
 
+        bool stop = false;
         size_t iterations = 0;
-        while(iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
+        while(!stop && iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
             if (spinlock_trylock(&rpt->thread.send_to_child.spinlock)) {
                 const char *disconnect_reason = NULL;
                 STREAM_HANDSHAKE reason;
@@ -661,14 +662,17 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
                         // recreate the circular buffer if we have to
                         stream_circular_buffer_recreate_timed_unsafe(rpt->thread.send_to_child.scb, now_ut, false);
+                        stop = true;
                     }
-                } else if (rc == 0 || errno == ECONNRESET) {
+                }
+                else if (rc == 0 || errno == ECONNRESET) {
                     disconnect_reason = "socket reports EOF (closed by child)";
                     reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END;
-                } else if (rc < 0) {
+                }
+                else if (rc < 0) {
                     if (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
                         // will try later
-                        iterations = MAX_IO_ITERATIONS_PER_EVENT;
+                        stop = true;
                     else {
                         disconnect_reason = "socket reports error while writing";
                         reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED;
@@ -700,9 +704,9 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
     // we can receive data from this socket
 
     worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
-    bool removed = false;
+    bool removed = false, stop = false;
     size_t iterations = 0;
-    while(!removed && iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
+    while(!removed && !stop && iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
         ssize_t rc = stream_receive_and_process(sth, rpt, parser, &removed);
         if (likely(rc > 0)) {
             rpt->last_msg_t = (time_t)(now_ut / USEC_PER_SEC);
@@ -722,7 +726,7 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
             else if ((errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
                 // will try later
-                break;
+                stop = true;
             else {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
                 nd_log(NDLS_DAEMON, NDLP_ERR,

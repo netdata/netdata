@@ -476,8 +476,9 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
     if(events & ND_POLL_WRITE) {
         // we can send data on this socket
 
+        bool stop = false;
         size_t iterations = 0;
-        while(iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
+        while(!stop && iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
             if(stream_sender_trylock(s)) {
                 worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
 
@@ -503,6 +504,7 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
 
                         // recreate the circular buffer if we have to
                         stream_circular_buffer_recreate_timed_unsafe(s->scb, now_ut, false);
+                        stop = true;
                     }
                 }
                 else if (rc == 0 || errno == ECONNRESET) {
@@ -512,7 +514,7 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                 else if (rc < 0) {
                     if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR) {
                         // will try later
-                        iterations = MAX_IO_ITERATIONS_PER_EVENT;
+                        stop = true;
                     }
                     else {
                         disconnect_reason = "socket reports error while writing";
@@ -544,8 +546,9 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
     // we can receive data from this socket
 
     worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
+    bool stop = false;
     size_t iterations = 0;
-    while(iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
+    while(!stop && iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
         // we have to drain the socket!
 
         ssize_t rc = nd_sock_revc_nowait(&s->sock, s->rbuf.b + s->rbuf.read_len, sizeof(s->rbuf.b) - s->rbuf.read_len - 1);
@@ -570,7 +573,7 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
         else if (rc < 0) {
             if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
                 // will try later
-                break;
+                stop = true;
             else {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
                 nd_log(NDLS_DAEMON, NDLP_ERR,
