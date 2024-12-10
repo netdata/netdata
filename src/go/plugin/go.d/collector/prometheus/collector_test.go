@@ -3,6 +3,7 @@
 package prometheus
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -63,21 +64,21 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	assert.NotPanics(t, New().Cleanup)
+	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 
 	collr := New()
 	collr.URL = "http://127.0.0.1"
-	require.NoError(t, collr.Init())
-	assert.NotPanics(t, collr.Cleanup)
+	require.NoError(t, collr.Init(context.Background()))
+	assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -188,12 +189,12 @@ test_counter_no_meta_metric_1_total{label1="value2"} 11
 			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -577,7 +578,7 @@ test_gauge_no_meta_metric_1{label1="value2"} 12
 			defer srv.Close()
 
 			collr.URL = srv.URL
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			for num, step := range test.steps {
 				t.Run(fmt.Sprintf("step num %d ('%s')", num+1, step.desc), func(t *testing.T) {
@@ -587,7 +588,7 @@ test_gauge_no_meta_metric_1{label1="value2"} 12
 					var mx map[string]int64
 
 					for i := 0; i < maxNotSeenTimes+1; i++ {
-						mx = collr.Collect()
+						mx = collr.Collect(context.Background())
 					}
 
 					assert.Equal(t, step.wantCollected, mx)

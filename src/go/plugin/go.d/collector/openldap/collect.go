@@ -3,6 +3,7 @@
 package openldap
 
 import (
+	"context"
 	"github.com/go-ldap/ldap/v3"
 )
 
@@ -18,11 +19,11 @@ func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
 	if err := c.collectMonitorCounters(mx); err != nil {
-		c.Cleanup()
+		c.Cleanup(context.Background())
 		return nil, err
 	}
 	if err := c.collectOperations(mx); err != nil {
-		c.Cleanup()
+		c.Cleanup(context.Background())
 		return nil, err
 	}
 

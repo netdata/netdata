@@ -3,6 +3,7 @@
 package k8s_kubeproxy
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -40,17 +41,17 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }
 
 func TestCollector_Init(t *testing.T) {
-	assert.NoError(t, New().Init())
+	assert.NoError(t, New().Init(context.Background()))
 }
 
 func TestCollector_InitNG(t *testing.T) {
 	collr := New()
 	collr.URL = ""
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -63,15 +64,15 @@ func TestCollector_Check(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/metrics"
-	require.NoError(t, collr.Init())
-	assert.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_CheckNG(t *testing.T) {
 	collr := New()
 	collr.URL = "http://127.0.0.1:38001/metrics"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -84,8 +85,8 @@ func TestCollector_Collect(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/metrics"
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"sync_proxy_rules_count":           2669,
@@ -114,7 +115,7 @@ func TestCollector_Collect(t *testing.T) {
 		"http_request_duration_099":        9464,
 	}
 
-	assert.Equal(t, expected, collr.Collect())
+	assert.Equal(t, expected, collr.Collect(context.Background()))
 }
 
 func TestCollector_InvalidData(t *testing.T) {
@@ -127,8 +128,8 @@ func TestCollector_InvalidData(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/metrics"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_404(t *testing.T) {
@@ -141,6 +142,6 @@ func TestCollector_404(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/metrics"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }

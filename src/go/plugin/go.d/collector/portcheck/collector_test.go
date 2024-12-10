@@ -3,6 +3,7 @@
 package portcheck
 
 import (
+	"context"
 	"errors"
 	"net"
 	"os"
@@ -39,32 +40,32 @@ func TestCollector_Init(t *testing.T) {
 
 	collr.Host = "127.0.0.1"
 	collr.Ports = []int{39001, 39002}
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 	assert.Len(t, collr.tcpPorts, 2)
 }
 func TestCollector_InitNG(t *testing.T) {
 	collr := New()
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 	collr.Host = "127.0.0.1"
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 	collr.Ports = []int{39001, 39002}
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
-	assert.Error(t, New().Check())
+	assert.Error(t, New().Check(context.Background()))
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }
 
 func TestCollector_Charts(t *testing.T) {
 	collr := New()
 	collr.Ports = []int{1, 2}
 	collr.Host = "localhost"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -74,8 +75,8 @@ func TestCollector_Collect(t *testing.T) {
 	collr.Ports = []int{39001, 39002}
 	collr.UpdateEvery = 5
 	collr.dialTCP = testDial(nil)
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	copyLatencyDuration := func(dst, src map[string]int64) {
 		for k := range dst {
@@ -97,7 +98,7 @@ func TestCollector_Collect(t *testing.T) {
 		"tcp_port_39002_success":                1,
 		"tcp_port_39002_timeout":                0,
 	}
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 	copyLatencyDuration(expected, mx)
 
 	assert.Equal(t, expected, mx)
@@ -114,7 +115,7 @@ func TestCollector_Collect(t *testing.T) {
 		"tcp_port_39002_success":                1,
 		"tcp_port_39002_timeout":                0,
 	}
-	mx = collr.Collect()
+	mx = collr.Collect(context.Background())
 	copyLatencyDuration(expected, mx)
 
 	assert.Equal(t, expected, mx)
@@ -133,7 +134,7 @@ func TestCollector_Collect(t *testing.T) {
 		"tcp_port_39002_success":                0,
 		"tcp_port_39002_timeout":                0,
 	}
-	mx = collr.Collect()
+	mx = collr.Collect(context.Background())
 	copyLatencyDuration(expected, mx)
 
 	assert.Equal(t, expected, mx)
@@ -152,7 +153,7 @@ func TestCollector_Collect(t *testing.T) {
 		"tcp_port_39002_timeout":                1,
 		"tcp_port_39002_failed":                 0,
 	}
-	mx = collr.Collect()
+	mx = collr.Collect(context.Background())
 	copyLatencyDuration(expected, mx)
 
 	assert.Equal(t, expected, mx)

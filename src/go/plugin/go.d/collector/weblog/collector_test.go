@@ -4,6 +4,7 @@ package weblog
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -51,73 +52,73 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 func TestCollector_Init(t *testing.T) {
 	collr := New()
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_ErrorOnCreatingURLPatterns(t *testing.T) {
 	collr := New()
 	collr.URLPatterns = []userPattern{{Match: "* !*"}}
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_ErrorOnCreatingCustomFields(t *testing.T) {
 	collr := New()
 	collr.CustomFields = []customField{{Patterns: []userPattern{{Name: "p1", Match: "* !*"}}}}
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
 	collr := New()
-	defer collr.Cleanup()
+	defer collr.Cleanup(context.Background())
 	collr.Path = "testdata/common.log"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Check_ErrorOnCreatingLogReaderNoLogFile(t *testing.T) {
 	collr := New()
-	defer collr.Cleanup()
+	defer collr.Cleanup(context.Background())
 	collr.Path = "testdata/not_exists.log"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Check_ErrorOnCreatingParserUnknownFormat(t *testing.T) {
 	collr := New()
-	defer collr.Cleanup()
+	defer collr.Cleanup(context.Background())
 	collr.Path = "testdata/custom.log"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Check_ErrorOnCreatingParserEmptyLine(t *testing.T) {
 	collr := New()
-	defer collr.Cleanup()
+	defer collr.Cleanup(context.Background())
 	collr.Path = "testdata/custom.log"
 	collr.ParserConfig.LogType = logs.TypeCSV
 	collr.ParserConfig.CSV.Format = "$one $two"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
 	collr := New()
-	defer collr.Cleanup()
+	defer collr.Cleanup(context.Background())
 	collr.Path = "testdata/common.log"
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	assert.NotNil(t, collr.Charts())
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -312,7 +313,7 @@ func TestCollector_Collect(t *testing.T) {
 		"url_ptn_org_resp_code_401":                               9,
 	}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 	assert.Equal(t, expected, mx)
 	testCharts(t, collr, mx)
 }
@@ -392,7 +393,7 @@ func TestCollector_Collect_CommonLogFormat(t *testing.T) {
 		"upstream_resp_time_sum":            0,
 	}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 	assert.Equal(t, expected, mx)
 	testCharts(t, collr, mx)
 }
@@ -462,7 +463,7 @@ func TestCollector_Collect_CustomLogs(t *testing.T) {
 		"upstream_resp_time_sum":            0,
 	}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 	assert.Equal(t, expected, mx)
 	testCharts(t, collr, mx)
 }
@@ -564,7 +565,7 @@ func TestCollector_Collect_CustomTimeFieldsLogs(t *testing.T) {
 		"upstream_resp_time_sum":                      0,
 	}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 	assert.Equal(t, expected, mx)
 	testCharts(t, collr, mx)
 }
@@ -640,7 +641,7 @@ func TestCollector_Collect_CustomNumericFieldsLogs(t *testing.T) {
 		"upstream_resp_time_sum":            0,
 	}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 
 	assert.Equal(t, expected, mx)
 	testCharts(t, collr, mx)
@@ -714,7 +715,7 @@ func TestCollector_IISLogs(t *testing.T) {
 		"upstream_resp_time_sum":            0,
 	}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 	assert.Equal(t, expected, mx)
 }
 
@@ -1187,9 +1188,9 @@ func prepareWebLogCollectFull(t *testing.T) *Collector {
 	}
 	collr := New()
 	collr.Config = cfg
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
-	defer collr.Cleanup()
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
 
 	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataFullLog))
 	require.NoError(t, err)
@@ -1230,9 +1231,9 @@ func prepareWebLogCollectCommon(t *testing.T) *Collector {
 
 	collr := New()
 	collr.Config = cfg
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
-	defer collr.Cleanup()
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
 
 	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataCommonLog))
 	require.NoError(t, err)
@@ -1282,9 +1283,9 @@ func prepareWebLogCollectCustom(t *testing.T) *Collector {
 	}
 	collr := New()
 	collr.Config = cfg
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
-	defer collr.Cleanup()
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
 
 	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataCustomLog))
 	require.NoError(t, err)
@@ -1328,9 +1329,9 @@ func prepareWebLogCollectCustomTimeFields(t *testing.T) *Collector {
 	}
 	collr := New()
 	collr.Config = cfg
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
-	defer collr.Cleanup()
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
 
 	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataCustomTimeFieldLog))
 	require.NoError(t, err)
@@ -1374,9 +1375,9 @@ func prepareWebLogCollectCustomNumericFields(t *testing.T) *Collector {
 	}
 	collr := New()
 	collr.Config = cfg
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
-	defer collr.Cleanup()
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
 
 	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataCustomTimeFieldLog))
 	require.NoError(t, err)
@@ -1424,9 +1425,9 @@ func prepareWebLogCollectIISFields(t *testing.T) *Collector {
 
 	collr := New()
 	collr.Config = cfg
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
-	defer collr.Cleanup()
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
 
 	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataIISLog))
 	require.NoError(t, err)

@@ -5,6 +5,7 @@ package zookeeper
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -41,7 +42,7 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 func TestCollector_Init(t *testing.T) {
 	collr := New()
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 	assert.NotNil(t, collr.fetcher)
 }
 
@@ -50,23 +51,23 @@ func TestCollector_InitErrorOnCreatingTLSConfig(t *testing.T) {
 	collr.UseTLS = true
 	collr.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
 	collr := New()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.fetcher = &mockZookeeperFetcher{data: dataMntrMetrics}
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_CheckErrorOnFetch(t *testing.T) {
 	collr := New()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.fetcher = &mockZookeeperFetcher{err: true}
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -74,12 +75,12 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }
 
 func TestCollector_Collect(t *testing.T) {
 	collr := New()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.fetcher = &mockZookeeperFetcher{data: dataMntrMetrics}
 
 	expected := map[string]int64{
@@ -99,7 +100,7 @@ func TestCollector_Collect(t *testing.T) {
 		"znode_count":                5,
 	}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 
 	assert.Equal(t, expected, mx)
 	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
@@ -107,34 +108,34 @@ func TestCollector_Collect(t *testing.T) {
 
 func TestCollector_CollectMntrNotInWhiteList(t *testing.T) {
 	collr := New()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.fetcher = &mockZookeeperFetcher{data: dataMntrNotInWhiteListResponse}
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_CollectMntrEmptyResponse(t *testing.T) {
 	collr := New()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.fetcher = &mockZookeeperFetcher{}
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_CollectMntrInvalidData(t *testing.T) {
 	collr := New()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.fetcher = &mockZookeeperFetcher{data: []byte("hello \nand good buy\n")}
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_CollectMntrReceiveError(t *testing.T) {
 	collr := New()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.fetcher = &mockZookeeperFetcher{err: true}
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 type mockZookeeperFetcher struct {

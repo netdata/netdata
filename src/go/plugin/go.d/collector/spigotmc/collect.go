@@ -3,6 +3,7 @@
 package spigotmc
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -30,11 +31,11 @@ func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
 	if err := c.collectTPS(mx); err != nil {
-		c.Cleanup()
+		c.Cleanup(context.Background())
 		return nil, fmt.Errorf("failed to collect '%s': %v", cmdTPS, err)
 	}
 	if err := c.collectList(mx); err != nil {
-		c.Cleanup()
+		c.Cleanup(context.Background())
 		return nil, fmt.Errorf("failed to collect '%s': %v", cmdList, err)
 	}
 

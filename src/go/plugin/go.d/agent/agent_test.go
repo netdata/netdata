@@ -68,13 +68,13 @@ func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) mod
 
 func prepareMockModule(name string, mux *sync.Mutex, stats map[string]int) module.Module {
 	return &module.MockModule{
-		InitFunc: func() error {
+		InitFunc: func(context.Context) error {
 			mux.Lock()
 			defer mux.Unlock()
 			stats[name+"_init"]++
 			return nil
 		},
-		CheckFunc: func() error {
+		CheckFunc: func(context.Context) error {
 			mux.Lock()
 			defer mux.Unlock()
 			stats[name+"_check"]++
@@ -88,13 +88,13 @@ func prepareMockModule(name string, mux *sync.Mutex, stats map[string]int) modul
 				&module.Chart{ID: "id", Title: "title", Units: "units", Dims: module.Dims{{ID: "id1"}}},
 			}
 		},
-		CollectFunc: func() map[string]int64 {
+		CollectFunc: func(context.Context) map[string]int64 {
 			mux.Lock()
 			defer mux.Unlock()
 			stats[name+"_collect"]++
 			return map[string]int64{"id1": 1}
 		},
-		CleanupFunc: func() {
+		CleanupFunc: func(context.Context) {
 			mux.Lock()
 			defer mux.Unlock()
 			stats[name+"_cleanup"]++

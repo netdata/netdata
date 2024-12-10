@@ -5,6 +5,7 @@
 package dnsmasq_dhcp
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -44,14 +45,14 @@ func TestCollector_Init(t *testing.T) {
 	collr.ConfPath = testConfPath
 	collr.ConfDir = testConfDir
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_InitEmptyLeasesPath(t *testing.T) {
 	collr := New()
 	collr.LeasesPath = ""
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_InitInvalidLeasesPath(t *testing.T) {
@@ -59,7 +60,7 @@ func TestCollector_InitInvalidLeasesPath(t *testing.T) {
 	collr.LeasesPath = testLeasesPath
 	collr.LeasesPath += "!"
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_InitZeroDHCPRanges(t *testing.T) {
@@ -68,7 +69,7 @@ func TestCollector_InitZeroDHCPRanges(t *testing.T) {
 	collr.ConfPath = "testdata/dnsmasq3.conf"
 	collr.ConfDir = ""
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -77,8 +78,8 @@ func TestCollector_Check(t *testing.T) {
 	collr.ConfPath = testConfPath
 	collr.ConfDir = testConfDir
 
-	require.NoError(t, collr.Init())
-	assert.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -87,13 +88,13 @@ func TestCollector_Charts(t *testing.T) {
 	collr.ConfPath = testConfPath
 	collr.ConfDir = testConfDir
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	assert.NotNil(t, collr.Charts())
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	assert.NotPanics(t, New().Cleanup)
+	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -102,8 +103,8 @@ func TestCollector_Collect(t *testing.T) {
 	collr.ConfPath = testConfPath
 	collr.ConfDir = testConfDir
 
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"dhcp_range_1230::1-1230::64_allocated_leases":              7,
@@ -134,7 +135,7 @@ func TestCollector_Collect(t *testing.T) {
 		"ipv6_dhcp_ranges": 5,
 	}
 
-	assert.Equal(t, expected, collr.Collect())
+	assert.Equal(t, expected, collr.Collect(context.Background()))
 }
 
 func TestCollector_CollectFailedToOpenLeasesPath(t *testing.T) {
@@ -143,11 +144,11 @@ func TestCollector_CollectFailedToOpenLeasesPath(t *testing.T) {
 	collr.ConfPath = testConfPath
 	collr.ConfDir = testConfDir
 
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	collr.LeasesPath = ""
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_parseDHCPRangeValue(t *testing.T) {

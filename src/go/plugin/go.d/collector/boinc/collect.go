@@ -3,6 +3,7 @@
 package boinc
 
 import (
+	"context"
 	"fmt"
 	"net"
 )
@@ -18,7 +19,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	results, err := c.conn.getResults()
 	if err != nil {
-		c.Cleanup()
+		c.Cleanup(context.Background())
 		return nil, err
 	}
 

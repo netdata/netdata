@@ -3,6 +3,7 @@
 package uwsgi
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -61,9 +62,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -82,7 +83,7 @@ func TestCollector_Cleanup(t *testing.T) {
 			prepare: func() *Collector {
 				collr := New()
 				collr.conn = prepareMockOk()
-				_ = collr.Check()
+				_ = collr.Check(context.Background())
 				return collr
 			},
 		},
@@ -90,7 +91,7 @@ func TestCollector_Cleanup(t *testing.T) {
 			prepare: func() *Collector {
 				collr := New()
 				collr.conn = prepareMockOk()
-				_ = collr.Collect()
+				_ = collr.Collect(context.Background())
 				return collr
 			},
 		},
@@ -100,7 +101,7 @@ func TestCollector_Cleanup(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
 
-			assert.NotPanics(t, collr.Cleanup)
+			assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 		})
 	}
 }
@@ -139,9 +140,9 @@ func TestCollector_Check(t *testing.T) {
 			collr.conn = mock
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -239,7 +240,7 @@ func TestCollector_Collect(t *testing.T) {
 			mock := test.prepareMock()
 			collr.conn = mock
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			require.Equal(t, test.wantMetrics, mx)
 

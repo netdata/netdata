@@ -3,6 +3,7 @@
 package boinc
 
 import (
+	"context"
 	_ "embed"
 	"errors"
 	"time"
@@ -55,7 +56,7 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init() error {
+func (c *Collector) Init(context.Context) error {
 	if c.Address == "" {
 		return errors.New("config: 'address' not set")
 	}
@@ -63,7 +64,7 @@ func (c *Collector) Init() error {
 	return nil
 }
 
-func (c *Collector) Check() error {
+func (c *Collector) Check(context.Context) error {
 	mx, err := c.collect()
 	if err != nil {
 		return err
@@ -80,7 +81,7 @@ func (c *Collector) Charts() *module.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect() map[string]int64 {
+func (c *Collector) Collect(context.Context) map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -93,7 +94,7 @@ func (c *Collector) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup() {
+func (c *Collector) Cleanup(context.Context) {
 	if c.conn != nil {
 		c.conn.disconnect()
 		c.conn = nil

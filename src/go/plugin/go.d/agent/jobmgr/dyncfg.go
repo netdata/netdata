@@ -265,13 +265,13 @@ func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 		slog.String("job", cfg.Name()),
 	)
 
-	defer job.Cleanup()
+	defer job.Cleanup(context.Background())
 
-	if err := job.Init(); err != nil {
+	if err := job.Init(context.Background()); err != nil {
 		m.dyncfgRespf(fn, 422, "Job initialization failed: %v", err)
 		return
 	}
-	if err := job.Check(); err != nil {
+	if err := job.Check(context.Background()); err != nil {
 		m.dyncfgRespf(fn, 422, "Job check failed: %v", err)
 		return
 	}

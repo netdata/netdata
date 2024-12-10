@@ -3,6 +3,7 @@
 package vcsa
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -34,57 +35,57 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 func TestCollector_Init(t *testing.T) {
 	collr := prepareVCSA()
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 	assert.NotNil(t, collr.client)
 }
 
 func TestCollector_InitErrorOnValidatingInitParameters(t *testing.T) {
 	collr := New()
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_InitErrorOnCreatingClient(t *testing.T) {
 	collr := prepareVCSA()
 	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
 	collr := prepareVCSA()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.client = &mockVCenterHealthClient{}
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_CheckErrorOnLogin(t *testing.T) {
 	collr := prepareVCSA()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.client = &mockVCenterHealthClient{
 		login: func() error { return errors.New("login mock error") },
 	}
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_CheckEnsureLoggedIn(t *testing.T) {
 	collr := prepareVCSA()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	mock := &mockVCenterHealthClient{}
 	collr.client = mock
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 	assert.True(t, mock.loginCalls == 1)
 }
 
 func TestCollector_Cleanup(t *testing.T) {
 	collr := prepareVCSA()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	mock := &mockVCenterHealthClient{}
 	collr.client = mock
-	collr.Cleanup()
+	collr.Cleanup(context.Background())
 
 	assert.True(t, mock.logoutCalls == 1)
 }
@@ -92,7 +93,7 @@ func TestCollector_Cleanup(t *testing.T) {
 func TestCollector_CleanupWithNilClient(t *testing.T) {
 	collr := prepareVCSA()
 
-	assert.NotPanics(t, collr.Cleanup)
+	assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -101,7 +102,7 @@ func TestCollector_Charts(t *testing.T) {
 
 func TestCollector_Collect(t *testing.T) {
 	collr := prepareVCSA()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	mock := &mockVCenterHealthClient{}
 	collr.client = mock
 
@@ -155,33 +156,33 @@ func TestCollector_Collect(t *testing.T) {
 		"system_status_yellow":             0,
 	}
 
-	assert.Equal(t, expected, collr.Collect())
+	assert.Equal(t, expected, collr.Collect(context.Background()))
 }
 
 func TestCollector_CollectEnsurePingIsCalled(t *testing.T) {
 	collr := prepareVCSA()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	mock := &mockVCenterHealthClient{}
 	collr.client = mock
-	collr.Collect()
+	collr.Collect(context.Background())
 
 	assert.True(t, mock.pingCalls == 1)
 }
 
 func TestCollector_CollectErrorOnPing(t *testing.T) {
 	collr := prepareVCSA()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	mock := &mockVCenterHealthClient{
 		ping: func() error { return errors.New("ping mock error") },
 	}
 	collr.client = mock
 
-	assert.Zero(t, collr.Collect())
+	assert.Zero(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_CollectErrorOnHealthCalls(t *testing.T) {
 	collr := prepareVCSA()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	mock := &mockVCenterHealthClient{
 		applMgmt:         func() (string, error) { return "", errors.New("applMgmt mock error") },
 		databaseStorage:  func() (string, error) { return "", errors.New("databaseStorage mock error") },
@@ -194,7 +195,7 @@ func TestCollector_CollectErrorOnHealthCalls(t *testing.T) {
 	}
 	collr.client = mock
 
-	assert.Zero(t, collr.Collect())
+	assert.Zero(t, collr.Collect(context.Background()))
 }
 
 func prepareVCSA() *Collector {

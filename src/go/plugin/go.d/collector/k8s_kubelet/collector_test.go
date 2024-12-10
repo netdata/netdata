@@ -3,6 +3,7 @@
 package k8s_kubelet
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -42,18 +43,18 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }
 
 func TestCollector_Init(t *testing.T) {
-	assert.NoError(t, New().Init())
+	assert.NoError(t, New().Init(context.Background()))
 }
 
 func TestCollector_Init_ReadServiceAccountToken(t *testing.T) {
 	collr := New()
 	collr.TokenPath = "testdata/token.txt"
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 	assert.Equal(t, "Bearer "+string(dataServiceAccountToken), collr.RequestConfig.Headers["Authorization"])
 }
 
@@ -61,7 +62,7 @@ func TestCollector_InitErrorOnCreatingClientWrongTLSCA(t *testing.T) {
 	collr := New()
 	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -74,15 +75,15 @@ func TestCollector_Check(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/metrics"
-	require.NoError(t, collr.Init())
-	assert.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Check_ConnectionRefused(t *testing.T) {
 	collr := New()
 	collr.URL = "http://127.0.0.1:38001/metrics"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -95,8 +96,8 @@ func TestCollector_Collect(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/metrics"
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"apiserver_audit_requests_rejected_total":                                    0,
@@ -181,7 +182,7 @@ func TestCollector_Collect(t *testing.T) {
 		"volume_manager_plugin_kubernetes.io/secret_state_desired":                   4,
 	}
 
-	assert.Equal(t, expected, collr.Collect())
+	assert.Equal(t, expected, collr.Collect(context.Background()))
 }
 
 func TestCollector_Collect_ReceiveInvalidResponse(t *testing.T) {
@@ -194,8 +195,8 @@ func TestCollector_Collect_ReceiveInvalidResponse(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/metrics"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Collect_Receive404(t *testing.T) {
@@ -208,6 +209,6 @@ func TestCollector_Collect_Receive404(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/metrics"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }

@@ -3,6 +3,7 @@
 package pgbouncer
 
 import (
+	"context"
 	"database/sql"
 	_ "embed"
 	"errors"
@@ -67,7 +68,7 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init() error {
+func (c *Collector) Init(context.Context) error {
 	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
@@ -76,7 +77,7 @@ func (c *Collector) Init() error {
 	return nil
 }
 
-func (c *Collector) Check() error {
+func (c *Collector) Check(context.Context) error {
 	mx, err := c.collect()
 	if err != nil {
 		return err
@@ -91,7 +92,7 @@ func (c *Collector) Charts() *module.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect() map[string]int64 {
+func (c *Collector) Collect(context.Context) map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -103,7 +104,7 @@ func (c *Collector) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup() {
+func (c *Collector) Cleanup(context.Context) {
 	if c.db == nil {
 		return
 	}

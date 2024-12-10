@@ -3,6 +3,7 @@
 package beanstalk
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"time"
@@ -22,7 +23,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
 	if err := c.collectStats(mx); err != nil {
-		c.Cleanup()
+		c.Cleanup(context.Background())
 		return nil, err
 	}
 	if err := c.collectTubesStats(mx); err != nil {

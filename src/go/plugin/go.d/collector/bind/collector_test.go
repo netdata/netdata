@@ -3,6 +3,7 @@
 package bind
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -38,18 +39,18 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestCollector_Cleanup(t *testing.T) { New().Cleanup() }
+func TestCollector_Cleanup(t *testing.T) { New().Cleanup(context.Background()) }
 
 func TestCollector_Init(t *testing.T) {
 	// OK
 	collr := New()
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 	assert.NotNil(t, collr.bindAPIClient)
 
 	//NG
 	collr = New()
 	collr.URL = ""
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -65,16 +66,16 @@ func TestCollector_Check(t *testing.T) {
 	collr := New()
 	collr.URL = ts.URL + "/json/v1"
 
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_CheckNG(t *testing.T) {
 	collr := New()
 
 	collr.URL = "http://127.0.0.1:38001/xml/v3"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -95,8 +96,8 @@ func TestCollector_CollectJSON(t *testing.T) {
 	collr.URL = ts.URL + "/json/v1"
 	collr.PermitView = "*"
 
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"_default_Queryv4":         4503685324,
@@ -254,7 +255,7 @@ func TestCollector_CollectJSON(t *testing.T) {
 		"Others":                   74006,
 	}
 
-	assert.Equal(t, expected, collr.Collect())
+	assert.Equal(t, expected, collr.Collect(context.Background()))
 	assert.Len(t, *collr.charts, 17)
 }
 
@@ -272,8 +273,8 @@ func TestCollector_CollectXML3(t *testing.T) {
 	collr.PermitView = "*"
 	collr.URL = ts.URL + "/xml/v3"
 
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"_bind_CookieClientOk":     0,
@@ -507,26 +508,30 @@ func TestCollector_CollectXML3(t *testing.T) {
 		"IQUERY":                   199,
 	}
 
-	assert.Equal(t, expected, collr.Collect())
+	assert.Equal(t, expected, collr.Collect(context.Background()))
 	assert.Len(t, *collr.charts, 20)
 }
 
 func TestCollector_InvalidData(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("hello and goodbye")) }))
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("hello and goodbye"))
+	}))
 	defer ts.Close()
 
 	collr := New()
 	collr.URL = ts.URL + "/json/v1"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_404(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(404) }))
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+	}))
 	defer ts.Close()
 
 	collr := New()
 	collr.URL = ts.URL + "/json/v1"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }

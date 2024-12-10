@@ -3,6 +3,7 @@
 package openvpn
 
 import (
+	"context"
 	_ "embed"
 	"time"
 
@@ -67,7 +68,7 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init() error {
+func (c *Collector) Init(context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return err
 	}
@@ -85,7 +86,7 @@ func (c *Collector) Init() error {
 	return nil
 }
 
-func (c *Collector) Check() error {
+func (c *Collector) Check(ctx context.Context) error {
 	if err := c.client.Connect(); err != nil {
 		return err
 	}
@@ -93,7 +94,7 @@ func (c *Collector) Check() error {
 
 	ver, err := c.client.Version()
 	if err != nil {
-		c.Cleanup()
+		c.Cleanup(ctx)
 		return err
 	}
 
@@ -104,7 +105,7 @@ func (c *Collector) Check() error {
 
 func (c *Collector) Charts() *Charts { return c.charts }
 
-func (c *Collector) Collect() map[string]int64 {
+func (c *Collector) Collect(context.Context) map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -116,7 +117,7 @@ func (c *Collector) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup() {
+func (c *Collector) Cleanup(context.Context) {
 	if c.client == nil {
 		return
 	}

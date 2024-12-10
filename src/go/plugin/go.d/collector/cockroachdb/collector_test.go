@@ -3,6 +3,7 @@
 package cockroachdb
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -44,36 +45,36 @@ func TestNew(t *testing.T) {
 func TestCollector_Init(t *testing.T) {
 	collr := prepareCockroachDB()
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_ReturnsFalseIfConfigURLIsNotSet(t *testing.T) {
 	collr := prepareCockroachDB()
 	collr.URL = ""
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
 	collr := prepareCockroachDB()
 	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
 	collr, srv := prepareClientServer(t)
 	defer srv.Close()
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Check_ReturnsFalseIfConnectionRefused(t *testing.T) {
 	collr := New()
 	collr.URL = "http://127.0.0.1:38001/metrics"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -81,7 +82,7 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	assert.NotPanics(t, New().Cleanup)
+	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -221,7 +222,7 @@ func TestCollector_Collect(t *testing.T) {
 		"valcount":                                     124081,
 	}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 
 	assert.Equal(t, expected, mx)
 
@@ -232,28 +233,28 @@ func TestCollector_Collect_ReturnsNilIfNotCockroachDBMetrics(t *testing.T) {
 	collr, srv := prepareClientServerNotCockroachDBMetricResponse(t)
 	defer srv.Close()
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_Collect_ReturnsNilIfConnectionRefused(t *testing.T) {
 	collr := prepareCockroachDB()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_Collect_ReturnsNilIfReceiveInvalidResponse(t *testing.T) {
 	collr, ts := prepareClientServerInvalidDataResponse(t)
 	defer ts.Close()
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_Collect_ReturnsNilIfReceiveResponse404(t *testing.T) {
 	collr, ts := prepareClientServerResponse404(t)
 	defer ts.Close()
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func prepareCockroachDB() *Collector {
@@ -271,7 +272,7 @@ func prepareClientServer(t *testing.T) (*Collector, *httptest.Server) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, ts
 }
@@ -285,7 +286,7 @@ func prepareClientServerNotCockroachDBMetricResponse(t *testing.T) (*Collector, 
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, ts
 }
@@ -299,7 +300,7 @@ func prepareClientServerInvalidDataResponse(t *testing.T) (*Collector, *httptest
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, ts
 }
@@ -313,6 +314,6 @@ func prepareClientServerResponse404(t *testing.T) (*Collector, *httptest.Server)
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	return collr, ts
 }

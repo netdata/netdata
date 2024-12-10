@@ -5,6 +5,7 @@ package mysql
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -117,9 +118,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -148,7 +149,7 @@ func TestCollector_Cleanup(t *testing.T) {
 			collr, cleanup := prepare(t)
 			defer cleanup()
 
-			assert.NotPanics(t, collr.Cleanup)
+			assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 			assert.Nil(t, collr.db)
 		})
 	}
@@ -257,14 +258,14 @@ func TestCollector_Check(t *testing.T) {
 			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			test.prepareMock(t, mock)
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -290,7 +291,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaVer5564ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"aborted_connects":                      0,
@@ -425,7 +426,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 
@@ -607,7 +608,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"aborted_connects":                        2,
@@ -791,7 +792,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"aborted_connects":                        2,
@@ -978,7 +979,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"aborted_connects":                        2,
@@ -1159,7 +1160,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaGaleraClusterVer1084ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"aborted_connects":                        0,
@@ -1355,7 +1356,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessListPS, dataMySQLVer8030ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"aborted_connects":                      0,
@@ -1494,7 +1495,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessListPS, dataPerconaV8029ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"aborted_connects":                        1,
@@ -1653,7 +1654,7 @@ func TestCollector_Collect(t *testing.T) {
 			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			for i, step := range test {
 				t.Run(fmt.Sprintf("step[%d]", i), func(t *testing.T) {
