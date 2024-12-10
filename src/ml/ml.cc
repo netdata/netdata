@@ -1088,6 +1088,11 @@ void *ml_train_main(void *arg) {
     worker_register_job_name(WORKER_TRAIN_FLUSH_MODELS, "flush models");
 
     while (!Cfg.training_stop) {
+        if(rrdr_backfill_running()) {
+            sleep_usec(1 * USEC_PER_SEC);
+            continue;
+        }
+
         worker_is_busy(WORKER_TRAIN_QUEUE_POP);
 
         ml_queue_stats_t loop_stats{};

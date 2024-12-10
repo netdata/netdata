@@ -1830,6 +1830,11 @@ static void *replication_worker_thread(void *ptr __maybe_unused) {
     replication_initialize_workers(false);
 
     while (service_running(SERVICE_REPLICATION)) {
+        if(rrdr_backfill_running()) {
+            sleep_usec(1 * USEC_PER_SEC);
+            continue;
+        }
+
         if (unlikely(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY)) {
             sender_commit_thread_buffer_free();
             worker_is_busy(WORKER_JOB_WAIT);
@@ -1925,6 +1930,11 @@ void *replication_thread_main(void *ptr) {
     size_t last_sender_resets = 0;
 
     while(service_running(SERVICE_REPLICATION)) {
+
+        if(rrdr_backfill_running()) {
+            sleep_usec(1 * USEC_PER_SEC);
+            continue;
+        }
 
         // statistics
         usec_t now_mono_ut = now_monotonic_usec();

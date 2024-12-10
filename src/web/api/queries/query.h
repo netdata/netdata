@@ -3,6 +3,8 @@
 #ifndef NETDATA_API_DATA_QUERY_H
 #define NETDATA_API_DATA_QUERY_H
 
+#include "libnetdata/common.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -92,6 +94,8 @@ typedef enum rrdr_group_by_function {
 
 RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s);
 const char *group_by_aggregate_function_to_string(RRDR_GROUP_BY_FUNCTION group_by_function);
+
+bool rrdr_backfill_running(void);
 
 #ifdef __cplusplus
 }

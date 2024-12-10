@@ -1281,7 +1281,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
         if(!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
             // we have not collected this tier before
             // let's fill any gap that may exist
-            rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now_s);
+            backfill_tier_from_smaller_tiers(rd, tier, now_s);
         }
 
         store_metric_at_tier(rd, tier, t, sp, point_end_time_ut);

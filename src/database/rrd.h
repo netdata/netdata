@@ -278,7 +278,7 @@ struct rrddim_tier {
     STORAGE_COLLECT_HANDLE *sch;   // the data collection handle
 };
 
-void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s);
+void backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric
