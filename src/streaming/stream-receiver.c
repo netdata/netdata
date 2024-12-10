@@ -820,6 +820,9 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     if(signal_rrdcontext)
         rrdcontext_host_child_connected(host);
 
+    if(set_this)
+        ml_host_start(host);
+
     return set_this;
 }
 
@@ -837,6 +840,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
             {
                 // run all these without having the receiver lock
 
+                ml_host_stop(host);
                 stream_path_child_disconnected(host);
                 stream_sender_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
                 stream_receiver_replication_reset(host);
