@@ -213,6 +213,11 @@ static void health_event_loop(void) {
     unsigned int loop = 0;
 
     while(service_running(SERVICE_HEALTH)) {
+        if(!stream_health_should_be_running()) {
+            sleep_usec(100 * USEC_PER_MS);
+            continue;
+        }
+
         loop++;
         netdata_log_debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
