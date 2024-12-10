@@ -643,8 +643,7 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
 
         bool stop = false;
-        size_t iterations = 0;
-        while(!stop && iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
+        while(!stop) {
             if (spinlock_trylock(&rpt->thread.send_to_child.spinlock)) {
                 const char *disconnect_reason = NULL;
                 STREAM_HANDSHAKE reason;

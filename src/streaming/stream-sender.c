@@ -477,8 +477,7 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
         // we can send data on this socket
 
         bool stop = false;
-        size_t iterations = 0;
-        while(!stop && iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
+        while(!stop) {
             if(stream_sender_trylock(s)) {
                 worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
 
