@@ -5,6 +5,7 @@ package gearman
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -22,13 +23,13 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	status, err := c.conn.queryStatus()
 	if err != nil {
-		c.Cleanup()
+		c.Cleanup(context.Background())
 		return nil, fmt.Errorf("couldn't query status: %v", err)
 	}
 
 	prioStatus, err := c.conn.queryPriorityStatus()
 	if err != nil {
-		c.Cleanup()
+		c.Cleanup(context.Background())
 		return nil, fmt.Errorf("couldn't query priority status: %v", err)
 	}
 

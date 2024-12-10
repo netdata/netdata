@@ -3,6 +3,7 @@
 package scaleio
 
 import (
+	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -71,7 +72,7 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init() error {
+func (c *Collector) Init(context.Context) error {
 	if c.Username == "" || c.Password == "" {
 		return errors.New("config: username and password aren't set")
 	}
@@ -88,7 +89,7 @@ func (c *Collector) Init() error {
 	return nil
 }
 
-func (c *Collector) Check() error {
+func (c *Collector) Check(context.Context) error {
 	if err := c.client.Login(); err != nil {
 		return err
 	}
@@ -106,7 +107,7 @@ func (c *Collector) Charts() *module.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect() map[string]int64 {
+func (c *Collector) Collect(context.Context) map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -119,7 +120,7 @@ func (c *Collector) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup() {
+func (c *Collector) Cleanup(context.Context) {
 	if c.client == nil {
 		return
 	}

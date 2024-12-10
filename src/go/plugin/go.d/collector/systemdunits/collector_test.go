@@ -64,9 +64,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -131,12 +131,12 @@ func TestCollector_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -144,7 +144,7 @@ func TestCollector_Check(t *testing.T) {
 
 func TestCollector_Charts(t *testing.T) {
 	collr := New()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	assert.NotNil(t, collr.Charts())
 }
 
@@ -154,10 +154,10 @@ func TestCollector_Cleanup(t *testing.T) {
 	client := prepareOKClient(230)
 	collr.client = client
 
-	require.NoError(t, collr.Init())
-	require.NotNil(t, collr.Collect())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NotNil(t, collr.Collect(context.Background()))
 	conn := collr.conn
-	collr.Cleanup()
+	collr.Cleanup(context.Background())
 
 	assert.Nil(t, collr.conn)
 	v, _ := conn.(*mockConn)
@@ -851,12 +851,12 @@ func TestCollector_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			var mx map[string]int64
 
 			for i := 0; i < 10; i++ {
-				mx = collr.Collect()
+				mx = collr.Collect(context.Background())
 			}
 
 			assert.Equal(t, test.wantCollected, mx)
@@ -872,11 +872,11 @@ func TestCollector_connectionReuse(t *testing.T) {
 	collr.Include = []string{"*"}
 	client := prepareOKClient(230)
 	collr.client = client
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	var collected map[string]int64
 	for i := 0; i < 10; i++ {
-		collected = collr.Collect()
+		collected = collr.Collect(context.Background())
 	}
 
 	assert.NotEmpty(t, collected)

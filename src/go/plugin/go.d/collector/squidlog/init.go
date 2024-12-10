@@ -3,6 +3,7 @@
 package squidlog
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -10,7 +11,7 @@ import (
 )
 
 func (c *Collector) createLogReader() error {
-	c.Cleanup()
+	c.Cleanup(context.Background())
 	c.Debug("starting log reader creating")
 
 	reader, err := logs.Open(c.Path, c.ExcludePath, c.Logger)

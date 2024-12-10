@@ -3,6 +3,7 @@
 package wireguard
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -36,7 +37,7 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestCollector_Init(t *testing.T) {
-	assert.NoError(t, New().Init())
+	assert.NoError(t, New().Init(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -55,15 +56,15 @@ func TestCollector_Cleanup(t *testing.T) {
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(c *Collector) { _ = c.Init() },
+			prepare:   func(c *Collector) { _ = c.Init(context.Background()) },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(c *Collector) { _ = c.Init(); _ = c.Check() },
+			prepare:   func(c *Collector) { _ = c.Init(context.Background()); _ = c.Check(context.Background()) },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(c *Collector) { _ = c.Init(); _ = c.Collect() },
+			prepare:   func(c *Collector) { _ = c.Init(context.Background()); _ = c.Collect(context.Background()) },
 		},
 	}
 
@@ -75,7 +76,7 @@ func TestCollector_Cleanup(t *testing.T) {
 
 			test.prepare(collr)
 
-			require.NotPanics(t, collr.Cleanup)
+			require.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 
 			if test.wantClose {
 				assert.True(t, m.closeCalled)
@@ -133,13 +134,13 @@ func TestCollector_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr := New()
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 			test.prepare(collr)
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -158,7 +159,7 @@ func TestCollector_Collect(t *testing.T) {
 					m.devices = append(m.devices, prepareDevice(2))
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"device_wg1_peers":    0,
@@ -189,7 +190,7 @@ func TestCollector_Collect(t *testing.T) {
 					m.devices = append(m.devices, d2)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"device_wg1_peers":    2,
@@ -229,7 +230,7 @@ func TestCollector_Collect(t *testing.T) {
 					m.devices = append(m.devices, d1)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"device_wg1_peers":    4,
@@ -255,7 +256,7 @@ func TestCollector_Collect(t *testing.T) {
 					m.devices = append(m.devices, prepareDevice(1))
 				},
 				check: func(t *testing.T, collr *Collector) {
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 					assert.Equal(t, len(deviceChartsTmpl)*1, len(*collr.Charts()))
 				},
 			},
@@ -264,7 +265,7 @@ func TestCollector_Collect(t *testing.T) {
 					m.devices = append(m.devices, prepareDevice(2))
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"device_wg1_peers":    0,
@@ -288,7 +289,7 @@ func TestCollector_Collect(t *testing.T) {
 					m.devices = append(m.devices, prepareDevice(2))
 				},
 				check: func(t *testing.T, collr *Collector) {
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 				},
 			},
 			{
@@ -296,7 +297,7 @@ func TestCollector_Collect(t *testing.T) {
 					m.devices = m.devices[:len(m.devices)-1]
 				},
 				check: func(t *testing.T, collr *Collector) {
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 					assert.Equal(t, len(deviceChartsTmpl)*2, len(*collr.Charts()))
 					assert.Equal(t, 0, calcObsoleteCharts(collr.Charts()))
 				},
@@ -309,7 +310,7 @@ func TestCollector_Collect(t *testing.T) {
 					m.devices = append(m.devices, prepareDevice(2))
 				},
 				check: func(t *testing.T, collr *Collector) {
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 				},
 			},
 			{
@@ -319,7 +320,7 @@ func TestCollector_Collect(t *testing.T) {
 				check: func(t *testing.T, collr *Collector) {
 					collr.cleanupEvery = time.Second
 					time.Sleep(time.Second)
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 					assert.Equal(t, len(deviceChartsTmpl)*2, len(*collr.Charts()))
 					assert.Equal(t, len(deviceChartsTmpl)*1, calcObsoleteCharts(collr.Charts()))
 				},
@@ -331,7 +332,7 @@ func TestCollector_Collect(t *testing.T) {
 					m.devices = append(m.devices, prepareDevice(1))
 				},
 				check: func(t *testing.T, collr *Collector) {
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 					assert.Equal(t, len(deviceChartsTmpl)*1, len(*collr.Charts()))
 				},
 			},
@@ -341,7 +342,7 @@ func TestCollector_Collect(t *testing.T) {
 					d1.Peers = append(d1.Peers, preparePeer("11"))
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"device_wg1_peers":    1,
@@ -366,7 +367,7 @@ func TestCollector_Collect(t *testing.T) {
 					m.devices = append(m.devices, d1)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 				},
 			},
 			{
@@ -375,7 +376,7 @@ func TestCollector_Collect(t *testing.T) {
 					d1.Peers = d1.Peers[:len(d1.Peers)-1]
 				},
 				check: func(t *testing.T, collr *Collector) {
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 					assert.Equal(t, len(deviceChartsTmpl)*1+len(peerChartsTmpl)*2, len(*collr.Charts()))
 					assert.Equal(t, 0, calcObsoleteCharts(collr.Charts()))
 				},
@@ -390,7 +391,7 @@ func TestCollector_Collect(t *testing.T) {
 					m.devices = append(m.devices, d1)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 				},
 			},
 			{
@@ -401,7 +402,7 @@ func TestCollector_Collect(t *testing.T) {
 				check: func(t *testing.T, collr *Collector) {
 					collr.cleanupEvery = time.Second
 					time.Sleep(time.Second)
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 					assert.Equal(t, len(deviceChartsTmpl)*1+len(peerChartsTmpl)*2, len(*collr.Charts()))
 					assert.Equal(t, len(peerChartsTmpl)*1, calcObsoleteCharts(collr.Charts()))
 				},
@@ -411,7 +412,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepareMock: func(m *mockClient) {},
 				check: func(t *testing.T, collr *Collector) {
-					assert.Equal(t, map[string]int64(nil), collr.Collect())
+					assert.Equal(t, map[string]int64(nil), collr.Collect(context.Background()))
 				},
 			},
 		},
@@ -421,7 +422,7 @@ func TestCollector_Collect(t *testing.T) {
 					m.errOnDevices = true
 				},
 				check: func(t *testing.T, collr *Collector) {
-					assert.Equal(t, map[string]int64(nil), collr.Collect())
+					assert.Equal(t, map[string]int64(nil), collr.Collect(context.Background()))
 				},
 			},
 		},
@@ -430,7 +431,7 @@ func TestCollector_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr := New()
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 			m := &mockClient{}
 			collr.client = m
 

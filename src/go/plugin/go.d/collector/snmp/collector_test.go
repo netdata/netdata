@@ -3,6 +3,7 @@
 package snmp
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -88,9 +89,9 @@ func TestCollector_Init(t *testing.T) {
 			collr := test.prepareSNMP()
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -107,7 +108,7 @@ func TestCollector_Cleanup(t *testing.T) {
 				collr.newSnmpClient = func() gosnmp.Handler { return m }
 				setMockClientInitExpect(m)
 
-				require.NoError(t, collr.Init())
+				require.NoError(t, collr.Init(context.Background()))
 
 				m.EXPECT().Close().Times(1)
 
@@ -121,7 +122,7 @@ func TestCollector_Cleanup(t *testing.T) {
 				collr.newSnmpClient = func() gosnmp.Handler { return m }
 				setMockClientInitExpect(m)
 
-				require.NoError(t, collr.Init())
+				require.NoError(t, collr.Init(context.Background()))
 
 				collr.snmpClient = nil
 
@@ -137,7 +138,7 @@ func TestCollector_Cleanup(t *testing.T) {
 
 			collr := test.prepareSNMP(t, mockSNMP)
 
-			assert.NotPanics(t, collr.Cleanup)
+			assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 		})
 	}
 }
@@ -182,10 +183,10 @@ func TestCollector_Charts(t *testing.T) {
 			collr := test.prepareSNMP(t, mockSNMP)
 			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			if test.doCollect {
-				_ = collr.Collect()
+				_ = collr.Collect(context.Background())
 			}
 
 			assert.Equal(t, test.wantNumCharts, len(*collr.Charts()))
@@ -256,12 +257,12 @@ func TestCollector_Check(t *testing.T) {
 			collr := test.prepareSNMP(mockSNMP)
 			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -468,9 +469,9 @@ func TestCollector_Collect(t *testing.T) {
 			collr := test.prepareSNMP(mockSNMP)
 			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			assert.Equal(t, test.wantCollected, mx)
 		})

@@ -3,6 +3,7 @@
 package apcupsd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -22,7 +23,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	resp, err := c.conn.status()
 	if err != nil {
-		c.Cleanup()
+		c.Cleanup(context.Background())
 		return nil, err
 	}
 

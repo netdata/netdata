@@ -3,6 +3,7 @@
 package dockerhub
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -42,17 +43,17 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 
 func TestCollector_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
 
-func TestCollector_Cleanup(t *testing.T) { New().Cleanup() }
+func TestCollector_Cleanup(t *testing.T) { New().Cleanup(context.Background()) }
 
 func TestCollector_Init(t *testing.T) {
 	collr := New()
 	collr.Repositories = []string{"name/repo"}
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 	assert.NotNil(t, collr.client)
 }
 
 func TestCollector_InitNG(t *testing.T) {
-	assert.Error(t, New().Init())
+	assert.Error(t, New().Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -73,16 +74,16 @@ func TestCollector_Check(t *testing.T) {
 	collr := New()
 	collr.URL = ts.URL
 	collr.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.NoError(t, collr.Init())
-	assert.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_CheckNG(t *testing.T) {
 	collr := New()
 	collr.URL = "http://127.0.0.1:38001/metrics"
 	collr.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -103,8 +104,8 @@ func TestCollector_Collect(t *testing.T) {
 	collr := New()
 	collr.URL = ts.URL
 	collr.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"star_count_user1/name1": 45,
@@ -119,7 +120,7 @@ func TestCollector_Collect(t *testing.T) {
 		"pull_sum":               55620576,
 	}
 
-	collected := collr.Collect()
+	collected := collr.Collect(context.Background())
 
 	for k := range collected {
 		if strings.HasPrefix(k, "last") {
@@ -140,8 +141,8 @@ func TestCollector_InvalidData(t *testing.T) {
 	collr := New()
 	collr.URL = ts.URL
 	collr.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_404(t *testing.T) {
@@ -154,6 +155,6 @@ func TestCollector_404(t *testing.T) {
 
 	collr := New()
 	collr.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }

@@ -3,6 +3,7 @@
 package scaleio
 
 import (
+	"context"
 	"encoding/json"
 	"net/http/httptest"
 	"os"
@@ -43,10 +44,10 @@ func TestCollector_Init(t *testing.T) {
 	collr.Username = "username"
 	collr.Password = "password"
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 }
 func TestCollector_Init_UsernameAndPasswordNotSet(t *testing.T) {
-	assert.Error(t, New().Init())
+	assert.Error(t, New().Init(context.Background()))
 }
 
 func TestCollector_Init_ErrorOnCreatingClientWrongTLSCA(t *testing.T) {
@@ -55,24 +56,24 @@ func TestCollector_Init_ErrorOnCreatingClientWrongTLSCA(t *testing.T) {
 	collr.Password = "password"
 	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
 	srv, _, collr := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Check_ErrorOnLogin(t *testing.T) {
 	srv, mock, collr := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	mock.Password = "new password"
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -82,18 +83,18 @@ func TestCollector_Charts(t *testing.T) {
 func TestCollector_Cleanup(t *testing.T) {
 	srv, _, collr := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
-	collr.Cleanup()
+	collr.Cleanup(context.Background())
 	assert.False(t, collr.client.LoggedIn())
 }
 
 func TestCollector_Collect(t *testing.T) {
 	srv, _, collr := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"sdc_6076fd0f00000000_bandwidth_read":                                    0,
@@ -298,7 +299,7 @@ func TestCollector_Collect(t *testing.T) {
 		"system_total_iops_write":                                                617200,
 	}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 
 	assert.Equal(t, expected, mx)
 
@@ -308,11 +309,11 @@ func TestCollector_Collect(t *testing.T) {
 func TestCollector_Collect_ConnectionRefused(t *testing.T) {
 	srv, _, collr := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 	collr.client.Request.URL = "http://127.0.0.1:38001"
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func testCharts(t *testing.T, collr *Collector, collected map[string]int64) {

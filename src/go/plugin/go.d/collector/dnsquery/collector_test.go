@@ -3,6 +3,7 @@
 package dnsquery
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -117,9 +118,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -144,12 +145,12 @@ func TestCollector_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -160,7 +161,7 @@ func TestCollector_Charts(t *testing.T) {
 
 	collr.Domains = []string{"google.com"}
 	collr.Servers = []string{"192.0.2.0", "192.0.2.1"}
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	assert.NotNil(t, collr.Charts())
 	assert.Len(t, *collr.Charts(), len(dnsChartsTmpl)*len(collr.Servers))
@@ -201,9 +202,9 @@ func TestCollector_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			require.Equal(t, test.wantMetrics, mx)
 		})

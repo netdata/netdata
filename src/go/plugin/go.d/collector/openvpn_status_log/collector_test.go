@@ -3,6 +3,7 @@
 package openvpn_status_log
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -66,9 +67,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -93,12 +94,12 @@ func TestCollector_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -131,9 +132,9 @@ func TestCollector_Charts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
 
-			require.NoError(t, collr.Init())
-			_ = collr.Check()
-			_ = collr.Collect()
+			require.NoError(t, collr.Init(context.Background()))
+			_ = collr.Check(context.Background())
+			_ = collr.Collect(context.Background())
 
 			assert.Equal(t, test.wantNumCharts, len(*collr.Charts()))
 		})
@@ -257,10 +258,10 @@ func TestCollector_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
 
-			require.NoError(t, collr.Init())
-			_ = collr.Check()
+			require.NoError(t, collr.Init(context.Background()))
+			_ = collr.Check(context.Background())
 
-			collected := collr.Collect()
+			collected := collr.Collect(context.Background())
 
 			copyConnTime(collected, test.expected)
 			assert.Equal(t, test.expected, collected)

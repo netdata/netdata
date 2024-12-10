@@ -5,6 +5,7 @@ package unbound
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -57,7 +58,7 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 func TestCollector_Init(t *testing.T) {
 	collr := prepareNonTLSUnbound()
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_SetEverythingFromUnboundConf(t *testing.T) {
@@ -76,7 +77,7 @@ func TestCollector_Init_SetEverythingFromUnboundConf(t *testing.T) {
 		},
 	}
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 	assert.Equal(t, expectedConfig, collr.Config)
 }
 
@@ -84,66 +85,66 @@ func TestCollector_Init_DisabledInUnboundConf(t *testing.T) {
 	collr := prepareNonTLSUnbound()
 	collr.ConfPath = "testdata/unbound_disabled.conf"
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_HandleEmptyConfig(t *testing.T) {
 	collr := prepareNonTLSUnbound()
 	collr.ConfPath = "testdata/unbound_empty.conf"
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_HandleNonExistentConfig(t *testing.T) {
 	collr := prepareNonTLSUnbound()
 	collr.ConfPath = "testdata/unbound_non_existent.conf"
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
 	collr := prepareNonTLSUnbound()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.client = mockUnboundClient{data: dataCommonStats, err: false}
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Check_ErrorDuringScrapingUnbound(t *testing.T) {
 	collr := prepareNonTLSUnbound()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.client = mockUnboundClient{err: true}
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }
 
 func TestCollector_Charts(t *testing.T) {
 	collr := prepareNonTLSUnbound()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	assert.NotNil(t, collr.Charts())
 }
 
 func TestCollector_Collect(t *testing.T) {
 	collr := prepareNonTLSUnbound()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.client = mockUnboundClient{data: dataCommonStats, err: false}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 	assert.Equal(t, expectedCommon, mx)
 	testCharts(t, collr, mx)
 }
 
 func TestCollector_Collect_ExtendedStats(t *testing.T) {
 	collr := prepareNonTLSUnbound()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.client = mockUnboundClient{data: dataExtendedStats, err: false}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 	assert.Equal(t, expectedExtended, mx)
 	testCharts(t, collr, mx)
 }
@@ -160,7 +161,7 @@ func TestCollector_Collect_LifeCycleCumulativeExtendedStats(t *testing.T) {
 
 	collr := prepareNonTLSUnbound()
 	collr.Cumulative = true
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	ubClient := &mockUnboundClient{err: false}
 	collr.client = ubClient
 
@@ -168,7 +169,7 @@ func TestCollector_Collect_LifeCycleCumulativeExtendedStats(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("run %d", i+1), func(t *testing.T) {
 			ubClient.data = test.input
-			mx = collr.Collect()
+			mx = collr.Collect(context.Background())
 			assert.Equal(t, test.expected, mx)
 		})
 	}
@@ -188,7 +189,7 @@ func TestCollector_Collect_LifeCycleResetExtendedStats(t *testing.T) {
 
 	collr := prepareNonTLSUnbound()
 	collr.Cumulative = false
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	ubClient := &mockUnboundClient{err: false}
 	collr.client = ubClient
 
@@ -196,7 +197,7 @@ func TestCollector_Collect_LifeCycleResetExtendedStats(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("run %d", i+1), func(t *testing.T) {
 			ubClient.data = test.input
-			mx = collr.Collect()
+			mx = collr.Collect(context.Background())
 			assert.Equal(t, test.expected, mx)
 		})
 	}
@@ -206,35 +207,35 @@ func TestCollector_Collect_LifeCycleResetExtendedStats(t *testing.T) {
 
 func TestCollector_Collect_EmptyResponse(t *testing.T) {
 	collr := prepareNonTLSUnbound()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.client = mockUnboundClient{data: []byte{}, err: false}
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_Collect_ErrorResponse(t *testing.T) {
 	collr := prepareNonTLSUnbound()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.client = mockUnboundClient{data: []byte("error unknown command 'unknown'"), err: false}
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_Collect_ErrorOnSend(t *testing.T) {
 	collr := prepareNonTLSUnbound()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.client = mockUnboundClient{err: true}
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_Collect_ErrorOnParseBadSyntax(t *testing.T) {
 	collr := prepareNonTLSUnbound()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	data := strings.Repeat("zk_avg_latency	0\nzk_min_latency	0\nzk_mix_latency	0\n", 10)
 	collr.client = mockUnboundClient{data: []byte(data), err: false}
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func prepareNonTLSUnbound() *Collector {

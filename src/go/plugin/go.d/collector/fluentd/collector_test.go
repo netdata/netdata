@@ -3,6 +3,7 @@
 package fluentd
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -38,13 +39,13 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 func TestCollector_Init(t *testing.T) {
 	// OK
 	collr := New()
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 	assert.NotNil(t, collr.apiClient)
 
 	//NG
 	collr = New()
 	collr.URL = ""
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -57,14 +58,14 @@ func TestCollector_Check(t *testing.T) {
 	// OK
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	// NG
 	collr = New()
 	collr.URL = "http://127.0.0.1:38001/api/plugins.json"
-	require.NoError(t, collr.Init())
-	require.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -72,7 +73,7 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -85,8 +86,8 @@ func TestCollector_Collect(t *testing.T) {
 	collr := New()
 	collr.URL = ts.URL
 
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"output_stdout_stdout_output_retry_count":         0,
@@ -94,7 +95,7 @@ func TestCollector_Collect(t *testing.T) {
 		"output_td_tdlog_output_buffer_queue_length":      0,
 		"output_td_tdlog_output_buffer_total_queued_size": 0,
 	}
-	assert.Equal(t, expected, collr.Collect())
+	assert.Equal(t, expected, collr.Collect(context.Background()))
 	assert.Len(t, collr.charts.Get("retry_count").Dims, 2)
 	assert.Len(t, collr.charts.Get("buffer_queue_length").Dims, 1)
 	assert.Len(t, collr.charts.Get("buffer_total_queued_size").Dims, 1)
@@ -109,8 +110,8 @@ func TestCollector_InvalidData(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_404(t *testing.T) {
@@ -122,6 +123,6 @@ func TestCollector_404(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }

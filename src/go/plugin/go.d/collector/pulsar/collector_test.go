@@ -3,6 +3,7 @@
 package pulsar
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -80,16 +81,16 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	assert.NotPanics(t, New().Cleanup)
+	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -111,9 +112,9 @@ func TestCollector_Check(t *testing.T) {
 			defer srv.Close()
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -139,7 +140,7 @@ func TestCollector_Collect_ReturnsNilOnErrors(t *testing.T) {
 			collr, srv := test.prepare(t)
 			defer srv.Close()
 
-			assert.Nil(t, collr.Collect())
+			assert.Nil(t, collr.Collect(context.Background()))
 		})
 	}
 }
@@ -169,9 +170,9 @@ func TestCollector_Collect(t *testing.T) {
 			defer srv.Close()
 
 			for i := 0; i < 10; i++ {
-				_ = collr.Collect()
+				_ = collr.Collect(context.Background())
 			}
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			require.NotNil(t, mx)
 			require.Equal(t, test.expected, mx)
@@ -186,7 +187,7 @@ func TestCollector_Collect_RemoveAddNamespacesTopicsInRuntime(t *testing.T) {
 
 	oldNsCharts := Charts{}
 
-	require.NotNil(t, collr.Collect())
+	require.NotNil(t, collr.Collect(context.Background()))
 	oldLength := len(*collr.Charts())
 
 	for _, chart := range *collr.Charts() {
@@ -197,7 +198,7 @@ func TestCollector_Collect_RemoveAddNamespacesTopicsInRuntime(t *testing.T) {
 		}
 	}
 
-	require.NotNil(t, collr.Collect())
+	require.NotNil(t, collr.Collect(context.Background()))
 
 	l := oldLength + len(*collr.nsCharts)*2 // 2 new namespaces
 	assert.Truef(t, len(*collr.Charts()) == l, "expected %d charts, but got %d", l, len(*collr.Charts()))
@@ -221,7 +222,7 @@ func prepareClientServerStdV250Namespaces(t *testing.T) (*Collector, *httptest.S
 
 	collr := New()
 	collr.URL = srv.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv
 }
@@ -235,7 +236,7 @@ func prepareClientServerStdV250Topics(t *testing.T) (*Collector, *httptest.Serve
 
 	collr := New()
 	collr.URL = srv.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv
 }
@@ -263,7 +264,7 @@ func prepareClientServersDynamicStdV250Topics(t *testing.T) (*Collector, *httpte
 
 	collr := New()
 	collr.URL = srv.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv
 }
@@ -277,7 +278,7 @@ func prepareClientServerNonPulsar(t *testing.T) (*Collector, *httptest.Server) {
 
 	collr := New()
 	collr.URL = srv.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv
 }
@@ -291,7 +292,7 @@ func prepareClientServerInvalidData(t *testing.T) (*Collector, *httptest.Server)
 
 	collr := New()
 	collr.URL = srv.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv
 }
@@ -305,7 +306,7 @@ func prepareClientServer404(t *testing.T) (*Collector, *httptest.Server) {
 
 	collr := New()
 	collr.URL = srv.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv
 }
@@ -316,7 +317,7 @@ func prepareClientServerConnectionRefused(t *testing.T) (*Collector, *httptest.S
 
 	collr := New()
 	collr.URL = "http://127.0.0.1:38001/metrics"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv
 }

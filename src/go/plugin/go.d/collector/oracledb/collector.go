@@ -3,6 +3,7 @@
 package oracledb
 
 import (
+	"context"
 	"database/sql"
 	_ "embed"
 	"errors"
@@ -59,7 +60,7 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init() error {
+func (c *Collector) Init(context.Context) error {
 	dsn, err := c.validateDSN()
 	if err != nil {
 		return fmt.Errorf("invalid oracle DSN: %w", err)
@@ -70,7 +71,7 @@ func (c *Collector) Init() error {
 	return nil
 }
 
-func (c *Collector) Check() error {
+func (c *Collector) Check(context.Context) error {
 	mx, err := c.collect()
 	if err != nil {
 		return fmt.Errorf("failed to collect metrics [%s]: %w", c.publicDSN, err)
@@ -86,7 +87,7 @@ func (c *Collector) Charts() *module.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect() map[string]int64 {
+func (c *Collector) Collect(context.Context) map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(fmt.Sprintf("failed to collect metrics [%s]: %s", c.publicDSN, err))
@@ -99,7 +100,7 @@ func (c *Collector) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup() {
+func (c *Collector) Cleanup(context.Context) {
 	if c.db != nil {
 		if err := c.db.Close(); err != nil {
 			c.Errorf("cleanup: error on closing connection [%s]: %v", c.publicDSN, err)

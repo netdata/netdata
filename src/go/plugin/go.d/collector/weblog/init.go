@@ -3,6 +3,7 @@
 package weblog
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -136,7 +137,7 @@ func (c *Collector) createLogLine() {
 }
 
 func (c *Collector) createLogReader() error {
-	c.Cleanup()
+	c.Cleanup(context.Background())
 	c.Debug("starting log reader creating")
 
 	reader, err := logs.Open(c.Path, c.ExcludePath, c.Logger)

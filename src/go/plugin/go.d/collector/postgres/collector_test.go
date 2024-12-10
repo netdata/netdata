@@ -5,6 +5,7 @@ package postgres
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -120,9 +121,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -226,14 +227,14 @@ func TestCollector_Check(t *testing.T) {
 			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			test.prepareMock(t, collr, mock)
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -287,7 +288,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryColumnsStats(), dataVer140004ColumnsStats)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"autovacuum_analyze":                                       0,
@@ -609,7 +610,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpectErr(m, queryServerVersion())
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 					var expected map[string]int64
 					assert.Equal(t, expected, mx)
 				},
@@ -625,7 +626,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpectErr(m, querySettingsMaxConnections())
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 					var expected map[string]int64
 					assert.Equal(t, expected, mx)
 				},
@@ -644,7 +645,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpectErr(m, queryServerCurrentConnectionsUsed())
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 					var expected map[string]int64
 					assert.Equal(t, expected, mx)
 				},
@@ -663,7 +664,7 @@ func TestCollector_Collect(t *testing.T) {
 			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			for i, step := range test {
 				t.Run(fmt.Sprintf("step[%d]", i), func(t *testing.T) {

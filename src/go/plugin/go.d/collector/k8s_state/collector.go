@@ -70,7 +70,7 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init() error {
+func (c *Collector) Init(context.Context) error {
 	client, err := c.initClient()
 	if err != nil {
 		return fmt.Errorf("init k8s client: %v", err)
@@ -84,7 +84,7 @@ func (c *Collector) Init() error {
 	return nil
 }
 
-func (c *Collector) Check() error {
+func (c *Collector) Check(context.Context) error {
 	if c.client == nil || c.discoverer == nil {
 		return errors.New("not initialized")
 	}
@@ -103,7 +103,7 @@ func (c *Collector) Charts() *module.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect() map[string]int64 {
+func (c *Collector) Collect(context.Context) map[string]int64 {
 	ms, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -115,7 +115,7 @@ func (c *Collector) Collect() map[string]int64 {
 	return ms
 }
 
-func (c *Collector) Cleanup() {
+func (c *Collector) Cleanup(context.Context) {
 	if c.ctxCancel == nil {
 		return
 	}

@@ -3,6 +3,7 @@
 package whoisquery
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -32,13 +33,13 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }
 
 func TestCollector_Charts(t *testing.T) {
 	collr := New()
 	collr.Source = "example.com"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	assert.NotNil(t, collr.Charts())
 }
@@ -66,9 +67,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.err {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				require.NoError(t, collr.Init())
+				require.NoError(t, collr.Init(context.Background()))
 
 				var typeOK bool
 				if test.providerType == net {
@@ -85,23 +86,23 @@ func TestCollector_Check(t *testing.T) {
 	collr := New()
 	collr.prov = &mockProvider{remTime: 12345.678}
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Check_ReturnsFalseOnProviderError(t *testing.T) {
 	collr := New()
 	collr.prov = &mockProvider{err: true}
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Collect(t *testing.T) {
 	collr := New()
 	collr.Source = "example.com"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.prov = &mockProvider{remTime: 12345}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 
 	expected := map[string]int64{
 		"expiry":                         12345,
@@ -117,10 +118,10 @@ func TestCollector_Collect(t *testing.T) {
 func TestCollector_Collect_ReturnsNilOnProviderError(t *testing.T) {
 	collr := New()
 	collr.Source = "example.com"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.prov = &mockProvider{err: true}
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 type mockProvider struct {

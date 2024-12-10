@@ -3,6 +3,7 @@
 package couchdb
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -84,9 +85,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 				assert.Equal(t, test.wantNumOfCharts, len(*collr.Charts()))
 			}
 		})
@@ -110,9 +111,9 @@ func TestCollector_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -123,7 +124,7 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	assert.NotPanics(t, New().Cleanup)
+	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -359,7 +360,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			var mx map[string]int64
 			for i := 0; i < 10; i++ {
-				mx = collr.Collect()
+				mx = collr.Collect(context.Background())
 			}
 
 			assert.Equal(t, test.wantCollected, mx)
@@ -376,7 +377,7 @@ func prepareCouchDB(t *testing.T, createCDB func() *Collector) (collr *Collector
 	srv := prepareCouchDBEndpoint()
 	collr.URL = srv.URL
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }
@@ -393,7 +394,7 @@ func prepareCouchDBInvalidData(t *testing.T) (*Collector, func()) {
 		}))
 	collr := New()
 	collr.URL = srv.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }
@@ -406,7 +407,7 @@ func prepareCouchDB404(t *testing.T) (*Collector, func()) {
 		}))
 	collr := New()
 	collr.URL = srv.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }
@@ -415,7 +416,7 @@ func prepareCouchDBConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	collr := New()
 	collr.URL = "http://127.0.0.1:38001"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, func() {}
 }
