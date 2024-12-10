@@ -24,8 +24,13 @@ RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t wall_clock_time
 
         if(unlikely(!(host_flags & RRDHOST_FLAG_STREAM_SENDER_LOGGED_STATUS))) {
             rrdhost_flag_set(host, RRDHOST_FLAG_STREAM_SENDER_LOGGED_STATUS);
+
+            // this message is logged in 2 cases:
+            // - the parent is connected, but not yet available for streaming data
+            // - the parent just disconnected, so local data are not streamed to parent
+
             nd_log(NDLS_DAEMON, NDLP_INFO,
-                   "STREAM SEND %s: connected but streaming is not ready yet...",
+                   "STREAM SEND %s: streaming is not ready, not sending data to a parent...",
                    rrdhost_hostname(host));
         }
 
