@@ -11,12 +11,9 @@ You can download the Netdata Windows installer (MSI) from the official releases 
 | [Stable](https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi)            | This is the recommended version for most users as it provides the most reliable and well-tested features.                                                                 |
 | [Nightly](https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi) | Offers the latest features but may contain bugs or instabilities. Use this option if you require access to the newest features and are comfortable with potential issues. |
 
-## Graphical User Interface (GUI)
-
-1. **Double-click** the installer to begin the setup process.
-2. **Grant Administrator Privileges**: You'll need to provide administrator permissions to install the Netdata service.
-
-Once installed, you can access your Netdata dashboard at `localhost:19999`.
+> **Note**
+>
+> The Windows version of Netdata is intended for users on paid plans.
 
 ## Silent Mode (Command line)
 
@@ -41,14 +38,26 @@ This section provides instructions for installing Netdata in silent mode, which 
 
 ### Example Usage
 
-Connect your Agent to your Netdata Cloud Space with token `<YOUR_TOKEN>` and room `<YOUR_ROOM>`:
+To connect your Agent to your Cloud Space:
 
 ```bash
-msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOM>"
+msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
 ```
 
-Replace `<YOUR_TOKEN>` and `<YOUR_ROOM>` with your Space claim token and Room ID, respectively.
+Where:
 
-> **Note**
->
-> The Windows version of Netdata is intended for users on paid plans.
+- `<YOUR_TOKEN>`: Your Space claim token from Netdata Cloud.
+- `<YOUR_ROOMS>`: Your Room ID(s) from Netdata Cloud.
+
+This command downloads and installs Netdata in one step:
+
+```powershell
+$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile "netdata-x64.msi"; msiexec /qn /i netdata-x64.msi TOKEN=<YOUR_TOKEN> ROOMS=<YOUR_ROOMS>
+```
+
+## Graphical User Interface (GUI)
+
+1. **Double-click** the installer to begin the setup process.
+2. **Grant Administrator Privileges**: You'll need to provide administrator permissions to install the Netdata service.
+
+Once installed, you can access your Netdata dashboard at `localhost:19999`.

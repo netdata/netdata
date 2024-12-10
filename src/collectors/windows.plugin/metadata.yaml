@@ -2,10 +2,10 @@ plugin_name: windows.plugin
 modules:
   - meta:
       plugin_name: windows.plugin
-      module_name: PerflibProcesses
+      module_name: PerflibProcessor
       monitored_instance:
-        name: System statistics
-        link: "https://learn.microsoft.com/en-us/windows/win32/procthread/processes-and-threads"
+        name: Processor
+        link: "https://learn.microsoft.com/en-us/windows-hardware/design/minimum/windows-processor-requirements"
         categories:
           - data-collection.windows-systems
         icon_filename: "windows.svg"
@@ -15,16 +15,17 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords:
-        - process counts
-        - threads
-        - context switch
+        - windows
+        - microsoft
+        - processor
+        - CPU
       most_popular: false
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors the current number of processes, threads, and context switches on Windows systems.
+          This collector monitors processors statistics on host.
         method_description: |
-          It queries the 'System' object from Perflib in order to gather the metrics.
+          It queries Processor object from Perflib in order to gather the metrics.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -53,7 +54,7 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibProcesses
+            - name: PerflibProcessor
               description: An option to enable or disable the data collection.
               default_value: yes
               required: false
@@ -65,7 +66,11 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
+    alerts:
+      - name: 10min_cpu_usage
+        metric: system.cpu
+        info: "Average CPU utilization over the last 10 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf
     metrics:
       folding:
         title: Metrics
@@ -74,27 +79,33 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics refer to the entire monitored instance."
+          description: "These metrics refer to the entire system."
           labels: []
           metrics:
-            - name: system.processes
-              description: System Processes
-              unit: "processes"
-              chart_type: line
+            - name: system.cpu
+              description: Total CPU utilization
+              unit: percentage
+              chart_type: stacked
               dimensions:
-                - name: running
-            - name: system.threads
-              description: System Threads
-              unit: "threads"
-              chart_type: line
+                - name: interrupts
+                - name: user
+                - name: privileged
+                - name: dpc
+        - name: CPU
+          description: "These metrics provide information about individual CPU cores."
+          labels:
+            - name: cpu
+              description: The identifier of the CPU core. On Windows systems, CPU cores are labeled as 'cpu0', 'cpu1', etc.
+          metrics:
+            - name: cpu.cpu
+              description: Core utilization
+              unit: percentage
+              chart_type: stacked
               dimensions:
-                - name: threads
-            - name: system.ctxt
-              description: CPU Context Switches
-              unit: "context switches/s"
-              chart_type: line
-              dimensions:
-                - name: switches
+                - name: interrupts
+                - name: user
+                - name: privileged
+                - name: dpc
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibMemory
@@ -168,7 +179,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "These metrics refer to the entire monitored instance"
+          description: "These metrics refer to the entire system."
           labels: []
           metrics:
             - name: mem.swap_iops
@@ -192,6 +203,187 @@ modules:
               dimensions:
                 - name: paged
                 - name: pool-paged
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibProcesses
+      monitored_instance:
+        name: System statistics
+        link: "https://learn.microsoft.com/en-us/windows/win32/procthread/processes-and-threads"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - process counts
+        - threads
+        - context switch
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the current number of processes, threads, and context switches on Windows systems.
+        method_description: |
+          It queries the 'System' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibProcesses
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire system."
+          labels: []
+          metrics:
+            - name: system.processes
+              description: System Processes
+              unit: "processes"
+              chart_type: line
+              dimensions:
+                - name: running
+            - name: system.threads
+              description: System Threads
+              unit: "threads"
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: system.ctxt
+              description: CPU Context Switches
+              unit: "context switches/s"
+              chart_type: line
+              dimensions:
+                - name: switches
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibObjects
+      monitored_instance:
+        name: Semaphore statistics
+        link: "https://learn.microsoft.com/en-us/windows/win32/sync/semaphore-objects"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - ipc
+        - semaphores
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Inter-Process Communication (IPC) enables different processes to communicate and coordinate with each other. This collector monitors IPC semaphores, which are synchronization tools that:
+
+          - Control access to shared resources (like files, memory, or devices).
+          - Ensure only one process can access a resource at a time.
+          - Prevent conflicts between competing processes.
+        method_description: |
+          It queries for the 'Objects' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibObjects
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the entire system."
+          labels: []
+          metrics:
+            - name: system.ipc_semaphores
+              description: IPC Semaphores
+              unit: "semaphores"
+              chart_type: area
+              dimensions:
+                - name: semaphores
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibThermalZone
