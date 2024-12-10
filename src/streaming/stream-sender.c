@@ -510,9 +510,10 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                     reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END;
                 }
                 else if (rc < 0) {
-                    if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
+                    if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR) {
                         // will try later
-                        ;
+                        iterations = MAX_IO_ITERATIONS_PER_EVENT;
+                    }
                     else {
                         disconnect_reason = "socket reports error while writing";
                         reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED;
