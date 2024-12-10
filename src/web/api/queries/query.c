@@ -1967,7 +1967,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
 static size_t backfill_runners = 0;
 
 bool rrdr_backfill_running(void) {
-    return __atomic_load_n(&backfill_runners, __ATOMIC_RELAXED);
+    return __atomic_load_n(&backfill_runners, __ATOMIC_RELAXED) > 0;
 }
 
 void backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {

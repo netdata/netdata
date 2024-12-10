@@ -6,6 +6,10 @@
 #include "libnetdata/libnetdata.h"
 #include "stream-traffic-types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define CBUFFER_INITIAL_SIZE (16 * 1024)
 #define CBUFFER_INITIAL_MAX_SIZE (10 * 1024 * 1024)
 #define THREAD_BUFFER_INITIAL_SIZE (8192)
@@ -83,5 +87,9 @@ size_t stream_circular_buffer_get_unsafe(STREAM_CIRCULAR_BUFFER *scb, char **chu
 // removes data from the beginning of circular buffer
 // it updates the statistics
 void stream_circular_buffer_del_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t bytes);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //NETDATA_STREAM_CIRCULAR_BUFFER_H

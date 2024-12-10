@@ -50,10 +50,15 @@ struct replication_query_statistics replication_get_query_statistics(void) {
     return ret;
 }
 
-size_t replication_buffers_allocated = 0;
+static size_t replication_buffers_allocated = 0;
 
 size_t replication_allocated_buffers(void) {
     return __atomic_load_n(&replication_buffers_allocated, __ATOMIC_RELAXED);
+}
+
+static size_t replication_queries_runners = 0;
+bool replication_queries_running(void) {
+    return __atomic_load_n(&replication_queries_runners, __ATOMIC_RELAXED) > 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -192,6 +197,7 @@ static struct replication_query *replication_query_prepare(
         STORAGE_PRIORITY priority = q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW;
         if(synchronous) priority = STORAGE_PRIORITY_SYNCHRONOUS;
 
+        __atomic_add_fetch(&replication_queries_runners, 1, __ATOMIC_RELAXED);
         storage_engine_query_init(q->backend, rd->tiers[0].smh, &d->handle,
                                   q->query.after, q->query.before, priority);
         d->enabled = true;
@@ -276,6 +282,7 @@ static void replication_query_finalize(BUFFER *wb, struct replication_query *q, 
         if (unlikely(!d->enabled)) continue;
 
         storage_engine_query_finalize(&d->handle);
+        __atomic_sub_fetch(&replication_queries_runners, 1, __ATOMIC_RELAXED);
 
         dictionary_acquired_item_release(d->dict, d->rda);
 
