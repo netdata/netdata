@@ -9,16 +9,16 @@
 typedef struct aral ARAL;
 
 struct aral_page_type_stats {
-    alignas(64) size_t allocations;
-    alignas(64) size_t allocated_bytes;
-    alignas(64) size_t used_bytes;
-    alignas(64) size_t padding_bytes;
+    size_t allocations;
+    size_t allocated_bytes;
+    size_t used_bytes;
+    size_t padding_bytes;
 };
 
 struct aral_statistics {
     struct {
-        alignas(64) size_t allocations;
-        alignas(64) size_t allocated_bytes;
+        size_t allocations;
+        size_t allocated_bytes;
     } structures;
 
     struct aral_page_type_stats malloc;

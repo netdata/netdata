@@ -61,13 +61,13 @@ typedef enum {
 
 struct aral_ops {
     struct {
-        alignas(64) size_t allocators; // the number of threads currently trying to allocate memory
-        alignas(64) size_t deallocators; // the number of threads currently trying to deallocate memory
-        alignas(64) bool last_allocated_or_deallocated; // stability detector, true when was last allocated
+        size_t allocators; // the number of threads currently trying to allocate memory
+        size_t deallocators; // the number of threads currently trying to deallocate memory
+        bool last_allocated_or_deallocated; // stability detector, true when was last allocated
     } atomic;
 
     struct {
-        alignas(64) SPINLOCK spinlock;
+        SPINLOCK spinlock;
         size_t allocating_elements;     // currently allocating elements
         size_t allocation_size;         // current / next allocation size
     } adders;
@@ -97,7 +97,7 @@ struct aral {
     } config;
 
     struct {
-        alignas(64) SPINLOCK spinlock;
+        SPINLOCK spinlock;
         size_t file_number;             // for mmap
 
         ARAL_PAGE *pages_free;          // pages with free items

@@ -124,7 +124,10 @@ static inline size_t stream_decompress_decode_signature(const char *data, size_t
     if (unlikely(data_size != STREAM_COMPRESSION_SIGNATURE_SIZE))
         return 0;
 
-    stream_compression_signature_t sign = *(stream_compression_signature_t *)data;
+    stream_compression_signature_t sign;
+    memcpy(&sign, data, sizeof(stream_compression_signature_t)); // Safe copy to aligned variable
+    // stream_compression_signature_t sign = *(stream_compression_signature_t *)data;
+
     if (unlikely((sign & STREAM_COMPRESSION_SIGNATURE_MASK) != STREAM_COMPRESSION_SIGNATURE))
         return 0;
 

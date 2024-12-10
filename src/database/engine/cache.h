@@ -50,114 +50,114 @@ struct pgc_size_histogram {
 struct pgc_queue_statistics {
     struct pgc_size_histogram size_histogram;
 
-    alignas(64) size_t entries;
-    alignas(64) size_t size;
+    size_t entries;
+    size_t size;
 
-    alignas(64) size_t max_entries;
-    alignas(64) size_t max_size;
+    size_t max_entries;
+    size_t max_size;
 
-    alignas(64) size_t added_entries;
-    alignas(64) size_t added_size;
+    size_t added_entries;
+    size_t added_size;
 
-    alignas(64) size_t removed_entries;
-    alignas(64) size_t removed_size;
+    size_t removed_entries;
+    size_t removed_size;
 };
 
 struct pgc_statistics {
-    alignas(64) size_t wanted_cache_size;
-    alignas(64) size_t current_cache_size;
+    size_t wanted_cache_size;
+    size_t current_cache_size;
 
     // ----------------------------------------------------------------------------------------------------------------
     // volume
 
-    alignas(64) size_t entries;                 // all the entries (includes clean, dirty, hot)
-    alignas(64) size_t size;                    // all the entries (includes clean, dirty, hot)
+    size_t entries;                 // all the entries (includes clean, dirty, hot)
+    size_t size;                    // all the entries (includes clean, dirty, hot)
 
-    alignas(64) size_t referenced_entries;      // all the entries currently referenced
-    alignas(64) size_t referenced_size;         // all the entries currently referenced
+    size_t referenced_entries;      // all the entries currently referenced
+    size_t referenced_size;         // all the entries currently referenced
 
-    alignas(64) size_t added_entries;
-    alignas(64) size_t added_size;
+    size_t added_entries;
+    size_t added_size;
 
-    alignas(64) size_t removed_entries;
-    alignas(64) size_t removed_size;
+    size_t removed_entries;
+    size_t removed_size;
 
 #ifdef PGC_COUNT_POINTS_COLLECTED
-    alignas(64) size_t points_collected;
+    size_t points_collected;
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------
     // migrations
 
-    alignas(64) size_t evicting_entries;
-    alignas(64) size_t evicting_size;
+    size_t evicting_entries;
+    size_t evicting_size;
 
-    alignas(64) size_t flushing_entries;
-    alignas(64) size_t flushing_size;
+    size_t flushing_entries;
+    size_t flushing_size;
 
-    alignas(64) size_t hot2dirty_entries;
-    alignas(64) size_t hot2dirty_size;
+    size_t hot2dirty_entries;
+    size_t hot2dirty_size;
 
-    alignas(64) size_t hot_empty_pages_evicted_immediately;
-    alignas(64) size_t hot_empty_pages_evicted_later;
+    size_t hot_empty_pages_evicted_immediately;
+    size_t hot_empty_pages_evicted_later;
 
     // ----------------------------------------------------------------------------------------------------------------
     // workload
 
-    alignas(64) size_t acquires;
-    alignas(64) size_t releases;
+    size_t acquires;
+    size_t releases;
 
-    alignas(64) size_t acquires_for_deletion;
+    size_t acquires_for_deletion;
 
-    alignas(64) size_t searches_exact;
-    alignas(64) size_t searches_exact_hits;
-    alignas(64) size_t searches_exact_misses;
+    size_t searches_exact;
+    size_t searches_exact_hits;
+    size_t searches_exact_misses;
 
-    alignas(64) size_t searches_closest;
-    alignas(64) size_t searches_closest_hits;
-    alignas(64) size_t searches_closest_misses;
+    size_t searches_closest;
+    size_t searches_closest_hits;
+    size_t searches_closest_misses;
 
-    alignas(64) size_t flushes_completed;
-    alignas(64) size_t flushes_completed_size;
-    alignas(64) size_t flushes_cancelled_size;
+    size_t flushes_completed;
+    size_t flushes_completed_size;
+    size_t flushes_cancelled_size;
 
     // ----------------------------------------------------------------------------------------------------------------
     // critical events
 
-    alignas(64) size_t events_cache_under_severe_pressure;
-    alignas(64) size_t events_cache_needs_space_aggressively;
-    alignas(64) size_t events_flush_critical;
+    size_t events_cache_under_severe_pressure;
+    size_t events_cache_needs_space_aggressively;
+    size_t events_flush_critical;
 
     // ----------------------------------------------------------------------------------------------------------------
     // worker threads
 
-    alignas(64) size_t workers_search;
-    alignas(64) size_t workers_add;
-    alignas(64) size_t workers_evict;
-    alignas(64) size_t workers_flush;
-    alignas(64) size_t workers_jv2_flush;
-    alignas(64) size_t workers_hot2dirty;
+    size_t workers_search;
+    size_t workers_add;
+    size_t workers_evict;
+    size_t workers_flush;
+    size_t workers_jv2_flush;
+    size_t workers_hot2dirty;
 
     // ----------------------------------------------------------------------------------------------------------------
     // waste events
 
     // waste events - spins
-    alignas(64) size_t waste_insert_spins;
-    alignas(64) size_t waste_evict_useless_spins;
-    alignas(64) size_t waste_release_spins;
-    alignas(64) size_t waste_acquire_spins;
-    alignas(64) size_t waste_delete_spins;
+    size_t waste_insert_spins;
+    size_t waste_evict_useless_spins;
+    size_t waste_release_spins;
+    size_t waste_acquire_spins;
+    size_t waste_delete_spins;
 
     // waste events - eviction
-    alignas(64) size_t waste_evict_relocated;
-    alignas(64) size_t waste_evict_thread_signals;
-    alignas(64) size_t waste_evictions_inline_on_add;
-    alignas(64) size_t waste_evictions_inline_on_release;
+    size_t waste_evict_relocated;
+    size_t waste_evict_thread_signals;
+    size_t waste_evictions_inline_on_add;
+    size_t waste_evictions_inline_on_release;
 
     // waste events - flushing
-    alignas(64) size_t waste_flush_on_add;
-    alignas(64) size_t waste_flush_on_release;
-    alignas(64) size_t waste_flushes_cancelled;
+    size_t waste_flush_on_add;
+    size_t waste_flush_on_release;
+    size_t waste_flushes_cancelled;
 
     // ----------------------------------------------------------------------------------------------------------------
     // per queue statistics

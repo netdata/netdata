@@ -6,20 +6,20 @@
 static struct sqlite3_statistics {
     bool enabled;
 
-    alignas(64) uint64_t sqlite3_queries_made;
-    alignas(64) uint64_t sqlite3_queries_ok;
-    alignas(64) uint64_t sqlite3_queries_failed;
-    alignas(64) uint64_t sqlite3_queries_failed_busy;
-    alignas(64) uint64_t sqlite3_queries_failed_locked;
-    alignas(64) uint64_t sqlite3_rows;
-    alignas(64) uint64_t sqlite3_metadata_cache_hit;
-    alignas(64) uint64_t sqlite3_context_cache_hit;
-    alignas(64) uint64_t sqlite3_metadata_cache_miss;
-    alignas(64) uint64_t sqlite3_context_cache_miss;
-    alignas(64) uint64_t sqlite3_metadata_cache_spill;
-    alignas(64) uint64_t sqlite3_context_cache_spill;
-    alignas(64) uint64_t sqlite3_metadata_cache_write;
-    alignas(64) uint64_t sqlite3_context_cache_write;
+    uint64_t sqlite3_queries_made;
+    uint64_t sqlite3_queries_ok;
+    uint64_t sqlite3_queries_failed;
+    uint64_t sqlite3_queries_failed_busy;
+    uint64_t sqlite3_queries_failed_locked;
+    uint64_t sqlite3_rows;
+    uint64_t sqlite3_metadata_cache_hit;
+    uint64_t sqlite3_context_cache_hit;
+    uint64_t sqlite3_metadata_cache_miss;
+    uint64_t sqlite3_context_cache_miss;
+    uint64_t sqlite3_metadata_cache_spill;
+    uint64_t sqlite3_context_cache_spill;
+    uint64_t sqlite3_metadata_cache_write;
+    uint64_t sqlite3_context_cache_write;
 } sqlite3_statistics = { };
 
 void pulse_sqlite3_query_completed(bool success, bool busy, bool locked) {

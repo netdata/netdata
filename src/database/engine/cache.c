@@ -71,7 +71,7 @@ struct pgc_page {
 };
 
 struct pgc_queue {
-    alignas(64) SPINLOCK spinlock;
+    SPINLOCK spinlock;
     union {
         PGC_PAGE *base;
         Pvoid_t sections_judy;
@@ -118,7 +118,7 @@ struct pgc {
     } evictor;
 
     struct pgc_index {
-        alignas(64) RW_SPINLOCK rw_spinlock;
+        RW_SPINLOCK rw_spinlock;
         Pvoid_t sections_judy;
 #ifdef PGC_WITH_ARAL
         ARAL *aral;
@@ -126,7 +126,7 @@ struct pgc {
     } *index;
 
     struct {
-        alignas(64) SPINLOCK spinlock;
+        SPINLOCK spinlock;
         size_t per1000;
     } usage;
 
@@ -136,7 +136,7 @@ struct pgc {
     struct pgc_statistics stats;        // statistics
 
 #ifdef NETDATA_PGC_POINTER_CHECK
-    alignas(64) netdata_mutex_t global_pointer_registry_mutex;
+    netdata_mutex_t global_pointer_registry_mutex;
     Pvoid_t global_pointer_registry;
 #endif
 };
