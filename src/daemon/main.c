@@ -394,11 +394,10 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     {
         watcher_step_complete(WATCHER_STEP_ID_FLUSH_DBENGINE_TIERS);
         watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
-        watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
-
         watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
         watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
         watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
+        watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
     else
     {
@@ -451,9 +450,6 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
         rrd_finalize_collection_for_all_hosts();
         watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
 
-        metadata_sync_shutdown();
-        watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
-
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
             size_t running = 1;
@@ -481,18 +477,22 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
                 rrdeng_exit(multidb_ctx[tier]);
             rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
-        } else {
+        }
+        else {
             // Skip these steps
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
 #else
-    // Skip these steps
-    watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
-    watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
-    watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
+        // Skip these steps
+        watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
+        watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
+        watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
 #endif
+
+        metadata_sync_shutdown();
+        watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
 
     // Don't register a shutdown event if we crashed
