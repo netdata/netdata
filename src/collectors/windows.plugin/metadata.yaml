@@ -300,6 +300,101 @@ modules:
                 - name: switches
   - meta:
       plugin_name: windows.plugin
+      module_name: PerflibStorage
+      monitored_instance:
+        name: Physical and Logical Disk Performance Metrics
+        link: "https://learn.microsoft.com/en-us/windows/win32/fileio/disk-management"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - disk
+        - disks
+        - io
+        - volume
+        - physical
+        - logical
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Detailed statistics for all disk devices and volumes.
+        method_description: |
+          It queries 'LogicalDisk' and 'PhysicalDisk' objects from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibStorage
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Logical
+          description: "These metrics refer to the logical disks."
+          labels:
+            - name: mount_point
+              description: The drive letter assigned by Microsoft Windows to identify the partition.
+            - name: driver_type
+              description: The type of disk, such as unknown, norootdir, removable, fixed, remote, cdrom, or ramdisk.
+            - name: filesystem
+              description: The file system used on the disk (e.g., NTFS, FAT32).
+            - name: rw_mode
+              description: The disk's read/write status ro (read-only) or rw (read/write).
+          metrics:
+            - name: disk.space
+              description: Disk Space Usage
+              unit: "GiB"
+              chart_type: stacked
+              dimensions:
+                - name: avail
+                - name: used
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibObjects
       monitored_instance:
         name: Semaphore statistics
