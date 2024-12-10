@@ -663,6 +663,8 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
                         stream_circular_buffer_recreate_timed_unsafe(rpt->thread.send_to_child.scb, now_ut, false);
                         stop = true;
                     }
+                    else if(stream_thread_process_opcodes(sth, &rpt->thread.meta))
+                        stop = true;
                 }
                 else if (rc == 0 || errno == ECONNRESET) {
                     disconnect_reason = "socket reports EOF (closed by child)";
@@ -709,6 +711,9 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
         ssize_t rc = stream_receive_and_process(sth, rpt, parser, &removed);
         if (likely(rc > 0)) {
             rpt->last_msg_t = (time_t)(now_ut / USEC_PER_SEC);
+
+            if(stream_thread_process_opcodes(sth, &rpt->thread.meta))
+                stop = true;
         }
         else if (rc == 0 || errno == ECONNRESET) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED);

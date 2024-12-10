@@ -505,6 +505,8 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                         stream_circular_buffer_recreate_timed_unsafe(s->scb, now_ut, false);
                         stop = true;
                     }
+                    else if(stream_thread_process_opcodes(sth, &s->thread.meta))
+                        stop = true;
                 }
                 else if (rc == 0 || errno == ECONNRESET) {
                     disconnect_reason = "socket reports EOF (closed by parent)";
@@ -559,6 +561,9 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
 
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
             stream_sender_execute_commands(s);
+
+            if(stream_thread_process_opcodes(sth, &s->thread.meta))
+                stop = true;
         }
         else if (rc == 0 || errno == ECONNRESET) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED);

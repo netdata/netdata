@@ -195,6 +195,9 @@ struct stream_thread *stream_thread_by_slot_id(size_t thread_slot);
 void stream_thread_node_queued(struct rrdhost *host);
 void stream_thread_node_removed(struct rrdhost *host);
 
+// returns true if my_meta has received a message
+bool stream_thread_process_opcodes(struct stream_thread *sth, struct pollfd_meta *my_meta);
+
 #include "stream-sender-internals.h"
 #include "stream-receiver-internals.h"
 #include "plugins.d/pluginsd_parser.h"

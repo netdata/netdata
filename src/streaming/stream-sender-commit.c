@@ -183,11 +183,12 @@ overflow_with_lock: {
         stream_sender_unlock(s);
         msg.opcode = STREAM_OPCODE_SENDER_BUFFER_OVERFLOW;
         stream_sender_send_opcode(s, msg);
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SEND[x] %s [to %s]: buffer overflow (buffer size %u, max size %u, used %u, available %u). "
-               "Restarting connection.",
-               rrdhost_hostname(s->host), s->connected_to,
-               stats->bytes_size, stats->bytes_max_size, stats->bytes_outstanding, stats->bytes_available);
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                     "STREAM SEND[x] %s [to %s]: buffer overflow (buffer size %u, max size %u, used %u, available %u). "
+                     "Restarting connection.",
+                     rrdhost_hostname(s->host), s->connected_to,
+                     stats->bytes_size, stats->bytes_max_size, stats->bytes_outstanding, stats->bytes_available);
         return;
     }
 
@@ -197,9 +198,11 @@ compression_failed_with_lock: {
         stream_sender_unlock(s);
         msg.opcode = STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION;
         stream_sender_send_opcode(s, msg);
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SEND[x] %s [to %s]: COMPRESSION failed (twice). Deactivating compression and restarting connection.",
-               rrdhost_hostname(s->host), s->connected_to);
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                     "STREAM SEND[x] %s [to %s]: COMPRESSION failed (twice). "
+                     "Deactivating compression and restarting connection.",
+                     rrdhost_hostname(s->host), s->connected_to);
     }
 }
 

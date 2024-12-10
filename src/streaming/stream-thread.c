@@ -48,7 +48,8 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
     }
     else {
         // this may happen if we receive a POLLOUT opcode, but the sender has been disconnected
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM THREAD[%zu]: OPCODE %u ignored.", sth->id, (unsigned)msg->opcode);
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG, "STREAM THREAD[%zu]: OPCODE %u ignored.", sth->id, (unsigned)msg->opcode);
     }
 }
 
@@ -210,11 +211,8 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
         stream_thread_send_pipe_signal(sth);
 }
 
-static void stream_thread_read_pipe_messages(struct stream_thread *sth) {
+bool stream_thread_process_opcodes(struct stream_thread *sth, struct pollfd_meta *my_meta) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
-
-    if(read(sth->pipe.fds[PIPE_READ], sth->pipe.buffer, sth->pipe.size * sizeof(*sth->pipe.buffer)) <= 0)
-        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: signal pipe read error", sth->id);
 
     size_t used = 0;
     spinlock_lock(&sth->messages.spinlock);
@@ -225,10 +223,23 @@ static void stream_thread_read_pipe_messages(struct stream_thread *sth) {
     }
     spinlock_unlock(&sth->messages.spinlock);
 
+    bool rc = false;
     for(size_t i = 0; i < used ;i++) {
         struct stream_opcode *msg = &sth->messages.copy[i];
+        if(msg->meta == my_meta) rc = true;
         stream_thread_handle_op(sth, msg);
     }
+
+    return rc;
+}
+
+static void stream_thread_read_pipe_messages(struct stream_thread *sth) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
+    if(read(sth->pipe.fds[PIPE_READ], sth->pipe.buffer, sth->pipe.size * sizeof(*sth->pipe.buffer)) <= 0)
+        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: signal pipe read error", sth->id);
+
+    stream_thread_process_opcodes(sth, NULL);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -265,8 +276,8 @@ static int set_pipe_size(int pipe_fd, int new_size) {
 static void stream_thread_messages_resize_unsafe(struct stream_thread *sth) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
-    if(sth->nodes_count >= sth->messages.size) {
-        size_t new_size = sth->messages.size ? sth->messages.size * 2 : 2;
+    if(sth->nodes_count * 2 >= sth->messages.size) {
+        size_t new_size = MAX(sth->messages.size * 2, sth->nodes_count * 2);
         sth->messages.array = reallocz(sth->messages.array, new_size * sizeof(*sth->messages.array));
         sth->messages.copy = reallocz(sth->messages.copy, new_size * sizeof(*sth->messages.copy));
         sth->messages.size = new_size;
