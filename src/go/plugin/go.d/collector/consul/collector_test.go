@@ -3,6 +3,7 @@
 package consul
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -88,9 +89,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -141,9 +142,9 @@ func TestCollector_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -535,7 +536,7 @@ func TestCollector_Collect(t *testing.T) {
 			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			delete(mx, "autopilot_server_stable_time")
 			delete(test.wantMetrics, "autopilot_server_stable_time")
@@ -571,7 +572,7 @@ func caseConsulV1143CloudServerResponse(t *testing.T) (*Collector, func()) {
 	collr := New()
 	collr.URL = srv.URL
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }
@@ -599,7 +600,7 @@ func caseConsulV1132ServerResponse(t *testing.T) (*Collector, func()) {
 	collr := New()
 	collr.URL = srv.URL
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }
@@ -627,7 +628,7 @@ func caseConsulV1132ServerWithHostnameResponse(t *testing.T) (*Collector, func()
 	collr := New()
 	collr.URL = srv.URL
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }
@@ -653,7 +654,7 @@ func caseConsulV1132ServerWithDisabledPrometheus(t *testing.T) (*Collector, func
 	collr := New()
 	collr.URL = srv.URL
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }
@@ -677,7 +678,7 @@ func caseConsulV1132ClientResponse(t *testing.T) (*Collector, func()) {
 	collr := New()
 	collr.URL = srv.URL
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }
@@ -692,7 +693,7 @@ func caseInvalidDataResponse(t *testing.T) (*Collector, func()) {
 	collr := New()
 	collr.URL = srv.URL
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }
@@ -701,7 +702,7 @@ func caseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	collr := New()
 	collr.URL = "http://127.0.0.1:65535/"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, func() {}
 }
@@ -715,7 +716,7 @@ func case404(t *testing.T) (*Collector, func()) {
 
 	collr := New()
 	collr.URL = srv.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }

@@ -3,6 +3,7 @@
 package ntpd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -54,9 +55,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -77,15 +78,15 @@ func TestCollector_Cleanup(t *testing.T) {
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(n *Collector) { _ = n.Init() },
+			prepare:   func(n *Collector) { _ = n.Init(context.Background()) },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(n *Collector) { _ = n.Init(); _ = n.Check() },
+			prepare:   func(n *Collector) { _ = n.Init(context.Background()); _ = n.Check(context.Background()) },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(n *Collector) { _ = n.Init(); n.Collect() },
+			prepare:   func(n *Collector) { _ = n.Init(context.Background()); n.Collect(context.Background()) },
 		},
 	}
 
@@ -95,7 +96,7 @@ func TestCollector_Cleanup(t *testing.T) {
 			collr := prepareNTPdWithMock(m, true)
 			test.prepare(collr)
 
-			require.NotPanics(t, collr.Cleanup)
+			require.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 
 			if test.wantClose {
 				assert.True(t, m.closeCalled)
@@ -137,12 +138,12 @@ func TestCollector_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -258,10 +259,11 @@ func TestCollector_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
 
-			require.NoError(t, collr.Init())
-			_ = collr.Check()
+			require.NoError(t, collr.Init(context.Background()))
 
-			mx := collr.Collect()
+			_ = collr.Check(context.Background())
+
+			mx := collr.Collect(context.Background())
 
 			assert.Equal(t, test.expected, mx)
 			assert.Equal(t, test.expectedCharts, len(*collr.Charts()))

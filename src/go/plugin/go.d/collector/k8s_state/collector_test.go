@@ -70,9 +70,9 @@ func TestCollector_Init(t *testing.T) {
 			collr := test.prepare()
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -105,12 +105,12 @@ func TestCollector_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -162,14 +162,14 @@ func TestCollector_Cleanup(t *testing.T) {
 			collr := test.prepare()
 
 			if test.doInit {
-				_ = collr.Init()
+				_ = collr.Init(context.Background())
 			}
 			if test.doCollect {
-				_ = collr.Collect()
+				_ = collr.Collect(context.Background())
 				time.Sleep(collr.initDelay)
 			}
 
-			assert.NotPanics(t, collr.Cleanup)
+			assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 			time.Sleep(time.Second)
 			if test.doCollect {
 				assert.True(t, collr.discoverer.stopped())
@@ -197,7 +197,7 @@ func TestCollector_Collect(t *testing.T) {
 				)
 
 				step1 := func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 					expected := map[string]int64{
 						"discovery_node_discoverer_state":              1,
 						"discovery_pod_discoverer_state":               1,
@@ -265,7 +265,7 @@ func TestCollector_Collect(t *testing.T) {
 				)
 
 				step1 := func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 					expected := map[string]int64{
 						"discovery_node_discoverer_state":                                                        1,
 						"discovery_pod_discoverer_state":                                                         1,
@@ -366,7 +366,7 @@ func TestCollector_Collect(t *testing.T) {
 				)
 
 				step1 := func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 					expected := map[string]int64{
 						"discovery_node_discoverer_state":                                                        1,
 						"discovery_pod_discoverer_state":                                                         1,
@@ -505,12 +505,12 @@ func TestCollector_Collect(t *testing.T) {
 					pod,
 				)
 				step1 := func(t *testing.T, collr *Collector) {
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 					_ = client.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 				}
 
 				step2 := func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 					expected := map[string]int64{
 						"discovery_node_discoverer_state":              1,
 						"discovery_pod_discoverer_state":               1,
@@ -586,7 +586,7 @@ func TestCollector_Collect(t *testing.T) {
 				podUpdated := newPod(node.Name, "pod01") // with set Spec.NodeName
 
 				step1 := func(t *testing.T, collr *Collector) {
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 					for _, c := range *collr.Charts() {
 						if strings.HasPrefix(c.ID, "pod_") {
 							ok := isLabelValueSet(c, labelKeyNodeName)
@@ -597,7 +597,7 @@ func TestCollector_Collect(t *testing.T) {
 				step2 := func(t *testing.T, collr *Collector) {
 					_, _ = client.CoreV1().Pods(podOrig.Namespace).Update(ctx, podUpdated, metav1.UpdateOptions{})
 					time.Sleep(time.Millisecond * 50)
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 
 					for _, c := range *collr.Charts() {
 						if strings.HasPrefix(c.ID, "pod_") {
@@ -624,12 +624,12 @@ func TestCollector_Collect(t *testing.T) {
 					pod1,
 				)
 				step1 := func(t *testing.T, collr *Collector) {
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 					_, _ = client.CoreV1().Pods(pod1.Namespace).Create(ctx, pod2, metav1.CreateOptions{})
 				}
 
 				step2 := func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 					expected := map[string]int64{
 						"discovery_node_discoverer_state":                                                        1,
 						"discovery_pod_discoverer_state":                                                         1,
@@ -840,13 +840,13 @@ func TestCollector_Collect(t *testing.T) {
 			collr := New()
 			collr.newKubeClient = func() (kubernetes.Interface, error) { return test.client, nil }
 
-			require.NoError(t, collr.Init())
-			require.NoError(t, collr.Check())
-			defer collr.Cleanup()
+			require.NoError(t, collr.Init(context.Background()))
+			require.NoError(t, collr.Check(context.Background()))
+			defer collr.Cleanup(context.Background())
 
 			for i, executeStep := range test.steps {
 				if i == 0 {
-					_ = collr.Collect()
+					_ = collr.Collect(context.Background())
 					time.Sleep(collr.initDelay)
 				} else {
 					time.Sleep(time.Second)

@@ -3,6 +3,7 @@
 package module
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -73,10 +74,10 @@ func TestJob_AutoDetectionEvery(t *testing.T) {
 func TestJob_RetryAutoDetection(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() error {
+		InitFunc: func(context.Context) error {
 			return nil
 		},
-		CheckFunc: func() error { return errors.New("check error") },
+		CheckFunc: func(context.Context) error { return errors.New("check error") },
 		ChartsFunc: func() *Charts {
 			return &Charts{}
 		},
@@ -104,11 +105,11 @@ func TestJob_AutoDetection(t *testing.T) {
 	job := newTestJob()
 	var v int
 	m := &MockModule{
-		InitFunc: func() error {
+		InitFunc: func(context.Context) error {
 			v++
 			return nil
 		},
-		CheckFunc: func() error {
+		CheckFunc: func(context.Context) error {
 			v++
 			return nil
 		},
@@ -126,7 +127,7 @@ func TestJob_AutoDetection(t *testing.T) {
 func TestJob_AutoDetection_FailInit(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() error {
+		InitFunc: func(context.Context) error {
 			return errors.New("init error")
 		},
 	}
@@ -139,10 +140,10 @@ func TestJob_AutoDetection_FailInit(t *testing.T) {
 func TestJob_AutoDetection_FailCheck(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() error {
+		InitFunc: func(context.Context) error {
 			return nil
 		},
-		CheckFunc: func() error {
+		CheckFunc: func(context.Context) error {
 			return errors.New("check error")
 		},
 	}
@@ -155,10 +156,10 @@ func TestJob_AutoDetection_FailCheck(t *testing.T) {
 func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() error {
+		InitFunc: func(context.Context) error {
 			return nil
 		},
-		CheckFunc: func() error {
+		CheckFunc: func(context.Context) error {
 			return nil
 		},
 		ChartsFunc: func() *Charts {
@@ -174,7 +175,7 @@ func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 func TestJob_AutoDetection_PanicInit(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() error {
+		InitFunc: func(context.Context) error {
 			panic("panic in Init")
 		},
 	}
@@ -187,10 +188,10 @@ func TestJob_AutoDetection_PanicInit(t *testing.T) {
 func TestJob_AutoDetection_PanicCheck(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() error {
+		InitFunc: func(context.Context) error {
 			return nil
 		},
-		CheckFunc: func() error {
+		CheckFunc: func(context.Context) error {
 			panic("panic in Check")
 		},
 	}
@@ -203,10 +204,10 @@ func TestJob_AutoDetection_PanicCheck(t *testing.T) {
 func TestJob_AutoDetection_PanicPostCheck(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() error {
+		InitFunc: func(context.Context) error {
 			return nil
 		},
-		CheckFunc: func() error {
+		CheckFunc: func(context.Context) error {
 			return nil
 		},
 		ChartsFunc: func() *Charts {
@@ -234,7 +235,7 @@ func TestJob_Start(t *testing.T) {
 				},
 			}
 		},
-		CollectFunc: func() map[string]int64 {
+		CollectFunc: func(context.Context) map[string]int64 {
 			return map[string]int64{
 				"id1": 1,
 				"id2": 2,
@@ -261,7 +262,7 @@ func TestJob_Start(t *testing.T) {
 
 func TestJob_MainLoop_Panic(t *testing.T) {
 	m := &MockModule{
-		CollectFunc: func() map[string]int64 {
+		CollectFunc: func(context.Context) map[string]int64 {
 			panic("panic in Collect")
 		},
 	}

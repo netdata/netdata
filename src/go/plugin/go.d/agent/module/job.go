@@ -4,6 +4,7 @@ package module
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -224,7 +225,7 @@ func (j *Job) AutoDetection() (err error) {
 			}
 		}
 		if err != nil {
-			j.module.Cleanup()
+			j.module.Cleanup(context.TODO())
 		}
 	}()
 
@@ -282,7 +283,7 @@ LOOP:
 			}
 		}
 	}
-	j.module.Cleanup()
+	j.module.Cleanup(context.TODO())
 	j.Cleanup()
 	j.stop <- struct{}{}
 }
@@ -342,7 +343,7 @@ func (j *Job) init() error {
 		return nil
 	}
 
-	if err := j.module.Init(); err != nil {
+	if err := j.module.Init(context.TODO()); err != nil {
 		return err
 	}
 
@@ -352,7 +353,7 @@ func (j *Job) init() error {
 }
 
 func (j *Job) check() error {
-	if err := j.module.Check(); err != nil {
+	if err := j.module.Check(context.TODO()); err != nil {
 		if j.AutoDetectTries != infTries {
 			j.AutoDetectTries--
 		}
@@ -405,7 +406,7 @@ func (j *Job) collect() (result map[string]int64) {
 			}
 		}
 	}()
-	return j.module.Collect()
+	return j.module.Collect(context.TODO())
 }
 
 func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinceLastRun int) bool {

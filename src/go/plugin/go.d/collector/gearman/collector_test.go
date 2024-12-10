@@ -3,6 +3,7 @@
 package gearman
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -62,9 +63,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -83,7 +84,7 @@ func TestCollector_Cleanup(t *testing.T) {
 			prepare: func() *Collector {
 				collr := New()
 				collr.newConn = func(Config) gearmanConn { return prepareMockOk() }
-				_ = collr.Check()
+				_ = collr.Check(context.Background())
 				return collr
 			},
 		},
@@ -91,7 +92,7 @@ func TestCollector_Cleanup(t *testing.T) {
 			prepare: func() *Collector {
 				collr := New()
 				collr.newConn = func(Config) gearmanConn { return prepareMockOk() }
-				_ = collr.Collect()
+				_ = collr.Collect(context.Background())
 				return collr
 			},
 		},
@@ -101,7 +102,7 @@ func TestCollector_Cleanup(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
 
-			assert.NotPanics(t, collr.Cleanup)
+			assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 		})
 	}
 }
@@ -140,9 +141,9 @@ func TestCollector_Check(t *testing.T) {
 			collr.newConn = func(Config) gearmanConn { return mock }
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -238,7 +239,7 @@ func TestCollector_Collect(t *testing.T) {
 			mock := test.prepareMock()
 			collr.newConn = func(Config) gearmanConn { return mock }
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			require.Equal(t, test.wantMetrics, mx, "want metrics")
 
@@ -248,7 +249,7 @@ func TestCollector_Collect(t *testing.T) {
 			}
 
 			assert.Equal(t, test.disconnectBeforeCleanup, mock.disconnectCalled, "disconnect before cleanup")
-			collr.Cleanup()
+			collr.Cleanup(context.Background())
 			assert.Equal(t, test.disconnectAfterCleanup, mock.disconnectCalled, "disconnect after cleanup")
 		})
 	}

@@ -3,6 +3,7 @@
 package phpfpm
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -46,7 +47,7 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 func TestCollector_Init(t *testing.T) {
 	collr := New()
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	assert.NotNil(t, collr.client)
 }
 
@@ -60,17 +61,17 @@ func TestCollector_Check(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_CheckReturnsFalseOnFailure(t *testing.T) {
 	collr := New()
 	collr.URL = "http://127.0.0.1:38001/us"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -89,9 +90,9 @@ func TestCollector_CollectJSON(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/?json"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	got := collr.Collect()
+	got := collr.Collect(context.Background())
 
 	want := map[string]int64{
 		"active":    1,
@@ -114,9 +115,9 @@ func TestCollector_CollectJSONFull(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/?json"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	got := collr.Collect()
+	got := collr.Collect(context.Background())
 
 	want := map[string]int64{
 		"active":    1,
@@ -148,9 +149,9 @@ func TestCollector_CollectNoIdleProcessesJSONFull(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/?json"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	got := collr.Collect()
+	got := collr.Collect(context.Background())
 
 	want := map[string]int64{
 		"active":    1,
@@ -173,9 +174,9 @@ func TestCollector_CollectText(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	got := collr.Collect()
+	got := collr.Collect(context.Background())
 
 	want := map[string]int64{
 		"active":    1,
@@ -198,9 +199,9 @@ func TestCollector_CollectTextFull(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	got := collr.Collect()
+	got := collr.Collect(context.Background())
 
 	want := map[string]int64{
 		"active":    1,
@@ -232,9 +233,9 @@ func TestCollector_CollectReturnsNothingWhenInvalidData(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Len(t, collr.Collect(), 0)
+	assert.Len(t, collr.Collect(context.Background()), 0)
 }
 
 func TestCollector_CollectReturnsNothingWhenEmptyData(t *testing.T) {
@@ -247,9 +248,9 @@ func TestCollector_CollectReturnsNothingWhenEmptyData(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Len(t, collr.Collect(), 0)
+	assert.Len(t, collr.Collect(context.Background()), 0)
 }
 
 func TestCollector_CollectReturnsNothingWhenBadStatusCode(t *testing.T) {
@@ -262,11 +263,11 @@ func TestCollector_CollectReturnsNothingWhenBadStatusCode(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Len(t, collr.Collect(), 0)
+	assert.Len(t, collr.Collect(context.Background()), 0)
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }

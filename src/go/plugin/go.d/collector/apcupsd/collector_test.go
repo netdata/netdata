@@ -3,6 +3,7 @@
 package apcupsd
 
 import (
+	"context"
 	"errors"
 	"os"
 	"strings"
@@ -39,14 +40,14 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 
 func TestCollector_Cleanup(t *testing.T) {
 	collr := New()
-	require.NotPanics(t, collr.Cleanup)
+	require.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 
 	mock := prepareMockOk()
 	collr.newConn = func(Config) apcupsdConn { return mock }
 
-	require.NoError(t, collr.Init())
-	_ = collr.Collect()
-	require.NotPanics(t, collr.Cleanup)
+	require.NoError(t, collr.Init(context.Background()))
+	_ = collr.Collect(context.Background())
+	require.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 	assert.True(t, mock.calledDisconnect)
 }
 
@@ -71,9 +72,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -107,12 +108,12 @@ func TestCollector_Check(t *testing.T) {
 			collr := New()
 			collr.newConn = func(Config) apcupsdConn { return test.prepareMock() }
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -120,7 +121,7 @@ func TestCollector_Check(t *testing.T) {
 
 func TestCollector_Charts(t *testing.T) {
 	collr := New()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	assert.NotNil(t, collr.Charts())
 }
 
@@ -205,12 +206,12 @@ func TestCollector_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr := New()
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			mock := test.prepareMock()
 			collr.newConn = func(Config) apcupsdConn { return mock }
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			if _, ok := mx["battery_seconds_since_replacement"]; ok {
 				mx["battery_seconds_since_replacement"] = 86400

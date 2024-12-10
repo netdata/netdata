@@ -4,6 +4,7 @@ package squidlog
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"testing"
 
@@ -42,7 +43,7 @@ func TestNew(t *testing.T) {
 func TestCollector_Init(t *testing.T) {
 	collr := New()
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -50,30 +51,30 @@ func TestCollector_Check(t *testing.T) {
 
 func TestCollector_Check_ErrorOnCreatingLogReaderNoLogFile(t *testing.T) {
 	collr := New()
-	defer collr.Cleanup()
+	defer collr.Cleanup(context.Background())
 	collr.Path = "testdata/not_exists.log"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestSquid_Check_ErrorOnCreatingParserUnknownFormat(t *testing.T) {
 	collr := New()
-	defer collr.Cleanup()
+	defer collr.Cleanup(context.Background())
 	collr.Path = "testdata/unknown.log"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestSquid_Check_ErrorOnCreatingParserZeroKnownFields(t *testing.T) {
 	collr := New()
-	defer collr.Cleanup()
+	defer collr.Cleanup(context.Background())
 	collr.Path = "testdata/access.log"
 	collr.ParserConfig.CSV.Format = "$one $two"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -85,7 +86,7 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -159,7 +160,7 @@ func TestCollector_Collect(t *testing.T) {
 		"unmatched":                                          16,
 	}
 
-	collected := collr.Collect()
+	collected := collr.Collect(context.Background())
 
 	assert.Equal(t, expected, collected)
 	testCharts(t, collr, collected)
@@ -236,9 +237,9 @@ func TestCollector_Collect_ReturnOldDataIfNothingRead(t *testing.T) {
 		"unmatched":                                          16,
 	}
 
-	_ = collr.Collect()
+	_ = collr.Collect(context.Background())
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 
 	assert.Equal(t, expected, mx)
 
@@ -281,9 +282,9 @@ func prepareSquidCollect(t *testing.T) *Collector {
 	t.Helper()
 	collr := New()
 	collr.Path = "testdata/access.log"
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
-	defer collr.Cleanup()
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
 
 	p, err := logs.NewCSVParser(collr.ParserConfig.CSV, bytes.NewReader(dataNativeFormatAccessLog))
 	require.NoError(t, err)

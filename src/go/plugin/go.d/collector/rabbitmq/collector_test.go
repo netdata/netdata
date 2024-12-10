@@ -3,6 +3,7 @@
 package rabbitmq
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -69,9 +70,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -82,12 +83,12 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	assert.NotPanics(t, New().Cleanup)
+	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 
 	collr := New()
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.NotPanics(t, collr.Cleanup)
+	assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -105,12 +106,12 @@ func TestCollector_Check(t *testing.T) {
 			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -359,9 +360,9 @@ func TestCollector_Collect(t *testing.T) {
 			collr, cleanup := test.prepare()
 			defer cleanup()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			assert.Equal(t, test.wantCollected, mx)
 

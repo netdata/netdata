@@ -3,6 +3,7 @@
 package openvpn
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -34,15 +35,15 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestCollector_Init(t *testing.T) {
-	assert.NoError(t, New().Init())
+	assert.NoError(t, New().Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
 	collr := New()
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.client = prepareMockOpenVPNClient()
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -52,20 +53,20 @@ func TestCollector_Charts(t *testing.T) {
 func TestCollector_Cleanup(t *testing.T) {
 	collr := New()
 
-	assert.NotPanics(t, collr.Cleanup)
-	require.NoError(t, collr.Init())
+	assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
+	require.NoError(t, collr.Init(context.Background()))
 	collr.client = prepareMockOpenVPNClient()
-	require.NoError(t, collr.Check())
-	collr.Cleanup()
+	require.NoError(t, collr.Check(context.Background()))
+	collr.Cleanup(context.Background())
 }
 
 func TestCollector_Collect(t *testing.T) {
 	collr := New()
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.perUserMatcher = matcher.TRUE()
 	collr.client = prepareMockOpenVPNClient()
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"bytes_in":            1,
@@ -75,7 +76,7 @@ func TestCollector_Collect(t *testing.T) {
 		"name_bytes_sent":     2,
 	}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 	require.NotNil(t, mx)
 	delete(mx, "name_connection_time")
 	assert.Equal(t, expected, mx)
@@ -84,12 +85,12 @@ func TestCollector_Collect(t *testing.T) {
 func TestCollector_Collect_UNDEFUsername(t *testing.T) {
 	collr := New()
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.perUserMatcher = matcher.TRUE()
 	cl := prepareMockOpenVPNClient()
 	cl.users = testUsersUNDEF
 	collr.client = cl
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"bytes_in":                   1,
@@ -99,7 +100,7 @@ func TestCollector_Collect_UNDEFUsername(t *testing.T) {
 		"common_name_bytes_sent":     2,
 	}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 	require.NotNil(t, mx)
 
 	delete(mx, "common_name_connection_time")

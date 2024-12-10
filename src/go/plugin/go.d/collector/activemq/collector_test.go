@@ -3,6 +3,7 @@
 package activemq
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -156,11 +157,11 @@ func TestCollector_Init(t *testing.T) {
 
 	// NG case
 	collr.Webadmin = ""
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 
 	// OK case
 	collr.Webadmin = "webadmin"
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 	assert.NotNil(t, collr.apiClient)
 }
 
@@ -181,8 +182,8 @@ func TestCollector_Check(t *testing.T) {
 	collr.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
 	collr.Webadmin = "webadmin"
 
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -190,7 +191,7 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -214,8 +215,8 @@ func TestCollector_Collect(t *testing.T) {
 	collr.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
 	collr.Webadmin = "webadmin"
 
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	cases := []struct {
 		expected  map[string]int64
@@ -303,7 +304,7 @@ func TestCollector_Collect(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		require.Equal(t, c.expected, collr.Collect())
+		require.Equal(t, c.expected, collr.Collect(context.Background()))
 		assert.Len(t, collr.activeQueues, c.numQueues)
 		assert.Len(t, collr.activeTopics, c.numTopics)
 		assert.Len(t, *collr.charts, c.numCharts)
@@ -321,8 +322,8 @@ func TestCollector_404(t *testing.T) {
 	collr.Webadmin = "webadmin"
 	collr.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
 
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_InvalidData(t *testing.T) {
@@ -335,6 +336,6 @@ func TestCollector_InvalidData(t *testing.T) {
 	collr.Webadmin = "webadmin"
 	collr.HTTPConfig.RequestConfig = web.RequestConfig{URL: ts.URL}
 
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }

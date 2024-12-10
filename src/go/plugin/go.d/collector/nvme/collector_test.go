@@ -5,6 +5,7 @@
 package nvme
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -61,9 +62,9 @@ func TestCollector_Init(t *testing.T) {
 			collr := New()
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -74,7 +75,7 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	assert.NotPanics(t, New().Cleanup)
+	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -107,9 +108,9 @@ func TestCollector_Check(t *testing.T) {
 			test.prepare(collr)
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -126,7 +127,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepare: prepareCaseOK,
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"device_nvme0n1_available_spare":                              100,
@@ -189,7 +190,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepare: prepareCaseStringValuesOK,
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"device_nvme0n1_available_spare":                              100,
@@ -252,7 +253,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepare: prepareCaseFloatValuesOK,
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"device_nvme0n1_available_spare":                              100,
@@ -315,7 +316,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepare: prepareCaseEmptyList,
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					assert.Equal(t, (map[string]int64)(nil), mx)
 				},
@@ -325,7 +326,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepare: prepareCaseErrOnList,
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					assert.Equal(t, (map[string]int64)(nil), mx)
 				},
@@ -335,7 +336,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepare: prepareCaseErrOnSmartLog,
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					assert.Equal(t, (map[string]int64)(nil), mx)
 				},

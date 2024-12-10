@@ -3,6 +3,7 @@
 package module
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,18 +12,20 @@ import (
 
 func TestMockModule_Init(t *testing.T) {
 	m := &MockModule{}
+	ctx := context.Background()
 
-	assert.NoError(t, m.Init())
-	m.InitFunc = func() error { return nil }
-	assert.NoError(t, m.Init())
+	assert.NoError(t, m.Init(ctx))
+	m.InitFunc = func(context.Context) error { return nil }
+	assert.NoError(t, m.Init(ctx))
 }
 
 func TestMockModule_Check(t *testing.T) {
 	m := &MockModule{}
+	ctx := context.Background()
 
-	assert.NoError(t, m.Check())
-	m.CheckFunc = func() error { return nil }
-	assert.NoError(t, m.Check())
+	assert.NoError(t, m.Check(ctx))
+	m.CheckFunc = func(context.Context) error { return nil }
+	assert.NoError(t, m.Check(ctx))
 }
 
 func TestMockModule_Charts(t *testing.T) {
@@ -39,16 +42,19 @@ func TestMockModule_Collect(t *testing.T) {
 	d := map[string]int64{
 		"1": 1,
 	}
+	ctx := context.Background()
 
-	assert.Nil(t, m.Collect())
-	m.CollectFunc = func() map[string]int64 { return d }
-	assert.Equal(t, d, m.Collect())
+	assert.Nil(t, m.Collect(ctx))
+	m.CollectFunc = func(ctx context.Context) map[string]int64 { return d }
+	assert.Equal(t, d, m.Collect(ctx))
 }
 
 func TestMockModule_Cleanup(t *testing.T) {
 	m := &MockModule{}
+	ctx := context.Background()
+
 	require.False(t, m.CleanupDone)
 
-	m.Cleanup()
+	m.Cleanup(ctx)
 	assert.True(t, m.CleanupDone)
 }

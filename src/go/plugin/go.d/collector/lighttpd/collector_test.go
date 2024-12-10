@@ -3,6 +3,7 @@
 package lighttpd
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -35,19 +36,19 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestCollector_Cleanup(t *testing.T) { New().Cleanup() }
+func TestCollector_Cleanup(t *testing.T) { New().Cleanup(context.Background()) }
 
 func TestCollector_Init(t *testing.T) {
 	collr := New()
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_InitNG(t *testing.T) {
 	collr := New()
 
 	collr.URL = ""
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -60,16 +61,16 @@ func TestCollector_Check(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/server-status?auto"
-	require.NoError(t, collr.Init())
-	assert.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_CheckNG(t *testing.T) {
 	collr := New()
 
 	collr.URL = "http://127.0.0.1:38001/server-status?auto"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
@@ -84,8 +85,8 @@ func TestCollector_Collect(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/server-status?auto"
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"scoreboard_waiting":        125,
@@ -108,7 +109,7 @@ func TestCollector_Collect(t *testing.T) {
 		"total_accesses":            12,
 	}
 
-	assert.Equal(t, expected, collr.Collect())
+	assert.Equal(t, expected, collr.Collect(context.Background()))
 }
 
 func TestCollector_InvalidData(t *testing.T) {
@@ -121,8 +122,8 @@ func TestCollector_InvalidData(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/server-status?auto"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_ApacheData(t *testing.T) {
@@ -135,8 +136,8 @@ func TestCollector_ApacheData(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/server-status?auto"
-	require.NoError(t, collr.Init())
-	require.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_404(t *testing.T) {
@@ -149,6 +150,6 @@ func TestCollector_404(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL + "/server-status?auto"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
