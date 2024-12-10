@@ -48,7 +48,7 @@ void ml_host_new(RRDHOST *rh)
     netdata_mutex_init(&host->mutex);
     spinlock_init(&host->type_anomaly_rate_spinlock);
 
-    host->ml_running = true;
+    host->ml_running = false;
     rh->ml_host = (rrd_ml_host_t *) host;
 }
 
@@ -62,6 +62,69 @@ void ml_host_delete(RRDHOST *rh)
 
     delete host;
     rh->ml_host = NULL;
+}
+
+void ml_host_start(RRDHOST *rh) {
+    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    if (!host)
+        return;
+
+    host->ml_running = true;
+}
+
+void ml_host_stop(RRDHOST *rh) {
+    ml_host_t *host = (ml_host_t *) rh->ml_host;
+    if (!host || !host->ml_running)
+        return;
+
+    netdata_mutex_lock(&host->mutex);
+
+    // reset host stats
+    host->mls = ml_machine_learning_stats_t();
+
+    // reset charts/dims
+    void *rsp = NULL;
+    rrdset_foreach_read(rsp, host->rh) {
+        RRDSET *rs = static_cast<RRDSET *>(rsp);
+
+        ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
+        if (!chart)
+            continue;
+
+        // reset chart
+        chart->mls = ml_machine_learning_stats_t();
+
+        void *rdp = NULL;
+        rrddim_foreach_read(rdp, rs) {
+            RRDDIM *rd = static_cast<RRDDIM *>(rdp);
+
+            ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
+            if (!dim)
+                continue;
+
+            spinlock_lock(&dim->slock);
+
+            dim->mt = METRIC_TYPE_CONSTANT;
+            dim->ts = TRAINING_STATUS_UNTRAINED;
+
+            // TODO: Check if we can remove this field.
+            dim->last_training_time = 0;
+
+            dim->suppression_anomaly_counter = 0;
+            dim->suppression_window_counter = 0;
+            dim->cns.clear();
+
+            ml_kmeans_init(&dim->kmeans);
+
+            spinlock_unlock(&dim->slock);
+        }
+        rrddim_foreach_done(rdp);
+    }
+    rrdset_foreach_done(rsp);
+
+    netdata_mutex_unlock(&host->mutex);
+
+    host->ml_running = false;
 }
 
 void ml_host_get_info(RRDHOST *rh, BUFFER *wb)
