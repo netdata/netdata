@@ -317,7 +317,7 @@ static bool parse_single_path(json_object *jobj, const char *path, STREAM_PATH *
     }
 
     if(p->hops < 0) {
-        buffer_strcat(error, "hops cannot be negative");
+        buffer_strcat(error, "hops cannot be negative (probably the child disconnected from the Netdata before us");
         return false;
     }
 

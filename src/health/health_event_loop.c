@@ -214,7 +214,7 @@ static void health_event_loop(void) {
 
     while(service_running(SERVICE_HEALTH)) {
         if(!stream_health_should_be_running()) {
-            sleep_usec(100 * USEC_PER_MS);
+            sleep_usec(50 * USEC_PER_MS);
             continue;
         }
 

@@ -1090,7 +1090,7 @@ void *ml_train_main(void *arg) {
 
     while (!Cfg.training_stop) {
         if(!stream_ml_should_be_running()) {
-            sleep_usec(1 * USEC_PER_SEC);
+            sleep_usec(50 * USEC_PER_MS);
             continue;
         }
 
