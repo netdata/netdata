@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "stream-sender-internals.h"
+#include "replication.h"
 
 #define TIME_TO_CONSIDER_PARENTS_SIMILAR 120
 
@@ -305,6 +306,10 @@ int stream_info_to_json_v1(BUFFER *wb, const char *machine_guid) {
     buffer_json_member_add_uint64(wb, "nonce", os_random32());
 
     if(ret == HTTP_RESP_OK) {
+        if((status.ingest.status == RRDHOST_INGEST_STATUS_ARCHIVED || status.ingest.status == RRDHOST_INGEST_STATUS_OFFLINE) &&
+            (rrdr_backfill_running() || replication_queries_running()))
+           status.ingest.status = RRDHOST_INGEST_STATUS_INITIALIZING;
+
         buffer_json_member_add_string(wb, "db_status", rrdhost_db_status_to_string(status.db.status));
         buffer_json_member_add_string(wb, "db_liveness", rrdhost_db_liveness_to_string(status.db.liveness));
         buffer_json_member_add_string(wb, "ingest_type", rrdhost_ingest_type_to_string(status.ingest.type));

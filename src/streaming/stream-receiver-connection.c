@@ -4,6 +4,7 @@
 #include "stream-thread.h"
 #include "stream-receiver-internals.h"
 #include "web/server/h2o/http_server.h"
+#include "replication.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -149,7 +150,8 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             return false;
         }
 
-        if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
+        if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD) ||
+                     rrdr_backfill_running() || replication_queries_running())) {
             stream_receiver_log_status(
                 rpt,
                 "host is initializing, retry later",
