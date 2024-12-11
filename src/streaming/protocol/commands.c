@@ -31,7 +31,7 @@ RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t wall_clock_time
             // - the parent just disconnected, so local data are not streamed to parent
 
             nd_log(NDLS_DAEMON, NDLP_INFO,
-                   "STREAM SEND %s: streaming is not ready, not sending data to a parent...",
+                   "STREAM SEND '%s': streaming is not ready, not sending data to a parent...",
                    rrdhost_hostname(host));
         }
 
@@ -39,7 +39,7 @@ RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t wall_clock_time
     }
     else if(unlikely(host_flags & RRDHOST_FLAG_STREAM_SENDER_LOGGED_STATUS)) {
         nd_log(NDLS_DAEMON, NDLP_INFO,
-               "STREAM SEND %s: streaming is ready, sending metrics to parent...",
+               "STREAM SEND '%s': streaming is ready, sending metrics to parent...",
                rrdhost_hostname(host));
         rrdhost_flag_clear(host, RRDHOST_FLAG_STREAM_SENDER_LOGGED_STATUS);
     }

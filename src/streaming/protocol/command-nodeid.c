@@ -51,7 +51,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     ND_UUID claim_id;
     if (uuid_parse(claim_id_str ? claim_id_str : "", claim_id.uuid) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM %s [send to %s] received invalid claim id '%s'",
+               "STREAM SEND '%s' [to %s] received invalid claim id '%s'",
                rrdhost_hostname(s->host), s->connected_to,
                claim_id_str ? claim_id_str : "(unset)");
         return;
@@ -60,7 +60,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     ND_UUID node_id;
     if(uuid_parse(node_id_str ? node_id_str : "", node_id.uuid) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM %s [send to %s] received an invalid node id '%s'",
+               "STREAM SEND '%s' [to %s] received an invalid node id '%s'",
                rrdhost_hostname(s->host), s->connected_to,
                node_id_str ? node_id_str : "(unset)");
         return;
@@ -68,14 +68,14 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
 
     if (!UUIDiszero(s->host->aclk.claim_id_of_parent) && !UUIDeq(s->host->aclk.claim_id_of_parent, claim_id))
         nd_log(NDLS_DAEMON, NDLP_INFO,
-               "STREAM %s [send to %s] changed parent's claim id to %s",
+               "STREAM SEND '%s' [to %s] changed parent's claim id to %s",
                rrdhost_hostname(s->host), s->connected_to,
                claim_id_str ? claim_id_str : "(unset)");
 
     if(!UUIDiszero(s->host->node_id) && !UUIDeq(s->host->node_id, node_id)) {
         if(claimed) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM %s [send to %s] parent reports different node id '%s', but we are claimed. Ignoring it.",
+                   "STREAM SEND '%s' [to %s] parent reports different node id '%s', but we are claimed. Ignoring it.",
                    rrdhost_hostname(s->host), s->connected_to,
                    node_id_str ? node_id_str : "(unset)");
             return;
@@ -83,7 +83,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
         else {
             update_node_id = true;
             nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM %s [send to %s] changed node id to %s",
+                   "STREAM SEND '%s' [to %s] changed node id to %s",
                    rrdhost_hostname(s->host), s->connected_to,
                    node_id_str ? node_id_str : "(unset)");
         }
@@ -91,7 +91,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
 
     if(!url || !*url) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM %s [send to %s] received an invalid cloud URL '%s'",
+               "STREAM SEND '%s' [to %s] received an invalid cloud URL '%s'",
                rrdhost_hostname(s->host), s->connected_to,
                url ? url : "(unset)");
         return;
