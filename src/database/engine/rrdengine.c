@@ -5,11 +5,7 @@
 #include "pdc.h"
 #include "dbengine-compression.h"
 
-rrdeng_stats_t global_io_errors = 0;
-rrdeng_stats_t global_fs_errors = 0;
-rrdeng_stats_t rrdeng_reserved_file_descriptors = 0;
-rrdeng_stats_t global_pg_cache_over_half_dirty_events = 0;
-rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
+struct rrdeng_global_stats global_stats = { 0 };
 
 unsigned rrdeng_pages_per_extent = DEFAULT_PAGES_PER_EXTENT;
 

@@ -394,6 +394,12 @@ typedef uint32_t uid_t;
 
 // --------------------------------------------------------------------------------------------------------------------
 
+#define CONCAT_INDIRECT(a, b) a##b
+#define CONCAT(a, b) CONCAT_INDIRECT(a, b)
+#define CACHE_LINE_PADDING() uint8_t CONCAT(padding, __COUNTER__)[64 - sizeof(size_t)];
+
+// --------------------------------------------------------------------------------------------------------------------
+
 #if defined(OS_WINDOWS)
 #include <windows.h>
 #include <wctype.h>

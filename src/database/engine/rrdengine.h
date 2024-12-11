@@ -327,34 +327,60 @@ void wal_release(WAL *wal);
  * They only describe operations since DB engine instance load time.
  */
 struct rrdengine_statistics {
+    CACHE_LINE_PADDING();
     rrdeng_stats_t before_decompress_bytes;
+    CACHE_LINE_PADDING();
     rrdeng_stats_t after_decompress_bytes;
+    CACHE_LINE_PADDING();
     rrdeng_stats_t before_compress_bytes;
+    CACHE_LINE_PADDING();
     rrdeng_stats_t after_compress_bytes;
 
+    CACHE_LINE_PADDING();
     rrdeng_stats_t io_write_bytes;
+    CACHE_LINE_PADDING();
     rrdeng_stats_t io_write_requests;
+    CACHE_LINE_PADDING();
     rrdeng_stats_t io_read_bytes;
+    CACHE_LINE_PADDING();
     rrdeng_stats_t io_read_requests;
 
+    CACHE_LINE_PADDING();
     rrdeng_stats_t datafile_creations;
+    CACHE_LINE_PADDING();
     rrdeng_stats_t datafile_deletions;
+    CACHE_LINE_PADDING();
     rrdeng_stats_t journalfile_creations;
+    CACHE_LINE_PADDING();
     rrdeng_stats_t journalfile_deletions;
 
+    CACHE_LINE_PADDING();
     rrdeng_stats_t io_errors;
+    CACHE_LINE_PADDING();
     rrdeng_stats_t fs_errors;
 };
 
-/* I/O errors global counter */
-extern rrdeng_stats_t global_io_errors;
-/* File-System errors global counter */
-extern rrdeng_stats_t global_fs_errors;
-/* number of File-Descriptors that have been reserved by dbengine */
-extern rrdeng_stats_t rrdeng_reserved_file_descriptors;
-/* inability to flush global counters */
-extern rrdeng_stats_t global_pg_cache_over_half_dirty_events;
-extern rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of deleted pages */
+struct rrdeng_global_stats {
+    CACHE_LINE_PADDING();
+    /* I/O errors global counter */
+    rrdeng_stats_t global_io_errors;
+
+    CACHE_LINE_PADDING();
+    /* File-System errors global counter */
+    rrdeng_stats_t global_fs_errors;
+
+    CACHE_LINE_PADDING();
+    /* number of File-Descriptors that have been reserved by dbengine */
+    rrdeng_stats_t rrdeng_reserved_file_descriptors;
+
+    CACHE_LINE_PADDING();
+    /* inability to flush global counters */
+    rrdeng_stats_t global_pg_cache_over_half_dirty_events;
+    CACHE_LINE_PADDING();
+    rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of deleted pages */
+};
+
+extern struct rrdeng_global_stats global_stats;
 
 typedef struct tier_config_prototype {
     int tier;                                   // the tier of this ctx
@@ -387,22 +413,35 @@ struct rrdengine_instance {
     } njfv2idx;
 
     struct {
+        CACHE_LINE_PADDING();
         unsigned last_fileno;                       // newest index of datafile and journalfile
+        CACHE_LINE_PADDING();
         unsigned last_flush_fileno;                 // newest index of datafile received data
 
+        CACHE_LINE_PADDING();
         size_t collectors_running;
+        CACHE_LINE_PADDING();
         size_t collectors_running_duplicate;
+        CACHE_LINE_PADDING();
         size_t inflight_queries;                    // the number of queries currently running
+        CACHE_LINE_PADDING();
         uint64_t current_disk_space;                // the current disk space size used
 
+        CACHE_LINE_PADDING();
         uint64_t transaction_id;                    // the transaction id of the next extent flushing
 
+        CACHE_LINE_PADDING();
         bool migration_to_v2_running;
+        CACHE_LINE_PADDING();
         bool now_deleting_files;
+        CACHE_LINE_PADDING();
         unsigned extents_currently_being_flushed;   // non-zero until we commit data to disk (both datafile and journal file)
 
+        CACHE_LINE_PADDING();
         time_t first_time_s;
+        CACHE_LINE_PADDING();
         uint64_t metrics;
+        CACHE_LINE_PADDING();
         uint64_t samples;
     } atomic;
 
@@ -440,12 +479,12 @@ static inline void ctx_io_write_op_bytes(struct rrdengine_instance *ctx, size_t 
 
 static inline void ctx_io_error(struct rrdengine_instance *ctx) {
     __atomic_add_fetch(&ctx->stats.io_errors, 1, __ATOMIC_RELAXED);
-    rrd_stat_atomic_add(&global_io_errors, 1);
+    rrd_stat_atomic_add(&global_stats.global_io_errors, 1);
 }
 
 static inline void ctx_fs_error(struct rrdengine_instance *ctx) {
     __atomic_add_fetch(&ctx->stats.fs_errors, 1, __ATOMIC_RELAXED);
-    rrd_stat_atomic_add(&global_fs_errors, 1);
+    rrd_stat_atomic_add(&global_stats.global_fs_errors, 1);
 }
 
 #define ctx_last_fileno_get(ctx) __atomic_load_n(&(ctx)->atomic.last_fileno, __ATOMIC_RELAXED)

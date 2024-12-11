@@ -66,48 +66,74 @@ struct dictionary_stats {
     const char *name;               // the name of the category
 
     struct {
+        CACHE_LINE_PADDING();
         size_t active;              // the number of active dictionaries
+        CACHE_LINE_PADDING();
         size_t deleted;             // the number of dictionaries queued for destruction
     } dictionaries;
 
     struct {
+        CACHE_LINE_PADDING();
         long entries;               // active items in the dictionary
+        CACHE_LINE_PADDING();
         long pending_deletion;      // pending deletion items in the dictionary
+        CACHE_LINE_PADDING();
         long referenced;            // referenced items in the dictionary
     } items;
 
     struct {
+        CACHE_LINE_PADDING();
         size_t creations;           // dictionary creations
+        CACHE_LINE_PADDING();
         size_t destructions;        // dictionary destructions
+        CACHE_LINE_PADDING();
         size_t flushes;             // dictionary flushes
+        CACHE_LINE_PADDING();
         size_t traversals;          // dictionary foreach
+        CACHE_LINE_PADDING();
         size_t walkthroughs;        // dictionary walkthrough
+        CACHE_LINE_PADDING();
         size_t garbage_collections; // dictionary garbage collections
+        CACHE_LINE_PADDING();
         size_t searches;            // item searches
+        CACHE_LINE_PADDING();
         size_t inserts;             // item inserts
+        CACHE_LINE_PADDING();
         size_t resets;              // item resets
+        CACHE_LINE_PADDING();
         size_t deletes;             // item deletes
     } ops;
 
     struct {
+        CACHE_LINE_PADDING();
         size_t inserts;             // number of times the insert callback is called
+        CACHE_LINE_PADDING();
         size_t conflicts;           // number of times the conflict callback is called
+        CACHE_LINE_PADDING();
         size_t reacts;              // number of times the react callback is called
+        CACHE_LINE_PADDING();
         size_t deletes;             // number of times the delete callback is called
     } callbacks;
 
     // memory
     struct {
+        CACHE_LINE_PADDING();
         ssize_t index;              // bytes of keys indexed (indication of the index size)
+        CACHE_LINE_PADDING();
         ssize_t values;             // bytes of caller structures
+        CACHE_LINE_PADDING();
         ssize_t dict;               // bytes of the structures dictionary needs
     } memory;
 
     // spin locks
     struct {
+        CACHE_LINE_PADDING();
         size_t use_spins;           // number of times a reference to item had to spin to acquire it or ignore it
+        CACHE_LINE_PADDING();
         size_t search_spins;        // number of times a successful search result had to be thrown away
+        CACHE_LINE_PADDING();
         size_t insert_spins;        // number of times an insertion to the hash table had to be repeated
+        CACHE_LINE_PADDING();
         size_t delete_spins;        // number of times a deletion had to spin to get a decision
     } spin_locks;
 };

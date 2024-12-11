@@ -4,8 +4,6 @@
 
 #include "../rrd.h"
 
-#define MRG_CACHE_LINE_PADDING(x) uint8_t padding##x[64]
-
 typedef struct metric METRIC;
 typedef struct mrg MRG;
 
@@ -30,21 +28,22 @@ struct mrg_statistics {
     size_t delete_having_retention_or_referenced;
     size_t delete_misses;
 
-    MRG_CACHE_LINE_PADDING(0);
-
     // --- atomic --- multiple readers / writers
 
+    CACHE_LINE_PADDING();
     size_t entries_referenced;
 
-    MRG_CACHE_LINE_PADDING(2);
+    CACHE_LINE_PADDING();
     size_t current_references;
 
-    MRG_CACHE_LINE_PADDING(3);
+    CACHE_LINE_PADDING();
     size_t search_hits;
+    CACHE_LINE_PADDING();
     size_t search_misses;
 
-    MRG_CACHE_LINE_PADDING(4);
+    CACHE_LINE_PADDING();
     size_t writers;
+    CACHE_LINE_PADDING();
     size_t writers_conflicts;
 };
 

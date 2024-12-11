@@ -67,12 +67,16 @@ typedef enum {
 
 struct aral_ops {
     struct {
+        CACHE_LINE_PADDING();
         size_t allocators; // the number of threads currently trying to allocate memory
+        CACHE_LINE_PADDING();
         size_t deallocators; // the number of threads currently trying to deallocate memory
+        CACHE_LINE_PADDING();
         bool last_allocated_or_deallocated; // stability detector, true when was last allocated
     } atomic;
 
     struct {
+        CACHE_LINE_PADDING();
         SPINLOCK spinlock;
         size_t allocating_elements;     // currently allocating elements
         size_t allocation_size;         // current / next allocation size

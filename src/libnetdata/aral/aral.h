@@ -9,15 +9,21 @@
 typedef struct aral ARAL;
 
 struct aral_page_type_stats {
+    CACHE_LINE_PADDING();
     size_t allocations;
+    CACHE_LINE_PADDING();
     size_t allocated_bytes;
+    CACHE_LINE_PADDING();
     size_t used_bytes;
+    CACHE_LINE_PADDING();
     size_t padding_bytes;
 };
 
 struct aral_statistics {
     struct {
+        CACHE_LINE_PADDING();
         size_t allocations;
+        CACHE_LINE_PADDING();
         size_t allocated_bytes;
     } structures;
 
