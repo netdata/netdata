@@ -21,4 +21,6 @@ typedef void (*backfill_callback_t)(size_t successful_dims, size_t failed_dims, 
 void *backfill_thread(void *ptr);
 struct backfill_request_data *backfill_request_add(RRDSET *st, backfill_callback_t cb);
 
+bool backfill_threads_detect_from_stream_conf(void);
+
 #endif //NETDATA_BACKFILL_H

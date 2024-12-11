@@ -4,6 +4,7 @@
 #include "buildinfo.h"
 #include "daemon/watcher.h"
 #include "static_threads.h"
+#include "web/api/queries/backfill.h"
 
 #include "database/engine/page_test.h"
 #include <curl/curl.h>
@@ -1323,6 +1324,7 @@ int netdata_main(int argc, char **argv) {
 
     if(!config_loaded) {
         netdata_conf_load(NULL, 0, &user);
+        stream_conf_load();
         cloud_conf_load(0);
     }
 
@@ -1467,6 +1469,9 @@ int netdata_main(int argc, char **argv) {
         for (i = 0; static_threads[i].name != NULL ; i++) {
             struct netdata_static_thread *st = &static_threads[i];
 
+            if(st->enable_routine)
+                st->enabled = st->enable_routine();
+
             if(st->config_name)
                 st->enabled = config_get_boolean(st->config_section, st->config_name, st->enabled);
 
@@ -1502,14 +1507,6 @@ int netdata_main(int argc, char **argv) {
 
         delta_startup_time("initialize ML");
         ml_init();
-
-#ifdef ENABLE_H2O
-        delta_startup_time("initialize h2o server");
-        for (int t = 0; static_threads[t].name; t++) {
-            if (static_threads[t].start_routine == h2o_main)
-                static_threads[t].enabled = httpd_is_enabled();
-        }
-#endif
     }
 
     delta_startup_time("set resource limits");
@@ -1632,6 +1629,7 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("start the static threads");
 
     netdata_conf_section_web();
+    backfill_threads_detect_from_stream_conf();
 
     set_late_analytics_variables(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {

@@ -228,3 +228,7 @@ void *backfill_thread(void *ptr) {
 
     return NULL;
 }
+
+bool backfill_threads_detect_from_stream_conf(void) {
+    return stream_conf_configured_as_parent();
+}
