@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Bump repository config fetched by kickstart to latest version [\#19181](https://github.com/netdata/netdata/pull/19181) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d\): pass context to init/check/collect/cleanup [\#19180](https://github.com/netdata/netdata/pull/19180) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19177](https://github.com/netdata/netdata/pull/19177) ([netdatabot](https://github.com/netdatabot))
+- docs: reorder silent mode and add full pipeline command example [\#19176](https://github.com/netdata/netdata/pull/19176) ([Ancairon](https://github.com/Ancairon))
+- Add Objects metadata \(Windows Plugin\) [\#19175](https://github.com/netdata/netdata/pull/19175) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations docs [\#19173](https://github.com/netdata/netdata/pull/19173) ([netdatabot](https://github.com/netdatabot))
 - build\(deps\): bump github.com/docker/docker from 27.3.1+incompatible to 27.4.0+incompatible in /src/go [\#19172](https://github.com/netdata/netdata/pull/19172) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Processor Metadata \(Windows Plugin\) [\#19171](https://github.com/netdata/netdata/pull/19171) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -330,7 +335,7 @@
 - Windows Network Interfaces Charts and Alerts [\#18785](https://github.com/netdata/netdata/pull/18785) ([ktsaou](https://github.com/ktsaou))
 - Document ML enabled `auto` [\#18784](https://github.com/netdata/netdata/pull/18784) ([stelfrag](https://github.com/stelfrag))
 - Bump github.com/redis/go-redis/v9 from 9.6.1 to 9.6.2 in /src/go [\#18783](https://github.com/netdata/netdata/pull/18783) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Update README.md, fix a typo [\#18781](https://github.com/netdata/netdata/pull/18781) ([BobConanDev](https://github.com/BobConanDev))
+- Update README.md, fix a typo [\#18781](https://github.com/netdata/netdata/pull/18781) ([NicholasWilsonDEV](https://github.com/NicholasWilsonDEV))
 - fix\(go.d/apcupsd\): fix ups\_load value divided by 100 [\#18780](https://github.com/netdata/netdata/pull/18780) ([ilyam8](https://github.com/ilyam8))
 - unify claiming response json [\#18777](https://github.com/netdata/netdata/pull/18777) ([ktsaou](https://github.com/ktsaou))
 - fix\(go.d/sd/netlisteners\): fix exec deadline exceeded check [\#18774](https://github.com/netdata/netdata/pull/18774) ([ilyam8](https://github.com/ilyam8))
@@ -444,11 +449,6 @@
 - Move plugins.d directory outside of collectors [\#18637](https://github.com/netdata/netdata/pull/18637) ([vkalintiris](https://github.com/vkalintiris))
 - go.d/smartctl: fix exit status check in scan [\#18635](https://github.com/netdata/netdata/pull/18635) ([ilyam8](https://github.com/ilyam8))
 - go.d pkg/socket: keep only one timeout option [\#18633](https://github.com/netdata/netdata/pull/18633) ([ilyam8](https://github.com/ilyam8))
-- Log  agent start / stop timing events [\#18632](https://github.com/netdata/netdata/pull/18632) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#18630](https://github.com/netdata/netdata/pull/18630) ([netdatabot](https://github.com/netdatabot))
-- go.d/postgres: fix checkpoints query for postgres 17 [\#18629](https://github.com/netdata/netdata/pull/18629) ([ilyam8](https://github.com/ilyam8))
-- go.d/ceph: fix leftovers after \#18582 [\#18628](https://github.com/netdata/netdata/pull/18628) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18627](https://github.com/netdata/netdata/pull/18627) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
