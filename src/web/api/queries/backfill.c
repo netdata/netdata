@@ -41,6 +41,9 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data) {
         rc = false;
     spinlock_unlock(&backfill_globals.spinlock);
 
+    if(rc)
+        completion_mark_complete_a_job(&backfill_globals.completion);
+
     return rc;
 }
 
@@ -87,7 +90,7 @@ static void backfill_request_free(bool successful, struct backfill_request *br) 
     freez(br);
 }
 
-void *backfill_worker_thread(void *ptr) {
+void *backfill_worker_thread(void *ptr __maybe_unused) {
     completion_init(&backfill_globals.completion);
     BACKFILL_INIT(&backfill_globals.queue);
 
@@ -152,4 +155,6 @@ void *backfill_thread(void *ptr) {
     spinlock_unlock(&backfill_globals.spinlock);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+
+    return NULL;
 }
