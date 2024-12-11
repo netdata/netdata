@@ -387,6 +387,23 @@ static void streaming_parser_init(struct receiver_state *rpt) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static void stream_receive_log_database_gap(struct receiver_state *rpt) {
+    RRDHOST *host = rpt->host;
+
+    time_t now = now_realtime_sec();
+    time_t last_db_entry = 0;
+    rrdhost_retention(host, now, false, NULL, &last_db_entry);
+
+    if(now < last_db_entry)
+        last_db_entry = now;
+
+    char buf[128];
+    duration_snprintf(buf, sizeof(buf), now - last_db_entry, "s", true);
+    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+           "STREAM RECEIVE '%s' [from [%s]:%s]: node connected; last sample in the database %s ago",
+           rrdhost_hostname(host), rpt->client_ip, rpt->client_port, buf);
+}
+
 void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
@@ -434,6 +451,8 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
                    "STREAM RECEIVE[%zu] '%s' [from [%s]:%s]:"
                    "Failed to add receiver socket to nd_poll()",
                    sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+
+        stream_receive_log_database_gap(rpt);
 
         // keep this last, since it sends commands back to the child
         streaming_parser_init(rpt);
@@ -511,6 +530,8 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
 
 static ssize_t
 stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt, PARSER *parser, bool *removed) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
+
     ssize_t rc;
     if(rpt->thread.compressed.enabled) {
         rc = receiver_read_compressed(rpt);
@@ -595,8 +616,7 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
 // returns true when the receiver is still there, false if it removed it
 bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events, usec_t now_ut)
 {
-    internal_fatal(
-        sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
 
     PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
     ND_LOG_STACK lgs[] = {
@@ -799,7 +819,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
             if (rpt->config.health.delay > 0) {
                 host->health.delay_up_to = now_realtime_sec() + rpt->config.health.delay;
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                       "STREAM RECEIVE[x] '%s' [from [%s]:%s]: "
+                       "STREAM RECEIVE '%s' [from [%s]:%s]: "
                        "Postponing health checks for %" PRId64 " seconds, because it was just connected.",
                        rrdhost_hostname(host), rpt->client_ip, rpt->client_port,
                        (int64_t) rpt->config.health.delay);
