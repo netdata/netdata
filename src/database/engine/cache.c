@@ -1961,9 +1961,10 @@ static void *pgc_evict_thread(void *ptr) {
         if (nd_thread_signaled_to_cancel())
             return NULL;
 
+        evict_pages(cache, 0, 0, true, false);
+
         size_t size_to_evict = 0;
-        if(evict_pages(cache, 0, 0, true, false) &&
-            cache_usage_per1000(cache, &size_to_evict) > cache->config.severe_pressure_per1000) {
+        if(cache_usage_per1000(cache, &size_to_evict) > cache->config.severe_pressure_per1000) {
             severe_pressure_counter++;
 
             if(severe_pressure_counter > 100) {
