@@ -78,7 +78,7 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
+        - name: System
           description: "These metrics refer to the entire system."
           labels: []
           metrics:
@@ -178,7 +178,7 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
+        - name: System
           description: "These metrics refer to the entire system."
           labels: []
           metrics:
@@ -276,7 +276,7 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
+        - name: System
           description: "These metrics refer to the entire system."
           labels: []
           metrics:
@@ -374,17 +374,28 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: Logical
-          description: "These metrics refer to the logical disks."
+        - name: System
+          description: "These metrics refer to the entire System."
+          labels: []
+          metrics:
+            - name: system.io
+              description: Disk I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+        - name: Logical Disk
+          description: "These metrics refer to Logical Disks."
           labels:
             - name: mount_point
-              description: The drive letter assigned by Microsoft Windows to identify the partition.
+              description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:')."
             - name: driver_type
-              description: The type of disk, such as unknown, norootdir, removable, fixed, remote, cdrom, or ramdisk.
+              description: "Classification of the disk device (e.g., norootdir, removable, cdrom, ramdisk)."
             - name: filesystem
-              description: The file system used on the disk (e.g., NTFS, FAT32).
+              description: "File system format used on the volume (e.g., NTFS, FAT32)."
             - name: rw_mode
-              description: The disk's read/write status ro (read-only) or rw (read/write).
+              description: "Current read/write permissions status of the volume (read-only access, read and write access)."
           metrics:
             - name: disk.space
               description: Disk Space Usage
@@ -393,17 +404,17 @@ modules:
               dimensions:
                 - name: avail
                 - name: used
-        - name: Physical
-          description: "These metrics refer to the global physical disks."
+        - name: Physical Disk
+          description: "These metrics refer to Physical Disks."
           labels:
             - name: mount_point
-              description: The drive letter assigned by Microsoft Windows to identify the partition.
+              description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:')."
             - name: device
-              description: The device name.
+              description: Manufacturer model name.
             - name: model
               description: The device model.
             - name: device_id
-              description: THe ID of device installed on host.
+              description: Unique hardware identifier for the storage device within the system.
           metrics:
             - name: disk.io
               description: Disk I/O Bandwidth
@@ -412,32 +423,26 @@ modules:
               dimensions:
                 - name: reads
                 - name: writes
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: "KiB/operation"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
             - name: disk.ops
               description: Disk Completed I/O Operations
               unit: "operations/s"
-              chart_type: area
-              dimensions:
-                - name: reads
-                - name: writes
-            - name: disk.busy
-              description: Disk Busy Time
-              unit: "milliseconds"
-              chart_type: area
-              dimensions:
-                - name: busy
-            - name: disk.iotime
-              description: Disk Total I/O Time
-              unit: "milliseconds/s"
               chart_type: line
               dimensions:
                 - name: reads
                 - name: writes
-            - name: disk.qops
-              description: Disk Current I/O Operations
-              unit: "operations"
+            - name: disk.split
+              description: Split I/O Operations
+              unit: "operations/s"
               chart_type: line
               dimensions:
-                - name: operations
+                - name: discards
             - name: disk.await
               description: Average Completed I/O Operation Time
               unit: "milliseconds/operation"
@@ -451,38 +456,31 @@ modules:
               chart_type: line
               dimensions:
                 - name: svctm
-            - name: disk.avgsz
-              description: Average Completed I/O Operation Bandwidth
-              unit: "KiB/operation"
+            - name: disk.util
+              description: Disk Utilization Time
+              unit: "percent"
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: disk.busy
+              description: Disk Busy Time
+              unit: "milliseconds"
+              chart_type: area
+              dimensions:
+                - name: busy
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: "milliseconds/s"
               chart_type: area
               dimensions:
                 - name: reads
                 - name: writes
-            - name: disk.split
-              description: Split I/O Operations
-              unit: "operations/s"
+            - name: disk.qops
+              description: Disk Current I/O Operations
+              unit: "operations"
               chart_type: line
               dimensions:
-                - name: discards
-        - name: Disk
-          description: "These metrics refer to the individual physical disks."
-          labels:
-            - name: mount_point
-              description: The drive letter assigned by Microsoft Windows to identify the partition.
-            - name: device
-              description: The device name.
-            - name: model
-              description: The device model.
-            - name: device_id
-              description: THe ID of device installed on host.
-          metrics:
-            - name: disk.io
-              description: Disk I/O Bandwidth
-              unit: "KiB/s"
-              chart_type: area
-              dimensions:
-                - name: reads
-                - name: writes
+                - name: operations
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibObjects
@@ -559,7 +557,7 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
+        - name: System
           description: "These metrics refer to the entire system."
           labels: []
           metrics:
@@ -896,7 +894,7 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
+        - name: Hyper-V
           description: "These metrics refer to the Hyper-V instance."
           labels: []
           metrics:
