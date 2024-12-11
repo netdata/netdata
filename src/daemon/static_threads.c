@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "web/api/queries/backfill.h"
 
 void *aclk_main(void *ptr);
 void *analytics_main(void *ptr);
@@ -167,6 +168,15 @@ const struct netdata_static_thread static_threads_common[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = profile_main
+    },
+    {
+        .name = "BACKFILL",
+        .config_section = NULL,
+        .config_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = backfill_thread
     },
 
     // terminator

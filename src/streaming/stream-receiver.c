@@ -801,6 +801,8 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     rrdhost_receiver_lock(host);
 
     if (!host->receiver) {
+        __atomic_add_fetch(&host->stream.rcv.status.state_id, 1, __ATOMIC_RELAXED);
+
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
 
         host->stream.rcv.status.connections++;
@@ -863,6 +865,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
 
         if (host->receiver == rpt) {
+            __atomic_add_fetch(&host->stream.rcv.status.state_id, 1, __ATOMIC_RELAXED);
             rrdhost_flag_clear(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
             rrdhost_receiver_unlock(host);
             {

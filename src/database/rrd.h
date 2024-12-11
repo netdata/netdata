@@ -1238,6 +1238,7 @@ struct rrdhost {
 
             struct {
                 pid_t tid;
+                uint32_t state_id;                  // every time the receiver connects/disconnects, this is incremented
 
                 time_t last_connected;              // the time the last sender was connected
                 time_t last_disconnected;           // the time the last sender was disconnected
