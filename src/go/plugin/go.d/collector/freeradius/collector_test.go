@@ -3,6 +3,7 @@
 package freeradius
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -35,42 +36,42 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 func TestCollector_Init(t *testing.T) {
 	collr := New()
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_ReturnsFalseIfAddressNotSet(t *testing.T) {
 	collr := New()
 	collr.Address = ""
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_ReturnsFalseIfPortNotSet(t *testing.T) {
 	collr := New()
 	collr.Port = 0
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_ReturnsFalseIfSecretNotSet(t *testing.T) {
 	collr := New()
 	collr.Secret = ""
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
 	collr := New()
 	collr.client = newOKMockClient()
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Check_ReturnsFalseIfClientStatusReturnsError(t *testing.T) {
 	collr := New()
 	collr.client = newErrorMockClient()
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -117,7 +118,7 @@ func TestCollector_Collect(t *testing.T) {
 		"proxy-acct-dropped-requests":   33,
 		"proxy-acct-unknown-types":      34,
 	}
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 
 	assert.Equal(t, expected, mx)
 	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
@@ -127,11 +128,11 @@ func TestCollector_Collect_ReturnsNilIfClientStatusReturnsError(t *testing.T) {
 	collr := New()
 	collr.client = newErrorMockClient()
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }
 
 func newOKMockClient() *mockClient {

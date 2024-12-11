@@ -3,6 +3,7 @@
 package filecheck
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -32,7 +33,7 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	assert.NotPanics(t, New().Cleanup)
+	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -100,9 +101,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				require.NoError(t, collr.Init())
+				require.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -124,9 +125,9 @@ func TestCollector_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
-			assert.NoError(t, collr.Check())
+			assert.NoError(t, collr.Check(context.Background()))
 		})
 	}
 }
@@ -239,9 +240,9 @@ func TestCollector_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			copyModTime(test.wantCollected, mx)
 

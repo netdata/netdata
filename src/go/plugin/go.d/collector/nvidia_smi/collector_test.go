@@ -3,6 +3,7 @@
 package nvidia_smi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -64,9 +65,9 @@ func TestCollector_Init(t *testing.T) {
 			test.prepare(collr)
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -110,9 +111,9 @@ func TestCollector_Check(t *testing.T) {
 			test.prepare(collr)
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -128,7 +129,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepare: prepareCaseMIGA100,
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"gpu_GPU-27b94a00-ed54-5c24-b1fd-1054085de32a_bar1_memory_usage_free":                            68718428160,
@@ -188,7 +189,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepare: prepareCaseRTX4090Driver535,
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"gpu_GPU-71d1acc2-662d-2166-bf9f-65272d2fc437_bar1_memory_usage_free":             267386880,
@@ -238,7 +239,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepare: prepareCaseRTX3060,
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"gpu_GPU-473d8d0f-d462-185c-6b36-6fc23e23e571_bar1_memory_usage_free":             8586788864,
@@ -287,7 +288,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepare: prepareCaseTeslaP100,
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"gpu_GPU-d3da8716-eaab-75db-efc1-60e88e1cd55e_bar1_memory_usage_free":             17177772032,
@@ -335,7 +336,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepare: prepareCaseRTX2080Win,
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					expected := map[string]int64{
 						"gpu_GPU-fbd55ed4-1eec-4423-0a47-ad594b4333e3_bar1_memory_usage_free":             266338304,
@@ -384,7 +385,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepare: prepareCaseErrOnQueryGPUInfo,
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect()
+					mx := collr.Collect(context.Background())
 
 					assert.Equal(t, map[string]int64(nil), mx)
 				},

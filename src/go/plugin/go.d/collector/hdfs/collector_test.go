@@ -3,6 +3,7 @@
 package hdfs
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -42,14 +43,14 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 func TestCollector_Init(t *testing.T) {
 	collr := New()
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_InitErrorOnCreatingClientWrongTLSCA(t *testing.T) {
 	collr := New()
 	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -62,9 +63,9 @@ func TestCollector_Check(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 	assert.NotZero(t, collr.nodeType)
 }
 
@@ -78,9 +79,9 @@ func TestCollector_CheckDataNode(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 	assert.Equal(t, dataNodeType, collr.nodeType)
 }
 
@@ -94,9 +95,9 @@ func TestCollector_CheckNameNode(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 	assert.Equal(t, nameNodeType, collr.nodeType)
 }
 
@@ -110,17 +111,17 @@ func TestCollector_CheckErrorOnNodeTypeDetermination(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_CheckNoResponse(t *testing.T) {
 	collr := New()
 	collr.URL = "http://127.0.0.1:38001/jmx"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -148,7 +149,7 @@ func TestCollector_ChartsNameNode(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	New().Cleanup()
+	New().Cleanup(context.Background())
 }
 
 func TestCollector_CollectDataNode(t *testing.T) {
@@ -161,8 +162,8 @@ func TestCollector_CollectDataNode(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"dna_bytes_read":                     80689178,
@@ -200,7 +201,7 @@ func TestCollector_CollectDataNode(t *testing.T) {
 		"rpc_sent_bytes":                     187,
 	}
 
-	assert.Equal(t, expected, collr.Collect())
+	assert.Equal(t, expected, collr.Collect(context.Background()))
 }
 
 func TestCollector_CollectNameNode(t *testing.T) {
@@ -213,8 +214,8 @@ func TestCollector_CollectNameNode(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"fsns_blocks_total":                  15,
@@ -259,7 +260,7 @@ func TestCollector_CollectNameNode(t *testing.T) {
 		"rpc_sent_bytes":                     25067414,
 	}
 
-	assert.Equal(t, expected, collr.Collect())
+	assert.Equal(t, expected, collr.Collect(context.Background()))
 }
 
 func TestCollector_CollectUnknownNode(t *testing.T) {
@@ -272,17 +273,17 @@ func TestCollector_CollectUnknownNode(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Panics(t, func() { _ = collr.Collect() })
+	assert.Panics(t, func() { _ = collr.Collect(context.Background()) })
 }
 
 func TestCollector_CollectNoResponse(t *testing.T) {
 	collr := New()
 	collr.URL = "http://127.0.0.1:38001/jmx"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_CollectReceiveInvalidResponse(t *testing.T) {
@@ -295,9 +296,9 @@ func TestCollector_CollectReceiveInvalidResponse(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_CollectReceive404(t *testing.T) {
@@ -310,7 +311,7 @@ func TestCollector_CollectReceive404(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }

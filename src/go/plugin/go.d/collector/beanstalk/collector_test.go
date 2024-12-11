@@ -4,6 +4,7 @@ package beanstalk
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -68,9 +69,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -115,15 +116,15 @@ func TestCollector_Check(t *testing.T) {
 				t.Errorf("mock collr daemon start timed out")
 			}
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 
-			collr.Cleanup()
+			collr.Cleanup(context.Background())
 
 			select {
 			case <-daemon.stopped:
@@ -226,9 +227,9 @@ func TestCollector_Collect(t *testing.T) {
 				t.Errorf("mock collr daemon start timed out")
 			}
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			require.Equal(t, test.wantMetrics, mx)
 
@@ -238,7 +239,7 @@ func TestCollector_Collect(t *testing.T) {
 				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 
-			collr.Cleanup()
+			collr.Cleanup(context.Background())
 
 			select {
 			case <-daemon.stopped:

@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -25,11 +26,11 @@ type example struct {
 	module.Base
 }
 
-func (e *example) Cleanup() {}
+func (e *example) Cleanup(context.Context) {}
 
-func (e *example) Init() error { return nil }
+func (e *example) Init(context.Context) error { return nil }
 
-func (e *example) Check() error { return nil }
+func (e *example) Check(context.Context) error { return nil }
 
 func (e *example) Charts() *module.Charts {
 	return &module.Charts{
@@ -45,7 +46,7 @@ func (e *example) Charts() *module.Charts {
 }
 func (e *example) Configuration() any { return nil }
 
-func (e *example) Collect() map[string]int64 {
+func (e *example) Collect(context.Context) map[string]int64 {
 	return map[string]int64{
 		"random0": rand.Int63n(100),
 		"random1": rand.Int63n(100),

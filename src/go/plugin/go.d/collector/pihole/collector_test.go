@@ -3,6 +3,7 @@
 package pihole
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -73,9 +74,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -106,9 +107,9 @@ func TestCollector_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -168,7 +169,7 @@ func TestCollector_Collect(t *testing.T) {
 			collr, cleanup := test.prepare(t)
 			defer cleanup()
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			copyBlockListLastUpdate(mx, test.wantMetrics)
 			require.Equal(t, test.wantMetrics, mx)
@@ -185,7 +186,7 @@ func caseSuccessWithWebPassword(t *testing.T) (*Collector, func()) {
 	collr.SetupVarsPath = pathSetupVarsOK
 	collr.URL = srv.URL
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }
@@ -196,7 +197,7 @@ func caseFailNoWebPassword(t *testing.T) (*Collector, func()) {
 	collr.SetupVarsPath = pathSetupVarsWrong
 	collr.URL = srv.URL
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }
@@ -207,7 +208,7 @@ func caseFailUnsupportedVersion(t *testing.T) (*Collector, func()) {
 	collr.SetupVarsPath = pathSetupVarsOK
 	collr.URL = srv.URL
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	return collr, srv.Close
 }

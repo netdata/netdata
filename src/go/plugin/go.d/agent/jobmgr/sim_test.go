@@ -134,7 +134,7 @@ func prepareMockRegistry() module.Registry {
 				ChartsFunc: func() *module.Charts {
 					return &module.Charts{&module.Chart{ID: "id", Title: "title", Units: "units", Dims: module.Dims{{ID: "id1"}}}}
 				},
-				CollectFunc: func() map[string]int64 { return map[string]int64{"id1": 1} },
+				CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"id1": 1} },
 			}
 		},
 		Config: func() any {
@@ -144,7 +144,7 @@ func prepareMockRegistry() module.Registry {
 	reg.Register("fail", module.Creator{
 		Create: func() module.Module {
 			return &module.MockModule{
-				InitFunc: func() error { return errors.New("mock failed init") },
+				InitFunc: func(context.Context) error { return errors.New("mock failed init") },
 			}
 		},
 	})

@@ -3,6 +3,7 @@
 package phpdaemon
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -38,7 +39,7 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 func TestCollector_Init(t *testing.T) {
 	collr := New()
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -51,15 +52,15 @@ func TestCollector_Check(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
-	assert.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_CheckNG(t *testing.T) {
 	collr := New()
 	collr.URL = "http://127.0.0.1:38001"
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -76,13 +77,13 @@ func TestCollector_Charts(t *testing.T) {
 	defer ts.Close()
 
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
-	assert.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.NoError(t, collr.Check(context.Background()))
 	assert.True(t, collr.charts.Has(uptimeChart.ID))
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	assert.NotPanics(t, New().Cleanup)
+	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -95,8 +96,8 @@ func TestCollector_Collect(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
-	assert.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.NoError(t, collr.Check(context.Background()))
 
 	expected := map[string]int64{
 		"alive":       350,
@@ -110,7 +111,7 @@ func TestCollector_Collect(t *testing.T) {
 		"uptime":      15765,
 	}
 
-	assert.Equal(t, expected, collr.Collect())
+	assert.Equal(t, expected, collr.Collect(context.Background()))
 
 }
 
@@ -124,8 +125,8 @@ func TestCollector_InvalidData(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_404(t *testing.T) {
@@ -138,6 +139,6 @@ func TestCollector_404(t *testing.T) {
 
 	collr := New()
 	collr.URL = ts.URL
-	require.NoError(t, collr.Init())
-	assert.Error(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Error(t, collr.Check(context.Background()))
 }

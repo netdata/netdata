@@ -5,6 +5,7 @@ package tor
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -21,7 +22,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	mx := make(map[string]int64)
 	if err := c.collectServerInfo(mx); err != nil {
-		c.Cleanup()
+		c.Cleanup(context.Background())
 		return nil, err
 	}
 

@@ -3,6 +3,7 @@
 package ping
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -59,9 +60,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.UpdateEvery = 1
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -72,7 +73,7 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	assert.NotPanics(t, New().Cleanup)
+	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -95,9 +96,9 @@ func TestCollector_Check(t *testing.T) {
 			collr := test.prepare(t)
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -147,7 +148,7 @@ func TestCollector_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare(t)
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			require.Equal(t, test.wantMetrics, mx)
 
@@ -165,7 +166,7 @@ func casePingSuccess(t *testing.T) *Collector {
 	collr.newProber = func(_ pingProberConfig, _ *logger.Logger) prober {
 		return &mockProber{}
 	}
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	return collr
 }
 
@@ -176,7 +177,7 @@ func casePingError(t *testing.T) *Collector {
 	collr.newProber = func(_ pingProberConfig, _ *logger.Logger) prober {
 		return &mockProber{errOnPing: true}
 	}
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	return collr
 }
 

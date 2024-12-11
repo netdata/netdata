@@ -5,6 +5,7 @@ package oracledb
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -71,9 +72,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -102,7 +103,7 @@ func TestCollector_Cleanup(t *testing.T) {
 			collr, cleanup := prepare(t)
 			defer cleanup()
 
-			assert.NotPanics(t, collr.Cleanup)
+			assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 			assert.Nil(t, collr.db)
 		})
 	}
@@ -142,14 +143,14 @@ func TestCollector_Check(t *testing.T) {
 			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			test.prepareMock(t, mock)
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -243,11 +244,11 @@ func TestCollector_Collect(t *testing.T) {
 			collr.db = db
 			defer func() { _ = db.Close() }()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			test.prepareMock(t, mock)
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 
 			require.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {

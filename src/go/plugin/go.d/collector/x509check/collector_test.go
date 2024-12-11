@@ -3,6 +3,7 @@
 package x509check
 
 import (
+	"context"
 	"crypto/x509"
 	"errors"
 	"os"
@@ -34,13 +35,13 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	assert.NotPanics(t, New().Cleanup)
+	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 }
 
 func TestCollector_Charts(t *testing.T) {
 	collr := New()
 	collr.Source = "https://example.com"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	assert.NotNil(t, collr.Charts())
 }
 
@@ -90,9 +91,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.err {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				require.NoError(t, collr.Init())
+				require.NoError(t, collr.Init(context.Background()))
 
 				var typeOK bool
 				switch test.providerType {
@@ -114,23 +115,23 @@ func TestCollector_Check(t *testing.T) {
 	collr := New()
 	collr.prov = &mockProvider{certs: []*x509.Certificate{{}}}
 
-	assert.NoError(t, collr.Check())
+	assert.NoError(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Check_ReturnsFalseOnProviderError(t *testing.T) {
 	collr := New()
 	collr.prov = &mockProvider{err: true}
 
-	assert.Error(t, collr.Check())
+	assert.Error(t, collr.Check(context.Background()))
 }
 
 func TestCollector_Collect(t *testing.T) {
 	collr := New()
 	collr.Source = "https://example.com"
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 	collr.prov = &mockProvider{certs: []*x509.Certificate{{}}}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 
 	assert.NotZero(t, mx)
 	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
@@ -140,13 +141,13 @@ func TestCollector_Collect_ReturnsNilOnProviderError(t *testing.T) {
 	collr := New()
 	collr.prov = &mockProvider{err: true}
 
-	assert.Nil(t, collr.Collect())
+	assert.Nil(t, collr.Collect(context.Background()))
 }
 
 func TestCollector_Collect_ReturnsNilOnZeroCertificates(t *testing.T) {
 	collr := New()
 	collr.prov = &mockProvider{certs: []*x509.Certificate{}}
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 
 	assert.Nil(t, mx)
 }

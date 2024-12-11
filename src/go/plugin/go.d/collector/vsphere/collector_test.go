@@ -2,6 +2,7 @@
 package vsphere
 
 import (
+	"context"
 	"crypto/tls"
 	"os"
 	"strings"
@@ -42,7 +43,7 @@ func TestCollector_Init(t *testing.T) {
 	collr, _, teardown := prepareVSphereSim(t)
 	defer teardown()
 
-	assert.NoError(t, collr.Init())
+	assert.NoError(t, collr.Init(context.Background()))
 	assert.NotNil(t, collr.discoverer)
 	assert.NotNil(t, collr.scraper)
 	assert.NotNil(t, collr.resources)
@@ -55,7 +56,7 @@ func TestCollector_Init_ReturnsFalseIfURLNotSet(t *testing.T) {
 	defer teardown()
 	collr.URL = ""
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_ReturnsFalseIfUsernameNotSet(t *testing.T) {
@@ -63,7 +64,7 @@ func TestCollector_Init_ReturnsFalseIfUsernameNotSet(t *testing.T) {
 	defer teardown()
 	collr.Username = ""
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_ReturnsFalseIfPasswordNotSet(t *testing.T) {
@@ -71,7 +72,7 @@ func TestCollector_Init_ReturnsFalseIfPasswordNotSet(t *testing.T) {
 	defer teardown()
 	collr.Password = ""
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
@@ -79,7 +80,7 @@ func TestCollector_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
 	defer teardown()
 	collr.ClientConfig.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_ReturnsFalseIfConnectionRefused(t *testing.T) {
@@ -87,7 +88,7 @@ func TestCollector_Init_ReturnsFalseIfConnectionRefused(t *testing.T) {
 	defer teardown()
 	collr.URL = "http://127.0.0.1:32001"
 
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Init_ReturnsFalseIfInvalidHostVMIncludeFormat(t *testing.T) {
@@ -95,16 +96,16 @@ func TestCollector_Init_ReturnsFalseIfInvalidHostVMIncludeFormat(t *testing.T) {
 	defer teardown()
 
 	collr.HostsInclude = match.HostIncludes{"invalid"}
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 
 	collr.HostsInclude = collr.HostsInclude[:0]
 
 	collr.VMsInclude = match.VMIncludes{"invalid"}
-	assert.Error(t, collr.Init())
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
-	assert.NoError(t, New().Check())
+	assert.NoError(t, New().Check(context.Background()))
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -115,23 +116,23 @@ func TestCollector_Cleanup(t *testing.T) {
 	collr, _, teardown := prepareVSphereSim(t)
 	defer teardown()
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
-	collr.Cleanup()
+	collr.Cleanup(context.Background())
 	time.Sleep(time.Second)
 	assert.True(t, collr.discoveryTask.isStopped())
 	assert.False(t, collr.discoveryTask.isRunning())
 }
 
 func TestCollector_Cleanup_NotPanicsIfNotInitialized(t *testing.T) {
-	assert.NotPanics(t, New().Cleanup)
+	assert.NotPanics(t, func() { New().Cleanup(context.Background()) })
 }
 
 func TestCollector_Collect(t *testing.T) {
 	collr, model, teardown := prepareVSphereSim(t)
 	defer teardown()
 
-	require.NoError(t, collr.Init())
+	require.NoError(t, collr.Init(context.Background()))
 
 	collr.scraper = mockScraper{collr.scraper}
 
@@ -330,7 +331,7 @@ func TestCollector_Collect(t *testing.T) {
 		"vm-72_sys.uptime.latest":             200,
 	}
 
-	mx := collr.Collect()
+	mx := collr.Collect(context.Background())
 
 	require.Equal(t, expected, mx)
 
@@ -347,8 +348,8 @@ func TestCollector_Collect_RemoveHostsVMsInRuntime(t *testing.T) {
 	collr, _, teardown := prepareVSphereSim(t)
 	defer teardown()
 
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	okHostID := "host-58"
 	okVMID := "vm-63"
@@ -359,7 +360,7 @@ func TestCollector_Collect_RemoveHostsVMsInRuntime(t *testing.T) {
 
 	numOfRuns := 5
 	for i := 0; i < numOfRuns; i++ {
-		collr.Collect()
+		collr.Collect(context.Background())
 	}
 
 	host := collr.resources.Hosts.Get(okHostID)
@@ -382,7 +383,7 @@ func TestCollector_Collect_RemoveHostsVMsInRuntime(t *testing.T) {
 	}
 
 	for i := numOfRuns; i < failedUpdatesLimit; i++ {
-		collr.Collect()
+		collr.Collect(context.Background())
 	}
 
 	assert.Len(t, collr.discoveredHosts, 1)
@@ -403,12 +404,12 @@ func TestCollector_Collect_Run(t *testing.T) {
 	defer teardown()
 
 	collr.DiscoveryInterval = confopt.Duration(time.Second * 2)
-	require.NoError(t, collr.Init())
-	require.NoError(t, collr.Check())
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
 
 	runs := 20
 	for i := 0; i < runs; i++ {
-		assert.True(t, len(collr.Collect()) > 0)
+		assert.True(t, len(collr.Collect(context.Background())) > 0)
 		if i < 6 {
 			time.Sleep(time.Second)
 		}
@@ -424,7 +425,7 @@ func TestCollector_Collect_Run(t *testing.T) {
 func prepareVSphereSim(t *testing.T) (collr *Collector, model *simulator.Model, teardown func()) {
 	model, srv := createSim(t)
 	collr = New()
-	teardown = func() { model.Remove(); srv.Close(); collr.Cleanup() }
+	teardown = func() { model.Remove(); srv.Close(); collr.Cleanup(context.Background()) }
 
 	collr.Username = "administrator"
 	collr.Password = "password"

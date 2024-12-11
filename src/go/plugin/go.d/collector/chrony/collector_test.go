@@ -3,6 +3,7 @@
 package chrony
 
 import (
+	"context"
 	"errors"
 	"net"
 	"os"
@@ -56,9 +57,9 @@ func TestCollector_Init(t *testing.T) {
 			collr.Config = test.config
 
 			if test.wantFail {
-				assert.Error(t, collr.Init())
+				assert.Error(t, collr.Init(context.Background()))
 			} else {
-				assert.NoError(t, collr.Init())
+				assert.NoError(t, collr.Init(context.Background()))
 			}
 		})
 	}
@@ -95,12 +96,12 @@ func TestCollector_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 
 			if test.wantFail {
-				assert.Error(t, collr.Check())
+				assert.Error(t, collr.Check(context.Background()))
 			} else {
-				assert.NoError(t, collr.Check())
+				assert.NoError(t, collr.Check(context.Background()))
 			}
 		})
 	}
@@ -121,15 +122,15 @@ func TestCollector_Cleanup(t *testing.T) {
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(c *Collector) { _ = c.Init() },
+			prepare:   func(c *Collector) { _ = c.Init(context.Background()) },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(c *Collector) { _ = c.Init(); _ = c.Check() },
+			prepare:   func(c *Collector) { _ = c.Init(context.Background()); _ = c.Check(context.Background()) },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(c *Collector) { _ = c.Init(); _ = c.Collect() },
+			prepare:   func(c *Collector) { _ = c.Init(context.Background()); _ = c.Collect(context.Background()) },
 		},
 	}
 
@@ -139,7 +140,7 @@ func TestCollector_Cleanup(t *testing.T) {
 			collr := prepareChronyWithMock(m)
 			test.prepare(collr)
 
-			require.NotPanics(t, collr.Cleanup)
+			require.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 
 			if test.wantClose {
 				assert.True(t, m.closeCalled)
@@ -222,11 +223,11 @@ func TestCollector_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
 
-			require.NoError(t, collr.Init())
+			require.NoError(t, collr.Init(context.Background()))
 			collr.exec = &mockChronyc{}
-			_ = collr.Check()
+			_ = collr.Check(context.Background())
 
-			mx := collr.Collect()
+			mx := collr.Collect(context.Background())
 			copyRefMeasurementTime(mx, test.expected)
 
 			assert.Equal(t, test.expected, mx)
