@@ -26,4 +26,4 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: netdata/website
           workflow: Update integrations
-          ref: refs/heads/maste
+          ref: refs/heads/master
