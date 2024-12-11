@@ -9,7 +9,7 @@ struct backfill_request {
     uint32_t successful;
     uint32_t failed;
     backfill_callback_t cb;
-    void *data;
+    struct backfill_request_data data;
 };
 
 struct backfill_dim_work {
@@ -28,12 +28,16 @@ static struct {
     size_t queue_size;
     BACKFILL_JudyLSet queue;
 
+    ARAL *ar_br;
+    ARAL *ar_bdm;
+
 } backfill_globals = {
     .spinlock = SPINLOCK_INITIALIZER,
     .queue = { 0 },
 };
 
-bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data) {
+struct backfill_request_data *backfill_request_add(RRDSET *st, backfill_callback_t cb) {
+    struct backfill_request_data *rc = NULL;
     size_t dimensions = dictionary_entries(st->rrddim_root_index);
     if(!dimensions || dimensions > 200)
         return false;
@@ -41,14 +45,12 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data) {
     size_t added = 0;
     struct backfill_dim_work *array[dimensions];
 
-    bool rc = false;
     if(backfill_globals.running) {
-        struct backfill_request *br = callocz(1, sizeof(*br));
+        struct backfill_request *br = aral_mallocz(backfill_globals.ar_br);
         br->rrdhost_receiver_state_id =__atomic_load_n(&st->rrdhost->stream.rcv.status.state_id, __ATOMIC_RELAXED);
         br->rsa = rrdset_find_and_acquire(st->rrdhost, string2str(st->id));
         if(br->rsa) {
             br->cb = cb;
-            br->data = data;
 
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
@@ -56,7 +58,7 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data) {
                     break;
 
                 if (!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
-                    struct backfill_dim_work *bdm = callocz(1, sizeof(*bdm));
+                    struct backfill_dim_work *bdm = aral_mallocz(backfill_globals.ar_bdm);
                     bdm->rda = (RRDDIM_ACQUIRED *)dictionary_acquired_item_dup(st->rrddim_root_index, rd_dfe.item);
                     bdm->br = br;
                     br->works++;
@@ -76,12 +78,13 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data) {
 
             spinlock_unlock(&backfill_globals.spinlock);
             completion_mark_complete_a_job(&backfill_globals.completion);
-            rc = true;
+
+            rc = &br->data;
         }
         else {
+            // no dimensions added
             rrdset_acquired_release(br->rsa);
-            freez(br);
-            rc = false;
+            aral_freez(backfill_globals.ar_br, br);
         }
     }
 
@@ -120,14 +123,14 @@ static void backfill_dim_work_free(bool successful, struct backfill_dim_work *bd
         if(br->cb)
             br->cb(__atomic_load_n(&br->successful, __ATOMIC_RELAXED),
                    __atomic_load_n(&br->failed, __ATOMIC_RELAXED),
-                   br->data);
+                   &br->data);
 
         rrdset_acquired_release(br->rsa);
-        freez(br);
+        aral_freez(backfill_globals.ar_br, br);
     }
 
     rrddim_acquired_release(bdm->rda);
-    freez(bdm);
+    aral_freez(backfill_globals.ar_bdm, bdm);
 }
 
 void *backfill_worker_thread(void *ptr) {
@@ -180,14 +183,16 @@ void *backfill_thread(void *ptr) {
 
     completion_init(&backfill_globals.completion);
     BACKFILL_INIT(&backfill_globals.queue);
+    backfill_globals.ar_br = aral_by_size_acquire(sizeof(struct backfill_request));
+    backfill_globals.ar_bdm = aral_by_size_acquire(sizeof(struct backfill_dim_work));
 
     spinlock_lock(&backfill_globals.spinlock);
     backfill_globals.running = true;
     spinlock_unlock(&backfill_globals.spinlock);
 
-    size_t threads = get_netdata_cpus();
+    size_t threads = get_netdata_cpus() / 2;
     if(threads < 2) threads = 2;
-    if(threads > 256) threads = 256;
+    if(threads > 16) threads = 16;
     ND_THREAD *th[threads - 1];
 
     for(size_t t = 0; t < threads - 1 ;t++) {
@@ -215,6 +220,8 @@ void *backfill_thread(void *ptr) {
     }
     spinlock_unlock(&backfill_globals.spinlock);
 
+    aral_by_size_release(backfill_globals.ar_br);
+    aral_by_size_release(backfill_globals.ar_bdm);
     completion_destroy(&backfill_globals.completion);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;

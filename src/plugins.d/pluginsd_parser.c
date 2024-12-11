@@ -374,18 +374,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
     return PARSER_RC_OK;
 }
 
-struct backfill_request_data {
-    size_t rrdhost_receiver_state_id;
-    PARSER *parser;
-    RRDHOST *host;
-    RRDSET *st;
-    time_t first_entry_child;
-    time_t last_entry_child;
-    time_t child_wall_clock_time;
-};
-
-static void backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, void *data) {
-    struct backfill_request_data *brd = data;
+static void backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, struct backfill_request_data *brd) {
     if (brd->rrdhost_receiver_state_id == __atomic_load_n(&brd->host->stream.rcv.status.state_id, __ATOMIC_RELAXED)) {
         if (!replicate_chart_request(send_to_plugin, brd->parser, brd->host, brd->st,
                                      brd->first_entry_child, brd->last_entry_child, brd->child_wall_clock_time,
@@ -427,22 +416,20 @@ static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_w
         rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         rrdhost_receiver_replicating_charts_plus_one(st->rrdhost);
 
-        struct backfill_request_data *brd = callocz(1, sizeof(*brd));
-        brd->rrdhost_receiver_state_id =__atomic_load_n(&host->stream.rcv.status.state_id, __ATOMIC_RELAXED);
-        brd->parser = parser;
-        brd->host = host;
-        brd->st = st;
-        brd->first_entry_child = first_entry_child;
-        brd->last_entry_child = last_entry_child;
-        brd->child_wall_clock_time = child_wall_clock_time;
-
-        if(!backfill_request_add(st, backfill_callback, brd)) {
-            freez(brd);
-            ok = replicate_chart_request(
-                send_to_plugin, parser, host, st, first_entry_child, last_entry_child, child_wall_clock_time, 0, 0);
+        struct backfill_request_data *brd = backfill_request_add(st, backfill_callback);
+        if(brd) {
+            brd->rrdhost_receiver_state_id =__atomic_load_n(&host->stream.rcv.status.state_id, __ATOMIC_RELAXED);
+            brd->parser = parser;
+            brd->host = host;
+            brd->st = st;
+            brd->first_entry_child = first_entry_child;
+            brd->last_entry_child = last_entry_child;
+            brd->child_wall_clock_time = child_wall_clock_time;
+            ok = true;
         }
         else
-            ok = true;
+            ok = replicate_chart_request(
+                send_to_plugin, parser, host, st, first_entry_child, last_entry_child, child_wall_clock_time, 0, 0);
     }
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     else {
