@@ -100,7 +100,7 @@
 #define CONFIG_SECTION_PROMETHEUS         "prometheus:exporter"
 #define CONFIG_SECTION_HOST_LABEL         "host labels"
 #define EXPORTING_CONF                    "exporting.conf"
-#define CONFIG_SECTION_GLOBAL_STATISTICS  "global statistics"
+#define CONFIG_SECTION_PULSE              "pulse"
 #define CONFIG_SECTION_DB                 "db"
 
 // these are used to limit the configuration names and values lengths
@@ -122,7 +122,7 @@ struct config {
 
 #define APPCONFIG_INITIALIZER (struct config) {         \
         .sections = NULL,                               \
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,       \
+        .spinlock = SPINLOCK_INITIALIZER,       \
         .index = {                                      \
             .avl_tree = {                               \
                 .root = NULL,                           \
@@ -182,6 +182,8 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct config_section *connector, st
 
 bool stream_conf_needs_dbengine(struct config *root);
 bool stream_conf_has_uuid_section(struct config *root);
+
+void appconfig_foreach_section(struct config *root, void (*cb)(struct config *root, const char *name, void *data), void *data);
 
 #include "appconfig_api_text.h"
 #include "appconfig_api_numbers.h"

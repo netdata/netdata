@@ -2,7 +2,7 @@
 
 Netdata's dashboard features powerful date visualization controls that include a time control, a timezone selector and a rich date and timeframe selector.
 
-The controls come with useful defaults and rich customization, to help you narrow your focus when troubleshooting issues or anomalies.
+The controls come with useful defaults and rich customization to help you narrow your focus when troubleshooting issues or anomalies.
 
 ## Time controls
 
@@ -12,12 +12,12 @@ The time control provides you the following options: **Play**, **Pause** and **F
 - **Pause** - the content of the page isn't refreshed due to a manual request to pause it or, for example, when your investigating data on a chart (cursor is on top of a chart)
 - **Force Play** - the content of the page will be automatically refreshed even if this is in the background
 
-With this, we aim to bring more clarity and allow you to distinguish if the content you are looking at is live or historical and also allow you to always refresh the content of the page when the tabs are in the background.
+With this, we aim to bring more clarity and allow you to distinguish if the content you’re looking at is live or historical and also allow you to always refresh the content of the page when the tabs are in the background.
 
 Main use cases for **Force Play**:
 
-- You use a terminal or deployment tools to do changes in your infra and want to see the effect immediately, Netdata is in the background, displaying the impact of these changes
-- You want to have Netdata on the background, example displayed on a TV, to constantly see metrics through dashboards or to watch the alert status
+- You use a terminal or deployment tools to do changes in your infra and want to see the effect immediately; Netdata is in the background, displaying the impact of these changes
+- You want to have Netdata in the background, example displayed on a TV, to constantly see metrics through dashboards or to watch the alert status
 
 ![The time control with Play, Pause and Force Play](https://user-images.githubusercontent.com/70198089/225850250-1fe12477-23f8-4b4d-b497-79b416963e10.png)
 
@@ -27,10 +27,10 @@ The date and time selector allows you to change the visible timeframe and change
 
 ### Pick timeframes to visualize
 
-While [panning through time and zooming in/out](/docs/dashboards-and-charts/netdata-charts.md) from charts it is helpful when you're looking a recent history, or want to do granular troubleshooting, what if you want to see metrics from 6 hours ago? Or 6 days?
+While [panning through time and zooming in/out](/docs/dashboards-and-charts/netdata-charts.md) from charts, it is helpful when you're looking a recent history, or want to do granular troubleshooting, what if you want to see metrics from 6 hours ago? Or 6 days?
 
 Netdata's dashboard features a **timeframe selector** to help you visualize specific timeframes in a few helpful ways.
-By default, it shows a certain number of minutes of historical metrics based on the your browser's viewport to ensure it's always showing per-second granularity.
+By default, it shows a certain number of minutes of historical metrics based on your browser's viewport to ensure it's always showing per-second granularity.
 
 #### Open the timeframe selector
 
@@ -75,13 +75,13 @@ timeframe begins at noon on the beginning and end dates. Click **Apply** to see 
 across a larger period of time.
 
 **You can only see metrics as far back in history as your metrics retention policy allows**. Netdata uses an internal
-time-series database (TSDB) to store as many metrics as it can within a specific amount of disk space. The default
-storage is 256 MiB, which should be enough for 1-3 days of historical metrics. If you navigate back to a timeframe
+time-series database (TSDB) to store as much metrics as it can within a specific amount of disk space. The default
+storage is 256 MiB, which should be enough for 1–3 days of historical metrics. If you navigate back to a timeframe
 beyond stored historical metrics, you'll see this message:
 
 ![image](https://user-images.githubusercontent.com/70198089/225851033-43b95164-a651-48f2-8915-6aac9739ed93.png)
 
-At any time, [configure the internal TSDB's storage capacity](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md) to expand your
+At any time, [configure the internal TSDB's storage capacity](/src/database/CONFIGURATION.md) to expand your
 depth of historical metrics.
 
 ### Timezone selector

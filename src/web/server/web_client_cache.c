@@ -33,14 +33,14 @@ static struct clients_cache {
     } avail;
 } web_clients_cache = {
         .used = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .spinlock = SPINLOCK_INITIALIZER,
                 .head = NULL,
                 .count = 0,
                 .reused = 0,
                 .allocated = 0,
         },
         .avail = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .spinlock = SPINLOCK_INITIALIZER,
                 .head = NULL,
                 .count = 0,
         },
@@ -103,7 +103,7 @@ struct web_client *web_client_get_from_cache(void) {
         w = web_client_create(&netdata_buffers_statistics.buffers_web);
         spinlock_lock(&web_clients_cache.used.spinlock);
 
-        w->id = global_statistics_web_client_connected();
+        w->id = pulse_web_client_connected();
         web_clients_cache.used.allocated++;
     }
 

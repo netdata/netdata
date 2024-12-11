@@ -201,7 +201,6 @@ struct rrdeng_collect_handle {
     struct metric *metric;
     struct pgc_page *pgc_page;
     struct pgd *page_data;
-    size_t page_data_size;
     struct pg_alignment *alignment;
     uint32_t page_entries_max;
     uint32_t page_position;                   // keep track of the current page size, to make sure we don't exceed it
@@ -249,8 +248,10 @@ enum rrdeng_opcode {
     RRDENG_OPCODE_FLUSHED_TO_OPEN,
     RRDENG_OPCODE_DATABASE_ROTATE,
     RRDENG_OPCODE_JOURNAL_INDEX,
-    RRDENG_OPCODE_FLUSH_INIT,
-    RRDENG_OPCODE_EVICT_INIT,
+    RRDENG_OPCODE_FLUSH_MAIN,
+    RRDENG_OPCODE_EVICT_MAIN,
+    RRDENG_OPCODE_EVICT_OPEN,
+    RRDENG_OPCODE_EVICT_EXTENT,
     RRDENG_OPCODE_CTX_SHUTDOWN,
     RRDENG_OPCODE_CTX_QUIESCE,
     RRDENG_OPCODE_CTX_POPULATE_MRG,

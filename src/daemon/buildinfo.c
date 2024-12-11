@@ -54,6 +54,7 @@ typedef enum __attribute__((packed)) {
     BIB_FEATURE_CONTEXTS,
     BIB_FEATURE_TIERING,
     BIB_FEATURE_ML,
+    BIB_FEATURE_ALLOCATOR,
     BIB_DB_DBENGINE,
     BIB_DB_ALLOC,
     BIB_DB_RAM,
@@ -528,6 +529,14 @@ static struct {
                 .analytics = "Machine Learning",
                 .print = "Machine Learning",
                 .json = "ml",
+                .value = NULL,
+        },
+        [BIB_FEATURE_ALLOCATOR] = {
+                .category = BIC_FEATURE,
+                .type = BIT_STRING,
+                .analytics = "allocator",
+                .print = "Memory Allocator",
+                .json = "allocator",
                 .value = NULL,
         },
         [BIB_DB_DBENGINE] = {
@@ -1096,6 +1105,15 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_FEATURE_ML, true);
 #endif
 
+#if defined(ENABLE_MIMALLOC)
+    build_info_set_status(BIB_FEATURE_ALLOCATOR, true);
+    build_info_set_value(BIB_FEATURE_ALLOCATOR, "mimalloc");
+#else
+    build_info_set_status(BIB_FEATURE_ALLOCATOR, true);
+    build_info_set_value(BIB_FEATURE_ALLOCATOR, "system");
+#endif
+
+
 #ifdef ENABLE_DBENGINE
     build_info_set_status(BIB_DB_DBENGINE, true);
 #ifdef ENABLE_ZSTD
@@ -1245,7 +1263,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 int get_system_info(struct rrdhost_system_info *system_info);
 static void populate_system_info(void) {
     static bool populated = false;
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
     if(populated)
         return;

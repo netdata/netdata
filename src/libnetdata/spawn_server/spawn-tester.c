@@ -108,7 +108,7 @@ void test_int_fds_plugin_kill_to_stop(SPAWN_SERVER *server, const char *argv0) {
     }
     fprintf(stderr, "\n");
 
-    int code = spawn_server_exec_kill(server, si);
+    int code = spawn_server_exec_kill(server, si, 0);
 
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
            "child exited with code %d",
@@ -162,7 +162,7 @@ void test_popen_plugin_kill_to_stop(const char *argv0) {
     }
     fprintf(stderr, "\n");
 
-    int code = spawn_popen_kill(pi);
+    int code = spawn_popen_kill(pi, 0);
 
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
            "child exited with code %d",

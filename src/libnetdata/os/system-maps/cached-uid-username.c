@@ -19,7 +19,7 @@ static struct {
     SIMPLE_HASHTABLE_USERNAMES_CACHE ht;
 } user_cache = {
     .initialized = false,
-    .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+    .spinlock = SPINLOCK_INITIALIZER,
     .ht = { 0 },
 };
 

@@ -12,7 +12,7 @@ func IsUdpSocket(address string) bool {
 	return strings.HasPrefix(address, "udp://")
 }
 
-func networkType(address string) (string, string) {
+func parseAddress(address string) (string, string) {
 	switch {
 	case IsUnixSocket(address):
 		address = strings.TrimPrefix(address, "unix://")

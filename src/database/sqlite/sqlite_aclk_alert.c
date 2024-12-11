@@ -18,9 +18,9 @@
 
 static inline bool is_event_from_alert_variable_config(int64_t unique_id, nd_uuid_t *host_id)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &res))
         return false;
 
     bool ret = false;
@@ -34,20 +34,18 @@ static inline bool is_event_from_alert_variable_config(int64_t unique_id, nd_uui
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
     return ret;
 }
-
-#define MAX_REMOVED_PERIOD 604800 //a week
 
 #define SQL_UPDATE_ALERT_VERSION_TRANSITION                                                                            \
     "UPDATE alert_version SET unique_id = @unique_id WHERE health_log_id = @health_log_id"
 
 static void update_alert_version_transition(int64_t health_log_id, int64_t unique_id)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION_TRANSITION, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION_TRANSITION, &res))
         return;
 
     int param = 0;
@@ -61,7 +59,7 @@ static void update_alert_version_transition(int64_t health_log_id, int64_t uniqu
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 //decide if some events should be sent or not
@@ -70,9 +68,9 @@ done:
 
 static bool cloud_status_matches(int64_t health_log_id, RRDCALC_STATUS status)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_LAST_ALERT_STATUS, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_LAST_ALERT_STATUS, &res))
         return true;
 
     bool send = false;
@@ -89,7 +87,7 @@ static bool cloud_status_matches(int64_t health_log_id, RRDCALC_STATUS status)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
     return send;
 }
 
@@ -108,7 +106,7 @@ done:
 //
 static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, uint32_t unique_id, RRDCALC_STATUS status)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
     if (cloud_status_matches(health_log_id, status)) {
         update_alert_version_transition(health_log_id, unique_id);
@@ -118,7 +116,7 @@ static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, ui
     if (is_event_from_alert_variable_config(unique_id, &host->host_id.uuid))
         return 2;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_QUEUE_ALERT_TO_CLOUD, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_QUEUE_ALERT_TO_CLOUD, &res))
         return -1;
 
     int param = 0;
@@ -133,7 +131,7 @@ static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, ui
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
     return 0;
 }
 
@@ -145,9 +143,9 @@ done:
 //
 static int delete_alert_from_submit_queue(RRDHOST *host, int64_t first_seq_id, int64_t last_seq_id)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_DELETE_QUEUE_ALERT_TO_CLOUD, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_QUEUE_ALERT_TO_CLOUD, &res))
         return -1;
 
     int param = 0;
@@ -162,7 +160,7 @@ static int delete_alert_from_submit_queue(RRDHOST *host, int64_t first_seq_id, i
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
     return 0;
 }
 
@@ -224,9 +222,9 @@ static inline char *sqlite3_text_strdupz_empty(sqlite3_stmt *res, int iCol) {
 //
 static void sql_update_alert_version(int64_t health_log_id, int64_t unique_id, RRDCALC_STATUS status, uint64_t version)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION, &res))
         return;
 
     int param = 0;
@@ -242,7 +240,7 @@ static void sql_update_alert_version(int64_t health_log_id, int64_t unique_id, R
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 #define SQL_SELECT_ALERT_TO_DUMMY                                                                                      \
@@ -355,7 +353,7 @@ void health_alarm_log_populate(
     alarm_log->timezone = strdupz(rrdhost_abbrev_timezone(host));
     alarm_log->exec_path =  sqlite3_column_bytes(res, EXEC) ?
                                strdupz((char *)sqlite3_column_text(res, EXEC)) :
-                               strdupz((char *)string2str(host->health.health_default_exec));
+                               strdupz((char *)string2str(host->health.default_exec));
 
     alarm_log->conf_source = source ? strdupz(source) : strdupz("");
 
@@ -422,6 +420,7 @@ void health_alarm_log_populate(
     " ORDER BY aq.sequence_id ASC LIMIT "ACLK_MAX_ALERT_UPDATES
 
 static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
+
 {
     CLAIM_ID claim_id = claim_id_get();
 
@@ -487,9 +486,9 @@ done:
 
 static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_DELETE_PROCESSED_ROWS, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_PROCESSED_ROWS, &res))
         return;
 
     int param = 0;
@@ -503,7 +502,7 @@ static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
 }
 
 #define SQL_REBUILD_HOST_ALERT_VERSION_TABLE                                                                           \
@@ -536,6 +535,7 @@ void rebuild_host_alert_version_table(RRDHOST *host)
     if (!PREPARE_STATEMENT(db_meta, SQL_REBUILD_HOST_ALERT_VERSION_TABLE, &res))
         return;
 
+    param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     param = 0;
@@ -554,9 +554,9 @@ done:
 
 bool process_alert_pending_queue(RRDHOST *host)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &res))
         return false;
 
     int param = 0;
@@ -586,7 +586,7 @@ bool process_alert_pending_queue(RRDHOST *host)
         nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK STA [%s (N/A)]: Processed %d entries, queued %d", rrdhost_hostname(host), count, added);
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
     return added > 0;
 }
 
@@ -765,9 +765,9 @@ done:
 
 static uint64_t calculate_node_alert_version(RRDHOST *host)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res = NULL;
 
-    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_ALERT_VERSION_CALC, &res))
+    if (!PREPARE_STATEMENT(db_meta, SQL_ALERT_VERSION_CALC, &res))
         return 0;
 
     uint64_t version = 0;
@@ -781,7 +781,7 @@ static uint64_t calculate_node_alert_version(RRDHOST *host)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    SQLITE_FINALIZE(res);
     return version;
 }
 
@@ -1007,7 +1007,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version)
         return;
     }
 
-    if (unlikely(!host->health.health_enabled)) {
+    if (unlikely(!host->health.enabled)) {
         nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK STA [%s (N/A)]: Ignoring request to stream alert state changes, health is disabled.", node_id);
         return;
     }

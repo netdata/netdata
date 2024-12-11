@@ -25,7 +25,7 @@
 #include "libnetdata/avl/avl.h"
 #include "libnetdata/clocks/clocks.h"
 #include "libnetdata/config/appconfig.h"
-#include "libnetdata/ebpf/ebpf.h"
+#include "libbpf_api/ebpf.h"
 #include "libnetdata/procfile/procfile.h"
 #include "collectors/cgroups.plugin/sys_fs_cgroup.h"
 #include "daemon/main.h"

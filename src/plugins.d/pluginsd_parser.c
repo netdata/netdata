@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "pluginsd_internals.h"
+#include "streaming/replication.h"
 
 static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
@@ -190,13 +191,13 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         default_rrd_history_entries,
         default_rrd_memory_mode,
         health_plugin_enabled(),
-        stream_conf_send_enabled,
-        stream_conf_send_destination,
-        stream_conf_send_api_key,
-        stream_conf_send_charts_matching,
-        stream_conf_replication_enabled,
-        stream_conf_replication_period,
-        stream_conf_replication_step,
+        stream_send.enabled,
+        stream_send.parents.destination,
+        stream_send.api_key,
+        stream_send.send_charts_matching,
+        stream_receive.replication.enabled,
+        stream_receive.replication.period,
+        stream_receive.replication.step,
         rrdhost_labels_to_system_info(parser->user.host_define.rrdlabels),
         false);
 
@@ -218,7 +219,10 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     rrdcontext_host_child_connected(host);
-    schedule_node_state_update(host, 100);
+    if (host->aclk_config)
+        aclk_queue_node_info(host, true);
+    else
+        schedule_node_state_update(host, 100);
 
     return PARSER_RC_OK;
 }
@@ -327,7 +331,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
 
     st = rrdset_create(
         host, type, id, name, family, context, title, units,
-        (plugin && *plugin) ? plugin : parser->user.cd->filename,
+        (plugin && *plugin) ? plugin : string2str(parser->user.cd->filename),
         module, priority, update_every,
         chart_type);
 
@@ -783,7 +787,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
     // ------------------------------------------------------------------------
     // prepare our state
 
-    pluginsd_lock_rrdset_data_collection(parser);
+    rrdset_data_collection_lock(parser);
 
     parser->user.v2.update_every = update_every;
     parser->user.v2.end_time = end_time;
@@ -795,8 +799,8 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
     // ------------------------------------------------------------------------
     // propagate it forward in v2
 
-    if(!parser->user.v2.stream_buffer.wb && rrdhost_has_rrdpush_sender_enabled(st->rrdhost))
-        parser->user.v2.stream_buffer = rrdset_push_metric_initialize(parser->user.st, wall_clock_time);
+    if(!parser->user.v2.stream_buffer.wb && rrdhost_has_stream_sender_enabled(st->rrdhost))
+        parser->user.v2.stream_buffer = stream_send_metrics_init(parser->user.st, wall_clock_time);
 
     if(parser->user.v2.stream_buffer.v2 && parser->user.v2.stream_buffer.wb) {
         // check receiver capabilities
@@ -817,7 +821,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
 
         if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, st->rrdpush.sender.chart_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, st->stream.snd.chart_slot);
         }
 
         buffer_fast_strcat(wb, " '", 2);
@@ -922,20 +926,33 @@ static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *
     // ------------------------------------------------------------------------
     // check value and ML
 
-    if (unlikely(!netdata_double_isnumber(value) || (flags == SN_EMPTY_SLOT))) {
-        value = NAN;
-        flags = SN_EMPTY_SLOT;
+    if(stream_has_capability(&parser->user, STREAM_CAP_ML_MODELS)) {
+        // we receive anomaly information, no need for prediction on this node
+        if (unlikely(!netdata_double_isnumber(value) || (flags == SN_EMPTY_SLOT))) {
+            value = NAN;
+            flags = SN_EMPTY_SLOT;
+        }
 
         if(parser->user.v2.ml_locked)
-            ml_dimension_is_anomalous(rd, parser->user.v2.end_time, 0, false);
+            ml_dimension_received_anomaly(rd, !(flags & SN_FLAG_NOT_ANOMALOUS));
     }
-    else if(parser->user.v2.ml_locked) {
-        if (ml_dimension_is_anomalous(rd, parser->user.v2.end_time, value, true)) {
-            // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
-            flags &= ~((storage_number) SN_FLAG_NOT_ANOMALOUS);
+    else {
+        // we don't receive anomaly information, we need to run prediction on this node
+        if (unlikely(!netdata_double_isnumber(value) || (flags == SN_EMPTY_SLOT))) {
+            value = NAN;
+            flags = SN_EMPTY_SLOT;
+
+            if(parser->user.v2.ml_locked)
+                ml_dimension_is_anomalous(rd, parser->user.v2.end_time, 0, false);
         }
-        else
-            flags |= SN_FLAG_NOT_ANOMALOUS;
+        else if(parser->user.v2.ml_locked) {
+            if (ml_dimension_is_anomalous(rd, parser->user.v2.end_time, value, true)) {
+                // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
+                flags &= ~((storage_number) SN_FLAG_NOT_ANOMALOUS);
+            }
+            else
+                flags |= SN_FLAG_NOT_ANOMALOUS;
+        }
     }
 
     timing_step(TIMING_STEP_SET2_ML);
@@ -958,7 +975,7 @@ static inline PARSER_RC pluginsd_set_v2(char **words, size_t num_words, PARSER *
 
         if(with_slots) {
             buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
-            buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdpush.sender.dim_slot);
+            buffer_print_uint64_encoded(wb, integer_encoding, rd->stream.snd.dim_slot);
         }
 
         buffer_fast_strcat(wb, " '", 2);
@@ -1014,14 +1031,14 @@ static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_
     // propagate the whole chart update in v1
 
     if(unlikely(!parser->user.v2.stream_buffer.v2 && !parser->user.v2.stream_buffer.begin_v2_added && parser->user.v2.stream_buffer.wb))
-        rrdset_push_metrics_v1(&parser->user.v2.stream_buffer, st);
+        stream_send_rrdset_metrics_v1(&parser->user.v2.stream_buffer, st);
 
     timing_step(TIMING_STEP_END2_PUSH_V1);
 
     // ------------------------------------------------------------------------
     // unblock data collection
 
-    pluginsd_unlock_previous_scope_chart(parser, PLUGINSD_KEYWORD_END_V2, false);
+    rrdset_previous_scope_chart_unlock(parser, PLUGINSD_KEYWORD_END_V2, false);
     rrdcontext_collected_rrdset(st);
     store_metric_collection_completed();
 
@@ -1030,7 +1047,7 @@ static inline PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_
     // ------------------------------------------------------------------------
     // propagate it forward
 
-    rrdset_push_metrics_finished(&parser->user.v2.stream_buffer, st);
+    stream_send_rrdset_metrics_finished(&parser->user.v2.stream_buffer, st);
 
     timing_step(TIMING_STEP_END2_PROPAGATE);
 
@@ -1080,6 +1097,11 @@ static void pluginsd_json_stream_paths(PARSER *parser, void *action_data __maybe
     buffer_free(parser->defer.response);
 }
 
+static void pluginsd_json_ml_model(PARSER *parser, void *action_data __maybe_unused) {
+    ml_model_received_from_child(parser->user.host, buffer_tostring(parser->defer.response));
+    buffer_free(parser->defer.response);
+}
+
 static void pluginsd_json_dev_null(PARSER *parser, void *action_data __maybe_unused) {
     buffer_free(parser->defer.response);
 }
@@ -1096,15 +1118,17 @@ static PARSER_RC pluginsd_json(char **words __maybe_unused, size_t num_words __m
     parser->defer.action_data = NULL;
     parser->flags |= PARSER_DEFER_UNTIL_KEYWORD;
 
-    if(strcmp(keyword, PLUGINSD_KEYWORD_STREAM_PATH) == 0)
+    if(strcmp(keyword, PLUGINSD_KEYWORD_JSON_CMD_STREAM_PATH) == 0)
         parser->defer.action = pluginsd_json_stream_paths;
+    else if(strcmp(keyword, PLUGINSD_KEYWORD_JSON_CMD_ML_MODEL) == 0)
+        parser->defer.action = pluginsd_json_ml_model;
     else
         netdata_log_error("PLUGINSD: invalid JSON payload keyword '%s'", keyword);
 
     return PARSER_RC_OK;
 }
 
-PARSER_RC rrdpush_receiver_pluginsd_claimed_id(char **words, size_t num_words, PARSER *parser);
+PARSER_RC stream_receiver_pluginsd_claimed_id(char **words, size_t num_words, PARSER *parser);
 
 // ----------------------------------------------------------------------------
 
@@ -1202,6 +1226,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     CLEANUP_FUNCTION_REGISTER(pluginsd_process_thread_cleanup) cleanup_parser = parser;
     buffered_reader_init(&parser->reader);
     CLEAN_BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
+    bool send_quit = true;
     while(likely(service_running(SERVICE_COLLECTORS))) {
 
         if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
@@ -1210,7 +1235,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
                     2 * 60 * MSEC_PER_SEC, true);
 
             if(unlikely(ret != BUFFERED_READER_READ_OK)) {
-                nd_log(NDLS_COLLECTORS, NDLP_INFO, "Buffered reader not OK");
+                nd_log(NDLS_COLLECTORS, NDLP_INFO, "PLUGINSD: buffered reader not OK (%u)", (unsigned)ret);
+                if(ret == BUFFERED_READER_READ_POLLERR || ret == BUFFERED_READER_READ_POLLHUP)
+                    send_quit = false;
                 break;
             }
 
@@ -1222,6 +1249,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
 
         buffer->len = 0;
         buffer->buffer[0] = '\0';
+    }
+
+    if(send_quit) {
+        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
+               "PLUGINSD: sending '"PLUGINSD_CALL_QUIT"'  to plugin: %s",
+               string2str(cd->filename));
+        
+        send_to_plugin(PLUGINSD_CALL_QUIT, parser, STREAM_TRAFFIC_TYPE_METADATA);
     }
 
     cd->unsafe.enabled = parser->user.enabled;
@@ -1290,7 +1325,7 @@ PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **w
         case PLUGINSD_KEYWORD_ID_VARIABLE:
             return pluginsd_variable(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_CLAIMED_ID:
-            return rrdpush_receiver_pluginsd_claimed_id(words, num_words, parser);
+            return stream_receiver_pluginsd_claimed_id(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_HOST:
             return pluginsd_host(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_HOST_DEFINE:

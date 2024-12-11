@@ -1188,14 +1188,14 @@ static inline void local_sockets_init(LS_STATE *ls) {
     ls->local_socket_aral = aral_create(
         "local-sockets",
         sizeof(LOCAL_SOCKET),
-        65536,
+        65536 / sizeof(LOCAL_SOCKET),
         65536,
         NULL, NULL, NULL, false, true);
 
     ls->pid_socket_aral = aral_create(
         "pid-sockets",
         sizeof(struct pid_socket),
-        65536,
+        65536 / sizeof(struct pid_socket),
         65536,
         NULL, NULL, NULL, false, true);
 
@@ -1587,7 +1587,7 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         spinlock_unlock(&ls->spinlock);
     }
 
-    spawn_server_exec_kill(ls->spawn_server, si);
+    spawn_server_exec_kill(ls->spawn_server, si, 0);
 
     if(ls->config.report && received == 0)
         __atomic_add_fetch(&ls->stats.namespaces_forks_unresponsive, 1, __ATOMIC_RELAXED);

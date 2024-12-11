@@ -2,7 +2,10 @@
 
 package module
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
 const MockConfigSchema = `
 {
@@ -38,31 +41,31 @@ type MockModule struct {
 
 	FailOnInit bool
 
-	InitFunc    func() error
-	CheckFunc   func() error
+	InitFunc    func(context.Context) error
+	CheckFunc   func(context.Context) error
 	ChartsFunc  func() *Charts
-	CollectFunc func() map[string]int64
-	CleanupFunc func()
+	CollectFunc func(context.Context) map[string]int64
+	CleanupFunc func(context.Context)
 	CleanupDone bool
 }
 
 // Init invokes InitFunc.
-func (m *MockModule) Init() error {
+func (m *MockModule) Init(ctx context.Context) error {
 	if m.FailOnInit {
 		return errors.New("mock init error")
 	}
 	if m.InitFunc == nil {
 		return nil
 	}
-	return m.InitFunc()
+	return m.InitFunc(ctx)
 }
 
 // Check invokes CheckFunc.
-func (m *MockModule) Check() error {
+func (m *MockModule) Check(ctx context.Context) error {
 	if m.CheckFunc == nil {
 		return nil
 	}
-	return m.CheckFunc()
+	return m.CheckFunc(ctx)
 }
 
 // Charts invokes ChartsFunc.
@@ -74,17 +77,17 @@ func (m *MockModule) Charts() *Charts {
 }
 
 // Collect invokes CollectDunc.
-func (m *MockModule) Collect() map[string]int64 {
+func (m *MockModule) Collect(ctx context.Context) map[string]int64 {
 	if m.CollectFunc == nil {
 		return nil
 	}
-	return m.CollectFunc()
+	return m.CollectFunc(ctx)
 }
 
 // Cleanup sets CleanupDone to true.
-func (m *MockModule) Cleanup() {
+func (m *MockModule) Cleanup(ctx context.Context) {
 	if m.CleanupFunc != nil {
-		m.CleanupFunc()
+		m.CleanupFunc(ctx)
 	}
 	m.CleanupDone = true
 }

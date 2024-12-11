@@ -4,6 +4,7 @@
 #define REPLICATION_H
 
 #include "daemon/common.h"
+#include "stream-circular-buffer.h"
 
 struct parser;
 
@@ -19,14 +20,14 @@ struct replication_query_statistics replication_get_query_statistics(void);
 
 bool replicate_chart_response(RRDHOST *rh, RRDSET *rs, bool start_streaming, time_t after, time_t before);
 
-typedef ssize_t (*send_command)(const char *txt, struct parser *parser);
+typedef ssize_t (*send_command)(const char *txt, struct parser *parser, STREAM_TRAFFIC_TYPE type);
 
 bool replicate_chart_request(send_command callback, struct parser *parser,
                              RRDHOST *rh, RRDSET *rs,
                              time_t child_first_entry, time_t child_last_entry, time_t child_wall_clock_time,
                              time_t response_first_start_time, time_t response_last_end_time);
 
-void replication_init_sender(struct sender_state *sender);
+void replication_sender_init(struct sender_state *sender);
 void replication_cleanup_sender(struct sender_state *sender);
 void replication_sender_delete_pending_requests(struct sender_state *sender);
 void replication_add_request(struct sender_state *sender, const char *chart_id, time_t after, time_t before, bool start_streaming);

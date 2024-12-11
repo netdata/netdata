@@ -2,10 +2,10 @@ plugin_name: windows.plugin
 modules:
   - meta:
       plugin_name: windows.plugin
-      module_name: PerflibProcesses
+      module_name: PerflibProcessor
       monitored_instance:
-        name: System statistics
-        link: "https://learn.microsoft.com/en-us/windows/win32/procthread/processes-and-threads"
+        name: Processor
+        link: "https://learn.microsoft.com/en-us/windows-hardware/design/minimum/windows-processor-requirements"
         categories:
           - data-collection.windows-systems
         icon_filename: "windows.svg"
@@ -15,16 +15,17 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords:
-        - process counts
-        - threads
-        - context switch
+        - windows
+        - microsoft
+        - processor
+        - CPU
       most_popular: false
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors the current number of processes, threads, and context switches on Windows systems.
+          This collector monitors processors statistics on host.
         method_description: |
-          It queries the 'System' object from Perflib in order to gather the metrics.
+          It queries Processor object from Perflib in order to gather the metrics.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -53,7 +54,7 @@ modules:
             title: "Config option"
             enabled: false
           list:
-            - name: PerflibProcesses
+            - name: PerflibProcessor
               description: An option to enable or disable the data collection.
               default_value: yes
               required: false
@@ -65,7 +66,11 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
+    alerts:
+      - name: 10min_cpu_usage
+        metric: system.cpu
+        info: "Average CPU utilization over the last 10 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf
     metrics:
       folding:
         title: Metrics
@@ -73,28 +78,34 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: "These metrics refer to the entire monitored instance."
+        - name: System
+          description: "These metrics refer to the entire system."
           labels: []
           metrics:
-            - name: system.processes
-              description: System Processes
-              unit: "processes"
-              chart_type: line
+            - name: system.cpu
+              description: Total CPU utilization
+              unit: percentage
+              chart_type: stacked
               dimensions:
-                - name: running
-            - name: system.threads
-              description: System Threads
-              unit: "threads"
-              chart_type: line
+                - name: interrupts
+                - name: user
+                - name: privileged
+                - name: dpc
+        - name: CPU
+          description: "These metrics provide information about individual CPU cores."
+          labels:
+            - name: cpu
+              description: The identifier of the CPU core. On Windows systems, CPU cores are labeled as 'cpu0', 'cpu1', etc.
+          metrics:
+            - name: cpu.cpu
+              description: Core utilization
+              unit: percentage
+              chart_type: stacked
               dimensions:
-                - name: threads
-            - name: system.ctxt
-              description: CPU Context Switches
-              unit: "context switches/s"
-              chart_type: line
-              dimensions:
-                - name: switches
+                - name: interrupts
+                - name: user
+                - name: privileged
+                - name: dpc
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibMemory
@@ -167,8 +178,8 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: "These metrics refer to the entire monitored instance"
+        - name: System
+          description: "These metrics refer to the entire system."
           labels: []
           metrics:
             - name: mem.swap_iops
@@ -192,6 +203,370 @@ modules:
               dimensions:
                 - name: paged
                 - name: pool-paged
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibProcesses
+      monitored_instance:
+        name: System statistics
+        link: "https://learn.microsoft.com/en-us/windows/win32/procthread/processes-and-threads"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - process counts
+        - threads
+        - context switch
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the current number of processes, threads, and context switches on Windows systems.
+        method_description: |
+          It queries the 'System' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibProcesses
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: System
+          description: "These metrics refer to the entire system."
+          labels: []
+          metrics:
+            - name: system.processes
+              description: System Processes
+              unit: "processes"
+              chart_type: line
+              dimensions:
+                - name: running
+            - name: system.threads
+              description: System Threads
+              unit: "threads"
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: system.ctxt
+              description: CPU Context Switches
+              unit: "context switches/s"
+              chart_type: line
+              dimensions:
+                - name: switches
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibStorage
+      monitored_instance:
+        name: Physical and Logical Disk Performance Metrics
+        link: "https://learn.microsoft.com/en-us/windows/win32/fileio/disk-management"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - disk
+        - disks
+        - io
+        - volume
+        - physical
+        - logical
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Detailed statistics for all disk devices and volumes.
+        method_description: |
+          It queries 'LogicalDisk' and 'PhysicalDisk' objects from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibStorage
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: System
+          description: "These metrics refer to the entire System."
+          labels: []
+          metrics:
+            - name: system.io
+              description: Disk I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+        - name: Logical Disk
+          description: "These metrics refer to Logical Disks."
+          labels:
+            - name: mount_point
+              description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:')."
+            - name: driver_type
+              description: "Classification of the disk device (e.g., norootdir, removable, cdrom, ramdisk)."
+            - name: filesystem
+              description: "File system format used on the volume (e.g., NTFS, FAT32)."
+            - name: rw_mode
+              description: "Current read/write permissions status of the volume (read-only access, read and write access)."
+          metrics:
+            - name: disk.space
+              description: Disk Space Usage
+              unit: "GiB"
+              chart_type: stacked
+              dimensions:
+                - name: avail
+                - name: used
+        - name: Physical Disk
+          description: "These metrics refer to Physical Disks."
+          labels:
+            - name: mount_point
+              description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:')."
+            - name: device
+              description: Manufacturer model name.
+            - name: model
+              description: The device model.
+            - name: device_id
+              description: Unique hardware identifier for the storage device within the system.
+          metrics:
+            - name: disk.io
+              description: Disk I/O Bandwidth
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: "KiB/operation"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.ops
+              description: Disk Completed I/O Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.split
+              description: Split I/O Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: discards
+            - name: disk.await
+              description: Average Completed I/O Operation Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.svctm
+              description: Average Service Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: svctm
+            - name: disk.util
+              description: Disk Utilization Time
+              unit: "percent"
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: disk.busy
+              description: Disk Busy Time
+              unit: "milliseconds"
+              chart_type: area
+              dimensions:
+                - name: busy
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: "milliseconds/s"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.qops
+              description: Disk Current I/O Operations
+              unit: "operations"
+              chart_type: line
+              dimensions:
+                - name: operations
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibObjects
+      monitored_instance:
+        name: Semaphore statistics
+        link: "https://learn.microsoft.com/en-us/windows/win32/sync/semaphore-objects"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - ipc
+        - semaphores
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Inter-Process Communication (IPC) enables different processes to communicate and coordinate with each other. This collector monitors IPC semaphores, which are synchronization tools that:
+
+          - Control access to shared resources (like files, memory, or devices).
+          - Ensure only one process can access a resource at a time.
+          - Prevent conflicts between competing processes.
+        method_description: |
+          It queries for the 'Objects' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibObjects
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: System
+          description: "These metrics refer to the entire system."
+          labels: []
+          metrics:
+            - name: system.ipc_semaphores
+              description: IPC Semaphores
+              unit: "semaphores"
+              chart_type: area
+              dimensions:
+                - name: semaphores
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibThermalZone
@@ -444,3 +819,818 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibHyperV
+      monitored_instance:
+        name: Hyper-V
+        link: "https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/about/"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - hyperv
+        - virtualization
+        - vm
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors website requests and logins.
+        method_description: |
+          It queries the 'HyperV' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibHyperV
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Hyper-V
+          description: "These metrics refer to the Hyper-V instance."
+          labels: []
+          metrics:
+            - name: hyperv.vms_health
+              description: Virtual machines health status
+              unit: "vms"
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: critical
+            - name: hyperv.root_partition_io_tlb_flush
+              description: Root partition flushes of I/O TLBs
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: gpa
+            - name: hyperv.root_partition_virtual_tlb_flush_entries
+              description: Root partition flushes of the entire virtual TLB
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: hyperv.root_partition_virtual_tlb_pages
+              description: Root partition pages used by the virtual TLB
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: hyperv.root_partition_address_space
+              description: Root partition address spaces in the virtual TLB
+              unit: "address spaces"
+              chart_type: line
+              dimensions:
+                - name: address_spaces
+            - name: hyperv.root_partition_attached_devices
+              description: Root partition attached devices
+              unit: "devices"
+              chart_type: line
+              dimensions:
+                - name: attached
+            - name: hyperv.root_partition_device_dma_errors
+              description: Root partition illegal DMA requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: illegal_dma
+            - name: hyperv.root_partition_device_interrupt_errors
+              description: Root partition illegal interrupt requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: illegal_interrupt
+            - name: hyperv.root_partition_device_interrupt_throttle_events
+              description: Root partition throttled interrupts
+              unit: "events"
+              chart_type: line
+              dimensions:
+                - name: throttling
+            - name: hyperv.root_partition_deposited_pages
+              description: Root partition deposited pages
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: gpa
+            - name: hyperv.root_partition_device_space_pages
+              description: Root partition device space pages
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: 4K
+                - name: 2M
+                - name: 1G
+            - name: hyperv.root_partition_gpa_space_pages
+              description: Root partition GPA space pages
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: 4K
+                - name: 2M
+                - name: 1G
+            - name: hyperv.root_partition_gpa_space_modifications
+              description: Root partition GPA space modifications
+              unit: "modifications/s"
+              chart_type: line
+              dimensions:
+                - name: gpa
+
+        - name: Virtual Machine
+          description: "These metrics refer to the Virtual Machine."
+          labels:
+            - name: vm_name
+              description: The name of the Virtual Machine.
+          metrics:
+            - name: hyperv.vm_cpu_usage
+              description: VM CPU usage
+              unit: "percentage"
+              chart_type: area
+              dimensions:
+                - name: usage
+            - name: hyperv.vm_cpu_usage_by_run_context
+              description: VM CPU usage by run context
+              unit: "percentage"
+              chart_type: stacked
+              dimensions:
+                - name: guest
+                - name: hypervisor
+                - name: remote
+            - name: hyperv.vm_memory_physical
+              description: VM assigned memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: assigned
+            - name: hyperv.vm_memory_physical_guest_visible
+              description: VM guest visible memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: visible
+                - name: available
+            - name: hyperv.vm_memory_pressure_current
+              description: VM Memory Pressure
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: pressure
+            - name: hyperv.vm_vid_physical_pages_allocated
+              description: VM physical pages allocated
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: allocated
+            - name: hyperv.vm_vid_remote_physical_pages
+              description: VM physical pages not allocated from the preferred NUMA node
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: remote_physical
+        - name: Virtual Machine Storage Device
+          description: "These metrics refer to the Virtual Machine Storage Device."
+          labels:
+            - name: vm_storage_device
+              description: The name of the Storage Device.
+          metrics:
+            - name: hyperv.vm_storage_device_bytes
+              description: VM storage device IO
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: hyperv.vm_storage_device_operations
+              description: VM storage device IOPS"
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: hyperv.vm_storage_device_errors
+              description: VM storage device errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: errors
+        - name: Virtual Machine Network Interface
+          description: "These metrics refer to the Virtual Machine Network Interface."
+          labels:
+            - name: vm_net_interface
+              description: The name of the Network Interface.
+          metrics:
+            - name: hyperv.vm_net_interface_traffic
+              description: VM interface traffic
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vm_net_interface_ipsec_traffic
+              description: VM interface traffic
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vm_net_interface_packets
+              description: VM interface packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vm_net_interface_directed_packets
+              description: VM interface directed packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vm_net_interface_broadcast_packets
+              description: VM interface broadcast
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vm_net_interface_multicast_packets
+              description: VM interface multicast
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vm_net_interface_packets_dropped
+              description: VM interface packets dropped
+              unit: "drops/s"
+              chart_type: line
+              dimensions:
+                - name: incoming
+                - name: outgoing
+        - name: Virtual Switch
+          description: "These metrics refer to the Virtual Switch."
+          labels:
+            - name: vswitch
+              description: The name of the Virtual Switch.
+          metrics:
+            - name: hyperv.vswitch_traffic
+              description: Virtual switch traffic
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vswitch_packets
+              description: Virtual switch packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vswitch_directed_packets
+              description: Virtual switch directed packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vswitch_broadcast_packets
+              description: Virtual switch broadcast packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vswitch_multicast_packets
+              description: Virtual switch multicast packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hyperv.vswitch_dropped_packets
+              description: Virtual switch dropped packets
+              unit: "drops/s"
+              chart_type: line
+              dimensions:
+                - name: incoming
+                - name: outgoing
+            - name: hyperv.vswitch_extensions_dropped_packets
+              description: Virtual switch extensions dropped packets
+              unit: "drops/s"
+              chart_type: line
+              dimensions:
+                - name: incoming
+                - name: outgoing
+            - name: hyperv.vswitch_packets_flooded
+              description: Virtual switch flooded packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: flooded
+            - name: hyperv.vswitch_learned_mac_addresses
+              description: Virtual switch learned MAC addresses
+              unit: "mac addresses/s"
+              chart_type: line
+              dimensions:
+                - name: learned
+            - name: hyperv.vswitch_purged_mac_addresses
+              description: Virtual switch purged MAC addresses
+              unit: "mac addresses/s"
+              chart_type: line
+              dimensions:
+                - name: purged
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibMSSQL
+      monitored_instance:
+        name: MS SQL Server
+        link: "https://www.microsoft.com/en-us/sql-server/"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - sql
+        - queries
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Microsoft SQL Server statistics.
+        method_description: |
+          It queries different SQL objects per instance from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibMSSQL
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: MSSQL instance
+          description: "These metrics refer to the Microsoft SQL Servers instances defined on host."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+          metrics:
+            - name: mssql.instance_user_connections
+              description: User connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: user
+            - name: mssql.instance_sqlstats_batch_requests
+              description: Total of batches requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: batch
+            - name: mssql.instance_sql_errors
+              description: Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: errors
+            - name: mssql.instance_sqlstats_sql_compilations
+              description: SQL compilations
+              unit: compilations/s
+              chart_type: line
+              dimensions:
+                - name: compilations
+            - name: mssql.instance_sqlstats_sql_recompilations
+              description: SQL re-compilations
+              unit: recompiles/s
+              chart_type: line
+              dimensions:
+                - name: recompiles
+            - name: mssql.instance_sqlstats_auto_parameterization_attempts
+              description: Failed auto-parameterization attempts
+              unit: attempts/s
+              chart_type: line
+              dimensions:
+                - name: failed
+            - name: mssql.instance_sqlstats_safe_auto_parameterization_attempts
+              description: Safe auto-parameterization attempts
+              unit: attempts/s
+              chart_type: line
+              dimensions:
+                - name: safe
+            - name: mssql.instance_accessmethods_page_splits
+              description: Pages splits
+              unit: splits/s
+              chart_type: line
+              dimensions:
+                - name: page
+            - name: mssql.instance_cache_hit_ratio
+              description: Buffer Cache hit ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hit_ratio
+            - name: mssql.instance_bufman_iops
+              description: Number of pages input and output
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: mssql.instance_bufman_checkpoint_pages
+              description: Flushed pages
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: log
+            - name: mssql.instance_bufman_page_life_expectancy
+              description: Page life expectancy
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: life_expectancy
+            - name: mssql.instance_memmgr_server_memory
+              description: Memory committed
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: memory
+            - name: mssql.instance_memmgr_connection_memory_bytes
+              description: Amount of dynamic memory to maintain connections
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: memory
+            - name: mssql.instance_memmgr_pending_memory_grants
+              description: Process waiting for memory grant
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: mssql.instance_memmgr_external_benefit_of_memory
+              description: Performance benefit from adding memory to a specific cache
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: benefit
+            - name: mssql.instance_locks_deadlocks
+              description: Lock requests that resulted in deadlock
+              unit: deadlocks/s
+              chart_type: line
+              dimensions:
+                - name: alloc_unit
+                - name: application
+                - name: database
+                - name: extent
+                - name: file
+                - name: hobt
+                - name: key
+                - name: metadata
+                - name: oib
+                - name: object
+                - name: page
+                - name: rid
+                - name: row_group
+                - name: xact
+            - name: mssql.instance_locks_lock_wait
+              description: Lock requests that required the caller to wait
+              unit: locks/s
+              chart_type: line
+              dimensions:
+                - name: alloc_unit
+                - name: application
+                - name: database
+                - name: extent
+                - name: file
+                - name: hobt
+                - name: key
+                - name: metadata
+                - name: oib
+                - name: object
+                - name: page
+                - name: rid
+                - name: row_group
+                - name: xact
+            - name: mssql.instance_blocked_processes
+              description: Blocked processes
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: blocked
+        - name: Database
+          description: "These metrics refer to Microsoft SQL Server databases."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: database
+              description: The database name.
+          metrics:
+            - name: mssql.database_active_transactions
+              description: Active transactions per database
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: mssql.database_transactions
+              description: Transactions
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: transactions
+            - name: mssql.database_write_transactions
+              description: Write transactions
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: write
+            - name: mssql.database_backup_restore_operations
+              description: Backup IO per database
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: backup
+            - name: mssql.database_log_flushes
+              description: Log flushes
+              unit: flushes/s
+              chart_type: line
+              dimensions:
+                - name: log
+            - name: mssql.database_log_flushed
+              description: Log flushed
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: flushed
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibNetFramework
+      monitored_instance:
+        name: NET Framework
+        link: "https://dotnet.microsoft.com/en-us/learn/dotnet/what-is-dotnet-framework"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "dotnet.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - netframework
+        - dotnet
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors application built with .NET
+        method_description: |
+          It queries different NET Framework objects per process from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibNetFramework
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: Processes running
+          description: "These metrics refer to NET applications."
+          labels:
+            - name: process
+              description: The process name.
+          metrics:
+            - name: netframework.clrexception_thrown
+              description: Thrown exceptions
+              unit: exceptions/s
+              chart_type: line
+              dimensions:
+                - name: exceptions
+            - name: netframework.clrexception_filters
+              description: Thrown exceptions filters
+              unit: filters/s
+              chart_type: line
+              dimensions:
+                - name: filters
+            - name: netframework.clrexception_finallys
+              description: Executed finally blocks
+              unit: finallys/s
+              chart_type: line
+              dimensions:
+                - name: finallys
+            - name: netframework.clrexception_throw_to_catch_depth
+              description: Traversed stack frames
+              unit: stack_frames/s
+              chart_type: line
+              dimensions:
+                - name: traversed
+            - name: netframework.clrinterop_com_callable_wrappers
+              description: COM callable wrappers (CCW)
+              unit: ccw/s
+              chart_type: line
+              dimensions:
+                - name: com_callable_wrappers
+            - name: netframework.clrinterop_interop_marshallings
+              description: Arguments and return values marshallings
+              unit: marshallings/s
+              chart_type: line
+              dimensions:
+                - name: marshallings
+            - name: netframework.clrinterop_interop_stubs_created
+              description: Created stubs
+              unit: stubs/s
+              chart_type: line
+              dimensions:
+                - name: created
+            - name: netframework.clrjit_methods
+              description: JIT-compiled methods
+              unit: methods/s
+              chart_type: line
+              dimensions:
+                - name: jit-compiled
+            - name: netframework.clrjit_time
+              description: Time spent in JIT compilation
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: netframework.clrjit_standard_failures
+              description: JIT compiler failures
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: netframework.clrjit_il_bytes
+              description: Compiled Microsoft intermediate language (MSIL) bytes
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: compiled_msil
+            - name: netframework.clrloading_loader_heap_size
+              description: Memory committed by class loader
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: committed
+            - name: netframework.clrloading_appdomains_loaded
+              description: Loaded application domains
+              unit: domain/s
+              chart_type: line
+              dimensions:
+                - name: loaded
+            - name: netframework.clrloading_appdomains_unloaded
+              description: Unloaded application domains
+              unit: domain/s
+              chart_type: line
+              dimensions:
+                - name: unloaded
+            - name: netframework.clrloading_assemblies_loaded
+              description: Loaded assemblies
+              unit: assemblies/s
+              chart_type: line
+              dimensions:
+                - name: loaded
+            - name: netframework.clrloading_classes_loaded
+              description: Loaded classes in all assemblies
+              unit: classes/s
+              chart_type: line
+              dimensions:
+                - name: loaded
+            - name: netframework.clrloading_class_load_failures
+              description: Class load failures
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: class_load

@@ -63,6 +63,8 @@
 #define PLUGINSD_CALL_FUNCTION_CANCEL           "FUNCTION_CANCEL"           // cancel a running function transaction
 #define PLUGINSD_CALL_FUNCTION_PROGRESS         "FUNCTION_PROGRESS"         // let the function know the user is waiting
 
+#define PLUGINSD_CALL_QUIT                      "QUIT"                      // ask the plugin to quit
+
 // dyncfg
 // enabled with STREAM_CAP_DYNCFG
 #define PLUGINSD_KEYWORD_CONFIG                 "CONFIG"
@@ -77,7 +79,8 @@
 
 #define PLUGINSD_KEYWORD_JSON                   "JSON"
 #define PLUGINSD_KEYWORD_JSON_END               "JSON_PAYLOAD_END"
-#define PLUGINSD_KEYWORD_STREAM_PATH            "STREAM_PATH"
+#define PLUGINSD_KEYWORD_JSON_CMD_STREAM_PATH   "STREAM_PATH"
+#define PLUGINSD_KEYWORD_JSON_CMD_ML_MODEL      "ML_MODEL"
 
 typedef void (*functions_evloop_worker_execute_t)(const char *transaction, char *function, usec_t *stop_monotonic_ut,
                                                   bool *cancelled, BUFFER *payload, HTTP_ACCESS access,

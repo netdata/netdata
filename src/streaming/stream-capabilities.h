@@ -25,9 +25,9 @@ typedef enum {
     STREAM_CAP_V1               = (1 << 3), // v1 = the oldest protocol
     STREAM_CAP_V2               = (1 << 4), // v2 = the second version of the protocol (with host labels)
     STREAM_CAP_VN               = (1 << 5), // version negotiation supported (for versions 3, 4, 5 of the protocol)
-                                         // v3 = claiming supported
-                                         // v4 = chart labels supported
-                                         // v5 = lz4 compression supported
+                                            // v3 = claiming supported
+                                            // v4 = chart labels supported
+                                            // v5 = lz4 compression supported
     STREAM_CAP_VCAPS            = (1 << 6), // capabilities negotiation supported
     STREAM_CAP_HLABELS          = (1 << 7), // host labels supported
     STREAM_CAP_CLAIM            = (1 << 8), // claiming supported
@@ -38,7 +38,7 @@ typedef enum {
     STREAM_CAP_BINARY           = (1 << 13), // streaming supports binary data
     STREAM_CAP_INTERPOLATED     = (1 << 14), // streaming supports interpolated streaming of values
     STREAM_CAP_IEEE754          = (1 << 15), // streaming supports binary/hex transfer of double values
-    STREAM_CAP_DATA_WITH_ML     = (1 << 16), // streaming supports transferring anomaly bit
+    STREAM_CAP_DATA_WITH_ML     = (1 << 16), // leave this unused for as long as possible - NOT USED, BUT KEEP IT
     // STREAM_CAP_DYNCFG        = (1 << 17), // leave this unused for as long as possible
     STREAM_CAP_SLOTS            = (1 << 18), // the sender can appoint a unique slot for each chart
     STREAM_CAP_ZSTD             = (1 << 19), // ZSTD compression supported
@@ -48,11 +48,14 @@ typedef enum {
     STREAM_CAP_DYNCFG           = (1 << 23), // support for DYNCFG
     STREAM_CAP_NODE_ID          = (1 << 24), // support for sending NODE_ID back to the child
     STREAM_CAP_PATHS            = (1 << 25), // support for sending PATHS upstream and downstream
+    STREAM_CAP_ML_MODELS        = (1 << 26), // support for sending MODELS upstream
 
     STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit
     // needed for negotiating errors between parent and child
 } STREAM_CAPABILITIES;
+
+#define STREAM_CAP_ALWAYS_DISABLED (STREAM_CAP_DATA_WITH_ML)
 
 #ifdef ENABLE_LZ4
 #define STREAM_CAP_LZ4_AVAILABLE STREAM_CAP_LZ4

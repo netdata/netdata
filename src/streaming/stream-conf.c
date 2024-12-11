@@ -1,28 +1,48 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "stream-conf.h"
+#include "daemon/common.h"
+#include "stream-receiver-internals.h"
+#include "stream-sender-internals.h"
 
-struct config stream_config = APPCONFIG_INITIALIZER;
+static struct config stream_config = APPCONFIG_INITIALIZER;
 
-bool stream_conf_send_enabled = false;
-bool stream_conf_compression_enabled = true;
-bool stream_conf_replication_enabled = true;
+struct _stream_send stream_send = {
+    .enabled = false,
+    .api_key = NULL,
+    .send_charts_matching = NULL,
+    .initial_clock_resync_iterations = 60,
 
-const char *stream_conf_send_destination = NULL;
-const char *stream_conf_send_api_key = NULL;
-const char *stream_conf_send_charts_matching = "*";
+    .buffer_max_size = CBUFFER_INITIAL_MAX_SIZE,
 
-time_t stream_conf_replication_period = 86400;
-time_t stream_conf_replication_step = 600;
+    .parents = {
+        .destination = NULL,
+        .default_port = 19999,
+        .h2o = false,
+        .timeout_s = 300,
+        .reconnect_delay_s = 15,
+        .ssl_ca_path = NULL,
+        .ssl_ca_file = NULL,
+    },
 
-const char *stream_conf_ssl_ca_path = NULL;
-const char *stream_conf_ssl_ca_file = NULL;
+    .compression = {
+        .enabled = true,
+        .levels = {
+            [COMPRESSION_ALGORITHM_NONE]    = 0,
+            [COMPRESSION_ALGORITHM_ZSTD]    = 3,    // 1 (faster)  - 22 (smaller)
+            [COMPRESSION_ALGORITHM_LZ4]     = 1,    // 1 (smaller) -  9 (faster)
+            [COMPRESSION_ALGORITHM_BROTLI]  = 3,    // 0 (faster)  - 11 (smaller)
+            [COMPRESSION_ALGORITHM_GZIP]    = 1,    // 1 (faster)  -  9 (smaller)
+        }
+    },
+};
 
-// to have the remote netdata re-sync the charts
-// to its current clock, we send for this many
-// iterations a BEGIN line without microseconds
-// this is for the first iterations of each chart
-unsigned int stream_conf_initial_clock_resync_iterations = 60;
+struct _stream_receive stream_receive = {
+    .replication = {
+        .enabled = true,
+        .period = 86400,
+        .step = 600,
+    }
+};
 
 static void stream_conf_load() {
     errno_clear();
@@ -61,6 +81,7 @@ static void stream_conf_load() {
     appconfig_move_everywhere(&stream_config, "seconds per replication step", "replication step");
     appconfig_move_everywhere(&stream_config, "default postpone alarms on connect seconds", "postpone alerts on connect");
     appconfig_move_everywhere(&stream_config, "postpone alarms on connect seconds", "postpone alerts on connect");
+    appconfig_move_everywhere(&stream_config, "health enabled by default", "health enabled");
 }
 
 bool stream_conf_receiver_needs_dbengine(void) {
@@ -68,70 +89,221 @@ bool stream_conf_receiver_needs_dbengine(void) {
 }
 
 bool stream_conf_init() {
-    // --------------------------------------------------------------------
-    // load stream.conf
     stream_conf_load();
 
-    stream_conf_send_enabled =
-        appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", stream_conf_send_enabled);
+    stream_send.enabled =
+        appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", stream_send.enabled);
 
-    stream_conf_send_destination =
-        appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
+    stream_send.parents.destination =
+        string_strdupz(appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", ""));
 
-    stream_conf_send_api_key =
-        appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
+    stream_send.api_key =
+        string_strdupz(appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", ""));
 
-    stream_conf_send_charts_matching =
-        appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", stream_conf_send_charts_matching);
+    stream_send.send_charts_matching =
+        string_strdupz(appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*"));
 
-    stream_conf_replication_enabled =
-        config_get_boolean(CONFIG_SECTION_DB, "enable replication", stream_conf_replication_enabled);
+    stream_receive.replication.enabled =
+        config_get_boolean(CONFIG_SECTION_DB, "enable replication",
+                           stream_receive.replication.enabled);
 
-    stream_conf_replication_period =
-        config_get_duration_seconds(CONFIG_SECTION_DB, "replication period", stream_conf_replication_period);
+    stream_receive.replication.period =
+        config_get_duration_seconds(CONFIG_SECTION_DB, "replication period",
+                                    stream_receive.replication.period);
 
-    stream_conf_replication_step =
-        config_get_duration_seconds(CONFIG_SECTION_DB, "replication step", stream_conf_replication_step);
+    stream_receive.replication.step =
+        config_get_duration_seconds(CONFIG_SECTION_DB, "replication step",
+                                    stream_receive.replication.step);
 
-    rrdhost_free_orphan_time_s =
-        config_get_duration_seconds(CONFIG_SECTION_DB, "cleanup orphan hosts after", rrdhost_free_orphan_time_s);
+    stream_send.buffer_max_size = (size_t)appconfig_get_number(
+        &stream_config, CONFIG_SECTION_STREAM, "buffer size bytes",
+        stream_send.buffer_max_size);
 
-    stream_conf_compression_enabled =
-        appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM,
-                              "enable compression", stream_conf_compression_enabled);
+    stream_send.parents.reconnect_delay_s = (unsigned int)appconfig_get_duration_seconds(
+        &stream_config, CONFIG_SECTION_STREAM, "reconnect delay",
+        stream_send.parents.reconnect_delay_s);
+    if(stream_send.parents.reconnect_delay_s < SENDER_MIN_RECONNECT_DELAY)
+        stream_send.parents.reconnect_delay_s = SENDER_MIN_RECONNECT_DELAY;
 
-    rrdpush_compression_levels[COMPRESSION_ALGORITHM_BROTLI] = (int)appconfig_get_number(
+    stream_send.compression.enabled =
+        appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable compression",
+                              stream_send.compression.enabled);
+
+    stream_send.compression.levels[COMPRESSION_ALGORITHM_BROTLI] = (int)appconfig_get_number(
         &stream_config, CONFIG_SECTION_STREAM, "brotli compression level",
-        rrdpush_compression_levels[COMPRESSION_ALGORITHM_BROTLI]);
+        stream_send.compression.levels[COMPRESSION_ALGORITHM_BROTLI]);
 
-    rrdpush_compression_levels[COMPRESSION_ALGORITHM_ZSTD] = (int)appconfig_get_number(
+    stream_send.compression.levels[COMPRESSION_ALGORITHM_ZSTD] = (int)appconfig_get_number(
         &stream_config, CONFIG_SECTION_STREAM, "zstd compression level",
-        rrdpush_compression_levels[COMPRESSION_ALGORITHM_ZSTD]);
+        stream_send.compression.levels[COMPRESSION_ALGORITHM_ZSTD]);
 
-    rrdpush_compression_levels[COMPRESSION_ALGORITHM_LZ4] = (int)appconfig_get_number(
+    stream_send.compression.levels[COMPRESSION_ALGORITHM_LZ4] = (int)appconfig_get_number(
         &stream_config, CONFIG_SECTION_STREAM, "lz4 compression acceleration",
-        rrdpush_compression_levels[COMPRESSION_ALGORITHM_LZ4]);
+        stream_send.compression.levels[COMPRESSION_ALGORITHM_LZ4]);
 
-    rrdpush_compression_levels[COMPRESSION_ALGORITHM_GZIP] = (int)appconfig_get_number(
+    stream_send.compression.levels[COMPRESSION_ALGORITHM_GZIP] = (int)appconfig_get_number(
         &stream_config, CONFIG_SECTION_STREAM, "gzip compression level",
-        rrdpush_compression_levels[COMPRESSION_ALGORITHM_GZIP]);
+        stream_send.compression.levels[COMPRESSION_ALGORITHM_GZIP]);
 
-    if(stream_conf_send_enabled && (!stream_conf_send_destination || !*stream_conf_send_destination || !stream_conf_send_api_key || !*stream_conf_send_api_key)) {
-        nd_log_daemon(NDLP_WARNING, "STREAM [send]: cannot enable sending thread - information is missing.");
-        stream_conf_send_enabled = false;
-    }
+    stream_send.parents.h2o = appconfig_get_boolean(
+        &stream_config, CONFIG_SECTION_STREAM, "parent using h2o",
+        stream_send.parents.h2o);
 
-    netdata_ssl_validate_certificate_sender = !appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", !netdata_ssl_validate_certificate);
+    stream_send.parents.timeout_s = (int)appconfig_get_duration_seconds(
+        &stream_config, CONFIG_SECTION_STREAM, "timeout",
+        stream_send.parents.timeout_s);
+
+    stream_send.buffer_max_size = (size_t)appconfig_get_number(
+        &stream_config, CONFIG_SECTION_STREAM, "buffer size bytes",
+        stream_send.buffer_max_size);
+
+    stream_send.parents.default_port = (int)appconfig_get_number(
+        &stream_config, CONFIG_SECTION_STREAM, "default port",
+        stream_send.parents.default_port);
+
+    stream_send.initial_clock_resync_iterations = (unsigned int)appconfig_get_number(
+        &stream_config, CONFIG_SECTION_STREAM, "initial clock resync iterations",
+        stream_send.initial_clock_resync_iterations); // TODO: REMOVE FOR SLEW / GAPFILLING
+
+    netdata_ssl_validate_certificate_sender = !appconfig_get_boolean(
+        &stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification",
+        !netdata_ssl_validate_certificate);
 
     if(!netdata_ssl_validate_certificate_sender)
         nd_log_daemon(NDLP_NOTICE, "SSL: streaming senders will skip SSL certificates verification.");
 
-    stream_conf_ssl_ca_path = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", NULL);
-    stream_conf_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", NULL);
+    stream_send.parents.ssl_ca_path = string_strdupz(appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", NULL));
+    stream_send.parents.ssl_ca_file = string_strdupz(appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", NULL));
 
-    return stream_conf_send_enabled;
+    if(stream_send.enabled && (!stream_send.parents.destination || !stream_send.api_key)) {
+        nd_log_daemon(NDLP_ERR, "STREAM [send]: cannot enable sending thread - information is missing.");
+        stream_send.enabled = false;
+    }
+
+    return stream_send.enabled;
 }
 
 bool stream_conf_configured_as_parent() {
     return stream_conf_has_uuid_section(&stream_config);
+}
+
+void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_receiver_config *config, const char *api_key, const char *machine_guid) {
+    config->mode = rrd_memory_mode_id(
+        appconfig_get(&stream_config, machine_guid, "db",
+        appconfig_get(&stream_config, api_key, "db",
+        rrd_memory_mode_name(default_rrd_memory_mode))));
+
+    if (unlikely(config->mode == RRD_MEMORY_MODE_DBENGINE && !dbengine_enabled)) {
+        netdata_log_error("STREAM '%s' [receive from %s:%s]: "
+                          "dbengine is not enabled, falling back to default."
+                          , rpt->hostname
+                          , rpt->client_ip, rpt->client_port
+        );
+        config->mode = default_rrd_memory_mode;
+    }
+
+    config->history = (int)
+        appconfig_get_number(&stream_config, machine_guid, "retention",
+        appconfig_get_number(&stream_config, api_key, "retention",
+        default_rrd_history_entries));
+    if(config->history < 5) config->history = 5;
+
+    config->health.enabled =
+        appconfig_get_boolean_ondemand(&stream_config, machine_guid, "health enabled",
+        appconfig_get_boolean_ondemand(&stream_config, api_key, "health enabled",
+        health_plugin_enabled()));
+
+    config->health.delay =
+        appconfig_get_duration_seconds(&stream_config, machine_guid, "postpone alerts on connect",
+        appconfig_get_duration_seconds(&stream_config, api_key, "postpone alerts on connect",
+        60));
+
+    config->update_every = (int)appconfig_get_duration_seconds(&stream_config, machine_guid, "update every", config->update_every);
+    if(config->update_every < 0) config->update_every = 1;
+
+    config->health.history =
+        appconfig_get_duration_seconds(&stream_config, machine_guid, "health log retention",
+        appconfig_get_duration_seconds(&stream_config, api_key, "health log retention",
+        HEALTH_LOG_RETENTION_DEFAULT));
+
+    config->send.enabled =
+        appconfig_get_boolean(&stream_config, machine_guid, "proxy enabled",
+        appconfig_get_boolean(&stream_config, api_key, "proxy enabled",
+        stream_send.enabled));
+
+    config->send.parents = string_strdupz(
+        appconfig_get(&stream_config, machine_guid, "proxy destination",
+        appconfig_get(&stream_config, api_key, "proxy destination",
+        string2str(stream_send.parents.destination))));
+
+    config->send.api_key = string_strdupz(
+        appconfig_get(&stream_config, machine_guid, "proxy api key",
+        appconfig_get(&stream_config, api_key, "proxy api key",
+        string2str(stream_send.api_key))));
+
+    config->send.charts_matching = string_strdupz(
+        appconfig_get(&stream_config, machine_guid, "proxy send charts matching",
+        appconfig_get(&stream_config, api_key, "proxy send charts matching",
+        string2str(stream_send.send_charts_matching))));
+
+    config->replication.enabled =
+        appconfig_get_boolean(&stream_config, machine_guid, "enable replication",
+        appconfig_get_boolean(&stream_config, api_key, "enable replication",
+        stream_receive.replication.enabled));
+
+    config->replication.period =
+        appconfig_get_duration_seconds(&stream_config, machine_guid, "replication period",
+        appconfig_get_duration_seconds(&stream_config, api_key, "replication period",
+        stream_receive.replication.period));
+
+    config->replication.step =
+        appconfig_get_number(&stream_config, machine_guid, "replication step",
+        appconfig_get_number(&stream_config, api_key, "replication step",
+        stream_receive.replication.step));
+
+    config->compression.enabled =
+        appconfig_get_boolean(&stream_config, machine_guid, "enable compression",
+        appconfig_get_boolean(&stream_config, api_key, "enable compression",
+        stream_send.compression.enabled));
+
+    if(config->compression.enabled) {
+        stream_parse_compression_order(
+            config,
+            appconfig_get(
+                &stream_config,
+                machine_guid,
+                "compression algorithms order",
+                appconfig_get(
+                    &stream_config, api_key, "compression algorithms order", STREAM_COMPRESSION_ALGORITHMS_ORDER)));
+    }
+
+    config->ephemeral =
+        appconfig_get_boolean(&stream_config, machine_guid, "is ephemeral node",
+        appconfig_get_boolean(&stream_config, api_key, "is ephemeral node",
+        CONFIG_BOOLEAN_NO));
+}
+
+bool stream_conf_is_key_type(const char *api_key, const char *type) {
+    const char *api_key_type = appconfig_get(&stream_config, api_key, "type", type);
+    if(!api_key_type || !*api_key_type) api_key_type = "unknown";
+    return strcmp(api_key_type, type) == 0;
+}
+
+bool stream_conf_api_key_is_enabled(const char *api_key, bool enabled) {
+    return appconfig_get_boolean(&stream_config, api_key, "enabled", enabled);
+}
+
+bool stream_conf_api_key_allows_client(const char *api_key, const char *client_ip) {
+    SIMPLE_PATTERN *key_allow_from = simple_pattern_create(
+        appconfig_get(&stream_config, api_key, "allow from", "*"),
+        NULL, SIMPLE_PATTERN_EXACT, true);
+
+    bool rc = true;
+
+    if(key_allow_from) {
+        rc = simple_pattern_matches(key_allow_from, client_ip);
+        simple_pattern_free(key_allow_from);
+    }
+
+    return rc;
 }

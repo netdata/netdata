@@ -75,7 +75,7 @@ static struct {
     ARAL *aral_providers;
     ARAL *aral_handles;
 } pbc = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .spinlock = SPINLOCK_INITIALIZER,
 };
 
 static void provider_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, WEVT_VARIANT *property,

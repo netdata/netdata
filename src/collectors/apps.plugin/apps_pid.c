@@ -53,7 +53,7 @@ size_t all_pids_count(void) {
 }
 
 void apps_pids_init(void) {
-    pids.all_pids.aral = aral_create("pid_stat", sizeof(struct pid_stat), 1, 65536, NULL, NULL, NULL, false, true);
+    pids.all_pids.aral = aral_create("pid_stat", sizeof(struct pid_stat), 1, 0, NULL, NULL, NULL, false, true);
     simple_hashtable_init_PID(&pids.all_pids.ht, 1024);
 }
 

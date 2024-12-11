@@ -53,10 +53,12 @@ void pdc_init(void) {
             "dbengine-pdc",
             sizeof(PDC),
             0,
-            65536,
+            0,
             NULL,
             NULL, NULL, false, false
             );
+
+    pulse_aral_register(pdc_globals.pdc.ar, "pdc");
 }
 
 PDC *pdc_get(void) {
@@ -81,10 +83,11 @@ void page_details_init(void) {
             "dbengine-pd",
             sizeof(struct page_details),
             0,
-            65536,
+            0,
             NULL,
             NULL, NULL, false, false
     );
+    pulse_aral_register(pdc_globals.pd.ar, "pd");
 }
 
 struct page_details *page_details_get(void) {
@@ -109,10 +112,11 @@ void epdl_init(void) {
             "dbengine-epdl",
             sizeof(EPDL),
             0,
-            65536,
+            0,
             NULL,
             NULL, NULL, false, false
     );
+    pulse_aral_register(pdc_globals.epdl.ar, "epdl");
 }
 
 static EPDL *epdl_get(void) {
@@ -137,10 +141,12 @@ void deol_init(void) {
             "dbengine-deol",
             sizeof(DEOL),
             0,
-            65536,
+            0,
             NULL,
             NULL, NULL, false, false
     );
+
+    pulse_aral_register(pdc_globals.deol.ar, "deol");
 }
 
 static DEOL *deol_get(void) {
@@ -176,7 +182,7 @@ static struct {
 
 } extent_buffer_globals = {
         .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .spinlock = SPINLOCK_INITIALIZER,
                 .available_items = NULL,
                 .available = 0,
         },
@@ -1126,6 +1132,7 @@ static bool epdl_populate_pages_from_extent_data(
         PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
         if (false == added) {
             pgd_free(pgd);
+            pgd = pgc_page_data(page);
             stats_cache_hit_while_inserting++;
             stats_data_from_main_cache++;
         }
@@ -1256,9 +1263,12 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         void *extent_data = datafile_extent_read(ctx, epdl->file, epdl->extent_offset, epdl->extent_size);
         if(extent_data != NULL) {
 
-            void *copied_extent_compressed_data = dbengine_extent_alloc(epdl->extent_size);
-            memcpy(copied_extent_compressed_data, extent_data, epdl->extent_size);
+#if defined(NETDATA_TRACE_ALLOCATIONS)
+            void *tmp = dbengine_extent_alloc(epdl->extent_size);
+            memcpy(tmp, extent_data, epdl->extent_size);
             datafile_extent_read_free(extent_data);
+            extent_data = tmp;
+#endif
 
             if(worker)
                 worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);
@@ -1272,11 +1282,11 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
                     .size = epdl->extent_size,
                     .end_time_s = 0,
                     .update_every_s = 0,
-                    .data = copied_extent_compressed_data,
+                    .data = extent_data,
             }, &added);
 
             if (!added) {
-                dbengine_extent_free(copied_extent_compressed_data, epdl->extent_size);
+                dbengine_extent_free(extent_data, epdl->extent_size);
                 internal_fatal(epdl->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
                                "DBENGINE: cache size does not match the expected size");
             }

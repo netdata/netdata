@@ -5,10 +5,10 @@ Netdata allows organizing your observability infrastructure with Spaces, Rooms, 
 
 ## Spaces and Rooms
 
-[Spaces](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces) are used for organization-level or infrastructure-level
+[Spaces](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#spaces) are used for organization-level or infrastructure-level
 grouping of nodes and people. A node can only appear in a single space, while people can have access to multiple spaces.
 
-The [Rooms](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-rooms) in a space bring together nodes and people in
+The [Rooms](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#rooms) in a space bring together nodes and people in
 collaboration areas. Rooms can also be used for fine-tuned
 [role-based access control](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
@@ -19,7 +19,7 @@ in all the UI, dashboards, tabs, filters, etc. For example, you can create a vir
 and monitor them as discrete entities. Virtual nodes can help you simplify your infrastructure monitoring and focus on the
 individual node that matters.
 
-To define your windows server as a virtual node you need to:
+To define your Windows server as a Virtual Node, you need to:
 
 * Define virtual nodes in `/etc/netdata/vnodes/vnodes.conf`
 
@@ -28,7 +28,7 @@ To define your windows server as a virtual node you need to:
       guid: <value>
     ```
 
-  Just remember to use a valid guid (On Linux you can use `uuidgen` command to generate one, on Windows just use the `[guid]::NewGuid()` command in PowerShell)
+  Remember to use a valid guid (On Linux you can use `uuidgen` command to generate one, on Windows use the `[guid]::NewGuid()` command in PowerShell)
 
 * Add the vnode config to the data collection job. e.g., in `go.d/windows.conf`:
 
@@ -61,12 +61,12 @@ They capture the following:
 * Kernel version
 * Operating system name and version
 * CPU architecture, system cores, CPU frequency, RAM, and disk space
-* Whether Netdata is running inside of a container, and if so, the OS and hardware details about the container's host
+* Whether Netdata is running inside a container, and if so, the OS and hardware details about the container's host
 * Whether Netdata is running inside K8s node
 * What virtualization layer the system runs on top of, if any
 * Whether the system is a streaming parent or child
 
-If you want to organize your systems without manually creating host labels, try the automatic labels in some of the
+If you want to organize your systems without manually creating host labels, try the automatic labels in some
 features below. You can see them under `http://HOST-IP:19999/api/v1/info`, beginning with an underscore `_`.
 
 ```json
@@ -87,8 +87,12 @@ cd /etc/netdata   # Replace this path with your Netdata config directory, if dif
 sudo ./edit-config netdata.conf
 ```
 
-Create a new `[host labels]` section defining a new host label and its value for the system in question. Make sure not
-to violate any of the [host label naming rules](/docs/netdata-agent/configuration/common-configuration-changes.md#organize-nodes-with-host-labels).
+Create a new `[host labels]` section defining a new host label and its value for the system in question. Make sure not to violate any of the host label naming rules:
+
+* Names can’t start with `_`, but it can be present in other parts of the name.
+* Names only accept alphabet letters, numbers, dots, and dashes.
+
+The policy for values is more flexible, but you can’t use exclamation marks (`!`), whitespaces (` `), single quotes (`'`), double quotes (`"`), or asterisks (`*`), because they’re used to compare label values in health alerts and templates.
 
 ```text
 [host labels]
@@ -138,10 +142,7 @@ Now, if you'd like to remind yourself of how much RAM a certain child node has, 
 `http://localhost:19999/host/CHILD_HOSTNAME/api/v1/info` and reference the automatically generated host labels from the
 child system. It's a vastly simplified way of accessing critical information about your infrastructure.
 
-> ⚠️ Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like
-> kernel and operating system versions, you should secure streaming connections with SSL. See the [streaming documentation](/src/streaming/README.md#securing-streaming-with-tlsssl) for details. You may also want to use
-> [access lists](/src/web/server/README.md#access-lists) or [expose the API only to LAN/localhost
-> connections](/docs/netdata-agent/securing-netdata-agents.md#expose-netdata-only-in-a-private-lan).
+> ⚠️ Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like kernel and operating system versions, you should secure streaming connections with SSL. See the [streaming documentation](/src/streaming/README.md#securing-streaming-with-tlsssl) for details. You may also want to use [access lists](/src/web/server/README.md#access-lists) or [expose the API only to LAN/localhost connections](/docs/netdata-agent/securing-netdata-agents.md#restrict-dashboard-access-to-private-lan).
 
 You can also use `_is_parent`, `_is_child`, and any other host labels in both health entities and metrics
 exporting. Speaking of which...
@@ -228,7 +229,7 @@ more about exporting, read the [documentation](/src/exporting/README.md).
 The Netdata aggregate charts allow you to filter and group metrics based on label name-value pairs.
 
 All go.d plugin collectors support the specification of labels at the "collection job" level. Some collectors come without of the box
-labels (e.g. generic Prometheus collector, Kubernetes, Docker and more). But you can also add your own custom labels by configuring
+labels (e.g., generic Prometheus collector, Kubernetes, Docker and more). But you can also add your own custom labels by configuring
 the data collection jobs.
 
 For example, suppose we have a single Netdata Agent, collecting data from two remote Apache web servers, located in different data centers.

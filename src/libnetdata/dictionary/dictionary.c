@@ -204,25 +204,11 @@ void dictionary_static_items_aral_init(void) {
     if(unlikely(!dict_items_aral || !dict_shared_items_aral)) {
         spinlock_lock(&spinlock);
 
-        // we have to check again
         if(!dict_items_aral)
-            dict_items_aral = aral_create(
-                    "dict-items",
-                    sizeof(DICTIONARY_ITEM),
-                    0,
-                    65536,
-                    aral_by_size_statistics(),
-                    NULL, NULL, false, false);
+            dict_items_aral = aral_by_size_acquire(sizeof(DICTIONARY_ITEM));
 
-        // we have to check again
         if(!dict_shared_items_aral)
-            dict_shared_items_aral = aral_create(
-                    "dict-shared-items",
-                    sizeof(DICTIONARY_ITEM_SHARED),
-                    0,
-                    65536,
-                    aral_by_size_statistics(),
-                    NULL, NULL, false, false);
+            dict_shared_items_aral = aral_by_size_acquire(sizeof(DICTIONARY_ITEM_SHARED));
 
         spinlock_unlock(&spinlock);
     }
@@ -540,7 +526,7 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
 #endif
 
     DICTIONARY *dict = dictionary_create_internal(master->options, master->stats,
-                                                  master->value_aral ? aral_element_size(master->value_aral) : 0);
+                                                  master->value_aral ? aral_requested_element_size(master->value_aral) : 0);
 
     dict->master = master;
 

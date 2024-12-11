@@ -3,7 +3,7 @@
 Hadoop is an [Apache project](https://hadoop.apache.org/) is a framework for processing large sets of data across a
 distributed cluster of systems.
 
-And while Hadoop is designed to be a highly-available and fault-tolerant service, those who operate a Hadoop cluster
+And while Hadoop is designed to be a highly available and fault-tolerant service, those who operate a Hadoop cluster
 will want to monitor the health and performance of their [Hadoop Distributed File System
 (HDFS)](https://hadoop.apache.org/docs/r1.2.1/hdfs_design.html) and [Zookeeper](https://zookeeper.apache.org/)
 implementations.
@@ -18,8 +18,8 @@ alternative, like the guide available from
 
 For more specifics on the collection modules used in this guide, read the respective pages in our documentation:
 
-- [HDFS](/src/go/plugin/go.d/modules/hdfs/README.md)
-- [Zookeeper](/src/go/plugin/go.d/modules/zookeeper/README.md)
+- [HDFS](/src/go/plugin/go.d/collector/hdfs/README.md)
+- [Zookeeper](/src/go/plugin/go.d/collector/zookeeper/README.md)
 
 ## Set up your HDFS and Zookeeper installations
 
@@ -90,7 +90,7 @@ The JSON result for a DataNode's `/jmx` endpoint is slightly different:
 If Netdata can't access the `/jmx` endpoint for either a NameNode or DataNode, it will not be able to auto-detect and
 collect metrics from your HDFS implementation.
 
-Zookeeper auto-detection relies on an accessible client port and a allow-listed `mntr` command. For more details on
+Zookeeper auto-detection relies on an accessible client port and an allow-listed `mntr` command. For more details on
 `mntr`, see Zookeeper's documentation on [cluster
 options](https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_clusterOptions) and [Zookeeper
 commands](https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_zkCommands).
@@ -118,7 +118,7 @@ At the bottom of the file, you will see two example jobs, both of which are comm
 ```
 
 Uncomment these lines and edit the `url` value(s) according to your setup. Now's the time to add any other configuration
-details, which you can find inside of the `hdfs.conf` file itself. Most production implementations will require TLS
+details, which you can find inside the `hdfs.conf` file itself. Most production implementations will require TLS
 certificates.
 
 The result for a simple HDFS setup, running entirely on `localhost` and without certificate authentication, might look

@@ -3,6 +3,7 @@
 package module
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -18,20 +19,20 @@ import (
 type Module interface {
 	// Init does initialization.
 	// If it returns error, the job will be disabled.
-	Init() error
+	Init(context.Context) error
 
 	// Check is called after Init.
 	// If it returns error, the job will be disabled.
-	Check() error
+	Check(context.Context) error
 
 	// Charts returns the chart definition.
 	Charts() *Charts
 
 	// Collect collects metrics.
-	Collect() map[string]int64
+	Collect(context.Context) map[string]int64
 
 	// Cleanup Cleanup
-	Cleanup()
+	Cleanup(context.Context)
 
 	GetBase() *Base
 

@@ -193,6 +193,15 @@ static struct web_api_command api_commands_v3[] = {
         .allow_subpaths = 0
     },
 
+    {
+        .api = "stream_info",
+        .hash = 0,
+        .acl = HTTP_ACL_NOCHECK,
+        .access = HTTP_ACCESS_NONE,
+        .callback = api_v3_stream_info,
+        .allow_subpaths = 0
+    },
+
     // WebRTC APIs
     {
         .api = "rtc_offer",

@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "commands.h"
+#include "../stream-receiver-internals.h"
+#include "../stream-sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
 
 // the child disconnected from the parent, and it has to clear the parent's claim id
-void rrdpush_sender_clear_parent_claim_id(RRDHOST *host) {
+void stream_sender_clear_parent_claim_id(RRDHOST *host) {
     host->aclk.claim_id_of_parent = UUID_ZERO;
 }
 
 // the parent sends to the child its claim id, node id and cloud url
-void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
+void stream_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
     if(host == localhost || UUIDiszero(host->node_id)) return;
 
-    spinlock_lock(&host->receiver_lock);
-    if(host->receiver && stream_has_capability(host->receiver, STREAM_CAP_NODE_ID)) {
+    rrdhost_receiver_lock(host);
+    if(stream_has_capability(host->receiver, STREAM_CAP_NODE_ID)) {
         char node_id_str[UUID_STR_LEN] = "";
         uuid_unparse_lower(host->node_id.uuid, node_id_str);
 
@@ -32,16 +34,16 @@ void rrdpush_receiver_send_node_and_claim_id_to_child(RRDHOST *host) {
                   PLUGINSD_KEYWORD_NODE_ID " '%s' '%s' '%s'\n",
                   claim_id.str, node_id_str, cloud_config_url_get());
 
-        send_to_plugin(buf, __atomic_load_n(&host->receiver->parser, __ATOMIC_RELAXED));
+        send_to_plugin(buf, __atomic_load_n(&host->receiver->thread.parser, __ATOMIC_RELAXED), STREAM_TRAFFIC_TYPE_METADATA);
     }
-    spinlock_unlock(&host->receiver_lock);
+    rrdhost_receiver_unlock(host);
 }
 
 // the sender of the child receives node id, claim id and cloud url from the receiver of the parent
-void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
-    char *claim_id_str = get_word(s->line.words, s->line.num_words, 1);
-    char *node_id_str = get_word(s->line.words, s->line.num_words, 2);
-    char *url = get_word(s->line.words, s->line.num_words, 3);
+void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
+    char *claim_id_str = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 1);
+    char *node_id_str = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 2);
+    char *url = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 3);
 
     bool claimed = is_agent_claimed();
     bool update_node_id = false;
@@ -72,7 +74,7 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
 
     if(!UUIDiszero(s->host->node_id) && !UUIDeq(s->host->node_id, node_id)) {
         if(claimed) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "STREAM %s [send to %s] parent reports different node id '%s', but we are claimed. Ignoring it.",
                    rrdhost_hostname(s->host), s->connected_to,
                    node_id_str ? node_id_str : "(unset)");
@@ -118,10 +120,11 @@ void rrdpush_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     }
 
     // we change the URL, to allow the agent dashboard to work with Netdata Cloud on-prem, if any.
-    cloud_config_url_set(url);
+    if(node_id_updated)
+        cloud_config_url_set(url);
 
     // send it down the line (to children)
-    rrdpush_receiver_send_node_and_claim_id_to_child(s->host);
+    stream_receiver_send_node_and_claim_id_to_child(s->host);
 
     if(node_id_updated)
         stream_path_node_id_updated(s->host);

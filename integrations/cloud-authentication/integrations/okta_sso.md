@@ -50,6 +50,6 @@ Steps needed to be done on Okta Admin Portal:
 
 ### SP-initiated SSO
 
-If you start your authentication flow from Netdata sign-in page please check [these steps](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md#from-netdata-sign-up-page).
+If you start your authentication flow from Netdata sign-in page please check [these steps](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md).
 
 

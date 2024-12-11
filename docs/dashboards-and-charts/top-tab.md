@@ -9,7 +9,7 @@ They can be used to retrieve additional information to help you troubleshoot or 
 >
 > **Note**
 >
-> If you get an error saying that your node can't execute Functions please check the [prerequisites](/docs/top-monitoring-netdata-functions.md#prerequisites).
+> If you get an error saying that your node can't execute Functions, check the [prerequisites](/docs/top-monitoring-netdata-functions.md).
 
 The main view of this tab provides you with (depending on the Function) two elements: a visualization on the top and a table on the bottom.
 
@@ -24,4 +24,4 @@ On the top right-hand corner you can:
 
 The bar on the right-hand side allows you to select which Function to run, on which node, and then depending on the Function, there might be more fine-grained filtering available.
 
-For example the `Block-devices` Function allows you to filter per Device, Type, ID, Model and Serial number or the Block devices on your node.
+For example, the `Block-devices` Function allows you to filter per Device, Type, ID, Model and Serial number or the Block devices on your node.

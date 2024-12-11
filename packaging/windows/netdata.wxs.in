@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 <Wix
     xmlns="http://wixtoolset.org/schemas/v4/wxs"
     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util"
@@ -33,6 +35,11 @@
             <Feature Id="Main">
                 <ComponentGroupRef Id="NetdataComponents" />
                 <ComponentRef Id="NetdataVarCache" />
+                <ComponentRef Id="NetdataDevShm" />
+                <ComponentRef Id="NetdataDevMqueue" />
+                <ComponentRef Id="NetdataTmp" />
+                <ComponentRef Id="NetdataHome" />
+                <ComponentRef Id="NetdataRoot" />
                 <ComponentRef Id="NetdataVarLib" />
                 <ComponentGroupRef Id="WevtComponents" />
                 <ComponentRef Id="NetdataService" />
@@ -50,14 +57,18 @@
                     <Directory Id="ETCDIR" Name="etc">
                         <Directory Id="ETCDIRNETDATA" Name="netdata" />
                     </Directory>
+                    <Directory Id="DEVDIR" Name="dev">
+                        <Directory Id="DEVSHMDIR" Name="shm" />
+                        <Directory Id="DEVMQUEUEDIR" Name="mqueue" />
+                    </Directory>
+                    <Directory Id="TMPDIR" Name="tmp">
+                    </Directory>
+                    <Directory Id="HOMEDIR" Name="home">
+                    </Directory>
+                    <Directory Id="ROOTDIR" Name="root">
+                    </Directory>
                 </Directory>
             </StandardDirectory>
-
-            <!-- Property Id="OS_HAS_FILE" Secure="yes">
-                <DirectorySearch Id="NetCoreDirectoryFoundx64" Path="[ETCDIRNETDATA]" AssignToProperty="yes" >
-                    <FileSearch Id="NetdataClaim" Name="claim.conf"/>
-                </DirectorySearch>
-            </Property -->
 
             <UI Id="FeatureTree_ViewLicense_X64">
             </UI>
@@ -87,6 +98,26 @@
             </Component>
 
             <Component Id="NetdataVarLib" Directory="VARLIBDIR" Guid="c72d7ea8-c848-46c4-a983-589044f2eec9">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataDevShm" Directory="DEVSHMDIR" Guid="cbe39d53-a5c8-4375-9b25-e24df4d411be">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataDevMqueue" Directory="DEVMQUEUEDIR" Guid="f119d45f-b4d4-4918-bf05-89ee88be951a">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataTmp" Directory="TMPDIR" Guid="19247d2f-0f9d-4891-a3b0-ffc208d8d878">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataHome" Directory="HOMEDIR" Guid="13056229-7734-45ac-a982-572fa99f8e72">
+                <CreateFolder />
+            </Component>
+
+            <Component Id="NetdataRoot" Directory="ROOTDIR" Guid="5f0b7def-c4e6-417a-a5ae-b6f9c4aff14e">
                 <CreateFolder />
             </Component>
 
@@ -131,6 +162,12 @@
                                 Remove="uninstall"
                                 Name="Netdata"
                                 Wait="yes" />
+
+                 <RegistryValue Root="HKLM"
+                               Key="System\CurrentControlSet\Services\Netdata"
+                               Name="DelayedAutoStart"
+                               Value="1"
+                               Type="integer" />
             </Component>
     </Fragment>
 
@@ -178,7 +215,7 @@
             <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
             <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="3" Condition="Installed AND PATCH" />
             <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
-            <Publish Dialog="MaintenanceTypeDlg" Control="ChangeButton" Event="NewDialog" Value="InstallDirDlg" />
+            <Publish Dialog="MaintenanceTypeDlg" Control="ChangeButton" Event="NewDialog" Value="VerifyReadyDlg" />
             <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
             <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
             <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
@@ -234,6 +271,13 @@
     </Fragment>
 
     <Fragment>
+        <Property Id="OS_HAS_FILE">
+            <!-- Our variables are not defined during startup so we have to use this -->
+            <DirectorySearch Id="NetCoreDirectoryFoundx64" Path="C:\Program Files\Netdata\etc\netdata\">
+                <FileSearch Name="claim.conf" />
+            </DirectorySearch>
+        </Property>
+
         <UI>
             <Dialog Id="NDConfigDialog" Width="370" Height="270" Title="Netdata Cloud">
                 <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
@@ -242,21 +286,21 @@
                 <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Enter your Space's Claim Token and the Room IDs where you want to add the Agent." />
                 <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Connect to the Cloud" />
 
-                <Control Id="WarningLabelOld" Type="Text" X="10" Y="60" Width="350" Height="15" Text="Agent already claimed? Click Next." />
+                <Control Id="WarningLabel" Type="Text" X="10" Y="60" Width="350" Height="15" Text="Agent already claimed! Click Next." HideCondition="NOT OS_HAS_FILE" />
 
-                <Control Id="TokenLabel" Type="Text" X="10" Y="100" Width="55" Height="15" Text="Claim Token:" />
-                <Control Id="Token" Type="Edit" X="65" Y="100" Width="290" Height="18" Property="TOKEN" Text="{135}" />
+                <Control Id="TokenLabel" Type="Text" X="10" Y="100" Width="55" Height="15" Text="Claim Token:" HideCondition="OS_HAS_FILE" />
+                <Control Id="Token" Type="Edit" X="65" Y="100" Width="290" Height="18" Property="TOKEN" Text="{135}" HideCondition="OS_HAS_FILE" />
             
-                <Control Id="RoomsLabel" Type="Text" X="10" Y="115" Width="55" Height="15" Text="Rooms ID(s):" />
-                <Control Id="Rooms" Type="Edit" X="65" Y="115" Width="290" Height="18" Property="ROOMS" />
+                <Control Id="RoomsLabel" Type="Text" X="10" Y="115" Width="55" Height="15" Text="Rooms ID(s):" HideCondition="OS_HAS_FILE" />
+                <Control Id="Rooms" Type="Edit" X="65" Y="115" Width="290" Height="18" Property="ROOMS" HideCondition="OS_HAS_FILE" />
             
-                <Control Id="ProxyLabel" Type="Text" X="10" Y="130" Width="55" Height="15" Text="Proxy URL:" />
-                <Control Id="Proxy" Type="Edit" X="65" Y="130" Width="290" Height="18" Property="PROXY" />
+                <Control Id="ProxyLabel" Type="Text" X="10" Y="130" Width="55" Height="15" Text="Proxy URL:" HideCondition="OS_HAS_FILE" />
+                <Control Id="Proxy" Type="Edit" X="65" Y="130" Width="290" Height="18" Property="PROXY" HideCondition="OS_HAS_FILE" />
             
-                <Control Id="URLLabel" Type="Text" X="10" Y="145" Width="55" Height="15" Text="Cloud URL:" />
-                <Control Id="URL" Type="Edit" X="65" Y="145" Width="290" Height="18" Property="URL" />
+                <Control Id="URLLabel" Type="Text" X="10" Y="145" Width="55" Height="15" Text="Cloud URL:" HideCondition="OS_HAS_FILE" />
+                <Control Id="URL" Type="Edit" X="65" Y="145" Width="290" Height="18" Property="URL" HideCondition="OS_HAS_FILE" />
 
-                <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="160" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" />
+                <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="160" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" HideCondition="OS_HAS_FILE" />
             
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />

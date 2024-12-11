@@ -84,9 +84,9 @@ static inline DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused,
 
 static inline void *dict_item_value_mallocz(DICTIONARY *dict, size_t value_len) {
     if(dict->value_aral) {
-        internal_fatal(aral_element_size(dict->value_aral) != value_len,
+        internal_fatal(aral_requested_element_size(dict->value_aral) != value_len,
                        "DICTIONARY: item value size %zu does not match the configured fixed one %zu",
-                       value_len, aral_element_size(dict->value_aral));
+                       value_len, aral_requested_element_size(dict->value_aral));
         return aral_mallocz(dict->value_aral);
     }
     else

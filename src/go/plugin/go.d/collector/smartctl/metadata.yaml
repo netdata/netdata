@@ -1,0 +1,240 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-smartctl
+      plugin_name: go.d.plugin
+      module_name: smartctl
+      monitored_instance:
+        name: S.M.A.R.T.
+        link: "https://linux.die.net/man/8/smartd"
+        icon_filename: "smart.png"
+        categories:
+          - data-collection.hardware-devices-and-sensors
+      keywords:
+        - smart
+        - S.M.A.R.T.
+        - SCSI devices
+        - ATA devices
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the health status of storage devices by analyzing S.M.A.R.T. (Self-Monitoring, Analysis, and Reporting Technology) counters.
+          It relies on the [`smartctl`](https://linux.die.net/man/8/smartctl) CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+
+          Executed commands:
+          -  `smartctl --json --scan`
+          -  `smartctl --json --all {deviceName} --device {deviceType} --nocheck {powerMode}`
+        method_description: ""
+      supported_platforms:
+        include: [Linux, BSD]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Install smartmontools (v7.0+)
+            description: |
+              Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
+          - title: For Netdata running in a Docker container
+            description: |
+              1. **Install smartmontools**.
+
+                  Ensure `smartctl` is available in the container by setting the environment variable `NETDATA_EXTRA_DEB_PACKAGES=smartmontools` when starting the container.
+
+              2. **Provide access to storage devices**.
+
+                  Netdata requires the `SYS_RAWIO` capability and access to the storage devices to run the `smartctl` collector inside a Docker container. Here's how you can achieve this:
+
+                  - `docker run`
+
+                    ```bash
+                    docker run --cap-add SYS_RAWIO --device /dev/sda:/dev/sda ...
+                    ```
+
+                  - `docker-compose.yml`
+
+                    ```yaml
+                    services:
+                      netdata:
+                        cap_add:
+                          - SYS_PTRACE
+                          - SYS_ADMIN
+                          - SYS_RAWIO # smartctl
+                        devices:
+                          - "/dev/sda:/dev/sda"
+                    ```
+
+                  > **Multiple Devices**: These examples only show mapping of one device (/dev/sda). You'll need to add additional `--device` options (in docker run) or entries in the `devices` list (in docker-compose.yml) for each storage device you want Netdata's smartctl collector to monitor.
+
+                  > **NVMe Devices**: Do not map NVMe devices using this method. Netdata uses a [dedicated collector](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nvme#readme) to monitor NVMe devices.
+      configuration:
+        file:
+          name: go.d/smartctl.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: interval for updating Netdata charts, measured in seconds. Collector might use cached data if less than **Devices poll interval**.
+              default_value: 10
+              required: false
+            - name: timeout
+              description: smartctl binary execution timeout.
+              default_value: 5
+              required: false
+            - name: scan_every
+              description: interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup.
+              default_value: 900
+              required: false
+            - name: poll_devices_every
+              description: interval for gathering data for every device, measured in seconds. Data is cached for this interval.
+              default_value: 300
+              required: false
+            - name: device_selector
+              description: "Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`."
+              default_value: "*"
+              required: false
+            - name: extra_devices
+              description: "Allows manual specification of devices not automatically detected by `smartctl --scan`. Each device entry must include both a name and a type. See \"Configuration Examples\" for details."
+              default_value: "[]"
+              required: false
+            - name: no_check_power_mode
+              description: "Skip data collection when the device is in a low-power mode. Prevents unnecessary disk spin-up."
+              default_value: standby
+              required: false
+              detailed_description: |
+                The valid arguments to this option are:
+
+                | Mode    | Description                                                                                                                                                                            |
+                |---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+                | never   | Check the device always.                                                                                                                                                               |
+                | sleep   | Check the device unless it is in SLEEP mode.                                                                                                                                           |
+                | standby | Check the device unless it is in SLEEP or STANDBY mode. In these modes most disks are not spinning, so if you want to prevent a disk from spinning up, this is probably what you want. |
+                | idle    | Check the device unless it is in SLEEP, STANDBY or IDLE mode. In the IDLE state, most disks are still spinning, so this is probably not what you want.                                 |
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom devices poll interval
+              description: Allows you to override the default devices poll interval (data collection).
+              config: |
+                jobs:
+                  - name: smartctl
+                    devices_poll_interval: 60  # Collect S.M.A.R.T statistics every 60 seconds
+            - name: Extra devices
+              description: |
+                This example demonstrates using `extra_devices` to manually add a storage device (`/dev/sdc`) not automatically detected by `smartctl --scan`.
+              config: |
+                jobs:
+                  - name: smartctl
+                    extra_devices:
+                      - name: /dev/sdc
+                        type: jmb39x-q,3
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: controller
+          description: These metrics refer to the Storage Device.
+          labels:
+            - name: device_name
+              description: Device name
+            - name: device_type
+              description: Device type
+            - name: model_name
+              description: Model name
+            - name: serial_number
+              description: Serial number
+          metrics:
+            - name: smartctl.device_smart_status
+              description: Device smart status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: passed
+                - name: failed
+            - name: smartctl.device_ata_smart_error_log_count
+              description: Device ATA smart error log count
+              unit: logs
+              chart_type: line
+              dimensions:
+                - name: error_log
+            - name: smartctl.device_power_on_time
+              description: Device power on time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: power_on_time
+            - name: smartctl.device_temperature
+              description: Device temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: smartctl.device_power_cycles_count
+              description: Device power cycles
+              unit: cycles
+              chart_type: line
+              dimensions:
+                - name: power
+            - name: smartctl.device_read_errors_rate
+              description: Device read errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: corrected
+                - name: uncorrected
+            - name: smartctl.device_write_errors_rate
+              description: Device write errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: corrected
+                - name: uncorrected
+            - name: smartctl.device_verify_errors_rate
+              description: Device verify errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: corrected
+                - name: uncorrected
+            - name: smartctl.device_smart_attr_{attribute_name}
+              description: Device smart attribute {attribute_name}
+              unit: '{attribute_unit}'
+              chart_type: line
+              dimensions:
+                - name: '{attribute_name}'
+            - name: smartctl.device_smart_attr_{attribute_name}_normalized
+              description: Device smart attribute {attribute_name} normalized
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: '{attribute_name}'

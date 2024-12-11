@@ -4,12 +4,23 @@
 
 #ifdef OS_WINDOWS
 void tinysleep(void) {
-    Sleep(1);
+    Sleep(0);
+    // SwitchToThread();
 }
 #else
 void tinysleep(void) {
     static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
     nanosleep(&ns, NULL);
+}
+#endif
+
+#ifdef OS_WINDOWS
+void yield_the_processor(void) {
+    Sleep(0);
+}
+#else
+void yield_the_processor(void) {
+    sched_yield();
 }
 #endif
 

@@ -2001,7 +2001,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
         long before_wanted = smaller_tier_last_time;
 
         struct rrddim_tier *tmp = &rd->tiers[read_tier];
-        storage_engine_query_init(tmp->seb, tmp->smh, &seqh, after_wanted, before_wanted, STORAGE_PRIORITY_HIGH);
+        storage_engine_query_init(tmp->seb, tmp->smh, &seqh, after_wanted, before_wanted, STORAGE_PRIORITY_SYNCHRONOUS);
 
         size_t points_read = 0;
 
@@ -2018,7 +2018,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
 
         storage_engine_query_finalize(&seqh);
         store_metric_collection_completed();
-        global_statistics_backfill_query_completed(points_read);
+        pulse_queries_backfill_query_completed(points_read);
 
         //internal_error(true, "DBENGINE: backfilled chart '%s', dimension '%s', tier %d, from %ld to %ld, with %zu points from tier %d",
         //               rd->rrdset->name, rd->name, tier, after_wanted, before_wanted, points, tr);
@@ -3592,11 +3592,11 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             continue;
         }
 
-        global_statistics_rrdr_query_completed(
-                1,
-                r_tmp->stats.db_points_read - last_db_points_read,
-                r_tmp->stats.result_points_generated - last_result_points_generated,
-                qt->request.query_source);
+        pulse_queries_rrdr_query_completed(
+            1,
+            r_tmp->stats.db_points_read - last_db_points_read,
+            r_tmp->stats.result_points_generated - last_result_points_generated,
+            qt->request.query_source);
 
         last_db_points_read = r_tmp->stats.db_points_read;
         last_result_points_generated = r_tmp->stats.result_points_generated;

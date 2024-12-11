@@ -2654,7 +2654,7 @@ void *statsd_main(void *ptr) {
     RRDSET *st_pcharts = NULL;
     RRDDIM *rd_pcharts = NULL;
 
-    if(global_statistics_enabled) {
+    if(pulse_enabled) {
         st_metrics = rrdset_create_localhost(
             "netdata",
             "statsd_metrics",
@@ -2851,7 +2851,7 @@ void *statsd_main(void *ptr) {
         if(unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
-        if(global_statistics_enabled) {
+        if(pulse_enabled) {
             rrddim_set_by_pointer(st_metrics, rd_metrics_gauge,        (collected_number)statsd.gauges.metrics);
             rrddim_set_by_pointer(st_metrics, rd_metrics_counter,      (collected_number)statsd.counters.metrics);
             rrddim_set_by_pointer(st_metrics, rd_metrics_timer,        (collected_number)statsd.timers.metrics);

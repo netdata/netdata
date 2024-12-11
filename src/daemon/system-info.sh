@@ -121,8 +121,8 @@ CONTAINER_ID_LIKE="unknown"
 
 if [ "${KERNEL_NAME}" = "Darwin" ]; then
   CONTAINER_ID=$(sw_vers -productName)
-  CONTAINER_ID_LIKE="mac"
-  CONTAINER_NAME="mac"
+  CONTAINER_ID_LIKE="macOS"
+  CONTAINER_NAME="macOS"
   CONTAINER_VERSION=$(sw_vers -productVersion)
   CONTAINER_OS_DETECTION="sw_vers"
 elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then

@@ -14,6 +14,5 @@ Observability Centralization Points are crucial for ensuring comprehensive monit
 
 When multiple independent centralization points are available:
 
-- Netdata Cloud queries all of them in parallel, to provide a unified infrastructure view.
-
-- Without Netdata Cloud, the dashboards of each of the Netdata Parents provide unified views of the infrastructure aggregated to each of them (metrics and logs).
+- Netdata Cloud provides a unified infrastructure view by querying all points in parallel.
+- Parent nodes without Cloud access provide consolidated views of their connected infrastructure's metrics and logs.

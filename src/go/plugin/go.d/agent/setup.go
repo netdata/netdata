@@ -22,15 +22,15 @@ import (
 func (a *Agent) loadPluginConfig() config {
 	a.Info("loading config file")
 
-	if len(a.ConfDir) == 0 {
+	if len(a.ConfigDir) == 0 {
 		a.Info("config dir not provided, will use defaults")
 		return defaultConfig()
 	}
 
 	cfgPath := a.Name + ".conf"
-	a.Debugf("looking for '%s' in %v", cfgPath, a.ConfDir)
+	a.Debugf("looking for '%s' in %v", cfgPath, a.ConfigDir)
 
-	path, err := a.ConfDir.Find(cfgPath)
+	path, err := a.ConfigDir.Find(cfgPath)
 	if err != nil || path == "" {
 		a.Warning("couldn't find config, will use defaults")
 		return defaultConfig()
@@ -90,7 +90,7 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 
 	var readPaths, dummyPaths []string
 
-	if len(a.ModulesConfDir) == 0 {
+	if len(a.CollectorsConfDir) == 0 {
 		if hostinfo.IsInsideK8sCluster() {
 			return discovery.Config{Registry: reg}
 		}
@@ -111,9 +111,9 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 		// 2nd part of this fix is in /agent/job/discovery/file/parse.go parseStaticFormat()
 		if name == "windows" {
 			cfgName := "wmi.conf"
-			a.Debugf("looking for '%s' in %v", cfgName, a.ModulesConfDir)
+			a.Debugf("looking for '%s' in %v", cfgName, a.CollectorsConfDir)
 
-			path, err := a.ModulesConfDir.Find(cfgName)
+			path, err := a.CollectorsConfDir.Find(cfgName)
 
 			if err == nil && strings.Contains(path, "etc/netdata") {
 				a.Infof("found '%s", path)
@@ -123,9 +123,9 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 		}
 
 		cfgName := name + ".conf"
-		a.Debugf("looking for '%s' in %v", cfgName, a.ModulesConfDir)
+		a.Debugf("looking for '%s' in %v", cfgName, a.CollectorsConfDir)
 
-		path, err := a.ModulesConfDir.Find(cfgName)
+		path, err := a.CollectorsConfDir.Find(cfgName)
 		if hostinfo.IsInsideK8sCluster() {
 			if err != nil {
 				a.Infof("not found '%s', won't use default (reading stock configs is disabled in k8s)", cfgName)
@@ -144,31 +144,31 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 		}
 	}
 
-	a.Infof("dummy/read/watch paths: %d/%d/%d", len(dummyPaths), len(readPaths), len(a.ModulesSDConfPath))
+	a.Infof("dummy/read/watch paths: %d/%d/%d", len(dummyPaths), len(readPaths), len(a.CollectorsConfigWatchPath))
 
 	return discovery.Config{
 		Registry: reg,
 		File: file.Config{
 			Read:  readPaths,
-			Watch: a.ModulesSDConfPath,
+			Watch: a.CollectorsConfigWatchPath,
 		},
 		Dummy: dummy.Config{
 			Names: dummyPaths,
 		},
 		SD: sd.Config{
-			ConfDir: a.ModulesConfSDDir,
+			ConfDir: a.ServiceDiscoveryConfigDir,
 		},
 	}
 }
 
 func (a *Agent) setupVnodeRegistry() *vnodes.Vnodes {
-	a.Debugf("looking for 'vnodes/' in %v", a.VnodesConfDir)
+	a.Debugf("looking for 'vnodes/' in %v", a.VnodesConfigDir)
 
-	if len(a.VnodesConfDir) == 0 {
+	if len(a.VnodesConfigDir) == 0 {
 		return nil
 	}
 
-	dirPath, err := a.VnodesConfDir.Find("vnodes/")
+	dirPath, err := a.VnodesConfigDir.Find("vnodes/")
 	if err != nil || dirPath == "" {
 		return nil
 	}

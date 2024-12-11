@@ -13,6 +13,7 @@ type noop struct{}
 
 func (n noop) Lock(string) (bool, error)                          { return true, nil }
 func (n noop) Unlock(string)                                      {}
+func (n noop) UnlockAll()                                         {}
 func (n noop) Save(confgroup.Config, string)                      {}
 func (n noop) Remove(confgroup.Config)                            {}
 func (n noop) Contains(confgroup.Config, ...string) bool          { return false }

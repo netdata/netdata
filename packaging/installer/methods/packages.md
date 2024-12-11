@@ -13,15 +13,12 @@ and fail if it cannot do so.
 > **Note**
 >
 > In July 2022, we switched hosting of our native packages from Package Cloud to self-hosted repositories.
-> We still maintain the Package cloud repositories, but they are not guaranteed to work and may be removed
-> without prior warning.
->
-> When selecting a repository configuration package, note that the version 2 packages provide configuration for
-> our self-hosted repositories, and then version 1 packages provide configuration for Package Cloud.
+> Until late 2024 we continued to provide packages via Package Cloud, but we have since then switched to only
+> providing packages via our repositories.
 
 ## Manual setup of RPM packages
 
-Netdata’s official RPM repositories are hosted at <https://repo.netdata.cloud/repos>. We provide four groups of
+Netdata’s official RPM repositories are hosted at <https://repository.netdata.cloud/repos/index.html>. We provide four groups of
 repositories at that top level:
 
 - `stable`: Contains packages for stable releases of the Netdata Agent.
@@ -42,16 +39,17 @@ Under each of those directories is a directory for each supported release of tha
 directory for each supported CPU architecture which contains the actual repository.
 
 For example, for stable release packages for RHEL 9 on 64-bit x86, the full URL for the repository would be
-<https://repo.netdata.cloud/repos/stable/el/9/x86_64/>
+<https://repository.netdata.cloud/repos/stable/el/9/x86_64/>
 
 Our RPM packages and repository metadata are signed using a GPG key with a user name of ‘Netdatabot’. The
 current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The associated public key can be fetched from
-`https://repo.netdata.cloud/netdatabot.gpg.key`.
+`https://repository.netdata.cloud/netdatabot.gpg.key`.
 
 If you are explicitly configuring a system to use our repositories, the recommended setup is to download the
-appropriate repository configuration package from <https://repo.netdata.cloud/repos/repoconfig> and install it
-directly on the target system using the system package manager. This will ensure any packages needed to use the
-repository are also installed, and will help enable a seamless transition if we ever need to change our infrastructure.
+appropriate repository configuration package from <https://repository.netdata.cloud/repos/repoconfig/index.html>
+and install it directly on the target system using the system package manager. This will ensure any packages
+needed to use the repository are also installed, and will help enable a seamless transition if we ever need to
+change our infrastructure.
 
 > **Note**
 >
@@ -62,7 +60,7 @@ repository are also installed, and will help enable a seamless transition if we 
 
 ## Manual setup of DEB packages
 
-Netdata’s official DEB repositories are hosted at <https://repo.netdata.cloud/repos>. We provide four groups of
+Netdata’s official DEB repositories are hosted at <https://repository.netdata.cloud/repos/index.html>. We provide four groups of
 repositories at that top level:
 
 - `stable`: Contains packages for stable releases of the Netdata Agent.
@@ -78,21 +76,34 @@ Within each top level group of repositories, there are directories for each supp
 Under each of these directories is a directory for each supported release, corresponding to the release codename.
 
 These repositories are set up as what Debian calls ‘flat repositories’, and are available via both HTTP and HTTPS.
+Additionally, our repositories support acquiring repository metadata by-hash, which leads to use of URLs similar to
+`http://repository.netdata.cloud/repos/edge/ubuntu/focal/by-hash/SHA256/91ccff6523a3c4483ebb539ff2b4adcd3b6b5d0c0c2c9573c5a6947a127819bc`,
+and this is the preferred method for updating metadata as it is more reliable.
 
-As a result of this structure, the required APT sources entry for stable packages for Debian 11 (Bullseye) is:
+As a result of this structure, the required APT sources.list entry for stable packages for Debian 11 (Bullseye) is:
 
 ```text
-deb http://repo.netdata.cloud/repos/stable/debian/ bullseye/
+deb by-hash=yes http://repository.netdata.cloud/repos/stable/debian/ bullseye/
+```
+
+And the equivalent required deb822 style entry for stable packages for Debian 11 (Bullseye) is:
+
+```text
+Types: deb
+URIs: http://repository.netdata.cloud/repos/stable/debian/
+Suites: bullseye/
+By-Hash: Yes
+Enabled: Yes
 ```
 
 Note the `/` at the end of the codename, this is required for the repository to be processed correctly.
 
 Our DEB packages and repository metadata are signed using a GPG key with a user name of ‘Netdatabot’. The
 current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The associated public key can be fetched from
-`https://repo.netdata.cloud/netdatabot.gpg.key`.
+`https://repository.netdata.cloud/netdatabot.gpg.key`.
 
 If you are explicitly configuring a system to use our repositories, the recommended setup is to download the
-appropriate repository configuration package from <https://repo.netdata.cloud/repos/repoconfig> and install it
+appropriate repository configuration package from <https://repository.netdata.cloud/repos/repoconfig/index.html> and install it
 directly on the target system using the system package manager. This will ensure any packages needed to use the
 repository are also installed, and will help enable a seamless transition if we ever need to change our infrastructure.
 
@@ -104,23 +115,19 @@ Local mirrors of our official repositories can be created in one of two ways:
    APT repositories, or reposync for RPM repositories. For this approach, please consult the documentation for
    the specific tool you are using for info on how to mirror the repositories.
 2. Using a regular website mirroring tool, such as GNU wget’s `--mirror` option. For this approach, simply point
-   your mirroring tool at `https://repo.netdata.cloud/repos/`, and everything should just work.
+   your mirroring tool at `https://repository.netdata.cloud/repos/`, and everything should just work.
 
-We do not provide official support for mirroring our repositories,
-but we do have some tips for anyone looking to do so:
+We do not provide official support for mirroring our repositories, but we do have some tips for anyone looking to do so:
 
-- Our `robots.txt` file explicitly disallows indexing, so if you’re using a regular website mirroring tool,
-  you wil need to tell it to ignore `robots.txt` (for example, if using GNU wget, add `-e robots=off` to the
-  options you pass) to ensure that it actually retrieves everything.
 - Excluding special cases of caching proxies (such as apt-cacher-ng), our repository configuration packages _DO NOT_
   work with custom local mirrors. Thus, you will need to manually configure your systems to use your local mirror.
 - Packages are published as they are built, with 64-bit x86 packages being built first, followed by 32-bit x86,
   and then non-x86 packages in alphabetical order of the CPU architecture. Because of the number of different
   packages being built, this means that packages for a given nightly build or stable release are typically published
   over the course of a few hours, usually starting about 15-20 minutes after the build or release is started.
-- Repository metadata is updated every hour on the hour, and the process may take anywhere from a few seconds to
-  more than 20 minutes. Because of this, it makes little sense to sync your mirror more frequently than once an hour,
-  and it’s generally preferred to start syncing at least 30 minutes into the hour.
+- Repository metadata may be updated as frequently as six times an hour, depending on whether or not there are
+  new packages for a given repository. However, it is generally not worth it to attempt to
+  synchronize a mirror of our repositories more frequently than once an hour.
 - A full mirror of all of our repositories currently requires up to 100 GB of storage space, though the exact
   amount of space needed fluctuates over time. Because of this, users seeking to mirror our repositories are
   encouraged to mirror only those repositories they actually need instead of mirroring everything.
@@ -128,7 +135,7 @@ but we do have some tips for anyone looking to do so:
   time to do so, as publishing nightly packages will almost always be done by this point, and publishing of stable
   releases typically happens after that time window.
 - If you intend to use our existing GPG signatures on the repository metadata and packages, you probably also want
-  a local copy of our public GPG key, which can be fetched from `https://repo.netdata.cloud/netdatabot.gpg.key`.
+  a local copy of our public GPG key, which can be fetched from `https://repository.netdata.cloud/netdatabot.gpg.key`.
 
 ## Public mirrors of the official Netdata repositories
 

@@ -12,7 +12,7 @@
 ## Write and test a simple collector
 
 > :exclamation: You can skip most of these steps if you first experiment directly with the existing
-> [example module](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/example), which
+> [example module](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/example), which
 > will
 > give you an idea of how things work.
 
@@ -21,7 +21,7 @@ Let's assume you want to write a collector named `example2`.
 The steps are:
 
 - Add the source code
-  to [`modules/example2/`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules).
+  to [`modules/example2/`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector).
   - [module interface](#module-interface).
   - [suggested module layout](#module-layout).
   - [helper packages](#helper-packages).
@@ -30,7 +30,7 @@ The steps are:
 - Add the module
   to [`config/go.d.conf`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d.conf).
 - Import the module
-  in [`modules/init.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/init.go).
+  in [`modules/init.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/init.go).
 - Update
   the [`available modules list`](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d#available-modules).
 - To build it, run `make` from the plugin root dir. This will create a new `go.d.plugin` binary that includes your newly
@@ -191,7 +191,7 @@ Suggested minimal layout:
 ### File `module_name.go`
 
 > :exclamation: See the
-> example [`example.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/example/example.go).
+> example [`example.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/example/example.go).
 
 Don't overload this file with the implementation details.
 
@@ -204,14 +204,14 @@ Usually it contains only:
 ### File `charts.go`
 
 > :exclamation: See the
-> example: [`charts.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/example/charts.go).
+> example: [`charts.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/example/charts.go).
 
 Put charts, charts templates and charts constructor functions in this file.
 
 ### File `init.go`
 
 > :exclamation: See the
-> example: [`init.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/example/init.go).
+> example: [`init.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/example/init.go).
 
 All the module initialization details should go in this file.
 
@@ -238,7 +238,7 @@ func (e *Example) initSomeValue() error {
 ### File `collect.go`
 
 > :exclamation: See the
-> example: [`collect.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/example/collect.go).
+> example: [`collect.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/example/collect.go).
 
 This file is the entry point for the metrics collection.
 
@@ -261,7 +261,7 @@ func (e *Example) collect() (map[string]int64, error) {
 ### File `module_name_test.go`
 
 > :exclamation: See the
-> example: [`example_test.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/example/example_test.go).
+> example: [`example_test.go`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/example/example_test.go).
 >
 > if you have no experience in testing we recommend starting
 > with [testing package documentation](https://golang.org/pkg/testing/).

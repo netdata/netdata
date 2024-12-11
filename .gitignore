@@ -19,7 +19,7 @@ Makefile.in
 *.old
 *.log
 !src/collectors/log2journal/tests.d/*.log
-!src/go/collectors/**/*.log
+!src/go/**/*.log
 *.pyc
 
 netdata.spec

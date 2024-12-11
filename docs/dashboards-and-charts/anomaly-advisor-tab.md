@@ -22,5 +22,5 @@ The right side of the page displays an anomaly index for the highlighted timelin
 
 ## Usage Tips
 
-- If you are interested in a subset of specific nodes then filtering to just those nodes before highlighting is recommended to get better results. When you highlight a timeframe, Netdata will ask the Agents for a ranking across all metrics, so if there is a subset of nodes there will be less "averaging" going on and you'll get a less noisy ranking.
-- Ideally try and highlight close to a spike or window of interest so that the resulting ranking can narrow-in more easily on the timeline you are interested in.
+- If you are interested in a subset of specific nodes, then filtering to just those nodes before highlighting is recommended to get better results. When you highlight a timeframe, Netdata will ask the Agents for a ranking across all metrics, so if there is a subset of nodes, there will be less "averaging" going on, and you'll get a less noisy ranking.
+- Ideally, try and highlight close to a spike or window of interest so that the resulting ranking can narrow-in more easily on the timeline you are interested in.

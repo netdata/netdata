@@ -2,13 +2,13 @@
 
 Parsing web server log files with Netdata, revealing the volume of redirects, requests and other metrics, can give you a better overview of your infrastructure.
 
-Too many bad requests? Maybe a recent deploy missed a few small SVG icons. Too many requests? Time to batten down the hatches—it's a DDoS.
+Too many bad requests? Maybe a recent deployment missed a few small SVG icons. Too many requests? Time to batten down the hatches—it's a DDoS.
 
 You can use the [LTSV log format](http://ltsv.org/), track TLS and cipher usage, and the whole parser is faster than
 ever. In one test on a system with SSD storage, the collector consistently parsed the logs for 200,000 requests in
 200ms, using ~30% of a single core.
 
-The [web_log](/src/go/plugin/go.d/modules/weblog/README.md) collector is currently compatible
+The [web_log](/src/go/plugin/go.d/collector/weblog/README.md) collector is currently compatible
 with [Nginx](https://nginx.org/en/) and [Apache](https://httpd.apache.org/).
 
 This guide will walk you through using the new Go-based web log collector to turn the logs these web servers
@@ -30,33 +30,33 @@ and their default locations for log files:
 ```yaml
 # [ JOBS ]
 jobs:
-# NGINX
-# debian, arch
+  # NGINX
+  # debian, arch
   - name: nginx
     path: /var/log/nginx/access.log
 
-# gentoo
+  # gentoo
   - name: nginx
     path: /var/log/nginx/localhost.access_log
 
-# APACHE
-# debian
+  # APACHE
+  # debian
   - name: apache
     path: /var/log/apache2/access.log
 
-# gentoo
+  # gentoo
   - name: apache
     path: /var/log/apache2/access_log
 
-# arch
+  # arch
   - name: apache
     path: /var/log/httpd/access_log
 
-# debian
+  # debian
   - name: apache_vhosts
     path: /var/log/apache2/other_vhosts_access.log
 
-# GUNICORN
+  # GUNICORN
   - name: gunicorn
     path: /var/log/gunicorn/access.log
 
@@ -64,7 +64,7 @@ jobs:
     path: /var/log/gunicorn/gunicorn-access.log
 ```
 
-However, if your log files were not auto-detected, it might be because they are in a different location. Try the default
+However, if your log files weren’t auto-detected, it might be because they’re in a different location. Try the default
 `web_log.conf` file.
 
 ```bash
@@ -87,7 +87,7 @@ Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate metho
 
 The web log collector is capable of parsing custom Nginx and Apache log formats and presenting them as charts, but we'll leave that topic for a separate guide.
 
-We do have [extensive documentation](/src/go/plugin/go.d/modules/weblog/README.md) on how to build custom parsing for Nginx and Apache logs.
+We do have [extensive documentation](/src/go/plugin/go.d/collector/weblog/README.md) on how to build custom parsing for Nginx and Apache logs.
 
 ## Tweak web log collector alerts
 

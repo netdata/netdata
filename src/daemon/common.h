@@ -3,7 +3,12 @@
 #ifndef NETDATA_COMMON_H
 #define NETDATA_COMMON_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "libnetdata/libnetdata.h"
+#include "config/netdata-conf.h"
 #include "libuv_workers.h"
 
 // ----------------------------------------------------------------------------
@@ -11,9 +16,10 @@
 
 #include "web/api/maps/maps.h"
 
-#include "daemon/config/dyncfg.h"
+#include "daemon/config/netdata-conf.h"
+#include "daemon/dyncfg/dyncfg.h"
 
-#include "global_statistics.h"
+#include "daemon/pulse/pulse.h"
 
 // health monitoring and alarm notifications
 #include "health/health.h"
@@ -30,10 +36,10 @@
 #endif
 
 // streaming metrics between netdata servers
-#include "streaming/rrdpush.h"
+#include "streaming/stream.h"
 
 // anomaly detection
-#include "ml/ml.h"
+#include "ml/ml_public.h"
 
 // the netdata registry
 // the registry is actually an API feature
@@ -93,5 +99,9 @@ extern time_t netdata_start_time;
 long get_netdata_cpus(void);
 
 void set_environment_for_plugins_and_scripts(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* NETDATA_COMMON_H */

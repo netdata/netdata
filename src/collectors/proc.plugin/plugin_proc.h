@@ -47,6 +47,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt);
 int do_sys_class_infiniband(int update_every, usec_t dt);
 int do_sys_class_drm(int update_every, usec_t dt);
 int get_numa_node_count(void);
+int do_run_reboot_required(int update_every, usec_t dt);
 
 // metrics that need to be shared among data collectors
 extern unsigned long long zfs_arcstats_shrinkable_cache_size_bytes;

@@ -301,16 +301,16 @@ struct nd_log nd_log = {
     },
 #endif
     .std_output = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .spinlock = SPINLOCK_INITIALIZER,
         .initialized = false,
     },
     .std_error = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .spinlock = SPINLOCK_INITIALIZER,
         .initialized = false,
     },
     .sources = {
         [NDLS_UNSET] = {
-            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+            .spinlock = SPINLOCK_INITIALIZER,
             .method = NDLM_DISABLED,
             .format = NDLF_JOURNAL,
             .filename = NULL,
@@ -320,7 +320,7 @@ struct nd_log nd_log = {
             .limits = ND_LOG_LIMITS_UNLIMITED,
         },
         [NDLS_ACCESS] = {
-            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+            .spinlock = SPINLOCK_INITIALIZER,
             .method = NDLM_DEFAULT,
             .format = NDLF_LOGFMT,
             .filename = LOG_DIR "/access.log",
@@ -330,7 +330,7 @@ struct nd_log nd_log = {
             .limits = ND_LOG_LIMITS_UNLIMITED,
         },
         [NDLS_ACLK] = {
-            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+            .spinlock = SPINLOCK_INITIALIZER,
             .method = NDLM_FILE,
             .format = NDLF_LOGFMT,
             .filename = LOG_DIR "/aclk.log",
@@ -340,7 +340,7 @@ struct nd_log nd_log = {
             .limits = ND_LOG_LIMITS_UNLIMITED,
         },
         [NDLS_COLLECTORS] = {
-            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+            .spinlock = SPINLOCK_INITIALIZER,
             .method = NDLM_DEFAULT,
             .format = NDLF_LOGFMT,
             .filename = LOG_DIR "/collector.log",
@@ -350,7 +350,7 @@ struct nd_log nd_log = {
             .limits = ND_LOG_LIMITS_DEFAULT,
         },
         [NDLS_DEBUG] = {
-            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+            .spinlock = SPINLOCK_INITIALIZER,
             .method = NDLM_DISABLED,
             .format = NDLF_LOGFMT,
             .filename = LOG_DIR "/debug.log",
@@ -360,7 +360,7 @@ struct nd_log nd_log = {
             .limits = ND_LOG_LIMITS_UNLIMITED,
         },
         [NDLS_DAEMON] = {
-            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+            .spinlock = SPINLOCK_INITIALIZER,
             .method = NDLM_DEFAULT,
             .filename = LOG_DIR "/daemon.log",
             .format = NDLF_LOGFMT,
@@ -370,7 +370,7 @@ struct nd_log nd_log = {
             .limits = ND_LOG_LIMITS_DEFAULT,
         },
         [NDLS_HEALTH] = {
-            .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+            .spinlock = SPINLOCK_INITIALIZER,
             .method = NDLM_DEFAULT,
             .format = NDLF_LOGFMT,
             .filename = LOG_DIR "/health.log",

@@ -1,37 +1,23 @@
 # Netdata Cloud On-Prem Troubleshooting
 
-Netdata Cloud is a sophisticated software piece relying on in multiple infrastructure components for its operation.
+Netdata Cloud On-Prem is an enterprise-grade monitoring solution that relies on several infrastructure components:
 
-We assume that your team already manages and monitors properly the components Netdata Cloud depends upon, like the PostgreSQL, Redis and Elasticsearch databases, the Pulsar and EMQX message brokers, the traffic controllers (Ingress and Traefik) and of course the health of the Kubernetes cluster itself.
+- Databases: PostgreSQL, Redis, Elasticsearch
+- Message Brokers: Pulsar, EMQX
+- Traffic Controllers: Ingress, Traefik
+- Kubernetes Cluster
 
-The following are questions that are usually asked by Netdata Cloud On-Prem operators.
+These components should be monitored and managed according to your organization's established practices and requirements.
 
-## Loading charts takes a long time or ends with an error
+## Common Issues
 
-The charts service is trying to collect data from the Agents involved in the query. In most of the cases, this microservice queries many Agents (depending on the Room), and all of them have to reply for the query to be satisfied.
+### Slow Chart Loading or Chart Errors
 
-One or more of the following may be the cause:
+When charts take a long time to load or fail with errors, the issue typically stems from data collection challenges. The `charts` service must gather data from multiple Agents within a Room, requiring successful responses from all queried Agents.
 
-1. **Slow Netdata Agent or Netdata Agents with unreliable connections**
-
-   If any of the Netdata Agents queried is slow or has an unreliable network connection, the query will stall and Netdata Cloud will have timeout before responding.
-
-   When Agents are overloaded or have unreliable connections, we suggest to install more Netdata Parents for providing reliable backends to Netdata Cloud. They will automatically be preferred for all queries, when available.
-
-2. **Poor Kubernetes cluster management**
-
-   Another common issue is poor management of the Kubernetes cluster. When a node of a Kubernetes cluster is saturated, or the limits set to its containers are small, Netdata Cloud microservices get throttled by Kubernetes and does not get the resources required to process the responses of Netdata Agents and aggregate the results for the dashboard.
-
-   We recommend to review the throttling of the containers and increase the limits if required.
-
-3. **Saturated Database**
-
-   Slow responses may also indicate performance issues at the PostgreSQL database.
-
-   Please review the resources utilization of the database server (CPU, Memory, and Disk I/O) and take action to improve the situation.
-
-4. **Messages pilling up in Pulsar**
-
-   Depending on the size of the infrastructure being monitored and the resources allocated to Pulsar and the microservices, messages may be pilling up. When this happens you may also experience that nodes status updates (online, offline, stale) are slow, or alerts transitions take time to appear on the dashboard.
-
-   We recommend to review Pulsar configuration and the resources allocated of the microservices, to ensure that there is no saturation.
+| Issue                | Symptoms                                                                                                        | Cause                                                                        | Solution                                                                                                                                                                                  |
+|----------------------|-----------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Agent Connectivity   | - Queries stall or timeout<br/>- Inconsistent chart loading                                                     | Slow Agents or unreliable network connections prevent timely data collection | Deploy additional [Parent](/docs/observability-centralization-points/README.md) nodes to provide reliable backends. The system will automatically prefer these for queries when available |
+| Kubernetes Resources | - Service throttling<br/>- Slow data processing<br/>- Delayed dashboard updates                                 | Resource saturation at the node level or restrictive container limits        | Review and adjust container resource limits and node capacity as needed                                                                                                                   |
+| Database Performance | - Slow query responses<br/>- Increased latency across services                                                  | PostgreSQL performance bottlenecks                                           | Monitor and optimize database resource utilization:<br/>- CPU usage<br/>- Memory allocation<br/>- Disk I/O performance                                                                    |
+| Message Broker       | - Delayed node status updates (online/offline/stale)<br/>- Slow alert transitions<br/>- Dashboard update delays | Message accumulation in Pulsar due to processing bottlenecks                 | - Review Pulsar configuration<br/>- Adjust microservice resource allocation<br/>- Monitor message processing rates                                                                        |

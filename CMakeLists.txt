@@ -208,7 +208,56 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
-set(NEED_PROTOBUF True)
+option(ENABLE_MIMALLOC "Enable mimalloc allocator" OFF)
+
+if(ENABLE_MIMALLOC)
+    if(CMAKE_MINOR_VERSION LESS 18)
+        message(WARNING "Mimalloc disabled: Requires CMake version 3.18 or higher.")
+        set(ENABLE_MIMALLOC OFF CACHE BOOL "Enable mimalloc allocator" FORCE)
+    elseif(CMAKE_SIZEOF_VOID_P LESS 8)
+        message(WARNING "Mimalloc disabled: Only supported on 64-bit platforms.")
+        set(ENABLE_MIMALLOC OFF CACHE BOOL "Enable mimalloc allocator" FORCE)
+    elseif(OS_FREEBSD OR OS_MACOS OR OS_WINDOWS)
+        message(WARNING "Mimalloc disabled: Not supported on FreeBSD, macOS, or Windows.")
+        set(ENABLE_MIMALLOC OFF CACHE BOOL "Enable mimalloc allocator" FORCE)
+    elseif(ENABLE_ADDRESS_SANITIZER)
+        message(WARNING "Mimalloc disabled: Cannot be used with Address Sanitizer.")
+        set(ENABLE_MIMALLOC OFF CACHE BOOL "Enable mimalloc allocator" FORCE)
+    else()
+        message(STATUS "Mimalloc is enabled.")
+    endif()
+else()
+    message(STATUS "Mimalloc is disabled.")
+endif()
+
+if(ENABLE_MIMALLOC)
+        function(netdata_add_mimalloc)
+                set(MI_BUILD_STATIC ON CACHE INTERNAL "")
+                set(MI_BUILD_SHARED OFF CACHE INTERNAL "")
+                set(MI_BUILD_OBJECT OFF CACHE INTERNAL "")
+                set(MI_BUILD_TESTS OFF CACHE INTERNAL "")
+
+                include(FetchContent)
+                include(NetdataFetchContentExtra)
+
+                if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+                        FetchContent_Declare(mimalloc
+                                GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+                                GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f
+                                EXCLUDE_FROM_ALL
+                        )
+                else()
+                        FetchContent_Declare(mimalloc
+                                GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+                                GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f
+                        )
+                endif()
+
+                FetchContent_MakeAvailable_NoInstall(mimalloc)
+        endfunction()
+
+        netdata_add_mimalloc()
+endif()
 
 if(ENABLE_PLUGIN_GO)
     include(NetdataGoTools)
@@ -245,12 +294,10 @@ if(ENABLE_WEBRTC)
         FetchContent_MakeAvailable(libdatachannel)
 endif()
 
-if(NEED_PROTOBUF)
-        include(NetdataProtobuf)
+include(NetdataProtobuf)
 
-        if(ENABLE_BUNDLED_PROTOBUF)
-                netdata_bundle_protobuf()
-        endif()
+if(ENABLE_BUNDLED_PROTOBUF)
+        netdata_bundle_protobuf()
 endif()
 
 set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
@@ -391,6 +438,7 @@ check_function_exists(backtrace HAVE_BACKTRACE)
 check_function_exists(arc4random_buf HAVE_ARC4RANDOM_BUF)
 check_function_exists(arc4random_uniform HAVE_ARC4RANDOM_UNIFORM)
 check_function_exists(getrandom HAVE_GETRANDOM)
+check_function_exists(sysinfo HAVE_SYSINFO)
 
 #
 # check source compilation
@@ -427,6 +475,14 @@ int main() {
         return 0;
 }
 " HAVE_C_MALLOPT)
+
+check_c_source_compiles("
+#include <malloc.h>
+int main() {
+        malloc_trim(0);
+        return 0;
+}
+" HAVE_C_MALLOC_TRIM)
 
 check_c_source_compiles("
 #define _GNU_SOURCE
@@ -590,53 +646,47 @@ else()
         pkg_check_modules(CRYPTO IMPORTED_TARGET REQUIRED libcrypto)
 endif()
 
-#
-# figure out if we need protoc/protobuf
-#
-
-if(NEED_PROTOBUF)
-        netdata_detect_protobuf()
-endif()
+netdata_detect_protobuf()
 
 #
 # source files
 #
 
 set(LIBJUDY_PREV_FILES
-        src/libnetdata/libjudy/src/JudyL/JudyLPrev.c
-        src/libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLPrev.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLPrevEmpty.c
 )
 
 set(LIBJUDY_NEXT_FILES
-        src/libnetdata/libjudy/src/JudyL/JudyLNext.c
-        src/libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLNext.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLNextEmpty.c
 )
 
 set(LIBJUDY_SOURCES
-        src/libnetdata/libjudy/src/Judy.h
-        src/libnetdata/libjudy/src/JudyCommon/JudyMalloc.c
-        src/libnetdata/libjudy/src/JudyCommon/JudyPrivate.h
-        src/libnetdata/libjudy/src/JudyCommon/JudyPrivate1L.h
-        src/libnetdata/libjudy/src/JudyCommon/JudyPrivateBranch.h
-        src/libnetdata/libjudy/src/JudyL/JudyL.h
-        src/libnetdata/libjudy/src/JudyL/JudyLByCount.c
-        src/libnetdata/libjudy/src/JudyL/JudyLCascade.c
-        src/libnetdata/libjudy/src/JudyL/JudyLCount.c
-        src/libnetdata/libjudy/src/JudyL/JudyLCreateBranch.c
-        src/libnetdata/libjudy/src/JudyL/JudyLDecascade.c
-        src/libnetdata/libjudy/src/JudyL/JudyLDel.c
-        src/libnetdata/libjudy/src/JudyL/JudyLFirst.c
-        src/libnetdata/libjudy/src/JudyL/JudyLFreeArray.c
-        src/libnetdata/libjudy/src/JudyL/j__udyLGet.c
-        src/libnetdata/libjudy/src/JudyL/JudyLGet.c
-        src/libnetdata/libjudy/src/JudyL/JudyLInsArray.c
-        src/libnetdata/libjudy/src/JudyL/JudyLIns.c
-        src/libnetdata/libjudy/src/JudyL/JudyLInsertBranch.c
-        src/libnetdata/libjudy/src/JudyL/JudyLMallocIF.c
-        src/libnetdata/libjudy/src/JudyL/JudyLMemActive.c
-        src/libnetdata/libjudy/src/JudyL/JudyLMemUsed.c
-        src/libnetdata/libjudy/src/JudyL/JudyLTables.c
-        src/libnetdata/libjudy/src/JudyHS/JudyHS.c
+        src/libnetdata/libjudy/vendored/Judy.h
+        src/libnetdata/libjudy/vendored/JudyCommon/JudyMalloc.c
+        src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivate.h
+        src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivate1L.h
+        src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivateBranch.h
+        src/libnetdata/libjudy/vendored/JudyL/JudyL.h
+        src/libnetdata/libjudy/vendored/JudyL/JudyLByCount.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLCascade.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLCount.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLCreateBranch.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLDecascade.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLDel.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLFirst.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLFreeArray.c
+        src/libnetdata/libjudy/vendored/JudyL/j__udyLGet.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLGet.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLInsArray.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLIns.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLInsertBranch.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLMallocIF.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLMemActive.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLMemUsed.c
+        src/libnetdata/libjudy/vendored/JudyL/JudyLTables.c
+        src/libnetdata/libjudy/vendored/JudyHS/JudyHS.c
         ${LIBJUDY_PREV_FILES}
         ${LIBJUDY_NEXT_FILES}
 )
@@ -683,8 +733,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/inlined.h
         src/libnetdata/json/json.c
         src/libnetdata/json/json.h
-        src/libnetdata/json/jsmn.c
-        src/libnetdata/json/jsmn.h
+        src/libnetdata/json/vendored/jsmn.c
+        src/libnetdata/json/vendored/jsmn.h
         src/libnetdata/libnetdata.c
         src/libnetdata/libnetdata.h
         src/libnetdata/line_splitter/line_splitter.c
@@ -879,14 +929,26 @@ set(LIBNETDATA_FILES
         src/libnetdata/xxHash/xxhash.h
         src/libnetdata/os/random.c
         src/libnetdata/os/random.h
+        src/libnetdata/socket/nd-sock.c
+        src/libnetdata/socket/nd-sock.h
+        src/libnetdata/socket/listen-sockets.c
+        src/libnetdata/socket/listen-sockets.h
+        src/libnetdata/socket/poll-events.c
+        src/libnetdata/socket/poll-events.h
+        src/libnetdata/socket/connect-to.c
+        src/libnetdata/socket/connect-to.h
+        src/libnetdata/socket/socket-peers.c
+        src/libnetdata/socket/socket-peers.h
+        src/libnetdata/libjudy/judyl-typed.h
+        src/libnetdata/os/system_memory.c
+        src/libnetdata/os/system_memory.h
+        src/libnetdata/socket/nd-poll.c
+        src/libnetdata/socket/nd-poll.h
+        src/libnetdata/locks/spinlock.c
+        src/libnetdata/locks/spinlock.h
+        src/libnetdata/locks/rw-spinlock.c
+        src/libnetdata/locks/rw-spinlock.h
 )
-
-if(ENABLE_PLUGIN_EBPF)
-        list(APPEND LIBNETDATA_FILES
-                src/libnetdata/ebpf/ebpf.c
-                src/libnetdata/ebpf/ebpf.h
-        )
-endif()
 
 set(LIBH2O_FILES
         src/web/server/h2o/libh2o/deps/cloexec/cloexec.c
@@ -979,8 +1041,8 @@ set(DAEMON_FILES
         src/daemon/daemon.h
         src/daemon/libuv_workers.c
         src/daemon/libuv_workers.h
-        src/daemon/global_statistics.c
-        src/daemon/global_statistics.h
+        src/daemon/pulse/pulse.c
+        src/daemon/pulse/pulse.h
         src/daemon/analytics.c
         src/daemon/analytics.h
         src/daemon/main.c
@@ -1001,15 +1063,59 @@ set(DAEMON_FILES
         src/daemon/pipename.h
         src/daemon/unit_test.c
         src/daemon/unit_test.h
-        src/daemon/config/dyncfg.c
-        src/daemon/config/dyncfg.h
-        src/daemon/config/dyncfg-files.c
-        src/daemon/config/dyncfg-unittest.c
-        src/daemon/config/dyncfg-inline.c
-        src/daemon/config/dyncfg-echo.c
-        src/daemon/config/dyncfg-internals.h
-        src/daemon/config/dyncfg-intercept.c
-        src/daemon/config/dyncfg-tree.c
+        src/daemon/dyncfg/dyncfg.c
+        src/daemon/dyncfg/dyncfg.h
+        src/daemon/dyncfg/dyncfg-files.c
+        src/daemon/dyncfg/dyncfg-unittest.c
+        src/daemon/dyncfg/dyncfg-inline.c
+        src/daemon/dyncfg/dyncfg-echo.c
+        src/daemon/dyncfg/dyncfg-internals.h
+        src/daemon/dyncfg/dyncfg-intercept.c
+        src/daemon/dyncfg/dyncfg-tree.c
+        src/daemon/pulse/pulse-http-api.c
+        src/daemon/pulse/pulse-http-api.h
+        src/daemon/pulse/pulse-queries.c
+        src/daemon/pulse/pulse-queries.h
+        src/daemon/pulse/pulse-ingestion.c
+        src/daemon/pulse/pulse-ingestion.h
+        src/daemon/pulse/pulse-ml.c
+        src/daemon/pulse/pulse-ml.h
+        src/daemon/pulse/pulse-gorilla.c
+        src/daemon/pulse/pulse-gorilla.h
+        src/daemon/pulse/pulse-daemon.c
+        src/daemon/pulse/pulse-daemon.h
+        src/daemon/pulse/pulse-daemon-memory.c
+        src/daemon/pulse/pulse-daemon-memory.h
+        src/daemon/pulse/pulse-sqlite3.c
+        src/daemon/pulse/pulse-sqlite3.h
+        src/daemon/pulse/pulse-dbengine.c
+        src/daemon/pulse/pulse-dbengine.h
+        src/daemon/pulse/pulse-string.c
+        src/daemon/pulse/pulse-string.h
+        src/daemon/pulse/pulse-heartbeat.c
+        src/daemon/pulse/pulse-heartbeat.h
+        src/daemon/pulse/pulse-dictionary.c
+        src/daemon/pulse/pulse-dictionary.h
+        src/daemon/pulse/pulse-workers.c
+        src/daemon/pulse/pulse-workers.h
+        src/daemon/pulse/pulse-trace-allocations.c
+        src/daemon/pulse/pulse-trace-allocations.h
+        src/daemon/pulse/pulse-aral.c
+        src/daemon/pulse/pulse-aral.h
+        src/daemon/config/netdata-conf-db.c
+        src/daemon/config/netdata-conf-db.h
+        src/daemon/config/netdata-conf.h
+        src/daemon/config/netdata-conf-backwards-compatibility.c
+        src/daemon/config/netdata-conf-backwards-compatibility.h
+        src/daemon/config/netdata-conf-web.c
+        src/daemon/config/netdata-conf-web.h
+        src/daemon/config/netdata-conf-directories.c
+        src/daemon/config/netdata-conf-directories.h
+        src/daemon/config/netdata-conf-logs.c
+        src/daemon/config/netdata-conf-logs.h
+        src/daemon/config/netdata-conf-global.c
+        src/daemon/config/netdata-conf-global.h
+        src/daemon/config/netdata-conf.c
 )
 
 set(H2O_FILES
@@ -1193,15 +1299,34 @@ if(ENABLE_ML)
         set(ML_FILES
                 src/ml/ad_charts.h
                 src/ml/ad_charts.cc
-                src/ml/Config.cc
                 src/ml/dlib/dlib/all/source.cpp
-                src/ml/ml.h
                 src/ml/ml.cc
-                src/ml/ml-private.h
+                src/ml/ml_calculated_number.h
+                src/ml/ml_host.h
+                src/ml/ml_config.h
+                src/ml/ml_config.cc
+                src/ml/ml_dimension.h
+                src/ml/ml_enums.h
+                src/ml/ml_enums.cc
+                src/ml/ml_features.h
+                src/ml/ml_features.cc
+                src/ml/ml_kmeans.h
+                src/ml/ml_kmeans.cc
+                src/ml/ml_queue.h
+                src/ml/ml_worker.h
+                src/ml/ml_string_wrapper.h
+                src/ml/ml_queue.cc
+                src/ml/ml_private.h
+                src/ml/ml_public.h
+                src/ml/ml_public.cc
         )
+
+        if(NOT ENABLE_MIMALLOC)
+                list(APPEND ML_FILES src/ml/ml_memory.cc)
+        endif()
 else()
         set(ML_FILES
-                src/ml/ml.h
+                src/ml/ml_public.h
                 src/ml/ml-dummy.c
         )
 endif()
@@ -1291,11 +1416,11 @@ set(RRD_PLUGIN_FILES
         src/database/sqlite/sqlite_aclk_node.h
         src/database/sqlite/sqlite_aclk_alert.c
         src/database/sqlite/sqlite_aclk_alert.h
-        src/database/sqlite/sqlite3.c
-        src/database/sqlite/sqlite3.h
-        src/database/sqlite/sqlite3recover.c
-        src/database/sqlite/sqlite3recover.h
-        src/database/sqlite/dbdata.c
+        src/database/sqlite/vendored/sqlite3.c
+        src/database/sqlite/vendored/sqlite3.h
+        src/database/sqlite/vendored/sqlite3recover.c
+        src/database/sqlite/vendored/sqlite3recover.h
+        src/database/sqlite/vendored/dbdata.c
         src/database/KolmogorovSmirnovDist.c
         src/database/KolmogorovSmirnovDist.h
         src/database/rrdfunctions-inflight.c
@@ -1304,6 +1429,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions-exporters.h
         src/database/rrdfunctions-internals.h
         src/database/rrdcollector-internals.h
+        src/database/rrd-database-mode.h
+        src/database/rrd-database-mode.c
 )
 
 if(ENABLE_DBENGINE)
@@ -1371,7 +1498,7 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
 )
 
 set(STREAMING_PLUGIN_FILES
-        src/streaming/rrdpush.h
+        src/streaming/stream.h
         src/streaming/stream-compression/compression.c
         src/streaming/stream-compression/compression.h
         src/streaming/stream-compression/brotli.c
@@ -1382,8 +1509,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-compression/lz4.h
         src/streaming/stream-compression/zstd.c
         src/streaming/stream-compression/zstd.h
-        src/streaming/receiver.c
-        src/streaming/sender.c
+        src/streaming/stream-receiver.c
+        src/streaming/stream-sender.c
         src/streaming/replication.c
         src/streaming/replication.h
         src/streaming/h2o-common.h
@@ -1395,11 +1522,11 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-path.h
         src/streaming/stream-capabilities.c
         src/streaming/stream-capabilities.h
-        src/streaming/sender-connect.c
-        src/streaming/sender-internals.h
-        src/streaming/sender-execute.c
-        src/streaming/sender-commit.c
-        src/streaming/sender-destinations.c
+        src/streaming/stream-connector.c
+        src/streaming/stream-sender-internals.h
+        src/streaming/stream-sender-execute.c
+        src/streaming/stream-sender-commit.c
+        src/streaming/stream-parents.c
         src/streaming/stream-handshake.c
         src/streaming/protocol/command-function.c
         src/streaming/protocol/command-host-labels.c
@@ -1409,11 +1536,19 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-conf.c
         src/streaming/stream-conf.h
         src/streaming/stream-handshake.h
-        src/streaming/sender.h
-        src/streaming/sender-destinations.h
+        src/streaming/stream-parents.h
         src/streaming/rrdhost-status.c
         src/streaming/rrdhost-status.h
-        src/streaming/receiver.h
+        src/streaming/stream-sender-api.c
+        src/streaming/stream-receiver-internals.h
+        src/streaming/stream-receiver-api.c
+        src/streaming/stream-thread.c
+        src/streaming/stream-thread.h
+        src/streaming/stream-receiver-connection.c
+        src/streaming/stream-sender-commit.h
+        src/streaming/stream-traffic-types.h
+        src/streaming/stream-circular-buffer.c
+        src/streaming/stream-circular-buffer.h
 )
 
 set(WEB_PLUGIN_FILES
@@ -1425,6 +1560,7 @@ set(WEB_PLUGIN_FILES
         src/web/server/static/static-threaded.h
         src/web/server/web_client_cache.c
         src/web/server/web_client_cache.h
+        src/web/api/v3/api_v3_stream_info.c
         src/web/api/v3/api_v3_stream_path.c
 )
 
@@ -1580,6 +1716,7 @@ set(PROC_PLUGIN_FILES
         src/collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c
         src/collectors/proc.plugin/proc_vmstat.c
         src/collectors/proc.plugin/proc_uptime.c
+        src/collectors/proc.plugin/run_reboot_required.c
         src/collectors/proc.plugin/proc_pressure.c
         src/collectors/proc.plugin/proc_pressure.h
         src/collectors/proc.plugin/sys_kernel_mm_ksm.c
@@ -1789,14 +1926,14 @@ target_compile_definitions(judy PRIVATE
 )
 
 target_include_directories(judy PUBLIC
-        src/libnetdata/libjudy/src
-        src/libnetdata/libjudy/src/JudyCommon
+        src/libnetdata/libjudy/vendored
+        src/libnetdata/libjudy/vendored/JudyCommon
 )
 
 set_source_files_properties(${LIBJUDY_PREV_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYPREV")
 set_source_files_properties(${LIBJUDY_NEXT_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYNEXT")
-set_source_files_properties(src/libnetdata/libjudy/src/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
-set_source_files_properties(src/libnetdata/libjudy/src/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
+set_source_files_properties(src/libnetdata/libjudy/vendored/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
+set_source_files_properties(src/libnetdata/libjudy/vendored/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
 set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/src/libnetdata/libjudy/src/JudyL")
 
 #
@@ -1822,6 +1959,7 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 # target_link_libraries(test Threads::Threads)
 
 target_link_libraries(libnetdata PUBLIC
+        "$<$<BOOL:${ENABLE_MIMALLOC}>:mimalloc-static>"
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
         "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid>"
@@ -2349,6 +2487,8 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_unittest.h
             src/collectors/ebpf.plugin/ebpf_functions.c
             src/collectors/ebpf.plugin/ebpf_functions.h
+            src/collectors/ebpf.plugin/libbpf_api/ebpf.c
+            src/collectors/ebpf.plugin/libbpf_api/ebpf.h
     )
 
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES})
@@ -2553,9 +2693,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
 )
 
-if(NEED_PROTOBUF)
-        netdata_add_protobuf(netdata)
-endif()
+netdata_add_protobuf(netdata)
 
 #
 # build systemd-cat-native

@@ -59,6 +59,7 @@ struct context_v2_entry {
     size_t count;
     STRING *id;
     STRING *family;
+    STRING *units;
     uint32_t priority;
     time_t first_time_s;
     time_t last_time_s;
@@ -174,6 +175,7 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
                 .count = 1,
                 .id = rc->id,
                 .family = string_dup(rc->family),
+                .units = string_dup(rc->units),
                 .priority = rc->priority,
                 .first_time_s = rc->first_time_s,
                 .last_time_s = rc->last_time_s,
@@ -215,11 +217,14 @@ static void rrdhost_receiver_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *
     buffer_json_member_add_object(wb, key);
     {
         buffer_json_member_add_uint64(wb, "id", s->ingest.id);
-        buffer_json_member_add_uint64(wb, "hops", s->ingest.hops);
+        buffer_json_member_add_int64(wb, "hops", s->ingest.hops);
         buffer_json_member_add_string(wb, "type", rrdhost_ingest_type_to_string(s->ingest.type));
         buffer_json_member_add_string(wb, "status", rrdhost_ingest_status_to_string(s->ingest.status));
         buffer_json_member_add_time_t(wb, "since", s->ingest.since);
         buffer_json_member_add_time_t(wb, "age", s->now - s->ingest.since);
+        buffer_json_member_add_uint64(wb, "metrics", s->ingest.collected.metrics);
+        buffer_json_member_add_uint64(wb, "instances", s->ingest.collected.instances);
+        buffer_json_member_add_uint64(wb, "contexts", s->ingest.collected.contexts);
 
         if(s->ingest.type == RRDHOST_INGEST_TYPE_CHILD) {
             if(s->ingest.status == RRDHOST_INGEST_STATUS_OFFLINE)
@@ -269,15 +274,13 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
         if (s->stream.status == RRDHOST_STREAM_STATUS_OFFLINE)
             buffer_json_member_add_string(wb, "reason", stream_handshake_error_to_string(s->stream.reason));
 
-        if (s->stream.status == RRDHOST_STREAM_STATUS_REPLICATING) {
-            buffer_json_member_add_object(wb, "replication");
-            {
-                buffer_json_member_add_boolean(wb, "in_progress", s->stream.replication.in_progress);
-                buffer_json_member_add_double(wb, "completion", s->stream.replication.completion);
-                buffer_json_member_add_uint64(wb, "instances", s->stream.replication.instances);
-            }
-            buffer_json_object_close(wb);
+        buffer_json_member_add_object(wb, "replication");
+        {
+            buffer_json_member_add_boolean(wb, "in_progress", s->stream.replication.in_progress);
+            buffer_json_member_add_double(wb, "completion", s->stream.replication.completion);
+            buffer_json_member_add_uint64(wb, "instances", s->stream.replication.instances);
         }
+        buffer_json_object_close(wb); // replication
 
         buffer_json_member_add_object(wb, "destination");
         {
@@ -297,35 +300,14 @@ static void rrdhost_sender_to_json(BUFFER *wb, RRDHOST_STATUS *s, const char *ke
                 buffer_json_member_add_uint64(wb, "metadata", s->stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_METADATA]);
                 buffer_json_member_add_uint64(wb, "functions", s->stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
                 buffer_json_member_add_uint64(wb, "replication", s->stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION]);
-                buffer_json_member_add_uint64(wb, "dyncfg", s->stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_DYNCFG]);
             }
             buffer_json_object_close(wb); // traffic
 
-            buffer_json_member_add_array(wb, "candidates");
-            struct rrdpush_destinations *d;
-            for (d = s->host->destinations; d; d = d->next) {
-                buffer_json_add_array_item_object(wb);
-                buffer_json_member_add_uint64(wb, "attempts", d->attempts);
-                {
+            buffer_json_member_add_array(wb, "parents");
+            rrdhost_stream_parents_to_json(wb, s);
+            buffer_json_array_close(wb); // parents
 
-                    if (d->ssl) {
-                        snprintfz(buf, sizeof(buf) - 1, "%s:SSL", string2str(d->destination));
-                        buffer_json_member_add_string(wb, "destination", buf);
-                    }
-                    else
-                        buffer_json_member_add_string(wb, "destination", string2str(d->destination));
-
-                    buffer_json_member_add_time_t(wb, "since", d->since);
-                    buffer_json_member_add_time_t(wb, "age", s->now - d->since);
-                    buffer_json_member_add_string(wb, "last_handshake", stream_handshake_error_to_string(d->reason));
-                    if(d->postpone_reconnection_until > s->now) {
-                        buffer_json_member_add_time_t(wb, "next_check", d->postpone_reconnection_until);
-                        buffer_json_member_add_time_t(wb, "next_in", d->postpone_reconnection_until - s->now);
-                    }
-                }
-                buffer_json_object_close(wb); // each candidate
-            }
-            buffer_json_array_close(wb); // candidates
+            rrdhost_stream_path_to_json(wb, s->host, STREAM_PATH_JSON_MEMBER, false);
         }
         buffer_json_object_close(wb); // destination
     }
@@ -362,7 +344,7 @@ static inline void rrdhost_health_to_json_v2(BUFFER *wb, const char *key, RRDHOS
     buffer_json_member_add_object(wb, key);
     {
         buffer_json_member_add_string(wb, "status", rrdhost_health_status_to_string(s->health.status));
-        if (s->health.status == RRDHOST_HEALTH_STATUS_RUNNING) {
+        if (s->health.status == RRDHOST_HEALTH_STATUS_RUNNING || s->health.status == RRDHOST_HEALTH_STATUS_INITIALIZING) {
             buffer_json_member_add_object(wb, "alerts");
             {
                 buffer_json_member_add_uint64(wb, "critical", s->health.alerts.critical);
@@ -447,29 +429,8 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
                     buffer_json_member_add_string(wb, "mode", rrd_memory_mode_name(s.db.mode));
                     buffer_json_member_add_time_t(wb, "first_time", s.db.first_time_s);
                     buffer_json_member_add_time_t(wb, "last_time", s.db.last_time_s);
+
                     buffer_json_member_add_uint64(wb, "metrics", s.db.metrics);
-
-                    spinlock_lock(&s.host->accounting.spinlock);
-                    int64_t count = 0;
-
-                    if (s.host->accounting.cache_timestamp &&
-                        ctl->now - s.host->accounting.cache_timestamp < host->rrd_update_every * 1.5)
-                        count = s.host->accounting.currently_collected;
-                    else {
-                        Pvoid_t *Pvalue;
-                        bool first = true;
-                        Word_t dimension_id = 0;
-                        while ((Pvalue = JudyLFirstThenNext(s.host->accounting.JudyL, &dimension_id, &first))) {
-                            RRDDIM *rd = *Pvalue;
-                            if (rd->collector.last_collected_time.tv_sec > ctl->now - (rd->rrdset->update_every * 2))
-                                count++;
-                        }
-                        s.host->accounting.currently_collected = count;
-                        s.host->accounting.cache_timestamp = ctl->now;
-                    }
-                    spinlock_unlock(&s.host->accounting.spinlock);
-
-                    buffer_json_member_add_uint64(wb, "currently_collected_metrics", count);
                     buffer_json_member_add_uint64(wb, "instances", s.db.instances);
                     buffer_json_member_add_uint64(wb, "contexts", s.db.contexts);
                 }
@@ -713,6 +674,21 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
         }
     }
 
+    if(o->units != n->units) {
+        if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
+            // keep old
+            ;
+        else if(!(o->flags & RRD_FLAG_COLLECTED) && (n->flags & RRD_FLAG_COLLECTED)) {
+            // keep new
+            string_freez(o->units);
+            o->units = string_dup(n->units);
+        }
+        else {
+            // keep old
+            ;
+        }
+    }
+
     if(o->priority != n->priority) {
         if((o->flags & RRD_FLAG_COLLECTED) && !(n->flags & RRD_FLAG_COLLECTED))
             // keep o
@@ -746,6 +722,7 @@ static bool contexts_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
 static void contexts_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct context_v2_entry *z = value;
     string_freez(z->family);
+    string_freez((z->units));
 }
 
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode) {
@@ -987,6 +964,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                     buffer_json_member_add_object(wb, string2str(z->id));
                     {
                         buffer_json_member_add_string(wb, "family", string2str(z->family));
+                        buffer_json_member_add_string(wb, "units", string2str(z->units));
                         buffer_json_member_add_uint64(wb, "priority", z->priority);
                         buffer_json_member_add_time_t(wb, "first_entry", z->first_time_s);
                         buffer_json_member_add_time_t(wb, "last_entry", collected ? ctl.now : z->last_time_s);

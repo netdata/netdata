@@ -257,7 +257,7 @@ static void *log_forwarder_thread_func(void *arg) {
                 ssize_t bytes_read = read(lf->pipe_fds[PIPE_READ], buf, sizeof(buf));
                 // Ignore the data; proceed regardless of the result
                 if (bytes_read == -1) {
-                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                    if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
                         // Handle read error if necessary
                         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to read from notification pipe");
                         return NULL;

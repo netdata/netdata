@@ -6,6 +6,45 @@
 char *pidfile = NULL;
 char *netdata_exe_path = NULL;
 
+long get_netdata_cpus(void) {
+    static long processors = 0;
+
+    if(processors)
+        return processors;
+
+    long cores_proc_stat = os_get_system_cpus_cached(false, true);
+    long cores_cpuset_v1 = (long)os_read_cpuset_cpus("/sys/fs/cgroup/cpuset/cpuset.cpus", cores_proc_stat);
+    long cores_cpuset_v2 = (long)os_read_cpuset_cpus("/sys/fs/cgroup/cpuset.cpus", cores_proc_stat);
+
+    if(cores_cpuset_v2)
+        processors = cores_cpuset_v2;
+    else if(cores_cpuset_v1)
+        processors = cores_cpuset_v1;
+    else
+        processors = cores_proc_stat;
+
+    long cores_user_configured = config_get_number(CONFIG_SECTION_GLOBAL, "cpu cores", processors);
+
+    errno_clear();
+    internal_error(true,
+                   "System CPUs: %ld, ("
+                   "system: %ld, cgroups cpuset v1: %ld, cgroups cpuset v2: %ld, netdata.conf: %ld"
+                   ")"
+                   , processors
+                   , cores_proc_stat
+                   , cores_cpuset_v1
+                   , cores_cpuset_v2
+                   , cores_user_configured
+    );
+
+    processors = cores_user_configured;
+
+    if(processors < 1)
+        processors = 1;
+
+    return processors;
+}
+
 void get_netdata_execution_path(void) {
     struct passwd *passwd = getpwuid(getuid());
     char *user = (passwd && passwd->pw_name) ? passwd->pw_name : "";
@@ -248,7 +287,7 @@ static void oom_score_adj(void) {
 
 static void process_nice_level(void) {
 #ifdef HAVE_NICE
-    int nice_level = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process nice level", 19);
+    int nice_level = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process nice level", 0);
     if(nice(nice_level) == -1)
         netdata_log_error("Cannot set netdata CPU nice level to %d.", nice_level);
     else

@@ -15,7 +15,7 @@ static void dictionary_netdev_rename_delete_cb(const DICTIONARY_ITEM *item __may
 }
 
 void netdev_renames_init(void) {
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
     spinlock_lock(&spinlock);
     if(!netdev_renames) {

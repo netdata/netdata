@@ -4,6 +4,7 @@ package module
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -224,7 +225,7 @@ func (j *Job) AutoDetection() (err error) {
 			}
 		}
 		if err != nil {
-			j.module.Cleanup()
+			j.module.Cleanup(context.TODO())
 		}
 	}()
 
@@ -282,7 +283,7 @@ LOOP:
 			}
 		}
 	}
-	j.module.Cleanup()
+	j.module.Cleanup(context.TODO())
 	j.Cleanup()
 	j.stop <- struct{}{}
 }
@@ -305,10 +306,14 @@ func (j *Job) Cleanup() {
 	}
 
 	if !j.vnodeCreated && j.vnodeGUID != "" {
-		_ = j.api.HOSTINFO(j.vnodeGUID, j.vnodeHostname, j.vnodeLabels)
+		j.api.HOSTINFO(netdataapi.HostInfo{
+			GUID:     j.vnodeGUID,
+			Hostname: j.vnodeHostname,
+			Labels:   j.vnodeLabels,
+		})
 		j.vnodeCreated = true
 	}
-	_ = j.api.HOST(j.vnodeGUID)
+	j.api.HOST(j.vnodeGUID)
 
 	if j.collectStatusChart.created {
 		j.collectStatusChart.MarkRemove()
@@ -338,7 +343,7 @@ func (j *Job) init() error {
 		return nil
 	}
 
-	if err := j.module.Init(); err != nil {
+	if err := j.module.Init(context.TODO()); err != nil {
 		return err
 	}
 
@@ -348,7 +353,7 @@ func (j *Job) init() error {
 }
 
 func (j *Job) check() error {
-	if err := j.module.Check(); err != nil {
+	if err := j.module.Check(context.TODO()); err != nil {
 		if j.AutoDetectTries != infTries {
 			j.AutoDetectTries--
 		}
@@ -401,7 +406,7 @@ func (j *Job) collect() (result map[string]int64) {
 			}
 		}
 	}()
-	return j.module.Collect()
+	return j.module.Collect(context.TODO())
 }
 
 func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinceLastRun int) bool {
@@ -414,12 +419,16 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 			}
 		}
 		if j.vnodeGUID != "" {
-			_ = j.api.HOSTINFO(j.vnodeGUID, j.vnodeHostname, j.vnodeLabels)
+			j.api.HOSTINFO(netdataapi.HostInfo{
+				GUID:     j.vnodeGUID,
+				Hostname: j.vnodeHostname,
+				Labels:   j.vnodeLabels,
+			})
 			j.vnodeCreated = true
 		}
 	}
 
-	_ = j.api.HOST(j.vnodeGUID)
+	j.api.HOST(j.vnodeGUID)
 
 	if !j.collectStatusChart.created {
 		j.collectStatusChart.ID = fmt.Sprintf("%s_%s_data_collection_status", cleanPluginName(j.pluginName), j.FullName())
@@ -483,21 +492,21 @@ func (j *Job) createChart(chart *Chart) {
 		chart.Priority = j.priority
 		j.priority++
 	}
-	_ = j.api.CHART(
-		getChartType(chart, j),
-		getChartID(chart),
-		chart.OverID,
-		chart.Title,
-		chart.Units,
-		chart.Fam,
-		chart.Ctx,
-		chart.Type.String(),
-		chart.Priority,
-		j.updateEvery,
-		chart.Opts.String(),
-		j.pluginName,
-		j.moduleName,
-	)
+	j.api.CHART(netdataapi.ChartOpts{
+		TypeID:      getChartType(chart, j),
+		ID:          getChartID(chart),
+		Name:        chart.OverID,
+		Title:       chart.Title,
+		Units:       chart.Units,
+		Family:      chart.Fam,
+		Context:     chart.Ctx,
+		ChartType:   chart.Type.String(),
+		Priority:    chart.Priority,
+		UpdateEvery: j.updateEvery,
+		Options:     chart.Opts.String(),
+		Plugin:      j.pluginName,
+		Module:      j.moduleName,
+	})
 
 	if chart.Obsolete {
 		_ = j.api.EMPTYLINE()
@@ -514,32 +523,32 @@ func (j *Job) createChart(chart *Chart) {
 			if ls == 0 {
 				ls = LabelSourceAuto
 			}
-			_ = j.api.CLABEL(l.Key, lblReplacer.Replace(l.Value), ls)
+			j.api.CLABEL(l.Key, lblReplacer.Replace(l.Value), ls)
 		}
 	}
 	for k, v := range j.labels {
 		if !seen[k] {
-			_ = j.api.CLABEL(k, lblReplacer.Replace(v), LabelSourceConf)
+			j.api.CLABEL(k, lblReplacer.Replace(v), LabelSourceConf)
 		}
 	}
-	_ = j.api.CLABEL("_collect_job", lblReplacer.Replace(j.Name()), LabelSourceAuto)
-	_ = j.api.CLABELCOMMIT()
+	j.api.CLABEL("_collect_job", lblReplacer.Replace(j.Name()), LabelSourceAuto)
+	j.api.CLABELCOMMIT()
 
 	for _, dim := range chart.Dims {
-		_ = j.api.DIMENSION(
-			firstNotEmpty(dim.Name, dim.ID),
-			dim.Name,
-			dim.Algo.String(),
-			handleZero(dim.Mul),
-			handleZero(dim.Div),
-			dim.DimOpts.String(),
-		)
+		j.api.DIMENSION(netdataapi.DimensionOpts{
+			ID:         firstNotEmpty(dim.Name, dim.ID),
+			Name:       dim.Name,
+			Algorithm:  dim.Algo.String(),
+			Multiplier: handleZero(dim.Mul),
+			Divisor:    handleZero(dim.Div),
+			Options:    dim.DimOpts.String(),
+		})
 	}
 	for _, v := range chart.Vars {
 		if v.Name != "" {
-			_ = j.api.VARIABLE(v.Name, v.Value)
+			j.api.VARIABLE(v.Name, v.Value)
 		} else {
-			_ = j.api.VARIABLE(v.ID, v.Value)
+			j.api.VARIABLE(v.ID, v.Value)
 		}
 	}
 	_ = j.api.EMPTYLINE()
@@ -561,11 +570,8 @@ func (j *Job) updateChart(chart *Chart, collected map[string]int64, sinceLastRun
 		sinceLastRun = 0
 	}
 
-	_ = j.api.BEGIN(
-		getChartType(chart, j),
-		getChartID(chart),
-		sinceLastRun,
-	)
+	j.api.BEGIN(getChartType(chart, j), getChartID(chart), sinceLastRun)
+
 	var i, updated int
 	for _, dim := range chart.Dims {
 		if dim.remove {
@@ -574,9 +580,9 @@ func (j *Job) updateChart(chart *Chart, collected map[string]int64, sinceLastRun
 		chart.Dims[i] = dim
 		i++
 		if v, ok := collected[dim.ID]; !ok {
-			_ = j.api.SETEMPTY(firstNotEmpty(dim.Name, dim.ID))
+			j.api.SETEMPTY(firstNotEmpty(dim.Name, dim.ID))
 		} else {
-			_ = j.api.SET(firstNotEmpty(dim.Name, dim.ID), v)
+			j.api.SET(firstNotEmpty(dim.Name, dim.ID), v)
 			updated++
 		}
 	}
@@ -585,14 +591,14 @@ func (j *Job) updateChart(chart *Chart, collected map[string]int64, sinceLastRun
 	for _, vr := range chart.Vars {
 		if v, ok := collected[vr.ID]; ok {
 			if vr.Name != "" {
-				_ = j.api.VARIABLE(vr.Name, v)
+				j.api.VARIABLE(vr.Name, v)
 			} else {
-				_ = j.api.VARIABLE(vr.ID, v)
+				j.api.VARIABLE(vr.ID, v)
 			}
 		}
 
 	}
-	_ = j.api.END()
+	j.api.END()
 
 	if chart.updated = updated > 0; chart.updated {
 		chart.Retries = 0

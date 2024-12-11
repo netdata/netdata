@@ -7,7 +7,7 @@
 #include "libnetdata/avl/avl.h"
 #include "libnetdata/clocks/clocks.h"
 #include "libnetdata/config/appconfig.h"
-#include "libnetdata/ebpf/ebpf.h"
+#include "libbpf_api/ebpf.h"
 
 #define NETDATA_APPS_FAMILY "apps"
 #define NETDATA_APP_FAMILY "app"
@@ -201,7 +201,7 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
 
 } ebpf_pid_data_t;
 
-extern ebpf_pid_data_t *ebpf_pids;
+//extern ebpf_pid_data_t *ebpf_pids;
 extern ebpf_pid_data_t *ebpf_pids_link_list;
 extern size_t ebpf_all_pids_count;
 extern size_t ebpf_hash_table_pids_count;
@@ -303,8 +303,11 @@ static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
     freez(ptr);
 }
 
+ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid);
+
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx) {
-    ebpf_pid_data_t *ptr = &ebpf_pids[pid];
+//    ebpf_pid_data_t *ptr = &ebpf_pids[pid];
+    ebpf_pid_data_t *ptr = ebpf_find_or_create_pid_data(pid);
     ptr->thread_collecting |= 1<<idx;
     // The caller is getting data to work.
     if (!name && idx != EBPF_PIDS_PROC_FILE)

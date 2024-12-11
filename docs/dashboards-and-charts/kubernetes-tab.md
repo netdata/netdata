@@ -32,7 +32,7 @@ their associated pods.
 
 ## Kubernetes Containers overview
 
-At the top of the Kubernetes containers section there is a map, that with a given context colorizes the containers in terms of their utilization.
+At the top of the Kubernetes containers section, there is a map that with a given context colorizes the containers in terms of their utilization.
 
 The filtering of this map is controlled by using the [NIDL framework](/docs/dashboards-and-charts/netdata-charts.md#nidl-framework) from the definition bar of the chart.
 

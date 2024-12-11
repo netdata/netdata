@@ -5,7 +5,7 @@
 #ifdef ENABLE_ZSTD
 #include <zstd.h>
 
-void rrdpush_compressor_init_zstd(struct compressor_state *state) {
+void stream_compressor_init_zstd(struct compressor_state *state) {
     if(!state->initialized) {
         state->initialized = true;
         state->stream = ZSTD_createCStream();
@@ -18,21 +18,21 @@ void rrdpush_compressor_init_zstd(struct compressor_state *state) {
 
         size_t ret = ZSTD_initCStream(state->stream, state->level);
         if(ZSTD_isError(ret))
-            netdata_log_error("STREAM: ZSTD_initCStream() returned error: %s", ZSTD_getErrorName(ret));
+            netdata_log_error("STREAM_COMPRESS: ZSTD_initCStream() returned error: %s", ZSTD_getErrorName(ret));
 
         // ZSTD_CCtx_setParameter(state->stream, ZSTD_c_compressionLevel, 1);
         // ZSTD_CCtx_setParameter(state->stream, ZSTD_c_strategy, ZSTD_fast);
     }
 }
 
-void rrdpush_compressor_destroy_zstd(struct compressor_state *state) {
+void stream_compressor_destroy_zstd(struct compressor_state *state) {
     if(state->stream) {
         ZSTD_freeCStream(state->stream);
         state->stream = NULL;
     }
 }
 
-size_t rrdpush_compress_zstd(struct compressor_state *state, const char *data, size_t size, const char **out) {
+size_t stream_compress_zstd(struct compressor_state *state, const char *data, size_t size, const char **out) {
     if(unlikely(!state || !size || !out))
         return 0;
 
@@ -56,12 +56,12 @@ size_t rrdpush_compress_zstd(struct compressor_state *state, const char *data, s
 
     // error handling
     if(ZSTD_isError(ret)) {
-        netdata_log_error("STREAM: ZSTD_compressStream() return error: %s", ZSTD_getErrorName(ret));
+        netdata_log_error("STREAM_COMPRESS: ZSTD_compressStream() return error: %s", ZSTD_getErrorName(ret));
         return 0;
     }
 
     if(inBuffer.pos < inBuffer.size) {
-        netdata_log_error("STREAM: ZSTD_compressStream() left unprocessed input (source payload %zu bytes, consumed %zu bytes)",
+        netdata_log_error("STREAM_COMPRESS: ZSTD_compressStream() left unprocessed input (source payload %zu bytes, consumed %zu bytes)",
                           inBuffer.size, inBuffer.pos);
         return 0;
     }
@@ -71,12 +71,12 @@ size_t rrdpush_compress_zstd(struct compressor_state *state, const char *data, s
         ret = ZSTD_flushStream(state->stream, &outBuffer);
 
         if(ZSTD_isError(ret)) {
-            netdata_log_error("STREAM: ZSTD_flushStream() return error: %s", ZSTD_getErrorName(ret));
+            netdata_log_error("STREAM_COMPRESS: ZSTD_flushStream() return error: %s", ZSTD_getErrorName(ret));
             return 0;
         }
 
         if(outBuffer.pos == 0) {
-            netdata_log_error("STREAM: ZSTD_compressStream() returned zero compressed bytes "
+            netdata_log_error("STREAM_COMPRESS: ZSTD_compressStream() returned zero compressed bytes "
                               "(source is %zu bytes, output buffer can fit %zu bytes) "
                               , size, outBuffer.size);
             return 0;
@@ -92,27 +92,27 @@ size_t rrdpush_compress_zstd(struct compressor_state *state, const char *data, s
     return outBuffer.pos;
 }
 
-void rrdpush_decompressor_init_zstd(struct decompressor_state *state) {
+void stream_decompressor_init_zstd(struct decompressor_state *state) {
     if(!state->initialized) {
         state->initialized = true;
         state->stream = ZSTD_createDStream();
 
         size_t ret = ZSTD_initDStream(state->stream);
         if(ZSTD_isError(ret))
-            netdata_log_error("STREAM: ZSTD_initDStream() returned error: %s", ZSTD_getErrorName(ret));
+            netdata_log_error("STREAM_DECOMPRESS: ZSTD_initDStream() returned error: %s", ZSTD_getErrorName(ret));
 
         simple_ring_buffer_make_room(&state->output, MAX(COMPRESSION_MAX_CHUNK, ZSTD_DStreamOutSize()));
     }
 }
 
-void rrdpush_decompressor_destroy_zstd(struct decompressor_state *state) {
+void stream_decompressor_destroy_zstd(struct decompressor_state *state) {
     if (state->stream) {
         ZSTD_freeDStream(state->stream);
         state->stream = NULL;
     }
 }
 
-size_t rrdpush_decompress_zstd(struct decompressor_state *state, const char *compressed_data, size_t compressed_size) {
+size_t stream_decompress_zstd(struct decompressor_state *state, const char *compressed_data, size_t compressed_size) {
     if (unlikely(!state || !compressed_data || !compressed_size))
         return 0;
 
@@ -138,12 +138,12 @@ size_t rrdpush_decompress_zstd(struct decompressor_state *state, const char *com
             , &inBuffer);
 
     if(ZSTD_isError(ret)) {
-        netdata_log_error("STREAM: ZSTD_decompressStream() return error: %s", ZSTD_getErrorName(ret));
+        netdata_log_error("STREAM_DECOMPRESS: ZSTD_decompressStream() return error: %s", ZSTD_getErrorName(ret));
         return 0;
     }
 
     if(inBuffer.pos < inBuffer.size)
-        fatal("RRDPUSH DECOMPRESS: ZSTD ZSTD_decompressStream() decompressed %zu bytes, "
+        fatal("STREAM_DECOMPRESS: ZSTD ZSTD_decompressStream() decompressed %zu bytes, "
               "but %zu bytes of compressed data remain",
               inBuffer.pos, inBuffer.size);
 

@@ -59,7 +59,7 @@ This section defines an API key for other Agents to connect to this Netdata.
 | [`allow from`](#allow-from)  | `*`        | A space-separated list of [Netdata simple patterns](/src/libnetdata/simple_pattern/README.md) matching the IPs of nodes that will stream metrics using this API key. [Read more &rarr;](#allow-from)     |
 | `retention`                  | `1h`       | The default amount of child metrics history to retain when using the `ram` db.                                                                                                                           |
 | [`db`](#default-memory-mode) | `dbengine` | The [database](/src/database/README.md) to use for all nodes using this `API_KEY`. Valid settings are `dbengine`, `ram`, or `none`. [Read more &rarr;](#default-memory-mode)                             |
-| `health enabled by default`  | `auto`     | Whether alerts and notifications should be enabled for nodes using this `API_KEY`. `auto` enables alerts when the child is connected. `yes` enables alerts always, and `no` disables alerts.             |
+| `health enabled`             | `auto`     | Whether alerts and notifications should be enabled for nodes using this `API_KEY`. `auto` enables alerts when the child is connected. `yes` enables alerts always, and `no` disables alerts.             |
 | `postpone alerts on connect` | `1m`       | Postpone alerts and notifications for a period of time after the child connects.                                                                                                                         |
 | `health log retention`       | `5d`       | History of health log events (in seconds) kept in the database.                                                                                                                                          |
 | `proxy enabled`              |            | Route metrics through a proxy.                                                                                                                                                                           |
@@ -179,7 +179,7 @@ Valid settings are `dbengine`, `ram`, , or `none`.
 | `[db]` section                     |                   |                                                                                                                                                                                                                                                                                                                 |
 | `mode`                             | `dbengine`        | Determines the [database type](/src/database/README.md) to be used on that node. Other options settings include `none`, and `ram`. `none` disables the database at this host. This also disables alerts and notifications, as those can't run without a database. |
 | `[web]` section                    |                   |                                                                                                                                                                                                                                                                                                                 |
-| `mode`                             | `static-threaded` | Determines the [web server](/src/web/server/README.md) type. The other option is `none`, which disables the dashboard, API, and registry.                                                                                                                             |
+| `mode`                             | `static-threaded` | Determines the [web server](/src/web/server/README.md) type. The other option is `none`, which disables the dashboard, API, and Registry.                                                                                                                             |
 | `accept a streaming request every` | `off`             | Set a limit on how often a parent node accepts streaming requests from child nodes. `0` equals no limit. If this is set, you may see `... too busy to accept new streaming request. Will be allowed in X secs` in Netdata's `error.log`.                                                                        |
 
 ### Basic use cases
@@ -461,7 +461,7 @@ On the parent, set the following in `stream.conf`:
     default memory = ram
 
     # alerts checks, only while the child is connected
-    health enabled by default = auto
+    health enabled = auto
 ```
 
 On the child nodes, set the following in `stream.conf`:
@@ -516,8 +516,8 @@ You can monitor the replication process in two ways:
 
 ### Replication history
 
-Replication history in [dbengine](/src/database/README.md) mode is limited
-by [Tier 0 retention](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md#effect-of-storage-tiers-and-disk-space-on-retention):
+Replication history in [dbengine](/src/database/README.md#modes) mode is limited
+by [Tier 0 retention](/src/database/README.md#tiers):
 
 - Child instances replicate only Tier 0 data.
 - Parent instance calculates higher-level tiers using Tier 0 as the basis.

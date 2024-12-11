@@ -1,135 +1,82 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdhost-status.h"
+#include "stream-receiver-internals.h"
+#include "stream-sender-internals.h"
 
-const char *rrdhost_db_status_to_string(RRDHOST_DB_STATUS status) {
-    switch(status) {
-        default:
-        case RRDHOST_DB_STATUS_INITIALIZING:
-            return "initializing";
+ENUM_STR_MAP_DEFINE(RRDHOST_DB_STATUS) = {
+    { RRDHOST_DB_STATUS_INITIALIZING, "initializing" },
+    { RRDHOST_DB_STATUS_QUERYABLE, "online" },
+    { 0, NULL } // Sentinel
+};
 
-        case RRDHOST_DB_STATUS_QUERYABLE:
-            return "online";
-    }
-}
+ENUM_STR_MAP_DEFINE(RRDHOST_DB_LIVENESS) = {
+    { RRDHOST_DB_LIVENESS_STALE, "stale" },
+    { RRDHOST_DB_LIVENESS_LIVE, "live" },
+    { 0, NULL } // Sentinel
+};
 
-const char *rrdhost_db_liveness_to_string(RRDHOST_DB_LIVENESS status) {
-    switch(status) {
-        default:
-        case RRDHOST_DB_LIVENESS_STALE:
-            return "stale";
+ENUM_STR_MAP_DEFINE(RRDHOST_INGEST_STATUS) = {
+    { RRDHOST_INGEST_STATUS_ARCHIVED, "archived" },
+    { RRDHOST_INGEST_STATUS_INITIALIZING, "initializing" },
+    { RRDHOST_INGEST_STATUS_REPLICATING, "replicating" },
+    { RRDHOST_INGEST_STATUS_ONLINE, "online" },
+    { RRDHOST_INGEST_STATUS_OFFLINE, "offline" },
+    { 0, NULL } // Sentinel
+};
 
-        case RRDHOST_DB_LIVENESS_LIVE:
-            return "live";
-    }
-}
+ENUM_STR_MAP_DEFINE(RRDHOST_INGEST_TYPE) = {
+    { RRDHOST_INGEST_TYPE_LOCALHOST, "localhost" },
+    { RRDHOST_INGEST_TYPE_VIRTUAL, "virtual" },
+    { RRDHOST_INGEST_TYPE_CHILD, "child" },
+    { RRDHOST_INGEST_TYPE_ARCHIVED, "archived" },
+    { 0, NULL } // Sentinel
+};
 
-const char *rrdhost_ingest_status_to_string(RRDHOST_INGEST_STATUS status) {
-    switch(status) {
-        case RRDHOST_INGEST_STATUS_ARCHIVED:
-            return "archived";
+ENUM_STR_MAP_DEFINE(RRDHOST_STREAMING_STATUS) = {
+    { RRDHOST_STREAM_STATUS_DISABLED, "disabled" },
+    { RRDHOST_STREAM_STATUS_REPLICATING, "replicating" },
+    { RRDHOST_STREAM_STATUS_ONLINE, "online" },
+    { RRDHOST_STREAM_STATUS_OFFLINE, "offline" },
+    { 0, NULL } // Sentinel
+};
 
-        case RRDHOST_INGEST_STATUS_INITIALIZING:
-            return "initializing";
+ENUM_STR_MAP_DEFINE(RRDHOST_ML_STATUS) = {
+    { RRDHOST_ML_STATUS_DISABLED, "disabled" },
+    { RRDHOST_ML_STATUS_OFFLINE, "offline" },
+    { RRDHOST_ML_STATUS_RUNNING, "online" },
+    { 0, NULL } // Sentinel
+};
 
-        case RRDHOST_INGEST_STATUS_REPLICATING:
-            return "replicating";
+ENUM_STR_MAP_DEFINE(RRDHOST_ML_TYPE) = {
+    { RRDHOST_ML_TYPE_DISABLED, "disabled" },
+    { RRDHOST_ML_TYPE_SELF, "self" },
+    { RRDHOST_ML_TYPE_RECEIVED, "received" },
+    { 0, NULL } // Sentinel
+};
 
-        case RRDHOST_INGEST_STATUS_ONLINE:
-            return "online";
+ENUM_STR_MAP_DEFINE(RRDHOST_HEALTH_STATUS) = {
+    { RRDHOST_HEALTH_STATUS_DISABLED, "disabled" },
+    { RRDHOST_HEALTH_STATUS_INITIALIZING, "initializing" },
+    { RRDHOST_HEALTH_STATUS_RUNNING, "online" },
+    { 0, NULL } // Sentinel
+};
 
-        default:
-        case RRDHOST_INGEST_STATUS_OFFLINE:
-            return "offline";
-    }
-}
+ENUM_STR_MAP_DEFINE(RRDHOST_DYNCFG_STATUS) = {
+    { RRDHOST_DYNCFG_STATUS_UNAVAILABLE, "unavailable" },
+    { RRDHOST_DYNCFG_STATUS_AVAILABLE, "online" },
+    { 0, NULL } // Sentinel
+};
 
-const char *rrdhost_ingest_type_to_string(RRDHOST_INGEST_TYPE type) {
-    switch(type) {
-        case RRDHOST_INGEST_TYPE_LOCALHOST:
-            return "localhost";
-
-        case RRDHOST_INGEST_TYPE_VIRTUAL:
-            return "virtual";
-
-        case RRDHOST_INGEST_TYPE_CHILD:
-            return "child";
-
-        default:
-        case RRDHOST_INGEST_TYPE_ARCHIVED:
-            return "archived";
-    }
-}
-
-const char *rrdhost_streaming_status_to_string(RRDHOST_STREAMING_STATUS status) {
-    switch(status) {
-        case RRDHOST_STREAM_STATUS_DISABLED:
-            return "disabled";
-
-        case RRDHOST_STREAM_STATUS_REPLICATING:
-            return "replicating";
-
-        case RRDHOST_STREAM_STATUS_ONLINE:
-            return "online";
-
-        default:
-        case RRDHOST_STREAM_STATUS_OFFLINE:
-            return "offline";
-    }
-}
-
-const char *rrdhost_ml_status_to_string(RRDHOST_ML_STATUS status) {
-    switch(status) {
-        case RRDHOST_ML_STATUS_RUNNING:
-            return "online";
-
-        case RRDHOST_ML_STATUS_OFFLINE:
-            return "offline";
-
-        default:
-        case RRDHOST_ML_STATUS_DISABLED:
-            return "disabled";
-    }
-}
-
-const char *rrdhost_ml_type_to_string(RRDHOST_ML_TYPE type) {
-    switch(type) {
-        case RRDHOST_ML_TYPE_SELF:
-            return "self";
-
-        case RRDHOST_ML_TYPE_RECEIVED:
-            return "received";
-
-        default:
-        case RRDHOST_ML_TYPE_DISABLED:
-            return "disabled";
-    }
-}
-
-const char *rrdhost_health_status_to_string(RRDHOST_HEALTH_STATUS status) {
-    switch(status) {
-        default:
-        case RRDHOST_HEALTH_STATUS_DISABLED:
-            return "disabled";
-
-        case RRDHOST_HEALTH_STATUS_INITIALIZING:
-            return "initializing";
-
-        case RRDHOST_HEALTH_STATUS_RUNNING:
-            return "online";
-    }
-}
-
-const char *rrdhost_dyncfg_status_to_string(RRDHOST_DYNCFG_STATUS status) {
-    switch(status) {
-        default:
-        case RRDHOST_DYNCFG_STATUS_UNAVAILABLE:
-            return "unavailable";
-
-        case RRDHOST_DYNCFG_STATUS_AVAILABLE:
-            return "online";
-    }
-}
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_DB_STATUS, RRDHOST_DB_STATUS_INITIALIZING, "initializing");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_DB_LIVENESS, RRDHOST_DB_LIVENESS_STALE, "stale");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_INGEST_STATUS, RRDHOST_INGEST_STATUS_OFFLINE, "offline");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_INGEST_TYPE, RRDHOST_INGEST_TYPE_ARCHIVED, "archived");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_STREAMING_STATUS, RRDHOST_STREAM_STATUS_OFFLINE, "offline");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_ML_STATUS, RRDHOST_ML_STATUS_DISABLED, "disabled");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_ML_TYPE, RRDHOST_ML_TYPE_DISABLED, "disabled");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_HEALTH_STATUS, RRDHOST_HEALTH_STATUS_DISABLED, "disabled");
+ENUM_STR_DEFINE_FUNCTIONS(RRDHOST_DYNCFG_STATUS, RRDHOST_DYNCFG_STATUS_UNAVAILABLE, "unavailable");
 
 static NETDATA_DOUBLE rrdhost_sender_replication_completion_unsafe(RRDHOST *host, time_t now, size_t *instances) {
     size_t charts = rrdhost_sender_replicating_charts(host);
@@ -166,9 +113,9 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     bool online = rrdhost_is_online(host);
 
     rrdhost_retention(host, now, online, &s->db.first_time_s, &s->db.last_time_s);
-    s->db.metrics = host->rrdctx.metrics;
-    s->db.instances = host->rrdctx.instances;
-    s->db.contexts = dictionary_entries(host->rrdctx.contexts);
+    s->db.metrics = __atomic_load_n(&host->rrdctx.metrics_count, __ATOMIC_RELAXED);
+    s->db.instances = __atomic_load_n(&host->rrdctx.instances_count, __ATOMIC_RELAXED);
+    s->db.contexts = __atomic_load_n(&host->rrdctx.contexts_count, __ATOMIC_RELAXED);
     if(!s->db.first_time_s || !s->db.last_time_s || !s->db.metrics || !s->db.instances || !s->db.contexts ||
         (flags & (RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
         s->db.status = RRDHOST_DB_STATUS_INITIALIZING;
@@ -179,23 +126,23 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
     // --- ingest ---
 
-    s->ingest.since = MAX(host->child_connect_time, host->child_disconnected_time);
-    s->ingest.reason = (online) ? STREAM_HANDSHAKE_NEVER : host->rrdpush_last_receiver_exit_reason;
+    s->ingest.since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
+    s->ingest.reason = (online) ? STREAM_HANDSHAKE_NEVER : host->stream.rcv.status.exit_reason;
 
-    spinlock_lock(&host->receiver_lock);
-    s->ingest.hops = (host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+    rrdhost_receiver_lock(host);
+    s->ingest.hops = (int16_t)(host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
     bool has_receiver = false;
-    if (host->receiver && !rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED)) {
+    if (host->receiver && !rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED)) {
         has_receiver = true;
         s->ingest.replication.instances = rrdhost_receiver_replicating_charts(host);
-        s->ingest.replication.completion = host->rrdpush_receiver_replication_percent;
+        s->ingest.replication.completion = host->stream.rcv.status.replication.percent;
         s->ingest.replication.in_progress = s->ingest.replication.instances > 0;
 
         s->ingest.capabilities = host->receiver->capabilities;
-        s->ingest.peers = socket_peers(host->receiver->fd);
-        s->ingest.ssl = SSL_connection(&host->receiver->ssl);
+        s->ingest.peers = nd_sock_socket_peers(&host->receiver->sock);
+        s->ingest.ssl = nd_sock_is_ssl(&host->receiver->sock);
     }
-    spinlock_unlock(&host->receiver_lock);
+    rrdhost_receiver_unlock(host);
 
     if (online) {
         if(s->db.status == RRDHOST_DB_STATUS_INITIALIZING)
@@ -222,6 +169,10 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
             s->ingest.status = RRDHOST_INGEST_STATUS_OFFLINE;
     }
 
+    s->ingest.collected.metrics = __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED);
+    s->ingest.collected.instances = __atomic_load_n(&host->collected.instances_count, __ATOMIC_RELAXED);
+    s->ingest.collected.contexts = __atomic_load_n(&host->collected.contexts_count, __ATOMIC_RELAXED);
+
     if(host == localhost)
         s->ingest.type = RRDHOST_INGEST_TYPE_LOCALHOST;
     else if(has_receiver)
@@ -231,7 +182,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     else
         s->ingest.type = RRDHOST_INGEST_TYPE_ARCHIVED;
 
-    s->ingest.id = host->rrdpush_receiver_connection_counter;
+    s->ingest.id = host->stream.rcv.status.connections;
 
     if(!s->ingest.since)
         s->ingest.since = netdata_start_time;
@@ -245,21 +196,25 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
     if (!host->sender) {
         s->stream.status = RRDHOST_STREAM_STATUS_DISABLED;
-        s->stream.hops = s->ingest.hops + 1;
+        s->stream.hops = (int16_t)(s->ingest.hops + 1);
     }
     else {
-        sender_lock(host->sender);
+        stream_sender_lock(host->sender);
 
         s->stream.since = host->sender->last_state_since_t;
-        s->stream.peers = socket_peers(host->sender->rrdpush_sender_socket);
-        s->stream.ssl = SSL_connection(&host->sender->ssl);
+        s->stream.peers = nd_sock_socket_peers(&host->sender->sock);
+        s->stream.ssl = nd_sock_is_ssl(&host->sender->sock);
 
-        memcpy(s->stream.sent_bytes_on_this_connection_per_type,
-               host->sender->sent_bytes_on_this_connection_per_type,
-               MIN(sizeof(s->stream.sent_bytes_on_this_connection_per_type),
-                   sizeof(host->sender->sent_bytes_on_this_connection_per_type)));
+        {
+            STREAM_CIRCULAR_BUFFER_STATS *stats = stream_circular_buffer_stats_unsafe(host->sender->scb);
 
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED)) {
+            memcpy(
+                s->stream.sent_bytes_on_this_connection_per_type,
+                stats->bytes_sent_by_type,
+                MIN(sizeof(s->stream.sent_bytes_on_this_connection_per_type), sizeof(stats->bytes_sent_by_type)));
+        }
+
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED)) {
             s->stream.hops = host->sender->hops;
             s->stream.reason = STREAM_HANDSHAKE_NEVER;
             s->stream.capabilities = host->sender->capabilities;
@@ -276,14 +231,14 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
         }
         else {
             s->stream.status = RRDHOST_STREAM_STATUS_OFFLINE;
-            s->stream.hops = s->ingest.hops + 1;
+            s->stream.hops = (int16_t)(s->ingest.hops + 1);
             s->stream.reason = host->sender->exit.reason;
         }
 
-        sender_unlock(host->sender);
+        stream_sender_unlock(host->sender);
     }
 
-    s->stream.id = host->rrdpush_sender_connection_counter;
+    s->stream.id = host->stream.snd.status.connections;
 
     if(!s->stream.since)
         s->stream.since = netdata_start_time;
@@ -291,16 +246,15 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     // --- ml ---
 
     if(ml_host_get_host_status(host, &s->ml.metrics)) {
-        s->ml.type = RRDHOST_ML_TYPE_SELF;
+        if(stream_has_capability(&s->ingest, STREAM_CAP_ML_MODELS))
+            s->ml.type = RRDHOST_ML_TYPE_RECEIVED;
+        else
+            s->ml.type = RRDHOST_ML_TYPE_SELF;
 
         if(s->ingest.status == RRDHOST_INGEST_STATUS_OFFLINE || s->ingest.status == RRDHOST_INGEST_STATUS_ARCHIVED)
             s->ml.status = RRDHOST_ML_STATUS_OFFLINE;
         else
             s->ml.status = RRDHOST_ML_STATUS_RUNNING;
-    }
-    else if(stream_has_capability(&s->ingest, STREAM_CAP_DATA_WITH_ML)) {
-        s->ml.type = RRDHOST_ML_TYPE_RECEIVED;
-        s->ml.status = RRDHOST_ML_STATUS_RUNNING;
     }
     else {
         // does not receive ML, does not run ML
@@ -310,45 +264,44 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
 
     // --- health ---
 
-    if(host->health.health_enabled) {
+    if(host->health.enabled) {
         if(flags & RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)
             s->health.status = RRDHOST_HEALTH_STATUS_INITIALIZING;
-        else {
+        else
             s->health.status = RRDHOST_HEALTH_STATUS_RUNNING;
 
-            RRDCALC *rc;
-            foreach_rrdcalc_in_rrdhost_read(host, rc) {
-                if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
-                    continue;
+        RRDCALC *rc;
+        foreach_rrdcalc_in_rrdhost_read(host, rc) {
+            if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+                continue;
 
-                switch (rc->status) {
-                    default:
-                    case RRDCALC_STATUS_REMOVED:
-                        break;
+            switch (rc->status) {
+                default:
+                case RRDCALC_STATUS_REMOVED:
+                    break;
 
-                    case RRDCALC_STATUS_CLEAR:
-                        s->health.alerts.clear++;
-                        break;
+                case RRDCALC_STATUS_CLEAR:
+                    s->health.alerts.clear++;
+                    break;
 
-                    case RRDCALC_STATUS_WARNING:
-                        s->health.alerts.warning++;
-                        break;
+                case RRDCALC_STATUS_WARNING:
+                    s->health.alerts.warning++;
+                    break;
 
-                    case RRDCALC_STATUS_CRITICAL:
-                        s->health.alerts.critical++;
-                        break;
+                case RRDCALC_STATUS_CRITICAL:
+                    s->health.alerts.critical++;
+                    break;
 
-                    case RRDCALC_STATUS_UNDEFINED:
-                        s->health.alerts.undefined++;
-                        break;
+                case RRDCALC_STATUS_UNDEFINED:
+                    s->health.alerts.undefined++;
+                    break;
 
-                    case RRDCALC_STATUS_UNINITIALIZED:
-                        s->health.alerts.uninitialized++;
-                        break;
-                }
+                case RRDCALC_STATUS_UNINITIALIZED:
+                    s->health.alerts.uninitialized++;
+                    break;
             }
-            foreach_rrdcalc_in_rrdhost_done(rc);
         }
+        foreach_rrdcalc_in_rrdhost_done(rc);
     }
     else
         s->health.status = RRDHOST_HEALTH_STATUS_DISABLED;

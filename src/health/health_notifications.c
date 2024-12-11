@@ -421,8 +421,8 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
            "[%s]: Sending notification for alarm '%s.%s' status %s.",
            rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
 
-    const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health.health_default_exec);
-    const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health.health_default_recipient);
+    const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health.default_exec);
+    const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health.default_recipient);
 
     char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
 

@@ -33,12 +33,17 @@ uint32_t pgd_type(PGD *pg);
 bool pgd_is_empty(PGD *pg);
 uint32_t pgd_slots_used(PGD *pg);
 
+uint32_t pgd_buffer_memory_footprint(PGD *pg);
 uint32_t pgd_memory_footprint(PGD *pg);
+uint32_t pgd_capacity(PGD *pg);
 uint32_t pgd_disk_footprint(PGD *pg);
+
+size_t pgd_aral_structures(void);
+size_t pgd_aral_overhead(void);
 
 void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size);
 
-void pgd_append_point(PGD *pg,
+size_t pgd_append_point(PGD *pg,
                       usec_t point_in_time_ut,
                       NETDATA_DOUBLE n,
                       NETDATA_DOUBLE min_value,

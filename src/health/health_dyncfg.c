@@ -509,7 +509,7 @@ int dyncfg_health_prototype_to_conf(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, const c
         if(nap->config.info)
             buffer_sprintf(wb, "%13s: %s\n", "info", string2str(nap->config.info));
 
-        if(nap->config.exec && nap->config.exec != localhost->health.health_default_exec)
+        if(nap->config.exec && nap->config.exec != localhost->health.default_exec)
             buffer_sprintf(wb, "%13s: %s\n", "exec", string2str(nap->config.exec));
 
         if(nap->config.recipient)

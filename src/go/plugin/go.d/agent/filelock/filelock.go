@@ -54,6 +54,13 @@ func (l *Locker) Unlock(name string) {
 	_ = locker.Close()
 }
 
+func (l *Locker) UnlockAll() {
+	for key, locker := range l.locks {
+		delete(l.locks, key)
+		_ = locker.Close()
+	}
+}
+
 func (l *Locker) isLocked(name string) bool {
 	_, ok := l.locks[l.filename(name)]
 	return ok

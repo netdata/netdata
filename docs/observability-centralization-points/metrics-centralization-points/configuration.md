@@ -4,10 +4,10 @@ Metrics streaming configuration for both Netdata Children and Parents is done vi
 
 `netdata.conf` and `stream.conf` have the same `ini` format, but `netdata.conf` is considered a non-sensitive file, while `stream.conf` contains API keys, IPs and other sensitive information that enable communication between Netdata Agents.
 
-`stream.conf` has 2 main sections:
+`stream.conf` has two main sections:
 
-- The `[stream]` section includes options for the **sending Netdata** (ie Netdata Children, or Netdata Parents that stream to Grand Parents, or to other sibling Netdata Parents in a cluster).
-- The rest includes multiple sections that define API keys for the **receiving Netdata** (ie. Netdata Parents).
+- The `[stream]` section includes options for the **sending Netdata** (i.e., Netdata Children, or Netdata Parents that stream to Grand Parents, or to other sibling Netdata Parents in a cluster).
+- The rest includes multiple sections that define API keys for the **receiving Netdata** (i.e., Netdata Parents).
 
 ## Edit `stream.conf`
 
@@ -61,8 +61,8 @@ While encrypting the connection between your parent and child nodes is recommend
 This example uses self-signed certificates.
 
 > **Note**  
-> This section assumes you have read the documentation on [how to edit the Netdata configuration files](/docs/netdata-agent/configuration/README.md).  
-<!-- here we need link to the section that will contain the restarting instructions -->
+> This section assumes you have read the documentation on [how to edit the Netdata configuration files](/docs/netdata-agent/configuration/README.md).
+<!-- here we need a link to the section that will contain the restarting instructions -->
 
 1. **Parent node**  
    To generate an SSL key and certificate using `openssl`, take a look at the related section around [Securing Netdata Agents](/src/web/server/README.md#enable-httpstls-support) in our Documentation.
@@ -78,7 +78,7 @@ This example uses self-signed certificates.
         api key = 11111111-2222-3333-4444-555555555555
     ```
 
-3. Restart the Netdata Agent on both the parent and child nodes, to stream encrypted metrics using TLS/SSL.
+3. Restart the Netdata Agent on both the parent and child nodes to stream encrypted metrics using TLS/SSL.
 
 ## Troubleshooting Streaming Connections
 

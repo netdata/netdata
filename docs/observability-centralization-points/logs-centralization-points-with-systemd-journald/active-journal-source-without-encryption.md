@@ -2,7 +2,7 @@
 
 This page will guide you through creating an active journal source without the use of encryption.
 
-Once you enable an active journal source on a server, `systemd-journal-gatewayd` will expose an REST API on TCP port 19531. This API can be used for querying the logs, exporting the logs, or monitoring new log entries, remotely.
+Once you enable an active journal source on a server, `systemd-journal-gatewayd` will expose an REST API on TCP port 19531. This API can be used for querying the logs, exporting the logs, or monitoring new log entries remotely.
 
 > ⚠️ **IMPORTANT**<br/>
 > These instructions will expose your logs to the network, without any encryption or authorization.<br/>
@@ -97,7 +97,7 @@ You can repeat this process to create as many `systemd-journal-remote` services,
 
 ## Verify it works
 
-To verify the central server is receiving logs, run this on the central server:
+To verify that the central server is receiving logs, run this on the central server:
 
 ```bash
 sudo ls -l /var/log/journal/remote/

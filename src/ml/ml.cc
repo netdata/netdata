@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "dlib/dlib/clustering.h"
+#include "ml_private.h"
 
-#include "ml-private.h"
-
-#include <random>
+#include <array>
 
 #include "ad_charts.h"
-#include "database/sqlite/sqlite3.h"
-
-#define ML_METADATA_VERSION 2
+#include "database/sqlite/vendored/sqlite3.h"
 
 #define WORKER_TRAIN_QUEUE_POP         0
 #define WORKER_TRAIN_ACQUIRE_DIMENSION 1
@@ -20,315 +16,44 @@
 #define WORKER_TRAIN_UPDATE_HOST       6
 #define WORKER_TRAIN_FLUSH_MODELS      7
 
-static sqlite3 *db = NULL;
+sqlite3 *ml_db = NULL;
 static netdata_mutex_t db_mutex = NETDATA_MUTEX_INITIALIZER;
 
-/*
- * Functions to convert enums to strings
-*/
+typedef struct {
+    // Time when the request for this response was made
+    time_t request_time;
 
-__attribute__((unused)) static const char *
-ml_machine_learning_status_to_string(enum ml_machine_learning_status mls)
-{
-    switch (mls) {
-        case MACHINE_LEARNING_STATUS_ENABLED:
-            return "enabled";
-        case MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART:
-            return "disabled-sp";
-        default:
-            return "unknown";
-    }
-}
+    // First/last entry of the dimension in DB when generating the request
+    time_t first_entry_on_request;
+    time_t last_entry_on_request;
 
-__attribute__((unused)) static const char *
-ml_metric_type_to_string(enum ml_metric_type mt)
-{
-    switch (mt) {
-        case METRIC_TYPE_CONSTANT:
-            return "constant";
-        case METRIC_TYPE_VARIABLE:
-            return "variable";
-        default:
-            return "unknown";
-    }
-}
+    // First/last entry of the dimension in DB when generating the response
+    time_t first_entry_on_response;
+    time_t last_entry_on_response;
 
-__attribute__((unused)) static const char *
-ml_training_status_to_string(enum ml_training_status ts)
-{
-    switch (ts) {
-        case TRAINING_STATUS_PENDING_WITH_MODEL:
-            return "pending-with-model";
-        case TRAINING_STATUS_PENDING_WITHOUT_MODEL:
-            return "pending-without-model";
-        case TRAINING_STATUS_TRAINED:
-            return "trained";
-        case TRAINING_STATUS_UNTRAINED:
-            return "untrained";
-        case TRAINING_STATUS_SILENCED:
-            return "silenced";
-        default:
-            return "unknown";
-    }
-}
+    // After/Before timestamps of our DB query
+    time_t query_after_t;
+    time_t query_before_t;
 
-__attribute__((unused)) static const char *
-ml_training_result_to_string(enum ml_training_result tr)
-{
-    switch (tr) {
-        case TRAINING_RESULT_OK:
-            return "ok";
-        case TRAINING_RESULT_INVALID_QUERY_TIME_RANGE:
-            return "invalid-query";
-        case TRAINING_RESULT_NOT_ENOUGH_COLLECTED_VALUES:
-            return "missing-values";
-        case TRAINING_RESULT_NULL_ACQUIRED_DIMENSION:
-            return "null-acquired-dim";
-        case TRAINING_RESULT_CHART_UNDER_REPLICATION:
-            return "chart-under-replication";
-        default:
-            return "unknown";
-    }
-}
+    // Actual after/before returned by the DB query ops
+    time_t db_after_t;
+    time_t db_before_t;
 
-/*
- * Features
-*/
+    // Number of doubles returned by the DB query
+    size_t collected_values;
 
-// subtract elements that are `diff_n` positions apart
-static void
-ml_features_diff(ml_features_t *features)
-{
-    if (features->diff_n == 0)
-        return;
+    // Number of values we return to the caller
+    size_t total_values;
+} ml_training_response_t;
 
-    for (size_t idx = 0; idx != (features->src_n - features->diff_n); idx++) {
-        size_t high = (features->src_n - 1) - idx;
-        size_t low = high - features->diff_n;
-
-        features->dst[low] = features->src[high] - features->src[low];
-    }
-
-    size_t n = features->src_n - features->diff_n;
-    memcpy(features->src, features->dst, n * sizeof(calculated_number_t));
-
-    for (size_t idx = features->src_n - features->diff_n; idx != features->src_n; idx++)
-        features->src[idx] = 0.0;
-}
-
-// a function that computes the window average of an array inplace
-static void
-ml_features_smooth(ml_features_t *features)
-{
-    calculated_number_t sum = 0.0;
-
-    size_t idx = 0;
-    for (; idx != features->smooth_n - 1; idx++)
-        sum += features->src[idx];
-
-    for (; idx != (features->src_n - features->diff_n); idx++) {
-        sum += features->src[idx];
-        calculated_number_t prev_cn = features->src[idx - (features->smooth_n - 1)];
-        features->src[idx - (features->smooth_n - 1)] = sum / features->smooth_n;
-        sum -= prev_cn;
-    }
-
-    for (idx = 0; idx != features->smooth_n; idx++)
-        features->src[(features->src_n - 1) - idx] = 0.0;
-}
-
-// create lag'd vectors out of the preprocessed buffer
-static void
-ml_features_lag(ml_features_t *features)
-{
-    size_t n = features->src_n - features->diff_n - features->smooth_n + 1 - features->lag_n;
-    features->preprocessed_features.resize(n);
-
-    unsigned target_num_samples = Cfg.max_train_samples * Cfg.random_sampling_ratio;
-    double sampling_ratio = std::min(static_cast<double>(target_num_samples) / n, 1.0);
-
-    uint32_t max_mt = std::numeric_limits<uint32_t>::max();
-    uint32_t cutoff = static_cast<double>(max_mt) * sampling_ratio;
-
-    size_t sample_idx = 0;
-
-    for (size_t idx = 0; idx != n; idx++) {
-        DSample &DS = features->preprocessed_features[sample_idx++];
-        DS.set_size(features->lag_n);
-
-        if (Cfg.random_nums[idx] > cutoff) {
-            sample_idx--;
-            continue;
-        }
-
-        for (size_t feature_idx = 0; feature_idx != features->lag_n + 1; feature_idx++)
-            DS(feature_idx) = features->src[idx + feature_idx];
-    }
-
-    features->preprocessed_features.resize(sample_idx);
-}
-
-static void
-ml_features_preprocess(ml_features_t *features)
-{
-    ml_features_diff(features);
-    ml_features_smooth(features);
-    ml_features_lag(features);
-}
-
-/*
- * KMeans
-*/
-
-static void
-ml_kmeans_init(ml_kmeans_t *kmeans)
-{
-    kmeans->cluster_centers.reserve(2);
-    kmeans->min_dist = std::numeric_limits<calculated_number_t>::max();
-    kmeans->max_dist = std::numeric_limits<calculated_number_t>::min();
-}
-
-static void
-ml_kmeans_train(ml_kmeans_t *kmeans, const ml_features_t *features, time_t after, time_t before)
-{
-    kmeans->after = (uint32_t) after;
-    kmeans->before = (uint32_t) before;
-
-    kmeans->min_dist = std::numeric_limits<calculated_number_t>::max();
-    kmeans->max_dist  = std::numeric_limits<calculated_number_t>::min();
-
-    kmeans->cluster_centers.clear();
-
-    dlib::pick_initial_centers(2, kmeans->cluster_centers, features->preprocessed_features);
-    dlib::find_clusters_using_kmeans(features->preprocessed_features, kmeans->cluster_centers, Cfg.max_kmeans_iters);
-
-    for (const auto &preprocessed_feature : features->preprocessed_features) {
-        calculated_number_t mean_dist = 0.0;
-
-        for (const auto &cluster_center : kmeans->cluster_centers) {
-            mean_dist += dlib::length(cluster_center - preprocessed_feature);
-        }
-
-        mean_dist /= kmeans->cluster_centers.size();
-
-        if (mean_dist < kmeans->min_dist)
-            kmeans->min_dist = mean_dist;
-
-        if (mean_dist > kmeans->max_dist)
-            kmeans->max_dist = mean_dist;
-    }
-}
-
-static calculated_number_t
-ml_kmeans_anomaly_score(const ml_kmeans_t *kmeans, const DSample &DS)
-{
-    calculated_number_t mean_dist = 0.0;
-    for (const auto &CC: kmeans->cluster_centers)
-        mean_dist += dlib::length(CC - DS);
-
-    mean_dist /= kmeans->cluster_centers.size();
-
-    if (kmeans->max_dist == kmeans->min_dist)
-        return 0.0;
-
-    calculated_number_t anomaly_score = 100.0 * std::abs((mean_dist - kmeans->min_dist) / (kmeans->max_dist - kmeans->min_dist));
-    return (anomaly_score > 100.0) ? 100.0 : anomaly_score;
-}
-
-/*
- * Queue
-*/
-
-static ml_queue_t *
-ml_queue_init()
-{
-    ml_queue_t *q = new ml_queue_t();
-
-    netdata_mutex_init(&q->mutex);
-    pthread_cond_init(&q->cond_var, NULL);
-    q->exit = false;
-    return q;
-}
-
-static void
-ml_queue_destroy(ml_queue_t *q)
-{
-    netdata_mutex_destroy(&q->mutex);
-    pthread_cond_destroy(&q->cond_var);
-    delete q;
-}
-
-static void
-ml_queue_push(ml_queue_t *q, const ml_training_request_t req)
-{
-    netdata_mutex_lock(&q->mutex);
-    q->internal.push(req);
-    pthread_cond_signal(&q->cond_var);
-    netdata_mutex_unlock(&q->mutex);
-}
-
-static ml_training_request_t
-ml_queue_pop(ml_queue_t *q)
-{
-    netdata_mutex_lock(&q->mutex);
-
-    ml_training_request_t req = {
-        {'\0'}, // machine_guid
-        NULL, // chart id
-        NULL, // dimension id
-        0, // current time
-        0, // first entry
-        0  // last entry
-    };
-
-    while (q->internal.empty()) {
-        pthread_cond_wait(&q->cond_var, &q->mutex);
-
-        if (q->exit) {
-            netdata_mutex_unlock(&q->mutex);
-
-            // We return a dummy request because the queue has been signaled
-            return req;
-        }
-    }
-
-    req = q->internal.front();
-    q->internal.pop();
-
-    netdata_mutex_unlock(&q->mutex);
-    return req;
-}
-
-static size_t
-ml_queue_size(ml_queue_t *q)
-{
-    netdata_mutex_lock(&q->mutex);
-    size_t size = q->internal.size();
-    netdata_mutex_unlock(&q->mutex);
-    return size;
-}
-
-static void
-ml_queue_signal(ml_queue_t *q)
-{
-    netdata_mutex_lock(&q->mutex);
-    q->exit = true;
-    pthread_cond_signal(&q->cond_var);
-    netdata_mutex_unlock(&q->mutex);
-}
-
-/*
- * Dimension
-*/
-
-static std::pair<calculated_number_t *, ml_training_response_t>
-ml_dimension_calculated_numbers(ml_training_thread_t *training_thread, ml_dimension_t *dim, const ml_training_request_t &training_request)
+static std::pair<enum ml_worker_result, ml_training_response_t>
+ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim, const ml_request_create_new_model_t &req)
 {
     ml_training_response_t training_response = {};
 
-    training_response.request_time = training_request.request_time;
-    training_response.first_entry_on_request = training_request.first_entry_on_request;
-    training_response.last_entry_on_request = training_request.last_entry_on_request;
+    training_response.request_time = req.request_time;
+    training_response.first_entry_on_request = req.first_entry_on_request;
+    training_response.last_entry_on_request = req.last_entry_on_request;
 
     training_response.first_entry_on_response = rrddim_first_entry_s_of_tier(dim->rd, 0);
     training_response.last_entry_on_response = rrddim_last_entry_s_of_tier(dim->rd, 0);
@@ -344,13 +69,11 @@ ml_dimension_calculated_numbers(ml_training_thread_t *training_thread, ml_dimens
     );
 
     if (training_response.query_after_t >= training_response.query_before_t) {
-        training_response.result = TRAINING_RESULT_INVALID_QUERY_TIME_RANGE;
-        return { NULL, training_response };
+        return { ML_WORKER_RESULT_INVALID_QUERY_TIME_RANGE, training_response };
     }
 
     if (rrdset_is_replicating(dim->rd->rrdset)) {
-        training_response.result = TRAINING_RESULT_CHART_UNDER_REPLICATION;
-        return { NULL, training_response };
+        return { ML_WORKER_RESULT_CHART_UNDER_REPLICATION, training_response };
     }
 
     /*
@@ -363,7 +86,7 @@ ml_dimension_calculated_numbers(ml_training_thread_t *training_thread, ml_dimens
               STORAGE_PRIORITY_BEST_EFFORT);
 
     size_t idx = 0;
-    memset(training_thread->training_cns, 0, sizeof(calculated_number_t) * max_n * (Cfg.lag_n + 1));
+    memset(worker->training_cns, 0, sizeof(calculated_number_t) * max_n * (Cfg.lag_n + 1));
     calculated_number_t last_value = std::numeric_limits<calculated_number_t>::quiet_NaN();
 
     while (!storage_engine_query_is_finished(&handle)) {
@@ -380,33 +103,31 @@ ml_dimension_calculated_numbers(ml_training_thread_t *training_thread, ml_dimens
                 training_response.db_after_t = timestamp;
             training_response.db_before_t = timestamp;
 
-            training_thread->training_cns[idx] = value;
-            last_value = training_thread->training_cns[idx];
+            worker->training_cns[idx] = value;
+            last_value = worker->training_cns[idx];
             training_response.collected_values++;
         } else
-            training_thread->training_cns[idx] = last_value;
+            worker->training_cns[idx] = last_value;
 
         idx++;
     }
     storage_engine_query_finalize(&handle);
 
-    global_statistics_ml_query_completed(/* points_read */ idx);
+    pulse_queries_ml_query_completed(/* points_read */ idx);
 
     training_response.total_values = idx;
     if (training_response.collected_values < min_n) {
-        training_response.result = TRAINING_RESULT_NOT_ENOUGH_COLLECTED_VALUES;
-        return { NULL, training_response };
+        return { ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES, training_response };
     }
 
     // Find first non-NaN value.
-    for (idx = 0; std::isnan(training_thread->training_cns[idx]); idx++, training_response.total_values--) { }
+    for (idx = 0; std::isnan(worker->training_cns[idx]); idx++, training_response.total_values--) { }
 
     // Overwrite NaN values.
     if (idx != 0)
-        memmove(training_thread->training_cns, &training_thread->training_cns[idx], sizeof(calculated_number_t) * training_response.total_values);
+        memmove(worker->training_cns, &worker->training_cns[idx], sizeof(calculated_number_t) * training_response.total_values);
 
-    training_response.result = TRAINING_RESULT_OK;
-    return { training_thread->training_cns, training_response };
+    return { ML_WORKER_RESULT_OK, training_response };
 }
 
 const char *db_models_create_table =
@@ -443,19 +164,19 @@ const char *db_models_prune =
     "WHERE after < @after LIMIT @n;";
 
 static int
-ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_t *km)
+ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *inlined_km)
 {
     static __thread sqlite3_stmt *res = NULL;
     int param = 0;
     int rc = 0;
 
-    if (unlikely(!db)) {
+    if (unlikely(!ml_db)) {
         error_report("Database has not been initialized");
         return 1;
     }
 
     if (unlikely(!res)) {
-        rc = prepare_statement(db, db_models_add_model, &res);
+        rc = prepare_statement(ml_db, db_models_add_model, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to store model, rc = %d", rc);
             return 1;
@@ -466,26 +187,23 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_t *km)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int) km->after);
+    rc = sqlite3_bind_int(res, ++param, (int) inlined_km->after);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int) km->before);
+    rc = sqlite3_bind_int(res, ++param, (int) inlined_km->before);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_double(res, ++param, km->min_dist);
+    rc = sqlite3_bind_double(res, ++param, inlined_km->min_dist);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_double(res, ++param, km->max_dist);
+    rc = sqlite3_bind_double(res, ++param, inlined_km->max_dist);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    if (km->cluster_centers.size() != 2)
-        fatal("Expected 2 cluster centers, got %zu", km->cluster_centers.size());
-
-    for (const DSample &ds : km->cluster_centers) {
+    for (const DSample &ds : inlined_km->cluster_centers) {
         if (ds.size() != 6)
             fatal("Expected dsample with 6 dimensions, got %ld", ds.size());
 
@@ -526,13 +244,13 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
     int rc = 0;
     int param = 0;
 
-    if (unlikely(!db)) {
+    if (unlikely(!ml_db)) {
         error_report("Database has not been initialized");
         return 1;
     }
 
     if (unlikely(!res)) {
-        rc = prepare_statement(db, db_models_delete, &res);
+        rc = prepare_statement(ml_db, db_models_delete, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to delete models, rc = %d", rc);
             return rc;
@@ -576,13 +294,13 @@ ml_prune_old_models(size_t num_models_to_prune)
     int rc = 0;
     int param = 0;
 
-    if (unlikely(!db)) {
+    if (unlikely(!ml_db)) {
         error_report("Database has not been initialized");
         return 1;
     }
 
     if (unlikely(!res)) {
-        rc = prepare_statement(db, db_models_prune, &res);
+        rc = prepare_statement(ml_db, db_models_prune, &res);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to prune models, rc = %d", rc);
             return rc;
@@ -639,13 +357,13 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     int rc = 0;
     int param = 0;
 
-    if (unlikely(!db)) {
+    if (unlikely(!ml_db)) {
         error_report("Database has not been initialized");
         return 1;
     }
 
     if (unlikely(!res)) {
-        rc = sqlite3_prepare_v2(db, db_models_load, -1, &res, NULL);
+        rc = sqlite3_prepare_v2(ml_db, db_models_load, -1, &res, NULL);
         if (unlikely(rc != SQLITE_OK)) {
             error_report("Failed to prepare statement to load models, rc = %d", rc);
             return 1;
@@ -692,7 +410,7 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         km.cluster_centers[1](4) = sqlite3_column_double(res, 16);
         km.cluster_centers[1](5) = sqlite3_column_double(res, 17);
 
-        dim->km_contexts.push_back(km);
+        dim->km_contexts.emplace_back(km);
     }
 
     if (!dim->km_contexts.empty()) {
@@ -721,14 +439,212 @@ bind_fail:
     return 1;
 }
 
-static enum ml_training_result
-ml_dimension_train_model(ml_training_thread_t *training_thread, ml_dimension_t *dim, const ml_training_request_t &training_request)
+static void ml_dimension_serialize_kmeans(const ml_dimension_t *dim, BUFFER *wb)
+{
+    RRDDIM *rd = dim->rd;
+
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    buffer_json_member_add_string(wb, "version", "1");
+    buffer_json_member_add_string(wb, "machine-guid", rd->rrdset->rrdhost->machine_guid);
+    buffer_json_member_add_string(wb, "chart", rrdset_id(rd->rrdset));
+    buffer_json_member_add_string(wb, "dimension", rrddim_id(rd));
+
+    buffer_json_member_add_object(wb, "model");
+    ml_kmeans_serialize(&dim->km_contexts.back(), wb);
+    buffer_json_object_close(wb);
+
+    buffer_json_finalize(wb);
+}
+
+bool
+ml_dimension_deserialize_kmeans(const char *json_str)
+{
+    if (!json_str) {
+        netdata_log_error("Failed to deserialize kmeans: json string is null");
+        return false;
+    }
+
+    struct json_object *root = json_tokener_parse(json_str);
+    if (!root) {
+        netdata_log_error("Failed to deserialize kmeans: json parsing failed");
+        return false;
+    }
+
+    // Check the version
+    {
+        struct json_object *tmp_obj;
+        if (!json_object_object_get_ex(root, "version", &tmp_obj)) {
+            netdata_log_error("Failed to deserialize kmeans: missing key 'version'");
+            json_object_put(root);
+            return false;
+        }
+        if (!json_object_is_type(tmp_obj, json_type_string)) {
+            netdata_log_error("Failed to deserialize kmeans: failed to parse string for 'version'");
+            json_object_put(root);
+            return false;
+        }
+        const char *version = json_object_get_string(tmp_obj);
+
+        if (strcmp(version, "1")) {
+            netdata_log_error("Failed to deserialize kmeans: expected version 1");
+            json_object_put(root);
+            return false;
+        }
+    }
+
+    // Get the value of each key
+    std::array<const char *, 3> values;
+    {
+        std::array<const char *, 3> keys = {
+            "machine-guid",
+            "chart",
+            "dimension",
+        };
+
+        struct json_object *tmp_obj;
+        for (size_t i = 0; i != keys.size(); i++) {
+            if (!json_object_object_get_ex(root, keys[i], &tmp_obj)) {
+                netdata_log_error("Failed to deserialize kmeans: missing key '%s'", keys[i]);
+                json_object_put(root);
+                return false;
+            }
+            if (!json_object_is_type(tmp_obj, json_type_string)) {
+                netdata_log_error("Failed to deserialize kmeans: missing string value for key '%s'", keys[i]);
+                json_object_put(root);
+                return false;
+            }
+            values[i] = json_object_get_string(tmp_obj);
+        }
+    }
+
+    DimensionLookupInfo DLI(values[0], values[1], values[2]);
+
+    // Parse the kmeans model
+    ml_kmeans_inlined_t inlined_km;
+    {
+        struct json_object *kmeans_obj;
+        if (!json_object_object_get_ex(root, "model", &kmeans_obj)) {
+            netdata_log_error("Failed to deserialize kmeans: missing key 'model'");
+            json_object_put(root);
+            return false;
+        }
+        if (!json_object_is_type(kmeans_obj, json_type_object)) {
+            netdata_log_error("Failed to deserialize kmeans: failed to parse object for 'model'");
+            json_object_put(root);
+            return false;
+        }
+
+        if (!ml_kmeans_deserialize(&inlined_km, kmeans_obj)) {
+            json_object_put(root);
+            return false;
+        }
+    }
+
+    AcquiredDimension AcqDim(DLI);
+    if (!AcqDim.acquired()) {
+        netdata_log_error("Failed to deserialize kmeans: could not acquire dimension (machine-guid: %s, dimension: '%s.%s', reason: %s)",
+                          DLI.machineGuid(), DLI.chartId(), DLI.dimensionId(), AcqDim.acquire_failure());
+        json_object_put(root);
+        return false;
+    }
+
+    ml_dimension_t *Dim = reinterpret_cast<ml_dimension_t *>(AcqDim.dimension());
+    if (!Dim) {
+        pulse_ml_models_ignored();
+        return true;
+    }
+
+    ml_queue_item_t item;
+    item.type = ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL;
+    item.add_existing_model = {
+        DLI, inlined_km
+    };
+    ml_queue_push(AcqDim.queue(), item);
+
+    json_object_put(root);
+    return true;
+}
+
+static void ml_dimension_stream_kmeans(const ml_dimension_t *dim)
+{
+    struct sender_state *s = dim->rd->rrdset->rrdhost->sender;
+    if (!s)
+        return;
+
+    if(!stream_sender_has_capabilities(dim->rd->rrdset->rrdhost, STREAM_CAP_ML_MODELS) ||
+        !rrdset_check_upstream_exposed(dim->rd->rrdset) ||
+        !rrddim_check_upstream_exposed(dim->rd))
+        return;
+
+    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+    ml_dimension_serialize_kmeans(dim, payload);
+
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+
+    buffer_sprintf(
+        wb, PLUGINSD_KEYWORD_JSON " " PLUGINSD_KEYWORD_JSON_CMD_ML_MODEL "\n%s\n" PLUGINSD_KEYWORD_JSON_END "\n",
+        buffer_tostring(payload));
+
+    sender_commit_clean_buffer(s, wb, STREAM_TRAFFIC_TYPE_METADATA);
+    pulse_ml_models_sent();
+}
+
+static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
+{
+    worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
+
+    spinlock_lock(&dim->slock);
+
+    if (dim->km_contexts.size() < Cfg.num_models_to_use) {
+        dim->km_contexts.emplace_back(dim->kmeans);
+    } else {
+        bool can_drop_middle_km = false;
+
+        if (Cfg.num_models_to_use > 2) {
+            const ml_kmeans_inlined_t *old_km = &dim->km_contexts[dim->km_contexts.size() - 1];
+            const ml_kmeans_inlined_t *middle_km = &dim->km_contexts[dim->km_contexts.size() - 2];
+            const ml_kmeans_t *new_km = &dim->kmeans;
+
+            can_drop_middle_km = (middle_km->after < old_km->before) &&
+                                 (middle_km->before > new_km->after);
+        }
+
+        if (can_drop_middle_km) {
+            dim->km_contexts.back() = dim->kmeans;
+        } else {
+            std::rotate(std::begin(dim->km_contexts), std::begin(dim->km_contexts) + 1, std::end(dim->km_contexts));
+            dim->km_contexts[dim->km_contexts.size() - 1] = dim->kmeans;
+        }
+    }
+
+    dim->mt = METRIC_TYPE_CONSTANT;
+    dim->ts = TRAINING_STATUS_TRAINED;
+
+    dim->suppression_anomaly_counter = 0;
+    dim->suppression_window_counter = 0;
+
+    dim->last_training_time = rrddim_last_entry_s(dim->rd);
+
+    // Add the newly generated model to the list of pending models to flush
+    ml_model_info_t model_info;
+    uuid_copy(model_info.metric_uuid, dim->rd->metric_uuid);
+    model_info.inlined_kmeans = dim->km_contexts.back();
+    worker->pending_model_info.push_back(model_info);
+
+    ml_dimension_stream_kmeans(dim);
+
+    spinlock_unlock(&dim->slock);
+}
+
+static enum ml_worker_result
+ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim, const ml_request_create_new_model_t &req)
 {
     worker_is_busy(WORKER_TRAIN_QUERY);
-    auto P = ml_dimension_calculated_numbers(training_thread, dim, training_request);
+    auto P = ml_dimension_calculated_numbers(worker, dim, req);
+    ml_worker_result worker_result = P.first;
     ml_training_response_t training_response = P.second;
 
-    if (training_response.result != TRAINING_RESULT_OK) {
+    if (worker_result != ML_WORKER_RESULT_OK) {
         spinlock_lock(&dim->slock);
 
         dim->mt = METRIC_TYPE_CONSTANT;
@@ -746,80 +662,36 @@ ml_dimension_train_model(ml_training_thread_t *training_thread, ml_dimension_t *
 
         dim->suppression_anomaly_counter = 0;
         dim->suppression_window_counter = 0;
-        dim->tr = training_response;
 
         dim->last_training_time = training_response.last_entry_on_response;
-        enum ml_training_result result = training_response.result;
 
         spinlock_unlock(&dim->slock);
 
-        return result;
+        return worker_result;
     }
 
     // compute kmeans
     worker_is_busy(WORKER_TRAIN_KMEANS);
     {
-        memcpy(training_thread->scratch_training_cns, training_thread->training_cns,
+        memcpy(worker->scratch_training_cns, worker->training_cns,
                training_response.total_values * sizeof(calculated_number_t));
 
         ml_features_t features = {
             Cfg.diff_n, Cfg.smooth_n, Cfg.lag_n,
-            training_thread->scratch_training_cns, training_response.total_values,
-            training_thread->training_cns, training_response.total_values,
-            training_thread->training_samples
+            worker->scratch_training_cns, training_response.total_values,
+            worker->training_cns, training_response.total_values,
+            worker->training_samples
         };
         ml_features_preprocess(&features);
 
         ml_kmeans_init(&dim->kmeans);
-        ml_kmeans_train(&dim->kmeans, &features, training_response.query_after_t, training_response.query_before_t);
+        ml_kmeans_train(&dim->kmeans, &features,  Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
     }
 
     // update models
-    worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
-    {
-        spinlock_lock(&dim->slock);
+    ml_dimension_update_models(worker, dim);
 
-        if (dim->km_contexts.size() < Cfg.num_models_to_use) {
-            dim->km_contexts.push_back(std::move(dim->kmeans));
-        } else {
-            bool can_drop_middle_km = false;
-
-            if (Cfg.num_models_to_use > 2) {
-                const ml_kmeans_t *old_km = &dim->km_contexts[dim->km_contexts.size() - 1];
-                const ml_kmeans_t *middle_km = &dim->km_contexts[dim->km_contexts.size() - 2];
-                const ml_kmeans_t *new_km = &dim->kmeans;
-
-                can_drop_middle_km = (middle_km->after < old_km->before) &&
-                                     (middle_km->before > new_km->after);
-            }
-
-            if (can_drop_middle_km) {
-                dim->km_contexts.back() = dim->kmeans;
-            } else {
-                std::rotate(std::begin(dim->km_contexts), std::begin(dim->km_contexts) + 1, std::end(dim->km_contexts));
-                dim->km_contexts[dim->km_contexts.size() - 1] = std::move(dim->kmeans);
-            }
-        }
-
-        dim->mt = METRIC_TYPE_CONSTANT;
-        dim->ts = TRAINING_STATUS_TRAINED;
-
-        dim->suppression_anomaly_counter = 0;
-        dim->suppression_window_counter = 0;
-
-        dim->tr = training_response;
-        dim->last_training_time = rrddim_last_entry_s(dim->rd);
-
-        // Add the newly generated model to the list of pending models to flush
-        ml_model_info_t model_info;
-        uuid_copy(model_info.metric_uuid, dim->rd->metric_uuid);
-        model_info.kmeans = dim->km_contexts.back();
-        training_thread->pending_model_info.push_back(model_info);
-
-        spinlock_unlock(&dim->slock);
-    }
-
-    return training_response.result;
+    return worker_result;
 }
 
 static void
@@ -853,21 +725,27 @@ ml_dimension_schedule_for_training(ml_dimension_t *dim, time_t curr_time)
     }
 
     if (schedule_for_training) {
-        ml_training_request_t req;
+        ml_request_create_new_model_t req;
 
-        memcpy(req.machine_guid, dim->rd->rrdset->rrdhost->machine_guid, GUID_LEN + 1);
-        req.chart_id = string_dup(dim->rd->rrdset->id);
-        req.dimension_id = string_dup(dim->rd->id);
+        req.DLI = DimensionLookupInfo(
+            &dim->rd->rrdset->rrdhost->machine_guid[0],
+            dim->rd->rrdset->id,
+            dim->rd->id
+        );
         req.request_time = curr_time;
         req.first_entry_on_request = rrddim_first_entry_s(dim->rd);
         req.last_entry_on_request = rrddim_last_entry_s(dim->rd);
 
         ml_host_t *host = (ml_host_t *) dim->rd->rrdset->rrdhost->ml_host;
-        ml_queue_push(host->training_queue, req);
+
+        ml_queue_item_t item;
+        item.type = ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL;
+        item.create_new_model = req;
+        ml_queue_push(host->queue, item);
     }
 }
 
-static bool
+bool
 ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t value, bool exists)
 {
     // Nothing to do if ML is disabled for this dimension
@@ -954,7 +832,7 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
             continue;
 
         if (anomaly_score < (100 * Cfg.dimension_anomaly_score_threshold)) {
-            global_statistics_ml_models_consulted(models_consulted);
+            pulse_ml_models_consulted(models_consulted);
             spinlock_unlock(&dim->slock);
             return false;
         }
@@ -971,7 +849,7 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
 
     spinlock_unlock(&dim->slock);
 
-    global_statistics_ml_models_consulted(models_consulted);
+    pulse_ml_models_consulted(models_consulted);
     return sum;
 }
 
@@ -1090,7 +968,7 @@ ml_host_detect_once(ml_host_t *host)
             host->mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
             host->mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
 
-            if (spinlock_trylock_cancelable(&host->type_anomaly_rate_spinlock))
+            if (spinlock_trylock(&host->type_anomaly_rate_spinlock))
             {
                 STRING *key = rs->parts.type;
                 auto &um = host->type_anomaly_rate;
@@ -1106,7 +984,7 @@ ml_host_detect_once(ml_host_t *host)
 
                 it->second.anomalous_dimensions += chart_mls.num_anomalous_dimensions;
                 it->second.normal_dimensions += chart_mls.num_normal_dimensions;
-                spinlock_unlock_cancelable(&host->type_anomaly_rate_spinlock);
+                spinlock_unlock(&host->type_anomaly_rate_spinlock);
             }
         }
         rrdset_foreach_done(rsp);
@@ -1139,74 +1017,7 @@ ml_host_detect_once(ml_host_t *host)
     ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0);
 }
 
-typedef struct {
-    RRDHOST_ACQUIRED *acq_rh;
-    RRDSET_ACQUIRED *acq_rs;
-    RRDDIM_ACQUIRED *acq_rd;
-    ml_dimension_t *dim;
-} ml_acquired_dimension_t;
-
-static ml_acquired_dimension_t
-ml_acquired_dimension_get(char *machine_guid, STRING *chart_id, STRING *dimension_id)
-{
-    RRDHOST_ACQUIRED *acq_rh = NULL;
-    RRDSET_ACQUIRED *acq_rs = NULL;
-    RRDDIM_ACQUIRED *acq_rd = NULL;
-    ml_dimension_t *dim = NULL;
-
-    rrd_rdlock();
-
-    acq_rh = rrdhost_find_and_acquire(machine_guid);
-    if (acq_rh) {
-        RRDHOST *rh = rrdhost_acquired_to_rrdhost(acq_rh);
-        if (rh && !rrdhost_flag_check(rh, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_ARCHIVED)) {
-            acq_rs = rrdset_find_and_acquire(rh, string2str(chart_id));
-            if (acq_rs) {
-                RRDSET *rs = rrdset_acquired_to_rrdset(acq_rs);
-                if (rs && !rrdset_flag_check(rs, RRDSET_FLAG_OBSOLETE)) {
-                    acq_rd = rrddim_find_and_acquire(rs, string2str(dimension_id));
-                    if (acq_rd) {
-                        RRDDIM *rd = rrddim_acquired_to_rrddim(acq_rd);
-                        if (rd)
-                            dim = (ml_dimension_t *) rd->ml_dimension;
-                    }
-                }
-            }
-        }
-    }
-
-    rrd_rdunlock();
-
-    ml_acquired_dimension_t acq_dim = {
-        acq_rh, acq_rs, acq_rd, dim
-    };
-
-    return acq_dim;
-}
-
-static void
-ml_acquired_dimension_release(ml_acquired_dimension_t acq_dim)
-{
-    if (acq_dim.acq_rd)
-        rrddim_acquired_release(acq_dim.acq_rd);
-
-    if (acq_dim.acq_rs)
-        rrdset_acquired_release(acq_dim.acq_rs);
-
-    if (acq_dim.acq_rh)
-        rrdhost_acquired_release(acq_dim.acq_rh);
-}
-
-static enum ml_training_result
-ml_acquired_dimension_train(ml_training_thread_t *training_thread, ml_acquired_dimension_t acq_dim, const ml_training_request_t &tr)
-{
-    if (!acq_dim.dim)
-        return TRAINING_RESULT_NULL_ACQUIRED_DIMENSION;
-
-    return ml_dimension_train_model(training_thread, acq_dim.dim, tr);
-}
-
-static void *
+void *
 ml_detect_main(void *arg)
 {
     UNUSED(arg);
@@ -1239,33 +1050,14 @@ ml_detect_main(void *arg)
 
         if (Cfg.enable_statistics_charts) {
             // collect and update training thread stats
-            for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
-                ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
+            for (size_t idx = 0; idx != Cfg.num_worker_threads; idx++) {
+                ml_worker_t *worker = &Cfg.workers[idx];
 
-                netdata_mutex_lock(&training_thread->nd_mutex);
-                ml_training_stats_t training_stats = training_thread->training_stats;
-                training_thread->training_stats = {};
-                netdata_mutex_unlock(&training_thread->nd_mutex);
+                netdata_mutex_lock(&worker->nd_mutex);
+                ml_queue_stats_t queue_stats = worker->queue_stats;
+                netdata_mutex_unlock(&worker->nd_mutex);
 
-                // calc the avg values
-                if (training_stats.num_popped_items) {
-                    training_stats.queue_size /= training_stats.num_popped_items;
-                    training_stats.allotted_ut /= training_stats.num_popped_items;
-                    training_stats.consumed_ut /= training_stats.num_popped_items;
-                    training_stats.remaining_ut /= training_stats.num_popped_items;
-                } else {
-                    training_stats.queue_size = ml_queue_size(training_thread->training_queue);
-                    training_stats.consumed_ut = 0;
-                    training_stats.remaining_ut = training_stats.allotted_ut;
-
-                    training_stats.training_result_ok = 0;
-                    training_stats.training_result_invalid_query_time_range = 0;
-                    training_stats.training_result_not_enough_collected_values = 0;
-                    training_stats.training_result_null_acquired_dimension = 0;
-                    training_stats.training_result_chart_under_replication = 0;
-                }
-
-                ml_update_training_statistics_chart(training_thread, training_stats);
+                ml_update_training_statistics_chart(worker, queue_stats);
             }
         }
     }
@@ -1274,382 +1066,101 @@ ml_detect_main(void *arg)
     return NULL;
 }
 
-/*
- * Public API
-*/
-
-bool ml_capable()
-{
-    return true;
-}
-
-bool ml_enabled(RRDHOST *rh)
-{
-    if (!rh)
-        return false;
-    
-    if (!Cfg.enable_anomaly_detection)
-        return false;
-
-    if (simple_pattern_matches(Cfg.sp_host_to_skip, rrdhost_hostname(rh)))
-        return false;
-
-    return true;
-}
-
-bool ml_streaming_enabled()
-{
-    return Cfg.stream_anomaly_detection_charts;
-}
-
-void ml_host_new(RRDHOST *rh)
-{
-    if (!ml_enabled(rh))
-        return;
-
-    ml_host_t *host = new ml_host_t();
-
-    host->rh = rh;
-    host->mls = ml_machine_learning_stats_t();
-    host->host_anomaly_rate = 0.0;
-    host->anomaly_rate_rs = NULL;
-
-    static std::atomic<size_t> times_called(0);
-    host->training_queue = Cfg.training_threads[times_called++ % Cfg.num_training_threads].training_queue;
-
-    netdata_mutex_init(&host->mutex);
-    spinlock_init(&host->type_anomaly_rate_spinlock);
-
-    host->ml_running = true;
-    rh->ml_host = (rrd_ml_host_t *) host;
-}
-
-void ml_host_delete(RRDHOST *rh)
-{
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
-    if (!host)
-        return;
-
-    netdata_mutex_destroy(&host->mutex);
-
-    delete host;
-    rh->ml_host = NULL;
-}
-
-void ml_host_start(RRDHOST *rh) {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
-    if (!host)
-        return;
-
-    host->ml_running = true;
-}
-
-void ml_host_stop(RRDHOST *rh) {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
-    if (!host || !host->ml_running)
-        return;
-
-    netdata_mutex_lock(&host->mutex);
-
-    // reset host stats
-    host->mls = ml_machine_learning_stats_t();
-
-    // reset charts/dims
-    void *rsp = NULL;
-    rrdset_foreach_read(rsp, host->rh) {
-        RRDSET *rs = static_cast<RRDSET *>(rsp);
-
-        ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
-        if (!chart)
-            continue;
-
-        // reset chart
-        chart->mls = ml_machine_learning_stats_t();
-
-        void *rdp = NULL;
-        rrddim_foreach_read(rdp, rs) {
-            RRDDIM *rd = static_cast<RRDDIM *>(rdp);
-
-            ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
-            if (!dim)
-                continue;
-
-            spinlock_lock(&dim->slock);
-
-            // reset dim
-            // TODO: should we drop in-mem models, or mark them as stale? Is it
-            // okay to resume training straight away?
-
-            dim->mt = METRIC_TYPE_CONSTANT;
-            dim->ts = TRAINING_STATUS_UNTRAINED;
-            dim->last_training_time = 0;
-            dim->suppression_anomaly_counter = 0;
-            dim->suppression_window_counter = 0;
-            dim->cns.clear();
-
-            ml_kmeans_init(&dim->kmeans);
-
-            spinlock_unlock(&dim->slock);
-        }
-        rrddim_foreach_done(rdp);
-    }
-    rrdset_foreach_done(rsp);
-
-    netdata_mutex_unlock(&host->mutex);
-
-    host->ml_running = false;
-}
-
-void ml_host_get_info(RRDHOST *rh, BUFFER *wb)
-{
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
-    if (!host) {
-        buffer_json_member_add_boolean(wb, "enabled", false);
-        return;
-    }
-
-    buffer_json_member_add_uint64(wb, "version", 1);
-
-    buffer_json_member_add_boolean(wb, "enabled", Cfg.enable_anomaly_detection);
-
-    buffer_json_member_add_uint64(wb, "min-train-samples", Cfg.min_train_samples);
-    buffer_json_member_add_uint64(wb, "max-train-samples", Cfg.max_train_samples);
-    buffer_json_member_add_uint64(wb, "train-every", Cfg.train_every);
-
-    buffer_json_member_add_uint64(wb, "diff-n", Cfg.diff_n);
-    buffer_json_member_add_uint64(wb, "smooth-n", Cfg.smooth_n);
-    buffer_json_member_add_uint64(wb, "lag-n", Cfg.lag_n);
-
-    buffer_json_member_add_double(wb, "random-sampling-ratio", Cfg.random_sampling_ratio);
-    buffer_json_member_add_uint64(wb, "max-kmeans-iters", Cfg.random_sampling_ratio);
-
-    buffer_json_member_add_double(wb, "dimension-anomaly-score-threshold", Cfg.dimension_anomaly_score_threshold);
-
-    buffer_json_member_add_string(wb, "anomaly-detection-grouping-method", time_grouping_id2txt(Cfg.anomaly_detection_grouping_method));
-
-    buffer_json_member_add_int64(wb, "anomaly-detection-query-duration", Cfg.anomaly_detection_query_duration);
-
-    buffer_json_member_add_string(wb, "hosts-to-skip", Cfg.hosts_to_skip.c_str());
-    buffer_json_member_add_string(wb, "charts-to-skip", Cfg.charts_to_skip.c_str());
-}
-
-void ml_host_get_detection_info(RRDHOST *rh, BUFFER *wb)
-{
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
-    if (!host)
-        return;
-
-    netdata_mutex_lock(&host->mutex);
-
-    buffer_json_member_add_uint64(wb, "version", 2);
-    buffer_json_member_add_uint64(wb, "ml-running", host->ml_running);
-    buffer_json_member_add_uint64(wb, "anomalous-dimensions", host->mls.num_anomalous_dimensions);
-    buffer_json_member_add_uint64(wb, "normal-dimensions", host->mls.num_normal_dimensions);
-    buffer_json_member_add_uint64(wb, "total-dimensions", host->mls.num_anomalous_dimensions +
-                                                          host->mls.num_normal_dimensions);
-    buffer_json_member_add_uint64(wb, "trained-dimensions", host->mls.num_training_status_trained +
-                                                            host->mls.num_training_status_pending_with_model);
-    netdata_mutex_unlock(&host->mutex);
-}
-
-bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm) {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
-    if (!host) {
-        memset(mlm, 0, sizeof(*mlm));
-        return false;
-    }
-
-    netdata_mutex_lock(&host->mutex);
-
-    mlm->anomalous = host->mls.num_anomalous_dimensions;
-    mlm->normal = host->mls.num_normal_dimensions;
-    mlm->trained = host->mls.num_training_status_trained + host->mls.num_training_status_pending_with_model;
-    mlm->pending = host->mls.num_training_status_untrained + host->mls.num_training_status_pending_without_model;
-    mlm->silenced = host->mls.num_training_status_silenced;
-
-    netdata_mutex_unlock(&host->mutex);
-
-    return true;
-}
-
-bool ml_host_running(RRDHOST *rh) {
-    ml_host_t *host = (ml_host_t *) rh->ml_host;
-    if(!host)
-        return false;
-
-    return true;
-}
-
-void ml_host_get_models(RRDHOST *rh, BUFFER *wb)
-{
-    UNUSED(rh);
-    UNUSED(wb);
-
-    // TODO: To be implemented
-    netdata_log_error("Fetching KMeans models is not supported yet");
-}
-
-void ml_chart_new(RRDSET *rs)
-{
-    ml_host_t *host = (ml_host_t *) rs->rrdhost->ml_host;
-    if (!host)
-        return;
-
-    ml_chart_t *chart = new ml_chart_t();
-
-    chart->rs = rs;
-    chart->mls = ml_machine_learning_stats_t();
-
-    rs->ml_chart = (rrd_ml_chart_t *) chart;
-}
-
-void ml_chart_delete(RRDSET *rs)
-{
-    ml_host_t *host = (ml_host_t *) rs->rrdhost->ml_host;
-    if (!host)
-        return;
-
-    ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
-
-    delete chart;
-    rs->ml_chart = NULL;
-}
-
-bool ml_chart_update_begin(RRDSET *rs)
-{
-    ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
-    if (!chart)
-        return false;
-
-    chart->mls = {};
-    return true;
-}
-
-void ml_chart_update_end(RRDSET *rs)
-{
-    ml_chart_t *chart = (ml_chart_t *) rs->ml_chart;
-    if (!chart)
-        return;
-}
-
-void ml_dimension_new(RRDDIM *rd)
-{
-    ml_chart_t *chart = (ml_chart_t *) rd->rrdset->ml_chart;
-    if (!chart)
-        return;
-
-    ml_dimension_t *dim = new ml_dimension_t();
-
-    dim->rd = rd;
-
-    dim->mt = METRIC_TYPE_CONSTANT;
-    dim->ts = TRAINING_STATUS_UNTRAINED;
-    dim->last_training_time = 0;
-    dim->suppression_anomaly_counter = 0;
-    dim->suppression_window_counter = 0;
-
-    ml_kmeans_init(&dim->kmeans);
-
-    if (simple_pattern_matches(Cfg.sp_charts_to_skip, rrdset_name(rd->rrdset)))
-        dim->mls = MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART;
-    else
-        dim->mls = MACHINE_LEARNING_STATUS_ENABLED;
-
-    spinlock_init(&dim->slock);
-
-    dim->km_contexts.reserve(Cfg.num_models_to_use);
-
-    rd->ml_dimension = (rrd_ml_dimension_t *) dim;
-
-    metaqueue_ml_load_models(rd);
-}
-
-void ml_dimension_delete(RRDDIM *rd)
-{
-    ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
-    if (!dim)
-        return;
-
-    delete dim;
-    rd->ml_dimension = NULL;
-}
-
-bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool exists)
-{
-    ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
-    if (!dim)
-        return false;
-
-    ml_host_t *host = (ml_host_t *) rd->rrdset->rrdhost->ml_host;
-    if (!host->ml_running)
-        return false;
-
-    ml_chart_t *chart = (ml_chart_t *) rd->rrdset->ml_chart;
-
-    bool is_anomalous = ml_dimension_predict(dim, curr_time, value, exists);
-    ml_chart_update_dimension(chart, dim, is_anomalous);
-
-    return is_anomalous;
-}
-
-static void ml_flush_pending_models(ml_training_thread_t *training_thread) {
+static void ml_flush_pending_models(ml_worker_t *worker) {
     int op_no = 1;
 
     // begin transaction
-    int rc = db_execute(db, "BEGIN TRANSACTION;");
+    int rc = db_execute(ml_db, "BEGIN TRANSACTION;");
 
     // add/delete models
     if (!rc) {
         op_no++;
 
-        for (const auto &pending_model: training_thread->pending_model_info) {
+        for (const auto &pending_model: worker->pending_model_info) {
             if (!rc)
-                rc = ml_dimension_add_model(&pending_model.metric_uuid, &pending_model.kmeans);
+                rc = ml_dimension_add_model(&pending_model.metric_uuid, &pending_model.inlined_kmeans);
 
             if (!rc)
-                rc = ml_dimension_delete_models(&pending_model.metric_uuid, pending_model.kmeans.before - (Cfg.num_models_to_use * Cfg.train_every));
+                rc = ml_dimension_delete_models(&pending_model.metric_uuid, pending_model.inlined_kmeans.before - (Cfg.num_models_to_use * Cfg.train_every));
         }
     }
 
     // prune old models
     if (!rc) {
-        if ((training_thread->num_db_transactions % 64) == 0) {
-            rc = ml_prune_old_models(training_thread->num_models_to_prune);
+        if ((worker->num_db_transactions % 64) == 0) {
+            rc = ml_prune_old_models(worker->num_models_to_prune);
             if (!rc)
-                training_thread->num_models_to_prune = 0;
+                worker->num_models_to_prune = 0;
         }
     }
 
     // commit transaction
     if (!rc) {
         op_no++;
-        rc = db_execute(db, "COMMIT TRANSACTION;");
+        rc = db_execute(ml_db, "COMMIT TRANSACTION;");
     }
 
     // rollback transaction on failure
     if (rc) {
         netdata_log_error("Trying to rollback ML transaction because it failed with rc=%d, op_no=%d", rc, op_no);
         op_no++;
-        rc = db_execute(db, "ROLLBACK;");
+        rc = db_execute(ml_db, "ROLLBACK;");
         if (rc)
             netdata_log_error("ML transaction rollback failed with rc=%d", rc);
     }
 
     if (!rc) {
-        training_thread->num_db_transactions++;
-        training_thread->num_models_to_prune += training_thread->pending_model_info.size();        
+        worker->num_db_transactions++;
+        worker->num_models_to_prune += worker->pending_model_info.size();
     }
 
-    vacuum_database(db, "ML", 0, 0);
+    vacuum_database(ml_db, "ML", 0, 0);
 
-    training_thread->pending_model_info.clear();
+    worker->pending_model_info.clear();
 }
 
-static void *ml_train_main(void *arg) {
-    ml_training_thread_t *training_thread = (ml_training_thread_t *) arg;
+static enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, ml_request_create_new_model_t req) {
+    AcquiredDimension AcqDim(req.DLI);
+
+    if (!AcqDim.acquired()) {
+        netdata_log_error("Failed to create new model: could not acquire dimension (machine-guid: %s, dimension: '%s.%s', reason: %s)",
+                          req.DLI.machineGuid(), req.DLI.chartId(), req.DLI.dimensionId(), AcqDim.acquire_failure());
+        return ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION;
+    }
+
+    ml_dimension_t *Dim = reinterpret_cast<ml_dimension_t *>(AcqDim.dimension());
+    return ml_dimension_train_model(worker, Dim, req);
+}
+
+static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, ml_request_add_existing_model_t req) {
+    UNUSED(worker);
+    UNUSED(req);
+
+    AcquiredDimension AcqDim(req.DLI);
+
+    if (!AcqDim.acquired()) {
+        netdata_log_error("Failed to add existing model: could not acquire dimension (machine-guid: %s, dimension: '%s.%s', reason: %s)",
+                          req.DLI.machineGuid(), req.DLI.chartId(), req.DLI.dimensionId(), AcqDim.acquire_failure());
+        return ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION;
+    }
+
+    ml_dimension_t *Dim = reinterpret_cast<ml_dimension_t *>(AcqDim.dimension());
+    if (!Dim) {
+        pulse_ml_models_ignored();
+        return ML_WORKER_RESULT_OK;
+    }
+
+    Dim->kmeans = req.inlined_km;
+    ml_dimension_update_models(worker, Dim);
+    pulse_ml_models_received();
+    return ML_WORKER_RESULT_OK;
+}
+
+void *ml_train_main(void *arg) {
+    ml_worker_t *worker = (ml_worker_t *) arg;
 
     char worker_name[1024];
-    snprintfz(worker_name, 1024, "training_thread_%zu", training_thread->id);
+    snprintfz(worker_name, 1024, "ml_worker_%zu", worker->id);
     worker_register("MLTRAIN");
 
     worker_register_job_name(WORKER_TRAIN_QUEUE_POP, "pop queue");
@@ -1664,36 +1175,35 @@ static void *ml_train_main(void *arg) {
     while (!Cfg.training_stop) {
         worker_is_busy(WORKER_TRAIN_QUEUE_POP);
 
-        ml_training_request_t training_req = ml_queue_pop(training_thread->training_queue);
+        ml_queue_stats_t loop_stats{};
 
-        // we know this thread has been cancelled, when the queue starts
-        // returning "null" requests without blocking on queue's pop().
-        if (training_req.chart_id == NULL)
+        ml_queue_item_t item = ml_queue_pop(worker->queue);
+        if (item.type == ML_QUEUE_ITEM_STOP_REQUEST) {
             break;
+        }
 
-        size_t queue_size = ml_queue_size(training_thread->training_queue) + 1;
+        ml_queue_size_t queue_size = ml_queue_size(worker->queue);
 
-        usec_t allotted_ut = (Cfg.train_every * USEC_PER_SEC) / queue_size;
+        usec_t allotted_ut = (Cfg.train_every * USEC_PER_SEC) / (queue_size.create_new_model + 1);
         if (allotted_ut > USEC_PER_SEC)
             allotted_ut = USEC_PER_SEC;
 
         usec_t start_ut = now_monotonic_usec();
 
-        enum ml_training_result training_res;
-        {
-            worker_is_busy(WORKER_TRAIN_ACQUIRE_DIMENSION);
-            ml_acquired_dimension_t acq_dim = ml_acquired_dimension_get(
-                training_req.machine_guid,
-                training_req.chart_id,
-                training_req.dimension_id);
+        enum ml_worker_result worker_res;
 
-            training_res = ml_acquired_dimension_train(training_thread, acq_dim, training_req);
-
-            string_freez(training_req.chart_id);
-            string_freez(training_req.dimension_id);
-
-            worker_is_busy(WORKER_TRAIN_RELEASE_DIMENSION);
-            ml_acquired_dimension_release(acq_dim);
+        switch (item.type) {
+            case ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL: {
+                worker_res = ml_worker_create_new_model(worker, item.create_new_model);
+                break;
+            }
+            case ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL: {
+                worker_res = ml_worker_add_existing_model(worker, item.add_existing_model);
+                break;
+            }
+            default: {
+                fatal("Unknown queue item type");
+            }
         }
 
         usec_t consumed_ut = now_monotonic_usec() - start_ut;
@@ -1705,184 +1215,76 @@ static void *ml_train_main(void *arg) {
         if (Cfg.enable_statistics_charts) {
             worker_is_busy(WORKER_TRAIN_UPDATE_HOST);
 
-            netdata_mutex_lock(&training_thread->nd_mutex);
+            ml_queue_stats_t queue_stats = ml_queue_stats(worker->queue);
 
-            training_thread->training_stats.queue_size += queue_size;
-            training_thread->training_stats.num_popped_items += 1;
+            loop_stats.total_add_existing_model_requests_pushed = queue_stats.total_add_existing_model_requests_pushed;
+            loop_stats.total_add_existing_model_requests_popped = queue_stats.total_add_existing_model_requests_popped;
+            loop_stats.total_create_new_model_requests_pushed = queue_stats.total_create_new_model_requests_pushed;
+            loop_stats.total_create_new_model_requests_popped = queue_stats.total_create_new_model_requests_popped;
 
-            training_thread->training_stats.allotted_ut += allotted_ut;
-            training_thread->training_stats.consumed_ut += consumed_ut;
-            training_thread->training_stats.remaining_ut += remaining_ut;
+            loop_stats.allotted_ut = allotted_ut;
+            loop_stats.consumed_ut = consumed_ut;
+            loop_stats.remaining_ut = remaining_ut;
 
-            switch (training_res) {
-                case TRAINING_RESULT_OK:
-                    training_thread->training_stats.training_result_ok += 1;
+            switch (worker_res) {
+                case ML_WORKER_RESULT_OK:
+                    loop_stats.item_result_ok = 1;
                     break;
-                case TRAINING_RESULT_INVALID_QUERY_TIME_RANGE:
-                    training_thread->training_stats.training_result_invalid_query_time_range += 1;
+                case ML_WORKER_RESULT_INVALID_QUERY_TIME_RANGE:
+                    loop_stats.item_result_invalid_query_time_range = 1;
                     break;
-                case TRAINING_RESULT_NOT_ENOUGH_COLLECTED_VALUES:
-                    training_thread->training_stats.training_result_not_enough_collected_values += 1;
+                case ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES:
+                    loop_stats.item_result_not_enough_collected_values = 1;
                     break;
-                case TRAINING_RESULT_NULL_ACQUIRED_DIMENSION:
-                    training_thread->training_stats.training_result_null_acquired_dimension += 1;
+                case ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION:
+                    loop_stats.item_result_null_acquired_dimension = 1;
                     break;
-                case TRAINING_RESULT_CHART_UNDER_REPLICATION:
-                    training_thread->training_stats.training_result_chart_under_replication += 1;
+                case ML_WORKER_RESULT_CHART_UNDER_REPLICATION:
+                    loop_stats.item_result_chart_under_replication = 1;
                     break;
             }
 
-            netdata_mutex_unlock(&training_thread->nd_mutex);
+            netdata_mutex_lock(&worker->nd_mutex);
+
+            worker->queue_stats.total_add_existing_model_requests_pushed = loop_stats.total_add_existing_model_requests_pushed;
+            worker->queue_stats.total_add_existing_model_requests_popped = loop_stats.total_add_existing_model_requests_popped;
+
+            worker->queue_stats.total_create_new_model_requests_pushed = loop_stats.total_create_new_model_requests_pushed;
+            worker->queue_stats.total_create_new_model_requests_popped = loop_stats.total_create_new_model_requests_popped;
+
+            worker->queue_stats.allotted_ut += loop_stats.allotted_ut;
+            worker->queue_stats.consumed_ut += loop_stats.consumed_ut;
+            worker->queue_stats.remaining_ut += loop_stats.remaining_ut;
+
+            worker->queue_stats.item_result_ok += loop_stats.item_result_ok;
+            worker->queue_stats.item_result_invalid_query_time_range += loop_stats.item_result_invalid_query_time_range;
+            worker->queue_stats.item_result_not_enough_collected_values += loop_stats.item_result_not_enough_collected_values;
+            worker->queue_stats.item_result_null_acquired_dimension += loop_stats.item_result_null_acquired_dimension;
+            worker->queue_stats.item_result_chart_under_replication += loop_stats.item_result_chart_under_replication;
+
+            netdata_mutex_unlock(&worker->nd_mutex);
         }
 
-        if (training_thread->pending_model_info.size() >= Cfg.flush_models_batch_size) {
+        bool should_sleep = true;
+
+        if (worker->pending_model_info.size() >= Cfg.flush_models_batch_size) {
             worker_is_busy(WORKER_TRAIN_FLUSH_MODELS);
             netdata_mutex_lock(&db_mutex);
-            ml_flush_pending_models(training_thread);
+            ml_flush_pending_models(worker);
             netdata_mutex_unlock(&db_mutex);
-            continue;
+            should_sleep = false;
         }
+
+        if (item.type == ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL) {
+           should_sleep = false;
+        }
+
+        if (!should_sleep)
+            continue;
 
         worker_is_idle();
         std::this_thread::sleep_for(std::chrono::microseconds{remaining_ut});
     }
 
     return NULL;
-}
-
-void ml_init()
-{
-    // Read config values
-    ml_config_load(&Cfg);
-
-    if (!Cfg.enable_anomaly_detection)
-        return;
-
-    // Generate random numbers to efficiently sample the features we need
-    // for KMeans clustering.
-    std::random_device RD;
-    std::mt19937 Gen(RD());
-
-    Cfg.random_nums.reserve(Cfg.max_train_samples);
-    for (size_t Idx = 0; Idx != Cfg.max_train_samples; Idx++)
-        Cfg.random_nums.push_back(Gen());
-
-    // init training thread-specific data
-    Cfg.training_threads.resize(Cfg.num_training_threads);
-    for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
-        ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
-
-        size_t max_elements_needed_for_training = (size_t) Cfg.max_train_samples * (size_t) (Cfg.lag_n + 1);
-        training_thread->training_cns = new calculated_number_t[max_elements_needed_for_training]();
-        training_thread->scratch_training_cns = new calculated_number_t[max_elements_needed_for_training]();
-
-        training_thread->id = idx;
-        training_thread->training_queue = ml_queue_init();
-        training_thread->pending_model_info.reserve(Cfg.flush_models_batch_size);
-        netdata_mutex_init(&training_thread->nd_mutex);
-    }
-
-    // open sqlite db
-    char path[FILENAME_MAX];
-    snprintfz(path, FILENAME_MAX - 1, "%s/%s", netdata_configured_cache_dir, "ml.db");
-    int rc = sqlite3_open(path, &db);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to initialize database at %s, due to \"%s\"", path, sqlite3_errstr(rc));
-        sqlite3_close(db);
-        db = NULL;
-    }
-
-    // create table
-    if (db) {
-        int target_version = perform_ml_database_migration(db, ML_METADATA_VERSION);
-        if (configure_sqlite_database(db, target_version, "ml_config")) {
-            error_report("Failed to setup ML database");
-            sqlite3_close(db);
-            db = NULL;
-        }
-        else {
-            char *err = NULL;
-            int rc = sqlite3_exec(db, db_models_create_table, NULL, NULL, &err);
-            if (rc != SQLITE_OK) {
-                error_report("Failed to create models table (%s, %s)", sqlite3_errstr(rc), err ? err : "");
-                sqlite3_close(db);
-                sqlite3_free(err);
-                db = NULL;
-            }
-        }
-    }
-}
-
-uint64_t sqlite_get_ml_space(void)
-{
-    return sqlite_get_db_space(db);
-}
-
-void ml_fini() {
-    if (!Cfg.enable_anomaly_detection || !db)
-        return;
-
-    sql_close_database(db, "ML");
-    db = NULL;
-}
-
-void ml_start_threads() {
-    if (!Cfg.enable_anomaly_detection)
-        return;
-
-    // start detection & training threads
-    Cfg.detection_stop = false;
-    Cfg.training_stop = false;
-
-    char tag[NETDATA_THREAD_TAG_MAX + 1];
-
-    snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "PREDICT");
-    Cfg.detection_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
-                                            ml_detect_main, NULL);
-
-    for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
-        ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
-        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "TRAIN[%zu]", training_thread->id);
-        training_thread->nd_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
-                                                      ml_train_main, training_thread);
-    }
-}
-
-void ml_stop_threads()
-{
-    if (!Cfg.enable_anomaly_detection)
-        return;
-
-    Cfg.detection_stop = true;
-    Cfg.training_stop = true;
-
-    if (!Cfg.detection_thread)
-        return;
-
-    nd_thread_join(Cfg.detection_thread);
-    Cfg.detection_thread = 0;
-
-    // signal the training queue of each thread
-    for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
-        ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
-
-        ml_queue_signal(training_thread->training_queue);
-    }
-
-    // join training threads
-    for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
-        ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
-
-        nd_thread_join(training_thread->nd_thread);
-    }
-
-    // clear training thread data
-    for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
-        ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
-
-        delete[] training_thread->training_cns;
-        delete[] training_thread->scratch_training_cns;
-        ml_queue_destroy(training_thread->training_queue);
-        netdata_mutex_destroy(&training_thread->nd_mutex);
-    }
 }

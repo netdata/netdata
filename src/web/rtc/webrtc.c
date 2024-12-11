@@ -115,7 +115,7 @@ static struct {
         .proxyServer = NULL, // [("http"|"socks5") (":"|"://")][username ":" password "@"]hostname["    :" port]
         .bindAddress = NULL,
         .unsafe = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .spinlock = SPINLOCK_INITIALIZER,
                 .head = NULL,
         },
 };

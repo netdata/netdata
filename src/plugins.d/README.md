@@ -314,7 +314,7 @@ the template is:
 
 -   `charttype`
 
-    one of `line`, `area` or `stacked`,
+    one of `line`, `area`, `stacked` or `heatmap`,
     if empty or missing, the `line` will be used
 
 -   `priority`

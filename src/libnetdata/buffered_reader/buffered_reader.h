@@ -115,22 +115,31 @@ static inline bool buffered_reader_next_line(struct buffered_reader *reader, BUF
         return false;
     }
 
-    // copy all bytes to buffer
-    while(ss < se && ds < de && *ss != '\n') {
-        *ds++ = *ss++;
-        dst->len++;
+    // Find out how many bytes we want to copy and whether we found a newline
+    size_t bytes_to_copy;
+    bool found_newline = false;
+    {
+        char *next_newline = (char *) memchr(ss, '\n', se - ss);
+        if (!next_newline) {
+            bytes_to_copy = se - ss;
+        } else {
+            bytes_to_copy = (next_newline - ss) + 1;
+            found_newline = true;
+        }
     }
 
-    // if we have a newline, return the buffer
-    if(ss < se && ds < de && *ss == '\n') {
-        // newline found in the r->read_buffer
+    // Check we don't overflow the destination buffer
+    if (bytes_to_copy > (size_t)(de - ds)) {
+        bytes_to_copy = de - ds;
+        found_newline = false;
+    }
 
-        *ds++ = *ss++; // copy the newline too
-        dst->len++;
+    memcpy(ds, ss, bytes_to_copy);
+    ds[bytes_to_copy] = '\0';
+    dst->len += bytes_to_copy;
 
-        *ds = '\0';
-
-        reader->pos = ss - reader->read_buffer;
+    if (found_newline) {
+        reader->pos = start + bytes_to_copy;
         return true;
     }
 

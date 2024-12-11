@@ -136,7 +136,7 @@ Let's explore the most colorful box by hovering over it.
 container](https://user-images.githubusercontent.com/1153921/109049544-a8417980-7695-11eb-80a7-109b4a645a27.png)
 
 The **Context** tab shows `rabbitmq-5bb66bb6c9-6xr5b` as the container's image name, which means this container is
-running a [RabbitMQ](/src/go/plugin/go.d/modules/rabbitmq/README.md) workload.
+running a [RabbitMQ](/src/go/plugin/go.d/collector/rabbitmq/README.md) workload.
 
 Click the **Metrics** tab to see real-time metrics from that container. Unsurprisingly, it shows a spike in CPU
 utilization at regular intervals.
@@ -165,13 +165,13 @@ for complete customization. For example, grouping the top chart by `k8s_containe
 Netdata has a [service discovery plugin](https://github.com/netdata/agent-service-discovery), which discovers and
 creates configuration files for [compatible
 services](https://github.com/netdata/helmchart#service-discovery-and-supported-services) and any endpoints covered by
-our [generic Prometheus collector](/src/go/plugin/go.d/modules/prometheus/README.md).
+our [generic Prometheus collector](/src/go/plugin/go.d/collector/prometheus/README.md).
 Netdata uses these files to collect metrics from any compatible application as they run _inside_ of a pod. Service
 discovery happens without manual intervention as pods are created, destroyed, or moved between nodes.
 
 Service metrics show up on the Overview as well, beneath the **Kubernetes** section, and are labeled according to the
 service in question. For example, the **RabbitMQ** section has numerous charts from the [`rabbitmq`
-collector](/src/go/plugin/go.d/modules/rabbitmq/README.md):
+collector](/src/go/plugin/go.d/collector/rabbitmq/README.md):
 
 ![Finding service discovery
 metrics](https://user-images.githubusercontent.com/1153921/109054511-2eac8a00-769b-11eb-97f1-da93acb4b5fe.png)
@@ -192,7 +192,7 @@ Netdata also automatically collects metrics from two essential Kubernetes proces
 
 The **k8s kubelet** section visualizes metrics from the Kubernetes agent responsible for managing every pod on a given
 node. This also happens without any configuration thanks to the [kubelet
-collector](/src/go/plugin/go.d/modules/k8s_kubelet/README.md).
+collector](/src/go/plugin/go.d/collector/k8s_kubelet/README.md).
 
 Monitoring each node's kubelet can be invaluable when diagnosing issues with your Kubernetes cluster. For example, you
 can see if the number of running containers/pods has dropped, which could signal a fault or crash in a particular
@@ -208,7 +208,7 @@ configuration-related errors, and the actual vs. desired numbers of volumes, plu
 The **k8s kube-proxy** section displays metrics about the network proxy that runs on each node in your Kubernetes
 cluster. kube-proxy lets pods communicate with each other and accept sessions from outside your cluster. Its metrics are
 collected by the [kube-proxy
-collector](/src/go/plugin/go.d/modules/k8s_kubeproxy/README.md).
+collector](/src/go/plugin/go.d/collector/k8s_kubeproxy/README.md).
 
 With Netdata, you can monitor how often your k8s proxies are syncing proxy rules between nodes. Dramatic changes in
 these figures could indicate an anomaly in your cluster that's worthy of further investigation.
@@ -228,7 +228,7 @@ clusters of all sizes.
 - [Netdata Helm chart](https://github.com/netdata/helmchart)
 - [Netdata service discovery](https://github.com/netdata/agent-service-discovery)
 - [Netdata Agent · `kubelet`
-  collector](/src/go/plugin/go.d/modules/k8s_kubelet/README.md)
+  collector](/src/go/plugin/go.d/collector/k8s_kubelet/README.md)
 - [Netdata Agent · `kube-proxy`
-  collector](/src/go/plugin/go.d/modules/k8s_kubeproxy/README.md)
+  collector](/src/go/plugin/go.d/collector/k8s_kubeproxy/README.md)
 - [Netdata Agent · `cgroups.plugin`](/src/collectors/cgroups.plugin/README.md)

@@ -434,7 +434,6 @@ jobs:
           mv ../dist-artifacts/* . || exit 1
           ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
           cp ../packaging/version ./latest-version.txt || exit 1
-          cp ../integrations/integrations.js ./integrations.js || exit 1
           sha256sum -b ./* > sha256sums.txt || exit 1
           cat sha256sums.txt
       - name: Store Artifacts
@@ -724,7 +723,7 @@ jobs:
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
-          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/netdata-*.msi,final-artifacts/integrations.js'
+          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/netdata-*.msi'
           owner: netdata
           repo: netdata-nightlies
           body: Netdata nightly build for ${{ steps.version.outputs.date }}.
@@ -842,7 +841,7 @@ jobs:
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
-          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/netdata-*.msi,final-artifacts/integrations.js'
+          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/netdata-*.msi'
           draft: true
           tag: ${{ needs.normalize-tag.outputs.tag }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}

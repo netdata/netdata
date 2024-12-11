@@ -16,9 +16,9 @@ All capabilities are set automatically during Netdata installation using the [of
 
 | Capability          |                                               Required by                                               |
 |:--------------------|:-------------------------------------------------------------------------------------------------------:|
-| CAP_NET_RAW         |      [Ping](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ping#readme)      |
-| CAP_NET_ADMIN       | [Wireguard](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/wireguard#readme) |
-| CAP_DAC_READ_SEARCH | [Filecheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/filecheck#readme) |
+| CAP_NET_RAW         |      [Ping](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ping#readme)      |
+| CAP_NET_ADMIN       | [Wireguard](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/wireguard#readme) |
+| CAP_DAC_READ_SEARCH | [Filecheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/filecheck#readme) |
 
 ## Available modules
 
@@ -27,126 +27,126 @@ All capabilities are set automatically during Netdata installation using the [of
 
 | Name                                                                                                               |           Monitors            |
 |:-------------------------------------------------------------------------------------------------------------------|:-----------------------------:|
-| [adaptec_raid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/adaptecraid)              |     Adaptec Hardware RAID     |
-| [activemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/activemq)                     |           ActiveMQ            |
-| [ap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ap)                                 |          Wireless AP          |
-| [apache](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/apache)                         |            Apache             |
-| [apcupsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/apcupsd)                       |           UPS (APC)           |
-| [beanstalk](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/beanstalk)                   |           Beanstalk           |
-| [bind](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/bind)                             |           ISC Bind            |
-| [boinc](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/boinc)                           |             BOINC             |
-| [cassandra](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/cassandra)                   |           Cassandra           |
-| [ceph](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ceph)                             |             Ceph              |
-| [chrony](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/chrony)                         |            Chrony             |
-| [clickhouse](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/clickhouse)                 |          ClickHouse           |
-| [cockroachdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/cockroachdb)               |          CockroachDB          |
-| [consul](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/consul)                         |            Consul             |
-| [coredns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/coredns)                       |            CoreDNS            |
-| [couchbase](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/couchbase)                   |           Couchbase           |
-| [couchdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/couchdb)                       |            CouchDB            |
-| [dmcache](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/dmcache)                       |            DMCache            |
-| [dnsdist](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/dnsdist)                       |            Dnsdist            |
-| [dnsmasq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/dnsmasq)                       |     Dnsmasq DNS Forwarder     |
-| [dnsmasq_dhcp](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/dnsmasq_dhcp)             |         Dnsmasq DHCP          |
-| [dns_query](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/dnsquery)                    |         DNS Query RTT         |
-| [docker](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/docker)                         |         Docker Engine         |
-| [docker_engine](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/docker_engine)           |         Docker Engine         |
-| [dockerhub](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/dockerhub)                   |          Docker Hub           |
-| [dovecot](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/dovecot)                       |            Dovecot            |
-| [elasticsearch](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/elasticsearch)           |   Elasticsearch/OpenSearch    |
-| [envoy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/envoy)                           |             Envoy             |
-| [exim](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/exim)                             |             Exim              |
-| [fail2ban](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/fail2ban)                     |        Fail2Ban Jails         |
-| [filecheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/filecheck)                   |     Files and Directories     |
-| [fluentd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/fluentd)                       |            Fluentd            |
-| [freeradius](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/freeradius)                 |          FreeRADIUS           |
-| [gearman](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/gearman)                       |            Gearman            |
-| [haproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/haproxy)                       |            HAProxy            |
-| [hddtemp](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hddtemp)                       |       Disks temperature       |
-| [hdfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hdfs)                             |             HDFS              |
-| [hpssa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/hpssa)                           |        HPE Smart Array        |
-| [httpcheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/httpcheck)                   |       Any HTTP Endpoint       |
-| [icecast](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/icecast)                       |            Icecast            |
-| [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/intelgpu)                     |     Intel integrated GPU      |
-| [ipfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ipfs)                             |             IPFS              |
-| [isc_dhcpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/isc_dhcpd)                   |           ISC DHCP            |
-| [k8s_kubelet](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/k8s_kubelet)               |            Kubelet            |
-| [k8s_kubeproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/k8s_kubeproxy)           |          Kube-proxy           |
-| [k8s_state](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/k8s_state)                   |   Kubernetes cluster state    |
-| [lighttpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/lighttpd)                     |           Lighttpd            |
-| [litespeed](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/litespeed)                   |           Litespeed           |
-| [logind](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/logind)                         |        systemd-logind         |
-| [logstash](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/logstash)                     |           Logstash            |
-| [lvm](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/lvm)                               |      LVM logical volumes      |
-| [maxscale](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/maxscale)                     |           MaxScale            |
-| [megacli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/megacli)                       |     MegaCli Hardware Raid     |
-| [memcached](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/memcached)                   |           Memcached           |
-| [mongoDB](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/mongodb)                       |            MongoDB            |
-| [monit](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/monit)                           |             Monit             |
-| [mysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/mysql)                           |             MySQL             |
-| [nginx](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginx)                           |             NGINX             |
-| [nginxplus](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginxplus)                   |          NGINX Plus           |
-| [nginxunit](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginxunit)                   |          NGINX Unit           |
-| [nginxvts](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nginxvts)                     |           NGINX VTS           |
-| [nsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nsd)                               |       NSD (NLnet Labs)        |
-| [ntpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ntpd)                             |          NTP daemon           |
-| [nvidia_smi](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nvidia_smi)                 |          Nvidia SMI           |
-| [nvme](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/nvme)                             |         NVMe devices          |
-| [openldap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/openldap)                     |           OpenLDAP            |
-| [openvpn](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/openvpn)                       |            OpenVPN            |
-| [openvpn_status_log](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/openvpn_status_log) |            OpenVPN            |
-| [pgbouncer](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/pgbouncer)                   |           PgBouncer           |
-| [oracledb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/oracledb)                     |           Oracle DB           |
-| [phpdaemon](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/phpdaemon)                   |           phpDaemon           |
-| [phpfpm](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/phpfpm)                         |            PHP-FPM            |
-| [pihole](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/pihole)                         |            Pi-hole            |
-| [pika](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/pika)                             |             Pika              |
-| [ping](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/ping)                             |       Any network host        |
-| [prometheus](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/prometheus)                 |    Any Prometheus Endpoint    |
-| [portcheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/portcheck)                   |       Any TCP Endpoint        |
-| [postgres](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/postgres)                     |          PostgreSQL           |
-| [postfix](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/postfix)                       |            Postfix            |
-| [powerdns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/powerdns)                     | PowerDNS Authoritative Server |
-| [powerdns_recursor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/powerdns_recursor)   |       PowerDNS Recursor       |
-| [proxysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/proxysql)                     |           ProxySQL            |
-| [pulsar](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/pulsar)                         |         Apache Pulsar         |
-| [puppet](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/puppet)                         |            Puppet             |
-| [rabbitmq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/rabbitmq)                     |           RabbitMQ            |
-| [redis](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/redis)                           |             Redis             |
-| [rethinkdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/rethinkdb)                   |           RethinkDB           |
-| [riakkv](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/riakkv)                         |            Riak KV            |
-| [rspamd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/rspamd)                         |            Rspamd             |
-| [samba](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/samba)                           |             Samba             |
-| [scaleio](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/scaleio)                       |       Dell EMC ScaleIO        |
-| [sensors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/sensors)                       |       Hardware Sensors        |
-| [SNMP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/modules/snmp)                             |             SNMP              |
-| [squid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/squid)                           |             Squid             |
-| [squidlog](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/squidlog)                     |             Squid             |
-| [smartctl](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/smartctl)                     |   S.M.A.R.T Storage Devices   |
-| [spigotmc](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/spigotmc)                     |           SpigotMC            |
-| [storcli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/storcli)                       |    Broadcom Hardware RAID     |
-| [supervisord](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/supervisord)               |          Supervisor           |
-| [systemdunits](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/systemdunits)             |      Systemd unit state       |
-| [tengine](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/tengine)                       |            Tengine            |
-| [tomcat](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/tomcat)                         |            Tomcat             |
-| [tor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/tor)                               |              Tor              |
-| [traefik](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/traefik)                       |            Traefik            |
-| [typesense](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/typesense)                   |           Typesense           |
-| [unbound](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/unbound)                       |            Unbound            |
-| [upsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/upsd)                             |          UPSd (Nut)           |
-| [uwsgi](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/uwsgi)                           |             uWSGI             |
-| [varnish](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/varnish)                       |            Varnish            |
-| [vcsa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/vcsa)                             |   vCenter Server Appliance    |
-| [vernemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/vernemq)                       |            VerneMQ            |
-| [vsphere](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/vsphere)                       |     VMware vCenter Server     |
-| [w1sensor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/w1sensor)                     |        1-Wire Sensors         |
-| [web_log](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/weblog)                        |         Apache/NGINX          |
-| [wireguard](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/wireguard)                   |           WireGuard           |
-| [whoisquery](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/whoisquery)                 |         Domain Expiry         |
-| [windows](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/windows)                       |            Windows            |
-| [x509check](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/x509check)                   |     Digital Certificates      |
-| [zfspool](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/zfspool)                       |           ZFS Pools           |
-| [zookeeper](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/modules/zookeeper)                   |           ZooKeeper           |
+| [adaptec_raid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/adaptecraid)              |     Adaptec Hardware RAID     |
+| [activemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/activemq)                     |           ActiveMQ            |
+| [ap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ap)                                 |          Wireless AP          |
+| [apache](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/apache)                         |            Apache             |
+| [apcupsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/apcupsd)                       |           UPS (APC)           |
+| [beanstalk](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/beanstalk)                   |           Beanstalk           |
+| [bind](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/bind)                             |           ISC Bind            |
+| [boinc](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/boinc)                           |             BOINC             |
+| [cassandra](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/cassandra)                   |           Cassandra           |
+| [ceph](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ceph)                             |             Ceph              |
+| [chrony](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/chrony)                         |            Chrony             |
+| [clickhouse](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/clickhouse)                 |          ClickHouse           |
+| [cockroachdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/cockroachdb)               |          CockroachDB          |
+| [consul](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/consul)                         |            Consul             |
+| [coredns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/coredns)                       |            CoreDNS            |
+| [couchbase](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/couchbase)                   |           Couchbase           |
+| [couchdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/couchdb)                       |            CouchDB            |
+| [dmcache](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/dmcache)                       |            DMCache            |
+| [dnsdist](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/dnsdist)                       |            Dnsdist            |
+| [dnsmasq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/dnsmasq)                       |     Dnsmasq DNS Forwarder     |
+| [dnsmasq_dhcp](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/dnsmasq_dhcp)             |         Dnsmasq DHCP          |
+| [dns_query](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/dnsquery)                    |         DNS Query RTT         |
+| [docker](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/docker)                         |         Docker Engine         |
+| [docker_engine](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/docker_engine)           |         Docker Engine         |
+| [dockerhub](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/dockerhub)                   |          Docker Hub           |
+| [dovecot](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/dovecot)                       |            Dovecot            |
+| [elasticsearch](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/elasticsearch)           |   Elasticsearch/OpenSearch    |
+| [envoy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/envoy)                           |             Envoy             |
+| [exim](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/exim)                             |             Exim              |
+| [fail2ban](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/fail2ban)                     |        Fail2Ban Jails         |
+| [filecheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/filecheck)                   |     Files and Directories     |
+| [fluentd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/fluentd)                       |            Fluentd            |
+| [freeradius](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/freeradius)                 |          FreeRADIUS           |
+| [gearman](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/gearman)                       |            Gearman            |
+| [haproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/haproxy)                       |            HAProxy            |
+| [hddtemp](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/hddtemp)                       |       Disks temperature       |
+| [hdfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/hdfs)                             |             HDFS              |
+| [hpssa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/hpssa)                           |        HPE Smart Array        |
+| [httpcheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/httpcheck)                   |       Any HTTP Endpoint       |
+| [icecast](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/icecast)                       |            Icecast            |
+| [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/intelgpu)                     |     Intel integrated GPU      |
+| [ipfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ipfs)                             |             IPFS              |
+| [isc_dhcpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/isc_dhcpd)                   |           ISC DHCP            |
+| [k8s_kubelet](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/k8s_kubelet)               |            Kubelet            |
+| [k8s_kubeproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/k8s_kubeproxy)           |          Kube-proxy           |
+| [k8s_state](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/k8s_state)                   |   Kubernetes cluster state    |
+| [lighttpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/lighttpd)                     |           Lighttpd            |
+| [litespeed](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/litespeed)                   |           Litespeed           |
+| [logind](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/logind)                         |        systemd-logind         |
+| [logstash](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/logstash)                     |           Logstash            |
+| [lvm](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/lvm)                               |      LVM logical volumes      |
+| [maxscale](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/maxscale)                     |           MaxScale            |
+| [megacli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/megacli)                       |     MegaCli Hardware Raid     |
+| [memcached](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/memcached)                   |           Memcached           |
+| [mongoDB](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/mongodb)                       |            MongoDB            |
+| [monit](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/monit)                           |             Monit             |
+| [mysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/mysql)                           |             MySQL             |
+| [nginx](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nginx)                           |             NGINX             |
+| [nginxplus](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nginxplus)                   |          NGINX Plus           |
+| [nginxunit](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nginxunit)                   |          NGINX Unit           |
+| [nginxvts](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nginxvts)                     |           NGINX VTS           |
+| [nsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nsd)                               |       NSD (NLnet Labs)        |
+| [ntpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ntpd)                             |          NTP daemon           |
+| [nvidia_smi](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nvidia_smi)                 |          Nvidia SMI           |
+| [nvme](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nvme)                             |         NVMe devices          |
+| [openldap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/openldap)                     |           OpenLDAP            |
+| [openvpn](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/openvpn)                       |            OpenVPN            |
+| [openvpn_status_log](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/openvpn_status_log) |            OpenVPN            |
+| [pgbouncer](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/pgbouncer)                   |           PgBouncer           |
+| [oracledb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/oracledb)                     |           Oracle DB           |
+| [phpdaemon](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/phpdaemon)                   |           phpDaemon           |
+| [phpfpm](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/phpfpm)                         |            PHP-FPM            |
+| [pihole](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/pihole)                         |            Pi-hole            |
+| [pika](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/pika)                             |             Pika              |
+| [ping](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ping)                             |       Any network host        |
+| [prometheus](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/prometheus)                 |    Any Prometheus Endpoint    |
+| [portcheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/portcheck)                   |       Any TCP Endpoint        |
+| [postgres](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/postgres)                     |          PostgreSQL           |
+| [postfix](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/postfix)                       |            Postfix            |
+| [powerdns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/powerdns)                     | PowerDNS Authoritative Server |
+| [powerdns_recursor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/powerdns_recursor)   |       PowerDNS Recursor       |
+| [proxysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/proxysql)                     |           ProxySQL            |
+| [pulsar](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/pulsar)                         |         Apache Pulsar         |
+| [puppet](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/puppet)                         |            Puppet             |
+| [rabbitmq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rabbitmq)                     |           RabbitMQ            |
+| [redis](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/redis)                           |             Redis             |
+| [rethinkdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rethinkdb)                   |           RethinkDB           |
+| [riakkv](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/riakkv)                         |            Riak KV            |
+| [rspamd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rspamd)                         |            Rspamd             |
+| [samba](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/samba)                           |             Samba             |
+| [scaleio](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/scaleio)                       |       Dell EMC ScaleIO        |
+| [sensors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/sensors)                       |       Hardware Sensors        |
+| [SNMP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp)                             |             SNMP              |
+| [squid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/squid)                           |             Squid             |
+| [squidlog](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/squidlog)                     |             Squid             |
+| [smartctl](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/smartctl)                     |   S.M.A.R.T Storage Devices   |
+| [spigotmc](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/spigotmc)                     |           SpigotMC            |
+| [storcli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/storcli)                       |    Broadcom Hardware RAID     |
+| [supervisord](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/supervisord)               |          Supervisor           |
+| [systemdunits](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/systemdunits)             |      Systemd unit state       |
+| [tengine](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/tengine)                       |            Tengine            |
+| [tomcat](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/tomcat)                         |            Tomcat             |
+| [tor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/tor)                               |              Tor              |
+| [traefik](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/traefik)                       |            Traefik            |
+| [typesense](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/typesense)                   |           Typesense           |
+| [unbound](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/unbound)                       |            Unbound            |
+| [upsd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/upsd)                             |          UPSd (Nut)           |
+| [uwsgi](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/uwsgi)                           |             uWSGI             |
+| [varnish](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/varnish)                       |            Varnish            |
+| [vcsa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/vcsa)                             |   vCenter Server Appliance    |
+| [vernemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/vernemq)                       |            VerneMQ            |
+| [vsphere](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/vsphere)                       |     VMware vCenter Server     |
+| [w1sensor](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/w1sensor)                     |        1-Wire Sensors         |
+| [web_log](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/weblog)                        |         Apache/NGINX          |
+| [wireguard](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/wireguard)                   |           WireGuard           |
+| [whoisquery](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/whoisquery)                 |         Domain Expiry         |
+| [windows](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/windows)                       |            Windows            |
+| [x509check](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/x509check)                   |     Digital Certificates      |
+| [zfspool](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/zfspool)                       |           ZFS Pools           |
+| [zookeeper](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/zookeeper)                   |           ZooKeeper           |
 
 </details>
 

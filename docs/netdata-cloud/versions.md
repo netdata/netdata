@@ -1,19 +1,22 @@
 # Netdata Cloud Versions
 
-Netdata Cloud is provided in two versions:
+Netdata Cloud is available in two versions:
 
-- **SaaS**, we run and maintain Netdata Cloud and users use it to complement their observability with the additional features it provides.
+| Version                | Description                                                                                                                                                                                                                     |
+|:-----------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Cloud Service**      | The fully-managed service hosted at [app.netdata.cloud](https://app.netdata.cloud). [Connect](/src/claim/README.md) your Agents to access comprehensive infrastructure monitoring, real-time dashboards, and advanced features. |
+| **Enterprise On-Prem** | A self-hosted version of Netdata Cloud for businesses requiring complete control over their monitoring infrastructure. Includes all features of our Cloud offering, deployed within your own environment.                       |
 
-- **On Prem**, we provide a licensed copy of the Netdata Cloud software, that users can install and run at their premises.
+Visit our [Pricing](https://www.netdata.cloud/pricing/) page to compare features and options.
 
-The pricing of both versions is similar, with the On-Prem version introducing a monthly fixed-fee for the extra support and packaging required when users are running Netdata Cloud by themselves.
+## Using Netdata Cloud Service
 
-For more information check our [Pricing](https://www.netdata.cloud/pricing/) page.
+1. [Create an account](https://app.netdata.cloud) on Netdata Cloud.
+2. Follow the provided setup instructions to install and connect Agents to your Space automatically
 
-## SaaS Version
+## Installing On-Prem
 
-[Sign-up to Netdata Cloud](https://app.netdata.cloud) and start connecting your Netdata Agents. The commands provided once you have signed up, include all the information to install and automatically connect (claim) Netdata Agents to your Netdata Cloud space.
+To learn more about installing Netdata Cloud in your own infrastructure:
 
-## On-Prem Version
-
-To deploy Netdata Cloud On-premises, take a look at the [related section](/docs/netdata-cloud/netdata-cloud-on-prem/README.md) on our Documentation.
+1. Review the [Architecture Diagram](/docs/netdata-cloud/netdata-cloud-on-prem/README.md) to understand the system components.
+2. Follow the [Deployment Guide](/docs/netdata-cloud/netdata-cloud-on-prem/installation.md) for detailed installation instructions

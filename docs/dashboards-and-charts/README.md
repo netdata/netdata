@@ -7,7 +7,7 @@ When you access the Netdata dashboard through the Cloud, you'll always have the 
 By default, the Agent dashboard shows the latest version (matching Netdata Cloud). However, there are a few exceptions:
 
 - Without internet access, the Agent can't download the newest dashboards. In this case, it will automatically use the bundled version.
-- Users have defined, e.g. through URL bookmark, that they want to see the previous version of the dashboard (accessible `http://NODE:19999/v1`, replacing `NODE` with the IP address or hostname of your Agent).
+- Users have defined, e.g., through URL bookmark that they want to see the previous version of the dashboard (accessible `http://NODE:19999/v1`, replacing `NODE` with the IP address or hostname of your Agent).
 
 ## Main sections
 
@@ -25,7 +25,7 @@ The Netdata dashboard consists of the following main sections:
 
 > **Note**
 >
-> Some sections of the dashboard, when accessed through the Agent, may require the user to be signed in to Netdata Cloud or have the Agent claimed to Netdata Cloud for their full functionality. Examples include saving visualization settings on charts or custom dashboards, claiming the node to Netdata Cloud, or executing functions on an Agent.
+> Some dashboard sections may require the user to be signed in and have the Agent connected to Netdata Cloud for their full functionality when accessed through the Agent. Examples include saving visualization settings on charts or custom dashboards, connecting a node to Netdata Cloud, or executing functions on an Agent.
 
 ## How to access the dashboards?
 
@@ -37,4 +37,4 @@ You can access the dashboard at <https://app.netdata.cloud/> and [sign-in with a
 
 To view your Netdata dashboard, open a web browser and enter the address `http://NODE:19999`  - replace `NODE` with your Agent's IP address or hostname. If the Agent is on the same machine, use `http://localhost:19999`.
 
-Documentation for previous Agent dashboard can still be found [here](/src/web/gui/README.md).
+Documentation for the previous Agent dashboard can still be found [here](/src/web/gui/README.md).

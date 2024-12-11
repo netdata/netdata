@@ -446,8 +446,25 @@ void *reallocz(void *ptr, size_t size) {
 void posix_memfree(void *ptr) {
     free(ptr);
 }
-
 #endif
+
+void mallocz_release_as_much_memory_to_the_system(void) {
+#if defined(HAVE_C_MALLOPT) || defined(HAVE_C_MALLOC_TRIM)
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
+    spinlock_lock(&spinlock);
+
+#ifdef HAVE_C_MALLOPT
+    size_t trim_threshold = aral_optimal_malloc_page_size();
+    mallopt(M_TRIM_THRESHOLD, (int)trim_threshold);
+#endif
+
+#ifdef HAVE_C_MALLOC_TRIM
+    malloc_trim(0);
+#endif
+
+    spinlock_unlock(&spinlock);
+#endif
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -782,7 +799,7 @@ BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_l
             buffer[max_line_length] = '\0';
             buffer_strcat(wb, buffer);
         }
-        spawn_popen_kill(pi);
+        spawn_popen_kill(pi, 0);
     }
     else {
         buffer_free(wb);
@@ -801,7 +818,7 @@ bool run_command_and_copy_output_to_stdout(const char *command, int max_line_len
         while (fgets(buffer, max_line_length, spawn_popen_stdout(pi)))
             fprintf(stdout, "%s", buffer);
 
-        spawn_popen_kill(pi);
+        spawn_popen_kill(pi, 0);
     }
     else {
         netdata_log_error("Failed to execute command '%s'.", command);
@@ -847,6 +864,28 @@ struct timing_steps {
         [TIMING_STEP_END2_RRDSET] = { .name = "END2 rrdset", .time = 0, },
         [TIMING_STEP_END2_PROPAGATE] = { .name = "END2 propagate", .time = 0, },
         [TIMING_STEP_END2_STORE] = { .name = "END2 store", .time = 0, },
+
+        [TIMING_STEP_DBENGINE_EVICT_LOCK]                       = { .name = "EVC_LOCK", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_SELECT]                     = { .name = "EVC_SELECT", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_SELECT_PAGE ]               = { .name = "EVT_SELECT_PAGE", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_RELOCATE_PAGE ]             = { .name = "EVT_RELOCATE_PAGE", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_SORT]                       = { .name = "EVC_SORT", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_DEINDEX]                    = { .name = "EVC_DEINDEX", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_DEINDEX_PAGE]               = { .name = "EVC_DEINDEX_PAGE", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FINISHED]                   = { .name = "EVC_FINISHED", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_LOOP]                  = { .name = "EVC_FREE_LOOP", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_PAGE]                  = { .name = "EVC_FREE_PAGE", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_ATOMICS]               = { .name = "EVC_FREE_ATOMICS", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_CB]                    = { .name = "EVC_FREE_CB", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_ATOMICS2]              = { .name = "EVC_FREE_ATOMICS2", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_ARAL]                  = { .name = "EVC_FREE_ARAL", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_DATA]         = { .name = "EVC_FREE_PGD_DATA", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_ARAL]         = { .name = "EVC_FREE_PGD_ARAL", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_TIER1_ARAL]   = { .name = "EVC_FREE_MAIN_T1ARL", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GLIVE]        = { .name = "EVC_FREE_MAIN_GLIVE", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_GWORKER]      = { .name = "EVC_FREE_MAIN_GWORK", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_OPEN]                  = { .name = "EVC_FREE_OPEN", .time = 0, },
+        [TIMING_STEP_DBENGINE_EVICT_FREE_EXTENT]                = { .name = "EVC_FREE_EXTENT", .time = 0, },
 
         // terminator
         [TIMING_STEP_MAX] = { .name = NULL, .time = 0, },

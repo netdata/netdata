@@ -80,3 +80,13 @@ bool stream_conf_has_uuid_section(struct config *root) {
 
     return is_parent;
 }
+
+void appconfig_foreach_section(struct config *root, void (*cb)(struct config *root, const char *name, void *data), void *data) {
+    struct config_section *sect = NULL;
+
+    APPCONFIG_LOCK(root);
+    for (sect = root->sections; sect; sect = sect->next) {
+        cb(root, string2str(sect->name), data);
+    }
+    APPCONFIG_UNLOCK(root);
+}

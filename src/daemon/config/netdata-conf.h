@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#ifndef NETDATA_DAEMON_NETDATA_CONF_H
+#define NETDATA_DAEMON_NETDATA_CONF_H
+
+#include "libnetdata/libnetdata.h"
+
+bool netdata_conf_load(char *filename, char overwrite_used, const char **user);
+
+#include "netdata-conf-backwards-compatibility.h"
+#include "netdata-conf-db.h"
+#include "netdata-conf-directories.h"
+#include "netdata-conf-global.h"
+#include "netdata-conf-logs.h"
+#include "netdata-conf-web.h"
+
+#include "daemon/common.h"
+
+#endif //NETDATA_DAEMON_NETDATA_CONF_H

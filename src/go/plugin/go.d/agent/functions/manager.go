@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -55,6 +54,8 @@ func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
 }
 
 func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
+	parser := newInputParser()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -63,29 +64,15 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 			if !ok {
 				return
 			}
-
-			var fn *Function
-			var err error
-
-			// FIXME:  if we are waiting for FUNCTION_PAYLOAD_END and a new FUNCTION* appears,
-			// we need to discard the current one and switch to the new one
-			switch {
-			case strings.HasPrefix(line, "FUNCTION "):
-				fn, err = parseFunction(line)
-			case strings.HasPrefix(line, "FUNCTION_PAYLOAD "):
-				fn, err = parseFunctionWithPayload(ctx, line, m.input)
-			case line == "":
-				continue
-			case line == "QUIT":
+			if line == "QUIT" {
 				if quitCh != nil {
 					quitCh <- struct{}{}
 					return
 				}
-			default:
-				m.Warningf("unexpected line: '%s'", line)
 				continue
 			}
 
+			fn, err := parser.parse(line)
 			if err != nil {
 				m.Warningf("parse function: %v ('%s')", err, line)
 				continue
@@ -127,6 +114,12 @@ func (m *Manager) respf(fn *Function, code int, msgf string, a ...any) {
 		Status:  code,
 		Message: fmt.Sprintf(msgf, a...),
 	})
-	ts := strconv.FormatInt(time.Now().Unix(), 10)
-	m.api.FUNCRESULT(fn.UID, "application/json", string(bs), strconv.Itoa(code), ts)
+
+	m.api.FUNCRESULT(netdataapi.FunctionResult{
+		UID:             fn.UID,
+		ContentType:     "application/json",
+		Payload:         string(bs),
+		Code:            strconv.Itoa(code),
+		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
+	})
 }

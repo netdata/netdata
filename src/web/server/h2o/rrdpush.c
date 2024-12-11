@@ -301,7 +301,7 @@ void stream_process(h2o_stream_conn_t *conn, int initial)
             w.client_ip[cpy_len - 1] = 0;
             w.user_agent = conn->user_agent;
 
-            rc = rrdpush_receiver_thread_spawn(&w, conn->url, conn);
+            rc = stream_receiver_accept_connection(&w, conn->url, conn);
             if (rc != HTTP_RESP_OK) {
                 error_report("HTTPD Failed to spawn the receiver thread %d", rc);
                 conn->state = STREAM_CLOSE;

@@ -739,7 +739,7 @@ ARAL *ebpf_allocate_pid_aral(char *name, size_t size)
     }
 
     return aral_create(name, size,
-        0, max_elements,
+        0, 0,
         NULL, NULL, NULL, false, false);
 }
 
@@ -993,8 +993,8 @@ static inline void ebpf_create_apps_for_module(ebpf_module_t *em, struct ebpf_ta
  */
 static void ebpf_create_apps_charts(struct ebpf_target *root)
 {
-    if (unlikely(!ebpf_pids))
-        return;
+//    if (unlikely(!ebpf_pids))
+//        return;
 
     struct ebpf_target *w;
     int newly_added = 0;
@@ -2675,7 +2675,7 @@ static void ebpf_allocate_common_vectors()
 {
     ebpf_judy_pid.pid_table = ebpf_allocate_pid_aral(NETDATA_EBPF_PID_SOCKET_ARAL_TABLE_NAME,
                                                      sizeof(netdata_ebpf_judy_pid_stats_t));
-    ebpf_pids = callocz((size_t)pid_max, sizeof(ebpf_pid_data_t));
+//    ebpf_pids = callocz((size_t)pid_max, sizeof(ebpf_pid_data_t));
     ebpf_aral_init();
 }
 

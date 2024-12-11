@@ -116,7 +116,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
 
-    system_info->hops = str2i((const char *) argv[IDX_HOPS]);
+    system_info->hops = (int16_t)str2i((const char *) argv[IDX_HOPS]);
 
     sql_build_host_system_info((nd_uuid_t *)argv[IDX_HOST_ID], system_info);
 
@@ -133,22 +133,14 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         argv[IDX_UPDATE_EVERY] ? str2i(argv[IDX_UPDATE_EVERY]) : 1,
         argv[IDX_ENTRIES] ? str2i(argv[IDX_ENTRIES]) : 0,
         default_rrd_memory_mode,
-        0 // health
-        ,
-        0 // rrdpush enabled
-        ,
-        NULL //destination
-        ,
-        NULL // api key
-        ,
-        NULL // send charts matching
-        ,
-        false // rrdpush_enable_replication
-        ,
-        0 // rrdpush_seconds_to_replicate
-        ,
-        0 // rrdpush_replication_step
-        ,
+        0,              // health
+        0,              // rrdpush enabled
+        NULL,           // destination
+        NULL,           // api key
+        NULL,           // send charts matching
+        false,          // rrdpush_enable_replication
+        0,              // rrdpush_seconds_to_replicate
+        0,              // rrdpush_replication_step
         system_info,
         1);
 
@@ -157,10 +149,10 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
             rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
 
         if (is_ephemeral)
-            host->child_disconnected_time = now_realtime_sec();
+            host->stream.rcv.status.last_disconnected = now_realtime_sec();
 
         host->rrdlabels = sql_load_host_labels((nd_uuid_t *)argv[IDX_HOST_ID]);
-        host->last_connected = last_connected;
+        host->stream.snd.status.last_connected = last_connected;
     }
 
     (*number_of_chidren)++;
@@ -361,9 +353,9 @@ static void node_update_timer_cb(uv_timer_t *handle)
     struct aclk_sync_cfg_t *ahc = handle->data;
     RRDHOST *host = ahc->host;
 
-    spinlock_lock(&host->receiver_lock);
+    rrdhost_receiver_lock(host);
     int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
-    spinlock_unlock(&host->receiver_lock);
+    rrdhost_receiver_unlock(host);
     nd_log(NDLS_ACLK, NDLP_DEBUG,"Timer: Sending node update info for %s, LIVE = %d", rrdhost_hostname(host), live);
     aclk_host_state_update(host, live, 1);
 }
@@ -461,9 +453,9 @@ static void aclk_synchronization(void *arg)
                     }
 
                     // This is fallback if timer fails
-                    spinlock_lock(&host->receiver_lock);
+                    rrdhost_receiver_lock(host);
                     int live = (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
-                    spinlock_unlock(&host->receiver_lock);
+                    rrdhost_receiver_unlock(host);
                     aclk_host_state_update(host, live, 1);
                     nd_log(NDLS_ACLK, NDLP_DEBUG,"Sending node update info for %s, LIVE = %d", rrdhost_hostname(host), live);
                     break;

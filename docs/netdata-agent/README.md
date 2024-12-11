@@ -61,11 +61,11 @@ stateDiagram-v2
 8. **Score**: a scoring engine for comparing and correlating metrics.
 9. **Stream**: a mechanism to connect Netdata Agents and build Metrics Centralization Points (Netdata Parents).
 10. **Visualize**: Netdata's fully automated dashboards for all metrics.
-11. **Export**: export metric samples to 3rd party time-series databases, enabling the use of 3rd party tools for visualization, like Grafana.
+11. **Export**: export metric samples to third party time-series databases, enabling the use of third party tools for visualization, like Grafana.
 
 ## Comparison to other observability solutions
 
-1. **One moving part**: Other monitoring solution require maintaining metrics exporters, time-series databases, visualization engines. Netdata has everything integrated into one package, even when [Metrics Centralization Points](/docs/observability-centralization-points/metrics-centralization-points/README.md) are required, making deployment and maintenance a lot simpler.
+1. **One moving part**: Another monitoring solution requires maintaining metrics exporters, time-series databases, and visualization engines. Netdata has everything integrated into one package, even when [Metrics Centralization Points](/docs/observability-centralization-points/metrics-centralization-points/README.md) are required, making deployment and maintenance a lot simpler.
 
 2. **Automation**: Netdata is designed to automate most of the process of setting up and running an observability solution. It is designed to instantly provide comprehensive dashboards and fully automated alerts, with zero configuration.
 

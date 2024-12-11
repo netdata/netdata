@@ -16,7 +16,7 @@ struct pending_req_list {
 };
 
 static struct pending_req_list *pending_req_list_head = NULL;
-static SPINLOCK pending_req_list_lock = NETDATA_SPINLOCK_INITIALIZER;
+static SPINLOCK pending_req_list_lock = SPINLOCK_INITIALIZER;
 
 void aclk_config_get_query_scope(void) {
     const char *s = config_get(CONFIG_SECTION_CLOUD, "scope", "full");

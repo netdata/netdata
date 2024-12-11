@@ -27,12 +27,12 @@ static struct {
     } used;
 } query_target_base = {
         .available = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .spinlock = SPINLOCK_INITIALIZER,
                 .base = NULL,
                 .count = 0,
         },
         .used = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .spinlock = SPINLOCK_INITIALIZER,
                 .base = NULL,
                 .count = 0,
         },

@@ -7,32 +7,8 @@
 #error RRD_STORAGE_TIERS is not 5 - you need to update the grouping iterations per tier
 #endif
 
-static void rrdhost_streaming_sender_structures_init(RRDHOST *host);
-
-bool dbengine_enabled = false; // will become true if and when dbengine is initialized
-size_t storage_tiers = 3;
-bool use_direct_io = true;
-size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = {1, 60, 60, 60, 60};
-size_t storage_tiers_collection_per_sec[RRD_STORAGE_TIERS] = {1, 60, 3600, 8 * 3600, 24 * 3600};
-double storage_tiers_retention_days[RRD_STORAGE_TIERS] = {14, 90, 2 * 365, 2 * 365, 2 * 365};
-
-size_t get_tier_grouping(size_t tier) {
-    if(unlikely(tier >= storage_tiers)) tier = storage_tiers - 1;
-
-    size_t grouping = 1;
-    // first tier is always 1 iteration of whatever update every the chart has
-    for(size_t i = 1; i <= tier ;i++)
-        grouping *= storage_tiers_grouping_iterations[i];
-
-    return grouping;
-}
-
 RRDHOST *localhost = NULL;
 netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
-
-time_t rrdset_free_obsolete_time_s = 3600;
-time_t rrdhost_free_orphan_time_s = 3600;
-time_t rrdhost_free_ephemeral_time_s = 86400;
 
 RRDHOST *find_host_by_node_id(char *node_id) {
 
@@ -133,7 +109,8 @@ inline RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
     if(unlikely(!strcmp(hostname, "localhost")))
         return localhost;
 
-    return dictionary_get(rrdhost_root_index_hostname, hostname);
+    RRDHOST *host = dictionary_get(rrdhost_root_index_hostname, hostname);
+    return host;
 }
 
 static inline void rrdhost_index_del_hostname(RRDHOST *host) {
@@ -231,34 +208,6 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
-static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
-                                              unsigned int rrdpush_enabled,
-                                              const char *rrdpush_destination,
-                                              const char *rrdpush_api_key,
-                                              const char *rrdpush_send_charts_matching
-) {
-    if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED)) return;
-
-    if(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) {
-        rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
-
-        rrdhost_streaming_sender_structures_init(host);
-
-        host->sender->ssl = NETDATA_SSL_UNSET_CONNECTION;
-
-        host->rrdpush.send.destination = strdupz(rrdpush_destination);
-        rrdpush_destinations_init(host);
-
-        host->rrdpush.send.api_key = strdupz(rrdpush_api_key);
-        host->rrdpush.send.charts_matching = simple_pattern_create(rrdpush_send_charts_matching, NULL,
-                                                                   SIMPLE_PATTERN_EXACT, true);
-
-        rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
-    }
-    else
-        rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
-}
-
 #ifdef ENABLE_DBENGINE
 //
 //  true on success
@@ -326,6 +275,24 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
 }
 #endif
 
+static void rrdhost_set_replication_parameters(RRDHOST *host, RRD_MEMORY_MODE memory_mode, time_t period, time_t step) {
+    host->stream.replication.period = period;
+    host->stream.replication.step = step;
+    host->stream.rcv.status.replication.percent = 100.0;
+
+    switch(memory_mode) {
+        default:
+        case RRD_MEMORY_MODE_ALLOC:
+        case RRD_MEMORY_MODE_RAM:
+            if(host->stream.replication.period > (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every)
+                host->stream.replication.period = (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every;
+            break;
+
+        case RRD_MEMORY_MODE_DBENGINE:
+            break;
+    }
+}
+
 static RRDHOST *rrdhost_create(
         const char *hostname,
         const char *registry_hostname,
@@ -339,14 +306,14 @@ static RRDHOST *rrdhost_create(
         int update_every,
         long entries,
         RRD_MEMORY_MODE memory_mode,
-        unsigned int health_enabled,
-        unsigned int rrdpush_enabled,
-        const char *rrdpush_destination,
-        const char *rrdpush_api_key,
-        const char *rrdpush_send_charts_matching,
-        bool rrdpush_enable_replication,
-        time_t rrdpush_seconds_to_replicate,
-        time_t rrdpush_replication_step,
+        bool health,
+        bool stream,
+        STRING *parents,
+        STRING *api_key,
+        STRING *send_charts_matching,
+        bool replication,
+        time_t replication_period,
+        time_t replication_step,
         struct rrdhost_system_info *system_info,
         int is_localhost,
         bool archived
@@ -363,6 +330,8 @@ static RRDHOST *rrdhost_create(
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
     strncpyz(host->machine_guid, guid, GUID_LEN + 1);
+    rrdhost_stream_path_init(host);
+    rrdhost_stream_parents_init(host);
 
     set_host_properties(
         host,
@@ -379,38 +348,23 @@ static RRDHOST *rrdhost_create(
     rrdhost_init_hostname(host, hostname, false);
 
     host->rrd_history_entries        = align_entries_to_pagesize(memory_mode, entries);
-    host->health.health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
+    host->health.enabled = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health;
 
     spinlock_init(&host->receiver_lock);
 
     if (likely(!archived)) {
         rrd_functions_host_init(host);
-        host->last_connected = now_realtime_sec();
+        host->stream.snd.status.last_connected = now_realtime_sec();
         host->rrdlabels = rrdlabels_create();
-        rrdhost_initialize_rrdpush_sender(
-            host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
+        stream_sender_structures_init(host, stream, parents, api_key, send_charts_matching);
     }
 
-    if(rrdpush_enable_replication)
+    if(replication)
         rrdhost_option_set(host, RRDHOST_OPTION_REPLICATION);
     else
         rrdhost_option_clear(host, RRDHOST_OPTION_REPLICATION);
 
-    host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
-    host->rrdpush_replication_step = rrdpush_replication_step;
-    host->rrdpush_receiver_replication_percent = 100.0;
-
-    switch(memory_mode) {
-        default:
-        case RRD_MEMORY_MODE_ALLOC:
-        case RRD_MEMORY_MODE_RAM:
-            if(host->rrdpush_seconds_to_replicate > (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every)
-                host->rrdpush_seconds_to_replicate = (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every;
-            break;
-
-        case RRD_MEMORY_MODE_DBENGINE:
-            break;
-    }
+    rrdhost_set_replication_parameters(host, memory_mode, replication_period, replication_step);
 
     host->system_info = system_info;
 
@@ -531,13 +485,14 @@ static RRDHOST *rrdhost_create(
          , host->rrd_update_every
          , rrd_memory_mode_name(host->rrd_memory_mode)
          , host->rrd_history_entries
-         , rrdhost_has_rrdpush_sender_enabled(host)?"enabled":"disabled"
-         , host->rrdpush.send.destination?host->rrdpush.send.destination:""
-         , host->rrdpush.send.api_key?host->rrdpush.send.api_key:""
-         , host->health.health_enabled?"enabled":"disabled"
+         ,
+        rrdhost_has_stream_sender_enabled(host)?"enabled":"disabled"
+         , string2str(host->stream.snd.destination)
+         , string2str(host->stream.snd.api_key)
+         , host->health.enabled ?"enabled":"disabled"
          , host->cache_dir
-         , string2str(host->health.health_default_exec)
-         , string2str(host->health.health_default_recipient)
+         , string2str(host->health.default_exec)
+         , string2str(host->health.default_recipient)
     );
 
     if(!archived) {
@@ -564,14 +519,14 @@ static void rrdhost_update(RRDHOST *host
                            , int update_every
                            , long history
                            , RRD_MEMORY_MODE mode
-                           , unsigned int health_enabled
-                           , unsigned int rrdpush_enabled
-                           , const char *rrdpush_destination
-                           , const char *rrdpush_api_key
-                           , const char *rrdpush_send_charts_matching
-                           , bool rrdpush_enable_replication
-                           , time_t rrdpush_seconds_to_replicate
-                           , time_t rrdpush_replication_step
+                           , bool health
+                           , bool stream
+                           , STRING *parents
+                           , STRING *api_key
+                           , STRING *send_charts_matching
+                           , bool replication
+                           , time_t replication_period
+                           , time_t replication_step
                            , struct rrdhost_system_info *system_info
 )
 {
@@ -579,7 +534,7 @@ static void rrdhost_update(RRDHOST *host
 
     spinlock_lock(&host->rrdhost_update_lock);
 
-    host->health.health_enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health_enabled;
+    host->health.enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health;
 
     {
         struct rrdhost_system_info *old = host->system_info;
@@ -651,7 +606,7 @@ static void rrdhost_update(RRDHOST *host
     if(!host->rrdvars)
         host->rrdvars = rrdvariables_create();
 
-    host->last_connected = now_realtime_sec();
+    host->stream.snd.status.last_connected = now_realtime_sec();
 
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
@@ -664,21 +619,16 @@ static void rrdhost_update(RRDHOST *host
         if (!host->rrdset_root_index)
             rrdset_index_init(host);
 
-        rrdhost_initialize_rrdpush_sender(host,
-                                   rrdpush_enabled,
-                                   rrdpush_destination,
-                                   rrdpush_api_key,
-                                   rrdpush_send_charts_matching);
+        stream_sender_structures_init(host, stream, parents, api_key, send_charts_matching);
 
         rrdcalc_rrdhost_index_init(host);
 
-        if(rrdpush_enable_replication)
+        if(replication)
             rrdhost_option_set(host, RRDHOST_OPTION_REPLICATION);
         else
             rrdhost_option_clear(host, RRDHOST_OPTION_REPLICATION);
 
-        host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
-        host->rrdpush_replication_step = rrdpush_replication_step;
+        rrdhost_set_replication_parameters(host, host->rrd_memory_mode, replication_period, replication_step);
 
         ml_host_new(host);
 
@@ -704,14 +654,14 @@ RRDHOST *rrdhost_find_or_create(
     , int update_every
     , long history
     , RRD_MEMORY_MODE mode
-    , unsigned int health_enabled
-    , unsigned int rrdpush_enabled
-    , const char *rrdpush_destination
-    , const char *rrdpush_api_key
-    , const char *rrdpush_send_charts_matching
-    , bool rrdpush_enable_replication
-    , time_t rrdpush_seconds_to_replicate
-    , time_t rrdpush_replication_step
+    , bool health
+    , bool stream
+    , STRING *parents
+    , STRING *api_key
+    , STRING *send_charts_matching
+    , bool replication
+    , time_t replication_period
+    , time_t replication_step
     , struct rrdhost_system_info *system_info
     , bool archived
 ) {
@@ -748,14 +698,14 @@ RRDHOST *rrdhost_find_or_create(
                 , update_every
                 , history
                 , mode
-                , health_enabled
-                , rrdpush_enabled
-                , rrdpush_destination
-                , rrdpush_api_key
-                , rrdpush_send_charts_matching
-                , rrdpush_enable_replication
-                , rrdpush_seconds_to_replicate
-                , rrdpush_replication_step
+                , health
+                , stream
+                , parents
+                , api_key
+                , send_charts_matching
+                , replication
+                , replication_period
+                , replication_step
                 , system_info
                 , 0
                 , archived
@@ -763,28 +713,29 @@ RRDHOST *rrdhost_find_or_create(
     }
     else {
         if (likely(!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
-            rrdhost_update(host
-               , hostname
-               , registry_hostname
-               , guid
-               , os
-               , timezone
-               , abbrev_timezone
-               , utc_offset
-               , prog_name
-               , prog_version
-               , update_every
-               , history
-               , mode
-               , health_enabled
-               , rrdpush_enabled
-               , rrdpush_destination
-               , rrdpush_api_key
-               , rrdpush_send_charts_matching
-               , rrdpush_enable_replication
-               , rrdpush_seconds_to_replicate
-               , rrdpush_replication_step
-               , system_info);
+            rrdhost_update(
+                host
+                , hostname
+                , registry_hostname
+                , guid
+                , os
+                , timezone
+                , abbrev_timezone
+                , utc_offset
+                , prog_name
+                , prog_version
+                , update_every
+                , history
+                , mode
+                , health
+                , stream
+                , parents
+                , api_key
+                , send_charts_matching
+                , replication
+                , replication_period
+                , replication_step
+                , system_info);
     }
 
     return host;
@@ -798,230 +749,11 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
        && !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)
        && !host->receiver
-       && host->child_disconnected_time
-       && host->child_disconnected_time + rrdhost_free_orphan_time_s < now_s)
+       && host->stream.rcv.status.last_disconnected
+       && host->stream.rcv.status.last_disconnected + rrdhost_free_orphan_time_s < now_s)
         return 1;
 
     return 0;
-}
-
-// ----------------------------------------------------------------------------
-// RRDHOST global / startup initialization
-
-#ifdef ENABLE_DBENGINE
-struct dbengine_initialization {
-    ND_THREAD *thread;
-    char path[FILENAME_MAX + 1];
-    int disk_space_mb;
-    size_t retention_seconds;
-    size_t tier;
-    int ret;
-};
-
-typedef struct rrd_alert_prototype {
-    struct rrd_alert_match match;
-    struct rrd_alert_config config;
-
-    struct {
-        uint32_t uses;
-        bool enabled;
-        bool is_on_disk;
-        SPINLOCK spinlock;
-        struct rrd_alert_prototype *prev, *next;
-    } _internal;
-} RRD_ALERT_PROTOTYPE;
-
-void *dbengine_tier_init(void *ptr) {
-    struct dbengine_initialization *dbi = ptr;
-    dbi->ret = rrdeng_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier, dbi->retention_seconds);
-    return ptr;
-}
-
-RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
-{
-    const char *bf = config_get(
-        CONFIG_SECTION_DB,
-        "dbengine tier backfill",
-        backfill == RRD_BACKFILL_NEW  ? "new" :
-        backfill == RRD_BACKFILL_FULL ? "full" :
-                                        "none");
-
-    if (strcmp(bf, "new") == 0)
-        backfill = RRD_BACKFILL_NEW;
-    else if (strcmp(bf, "full") == 0)
-        backfill = RRD_BACKFILL_FULL;
-    else if (strcmp(bf, "none") == 0)
-        backfill = RRD_BACKFILL_NONE;
-    else {
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
-        config_set(CONFIG_SECTION_DB, "dbengine tier backfill", "new");
-        backfill = RRD_BACKFILL_NEW;
-    }
-    return backfill;
-}
-
-#endif
-
-static void dbengine_init(const char *hostname) {
-#ifdef ENABLE_DBENGINE
-
-    use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", use_direct_io);
-
-    unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", DEFAULT_PAGES_PER_EXTENT);
-    if (read_num > 0 && read_num <= DEFAULT_PAGES_PER_EXTENT)
-        rrdeng_pages_per_extent = read_num;
-    else {
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "Invalid dbengine pages per extent %u given. Using %u.",
-               read_num, rrdeng_pages_per_extent);
-
-        config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
-    }
-
-    storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
-    if(storage_tiers < 1) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "At least 1 storage tier is required. Assuming 1.");
-
-        storage_tiers = 1;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
-    }
-    if(storage_tiers > RRD_STORAGE_TIERS) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "Up to %d storage tier are supported. Assuming %d.",
-               RRD_STORAGE_TIERS, RRD_STORAGE_TIERS);
-
-        storage_tiers = RRD_STORAGE_TIERS;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
-    }
-
-    new_dbengine_defaults =
-        (!legacy_multihost_db_space &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 update every iterations") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 retention size") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 retention size") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 retention size") &&
-         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 retention size"));
-
-    default_backfill = get_dbengine_backfill(RRD_BACKFILL_NEW);
-    char dbengineconfig[200 + 1];
-
-    size_t grouping_iterations = default_rrd_update_every;
-    storage_tiers_grouping_iterations[0] = default_rrd_update_every;
-
-    for (size_t tier = 1; tier < storage_tiers; tier++) {
-        grouping_iterations = storage_tiers_grouping_iterations[tier];
-        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu update every iterations", tier);
-        grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-        if(grouping_iterations < 2) {
-            grouping_iterations = 2;
-            config_set_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "DBENGINE on '%s': 'dbegnine tier %zu update every iterations' cannot be less than 2. Assuming 2.",
-                   hostname, tier);
-        }
-        storage_tiers_grouping_iterations[tier] = grouping_iterations;
-    }
-
-    default_multidb_disk_quota_mb = (int) config_get_size_mb(CONFIG_SECTION_DB, "dbengine tier 0 retention size", RRDENG_DEFAULT_TIER_DISK_SPACE_MB);
-    if(default_multidb_disk_quota_mb && default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        netdata_log_error("Invalid disk space %d for tier 0 given. Defaulting to %d.", default_multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
-        default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-        config_set_size_mb(CONFIG_SECTION_DB, "dbengine tier 0 retention size", default_multidb_disk_quota_mb);
-    }
-
-#ifdef OS_WINDOWS
-    // FIXME: for whatever reason joining the initialization threads
-    // fails on Windows.
-    bool parallel_initialization = false;
-#else
-    bool parallel_initialization = (storage_tiers <= (size_t)get_netdata_cpus()) ? true : false;
-#endif
-
-    struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
-
-    size_t created_tiers = 0;
-    char dbenginepath[FILENAME_MAX + 1];
-
-    for (size_t tier = 0; tier < storage_tiers; tier++) {
-
-        if (tier == 0)
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
-        else
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
-
-        int ret = mkdir(dbenginepath, 0775);
-        if (ret != 0 && errno != EEXIST) {
-            nd_log(NDLS_DAEMON, NDLP_CRIT, "DBENGINE on '%s': cannot create directory '%s'", hostname, dbenginepath);
-            continue;
-        }
-
-        int disk_space_mb = tier ? RRDENG_DEFAULT_TIER_DISK_SPACE_MB : default_multidb_disk_quota_mb;
-        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention size", tier);
-        disk_space_mb = config_get_size_mb(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
-
-        snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention time", tier);
-        storage_tiers_retention_days[tier] = config_get_duration_days(
-            CONFIG_SECTION_DB, dbengineconfig, new_dbengine_defaults ? storage_tiers_retention_days[tier] : 0);
-
-        tiers_init[tier].disk_space_mb = (int) disk_space_mb;
-        tiers_init[tier].tier = tier;
-        tiers_init[tier].retention_seconds = (size_t) (86400.0 * storage_tiers_retention_days[tier]);
-        strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
-        tiers_init[tier].ret = 0;
-
-        if(parallel_initialization) {
-            char tag[NETDATA_THREAD_TAG_MAX + 1];
-            snprintfz(tag, NETDATA_THREAD_TAG_MAX, "DBENGINIT[%zu]", tier);
-            tiers_init[tier].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, dbengine_tier_init, &tiers_init[tier]);
-        }
-        else
-            dbengine_tier_init(&tiers_init[tier]);
-    }
-
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(parallel_initialization)
-            nd_thread_join(tiers_init[tier].thread);
-
-        if(tiers_init[tier].ret != 0) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "DBENGINE on '%s': Failed to initialize multi-host database tier %zu on path '%s'",
-                   hostname, tiers_init[tier].tier, tiers_init[tier].path);
-        }
-        else if(created_tiers == tier)
-            created_tiers++;
-    }
-
-    if(created_tiers && created_tiers < storage_tiers) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "DBENGINE on '%s': Managed to create %zu tiers instead of %zu. Continuing with %zu available.",
-               hostname, created_tiers, storage_tiers, created_tiers);
-
-        storage_tiers = created_tiers;
-    }
-    else if(!created_tiers)
-        fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, netdata_configured_cache_dir);
-
-    for(size_t tier = 0; tier < storage_tiers ;tier++)
-        rrdeng_readiness_wait(multidb_ctx[tier]);
-
-    calculate_tier_disk_space_percentage();
-
-    dbengine_enabled = true;
-#else
-    storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", 1);
-    if(storage_tiers != 1) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "DBENGINE is not available on '%s', so only 1 database tier can be supported.",
-               hostname);
-
-        storage_tiers = 1;
-        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
-    }
-    dbengine_enabled = false;
-#endif
 }
 
 void api_v1_management_init(void);
@@ -1053,7 +785,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "DBENGINE: Initializing ...");
 
-            dbengine_init(hostname);
+            netdata_conf_dbengine_init(hostname);
         }
         else
             storage_tiers = 1;
@@ -1094,14 +826,14 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
             , default_rrd_history_entries
             , default_rrd_memory_mode
             , health_plugin_enabled()
-            ,
-        stream_conf_send_enabled,
-        stream_conf_send_destination,
-        stream_conf_send_api_key,
-        stream_conf_send_charts_matching,
-        stream_conf_replication_enabled,
-        stream_conf_replication_period,
-        stream_conf_replication_step, system_info
+            , stream_send.enabled
+            , stream_send.parents.destination
+            , stream_send.api_key
+            , stream_send.send_charts_matching
+            , stream_receive.replication.enabled
+            , stream_receive.replication.period
+            , stream_receive.replication.step
+            , system_info
             , 1
             , 0
     );
@@ -1167,51 +899,6 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
     }
 }
 
-static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
-{
-    if (host->sender)
-        return;
-
-    host->sender = callocz(1, sizeof(*host->sender));
-    __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
-
-    host->sender->host = host;
-    host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024, &netdata_buffers_statistics.cbuffers_streaming);
-    host->sender->capabilities = stream_our_capabilities(host, true);
-
-    host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
-    host->sender->rrdpush_sender_pipe[PIPE_WRITE] = -1;
-    host->sender->rrdpush_sender_socket  = -1;
-    host->sender->disabled_capabilities = STREAM_CAP_NONE;
-
-    if(!stream_conf_compression_enabled)
-        host->sender->disabled_capabilities |= STREAM_CAP_COMPRESSIONS_AVAILABLE;
-
-    spinlock_init(&host->sender->spinlock);
-    replication_init_sender(host->sender);
-}
-
-static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
-{
-    rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
-
-    if (unlikely(!host->sender))
-        return;
-
-    rrdpush_sender_thread_stop(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true); // stop a possibly running thread
-    cbuffer_free(host->sender->buffer);
-
-    rrdpush_compressor_destroy(&host->sender->compressor);
-
-    replication_cleanup_sender(host->sender);
-
-    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
-
-    freez(host->sender);
-    host->sender = NULL;
-    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
-}
-
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     if(!host) return;
 
@@ -1243,10 +930,10 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     // ------------------------------------------------------------------------
     // clean up streaming
 
-    rrdhost_streaming_sender_structures_free(host);
+    stream_sender_structures_free(host);
 
     if (netdata_exit || force)
-        stop_streaming_receiver(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP);
+        stream_receiver_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP);
 
 
     // ------------------------------------------------------------------------
@@ -1285,13 +972,13 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     string_freez(host->program_version);
     rrdhost_system_info_free(host->system_info);
     freez(host->cache_dir);
-    freez(host->rrdpush.send.api_key);
-    freez(host->rrdpush.send.destination);
-    rrdpush_destinations_free(host);
-    string_freez(host->health.health_default_exec);
-    string_freez(host->health.health_default_recipient);
+    string_freez(host->stream.snd.api_key);
+    string_freez(host->stream.snd.destination);
+    rrdhost_stream_parents_free(host, false);
+    string_freez(host->health.default_exec);
+    string_freez(host->health.default_recipient);
     string_freez(host->registry_hostname);
-    simple_pattern_free(host->rrdpush.send.charts_matching);
+    simple_pattern_free(host->stream.snd.charts_matching);
 
     rrd_functions_host_destroy(host);
     rrdvariables_destroy(host->rrdvars);
@@ -1429,23 +1116,23 @@ static void rrdhost_load_auto_labels(void) {
     int has_unstable_connection = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "has unstable connection", CONFIG_BOOLEAN_NO);
     rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
 
-    rrdlabels_add(labels, "_is_parent", (localhost->connected_children_count > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_is_parent", (stream_receivers_currently_connected() > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
     rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_os", string2str(localhost->os), RRDLABEL_SRC_AUTO);
 
-    if (localhost->rrdpush.send.destination)
-        rrdlabels_add(labels, "_streams_to", localhost->rrdpush.send.destination, RRDLABEL_SRC_AUTO);
+    if (localhost->stream.snd.destination)
+        rrdlabels_add(labels, "_streams_to", string2str(localhost->stream.snd.destination), RRDLABEL_SRC_AUTO);
 }
 
 void rrdhost_set_is_parent_label(void) {
-    int count = __atomic_load_n(&localhost->connected_children_count, __ATOMIC_RELAXED);
+    uint32_t count = stream_receivers_currently_connected();
 
     if (count == 0 || count == 1) {
         RRDLABELS *labels = localhost->rrdlabels;
         rrdlabels_add(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
-        //queue a node info
+        // queue a node info
         aclk_queue_node_info(localhost, false);
     }
 }
@@ -1508,7 +1195,7 @@ void reload_host_labels(void) {
 
     rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
 
-    rrdpush_send_host_labels(localhost);
+    stream_send_host_labels(localhost);
 }
 
 void rrdhost_finalize_collection(RRDHOST *host) {

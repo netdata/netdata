@@ -18,6 +18,9 @@
   <br/>
   <a href="https://community.netdata.cloud"><img alt="Discourse topics" src="https://img.shields.io/discourse/topics?server=https%3A%2F%2Fcommunity.netdata.cloud%2F&logo=discourse&label=discourse%20forum"></a>
   <a href="https://github.com/netdata/netdata/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/github/discussions/netdata/netdata?logo=github&label=github%20discussions"></a>
+  <br/>
+  <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a>
+  <a href="https://scan.coverity.com/projects/netdata-netdata?tab=overview"><img alt="Coverity Scan" src="https://img.shields.io/coverity/scan/netdata"></a>
 </p>
 
 <p align="center"><b>Visit the <a href="https://www.netdata.cloud">Project's Home Page</a></b></p>
@@ -29,83 +32,72 @@ MENU: **[GETTING STARTED](#getting-started)** | **[HOW IT WORKS](#how-it-works)*
 > **Important** :bulb:<br/>
 > People get addicted to Netdata. Once you use it on your systems, **there's no going back!**<br/>
 
-**Netdata** is a high-performance, cloud-native, and on-premises observability platform designed to monitor metrics and logs with unparalleled efficiency. It delivers a simpler, faster, and significantly easier approach to real-time, low-latency monitoring for systems, containers, and applications. Netdata requires **zero-configuration** to get started, offering a powerful and comprehensive monitoring experience, out of the box.
+**Netdata: Real-time Observability, Simplified.**
 
-Netdata is also known for its **cost-efficient, distributed design**. Unlike traditional monitoring solutions that centralize data, **Netdata distributes the code**. Instead of funneling all data into a few central databases, Netdata processes data at the edge, keeping it close to the source. The smart open-source Netdata Agent acts as a distributed database, enabling the construction of complex observability pipelines with modular, Lego-like simplicity.
+[![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20FreeBSD%20%7C%20Windows-blue)]()
 
-Netdata provides **A.I. insights** for all monitored data, training machine learning models directly at the edge. This allows for fully automated and unsupervised anomaly detection, and with its intuitive APIs and UIs, users can quickly perform root cause analysis and troubleshoot issues, identifying correlations and gaining deeper insights into their infrastructure.
+Netdata is a high-performance observability platform designed to simplify modern infrastructure monitoring. With its innovative distributed architecture, Netdata delivers real-time insights into your systems, containers, and applications at a granular level.
+
+**:sparkles: Key Features**:
+
+- **Real-Time**: Per-second data collection provides immediate visibility into your infrastructure's behavior.
+- **Zero-Configuration**: Start monitoring in minutes with automatic detection and instant insights.
+- **ML-Powered Insights**: Automatic anomaly detection and pattern recognition, helping you identify issues before they become critical.
+- **Enterprise-Ready**: Scale from a single node to thousands while maintaining performance and ease of use.
+- **Complete Visibility**: From infrastructure to applications, logs to metrics, all in one solution.
+- **Edge-Based**: Process and store metrics at the edge for superior performance and cost efficiency.
+- **Advanced Visualization**: Rich, interactive dashboard for deep system insights and rapid troubleshooting.
+
+---
 
 ### The Netdata Ecosystem
 
-Netdata is built on three core parts:
+> **Note**: This repository contains the Netdata Agent, the open-source core of the Netdata ecosystem. For information about other components, see below.
 
-1. **Netdata Agent** (usually called just "Netdata"): This open-source component is the heart of the Netdata ecosystem, handling data collection, storage (embedded database), querying, machine learning, exporting, and alerting of observability data. All observability data and features a Netdata ecosystem offers, are managed by the Netdata Agent. It runs in physical and virtual servers, cloud environments, Kubernetes clusters, and edge/IoT devices and is carefully optimized to have _**zero impact**_ on production systems and applications.
+This three-part architecture enables Netdata to scale seamlessly from single-node deployments to complex multi-cloud environments with thousands of nodes, supporting long-term data retention without compromising performance.
 
-   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/Netdata%20Agent%20License-GPL%20v3%2B-blue.svg" alt="Netdata Agent License: GPL v3+"></a> <a href="https://bestpractices.coreinfrastructure.org/projects/2231"><img src="https://bestpractices.coreinfrastructure.org/projects/2231/badge" alt="CII Best Practices"></a> <a href="https://scan.coverity.com/projects/netdata-netdata?tab=overview"><img alt="Coverity Scan" src="https://img.shields.io/coverity/scan/netdata"></a>
+| Component     | Description                                                                                                                                                                                                                                                                                                                            | License                                         |
+|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
+| Netdata Agent | • The heart of Netdata's monitoring capabilities<br/>• Handles data collection, storage, querying, ML analysis, exports, and alerts<br/>• Runs on physical/virtual servers, cloud, Kubernetes, and IoT devices<br/>• Optimized for zero production impact<br/>• Core of all observability features                                     | [GPL v3+](https://www.gnu.org/licenses/gpl-3.0) |
+| Netdata Cloud | • Adds enterprise-grade features:<br/>  &emsp; - User management and RBAC<br/>  &emsp; - Horizontal scalability<br/>  &emsp; - Centralized alert management<br/> &emsp;  - Access your infrastructure from anywhere<br/>• Available as SaaS or on-premises<br/>• Includes free community tier<br/>• Does not centralize metric storage |                                                 |
+| Netdata UI    | • Powers all dashboards and visualizations<br/>• Free to use with both Agent and Cloud<br/>• Included in standard Netdata packages<br/>• Latest version available via CDN                                                                                                                                                              | [NCUL1](https://app.netdata.cloud/LICENSE.txt)  |
 
-2. **Netdata Cloud**: Enhancing the Netdata Agent, Netdata Cloud offers enterprise features such as user management, role-based access control, horizontal scalability, alert and notification management, access from anywhere, and more. Netdata Cloud does **not** centralize or store observability data.
+### Key capabilities of the Netdata Agent
 
-   _Netdata Cloud is a commercial product, available as an on-premises installation, or a SaaS solution, with a free community tier._
+With these capabilities, Netdata Agent provides a powerful, automated monitoring solution that works right out-of-the-box while remaining highly customizable for specific needs.
 
-3. **Netdata UI**: The user interface that powers all dashboards, data visualization, and configuration.
-
-   _While closed-source, it is free to use with both Netdata Agents and Netdata Cloud, via their public APIs. It is included in the binary packages offered by Netdata, and its latest version is publicly available via CDN._
-
-   <a href="https://app.netdata.cloud/LICENSE.txt"><img src="https://img.shields.io/badge/Netdata%20UI%20License%20-NCUL1-blue.svg" alt="Netdata UI License: NCUL1"></a>
-
-Netdata scales effortlessly from a single server to thousands, even in complex, multi-cloud or hybrid environments, with the ability to retain data for years.
-
-### Key characteristics of the Netdata Agent
-
-- :boom: **Collects data from 800+ integrations**<br/>
-  Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD, and logs. OpenTelemetry is on its way to be included (currently being developed)...
-
-- :muscle: **Real-Time, Low-Latency, High-Resolution**<br/>
-  All data are collected per second and are made available on the APIs for visualization, immediately after data collection (1-second latency, data collection to visualization).
-
-- :face_in_clouds: **AI across the board**<br/>
-  Trains multiple Machine-Learning (ML) models at the edge, for each metric collected and uses AI to detect anomalies based on the past behavior of each metric.
-
-- :scroll: **systemd-journald Logs**<br/>
-  Includes tools to efficiently convert plain text log (text, csv, logfmt, json) files to structured systemd-journald entries (`log2journal`, `systemd-cat-native`) and queries systemd-journal files directly enabling powerful logs visualization dashboards. The Netdata Agents eliminate the need to centralize logs and provide all the functions to work with logs directly at the edge.
-
-- :star: **Lego like, Observability Pipelines**<br/>
-  Netdata Agents can be linked to together (in parent-child relationships), to build observability centralization points within your infrastructure, allowing you to control data replication and retention at multiple levels.
-
-- :fire: **Fully Automated Powerful Visualization**<br/>
-  Using the NIDL (Nodes, Instances, Dimensions & Labels) data model, the Netdata Agent enables the creation of fully automated dashboards, providing correlated visualization of all metrics, allowing you to understand any dataset at first sight, but also to filter, slice and dice the data directly on the dashboards, without the need to learn a query language.
-
-  <small>Note: the Netdata UI is closed-source, but free to use with Netdata Agents and Netdata Cloud.</small>
-
-- :bell: **Out of box Alerts**<br/>
-  Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
-
-- :sunglasses: **Low Maintenance**<br/>
-  Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, zero-touch machine-learning, easy scalability and high availability, and CI/CD friendly.
-
-- :star: **Open and Extensible**<br/>
-  Netdata is a modular platform that can be extended in all possible ways, and it also integrates nicely with other monitoring solutions.
+| Capability                    | Description                                                                                                                                                                                                                     |
+|-------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Comprehensive Data Collection | • 800+ integrations out of the box<br/>• Collects metrics from systems, containers, VMs, hardware sensors<br/>• Supports OpenMetrics exporters, StatsD, and logs<br/>• OpenTelemetry support coming soon                        |
+| Performance & Precision       | • Per-second data collection<br/>• Real-time visualization with 1-second latency<br/>• High-resolution metrics for precise monitoring                                                                                           |
+| Edge-Based ML                 | • Trains ML models directly at the edge<br/>• Automatic anomaly detection per metric<br/>• Pattern recognition based on historical behavior                                                                                     |
+| Advanced Log Management       | • Direct systemd-journald and Windows Event Log integrations<br/>• Tools for log conversion (log2journal, systemd-cat-native)<br/>• Process logs at the edge - no centralization needed<br/>• Rich log visualization dashboards |
+| Observability Pipeline        | • Build Parent-Child relationships between Agents<br/>• Create flexible centralization points<br/>• Control data replication and retention at multiple levels                                                                   |
+| Automated Visualization       | • NIDL (Nodes, Instances, Dimensions & Labels) data model<br/>• Auto-generated, correlated dashboards<br/>• Filter and analyze data without query language<br/>• Free to use, powered by Netdata UI                             |
+| Smart Alerting                | • Hundreds of pre-configured alerts<br/>• Detect common issues automatically<br/>• Multiple notification methods<br/>• Proactive problem detection                                                                              |
+| Low Maintenance               | • Auto-detection of metrics<br/>• Zero-touch machine learning<br/>• Easy scalability<br/>• CI/CD friendly deployment                                                                                                            |
+| Open & Extensible             | • Modular architecture<br/>• Easy to extend and customize<br/>• Integrates with existing monitoring tools<br/>• Active community ecosystem                                                                                      |
 
 ### What can be monitored with the Netdata Agent
 
 Netdata monitors all the following:
 
-|                                                                                                   Component |              Linux               | FreeBSD | macOS |             Windows              |
-|------------------------------------------------------------------------------------------------------------:|:--------------------------------:|:-------:|:-----:|:--------------------------------:|
-|                             **System Resources**<small><br/>CPU, Memory and system shared resources</small> |               Full               |   Yes   |  Yes  |               Yes                |
-|                                **Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small> |               Full               |   Yes   |  Yes  |               Yes                |
-|                                 **Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small> |               Full               |   Yes   |  Yes  |               Yes                |
-|                        **Hardware & Sensors**<small><br/>Fans, Temperatures, Controllers, GPUs, etc</small> |               Full               |  Some   | Some  |              Some                |
-|                                       **O/S Services**<small><br/>Resources, Performance and Status</small> | Yes<small><br/>`systemd`</small> |    -    |   -   |                -                 |
-|                                      **Processes**<small><br/>Resources, Performance, OOM, and more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
+|                                                                                                   Component |              Linux               | FreeBSD | macOS |                                     Windows                                     |
+|------------------------------------------------------------------------------------------------------------:|:--------------------------------:|:-------:|:-----:|:-------------------------------------------------------------------------------:|
+|                             **System Resources**<small><br/>CPU, Memory and system shared resources</small> |               Full               |   Yes   |  Yes  |                                       Yes                                       |
+|                                **Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small> |               Full               |   Yes   |  Yes  |                                       Yes                                       |
+|                                 **Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small> |               Full               |   Yes   |  Yes  |                                       Yes                                       |
+|                        **Hardware & Sensors**<small><br/>Fans, Temperatures, Controllers, GPUs, etc</small> |               Full               |  Some   | Some  |                                      Some                                       |
+|                                       **O/S Services**<small><br/>Resources, Performance and Status</small> | Yes<small><br/>`systemd`</small> |    -    |   -   |                                        -                                        |
+|                                      **Processes**<small><br/>Resources, Performance, OOM, and more</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
 |                                                                             System and Application **Logs** | Yes<small><br/>`systemd`-journal |    -    |   -   | Yes<small><br/>`Windows Event Log`, and<br/>`Event Tracing for Windows`</small> |
-|                                 **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |               Yes                |    -    |   -   |                -                 |
-|                               **Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small> |               Yes                |    -    |   -   |                -                 |
-|                                 **VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small> | Yes<small><br/>`cgroups`</small> |    -    |   -   | Yes<small><br/>`Hyper-V`</small> |
-|                       **Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small> |               Yes                |   Yes   |  Yes  |               Yes                |
-| **Packaged Applications**<small><br/>nginx, apache, postgres, redis, mongodb,<br/>and hundreds more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
-|                              **Cloud Provider Infrastructure**<small><br/>AWS, GCP, Azure, and more</small> |               Yes                |   Yes   |  Yes  |               Yes                |
-|                       **Custom Applications**<small><br/>OpenMetrics, StatsD and soon OpenTelemetry</small> |               Yes                |   Yes   |  Yes  |               Yes                |
+|                                 **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |               Yes                |    -    |   -   |                                        -                                        |
+|                               **Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small> |               Yes                |    -    |   -   |                                        -                                        |
+|                                 **VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small> | Yes<small><br/>`cgroups`</small> |    -    |   -   |                        Yes<small><br/>`Hyper-V`</small>                         |
+|                       **Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
+| **Packaged Applications**<small><br/>nginx, apache, postgres, redis, mongodb,<br/>and hundreds more</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
+|                              **Cloud Provider Infrastructure**<small><br/>AWS, GCP, Azure, and more</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
+|                       **Custom Applications**<small><br/>OpenMetrics, StatsD and soon OpenTelemetry</small> |               Yes                |   Yes   |  Yes  |                                       Yes                                       |
 
 When the Netdata Agent runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies and offers full **enterprise hardware** coverage, monitoring all components that provide hardware error reporting, like PCI AER, RAM EDAC, IPMI, S.M.A.R.T., NVMe, Fans, Power, Voltages, and more.
 
@@ -163,7 +155,7 @@ On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% les
 <hr class="solid">
 
 <p align="center">
-  <b>Below is an animated image, but you can see Netdata live!</b><br/>
+  <b>You can see Netdata live!</b><br/>
 	<a href="https://frankfurt.netdata.rocks"><b>FRANKFURT</b></a> |
 	<a href="https://newyork.netdata.rocks"><b>NEWYORK</b></a> |
 	<a href="https://atlanta.netdata.rocks"><b>ATLANTA</b></a> |
@@ -172,13 +164,10 @@ On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% les
 	<a href="https://singapore.netdata.rocks"><b>SINGAPORE</b></a> |
 	<a href="https://bangalore.netdata.rocks"><b>BANGALORE</b></a>
   <br/>
-  	<i>They are clustered Netdata Agent Parents. They all have the same data. <b>Select the one closer to you.</b></i>
-	<br/>
-	<i>All these run with the default configuration. We only clustered them to have multi-node dashboards.</i>
-	<br/><small>Note: These demos include the Netdata UI,<br/>which while being closed-source, is free to use with Netdata Agents and Netdata Cloud.</small>
+  	<i>We've set up multiple demo clusters around the world, each running with the default configuration and showing real monitoring data.</i>
+  <br/>
+    <i>Choose the instance closest to you for the best experience.</i>
 </p>
-
-![Netdata Agent](https://github.com/netdata/netdata/assets/2662304/af4caa23-19be-46ef-9779-8fdad8d99d2a)
 
 <hr class="solid">
 
@@ -259,7 +248,7 @@ You can also use Netdata Parents to:
 
 ### 5. **Connect to Netdata Cloud** :cloud:
 
-[Sign-in](https://app.netdata.cloud/sign-in) to [Netdata Cloud](https://www.netdata.cloud/) and claim your Netdata Agents and Parents.
+[Sign-in](https://app.netdata.cloud/sign-in) to [Netdata Cloud](https://www.netdata.cloud/) and connect your Netdata Agents and Parents.
 If you connect your Netdata Parents, there is no need to connect your Netdata Agents. They will be connected via the Parents.
 
 When your Netdata nodes are connected to Netdata Cloud, you can (on top of the above):
@@ -635,7 +624,7 @@ These steps will disable the anonymous telemetry for your Netdata installation.
 
 Please note, even with telemetry disabled, Netdata still requires a [Netdata Registry](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry) for alert notifications' Call To Action (CTA) functionality. When you click an alert notification, it redirects you to the Netdata Registry, which then directs your web browser to the specific Netdata Agent that issued the alert for further troubleshooting. The Netdata Registry learns the URLs of your Agents when you visit their dashboards.
 
-Any Netdata Agent can act as a Netdata Registry. Designate one Netdata Agent as your registry, and our global Netdata Registry will no longer be in use. For further information on this, please refer to [this guide](https://learn.netdata.cloud/docs/configuring/securing-netdata-agents/registry).
+Any Netdata Agent can act as a Netdata Registry. Designate one Netdata Agent as your Registry, read more [here](https://learn.netdata.cloud/docs/netdata-agent/configuration/registry).
 
 &nbsp;<br/>&nbsp;<br/>
 </details>

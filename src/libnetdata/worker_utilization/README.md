@@ -80,6 +80,6 @@ busy or idle all the time or part of the time. Works well for both thousands of 
 per second and unlimited working time (being totally busy with a single request for
 ages).
 
-The statistics collector is called by the global statistics thread of netdata. So,
+The statistics collector is called by the telemetry thread of netdata. So,
 even if the workers are extremely busy with their jobs, netdata will be able to know
 how busy they are.

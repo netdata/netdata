@@ -80,7 +80,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
                 buffer_json_add_array_item_string(wb, NULL); // InAge
             }
             buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(s.ingest.reason)); // InReason
-            buffer_json_add_array_item_uint64(wb, s.ingest.hops); // InHops
+            buffer_json_add_array_item_int64(wb, s.ingest.hops); // InHops
             buffer_json_add_array_item_double(wb, s.ingest.replication.completion); // InReplCompletion
             buffer_json_add_array_item_uint64(wb, s.ingest.replication.instances); // InReplInstances
             buffer_json_add_array_item_string(wb, s.ingest.peers.local.ip); // InLocalIP
@@ -89,6 +89,10 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
             buffer_json_add_array_item_uint64(wb, s.ingest.peers.peer.port); // InRemotePort
             buffer_json_add_array_item_string(wb, s.ingest.ssl ? "SSL" : "PLAIN"); // InSSL
             stream_capabilities_to_json_array(wb, s.ingest.capabilities, NULL); // InCapabilities
+
+            buffer_json_add_array_item_uint64(wb, s.ingest.collected.metrics); // CollectedMetrics
+            buffer_json_add_array_item_uint64(wb, s.ingest.collected.instances); // CollectedInstances
+            buffer_json_add_array_item_uint64(wb, s.ingest.collected.contexts); // CollectedContexts
 
             // streaming
             if(s.stream.since) {
@@ -116,13 +120,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
             buffer_json_add_array_item_uint64(wb, s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
 
             buffer_json_add_array_item_array(wb); // OutAttemptHandshake
-            time_t last_attempt = 0;
-            for(struct rrdpush_destinations *d = host->destinations; d ; d = d->next) {
-                if(d->since > last_attempt)
-                    last_attempt = d->since;
-
-                buffer_json_add_array_item_string(wb, stream_handshake_error_to_string(d->reason));
-            }
+            usec_t last_attempt = stream_parent_handshake_error_to_json(wb, host);
             buffer_json_array_close(wb); // // OutAttemptHandshake
 
             if(!last_attempt) {
@@ -130,8 +128,8 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
                 buffer_json_add_array_item_string(wb, NULL); // OutAttemptAge
             }
             else {
-                buffer_json_add_array_item_uint64(wb, last_attempt * 1000); // OutAttemptSince
-                buffer_json_add_array_item_time_t(wb, s.now - last_attempt); // OutAttemptAge
+                buffer_json_add_array_item_uint64(wb, last_attempt / USEC_PER_MS); // OutAttemptSince
+                buffer_json_add_array_item_time_t(wb, s.now - (time_t)(last_attempt / USEC_PER_SEC)); // OutAttemptAge
             }
 
             // ML
@@ -315,6 +313,24 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "CollectedMetrics", "Time-series Metrics Currently Collected",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0, NULL, (double)max_db_metrics, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "CollectedInstances", "Instances Currently Collected",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0, NULL, (double)max_db_instances, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "CollectedContexts", "Contexts Currently Collected",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                                    0, NULL, (double)max_db_contexts, RRDF_FIELD_SORT_DESCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // --- streaming ---
 

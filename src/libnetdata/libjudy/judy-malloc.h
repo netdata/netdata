@@ -8,4 +8,7 @@
 size_t judy_aral_overhead(void);
 size_t judy_aral_structures(void);
 
+void JudyAllocThreadTelemetryReset(void);
+int64_t JudyAllocThreadTelemetryGetAndReset(void);
+
 #endif //NETDATA_JUDY_MALLOC_H
