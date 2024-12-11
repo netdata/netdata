@@ -87,10 +87,7 @@ static void backfill_request_free(bool successful, struct backfill_request *br) 
     freez(br);
 }
 
-void *backfill_thread(void *ptr) {
-    struct netdata_static_thread *static_thread = ptr;
-    if(!static_thread) return NULL;
-
+void *backfill_worker_thread(void *ptr) {
     completion_init(&backfill_globals.completion);
     BACKFILL_INIT(&backfill_globals.queue);
 
@@ -115,7 +112,33 @@ void *backfill_thread(void *ptr) {
         job_id = completion_wait_for_a_job_with_timeout(&backfill_globals.completion, job_id, 1000);
     }
 
+    return NULL;
+}
+
+void *backfill_thread(void *ptr) {
+    struct netdata_static_thread *static_thread = ptr;
+    if(!static_thread) return NULL;
+
+    nd_thread_tag_set("BACKFILL[0]");
+
+    size_t threads = get_netdata_cpus();
+    if(threads < 2) threads = 2;
+    if(threads > 256) threads = 256;
+    ND_THREAD *th[threads - 1];
+
+    for(size_t t = 0; t < threads - 1 ;t++) {
+        char tag[15];
+        snprintfz(tag, sizeof(tag), "BACKFILL[%zu]", t + 1);
+        th[t] = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, backfill_worker_thread, NULL);
+    }
+
+    backfill_worker_thread(NULL);
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    for(size_t t = 0; t < threads - 1 ;t++) {
+        nd_thread_signal_cancel(th[t]);
+        nd_thread_join(th[t]);
+    }
 
     // cleanup
     spinlock_lock(&backfill_globals.spinlock);
@@ -129,5 +152,4 @@ void *backfill_thread(void *ptr) {
     spinlock_unlock(&backfill_globals.spinlock);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-    return NULL;
 }
