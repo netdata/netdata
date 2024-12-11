@@ -393,6 +393,96 @@ modules:
               dimensions:
                 - name: avail
                 - name: used
+        - name: Physical
+          description: "These metrics refer to the global physical disks."
+          labels:
+            - name: mount_point
+              description: The drive letter assigned by Microsoft Windows to identify the partition.
+            - name: device
+              description: The device name.
+            - name: model
+              description: The device model.
+            - name: device_id
+              description: THe ID of device installed on host.
+          metrics:
+            - name: disk.io
+              description: Disk I/O Bandwidth
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.ops
+              description: Disk Completed I/O Operations
+              unit: "operations/s"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.busy
+              description: Disk Busy Time
+              unit: "milliseconds"
+              chart_type: area
+              dimensions:
+                - name: busy
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: "milliseconds/s"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.qops
+              description: Disk Current I/O Operations
+              unit: "operations"
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: disk.await
+              description: Average Completed I/O Operation Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.svctm
+              description: Average Service Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: svctm
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: "KiB/operation"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.split
+              description: Split I/O Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: discards
+        - name: Disk
+          description: "These metrics refer to the individual physical disks."
+          labels:
+            - name: mount_point
+              description: The drive letter assigned by Microsoft Windows to identify the partition.
+            - name: device
+              description: The device name.
+            - name: model
+              description: The device model.
+            - name: device_id
+              description: THe ID of device installed on host.
+          metrics:
+            - name: disk.io
+              description: Disk I/O Bandwidth
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibObjects
