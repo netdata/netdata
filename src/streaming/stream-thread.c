@@ -30,7 +30,7 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
                 if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, ND_POLL_READ|ND_POLL_WRITE, m)) {
                     nd_log_limit_static_global_var(erl, 1, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
-                                 "STREAM SEND[%zu] '%s' [to %s]: cannot enable output on sender socket %d.",
+                                 "STREAM SND[%zu] '%s' [to %s]: cannot enable output on sender socket %d.",
                                  sth->id, rrdhost_hostname(m->s->host), m->s->connected_to, m->s->sock.fd);
                 }
                 msg->opcode &= ~(STREAM_OPCODE_SENDER_POLLOUT);
@@ -44,7 +44,7 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
                 if (!nd_poll_upd(sth->run.ndpl, m->rpt->sock.fd, ND_POLL_READ | ND_POLL_WRITE, m)) {
                     nd_log_limit_static_global_var(erl, 1, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
-                                 "STREAM RECEIVE[%zu] '%s' [from [%s]:%s]: cannot enable output on receiver socket %d.",
+                                 "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot enable output on receiver socket %d.",
                                  sth->id, rrdhost_hostname(m->rpt->host), m->rpt->client_ip, m->rpt->client_port, m->rpt->sock.fd);
                 }
                 msg->opcode &= ~(STREAM_OPCODE_RECEIVER_POLLOUT);
@@ -81,14 +81,14 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
 
     if(msg.meta != &rpt->thread.meta) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM RECEIVE '%s' [from [%s]:%s]: the receiver in the opcode the message does not match this receiver. "
+               "STREAM RCV '%s' [from [%s]:%s]: the receiver in the opcode the message does not match this receiver. "
                "Ignoring opcode.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
         return;
     }
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
     if(!sth) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM RECEIVE '%s' [from [%s]:%s]: the opcode (%u) message cannot be verified. Ignoring it.",
+               "STREAM RCV '%s' [from [%s]:%s]: the opcode (%u) message cannot be verified. Ignoring it.",
                rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, msg.opcode);
         return;
     }
@@ -135,7 +135,7 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
                 }
 #endif
 
-                fatal("STREAM RECEIVE '%s' [from [%s]:%s]: The streaming opcode queue is full, but this should never happen...",
+                fatal("STREAM RCV '%s' [from [%s]:%s]: The streaming opcode queue is full, but this should never happen...",
                       rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
             }
 
@@ -161,7 +161,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
 
     if(msg.meta != &s->thread.meta) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SEND '%s' [to %s]: the opcode message does not match this sender. "
+               "STREAM SND '%s' [to %s]: the opcode message does not match this sender. "
                "Ignoring opcode.", rrdhost_hostname(s->host), s->connected_to);
         return;
     }
@@ -169,7 +169,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
     if(!sth) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SEND[x] '%s' [to %s] the opcode (%u) message cannot be verified. Ignoring it.",
+               "STREAM SND[x] '%s' [to %s] the opcode (%u) message cannot be verified. Ignoring it.",
                rrdhost_hostname(s->host), s->connected_to, msg.opcode);
         return;
     }
@@ -216,7 +216,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
                 }
 #endif
 
-                fatal("STREAM SEND '%s' [to %s]: The streaming opcode queue is full, but this should never happen...",
+                fatal("STREAM SND '%s' [to %s]: The streaming opcode queue is full, but this should never happen...",
                       rrdhost_hostname(s->host), s->connected_to);
             }
 
@@ -685,7 +685,7 @@ void stream_receiver_add_to_queue(struct receiver_state *rpt) {
     stream_thread_node_queued(rpt->host);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM RECEIVE[%zu] '%s': moving host to receiver queue...",
+           "STREAM RCV[%zu] '%s': moving host to receiver queue...",
            sth->id, rrdhost_hostname(rpt->host));
 
     spinlock_lock(&sth->queue.spinlock);

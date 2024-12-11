@@ -30,7 +30,7 @@ stream_send_rrdset_metrics_v1_internal(BUFFER *wb, RRDSET *st, struct sender_sta
             buffer_fast_strcat(wb, "\n", 1);
         }
         else {
-            internal_error(true, "STREAM SEND '%s': 'chart:%s/dim:%s' flag 'exposed' is updated but not exposed",
+            internal_error(true, "STREAM SND '%s': 'chart:%s/dim:%s' flag 'exposed' is updated but not exposed",
                            rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
             // we will include it in the next iteration
             rrddim_metadata_updated(rd);

@@ -204,7 +204,7 @@ static int stream_connect_upgrade_prelude(RRDHOST *host __maybe_unused, struct s
         goto err_cleanup;
     }
 
-    netdata_log_debug(D_STREAM, "Stream sender upgrade to \"" NETDATA_STREAM_PROTO_NAME "\" successful");
+    netdata_log_debug(D_STREAM, "STREAM SNDer upgrade to \"" NETDATA_STREAM_PROTO_NAME "\" successful");
     rbuf_free(buf);
     http_parse_ctx_destroy(&ctx);
     return 0;

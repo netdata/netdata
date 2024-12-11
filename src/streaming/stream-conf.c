@@ -194,7 +194,7 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
         rrd_memory_mode_name(default_rrd_memory_mode))));
 
     if (unlikely(config->mode == RRD_MEMORY_MODE_DBENGINE && !dbengine_enabled)) {
-        netdata_log_error("STREAM RECEIVE '%s' [from [%s]:%s]: "
+        netdata_log_error("STREAM RCV '%s' [from [%s]:%s]: "
                           "dbengine is not enabled, falling back to default."
                           , rpt->hostname
                           , rpt->client_ip, rpt->client_port

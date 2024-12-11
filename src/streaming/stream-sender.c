@@ -72,7 +72,7 @@ static void stream_sender_charts_and_replication_reset(struct sender_state *s) {
 
 void stream_sender_on_connect(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM SEND [%s]: running on-connect hooks...",
+           "STREAM SND [%s]: running on-connect hooks...",
            rrdhost_hostname(s->host));
 
     rrdhost_flag_set(s->host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED);
@@ -89,7 +89,7 @@ void stream_sender_on_connect(struct sender_state *s) {
 
 static void stream_sender_on_ready_to_dispatch(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM SEND '%s': running ready-to-dispatch hooks...",
+           "STREAM SND '%s': running ready-to-dispatch hooks...",
            rrdhost_hostname(s->host));
 
     // set this flag before sending any data, or the data will not be sent
@@ -105,7 +105,7 @@ static void stream_sender_on_ready_to_dispatch(struct sender_state *s) {
 
 static void stream_sender_on_disconnect(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM SEND '%s': running on-disconnect hooks...",
+           "STREAM SND '%s': running on-disconnect hooks...",
            rrdhost_hostname(s->host));
 
     stream_sender_lock(s);
@@ -182,7 +182,7 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
         STREAM_CIRCULAR_BUFFER_STATS stats = *stream_circular_buffer_stats_unsafe(s->scb);
         stream_sender_unlock(s);
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SEND[%zu] '%s' [to %s]: send buffer is full (buffer size %u, max %u, used %u, available %u). "
+               "STREAM SND[%zu] '%s' [to %s]: send buffer is full (buffer size %u, max %u, used %u, available %u). "
                "Restarting connection.",
                sth->id, rrdhost_hostname(s->host), s->connected_to,
                stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
@@ -203,7 +203,7 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_COMPRESSION_ERROR);
         errno_clear();
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SEND[%zu] '%s' [to %s]: restarting connection without compression.",
+               "STREAM SND[%zu] '%s' [to %s]: restarting connection without compression.",
                sth->id, rrdhost_hostname(s->host), s->connected_to);
 
         stream_sender_move_running_to_connector_or_remove(
@@ -219,7 +219,7 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
     }
 
     nd_log(NDLS_DAEMON, NDLP_ERR,
-           "STREAM SEND[%zu]: invalid msg id %u", sth->id, (unsigned)msg->opcode);
+           "STREAM SND[%zu]: invalid msg id %u", sth->id, (unsigned)msg->opcode);
 }
 
 
@@ -245,7 +245,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         ND_LOG_STACK_PUSH(lgs);
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM SEND[%zu] '%s' [to %s]: moving host from dispatcher queue to dispatcher running...",
+               "STREAM SND[%zu] '%s' [to %s]: moving host from dispatcher queue to dispatcher running...",
                sth->id, rrdhost_hostname(s->host), s->connected_to);
 
         stream_sender_lock(s);
@@ -269,7 +269,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
 
         if(!nd_poll_add(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SEND[%zu] '%s' [to %s]: failed to add sender socket to nd_poll()",
+                   "STREAM SND[%zu] '%s' [to %s]: failed to add sender socket to nd_poll()",
                    sth->id, rrdhost_hostname(s->host), s->connected_to);
 
         stream_sender_on_ready_to_dispatch(s);
@@ -281,7 +281,7 @@ void stream_sender_remove(struct sender_state *s) {
     // when it gives up on a certain node
 
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "STREAM SEND '%s' [to %s]: streaming sender removed host: %s",
+           "STREAM SND '%s' [to %s]: streaming sender removed host: %s",
            rrdhost_hostname(s->host), s->connected_to, stream_handshake_error_to_string(s->exit.reason));
 
     stream_sender_lock(s);
@@ -319,7 +319,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
 
     if(!nd_poll_del(sth->run.ndpl, s->sock.fd))
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SEND[%zu] '%s' [to %s]: failed to delete sender socket from nd_poll()",
+               "STREAM SND[%zu] '%s' [to %s]: failed to delete sender socket from nd_poll()",
                sth->id, rrdhost_hostname(s->host), s->connected_to);
 
     // clear this flag asap, to stop other threads from pushing metrics for this node
@@ -335,7 +335,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     stream_sender_unlock(s);
 
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "STREAM SEND[%zu] '%s' [to %s]: sender disconnected from parent, reason: %s",
+           "STREAM SND[%zu] '%s' [to %s]: sender disconnected from parent, reason: %s",
            sth->id, rrdhost_hostname(s->host), s->connected_to, stream_handshake_error_to_string(reason));
 
     nd_sock_close(&s->sock);
@@ -402,7 +402,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
                 size_snprintf(pending, sizeof(pending), stats.bytes_outstanding, "B", false);
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SEND[%zu] '%s' [to %s]: could not send data for %ld seconds - closing connection - "
+                   "STREAM SND[%zu] '%s' [to %s]: could not send data for %ld seconds - closing connection - "
                    "we have sent %zu bytes in %zu operations, it is idle for %s, and we have %s pending to send "
                    "(buffer is used %.2f%%).",
                    sth->id, rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
@@ -418,7 +418,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
 
         if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0), &s->thread.meta))
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SEND[%zu] '%s' [to %s]: failed to update nd_poll().",
+                   "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
                    sth->id, rrdhost_hostname(s->host), s->connected_to);
     }
 
@@ -470,7 +470,7 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
         stream_sender_unlock(s);
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SEND[%zu] '%s' [to %s]: %s restarting connection - %zu bytes transmitted in %zu operations.",
+               "STREAM SND[%zu] '%s' [to %s]: %s restarting connection - %zu bytes transmitted in %zu operations.",
                sth->id, rrdhost_hostname(s->host), s->connected_to, error, stats.bytes_sent, stats.sends);
 
         stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR, true);
@@ -502,7 +502,7 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                         // we sent them all - remove ND_POLL_WRITE
                         if (!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
                             nd_log(NDLS_DAEMON, NDLP_ERR,
-                                   "STREAM SEND[%zu] '%s' [to %s]: failed to update nd_poll().",
+                                   "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
                                    sth->id, rrdhost_hostname(s->host), s->connected_to);
 
                         // recreate the circular buffer if we have to
@@ -531,7 +531,7 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                 if (disconnect_reason) {
                     worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR);
                     nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "STREAM SEND[%zu] '%s' [to %s]: %s (%zd, on fd %d) - restarting connection - "
+                           "STREAM SND[%zu] '%s' [to %s]: %s (%zd, on fd %d) - restarting connection - "
                            "we have sent %zu bytes in %zu operations.",
                            sth->id, rrdhost_hostname(s->host), s->connected_to, disconnect_reason, rc, s->sock.fd,
                            stats->bytes_sent, stats->sends);
@@ -572,7 +572,7 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
         else if (rc == 0 || errno == ECONNRESET) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED);
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SEND[%zu] '%s' [to %s]: socket %d reports EOF (closed by parent).",
+                   "STREAM SND[%zu] '%s' [to %s]: socket %d reports EOF (closed by parent).",
                    sth->id, rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
             stream_sender_move_running_to_connector_or_remove(
                 sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END, true);
@@ -585,7 +585,7 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
             else {
                 worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
                 nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM SEND[%zu] '%s' [to %s]: error during receive (%zd, on fd %d) - restarting connection.",
+                       "STREAM SND[%zu] '%s' [to %s]: error during receive (%zd, on fd %d) - restarting connection.",
                        sth->id, rrdhost_hostname(s->host), s->connected_to, rc, s->sock.fd);
                 stream_sender_move_running_to_connector_or_remove(
                     sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, true);

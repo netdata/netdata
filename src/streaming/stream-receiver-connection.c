@@ -26,7 +26,7 @@ void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, con
            , (rpt->machine_guid && *rpt->machine_guid) ? rpt->machine_guid : ""
            , msg);
 
-    nd_log(NDLS_DAEMON, priority, "STREAM RECEIVE '%s' [from [%s]:%s]: %s %s%s%s"
+    nd_log(NDLS_DAEMON, priority, "STREAM RCV '%s' [from [%s]:%s]: %s %s%s%s"
            , (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""
            , rpt->client_ip, rpt->client_port
            , msg
@@ -187,7 +187,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    netdata_log_info("STREAM RECEIVE '%s' [from [%s]:%s]: "
+    netdata_log_info("STREAM RCV '%s' [from [%s]:%s]: "
                      "client willing to stream metrics for host '%s' with machine_guid '%s': "
                      "update every = %d, history = %d, memory mode = %s, health %s,%s"
                      , rpt->hostname
@@ -235,7 +235,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             // remove the non-blocking flag from the socket
             if(sock_delnonblock(rpt->sock.fd) < 0)
                 nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM RECEIVE '%s' [from [%s]:%s]: cannot remove the non-blocking flag from socket %d",
+                       "STREAM RCV '%s' [from [%s]:%s]: cannot remove the non-blocking flag from socket %d",
                        rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->sock.fd);
 
             struct timeval timeout;
@@ -243,7 +243,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             timeout.tv_usec = 0;
             if (unlikely(setsockopt(rpt->sock.fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout) != 0))
                 nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM RECEIVE '%s' [from [%s]:%s]: cannot set timeout for socket %d",
+                       "STREAM RCV '%s' [from [%s]:%s]: cannot set timeout for socket %d",
                        rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->sock.fd);
         }
 
@@ -378,7 +378,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
                 rpt->capabilities = convert_stream_version_to_capabilities(1, NULL, false);
 
             if (unlikely(rrdhost_set_system_info_variable(rpt->system_info, name, value))) {
-                nd_log_daemon(NDLP_NOTICE, "STREAM RECEIVE '%s' [from [%s]:%s]: "
+                nd_log_daemon(NDLP_NOTICE, "STREAM RCV '%s' [from [%s]:%s]: "
                                            "request has parameter '%s' = '%s', which is not used."
                               , (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-"
                               , rpt->client_ip, rpt->client_port
@@ -540,7 +540,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         if(nd_sock_send_timeout(&rpt->sock, initial_response, strlen(initial_response), 0, 60) !=
             (ssize_t)strlen(initial_response)) {
 
-            nd_log_daemon(NDLP_ERR, "STREAM RECEIVE '%s' [from [%s]:%s]: failed to reply.",
+            nd_log_daemon(NDLP_ERR, "STREAM RCV '%s' [from [%s]:%s]: failed to reply.",
                           rpt->hostname, rpt->client_ip, rpt->client_port
             );
         }
