@@ -454,7 +454,8 @@ void mallocz_release_as_much_memory_to_the_system(void) {
     spinlock_lock(&spinlock);
 
 #ifdef HAVE_C_MALLOPT
-    size_t trim_threshold = 16ULL * 1024;
+    // the default is 128KiB
+    size_t trim_threshold = 65ULL * 1024;
     mallopt(M_TRIM_THRESHOLD, (int)trim_threshold);
 #endif
 

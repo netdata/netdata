@@ -1948,7 +1948,7 @@ static void *pgc_evict_thread(void *ptr) {
     worker_register_job_name(0, "signaled");
     worker_register_job_name(1, "scheduled");
 
-    unsigned job_id = 0;
+    unsigned job_id = 0, severe_pressure_counter = 0;
 
     while (true) {
         worker_is_idle();
@@ -1961,7 +1961,21 @@ static void *pgc_evict_thread(void *ptr) {
         if (nd_thread_signaled_to_cancel())
             return NULL;
 
-        evict_pages(cache, 0, 0, true, false);
+        size_t size_to_evict = 0;
+        if(evict_pages(cache, 0, 0, true, false) &&
+            cache_usage_per1000(cache, &size_to_evict) > cache->config.severe_pressure_per1000) {
+            severe_pressure_counter++;
+
+            if(severe_pressure_counter > 100) {
+                // so, we tried 100 times to reduce memory,
+                // but it is still severe!
+
+                mallocz_release_as_much_memory_to_the_system();
+                severe_pressure_counter = 0;
+            }
+        }
+        else
+            severe_pressure_counter = 0;
     }
 
     worker_unregister();
