@@ -1,0 +1,22 @@
+name: Update website
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "integrations/integrations.json"
+concurrency:
+  group: website-trigger-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    if: github.repository == 'netdata/netdata'
+    steps:
+      - name: Trigger netdata/website update-integrations workflow
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          repo: netdata/website
+          workflow: Update integrations
+          ref: refs/heads/master
