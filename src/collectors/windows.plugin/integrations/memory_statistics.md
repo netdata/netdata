@@ -58,7 +58,7 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per Memory statistics instance
+### Per System
 
 These metrics refer to the entire system.
 
