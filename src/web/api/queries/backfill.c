@@ -33,10 +33,12 @@ static struct {
 };
 
 bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data) {
+    size_t dimensions = dictionary_entries(st->rrddim_root_index);
+    size_t added = 0;
+    struct backfill_dim_work *array[dimensions];
+
     bool rc = true;
-    spinlock_lock(&backfill_globals.spinlock);
     if(backfill_globals.running) {
-        size_t added = 0;
         struct backfill_request *br = callocz(1, sizeof(*br));
         br->rrdhost_receiver_state_id =__atomic_load_n(&st->rrdhost->stream.rcv.status.state_id, __ATOMIC_RELAXED);
         br->rsa = rrdset_find_and_acquire(st->rrdhost, string2str(st->id));
@@ -46,13 +48,15 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data) {
 
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
+                if(added >= dimensions)
+                    break;
+
                 if (!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
                     struct backfill_dim_work *bdm = callocz(1, sizeof(*bdm));
                     bdm->rda = (RRDDIM_ACQUIRED *)dictionary_acquired_item_dup(st->rrddim_root_index, rd_dfe.item);
                     bdm->br = br;
                     br->works++;
-                    BACKFILL_SET(&backfill_globals.queue, backfill_globals.id++, bdm);
-                    added++;
+                    array[added++] = bdm;
                 }
             }
             rrddim_foreach_done(rd);
@@ -66,6 +70,12 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data) {
     }
     else
         rc = false;
+
+    spinlock_lock(&backfill_globals.spinlock);
+    if(rc) {
+        for(size_t i = 0; i < added ;i++)
+            BACKFILL_SET(&backfill_globals.queue, backfill_globals.id++, array[i]);
+    }
     spinlock_unlock(&backfill_globals.spinlock);
 
     if(rc)
