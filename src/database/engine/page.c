@@ -62,6 +62,7 @@ struct pgd {
 #define PGD_ARAL_PARTITIONS_MAX 256
 
 struct {
+    int64_t padding_used;
     size_t partitions;
 
     size_t sizeof_pgd;
@@ -77,7 +78,7 @@ struct {
 #error "You need to update the slots reserved for storage tiers"
 #endif
 
-static struct aral_statistics aral_statistics_for_pgd = { 0 };
+static struct aral_statistics pgd_aral_statistics = { 0 };
 
 static size_t aral_sizes_delta;
 static size_t aral_sizes_count;
@@ -89,8 +90,11 @@ static size_t aral_sizes[] = {
     [RRD_STORAGE_TIERS - 2] = 0,
     [RRD_STORAGE_TIERS - 1] = 0,
 
-    // gorilla buffer size
+    // gorilla buffer sizes
     RRDENG_GORILLA_32BIT_BUFFER_SIZE,
+    RRDENG_GORILLA_32BIT_BUFFER_SIZE * 2,
+    RRDENG_GORILLA_32BIT_BUFFER_SIZE * 3,
+    RRDENG_GORILLA_32BIT_BUFFER_SIZE * 4,
 
     // our structures
     sizeof(gorilla_writer_t),
@@ -101,12 +105,13 @@ static ARAL **arals = NULL;
 #define arals_slot(slot, partition) ((partition) * aral_sizes_count + (slot))
 static ARAL *pgd_get_aral_by_size_and_partition(size_t size, size_t partition);
 
-size_t pgd_aral_structures(void) {
-    return aral_structures(pgd_alloc_globals.aral_pgd[0]);
+size_t pgd_padding_bytes(void) {
+    int64_t x = __atomic_load_n(&pgd_alloc_globals.padding_used, __ATOMIC_RELAXED);
+    return (x > 0) ? x : 0;
 }
 
-size_t pgd_aral_overhead(void) {
-    return aral_overhead(pgd_alloc_globals.aral_pgd[0]);
+struct aral_statistics *pgd_aral_stats(void) {
+    return &pgd_aral_statistics;
 }
 
 int aral_size_sort_compare(const void *a, const void *b) {
@@ -175,7 +180,7 @@ void pgd_init_arals(void) {
                 aral_sizes[slot],
                 0,
                 0,
-                &aral_statistics_for_pgd,
+                &pgd_aral_statistics,
                 NULL, NULL, false, false);
         }
     }
@@ -254,6 +259,9 @@ static inline PGD *pgd_alloc(bool for_collector) {
 static inline void *pgd_data_alloc(size_t size, size_t partition, bool for_collector) {
     ARAL *ar = pgd_get_aral_by_size_and_partition(size, partition);
     if(ar) {
+        int64_t padding = (int64_t)aral_requested_element_size(ar) - (int64_t)size;
+        __atomic_add_fetch(&pgd_alloc_globals.padding_used, padding, __ATOMIC_RELAXED);
+
         if(for_collector)
             return aral_mallocz_marked(ar);
         else
@@ -265,8 +273,12 @@ static inline void *pgd_data_alloc(size_t size, size_t partition, bool for_colle
 
 static void pgd_data_free(void *page, size_t size, size_t partition) {
     ARAL *ar = pgd_get_aral_by_size_and_partition(size, partition);
-    if(ar)
+    if(ar) {
+        int64_t padding = (int64_t)aral_requested_element_size(ar) - (int64_t)size;
+        __atomic_sub_fetch(&pgd_alloc_globals.padding_used, padding, __ATOMIC_RELAXED);
+
         aral_freez(ar, page);
+    }
     else
         freez(page);
     timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_MAIN_PGD_TIER1_ARAL);

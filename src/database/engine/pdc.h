@@ -34,10 +34,11 @@ typedef void (*execute_extent_page_details_list_t)(struct rrdengine_instance *ct
 void pdc_to_epdl_router(struct rrdengine_instance *ctx, struct page_details_control *pdc, execute_extent_page_details_list_t exec_first_extent_list, execute_extent_page_details_list_t exec_rest_extent_list);
 void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker);
 
-size_t pdc_cache_size(void);
-size_t pd_cache_size(void);
-size_t epdl_cache_size(void);
-size_t deol_cache_size(void);
+struct aral_statistics *pdc_aral_stats(void);
+struct aral_statistics *pd_aral_stats(void);
+struct aral_statistics *epdl_aral_stats(void);
+struct aral_statistics *deol_aral_stats(void);
+
 size_t extent_buffer_cache_size(void);
 
 void pdc_init(void);

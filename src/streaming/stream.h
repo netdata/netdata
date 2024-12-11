@@ -41,6 +41,7 @@ char *stream_receiver_program_version_strdupz(struct rrdhost *host);
 #include "rrdhost-status.h"
 #include "protocol/commands.h"
 #include "stream-path.h"
+#include "stream-control.h"
 
 void stream_threads_cancel(void);
 

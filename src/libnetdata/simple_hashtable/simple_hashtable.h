@@ -69,9 +69,13 @@ static inline bool SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION(SIMPLE_HASHTABLE_KEY_T
 #endif
 
 // First layer of macro for token concatenation
-#define CONCAT_INTERNAL(a, b) a ## b
+#ifndef CONCAT_INDIRECT
+#define CONCAT_INDIRECT(a, b) a ## b
+#endif
 // Second layer of macro, which ensures proper expansion
-#define CONCAT(a, b) CONCAT_INTERNAL(a, b)
+#ifndef CONCAT
+#define CONCAT(a, b) CONCAT_INDIRECT(a, b)
+#endif
 
 // define names for all structures and structures
 #define simple_hashtable_init_named CONCAT(simple_hashtable_init, SIMPLE_HASHTABLE_NAME)

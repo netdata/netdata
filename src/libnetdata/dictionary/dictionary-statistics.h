@@ -9,10 +9,7 @@
 // memory statistics
 
 #ifdef DICT_WITH_STATS
-static inline void DICTIONARY_STATS_PLUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
-    if(key_size)
-        __atomic_fetch_add(&dict->stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
-
+static inline void DICTIONARY_STATS_PLUS_MEMORY(DICTIONARY *dict, size_t key_size __maybe_unused, size_t item_size, size_t value_size) {
     if(item_size)
         __atomic_fetch_add(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
 
@@ -20,10 +17,7 @@ static inline void DICTIONARY_STATS_PLUS_MEMORY(DICTIONARY *dict, size_t key_siz
         __atomic_fetch_add(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
 }
 
-static inline void DICTIONARY_STATS_MINUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
-    if(key_size)
-        __atomic_fetch_sub(&dict->stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
-
+static inline void DICTIONARY_STATS_MINUS_MEMORY(DICTIONARY *dict, size_t key_size __maybe_unused, size_t item_size, size_t value_size) {
     if(item_size)
         __atomic_fetch_sub(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
 

@@ -32,7 +32,7 @@ static struct string_partition {
     size_t deletes;             // the number of successful deleted from the index
 
     long int entries;           // the number of entries in the index
-    long int memory;            // the memory used, without the JudyHS index
+    long int memory;            // the memory used, with JudyHS (accurate)
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // internal statistics
@@ -196,10 +196,18 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
 
     rw_spinlock_write_lock(&string_base[partition].spinlock);
 
+    int64_t mem = 0;
+
     STRING **ptr;
     {
         JError_t J_Error;
+
+        JudyAllocThreadPulseReset();
+
         Pvoid_t *Rc = JudyHSIns(&string_base[partition].JudyHSArray, (void *)str, length - 1, &J_Error);
+
+        mem = JudyAllocThreadPulseGetAndReset();
+
         if (unlikely(Rc == PJERR)) {
             fatal(
                 "STRING: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
@@ -220,7 +228,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
         *ptr = string;
         string_base[partition].inserts++;
         string_base[partition].entries++;
-        string_base[partition].memory += (long)(mem_size + JUDYHS_INDEX_SIZE_ESTIMATE(length));
+        string_base[partition].memory += (long)(mem_size + mem);
     }
     else {
         // the item is already in the index
@@ -256,10 +264,17 @@ static inline void string_index_delete(STRING *string) {
 #endif
 
     bool deleted = false;
+    int64_t mem = 0;
 
     if (likely(string_base[partition].JudyHSArray)) {
         JError_t J_Error;
+
+        JudyAllocThreadPulseReset();
+
         int ret = JudyHSDel(&string_base[partition].JudyHSArray, (void *)string->str, string->length - 1, &J_Error);
+
+        mem = JudyAllocThreadPulseGetAndReset();
+
         if (unlikely(ret == JERR)) {
             netdata_log_error(
                 "STRING: Cannot delete entry with name '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d",
@@ -276,7 +291,7 @@ static inline void string_index_delete(STRING *string) {
         size_t mem_size = sizeof(STRING) + string->length;
         string_base[partition].deletes++;
         string_base[partition].entries--;
-        string_base[partition].memory -= (long)(mem_size + JUDYHS_INDEX_SIZE_ESTIMATE(string->length));
+        string_base[partition].memory -= (long)(mem_size + mem);
         freez(string);
     }
 

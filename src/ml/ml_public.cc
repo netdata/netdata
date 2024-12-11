@@ -48,7 +48,7 @@ void ml_host_new(RRDHOST *rh)
     netdata_mutex_init(&host->mutex);
     spinlock_init(&host->type_anomaly_rate_spinlock);
 
-    host->ml_running = true;
+    host->ml_running = false;
     rh->ml_host = (rrd_ml_host_t *) host;
 }
 
@@ -104,13 +104,12 @@ void ml_host_stop(RRDHOST *rh) {
 
             spinlock_lock(&dim->slock);
 
-            // reset dim
-            // TODO: should we drop in-mem models, or mark them as stale? Is it
-            // okay to resume training straight away?
-
             dim->mt = METRIC_TYPE_CONSTANT;
             dim->ts = TRAINING_STATUS_UNTRAINED;
+
+            // TODO: Check if we can remove this field.
             dim->last_training_time = 0;
+
             dim->suppression_anomaly_counter = 0;
             dim->suppression_window_counter = 0;
             dim->cns.clear();
@@ -290,6 +289,25 @@ void ml_dimension_new(RRDDIM *rd)
     rd->ml_dimension = (rrd_ml_dimension_t *) dim;
 
     metaqueue_ml_load_models(rd);
+
+    // add to worker queue
+    {
+        RRDHOST *rh = rd->rrdset->rrdhost;
+        ml_host_t *host = (ml_host_t *) rh->ml_host;
+
+        ml_queue_item_t item;
+        item.type = ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL;
+
+        ml_request_create_new_model_t req;
+        req.DLI = DimensionLookupInfo(
+            &rh->machine_guid[0],
+            rd->rrdset->id,
+            rd->id
+        );
+        item.create_new_model = req;
+
+        ml_queue_push(host->queue, item);
+    }
 }
 
 void ml_dimension_delete(RRDDIM *rd)
@@ -318,6 +336,8 @@ void ml_dimension_received_anomaly(RRDDIM *rd, bool is_anomalous) {
 
 bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool exists)
 {
+    UNUSED(curr_time);
+
     ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
     if (!dim)
         return false;
@@ -328,7 +348,7 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
 
     ml_chart_t *chart = (ml_chart_t *) rd->rrdset->ml_chart;
 
-    bool is_anomalous = ml_dimension_predict(dim, curr_time, value, exists);
+    bool is_anomalous = ml_dimension_predict(dim, value, exists);
     ml_chart_update_dimension(chart, dim, is_anomalous);
 
     return is_anomalous;

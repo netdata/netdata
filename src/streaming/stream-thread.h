@@ -91,6 +91,8 @@ struct stream_opcode {
 #define STREAM_MAX_THREADS 2048
 #define THREAD_TAG_STREAM "STREAM"
 
+#define MAX_IO_ITERATIONS_PER_EVENT 65536 // drain the input, take it all
+
 typedef enum {
     POLLFD_TYPE_EMPTY,
     POLLFD_TYPE_SENDER,
@@ -181,8 +183,8 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
 void stream_receiver_add_to_queue(struct receiver_state *rpt);
 void stream_sender_add_to_connector_queue(struct rrdhost *host);
 
-void stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t events, usec_t now_ut);
-void stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events, usec_t now_ut);
+bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t events, usec_t now_ut);
+bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events, usec_t now_ut);
 
 void stream_sender_cleanup(struct stream_thread *sth);
 void stream_receiver_cleanup(struct stream_thread *sth);
@@ -192,6 +194,9 @@ struct stream_thread *stream_thread_by_slot_id(size_t thread_slot);
 
 void stream_thread_node_queued(struct rrdhost *host);
 void stream_thread_node_removed(struct rrdhost *host);
+
+// returns true if my_meta has received a message
+bool stream_thread_process_opcodes(struct stream_thread *sth, struct pollfd_meta *my_meta);
 
 #include "stream-sender-internals.h"
 #include "stream-receiver-internals.h"

@@ -27,12 +27,6 @@ enum ml_training_status {
     // We don't have a model for this dimension
     TRAINING_STATUS_UNTRAINED,
 
-    // Request for training sent, but we don't have any models yet
-    TRAINING_STATUS_PENDING_WITHOUT_MODEL,
-
-    // Request to update existing models sent
-    TRAINING_STATUS_PENDING_WITH_MODEL,
-
     // Have a valid, up-to-date model
     TRAINING_STATUS_TRAINED,
 

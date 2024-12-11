@@ -80,7 +80,7 @@ void log_receiver_capabilities(struct receiver_state *rpt) {
     BUFFER *wb = buffer_create(100, NULL);
     stream_capabilities_to_string(wb, rpt->capabilities);
 
-    nd_log_daemon(NDLP_INFO, "STREAM %s [receive from [%s]:%s]: established link with negotiated capabilities: %s",
+    nd_log_daemon(NDLP_INFO, "STREAM RECEIVE '%s' [from [%s]:%s]: established link with negotiated capabilities: %s",
                   rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, buffer_tostring(wb));
 
     buffer_free(wb);
@@ -90,7 +90,7 @@ void log_sender_capabilities(struct sender_state *s) {
     BUFFER *wb = buffer_create(100, NULL);
     stream_capabilities_to_string(wb, s->capabilities);
 
-    nd_log_daemon(NDLP_INFO, "STREAM %s [send to %s]: established link with negotiated capabilities: %s",
+    nd_log_daemon(NDLP_INFO, "STREAM SEND '%s' [to %s]: established link with negotiated capabilities: %s",
                   rrdhost_hostname(s->host), s->connected_to, buffer_tostring(wb));
 
     buffer_free(wb);

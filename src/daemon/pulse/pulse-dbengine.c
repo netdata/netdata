@@ -668,15 +668,26 @@ void pulse_dbengine_do(bool extended) {
     mrg_stats_old = mrg_stats;
     mrg_get_statistics(main_mrg, &mrg_stats);
 
-    struct rrdeng_buffer_sizes buffers = rrdeng_get_buffer_sizes();
-    size_t buffers_total_size = buffers.handles + buffers.xt_buf + buffers.xt_io + buffers.pdc + buffers.descriptors +
-                                buffers.opcodes + buffers.wal + buffers.workers + buffers.epdl + buffers.deol + buffers.pd + buffers.pgc + buffers.pgd + buffers.mrg;
+    struct rrdeng_buffer_sizes dbmem = rrdeng_pulse_memory_sizes();
 
+    size_t buffers_total_size = dbmem.xt_buf + dbmem.wal;
 #ifdef PDC_USE_JULYL
     buffers_total_size += buffers.julyl;
 #endif
 
-    pulse_dbengine_total_memory = pgc_main_stats.size + pgc_open_stats.size + pgc_extent_stats.size + mrg_stats.size + buffers_total_size;
+    size_t aral_structures_total_size = 0, aral_used_total_size = 0;
+    size_t aral_padding_total_size = 0;
+    for(size_t i = 0; i < RRDENG_MEM_MAX ; i++) {
+        buffers_total_size += aral_free_bytes_from_stats(dbmem.as[i]);
+        aral_structures_total_size += aral_structures_bytes_from_stats(dbmem.as[i]);
+        aral_used_total_size += aral_used_bytes_from_stats(dbmem.as[i]);
+        aral_padding_total_size += aral_padding_bytes_from_stats(dbmem.as[i]);
+    }
+
+    pulse_dbengine_total_memory =
+        pgc_main_stats.size + (ssize_t)pgc_open_stats.size + pgc_extent_stats.size +
+        mrg_stats.size +
+        buffers_total_size + aral_structures_total_size + aral_padding_total_size + pgd_padding_bytes();
 
     size_t priority = 135000;
 
@@ -687,6 +698,9 @@ void pulse_dbengine_do(bool extended) {
         static RRDDIM *rd_pgc_memory_extent = NULL;  // extent compresses cache memory
         static RRDDIM *rd_pgc_memory_metrics = NULL;  // metric registry memory
         static RRDDIM *rd_pgc_memory_buffers = NULL;
+        static RRDDIM *rd_pgc_memory_aral_padding = NULL;
+        static RRDDIM *rd_pgc_memory_pgd_padding = NULL;
+        static RRDDIM *rd_pgc_memory_aral_structures = NULL;
 
         if (unlikely(!st_pgc_memory)) {
             st_pgc_memory = rrdset_create_localhost(
@@ -708,6 +722,9 @@ void pulse_dbengine_do(bool extended) {
             rd_pgc_memory_extent  = rrddim_add(st_pgc_memory, "extent cache",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_metrics = rrddim_add(st_pgc_memory, "metrics registry", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_buffers = rrddim_add(st_pgc_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_aral_padding = rrddim_add(st_pgc_memory, "aral padding", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_pgd_padding = rrddim_add(st_pgc_memory, "pgd padding", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_aral_structures = rrddim_add(st_pgc_memory, "aral structures", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         priority++;
 
@@ -717,6 +734,9 @@ void pulse_dbengine_do(bool extended) {
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_extent, (collected_number)pgc_extent_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_metrics, (collected_number)mrg_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_buffers, (collected_number)buffers_total_size);
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_aral_padding, (collected_number)aral_padding_total_size);
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_pgd_padding, (collected_number)pgd_padding_bytes());
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_aral_structures, (collected_number)aral_structures_total_size);
 
         rrdset_done(st_pgc_memory);
     }
@@ -756,9 +776,9 @@ void pulse_dbengine_do(bool extended) {
                 localhost->rrd_update_every,
                 RRDSET_TYPE_STACKED);
 
-            rd_pgc_buffers_pgc         = rrddim_add(st_pgc_buffers, "pgc", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_pgc_buffers_pgd         = rrddim_add(st_pgc_buffers, "pgd", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_pgc_buffers_mrg         = rrddim_add(st_pgc_buffers, "mrg", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_pgc         = rrddim_add(st_pgc_buffers, "pgc",            NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_pgd         = rrddim_add(st_pgc_buffers, "pgd",            NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_mrg         = rrddim_add(st_pgc_buffers, "mrg",            NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_opcodes     = rrddim_add(st_pgc_buffers, "opcodes",        NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_handles     = rrddim_add(st_pgc_buffers, "query handles",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_descriptors = rrddim_add(st_pgc_buffers, "descriptors",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -776,20 +796,20 @@ void pulse_dbengine_do(bool extended) {
         }
         priority++;
 
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pgc, (collected_number)buffers.pgc);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pgd, (collected_number)buffers.pgd);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_mrg, (collected_number)buffers.mrg);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_opcodes, (collected_number)buffers.opcodes);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_handles, (collected_number)buffers.handles);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_descriptors, (collected_number)buffers.descriptors);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_wal, (collected_number)buffers.wal);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_workers, (collected_number)buffers.workers);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pdc, (collected_number)buffers.pdc);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pd, (collected_number)buffers.pd);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_xt_io, (collected_number)buffers.xt_io);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_xt_buf, (collected_number)buffers.xt_buf);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_epdl, (collected_number)buffers.epdl);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_deol, (collected_number)buffers.deol);
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pgc, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_PGC]));
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pgd, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_PGD]));
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_mrg, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_MRG]));
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_opcodes, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_OPCODES]));
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_handles, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_HANDLES]));
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_descriptors, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_DESCRIPTORS]));
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_wal, (collected_number)dbmem.wal);
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_workers, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_WORKERS]));
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pdc, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_PDC]));
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pd, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_PD]));
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_xt_io, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_XT_IO]));
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_xt_buf, (collected_number)dbmem.xt_buf);
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_epdl, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_EPDL]));
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_deol, (collected_number)aral_free_bytes_from_stats(dbmem.as[RRDENG_MEM_DEOL]));
 #ifdef PDC_USE_JULYL
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_julyl, (collected_number)buffers.julyl);
 #endif

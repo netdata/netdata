@@ -6,9 +6,15 @@
 #include "libnetdata/libnetdata.h"
 #include "stream-traffic-types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define CBUFFER_INITIAL_SIZE (16 * 1024)
 #define CBUFFER_INITIAL_MAX_SIZE (10 * 1024 * 1024)
 #define THREAD_BUFFER_INITIAL_SIZE (8192)
+
+#define STREAM_CIRCULAR_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
 
 typedef struct stream_circular_buffer_stats {
     size_t adds;
@@ -48,7 +54,7 @@ void stream_circular_buffer_recreate_timed_unsafe(STREAM_CIRCULAR_BUFFER *scb, u
 
 // returns true if it increased the buffer size
 // if it changes the size, it updates the statistics
-bool stream_circular_buffer_set_max_size_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t uncompressed_msg_size, bool force);
+bool stream_circular_buffer_set_max_size_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t max_size, bool force);
 
 // returns a pointer to the current circular buffer statistics
 // copy it if you plan to use it without a lock
@@ -71,7 +77,9 @@ usec_t stream_circular_buffer_get_since_ut(STREAM_CIRCULAR_BUFFER *scb);
 
 // adds data to the end of the circular buffer, returns false when it can't (buffer is full)
 // it updates the statistics
-bool stream_circular_buffer_add_unsafe(STREAM_CIRCULAR_BUFFER *scb, const char *data, size_t bytes_actual, size_t bytes_uncompressed, STREAM_TRAFFIC_TYPE type);
+bool stream_circular_buffer_add_unsafe(
+    STREAM_CIRCULAR_BUFFER *scb, const char *data, size_t bytes_actual, size_t bytes_uncompressed,
+    STREAM_TRAFFIC_TYPE type, bool autoscale);
 
 // returns a pointer to the beginning of the buffer, and its size in bytes
 size_t stream_circular_buffer_get_unsafe(STREAM_CIRCULAR_BUFFER *scb, char **chunk);
@@ -79,5 +87,9 @@ size_t stream_circular_buffer_get_unsafe(STREAM_CIRCULAR_BUFFER *scb, char **chu
 // removes data from the beginning of circular buffer
 // it updates the statistics
 void stream_circular_buffer_del_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t bytes);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //NETDATA_STREAM_CIRCULAR_BUFFER_H

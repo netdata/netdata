@@ -87,9 +87,7 @@ void pulse_daemon_memory_do(bool extended) {
             netdata_buffers_statistics.buffers_streaming +
             netdata_buffers_statistics.cbuffers_streaming +
             netdata_buffers_statistics.buffers_web +
-            replication_allocated_buffers() +
-            aral_by_size_overhead() +
-            judy_aral_overhead();
+            replication_allocated_buffers() + aral_by_size_free_bytes() + judy_aral_free_bytes();
 
         size_t strings = 0;
         string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
@@ -101,8 +99,7 @@ void pulse_daemon_memory_do(bool extended) {
         rrddim_set_by_pointer(st_memory, rd_collectors,
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_collectors));
 
-        rrddim_set_by_pointer(st_memory,
-            rd_rrdhosts,
+        rrddim_set_by_pointer(st_memory,rd_rrdhosts,
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhost) + (collected_number)netdata_buffers_statistics.rrdhost_allocations_size);
 
         rrddim_set_by_pointer(st_memory, rd_rrdsets,
@@ -124,14 +121,15 @@ void pulse_daemon_memory_do(bool extended) {
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
 #else
         uint64_t metadata =
-            aral_by_size_used_bytes() +
-            dictionary_stats_category_rrdhost.memory.dict +
-            dictionary_stats_category_rrdset.memory.dict +
-            dictionary_stats_category_rrddim.memory.dict +
-            dictionary_stats_category_rrdcontext.memory.dict +
-            dictionary_stats_category_rrdhealth.memory.dict +
-            dictionary_stats_category_functions.memory.dict +
-            dictionary_stats_category_replication.memory.dict +
+            aral_by_size_structures_bytes() + aral_by_size_used_bytes() +
+            dictionary_stats_category_rrdhost.memory.dict + dictionary_stats_category_rrdhost.memory.index +
+            dictionary_stats_category_rrdset.memory.dict + dictionary_stats_category_rrdset.memory.index +
+            dictionary_stats_category_rrddim.memory.dict + dictionary_stats_category_rrddim.memory.index +
+            dictionary_stats_category_rrdcontext.memory.dict + dictionary_stats_category_rrdcontext.memory.index +
+            dictionary_stats_category_rrdhealth.memory.dict + dictionary_stats_category_rrdhealth.memory.index +
+            dictionary_stats_category_functions.memory.dict + dictionary_stats_category_functions.memory.index +
+            dictionary_stats_category_replication.memory.dict + dictionary_stats_category_replication.memory.index +
+            netdata_buffers_statistics.rrdhost_allocations_size +
             replication_allocated_memory();
 
         rrddim_set_by_pointer(st_memory, rd_metadata, (collected_number)metadata);
@@ -157,7 +155,7 @@ void pulse_daemon_memory_do(bool extended) {
                               (collected_number) workers_allocated_memory());
 
         rrddim_set_by_pointer(st_memory, rd_aral,
-                              (collected_number) aral_by_size_structures());
+                              (collected_number)aral_by_size_structures_bytes());
 
         rrddim_set_by_pointer(st_memory,
                               rd_judy, (collected_number) judy_aral_structures());
@@ -167,6 +165,13 @@ void pulse_daemon_memory_do(bool extended) {
 
         rrdset_done(st_memory);
     }
+
+    // ----------------------------------------------------------------------------------------------------------------
+
+    if(!extended)
+        return;
+
+    // ----------------------------------------------------------------------------------------------------------------
 
     {
         static RRDSET *st_memory_buffers = NULL;
@@ -212,8 +217,8 @@ void pulse_daemon_memory_do(bool extended) {
             rd_cbuffers_streaming = rrddim_add(st_memory_buffers, "streaming cbuf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_replication = rrddim_add(st_memory_buffers, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_web = rrddim_add(st_memory_buffers, "web", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_aral = rrddim_add(st_memory_buffers, "aral", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers_judy = rrddim_add(st_memory_buffers, "judy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_aral = rrddim_add(st_memory_buffers, "aral-by-size free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_judy = rrddim_add(st_memory_buffers, "aral-judy free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         rrddim_set_by_pointer(st_memory_buffers, rd_queries, (collected_number)netdata_buffers_statistics.query_targets_size + (collected_number) onewayalloc_allocated_memory());
@@ -228,16 +233,11 @@ void pulse_daemon_memory_do(bool extended) {
         rrddim_set_by_pointer(st_memory_buffers, rd_cbuffers_streaming, (collected_number)netdata_buffers_statistics.cbuffers_streaming);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_allocated_buffers());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_web, (collected_number)netdata_buffers_statistics.buffers_web);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aral, (collected_number)aral_by_size_overhead());
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_judy, (collected_number)judy_aral_overhead());
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aral, (collected_number)aral_by_size_free_bytes());
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_judy, (collected_number)judy_aral_free_bytes());
 
         rrdset_done(st_memory_buffers);
     }
-
-    // ----------------------------------------------------------------------------------------------------------------
-
-    if(!extended)
-        return;
 
     // ----------------------------------------------------------------------------------------------------------------
 

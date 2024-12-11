@@ -3,8 +3,6 @@
 #include "stream.h"
 #include "stream-sender-internals.h"
 
-#define STREAM_CIRCULAR_BUFFER_ADAPT_TO_TIMES_MAX_SIZE 3
-
 struct stream_circular_buffer {
     struct circular_buffer *cb;
     STREAM_CIRCULAR_BUFFER_STATS stats;
@@ -41,10 +39,9 @@ STREAM_CIRCULAR_BUFFER *stream_circular_buffer_create(void) {
 }
 
 // returns true if it increased the buffer size
-bool stream_circular_buffer_set_max_size_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t uncompressed_msg_size, bool force) {
-    size_t wanted = uncompressed_msg_size * STREAM_CIRCULAR_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
-    if(force || scb->cb->max_size < wanted) {
-        scb->cb->max_size = wanted;
+bool stream_circular_buffer_set_max_size_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t max_size, bool force) {
+    if(force || scb->cb->max_size < max_size) {
+        scb->cb->max_size = max_size;
         scb->stats.bytes_max_size = scb->cb->max_size;
         __atomic_store_n(&scb->atomic.max_size, scb->cb->max_size, __ATOMIC_RELAXED);
         stream_circular_buffer_stats_update_unsafe(scb);
@@ -81,8 +78,9 @@ void stream_circular_buffer_recreate_timed_unsafe(STREAM_CIRCULAR_BUFFER *scb, u
     scb->stats.recreates++; // we increase even if we don't do it, to have sender_start() recreate its buffers
 
     if(scb->cb && scb->cb->size > CBUFFER_INITIAL_SIZE) {
+        size_t max_size = scb->cb->max_size;
         cbuffer_free(scb->cb);
-        scb->cb = cbuffer_new(CBUFFER_INITIAL_SIZE, stream_send.buffer_max_size, &netdata_buffers_statistics.cbuffers_streaming);
+        scb->cb = cbuffer_new(CBUFFER_INITIAL_SIZE, max_size, &netdata_buffers_statistics.cbuffers_streaming);
     }
 }
 
@@ -96,15 +94,22 @@ void stream_circular_buffer_destroy(STREAM_CIRCULAR_BUFFER *scb) {
 }
 
 // adds data to the circular buffer, returns false when it can't (buffer is full)
-bool stream_circular_buffer_add_unsafe(STREAM_CIRCULAR_BUFFER *scb, const char *data, size_t bytes_actual, size_t bytes_uncompressed, STREAM_TRAFFIC_TYPE type) {
+bool stream_circular_buffer_add_unsafe(
+    STREAM_CIRCULAR_BUFFER *scb, const char *data,
+    size_t bytes_actual, size_t bytes_uncompressed, STREAM_TRAFFIC_TYPE type, bool autoscale) {
     scb->stats.adds++;
     scb->stats.bytes_added += bytes_actual;
     scb->stats.bytes_uncompressed += bytes_uncompressed;
     scb->stats.bytes_sent_by_type[type] += bytes_actual;
-    bool rc = cbuffer_add_unsafe(scb->cb, data, bytes_actual) == 0;
-    if(rc)
-        stream_circular_buffer_stats_update_unsafe(scb);
-    return rc;
+
+    if(unlikely(autoscale && cbuffer_available_size_unsafe(scb->cb) < bytes_actual))
+        stream_circular_buffer_set_max_size_unsafe(scb, scb->cb->max_size * 2, true);
+
+    if(unlikely(cbuffer_add_unsafe(scb->cb, data, bytes_actual) != 0))
+        return false;
+
+    stream_circular_buffer_stats_update_unsafe(scb);
+    return true;
 }
 
 // return the first available chunk at the beginning of the buffer

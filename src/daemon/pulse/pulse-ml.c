@@ -4,14 +4,22 @@
 #include "pulse-ml.h"
 
 static struct ml_statistics {
-    alignas(64) uint64_t ml_models_consulted;
-    alignas(64) uint64_t ml_models_received;
-    alignas(64) uint64_t ml_models_ignored;
-    alignas(64) uint64_t ml_models_sent;
-    alignas(64) uint64_t ml_models_deserialization_failures;
-    alignas(64) uint64_t ml_memory_consumption;
-    alignas(64) uint64_t ml_memory_new;
-    alignas(64) uint64_t ml_memory_delete;
+    CACHE_LINE_PADDING();
+    uint64_t ml_models_consulted;
+    CACHE_LINE_PADDING();
+    uint64_t ml_models_received;
+    CACHE_LINE_PADDING();
+    uint64_t ml_models_ignored;
+    CACHE_LINE_PADDING();
+    uint64_t ml_models_sent;
+    CACHE_LINE_PADDING();
+    uint64_t ml_models_deserialization_failures;
+    CACHE_LINE_PADDING();
+    uint64_t ml_memory_consumption;
+    CACHE_LINE_PADDING();
+    uint64_t ml_memory_new;
+    CACHE_LINE_PADDING();
+    uint64_t ml_memory_delete;
 } ml_statistics = {0};
 
 void pulse_ml_models_received()

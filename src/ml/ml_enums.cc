@@ -32,10 +32,6 @@ const char *
 ml_training_status_to_string(enum ml_training_status ts)
 {
     switch (ts) {
-        case TRAINING_STATUS_PENDING_WITH_MODEL:
-            return "pending-with-model";
-        case TRAINING_STATUS_PENDING_WITHOUT_MODEL:
-            return "pending-without-model";
         case TRAINING_STATUS_TRAINED:
             return "trained";
         case TRAINING_STATUS_UNTRAINED:

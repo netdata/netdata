@@ -11,6 +11,12 @@
 #define TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS
 #endif
 
+#if ENV32BIT
+#define SYSTEM_REQUIRED_ALIGNMENT (sizeof(uintptr_t) * 2)
+#else
+#define SYSTEM_REQUIRED_ALIGNMENT (alignof(uintptr_t))
+#endif
+
 // max mapped file size
 #define ARAL_MAX_PAGE_SIZE_MMAP (1ULL * 1024 * 1024 * 1024)
 
@@ -61,13 +67,17 @@ typedef enum {
 
 struct aral_ops {
     struct {
-        alignas(64) size_t allocators; // the number of threads currently trying to allocate memory
-        alignas(64) size_t deallocators; // the number of threads currently trying to deallocate memory
-        alignas(64) bool last_allocated_or_deallocated; // stability detector, true when was last allocated
+        CACHE_LINE_PADDING();
+        size_t allocators; // the number of threads currently trying to allocate memory
+        CACHE_LINE_PADDING();
+        size_t deallocators; // the number of threads currently trying to deallocate memory
+        CACHE_LINE_PADDING();
+        bool last_allocated_or_deallocated; // stability detector, true when was last allocated
     } atomic;
 
     struct {
-        alignas(64) SPINLOCK spinlock;
+        CACHE_LINE_PADDING();
+        SPINLOCK spinlock;
         size_t allocating_elements;     // currently allocating elements
         size_t allocation_size;         // current / next allocation size
     } adders;
@@ -97,7 +107,7 @@ struct aral {
     } config;
 
     struct {
-        alignas(64) SPINLOCK spinlock;
+        SPINLOCK spinlock;
         size_t file_number;             // for mmap
 
         ARAL_PAGE *pages_free;          // pages with free items
@@ -125,12 +135,12 @@ const char *aral_name(ARAL *ar) {
     return ar->config.name;
 }
 
-size_t aral_structures_from_stats(struct aral_statistics *stats) {
+size_t aral_structures_bytes_from_stats(struct aral_statistics *stats) {
     if(!stats) return 0;
     return __atomic_load_n(&stats->structures.allocated_bytes, __ATOMIC_RELAXED);
 }
 
-size_t aral_overhead_from_stats(struct aral_statistics *stats) {
+size_t aral_free_bytes_from_stats(struct aral_statistics *stats) {
     if(!stats) return 0;
 
     size_t allocated = __atomic_load_n(&stats->malloc.allocated_bytes, __ATOMIC_RELAXED) +
@@ -139,23 +149,39 @@ size_t aral_overhead_from_stats(struct aral_statistics *stats) {
     size_t used = __atomic_load_n(&stats->malloc.used_bytes, __ATOMIC_RELAXED) +
                   __atomic_load_n(&stats->mmap.used_bytes, __ATOMIC_RELAXED);
 
-    if(allocated > used) return allocated - used;
-    return allocated;
+    return (allocated > used) ? allocated - used : 0;
 }
 
 size_t aral_used_bytes_from_stats(struct aral_statistics *stats) {
     size_t used = __atomic_load_n(&stats->malloc.used_bytes, __ATOMIC_RELAXED) +
                   __atomic_load_n(&stats->mmap.used_bytes, __ATOMIC_RELAXED);
-
     return used;
 }
 
-size_t aral_overhead(ARAL *ar) {
-    return aral_overhead_from_stats(ar->stats);
+size_t aral_padding_bytes_from_stats(struct aral_statistics *stats) {
+    size_t padding = __atomic_load_n(&stats->malloc.padding_bytes, __ATOMIC_RELAXED) +
+                     __atomic_load_n(&stats->mmap.padding_bytes, __ATOMIC_RELAXED);
+    return padding;
 }
 
-size_t aral_structures(ARAL *ar) {
-    return aral_structures_from_stats(ar->stats);
+size_t aral_used_bytes(ARAL *ar) {
+    return aral_used_bytes_from_stats(ar->stats);
+}
+
+size_t aral_free_bytes(ARAL *ar) {
+    return aral_free_bytes_from_stats(ar->stats);
+}
+
+size_t aral_structures_bytes(ARAL *ar) {
+    return aral_structures_bytes_from_stats(ar->stats);
+}
+
+size_t aral_padding_bytes(ARAL *ar) {
+    return aral_padding_bytes_from_stats(ar->stats);
+}
+
+size_t aral_free_structures_padding_from_stats(struct aral_statistics *stats) {
+    return aral_free_bytes_from_stats(stats) + aral_structures_bytes_from_stats(stats) + aral_padding_bytes_from_stats(stats);
 }
 
 struct aral_statistics *aral_get_statistics(ARAL *ar) {
@@ -343,6 +369,8 @@ static ARAL_PAGE *aral_get_page_pointer_after_element___do_NOT_have_aral_lock(AR
     }
 #endif
 
+    internal_fatal((uintptr_t)page % SYSTEM_REQUIRED_ALIGNMENT != 0, "Pointer is not aligned properly");
+
     return page;
 }
 
@@ -386,11 +414,6 @@ static size_t aral_get_system_page_size(void) {
     else
         return page_size;
 }
-
-// we don't need alignof(max_align_t) for normal C structures
-// alignof(uintptr_r) is sufficient for our use cases
-// #define SYSTEM_REQUIRED_ALIGNMENT (alignof(max_align_t))
-#define SYSTEM_REQUIRED_ALIGNMENT (alignof(uintptr_t))
 
 static size_t aral_element_slot_size(size_t requested_element_size, bool usable) {
     // we need to add a page pointer after the element
@@ -453,8 +476,11 @@ static size_t aral_next_allocation_size___adders_lock_needed(ARAL *ar, bool mark
 // --------------------------------------------------------------------------------------------------------------------
 
 static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
-    size_t data_size, structures_size;
+    struct aral_page_type_stats *stats;
     ARAL_PAGE *page;
+
+    size_t total_size = size;
+
     if(ar->config.mmap.enabled) {
         page = callocz(1, sizeof(ARAL_PAGE));
         ar->aral_lock.file_number++;
@@ -469,10 +495,8 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
             fatal("ARAL: '%s' cannot allocate aral buffer of size %zu on filename '%s'",
                   ar->config.name, size, page->filename);
 
-        __atomic_add_fetch(&ar->stats->mmap.allocations, 1, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&ar->stats->mmap.allocated_bytes, size, __ATOMIC_RELAXED);
-        data_size = size;
-        structures_size = sizeof(ARAL_PAGE);
+        total_size = size + sizeof(ARAL_PAGE);
+        stats = &ar->stats->mmap;
     }
 #ifdef NETDATA_TRACE_ALLOCATIONS
     else {
@@ -485,23 +509,18 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
 #else
     else {
         size_t ARAL_PAGE_size = memory_alignment(sizeof(ARAL_PAGE), SYSTEM_REQUIRED_ALIGNMENT);
-        size_t max_elements = aral_elements_in_page_size(ar, size);
-        data_size = max_elements * ar->config.element_size;
-        structures_size = size - data_size;
 
         if (size >= ARAL_MMAP_PAGES_ABOVE) {
             bool mapped;
             uint8_t *ptr = netdata_mmap(NULL, size, MAP_PRIVATE, 1, false, NULL);
             if (ptr) {
                 mapped = true;
-                __atomic_add_fetch(&ar->stats->mmap.allocations, 1, __ATOMIC_RELAXED);
-                __atomic_add_fetch(&ar->stats->mmap.allocated_bytes, data_size, __ATOMIC_RELAXED);
+                stats = &ar->stats->mmap;
             }
             else {
                 ptr = mallocz(size);
                 mapped = false;
-                __atomic_add_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
-                __atomic_add_fetch(&ar->stats->malloc.allocated_bytes, data_size, __ATOMIC_RELAXED);
+                stats = &ar->stats->malloc;
             }
             page = (ARAL_PAGE *)ptr;
             memset(page, 0, ARAL_PAGE_size);
@@ -515,8 +534,7 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
             page->data = &ptr[ARAL_PAGE_size];
             page->mapped = false;
 
-            __atomic_add_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
-            __atomic_add_fetch(&ar->stats->malloc.allocated_bytes, data_size, __ATOMIC_RELAXED);
+            stats = &ar->stats->malloc;
         }
     }
 #endif
@@ -526,13 +544,21 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
     page->max_elements = aral_elements_in_page_size(ar, page->size);
     page->aral_lock.free_elements = page->max_elements;
 
+    size_t structures_size = sizeof(ARAL_PAGE) + page->max_elements * sizeof(void *);
+    size_t data_size = page->max_elements * ar->config.requested_element_size;
+    size_t padding_size = total_size - data_size - structures_size;
+
+    __atomic_add_fetch(&stats->allocations, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&stats->allocated_bytes, data_size, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&stats->padding_bytes, padding_size, __ATOMIC_RELAXED);
+
     __atomic_add_fetch(&ar->stats->structures.allocations, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ar->stats->structures.allocated_bytes, structures_size, __ATOMIC_RELAXED);
 
     // link the free space to its page
     ARAL_FREE *fr = (ARAL_FREE *)page->data;
 
-    fr->size = data_size;
+    fr->size = page->max_elements * ar->config.element_size;
     fr->next = NULL;
     page->free.list = fr;
 
@@ -545,15 +571,15 @@ void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_
     size_t idx = mark_to_idx(page->started_marked);
     __atomic_store_n(&ar->ops[idx].atomic.last_allocated_or_deallocated, true, __ATOMIC_RELAXED);
 
-    size_t data_size, structures_size;
+    struct aral_page_type_stats *stats;
+    size_t max_elements = page->max_elements;
+    size_t size = page->size;
+    size_t total_size = size;
 
     // free it
     if (ar->config.mmap.enabled) {
-        data_size = page->size;
-        structures_size = sizeof(ARAL_PAGE);
-
-        __atomic_sub_fetch(&ar->stats->mmap.allocations, 1, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&ar->stats->mmap.allocated_bytes, page->size, __ATOMIC_RELAXED);
+        stats = &ar->stats->mmap;
+        total_size = size + sizeof(ARAL_PAGE);
 
         netdata_munmap(page->data, page->size);
 
@@ -571,23 +597,24 @@ void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_
         freez_int(page->data TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
         freez(page);
 #else
-        data_size = page->max_elements * ar->config.element_size;
-        structures_size = page->size - data_size;
-
         if(page->mapped) {
-            __atomic_sub_fetch(&ar->stats->mmap.allocations, 1, __ATOMIC_RELAXED);
-            __atomic_sub_fetch(&ar->stats->mmap.allocated_bytes, data_size, __ATOMIC_RELAXED);
-
+            stats = &ar->stats->mmap;
             netdata_munmap(page, page->size);
         }
         else {
-            __atomic_sub_fetch(&ar->stats->malloc.allocations, 1, __ATOMIC_RELAXED);
-            __atomic_sub_fetch(&ar->stats->malloc.allocated_bytes, data_size, __ATOMIC_RELAXED);
-
+            stats = &ar->stats->malloc;
             freez(page);
         }
 #endif
     }
+
+    size_t structures_size = sizeof(ARAL_PAGE) + max_elements * sizeof(void *);
+    size_t data_size = max_elements * ar->config.requested_element_size;
+    size_t padding_size = total_size - data_size - structures_size;
+
+    __atomic_sub_fetch(&stats->allocations, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&stats->allocated_bytes, data_size, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&stats->padding_bytes, padding_size, __ATOMIC_RELAXED);
 
     __atomic_sub_fetch(&ar->stats->structures.allocations, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&ar->stats->structures.allocated_bytes, structures_size, __ATOMIC_RELAXED);
@@ -766,10 +793,12 @@ void *aral_mallocz_internal(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEF
     // put the page pointer after the element
     aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ar, page, found_fr, marked);
 
-    if(unlikely(ar->config.mmap.enabled))
-        __atomic_add_fetch(&ar->stats->mmap.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
+    if(unlikely(ar->config.mmap.enabled || page->mapped))
+        __atomic_add_fetch(&ar->stats->mmap.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
     else
-        __atomic_add_fetch(&ar->stats->malloc.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ar->stats->malloc.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+
+    internal_fatal((uintptr_t)found_fr % SYSTEM_REQUIRED_ALIGNMENT != 0, "Pointer is not aligned properly");
 
     return (void *)found_fr;
 }
@@ -827,17 +856,17 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
 
     if(unlikely(!ptr)) return;
 
-    if(unlikely(ar->config.mmap.enabled))
-        __atomic_sub_fetch(&ar->stats->mmap.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
-    else
-        __atomic_sub_fetch(&ar->stats->malloc.used_bytes, ar->config.element_size, __ATOMIC_RELAXED);
-
     // get the page pointer
     bool marked;
     ARAL_PAGE *page = aral_get_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, &marked);
 
     size_t idx = mark_to_idx(marked);
     __atomic_add_fetch(&ar->ops[idx].atomic.deallocators, 1, __ATOMIC_RELAXED);
+
+    if(unlikely(ar->config.mmap.enabled || page->mapped))
+        __atomic_sub_fetch(&ar->stats->mmap.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
+    else
+        __atomic_sub_fetch(&ar->stats->malloc.used_bytes, ar->config.requested_element_size, __ATOMIC_RELAXED);
 
     // make this element available
     ARAL_FREE *fr = (ARAL_FREE *)ptr;
@@ -1093,16 +1122,20 @@ struct aral_statistics *aral_by_size_statistics(void) {
     return &aral_by_size_globals.shared_statistics;
 }
 
-size_t aral_by_size_structures(void) {
-    return aral_structures_from_stats(&aral_by_size_globals.shared_statistics);
+size_t aral_by_size_structures_bytes(void) {
+    return aral_structures_bytes_from_stats(&aral_by_size_globals.shared_statistics);
 }
 
-size_t aral_by_size_overhead(void) {
-    return aral_overhead_from_stats(&aral_by_size_globals.shared_statistics);
+size_t aral_by_size_free_bytes(void) {
+    return aral_free_bytes_from_stats(&aral_by_size_globals.shared_statistics);
 }
 
 size_t aral_by_size_used_bytes(void) {
     return aral_used_bytes_from_stats(&aral_by_size_globals.shared_statistics);
+}
+
+size_t aral_by_size_padding_bytes(void) {
+    return aral_padding_bytes_from_stats(&aral_by_size_globals.shared_statistics);
 }
 
 ARAL *aral_by_size_acquire(size_t size) {

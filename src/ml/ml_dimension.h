@@ -29,7 +29,7 @@ struct ml_dimension_t {
 };
 
 bool
-ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t value, bool exists);
+ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists);
 
 bool ml_dimension_deserialize_kmeans(const char *json_str);
 

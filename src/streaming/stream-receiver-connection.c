@@ -4,6 +4,7 @@
 #include "stream-thread.h"
 #include "stream-receiver-internals.h"
 #include "web/server/h2o/http_server.h"
+#include "replication.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -25,8 +26,9 @@ void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, con
            , (rpt->machine_guid && *rpt->machine_guid) ? rpt->machine_guid : ""
            , msg);
 
-    nd_log(NDLS_DAEMON, priority, "STREAM RECEIVE '%s': %s %s%s%s"
+    nd_log(NDLS_DAEMON, priority, "STREAM RECEIVE '%s' [from [%s]:%s]: %s %s%s%s"
            , (rpt->hostname && *rpt->hostname) ? rpt->hostname : ""
+           , rpt->client_ip, rpt->client_port
            , msg
            , rpt->exit.reason != STREAM_HANDSHAKE_NEVER?" (":""
            , stream_handshake_error_to_string(rpt->exit.reason)
@@ -142,30 +144,41 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
         if(!host) {
             stream_receiver_log_status(
                 rpt,
-                "failed to find/create host structure, rejecting connection",
+                "rejecting streaming connection; failed to find or create the required host structure",
                 STREAM_STATUS_INTERNAL_SERVER_ERROR, NDLP_ERR);
 
             stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INTERNAL_ERROR);
             return false;
         }
+        // IMPORTANT: KEEP THIS FIRST AFTER CHECKING host RESPONSE!
+        // THIS IS HOW WE KNOW THE system_info IS GONE NOW...
+        // system_info has been consumed by the host structure
+        rpt->system_info = NULL;
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
             stream_receiver_log_status(
                 rpt,
-                "host is initializing, retry later",
+                "rejecting streaming connection; host is initializing, retry later",
                 STREAM_STATUS_INITIALIZATION_IN_PROGRESS, NDLP_NOTICE);
 
             stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INITIALIZATION);
             return false;
         }
 
-        // system_info has been consumed by the host structure
-        rpt->system_info = NULL;
+        if (unlikely(!stream_control_children_should_be_accepted())) {
+            stream_receiver_log_status(
+                rpt,
+                "rejecting streaming connection; the system is backfilling higher tiers with high-resolution data, retry later",
+                STREAM_STATUS_INITIALIZATION_IN_PROGRESS, NDLP_NOTICE);
+
+            stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INITIALIZATION);
+            return false;
+        }
 
         if(!rrdhost_set_receiver(host, rpt)) {
             stream_receiver_log_status(
                 rpt,
-                "host is already served by another receiver",
+                "rejecting streaming connection; host is already served by another receiver",
                 STREAM_STATUS_DUPLICATE_RECEIVER, NDLP_INFO);
 
             stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_ALREADY_STREAMING);
@@ -174,7 +187,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
+    netdata_log_info("STREAM RECEIVE '%s' [from [%s]:%s]: "
                      "client willing to stream metrics for host '%s' with machine_guid '%s': "
                      "update every = %d, history = %d, memory mode = %s, health %s,%s"
                      , rpt->hostname
@@ -395,7 +408,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     if(!rpt->key || !*rpt->key) {
         stream_receiver_log_status(
             rpt,
-            "request without an API key, rejecting connection",
+            "rejecting streaming connection; request without an API key",
             STREAM_STATUS_NO_API_KEY, NDLP_WARNING);
 
         stream_receiver_free(rpt);
@@ -405,7 +418,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     if(!rpt->hostname || !*rpt->hostname) {
         stream_receiver_log_status(
             rpt,
-            "request without a hostname, rejecting connection",
+            "rejecting streaming connection; request without a hostname",
             STREAM_STATUS_NO_HOSTNAME, NDLP_WARNING);
 
         stream_receiver_free(rpt);
@@ -418,7 +431,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     if(!rpt->machine_guid || !*rpt->machine_guid) {
         stream_receiver_log_status(
             rpt,
-            "request without a machine GUID, rejecting connection",
+            "rejecting streaming connection; request without a machine UUID",
             STREAM_STATUS_NO_MACHINE_GUID, NDLP_WARNING);
 
         stream_receiver_free(rpt);
@@ -431,7 +444,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         if (regenerate_guid(rpt->key, buf) == -1) {
             stream_receiver_log_status(
                 rpt,
-                "API key is not a valid UUID (use the command uuidgen to generate one)",
+                "rejecting streaming connection; API key is not a valid UUID (use the command uuidgen to generate one)",
                 STREAM_STATUS_INVALID_API_KEY, NDLP_WARNING);
 
             stream_receiver_free(rpt);
@@ -441,7 +454,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         if (regenerate_guid(rpt->machine_guid, buf) == -1) {
             stream_receiver_log_status(
                 rpt,
-                "machine GUID is not a valid UUID",
+                "rejecting streaming connection; machine UUID is not a valid UUID",
                 STREAM_STATUS_INVALID_MACHINE_GUID, NDLP_WARNING);
 
             stream_receiver_free(rpt);
@@ -452,7 +465,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     if(!stream_conf_is_key_type(rpt->key, "api")) {
         stream_receiver_log_status(
             rpt,
-            "API key is a machine GUID",
+            "rejecting streaming connection; API key provided is a machine UUID (did you mix them up?)",
             STREAM_STATUS_INVALID_API_KEY, NDLP_WARNING);
 
         stream_receiver_free(rpt);
@@ -464,7 +477,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     if(!stream_conf_api_key_is_enabled(rpt->key, false)) {
         stream_receiver_log_status(
             rpt,
-            "API key is not enabled",
+            "rejecting streaming connection; API key is not enabled in stream.conf",
             STREAM_STATUS_API_KEY_DISABLED, NDLP_WARNING);
 
         stream_receiver_free(rpt);
@@ -474,7 +487,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     if(!stream_conf_api_key_allows_client(rpt->key, w->client_ip)) {
         stream_receiver_log_status(
             rpt,
-            "API key is not allowed from this IP",
+            "rejecting streaming connection; API key is not allowed from this IP",
             STREAM_STATUS_NOT_ALLOWED_IP, NDLP_WARNING);
 
         stream_receiver_free(rpt);
@@ -484,7 +497,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     if (!stream_conf_is_key_type(rpt->machine_guid, "machine")) {
         stream_receiver_log_status(
             rpt,
-            "machine GUID is an API key",
+            "rejecting streaming connection; machine UUID is an API key (did you mix them up?)",
             STREAM_STATUS_INVALID_MACHINE_GUID, NDLP_WARNING);
 
         stream_receiver_free(rpt);
@@ -496,7 +509,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     if(!stream_conf_api_key_is_enabled(rpt->machine_guid, true)) {
         stream_receiver_log_status(
             rpt,
-            "machine GUID is not enabled",
+            "rejecting streaming connection; machine UUID is not enabled in stream.conf",
             STREAM_STATUS_MACHINE_GUID_DISABLED, NDLP_WARNING);
 
         stream_receiver_free(rpt);
@@ -506,7 +519,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     if(!stream_conf_api_key_allows_client(rpt->machine_guid, w->client_ip)) {
         stream_receiver_log_status(
             rpt,
-            "machine GUID is not allowed from this IP",
+            "rejecting streaming connection; machine UUID is not allowed from this IP",
             STREAM_STATUS_NOT_ALLOWED_IP, NDLP_WARNING);
 
         stream_receiver_free(rpt);
@@ -518,7 +531,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
         stream_receiver_log_status(
             rpt,
-            "machine GUID is my own",
+            "rejecting streaming connection; machine UUID is my own",
             STREAM_STATUS_LOCALHOST, NDLP_DEBUG);
 
         char initial_response[HTTP_HEADER_SIZE + 1];
@@ -551,7 +564,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
             char msg[100 + 1];
             snprintfz(msg, sizeof(msg) - 1,
-                      "rate limit, will accept new connection in %ld secs",
+                      "rejecting streaming connection; rate limit, will accept new connection in %ld secs",
                       (long)(web_client_streaming_rate_t - (now - last_stream_accepted_t)));
 
             stream_receiver_log_status(rpt, msg, STREAM_STATUS_RATE_LIMIT, NDLP_NOTICE);
@@ -616,7 +629,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
             char msg[200 + 1];
             snprintfz(msg, sizeof(msg) - 1,
-                      "multiple connections for same host, "
+                      "rejecting streaming connection; multiple connections for same host, "
                       "old connection was last used %ld secs ago%s",
                       age, receiver_stale ? " (signaled old receiver to stop)" : " (new connection not accepted)");
 

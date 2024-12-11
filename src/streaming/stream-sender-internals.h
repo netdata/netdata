@@ -40,6 +40,8 @@ struct sender_state {
     ND_SOCK sock;
 
     struct {
+        bool draining_input;        // used exclusively by the stream thread
+
         struct stream_opcode msg;   // the template for sending a message to the dispatcher - protected by sender_lock()
 
         // this is a property of stream_sender_send_msg_to_dispatcher()

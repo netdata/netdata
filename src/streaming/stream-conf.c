@@ -194,7 +194,7 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
         rrd_memory_mode_name(default_rrd_memory_mode))));
 
     if (unlikely(config->mode == RRD_MEMORY_MODE_DBENGINE && !dbengine_enabled)) {
-        netdata_log_error("STREAM '%s' [receive from %s:%s]: "
+        netdata_log_error("STREAM RECEIVE '%s' [from [%s]:%s]: "
                           "dbengine is not enabled, falling back to default."
                           , rpt->hostname
                           , rpt->client_ip, rpt->client_port
@@ -270,11 +270,8 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
         stream_parse_compression_order(
             config,
             appconfig_get(
-                &stream_config,
-                machine_guid,
-                "compression algorithms order",
-                appconfig_get(
-                    &stream_config, api_key, "compression algorithms order", STREAM_COMPRESSION_ALGORITHMS_ORDER)));
+                &stream_config, machine_guid, "compression algorithms order",
+                appconfig_get(&stream_config, api_key, "compression algorithms order", STREAM_COMPRESSION_ALGORITHMS_ORDER)));
     }
 
     config->ephemeral =

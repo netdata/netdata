@@ -3,6 +3,8 @@
 #ifndef NETDATA_API_DATA_QUERY_H
 #define NETDATA_API_DATA_QUERY_H
 
+#include "libnetdata/common.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

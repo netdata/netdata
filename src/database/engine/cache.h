@@ -48,116 +48,180 @@ struct pgc_size_histogram {
 };
 
 struct pgc_queue_statistics {
+    CACHE_LINE_PADDING();
     struct pgc_size_histogram size_histogram;
 
-    alignas(64) size_t entries;
-    alignas(64) size_t size;
+    CACHE_LINE_PADDING();
+    size_t entries;
+    CACHE_LINE_PADDING();
+    size_t size;
 
-    alignas(64) size_t max_entries;
-    alignas(64) size_t max_size;
+    CACHE_LINE_PADDING();
+    size_t max_entries;
+    CACHE_LINE_PADDING();
+    size_t max_size;
 
-    alignas(64) size_t added_entries;
-    alignas(64) size_t added_size;
+    CACHE_LINE_PADDING();
+    size_t added_entries;
+    CACHE_LINE_PADDING();
+    size_t added_size;
 
-    alignas(64) size_t removed_entries;
-    alignas(64) size_t removed_size;
+    CACHE_LINE_PADDING();
+    size_t removed_entries;
+    CACHE_LINE_PADDING();
+    size_t removed_size;
+
+    CACHE_LINE_PADDING();
 };
 
 struct pgc_statistics {
-    alignas(64) size_t wanted_cache_size;
-    alignas(64) size_t current_cache_size;
+    CACHE_LINE_PADDING();
+    size_t wanted_cache_size;
+    CACHE_LINE_PADDING();
+    size_t current_cache_size;
+    CACHE_LINE_PADDING();
 
     // ----------------------------------------------------------------------------------------------------------------
     // volume
 
-    alignas(64) size_t entries;                 // all the entries (includes clean, dirty, hot)
-    alignas(64) size_t size;                    // all the entries (includes clean, dirty, hot)
+    CACHE_LINE_PADDING();
+    size_t entries;                 // all the entries (includes clean, dirty, hot)
+    CACHE_LINE_PADDING();
+    size_t size;                    // all the entries (includes clean, dirty, hot)
 
-    alignas(64) size_t referenced_entries;      // all the entries currently referenced
-    alignas(64) size_t referenced_size;         // all the entries currently referenced
+    CACHE_LINE_PADDING();
+    size_t referenced_entries;      // all the entries currently referenced
+    CACHE_LINE_PADDING();
+    size_t referenced_size;         // all the entries currently referenced
 
-    alignas(64) size_t added_entries;
-    alignas(64) size_t added_size;
+    CACHE_LINE_PADDING();
+    size_t added_entries;
+    CACHE_LINE_PADDING();
+    size_t added_size;
 
-    alignas(64) size_t removed_entries;
-    alignas(64) size_t removed_size;
+    CACHE_LINE_PADDING();
+    size_t removed_entries;
+    CACHE_LINE_PADDING();
+    size_t removed_size;
 
 #ifdef PGC_COUNT_POINTS_COLLECTED
-    alignas(64) size_t points_collected;
+    CACHE_LINE_PADDING();
+    size_t points_collected;
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------
     // migrations
 
-    alignas(64) size_t evicting_entries;
-    alignas(64) size_t evicting_size;
+    CACHE_LINE_PADDING();
+    size_t evicting_entries;
+    CACHE_LINE_PADDING();
+    size_t evicting_size;
 
-    alignas(64) size_t flushing_entries;
-    alignas(64) size_t flushing_size;
+    CACHE_LINE_PADDING();
+    size_t flushing_entries;
+    CACHE_LINE_PADDING();
+    size_t flushing_size;
 
-    alignas(64) size_t hot2dirty_entries;
-    alignas(64) size_t hot2dirty_size;
+    CACHE_LINE_PADDING();
+    size_t hot2dirty_entries;
+    CACHE_LINE_PADDING();
+    size_t hot2dirty_size;
 
-    alignas(64) size_t hot_empty_pages_evicted_immediately;
-    alignas(64) size_t hot_empty_pages_evicted_later;
+    CACHE_LINE_PADDING();
+    size_t hot_empty_pages_evicted_immediately;
+    CACHE_LINE_PADDING();
+    size_t hot_empty_pages_evicted_later;
 
     // ----------------------------------------------------------------------------------------------------------------
     // workload
 
-    alignas(64) size_t acquires;
-    alignas(64) size_t releases;
+    CACHE_LINE_PADDING();
+    size_t acquires;
+    CACHE_LINE_PADDING();
+    size_t releases;
 
-    alignas(64) size_t acquires_for_deletion;
+    CACHE_LINE_PADDING();
+    size_t acquires_for_deletion;
 
-    alignas(64) size_t searches_exact;
-    alignas(64) size_t searches_exact_hits;
-    alignas(64) size_t searches_exact_misses;
+    CACHE_LINE_PADDING();
+    size_t searches_exact;
+    CACHE_LINE_PADDING();
+    size_t searches_exact_hits;
+    CACHE_LINE_PADDING();
+    size_t searches_exact_misses;
 
-    alignas(64) size_t searches_closest;
-    alignas(64) size_t searches_closest_hits;
-    alignas(64) size_t searches_closest_misses;
+    CACHE_LINE_PADDING();
+    size_t searches_closest;
+    CACHE_LINE_PADDING();
+    size_t searches_closest_hits;
+    CACHE_LINE_PADDING();
+    size_t searches_closest_misses;
 
-    alignas(64) size_t flushes_completed;
-    alignas(64) size_t flushes_completed_size;
-    alignas(64) size_t flushes_cancelled_size;
+    CACHE_LINE_PADDING();
+    size_t flushes_completed;
+    CACHE_LINE_PADDING();
+    size_t flushes_completed_size;
+    CACHE_LINE_PADDING();
+    size_t flushes_cancelled_size;
 
     // ----------------------------------------------------------------------------------------------------------------
     // critical events
 
-    alignas(64) size_t events_cache_under_severe_pressure;
-    alignas(64) size_t events_cache_needs_space_aggressively;
-    alignas(64) size_t events_flush_critical;
+    CACHE_LINE_PADDING();
+    size_t events_cache_under_severe_pressure;
+    CACHE_LINE_PADDING();
+    size_t events_cache_needs_space_aggressively;
+    CACHE_LINE_PADDING();
+    size_t events_flush_critical;
 
     // ----------------------------------------------------------------------------------------------------------------
     // worker threads
 
-    alignas(64) size_t workers_search;
-    alignas(64) size_t workers_add;
-    alignas(64) size_t workers_evict;
-    alignas(64) size_t workers_flush;
-    alignas(64) size_t workers_jv2_flush;
-    alignas(64) size_t workers_hot2dirty;
+    CACHE_LINE_PADDING();
+    size_t workers_search;
+    CACHE_LINE_PADDING();
+    size_t workers_add;
+    CACHE_LINE_PADDING();
+    size_t workers_evict;
+    CACHE_LINE_PADDING();
+    size_t workers_flush;
+    CACHE_LINE_PADDING();
+    size_t workers_jv2_flush;
+    CACHE_LINE_PADDING();
+    size_t workers_hot2dirty;
 
     // ----------------------------------------------------------------------------------------------------------------
     // waste events
 
     // waste events - spins
-    alignas(64) size_t waste_insert_spins;
-    alignas(64) size_t waste_evict_useless_spins;
-    alignas(64) size_t waste_release_spins;
-    alignas(64) size_t waste_acquire_spins;
-    alignas(64) size_t waste_delete_spins;
+    CACHE_LINE_PADDING();
+    size_t waste_insert_spins;
+    CACHE_LINE_PADDING();
+    size_t waste_evict_useless_spins;
+    CACHE_LINE_PADDING();
+    size_t waste_release_spins;
+    CACHE_LINE_PADDING();
+    size_t waste_acquire_spins;
+    CACHE_LINE_PADDING();
+    size_t waste_delete_spins;
 
     // waste events - eviction
-    alignas(64) size_t waste_evict_relocated;
-    alignas(64) size_t waste_evict_thread_signals;
-    alignas(64) size_t waste_evictions_inline_on_add;
-    alignas(64) size_t waste_evictions_inline_on_release;
+    CACHE_LINE_PADDING();
+    size_t waste_evict_relocated;
+    CACHE_LINE_PADDING();
+    size_t waste_evict_thread_signals;
+    CACHE_LINE_PADDING();
+    size_t waste_evictions_inline_on_add;
+    CACHE_LINE_PADDING();
+    size_t waste_evictions_inline_on_release;
 
     // waste events - flushing
-    alignas(64) size_t waste_flush_on_add;
-    alignas(64) size_t waste_flush_on_release;
-    alignas(64) size_t waste_flushes_cancelled;
+    CACHE_LINE_PADDING();
+    size_t waste_flush_on_add;
+    CACHE_LINE_PADDING();
+    size_t waste_flush_on_release;
+    CACHE_LINE_PADDING();
+    size_t waste_flushes_cancelled;
 
     // ----------------------------------------------------------------------------------------------------------------
     // per queue statistics
@@ -248,8 +312,7 @@ bool pgc_flush_pages(PGC *cache);
 struct pgc_statistics pgc_get_statistics(PGC *cache);
 size_t pgc_hot_and_dirty_entries(PGC *cache);
 
-size_t pgc_aral_structures(void);
-size_t pgc_aral_overhead(void);
+struct aral_statistics *pgc_aral_stats(void);
 
 static inline size_t indexing_partition(Word_t ptr, Word_t modulo) __attribute__((const));
 static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {

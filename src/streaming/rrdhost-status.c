@@ -132,7 +132,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     rrdhost_receiver_lock(host);
     s->ingest.hops = (int16_t)(host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
     bool has_receiver = false;
-    if (host->receiver && !rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_RECEIVER_DISCONNECTED)) {
+    if (host->receiver && rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE)) {
         has_receiver = true;
         s->ingest.replication.instances = rrdhost_receiver_replicating_charts(host);
         s->ingest.replication.completion = host->stream.rcv.status.replication.percent;

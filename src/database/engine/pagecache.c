@@ -1033,7 +1033,7 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
 
 size_t dynamic_open_cache_size(void) {
     size_t main_wanted_cache_size = pgc_get_wanted_cache_size(main_cache);
-    size_t target_size = main_wanted_cache_size / 100 * 10; // 10%
+    size_t target_size = main_wanted_cache_size / 100 * 5;
 
     if(target_size < 2 * 1024 * 1024)
         target_size = 2 * 1024 * 1024;
@@ -1048,7 +1048,7 @@ size_t dynamic_open_cache_size(void) {
 
 size_t dynamic_extent_cache_size(void) {
     size_t main_wanted_cache_size = pgc_get_wanted_cache_size(main_cache);
-    size_t target_size = main_wanted_cache_size / 100 * 10; // 10%
+    size_t target_size = main_wanted_cache_size / 100 * 30;
 
     if(target_size < 5 * 1024 * 1024)
         target_size = 5 * 1024 * 1024;
@@ -1070,12 +1070,12 @@ void pgc_and_mrg_initialize(void)
     main_mrg = mrg_create(0);
 
     size_t target_cache_size = (size_t)default_rrdeng_page_cache_mb * 1024ULL * 1024ULL;
-    size_t main_cache_size = (target_cache_size / 100) * 95;
+    size_t main_cache_size = (target_cache_size / 100) * 70;
     size_t open_cache_size = 0;
-    size_t extent_cache_size = (target_cache_size / 100) * 5;
+    size_t extent_cache_size = (target_cache_size / 100) * 30;
 
-    if(extent_cache_size < 3 * 1024 * 1024) {
-        extent_cache_size = 3 * 1024 * 1024;
+    if(extent_cache_size < 5 * 1024 * 1024) {
+        extent_cache_size = 5 * 1024 * 1024;
         main_cache_size = target_cache_size - extent_cache_size;
     }
 
@@ -1092,7 +1092,7 @@ void pgc_and_mrg_initialize(void)
             pgc_max_evictors(),
             1000,
             1,
-            PGC_OPTIONS_AUTOSCALE,
+            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
             0,
             0
     );
@@ -1109,7 +1109,7 @@ void pgc_and_mrg_initialize(void)
             pgc_max_evictors(),
             1000,
             1,
-            PGC_OPTIONS_AUTOSCALE, // flushing inline: all dirty pages are just converted to clean
+            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
             0,
             sizeof(struct extent_io_data)
     );
@@ -1126,7 +1126,7 @@ void pgc_and_mrg_initialize(void)
             pgc_max_evictors(),
             1000,
             1,
-            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE, // no flushing needed
+            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE, // no flushing needed
             0,
             0
     );

@@ -34,12 +34,12 @@ __attribute__((constructor)) void aral_judy_init(void) {
         }
 }
 
-size_t judy_aral_overhead(void) {
-    return aral_overhead_from_stats(&judy_sizes_aral_statistics);
+size_t judy_aral_free_bytes(void) {
+    return aral_free_bytes_from_stats(&judy_sizes_aral_statistics);
 }
 
 size_t judy_aral_structures(void) {
-    return aral_structures_from_stats(&judy_sizes_aral_statistics);
+    return aral_structures_bytes_from_stats(&judy_sizes_aral_statistics);
 }
 
 static ARAL *judy_size_aral(Word_t Words) {
@@ -51,11 +51,11 @@ static ARAL *judy_size_aral(Word_t Words) {
 
 static __thread int64_t judy_allocated = 0;
 
-void JudyAllocThreadTelemetryReset(void) {
+void JudyAllocThreadPulseReset(void) {
     judy_allocated = 0;
 }
 
-int64_t JudyAllocThreadTelemetryGetAndReset(void) {
+int64_t JudyAllocThreadPulseGetAndReset(void) {
     int64_t rc = judy_allocated;
     judy_allocated = 0;
     return rc;

@@ -35,6 +35,8 @@ struct receiver_state {
     struct buffered_reader reader;
 
     struct {
+        bool draining_input;        // used exclusively by the stream thread
+
         // The parser pointer is safe to read and use, only when having the host receiver lock.
         // Without this lock, the data pointed by the pointer may vanish randomly.
         // Also, since the receiver sets it when it starts, it should be read with
@@ -88,7 +90,6 @@ void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, con
 void stream_receiver_free(struct receiver_state *rpt);
 bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE reason);
 
-ssize_t send_to_child(const char *txt, void *data, STREAM_TRAFFIC_TYPE type);
 void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcode msg);
 void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state *rpt, struct stream_opcode *msg);
 

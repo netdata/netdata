@@ -90,19 +90,16 @@ static inline void MRG_STATS_DELETE_MISS(MRG *mrg, size_t partition) {
 #define mrg_index_write_lock(mrg, partition) rw_spinlock_write_lock(&(mrg)->index[partition].rw_spinlock)
 #define mrg_index_write_unlock(mrg, partition) rw_spinlock_write_unlock(&(mrg)->index[partition].rw_spinlock)
 
-static inline void mrg_stats_size_judyl_change(MRG *mrg, size_t mem_before_judyl, size_t mem_after_judyl, size_t partition) {
-    if(mem_after_judyl > mem_before_judyl)
-        __atomic_add_fetch(&mrg->index[partition].stats.size, mem_after_judyl - mem_before_judyl, __ATOMIC_RELAXED);
-    else if(mem_after_judyl < mem_before_judyl)
-        __atomic_sub_fetch(&mrg->index[partition].stats.size, mem_before_judyl - mem_after_judyl, __ATOMIC_RELAXED);
+static inline void mrg_stats_size_judyl_change(MRG *mrg, int64_t judy_mem, size_t partition) {
+    __atomic_add_fetch(&mrg->index[partition].stats.size, judy_mem, __ATOMIC_RELAXED);
 }
 
-static inline void mrg_stats_size_judyhs_added_uuid(MRG *mrg, size_t partition) {
-    __atomic_add_fetch(&mrg->index[partition].stats.size, JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(nd_uuid_t)), __ATOMIC_RELAXED);
+static inline void mrg_stats_size_judyhs_added_uuid(MRG *mrg, size_t partition, int64_t judy_mem) {
+    __atomic_add_fetch(&mrg->index[partition].stats.size, judy_mem, __ATOMIC_RELAXED);
 }
 
-static inline void mrg_stats_size_judyhs_removed_uuid(MRG *mrg, size_t partition) {
-    __atomic_sub_fetch(&mrg->index[partition].stats.size, JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(nd_uuid_t)), __ATOMIC_RELAXED);
+static inline void mrg_stats_size_judyhs_removed_uuid(MRG *mrg, size_t partition, int64_t judy_mem) {
+    __atomic_sub_fetch(&mrg->index[partition].stats.size, judy_mem, __ATOMIC_RELAXED);
 }
 
 static inline size_t uuid_partition(MRG *mrg __maybe_unused, nd_uuid_t *uuid) {
@@ -163,7 +160,7 @@ static inline bool acquired_metric_has_retention(MRG *mrg, METRIC *metric) {
 static inline void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric) {
     size_t partition = metric->partition;
 
-    size_t mem_before_judyl, mem_after_judyl;
+    int64_t judy_mem;
 
     mrg_index_write_lock(mrg, partition);
 
@@ -174,10 +171,10 @@ static inline void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric)
         return;
     }
 
-    mem_before_judyl = JudyLMemUsed(*sections_judy_pptr);
+    judy_mem = -(int64_t)JudyLMemUsed(*sections_judy_pptr);
     int rc = JudyLDel(sections_judy_pptr, metric->section, PJE0);
-    mem_after_judyl = JudyLMemUsed(*sections_judy_pptr);
-    mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl, partition);
+    judy_mem += (int64_t)JudyLMemUsed(*sections_judy_pptr);
+    mrg_stats_size_judyl_change(mrg, judy_mem, partition);
 
     if(unlikely(!rc)) {
         MRG_STATS_DELETE_MISS(mrg, partition);
@@ -186,10 +183,15 @@ static inline void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric)
     }
 
     if(!*sections_judy_pptr) {
+        JudyAllocThreadPulseReset();
+
         rc = JudyHSDel(&mrg->index[partition].uuid_judy, &metric->uuid, sizeof(nd_uuid_t), PJE0);
+
+        int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+
         if(unlikely(!rc))
             fatal("DBENGINE METRIC: cannot delete UUID from JudyHS");
-        mrg_stats_size_judyhs_removed_uuid(mrg, partition);
+        mrg_stats_size_judyhs_removed_uuid(mrg, partition, judy_mem);
     }
 
     MRG_STATS_DELETED_METRIC(mrg, partition);
@@ -262,19 +264,22 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
     while(1) {
         mrg_index_write_lock(mrg, partition);
 
-        size_t mem_before_judyl, mem_after_judyl;
+        JudyAllocThreadPulseReset();
 
         Pvoid_t *sections_judy_pptr = JudyHSIns(&mrg->index[partition].uuid_judy, entry->uuid, sizeof(nd_uuid_t), PJE0);
+
+        int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+
         if (unlikely(!sections_judy_pptr || sections_judy_pptr == PJERR))
             fatal("DBENGINE METRIC: corrupted UUIDs JudyHS array");
 
         if (unlikely(!*sections_judy_pptr))
-            mrg_stats_size_judyhs_added_uuid(mrg, partition);
+            mrg_stats_size_judyhs_added_uuid(mrg, partition, judy_mem);
 
-        mem_before_judyl = JudyLMemUsed(*sections_judy_pptr);
+        judy_mem = -(int64_t)JudyLMemUsed(*sections_judy_pptr);
         PValue = JudyLIns(sections_judy_pptr, entry->section, PJE0);
-        mem_after_judyl = JudyLMemUsed(*sections_judy_pptr);
-        mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl, partition);
+        judy_mem += (int64_t)JudyLMemUsed(*sections_judy_pptr);
+        mrg_stats_size_judyl_change(mrg, judy_mem, partition);
 
         if (unlikely(!PValue || PValue == PJERR))
             fatal("DBENGINE METRIC: corrupted section JudyL array");
@@ -380,12 +385,8 @@ inline MRG *mrg_create(ssize_t partitions) {
     return mrg;
 }
 
-inline size_t mrg_aral_structures(void) {
-    return aral_structures_from_stats(&mrg_aral_statistics);
-}
-
-inline size_t mrg_aral_overhead(void) {
-    return aral_overhead_from_stats(&mrg_aral_statistics);
+struct aral_statistics *mrg_aral_stats(void) {
+    return &mrg_aral_statistics;
 }
 
 inline void mrg_destroy(MRG *mrg __maybe_unused) {

@@ -82,10 +82,10 @@ void *watcher_main(void *arg)
     watcher_wait_for_step(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
     watcher_wait_for_step(WATCHER_STEP_ID_FLUSH_DBENGINE_TIERS);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
     watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_PID_FILE);
     watcher_wait_for_step(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
@@ -140,14 +140,14 @@ void watcher_thread_start() {
         "flush dbengine tiers";
     watcher_steps[WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS].msg =
         "stop collection for all hosts";
-    watcher_steps[WATCHER_STEP_ID_STOP_METASYNC_THREADS].msg =
-        "stop metasync threads";
     watcher_steps[WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH].msg =
         "wait for dbengine collectors to finish";
     watcher_steps[WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING].msg =
         "wait for dbengine main cache to finish flushing";
     watcher_steps[WATCHER_STEP_ID_STOP_DBENGINE_TIERS].msg =
         "stop dbengine tiers";
+    watcher_steps[WATCHER_STEP_ID_STOP_METASYNC_THREADS].msg =
+        "stop metasync threads";
     watcher_steps[WATCHER_STEP_ID_CLOSE_SQL_DATABASES].msg =
         "close SQL databases";
     watcher_steps[WATCHER_STEP_ID_REMOVE_PID_FILE].msg =

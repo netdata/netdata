@@ -19,7 +19,7 @@ This number can be lowered by limiting the number of Database Tiers or switching
 | nodes currently received             |    nodes collected    |   512 KiB    |         Structures and reception buffers         |
 | nodes currently sent                 |    nodes collected    |   512 KiB    |         Structures and dispatch buffers          |
 
-These numbers vary depending on name length, the number of dimensions per instance and per context, the number and length of the labels added, the number of Machine Learning models maintained and similar parameters. For most use cases, they represent the worst case scenario, so you may find out Netdata actually needs less than that.
+These numbers vary depending on metric name length, the average number of dimensions per instance and per context, the number and length of the labels added, the number of database tiers configured, the number of Machine Learning models maintained per metric and similar parameters. For most use cases, they represent the worst case scenario, so you may find out Netdata actually needs less than that.
 
 Each metric currently being collected needs (1 index + 20 collection + 5 ml) = 26 KiB.  When it stops being collected, it needs 1 KiB (index).
 
@@ -84,3 +84,11 @@ We frequently see that the following strategy gives the best results:
 3. Set the page cache in `netdata.conf` to use 1/3 of the available memory.
 
 This will allow Netdata queries to have more caches, while leaving plenty of available memory of logs and the operating system.
+
+In Netdata 2.1 we added the `netdata.conf` option `[db].dbengine use all ram for caches` and `[db].dbengine out of memory protection`.
+Combining these two parameters is probably simpler to get best results:
+
+- `[db].dbengine out of memory protection` is by default 10% of total system RAM, but not more than 5GiB. When the amount of free memory is less than this, Netdata automatically starts releasing memory from its caches to avoid getting out of memory. On `systemd-journal` centralization points, set this to the amount of memory to be dedicated for systemd journal.
+- `[db].dbengine use all ram for caches` is by default `no`. Set it to `yes` to use all the memory except the memory given above.
+
+With these settings, netdata will use all the memory available but leave the amount specified for systemd journal.

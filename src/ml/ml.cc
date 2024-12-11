@@ -6,6 +6,7 @@
 
 #include "ad_charts.h"
 #include "database/sqlite/vendored/sqlite3.h"
+#include "streaming/stream-control.h"
 
 #define WORKER_TRAIN_QUEUE_POP         0
 #define WORKER_TRAIN_ACQUIRE_DIMENSION 1
@@ -20,13 +21,6 @@ sqlite3 *ml_db = NULL;
 static netdata_mutex_t db_mutex = NETDATA_MUTEX_INITIALIZER;
 
 typedef struct {
-    // Time when the request for this response was made
-    time_t request_time;
-
-    // First/last entry of the dimension in DB when generating the request
-    time_t first_entry_on_request;
-    time_t last_entry_on_request;
-
     // First/last entry of the dimension in DB when generating the response
     time_t first_entry_on_response;
     time_t last_entry_on_response;
@@ -47,13 +41,9 @@ typedef struct {
 } ml_training_response_t;
 
 static std::pair<enum ml_worker_result, ml_training_response_t>
-ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim, const ml_request_create_new_model_t &req)
+ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim)
 {
     ml_training_response_t training_response = {};
-
-    training_response.request_time = req.request_time;
-    training_response.first_entry_on_request = req.first_entry_on_request;
-    training_response.last_entry_on_request = req.last_entry_on_request;
 
     training_response.first_entry_on_response = rrddim_first_entry_s_of_tier(dim->rd, 0);
     training_response.last_entry_on_response = rrddim_last_entry_s_of_tier(dim->rd, 0);
@@ -83,7 +73,7 @@ ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim, const 
 
     storage_engine_query_init(dim->rd->tiers[0].seb, dim->rd->tiers[0].smh, &handle,
               training_response.query_after_t, training_response.query_before_t,
-              STORAGE_PRIORITY_BEST_EFFORT);
+              STORAGE_PRIORITY_SYNCHRONOUS);
 
     size_t idx = 0;
     memset(worker->training_cns, 0, sizeof(calculated_number_t) * max_n * (Cfg.lag_n + 1));
@@ -637,10 +627,18 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
 }
 
 static enum ml_worker_result
-ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim, const ml_request_create_new_model_t &req)
+ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
 {
     worker_is_busy(WORKER_TRAIN_QUERY);
-    auto P = ml_dimension_calculated_numbers(worker, dim, req);
+
+    spinlock_lock(&dim->slock);
+    if (dim->mt == METRIC_TYPE_CONSTANT) {
+        spinlock_unlock(&dim->slock);
+        return ML_WORKER_RESULT_OK;
+    }
+    spinlock_unlock(&dim->slock);
+
+    auto P = ml_dimension_calculated_numbers(worker, dim);
     ml_worker_result worker_result = P.first;
     ml_training_response_t training_response = P.second;
 
@@ -648,21 +646,8 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim, const ml_requ
         spinlock_lock(&dim->slock);
 
         dim->mt = METRIC_TYPE_CONSTANT;
-
-        switch (dim->ts) {
-            case TRAINING_STATUS_PENDING_WITH_MODEL:
-                dim->ts = TRAINING_STATUS_TRAINED;
-                break;
-            case TRAINING_STATUS_PENDING_WITHOUT_MODEL:
-                dim->ts = TRAINING_STATUS_UNTRAINED;
-                break;
-            default:
-                break;
-        }
-
         dim->suppression_anomaly_counter = 0;
         dim->suppression_window_counter = 0;
-
         dim->last_training_time = training_response.last_entry_on_response;
 
         spinlock_unlock(&dim->slock);
@@ -694,59 +679,8 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim, const ml_requ
     return worker_result;
 }
 
-static void
-ml_dimension_schedule_for_training(ml_dimension_t *dim, time_t curr_time)
-{
-    switch (dim->mt) {
-    case METRIC_TYPE_CONSTANT:
-        return;
-    default:
-        break;
-    }
-
-    bool schedule_for_training = false;
-
-    switch (dim->ts) {
-    case TRAINING_STATUS_PENDING_WITH_MODEL:
-    case TRAINING_STATUS_PENDING_WITHOUT_MODEL:
-        schedule_for_training = false;
-        break;
-    case TRAINING_STATUS_UNTRAINED:
-        schedule_for_training = true;
-        dim->ts = TRAINING_STATUS_PENDING_WITHOUT_MODEL;
-        break;
-    case TRAINING_STATUS_SILENCED:
-    case TRAINING_STATUS_TRAINED:
-        if ((dim->last_training_time + (Cfg.train_every * dim->rd->rrdset->update_every)) < curr_time) {
-            schedule_for_training = true;
-            dim->ts = TRAINING_STATUS_PENDING_WITH_MODEL;
-        }
-        break;
-    }
-
-    if (schedule_for_training) {
-        ml_request_create_new_model_t req;
-
-        req.DLI = DimensionLookupInfo(
-            &dim->rd->rrdset->rrdhost->machine_guid[0],
-            dim->rd->rrdset->id,
-            dim->rd->id
-        );
-        req.request_time = curr_time;
-        req.first_entry_on_request = rrddim_first_entry_s(dim->rd);
-        req.last_entry_on_request = rrddim_last_entry_s(dim->rd);
-
-        ml_host_t *host = (ml_host_t *) dim->rd->rrdset->rrdhost->ml_host;
-
-        ml_queue_item_t item;
-        item.type = ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL;
-        item.create_new_model = req;
-        ml_queue_push(host->queue, item);
-    }
-}
-
 bool
-ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t value, bool exists)
+ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists)
 {
     // Nothing to do if ML is disabled for this dimension
     if (dim->mls != MACHINE_LEARNING_STATUS_ENABLED)
@@ -791,7 +725,7 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
     ml_features_preprocess(&features);
 
     /*
-     * Lock to predict and possibly schedule the dimension for training
+     * Lock to predict
     */
     if (spinlock_trylock(&dim->slock) == 0)
         return false;
@@ -800,19 +734,10 @@ ml_dimension_predict(ml_dimension_t *dim, time_t curr_time, calculated_number_t 
     if (!same_value)
         dim->mt = METRIC_TYPE_VARIABLE;
 
-    // Decide if the dimension needs to be scheduled for training
-    ml_dimension_schedule_for_training(dim, curr_time);
-
-    // Nothing to do if we don't have a model
-    switch (dim->ts) {
-        case TRAINING_STATUS_UNTRAINED:
-        case TRAINING_STATUS_PENDING_WITHOUT_MODEL: {
-        case TRAINING_STATUS_SILENCED:
-            spinlock_unlock(&dim->slock);
-            return false;
-        }
-        default:
-            break;
+    // Ignore silenced dimensions
+    if (dim->ts == TRAINING_STATUS_SILENCED) {
+        spinlock_unlock(&dim->slock);
+        return false;
     }
 
     dim->suppression_window_counter++;
@@ -888,17 +813,8 @@ ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomal
                 case TRAINING_STATUS_UNTRAINED:
                     chart->mls.num_training_status_untrained++;
                     return;
-                case TRAINING_STATUS_PENDING_WITHOUT_MODEL:
-                    chart->mls.num_training_status_pending_without_model++;
-                    return;
                 case TRAINING_STATUS_TRAINED:
                     chart->mls.num_training_status_trained++;
-
-                    chart->mls.num_anomalous_dimensions += is_anomalous;
-                    chart->mls.num_normal_dimensions += !is_anomalous;
-                    return;
-                case TRAINING_STATUS_PENDING_WITH_MODEL:
-                    chart->mls.num_training_status_pending_with_model++;
 
                     chart->mls.num_anomalous_dimensions += is_anomalous;
                     chart->mls.num_normal_dimensions += !is_anomalous;
@@ -997,6 +913,12 @@ ml_host_detect_once(ml_host_t *host)
         mls_copy = host->mls;
 
         netdata_mutex_unlock(&host->mutex);
+
+        worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
+        ml_update_dimensions_chart(host, mls_copy);
+
+        worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
+        ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0);
     } else {
         host->host_anomaly_rate = 0.0;
 
@@ -1009,12 +931,6 @@ ml_host_detect_once(ml_host_t *host)
             };
         }
     }
-
-    worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
-    ml_update_dimensions_chart(host, mls_copy);
-
-    worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
-    ml_update_host_and_detection_rate_charts(host, host->host_anomaly_rate * 10000.0);
 }
 
 void *
@@ -1129,7 +1045,7 @@ static enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, ml_
     }
 
     ml_dimension_t *Dim = reinterpret_cast<ml_dimension_t *>(AcqDim.dimension());
-    return ml_dimension_train_model(worker, Dim, req);
+    return ml_dimension_train_model(worker, Dim);
 }
 
 static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, ml_request_add_existing_model_t req) {
@@ -1173,6 +1089,12 @@ void *ml_train_main(void *arg) {
     worker_register_job_name(WORKER_TRAIN_FLUSH_MODELS, "flush models");
 
     while (!Cfg.training_stop) {
+        if(!stream_control_ml_should_be_running()) {
+            worker_is_idle();
+            stream_control_throttle();
+            continue;
+        }
+
         worker_is_busy(WORKER_TRAIN_QUEUE_POP);
 
         ml_queue_stats_t loop_stats{};
@@ -1195,6 +1117,9 @@ void *ml_train_main(void *arg) {
         switch (item.type) {
             case ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL: {
                 worker_res = ml_worker_create_new_model(worker, item.create_new_model);
+                if (worker_res != ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION) {
+                    ml_queue_push(worker->queue, item);
+                }
                 break;
             }
             case ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL: {

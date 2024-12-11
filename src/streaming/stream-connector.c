@@ -2,49 +2,6 @@
 
 #include "stream-sender-internals.h"
 
-typedef struct {
-    char *os_name;
-    char *os_id;
-    char *os_version;
-    char *kernel_name;
-    char *kernel_version;
-} stream_encoded_t;
-
-static void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host) {
-    se->os_name = (host->system_info->host_os_name)?url_encode(host->system_info->host_os_name):strdupz("");
-    se->os_id = (host->system_info->host_os_id)?url_encode(host->system_info->host_os_id):strdupz("");
-    se->os_version = (host->system_info->host_os_version)?url_encode(host->system_info->host_os_version):strdupz("");
-    se->kernel_name = (host->system_info->kernel_name)?url_encode(host->system_info->kernel_name):strdupz("");
-    se->kernel_version = (host->system_info->kernel_version)?url_encode(host->system_info->kernel_version):strdupz("");
-}
-
-static void rrdpush_clean_encoded(stream_encoded_t *se) {
-    if (se->os_name) {
-        freez(se->os_name);
-        se->os_name = NULL;
-    }
-
-    if (se->os_id) {
-        freez(se->os_id);
-        se->os_id = NULL;
-    }
-
-    if (se->os_version) {
-        freez(se->os_version);
-        se->os_version = NULL;
-    }
-
-    if (se->kernel_name) {
-        freez(se->kernel_name);
-        se->kernel_name = NULL;
-    }
-
-    if (se->kernel_version) {
-        freez(se->kernel_version);
-        se->kernel_version = NULL;
-    }
-}
-
 static struct {
     const char *response;
     const char *status;
@@ -152,7 +109,7 @@ static struct {
         .dynamic = false,
         .error = "remote server is initializing, we should try later",
         .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
-        .postpone_reconnect_seconds = 2 * 60, // 2 minute
+        .postpone_reconnect_seconds = 30, // 30 seconds
         .priority = NDLP_NOTICE,
     },
 
@@ -303,10 +260,21 @@ stream_connect_validate_first_response(RRDHOST *host, struct sender_state *s, ch
     rfc3339_datetime_ut(buf, sizeof(buf), stream_parent_get_reconnection_ut(host->stream.snd.parents.current), 0, false);
 
     nd_log(NDLS_DAEMON, priority,
-           "STREAM %s [send to %s]: %s - will retry in %d secs, at %s",
+           "STREAM CONNECT '%s' [to %s]: %s - will retry in %d secs, at %s",
            rrdhost_hostname(host), s->connected_to, error, delay, buf);
 
     return false;
+}
+
+static inline void buffer_key_value_urlencode(BUFFER *wb, const char *key, const char *value) {
+    char *encoded = NULL;
+
+    if(value && *value)
+        encoded = url_encode(value);
+
+    buffer_sprintf(wb, "%s=%s", key, encoded ? encoded : "");
+
+    freez(encoded);
 }
 
 bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeout) {
@@ -342,104 +310,53 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
              version negotiation resulted in a high enough version.
     */
-    stream_encoded_t se;
-    rrdpush_encode_variable(&se, host);
-
-    char http[HTTP_HEADER_SIZE + 1];
-    int eol = snprintfz(http, HTTP_HEADER_SIZE,
-                        "STREAM "
-                        "key=%s"
-                        "&hostname=%s"
-                        "&registry_hostname=%s"
-                        "&machine_guid=%s"
-                        "&update_every=%d"
-                        "&os=%s"
-                        "&timezone=%s"
-                        "&abbrev_timezone=%s"
-                        "&utc_offset=%d"
-                        "&hops=%d"
-                        "&ml_capable=%d"
-                        "&ml_enabled=%d"
-                        "&mc_version=%d"
-                        "&ver=%u"
-                        "&NETDATA_INSTANCE_CLOUD_TYPE=%s"
-                        "&NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE=%s"
-                        "&NETDATA_INSTANCE_CLOUD_INSTANCE_REGION=%s"
-                        "&NETDATA_SYSTEM_OS_NAME=%s"
-                        "&NETDATA_SYSTEM_OS_ID=%s"
-                        "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
-                        "&NETDATA_SYSTEM_OS_VERSION=%s"
-                        "&NETDATA_SYSTEM_OS_VERSION_ID=%s"
-                        "&NETDATA_SYSTEM_OS_DETECTION=%s"
-                        "&NETDATA_HOST_IS_K8S_NODE=%s"
-                        "&NETDATA_SYSTEM_KERNEL_NAME=%s"
-                        "&NETDATA_SYSTEM_KERNEL_VERSION=%s"
-                        "&NETDATA_SYSTEM_ARCHITECTURE=%s"
-                        "&NETDATA_SYSTEM_VIRTUALIZATION=%s"
-                        "&NETDATA_SYSTEM_VIRT_DETECTION=%s"
-                        "&NETDATA_SYSTEM_CONTAINER=%s"
-                        "&NETDATA_SYSTEM_CONTAINER_DETECTION=%s"
-                        "&NETDATA_CONTAINER_OS_NAME=%s"
-                        "&NETDATA_CONTAINER_OS_ID=%s"
-                        "&NETDATA_CONTAINER_OS_ID_LIKE=%s"
-                        "&NETDATA_CONTAINER_OS_VERSION=%s"
-                        "&NETDATA_CONTAINER_OS_VERSION_ID=%s"
-                        "&NETDATA_CONTAINER_OS_DETECTION=%s"
-                        "&NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT=%s"
-                        "&NETDATA_SYSTEM_CPU_FREQ=%s"
-                        "&NETDATA_SYSTEM_TOTAL_RAM=%s"
-                        "&NETDATA_SYSTEM_TOTAL_DISK_SIZE=%s"
-                        "&NETDATA_PROTOCOL_VERSION=%s"
-                        HTTP_1_1 HTTP_ENDL
-                        "User-Agent: %s/%s" HTTP_ENDL
-                        "Accept: */*" HTTP_HDR_END
-                        , string2str(host->stream.snd.api_key)
-                        , rrdhost_hostname(host)
-                        , rrdhost_registry_hostname(host)
-                        , host->machine_guid
-                        , default_rrd_update_every
-                        , rrdhost_os(host)
-                        , rrdhost_timezone(host)
-                        , rrdhost_abbrev_timezone(host)
-                        , host->utc_offset
-                        , s->hops
-                        , host->system_info->ml_capable
-                        , host->system_info->ml_enabled
-                        , host->system_info->mc_version
-                        , s->capabilities
-                        , (host->system_info->cloud_provider_type) ? host->system_info->cloud_provider_type : ""
-                        , (host->system_info->cloud_instance_type) ? host->system_info->cloud_instance_type : ""
-                        , (host->system_info->cloud_instance_region) ? host->system_info->cloud_instance_region : ""
-                        , se.os_name
-                        , se.os_id
-                        , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
-                        , se.os_version
-                        , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
-                        , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
-                        , (host->system_info->is_k8s_node) ? host->system_info->is_k8s_node : ""
-                        , se.kernel_name
-                        , se.kernel_version
-                        , (host->system_info->architecture) ? host->system_info->architecture : ""
-                        , (host->system_info->virtualization) ? host->system_info->virtualization : ""
-                        , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
-                        , (host->system_info->container) ? host->system_info->container : ""
-                        , (host->system_info->container_detection) ? host->system_info->container_detection : ""
-                        , (host->system_info->container_os_name) ? host->system_info->container_os_name : ""
-                        , (host->system_info->container_os_id) ? host->system_info->container_os_id : ""
-                        , (host->system_info->container_os_id_like) ? host->system_info->container_os_id_like : ""
-                        , (host->system_info->container_os_version) ? host->system_info->container_os_version : ""
-                        , (host->system_info->container_os_version_id) ? host->system_info->container_os_version_id : ""
-                        , (host->system_info->container_os_detection) ? host->system_info->container_os_detection : ""
-                        , (host->system_info->host_cores) ? host->system_info->host_cores : ""
-                        , (host->system_info->host_cpu_freq) ? host->system_info->host_cpu_freq : ""
-                        , (host->system_info->host_ram_total) ? host->system_info->host_ram_total : ""
-                        , (host->system_info->host_disk_space) ? host->system_info->host_disk_space : ""
-                        , STREAMING_PROTOCOL_VERSION
-                        , rrdhost_program_name(host)
-                        , rrdhost_program_version(host)
-    );
-    http[eol] = 0x00;
-    rrdpush_clean_encoded(&se);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_strcat(wb, "STREAM ");
+    buffer_key_value_urlencode(wb, "key", string2str(host->stream.snd.api_key));
+    buffer_key_value_urlencode(wb, "&hostname", rrdhost_hostname(host));
+    buffer_key_value_urlencode(wb, "&registry_hostname", rrdhost_registry_hostname(host));
+    buffer_key_value_urlencode(wb, "&machine_guid", host->machine_guid);
+    buffer_sprintf(wb, "&update_every=%d", default_rrd_update_every);
+    buffer_key_value_urlencode(wb, "&os", rrdhost_os(host));
+    buffer_key_value_urlencode(wb, "&timezone", rrdhost_timezone(host));
+    buffer_key_value_urlencode(wb, "&abbrev_timezone", rrdhost_abbrev_timezone(host));
+    buffer_sprintf(wb, "&utc_offset=%d", host->utc_offset);
+    buffer_sprintf(wb, "&hops=%d", s->hops);
+    buffer_sprintf(wb, "&ml_capable=%d", host->system_info->ml_capable);
+    buffer_sprintf(wb, "&ml_enabled=%d", host->system_info->ml_enabled);
+    buffer_sprintf(wb, "&mc_version=%d", host->system_info->mc_version);
+    buffer_sprintf(wb, "&ver=%u", s->capabilities);
+    buffer_key_value_urlencode(wb, "&NETDATA_INSTANCE_CLOUD_TYPE", host->system_info->cloud_provider_type);
+    buffer_key_value_urlencode(wb, "&NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE", host->system_info->cloud_instance_type);
+    buffer_key_value_urlencode(wb, "&NETDATA_INSTANCE_CLOUD_INSTANCE_REGION", host->system_info->cloud_instance_region);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_OS_NAME", host->system_info->host_os_name);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_OS_ID", host->system_info->host_os_id);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_OS_ID_LIKE", host->system_info->host_os_id_like);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_OS_VERSION", host->system_info->host_os_version);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_OS_VERSION_ID", host->system_info->host_os_version_id);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_OS_DETECTION", host->system_info->host_os_detection);
+    buffer_key_value_urlencode(wb, "&NETDATA_HOST_IS_K8S_NODE", host->system_info->is_k8s_node);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_KERNEL_NAME", host->system_info->kernel_name);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_KERNEL_VERSION", host->system_info->kernel_version);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_ARCHITECTURE", host->system_info->architecture);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_VIRTUALIZATION", host->system_info->virtualization);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_VIRT_DETECTION", host->system_info->virt_detection);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_CONTAINER", host->system_info->container);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_CONTAINER_DETECTION", host->system_info->container_detection);
+    buffer_key_value_urlencode(wb, "&NETDATA_CONTAINER_OS_NAME", host->system_info->container_os_name);
+    buffer_key_value_urlencode(wb, "&NETDATA_CONTAINER_OS_ID", host->system_info->container_os_id);
+    buffer_key_value_urlencode(wb, "&NETDATA_CONTAINER_OS_ID_LIKE", host->system_info->container_os_id_like);
+    buffer_key_value_urlencode(wb, "&NETDATA_CONTAINER_OS_VERSION", host->system_info->container_os_version);
+    buffer_key_value_urlencode(wb, "&NETDATA_CONTAINER_OS_VERSION_ID", host->system_info->container_os_version_id);
+    buffer_key_value_urlencode(wb, "&NETDATA_CONTAINER_OS_DETECTION", host->system_info->container_os_detection);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", host->system_info->host_cores);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_CPU_FREQ", host->system_info->host_cpu_freq);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_TOTAL_RAM", host->system_info->host_ram_total);
+    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_TOTAL_DISK_SIZE", host->system_info->host_disk_space);
+    buffer_key_value_urlencode(wb, "&NETDATA_PROTOCOL_VERSION", STREAMING_PROTOCOL_VERSION);
+    buffer_strcat(wb, HTTP_1_1 HTTP_ENDL);
+    buffer_sprintf(wb, "User-Agent: %s/%s" HTTP_ENDL, rrdhost_program_name(host), rrdhost_program_version(host));
+    buffer_strcat(wb, "Accept: */*" HTTP_HDR_END);
 
     if (s->parent_using_h2o && stream_connect_upgrade_prelude(host, s)) {
         ND_LOG_STACK lgs[] = {
@@ -455,8 +372,8 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
         return false;
     }
 
-    ssize_t len = (ssize_t)strlen(http);
-    ssize_t bytes = nd_sock_send_timeout(&s->sock, http, len, 0, timeout);
+    ssize_t len = (ssize_t)buffer_strlen(wb);
+    ssize_t bytes = nd_sock_send_timeout(&s->sock, (void *)buffer_tostring(wb), len, 0, timeout);
     if(bytes <= 0) { // timeout is 0
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, STREAM_STATUS_TIMEOUT),
@@ -468,7 +385,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
         nd_sock_close(&s->sock);
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM %s [send to %s]: failed to send HTTP header to remote netdata.",
+               "STREAM CONNECT '%s' [to %s]: failed to send HTTP header to remote netdata.",
                rrdhost_hostname(host), s->connected_to);
 
         stream_parent_set_reconnect_delay(
@@ -476,7 +393,8 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
         return false;
     }
 
-    bytes = nd_sock_recv_timeout(&s->sock, http, HTTP_HEADER_SIZE, 0, timeout);
+    char response[4096];
+    bytes = nd_sock_recv_timeout(&s->sock, response, sizeof(response) - 1, 0, timeout);
     if(bytes <= 0) { // timeout is 0
         nd_sock_close(&s->sock);
 
@@ -489,7 +407,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
         worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT);
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM %s [send to %s]: remote netdata does not respond.",
+               "STREAM CONNECT '%s' [to %s]: remote netdata does not respond.",
                rrdhost_hostname(host), s->connected_to);
 
         stream_parent_set_reconnect_delay(
@@ -497,21 +415,21 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
         return false;
     }
-    http[bytes] = '\0';
+    response[bytes] = '\0';
 
     if(sock_setnonblock(s->sock.fd) < 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM %s [send to %s]: cannot set non-blocking mode for socket.",
+               "STREAM CONNECT '%s' [to %s]: cannot set non-blocking mode for socket.",
                rrdhost_hostname(host), s->connected_to);
 
     sock_setcloexec(s->sock.fd);
 
     if(sock_enlarge_out(s->sock.fd) < 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM %s [send to %s]: cannot enlarge the socket buffer.",
+               "STREAM CONNECT '%s' [to %s]: cannot enlarge the socket buffer.",
                rrdhost_hostname(host), s->connected_to);
 
-    if(!stream_connect_validate_first_response(host, s, http, bytes)) {
+    if(!stream_connect_validate_first_response(host, s, response, bytes)) {
         nd_sock_close(&s->sock);
         return false;
     }
@@ -527,7 +445,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     ND_LOG_STACK_PUSH(lgs);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM [connector] %s: connected to %s...",
+           "STREAM CONNECT '%s' [to %s]: connected to parent...",
            rrdhost_hostname(host), s->connected_to);
 
     return true;
@@ -592,7 +510,7 @@ void stream_connector_requeue(struct sender_state *s) {
     struct connector *sc = stream_connector_get(s);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM [connector] [%s]: adding host in connector queue...",
+           "STREAM CONNECT '%s' [to parent]: adding host in connector queue...",
            rrdhost_hostname(s->host));
 
     spinlock_lock(&sc->queue.spinlock);
@@ -608,13 +526,13 @@ void stream_connector_add(struct sender_state *s) {
     // multiple threads may come here - only one should be able to pass through
     stream_sender_lock(s);
     if(!rrdhost_has_stream_sender_enabled(s->host) || !s->host->stream.snd.destination || !s->host->stream.snd.api_key) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM %s [send]: host has streaming disabled - not sending data to a parent.",
+        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM CONNECT '%s' [disabled]: host has streaming disabled - not sending data to a parent.",
                rrdhost_hostname(s->host));
         stream_sender_unlock(s);
         return;
     }
     if(rrdhost_flag_check(s->host, RRDHOST_FLAG_STREAM_SENDER_ADDED)) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM %s [send]: host has already added to sender - ignoring request",
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM CONNECT '%s' [duplicate]: host has already added to sender - ignoring request.",
                rrdhost_hostname(s->host));
         stream_sender_unlock(s);
         return;
@@ -632,7 +550,7 @@ void stream_connector_add(struct sender_state *s) {
 
 static void stream_connector_remove(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "STREAM [connector] [%s]: stopped streaming connector for host: %s",
+           "STREAM CONNECT '%s' [stopped]: stopped streaming connector for host, reason: %s",
            rrdhost_hostname(s->host), stream_handshake_error_to_string(s->exit.reason));
 
     struct connector *sc = stream_connector_get(s);
@@ -658,8 +576,8 @@ static void *stream_connector_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_CANCELLED_NODES, "cancelled nodes", "nodes", WORKER_METRIC_ABSOLUTE);
 
     unsigned job_id = 0;
-
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
+
         worker_is_idle();
         job_id = completion_wait_for_a_job_with_timeout(&sc->completion, job_id, 1000);
         size_t nodes = 0, connected_nodes = 0, failed_nodes = 0, cancelled_nodes = 0;
@@ -730,7 +648,7 @@ bool stream_connector_init(struct sender_state *s) {
     if(!sc->thread) {
         sc->id = (int8_t)(sc - connector_globals.connectors); // find the slot number
         if(&connector_globals.connectors[sc->id] != sc)
-            fatal("Connector ID and slot do not match!");
+            fatal("STREAM CONNECT '%s': connector ID and slot do not match!", rrdhost_hostname(s->host));
 
         spinlock_init(&sc->queue.spinlock);
         completion_init(&sc->completion);
@@ -741,7 +659,9 @@ bool stream_connector_init(struct sender_state *s) {
 
         sc->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_connector_thread, sc);
         if (!sc->thread)
-            nd_log_daemon(NDLP_ERR, "STREAM connector: failed to create new thread for client.");
+            nd_log_daemon(NDLP_ERR,
+                          "STREAM CONNECT '%s': failed to create new thread for client.",
+                          rrdhost_hostname(s->host));
     }
 
     spinlock_unlock(&spinlock);
