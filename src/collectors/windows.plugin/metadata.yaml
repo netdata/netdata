@@ -506,7 +506,7 @@ modules:
         metrics_description: |
           Monitor network interface metrics about bandwidth, state, errors and more.
         method_description: |
-          It queries 'Network Interface' object from Perflib in order to gather the metrics.
+          It queries 'Network Interface' and 'Network Adapter' objects from Perflib in order to gather the metrics.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -560,7 +560,7 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: System
+        - name: Global
           description: "These metrics refer to the entire System."
           labels: []
           metrics:
@@ -571,6 +571,84 @@ modules:
               dimensions:
                 - name: received
                 - name: sent
+        - name: netowrk device
+          description: "These metrics refer to the network card available on host."
+          labels:
+            - name: interface_type
+              description: "Inform the interface type: real or virtual"
+            - name: device
+              description: "The device name"
+          metrics:
+            - name: net.net
+              description: Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.packets
+              description: Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.speed
+              description: Interface Speed
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: net.errors
+              description: Interface Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.drops
+              description: Interface Drops
+              unit: "drops/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.queue_length
+              description: Interface Output Queue Length
+              unit: "packets"
+              chart_type: line
+              dimensions:
+                - name: length
+            - name: net.rsc_connections
+              description: Active TCP Connections Offloaded by RSC
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: net.rsc_packets
+              description: TCP RSC Coalesced Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: packets
+            - name: net.rsc_exceptions
+              description: TCP RSC Exceptions
+              unit: "exceptions/s"
+              chart_type: line
+              dimensions:
+                - name: exceptions
+            - name: net.rsc_average_packet_size
+              description: TCP RSC Average Packet Size
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: net.chimney_connections
+              description: Active TCP Connections Offloaded with Chimney
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: connections
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibObjects
