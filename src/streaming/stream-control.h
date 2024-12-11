@@ -16,7 +16,7 @@ void stream_control_replication_query_started(void);
 void stream_control_replication_query_finished(void);
 
 void stream_control_user_weights_query_started(void);
-void stream_control_user_data_weights_finished(void);
+void stream_control_user_weights_query_finished(void);
 
 void stream_control_user_data_query_started(void);
 void stream_control_user_data_query_finished(void);

@@ -5,19 +5,23 @@
 #include "replication.h"
 
 static struct {
-    char pad0[64];
+    CACHE_LINE_PADDING();
 
     uint32_t backfill_runners;
-    char pad1[64];
+
+    CACHE_LINE_PADDING();
 
     uint32_t replication_runners;
-    char pad2[64];
+
+    CACHE_LINE_PADDING();
 
     uint32_t user_data_queries_runners;
-    char pad3[64];
+
+    CACHE_LINE_PADDING();
 
     uint32_t user_weights_queries_runners;
-    char pad4[64];
+
+    CACHE_LINE_PADDING();
 } sc;
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -76,7 +80,7 @@ void stream_control_user_weights_query_started(void) {
     __atomic_add_fetch(&sc.user_weights_queries_runners, 1, __ATOMIC_RELAXED);
 }
 
-void stream_control_user_data_weights_finished(void) {
+void stream_control_user_weights_query_finished(void) {
     __atomic_sub_fetch(&sc.user_weights_queries_runners, 1, __ATOMIC_RELAXED);
 }
 
@@ -84,7 +88,10 @@ void stream_control_user_data_weights_finished(void) {
 // consumer API
 
 bool stream_control_ml_should_be_running(void) {
-    return backfill_runners() == 0 && replication_runners() == 0;
+    return backfill_runners() == 0 &&
+           replication_runners() == 0 &&
+           user_data_query_runners() == 0 &&
+           user_weights_query_runners() == 0;
 }
 
 bool stream_control_children_should_be_accepted(void) {
@@ -94,13 +101,16 @@ bool stream_control_children_should_be_accepted(void) {
     // - checking for replication leaves the last few nodes locked-out (since all the others are replicating)
 
     // allow up to 3 nodes to backfill at the same time
-    return backfill_runners() <= 3;
+    return backfill_runners() <= 2;
 }
 
 bool stream_control_replication_should_be_running(void) {
-    return backfill_runners() == 0;
+    return backfill_runners() == 0 &&
+           user_data_query_runners() == 0 &&
+           user_weights_query_runners() == 0;
 }
 
 bool stream_control_health_should_be_running(void) {
-    return backfill_runners() == 0;
+    return backfill_runners() == 0 &&
+           (replication_runners() + user_data_query_runners() + user_weights_query_runners()) <= 2;
 }

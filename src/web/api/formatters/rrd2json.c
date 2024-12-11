@@ -124,7 +124,9 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         wrapper_end = rrdr_json_wrapper_end2;
     }
 
+    stream_control_user_data_query_started();
     RRDR *r = rrd2rrdr(owa, qt);
+    stream_control_user_data_query_finished();
 
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");

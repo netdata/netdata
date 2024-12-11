@@ -1285,7 +1285,10 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     };
 
     QUERY_TARGET *qt = query_target_create(&qtr);
+    stream_control_user_weights_query_started();
     RRDR *r = rrd2rrdr(owa, qt);
+    stream_control_user_weights_query_finished();
+
     if(!r)
         goto cleanup;
 
@@ -1524,7 +1527,9 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
 
     ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
     QUERY_TARGET *qt = query_target_create(&qtr);
+    stream_control_user_weights_query_started();
     RRDR *r = rrd2rrdr(owa, qt);
+    stream_control_user_weights_query_finished();
 
     if(!r || rrdr_rows(r) != 1 || !r->d || r->d != r->internal.qt->query.used)
         goto cleanup;
