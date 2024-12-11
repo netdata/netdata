@@ -58,7 +58,7 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per Hyper-V instance
+### Per Hyper-V
 
 These metrics refer to the Hyper-V instance.
 

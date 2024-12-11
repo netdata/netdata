@@ -78,7 +78,7 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
+        - name: System
           description: "These metrics refer to the entire system."
           labels: []
           metrics:
@@ -178,7 +178,7 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
+        - name: System
           description: "These metrics refer to the entire system."
           labels: []
           metrics:
@@ -276,7 +276,7 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
+        - name: System
           description: "These metrics refer to the entire system."
           labels: []
           metrics:
@@ -298,6 +298,189 @@ modules:
               chart_type: line
               dimensions:
                 - name: switches
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibStorage
+      monitored_instance:
+        name: Physical and Logical Disk Performance Metrics
+        link: "https://learn.microsoft.com/en-us/windows/win32/fileio/disk-management"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - disk
+        - disks
+        - io
+        - volume
+        - physical
+        - logical
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Detailed statistics for all disk devices and volumes.
+        method_description: |
+          It queries 'LogicalDisk' and 'PhysicalDisk' objects from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibStorage
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: System
+          description: "These metrics refer to the entire System."
+          labels: []
+          metrics:
+            - name: system.io
+              description: Disk I/O
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+        - name: Logical Disk
+          description: "These metrics refer to Logical Disks."
+          labels:
+            - name: mount_point
+              description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:')."
+            - name: driver_type
+              description: "Classification of the disk device (e.g., norootdir, removable, cdrom, ramdisk)."
+            - name: filesystem
+              description: "File system format used on the volume (e.g., NTFS, FAT32)."
+            - name: rw_mode
+              description: "Current read/write permissions status of the volume (read-only access, read and write access)."
+          metrics:
+            - name: disk.space
+              description: Disk Space Usage
+              unit: "GiB"
+              chart_type: stacked
+              dimensions:
+                - name: avail
+                - name: used
+        - name: Physical Disk
+          description: "These metrics refer to Physical Disks."
+          labels:
+            - name: mount_point
+              description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:')."
+            - name: device
+              description: Manufacturer model name.
+            - name: model
+              description: The device model.
+            - name: device_id
+              description: Unique hardware identifier for the storage device within the system.
+          metrics:
+            - name: disk.io
+              description: Disk I/O Bandwidth
+              unit: "KiB/s"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.avgsz
+              description: Average Completed I/O Operation Bandwidth
+              unit: "KiB/operation"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.ops
+              description: Disk Completed I/O Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.split
+              description: Split I/O Operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: discards
+            - name: disk.await
+              description: Average Completed I/O Operation Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.svctm
+              description: Average Service Time
+              unit: "milliseconds/operation"
+              chart_type: line
+              dimensions:
+                - name: svctm
+            - name: disk.util
+              description: Disk Utilization Time
+              unit: "percent"
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: disk.busy
+              description: Disk Busy Time
+              unit: "milliseconds"
+              chart_type: area
+              dimensions:
+                - name: busy
+            - name: disk.iotime
+              description: Disk Total I/O Time
+              unit: "milliseconds/s"
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: disk.qops
+              description: Disk Current I/O Operations
+              unit: "operations"
+              chart_type: line
+              dimensions:
+                - name: operations
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibObjects
@@ -374,7 +557,7 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
+        - name: System
           description: "These metrics refer to the entire system."
           labels: []
           metrics:
@@ -711,7 +894,7 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
+        - name: Hyper-V
           description: "These metrics refer to the Hyper-V instance."
           labels: []
           metrics:
