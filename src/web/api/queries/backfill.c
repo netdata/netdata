@@ -25,6 +25,7 @@ static struct {
     SPINLOCK spinlock;
     bool running;
     Word_t id;
+    size_t queue_size;
     BACKFILL_JudyLSet queue;
 
 } backfill_globals = {
@@ -34,10 +35,13 @@ static struct {
 
 bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data) {
     size_t dimensions = dictionary_entries(st->rrddim_root_index);
+    if(!dimensions || dimensions > 200)
+        return false;
+
     size_t added = 0;
     struct backfill_dim_work *array[dimensions];
 
-    bool rc = true;
+    bool rc = false;
     if(backfill_globals.running) {
         struct backfill_request *br = callocz(1, sizeof(*br));
         br->rrdhost_receiver_state_id =__atomic_load_n(&st->rrdhost->stream.rcv.status.state_id, __ATOMIC_RELAXED);
@@ -62,24 +66,24 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data) {
             rrddim_foreach_done(rd);
         }
 
-        if (!added) {
+        if(added) {
+            spinlock_lock(&backfill_globals.spinlock);
+
+            for(size_t i = 0; i < added ;i++) {
+                backfill_globals.queue_size++;
+                BACKFILL_SET(&backfill_globals.queue, backfill_globals.id++, array[i]);
+            }
+
+            spinlock_unlock(&backfill_globals.spinlock);
+            completion_mark_complete_a_job(&backfill_globals.completion);
+            rc = true;
+        }
+        else {
             rrdset_acquired_release(br->rsa);
             freez(br);
             rc = false;
         }
     }
-    else
-        rc = false;
-
-    spinlock_lock(&backfill_globals.spinlock);
-    if(rc) {
-        for(size_t i = 0; i < added ;i++)
-            BACKFILL_SET(&backfill_globals.queue, backfill_globals.id++, array[i]);
-    }
-    spinlock_unlock(&backfill_globals.spinlock);
-
-    if(rc)
-        completion_mark_complete_a_job(&backfill_globals.completion);
 
     return rc;
 }
@@ -126,24 +130,44 @@ static void backfill_dim_work_free(bool successful, struct backfill_dim_work *bd
     freez(bdm);
 }
 
-void *backfill_worker_thread(void *ptr __maybe_unused) {
-    size_t job_id = 0;
+void *backfill_worker_thread(void *ptr) {
+    bool master = (ptr == (void *)0x01);
+
+    worker_register("BACKFILL");
+
+    worker_register_job_name(0, "get");
+    worker_register_job_name(1, "backfill");
+
+    if(master)
+        worker_register_job_custom_metric(2, "backfill queue size", "dimensions", WORKER_METRIC_ABSOLUTE);
+
+    size_t job_id = 0, queue_size = 0;
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS|SERVICE_STREAMING)) {
+        worker_is_busy(0);
         spinlock_lock(&backfill_globals.spinlock);
         Word_t idx = 0;
         struct backfill_dim_work *bdm = BACKFILL_FIRST(&backfill_globals.queue, &idx);
-        if(bdm)
+        if(bdm) {
+            backfill_globals.queue_size--;
             BACKFILL_DEL(&backfill_globals.queue, idx);
+        }
+        queue_size = backfill_globals.queue_size;
         spinlock_unlock(&backfill_globals.spinlock);
 
         if(bdm) {
+            worker_is_busy(1);
             bool success = backfill_execute(bdm);
             backfill_dim_work_free(success, bdm);
             continue;
         }
 
+        worker_set_metric(2, (NETDATA_DOUBLE)queue_size);
+
+        worker_is_idle();
         job_id = completion_wait_for_a_job_with_timeout(&backfill_globals.completion, job_id, 1000);
     }
+
+    worker_unregister();
 
     return NULL;
 }
@@ -172,7 +196,7 @@ void *backfill_thread(void *ptr) {
         th[t] = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, backfill_worker_thread, NULL);
     }
 
-    backfill_worker_thread(NULL);
+    backfill_worker_thread((void *)0x01);
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     for(size_t t = 0; t < threads - 1 ;t++) {
