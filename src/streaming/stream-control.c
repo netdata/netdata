@@ -100,8 +100,7 @@ bool stream_control_children_should_be_accepted(void) {
     // and also the nodes should be close in time in the db
     // - checking for replication leaves the last few nodes locked-out (since all the others are replicating)
 
-    // allow up to 3 nodes to backfill at the same time
-    return backfill_runners() <= 2;
+    return backfill_runners() == 0;
 }
 
 bool stream_control_replication_should_be_running(void) {
@@ -112,5 +111,6 @@ bool stream_control_replication_should_be_running(void) {
 
 bool stream_control_health_should_be_running(void) {
     return backfill_runners() == 0 &&
-           (replication_runners() + user_data_query_runners() + user_weights_query_runners()) <= 2;
+           replication_runners() == 0 &&
+           (user_data_query_runners() + user_weights_query_runners()) <= 1;
 }
