@@ -1476,7 +1476,7 @@ pkg_installed() {
 netdata_avail_check() {
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
-      env DEBIAN_FRONTEND=noninteractive apt-cache policy netdata | grep -q repo.netdata.cloud/repos/;
+      env DEBIAN_FRONTEND=noninteractive apt-cache policy netdata | grep -q "repo.*.netdata.cloud/repos/";
       return $?
       ;;
     centos|fedora|ol|amzn)
