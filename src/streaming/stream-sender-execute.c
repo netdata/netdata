@@ -26,7 +26,7 @@ static void stream_execute_function_callback(BUFFER *func_wb, int code, void *da
 
         sender_commit_clean_buffer(s, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
 
-        internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %"PRIu64" usec).",
+        internal_error(true, "STREAM SEND '%s' [to %s]: FUNCTION transaction %s sending back response (%zu bytes, %"PRIu64" usec).",
                        rrdhost_hostname(s->host), s->connected_to,
                        string2str(tmp->transaction),
                        buffer_strlen(func_wb),
@@ -57,7 +57,7 @@ static void execute_commands_function(struct sender_state *s, const char *comman
     nd_log(NDLS_ACCESS, NDLP_INFO, NULL);
 
     if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
-        netdata_log_error("STREAM %s [send to %s] %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
+        netdata_log_error("STREAM SEND '%s' [to %s]: %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
                           rrdhost_hostname(s->host), s->connected_to,
                           command,
                           transaction?transaction:"(unset)",
@@ -110,7 +110,10 @@ static void execute_deferred_json(struct sender_state *s, void *data) {
     if(strcmp(keyword, PLUGINSD_KEYWORD_JSON_CMD_STREAM_PATH) == 0)
         stream_path_set_from_json(s->host, buffer_tostring(s->defer.payload), true);
     else
-        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM: unknown JSON keyword '%s' with payload: %s", keyword, buffer_tostring(s->defer.payload));
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM SEND '%s' [to %s]: unknown JSON keyword '%s' with payload: %s",
+               rrdhost_hostname(s->host), s->connected_to,
+               keyword, buffer_tostring(s->defer.payload));
 }
 
 static void cleanup_deferred_json(struct sender_state *s __maybe_unused, void *data) {
@@ -274,7 +277,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
             const char *before = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 4);
 
             if (!chart_id || !start_streaming || !after || !before) {
-                netdata_log_error("STREAM %s [send to %s] %s command is incomplete"
+                netdata_log_error("STREAM SEND '%s' [to %s] %s command is incomplete"
                                   " (chart=%s, start_streaming=%s, after=%s, before=%s)",
                                   rrdhost_hostname(s->host), s->connected_to,
                                   command,
@@ -310,7 +313,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
             s->defer.action_data = strdupz(keyword);
         }
         else {
-            netdata_log_error("STREAM %s [send to %s] received unknown command over connection: %s",
+            netdata_log_error("STREAM SEND '%s' [to %s] received unknown command over connection: %s",
                               rrdhost_hostname(s->host), s->connected_to, s->rbuf.line.words[0]?s->rbuf.line.words[0]:"(unset)");
         }
 

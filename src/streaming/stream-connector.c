@@ -260,7 +260,7 @@ stream_connect_validate_first_response(RRDHOST *host, struct sender_state *s, ch
     rfc3339_datetime_ut(buf, sizeof(buf), stream_parent_get_reconnection_ut(host->stream.snd.parents.current), 0, false);
 
     nd_log(NDLS_DAEMON, priority,
-           "STREAM CONNECT[x] %s [to %s]: %s - will retry in %d secs, at %s",
+           "STREAM CONNECT '%s' [to %s]: %s - will retry in %d secs, at %s",
            rrdhost_hostname(host), s->connected_to, error, delay, buf);
 
     return false;
@@ -385,7 +385,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
         nd_sock_close(&s->sock);
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM CONNECT[x] %s [to %s]: failed to send HTTP header to remote netdata.",
+               "STREAM CONNECT '%s' [to %s]: failed to send HTTP header to remote netdata.",
                rrdhost_hostname(host), s->connected_to);
 
         stream_parent_set_reconnect_delay(
@@ -407,7 +407,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
         worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT);
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM CONNECT[x] %s [to %s]: remote netdata does not respond.",
+               "STREAM CONNECT '%s' [to %s]: remote netdata does not respond.",
                rrdhost_hostname(host), s->connected_to);
 
         stream_parent_set_reconnect_delay(
@@ -419,14 +419,14 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
     if(sock_setnonblock(s->sock.fd) < 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM CONNECT[x] %s [to %s]: cannot set non-blocking mode for socket.",
+               "STREAM CONNECT '%s' [to %s]: cannot set non-blocking mode for socket.",
                rrdhost_hostname(host), s->connected_to);
 
     sock_setcloexec(s->sock.fd);
 
     if(sock_enlarge_out(s->sock.fd) < 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM CONNECT[x] %s [to %s]: cannot enlarge the socket buffer.",
+               "STREAM CONNECT '%s' [to %s]: cannot enlarge the socket buffer.",
                rrdhost_hostname(host), s->connected_to);
 
     if(!stream_connect_validate_first_response(host, s, response, bytes)) {
@@ -445,7 +445,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     ND_LOG_STACK_PUSH(lgs);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM CONNECT[x] %s [to %s]: connected to parent...",
+           "STREAM CONNECT '%s' [to %s]: connected to parent...",
            rrdhost_hostname(host), s->connected_to);
 
     return true;
@@ -510,7 +510,7 @@ void stream_connector_requeue(struct sender_state *s) {
     struct connector *sc = stream_connector_get(s);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM CONNECT[x] %s [to parent]: adding host in connector queue...",
+           "STREAM CONNECT '%s' [to parent]: adding host in connector queue...",
            rrdhost_hostname(s->host));
 
     spinlock_lock(&sc->queue.spinlock);
@@ -526,13 +526,13 @@ void stream_connector_add(struct sender_state *s) {
     // multiple threads may come here - only one should be able to pass through
     stream_sender_lock(s);
     if(!rrdhost_has_stream_sender_enabled(s->host) || !s->host->stream.snd.destination || !s->host->stream.snd.api_key) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM CONNECT[x] %s [disabled]: host has streaming disabled - not sending data to a parent.",
+        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM CONNECT '%s' [disabled]: host has streaming disabled - not sending data to a parent.",
                rrdhost_hostname(s->host));
         stream_sender_unlock(s);
         return;
     }
     if(rrdhost_flag_check(s->host, RRDHOST_FLAG_STREAM_SENDER_ADDED)) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM CONNECT[x] %s [duplicate]: host has already added to sender - ignoring request.",
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "STREAM CONNECT '%s' [duplicate]: host has already added to sender - ignoring request.",
                rrdhost_hostname(s->host));
         stream_sender_unlock(s);
         return;
@@ -550,7 +550,7 @@ void stream_connector_add(struct sender_state *s) {
 
 static void stream_connector_remove(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "STREAM CONNECT[x] %s [stopped]: stopped streaming connector for host, reason: %s",
+           "STREAM CONNECT '%s' [stopped]: stopped streaming connector for host, reason: %s",
            rrdhost_hostname(s->host), stream_handshake_error_to_string(s->exit.reason));
 
     struct connector *sc = stream_connector_get(s);
@@ -648,7 +648,7 @@ bool stream_connector_init(struct sender_state *s) {
     if(!sc->thread) {
         sc->id = (int8_t)(sc - connector_globals.connectors); // find the slot number
         if(&connector_globals.connectors[sc->id] != sc)
-            fatal("Connector ID and slot do not match!");
+            fatal("STREAM CONNECT '%s': connector ID and slot do not match!", rrdhost_hostname(s->host));
 
         spinlock_init(&sc->queue.spinlock);
         completion_init(&sc->completion);
@@ -659,7 +659,9 @@ bool stream_connector_init(struct sender_state *s) {
 
         sc->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, stream_connector_thread, sc);
         if (!sc->thread)
-            nd_log_daemon(NDLP_ERR, "STREAM CONNECT[x]: failed to create new thread for client.");
+            nd_log_daemon(NDLP_ERR,
+                          "STREAM CONNECT '%s': failed to create new thread for client.",
+                          rrdhost_hostname(s->host));
     }
 
     spinlock_unlock(&spinlock);

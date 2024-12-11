@@ -360,7 +360,8 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
     CLEAN_JSON_OBJECT *jobj = json_tokener_parse(json);
     if(!jobj) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM PATH: Cannot parse json: %s", json);
+               "STREAM PATH '%s': Cannot parse json: %s",
+               rrdhost_hostname(host), json);
         return false;
     }
 
@@ -381,14 +382,16 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
             json_object *joption = json_object_array_get_idx(_jarray, i);
             if (!json_object_is_type(joption, json_type_object)) {
                 nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM PATH: Array item No %zu is not an object: %s", i, json);
+                       "STREAM PATH '%s': Array item No %zu is not an object: %s",
+                       rrdhost_hostname(host), i, json);
                 continue;
             }
 
             if(!parse_single_path(joption, "", &host->stream.path.array[host->stream.path.used], error)) {
                 stream_path_cleanup(&host->stream.path.array[host->stream.path.used]);
                 nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM PATH: Array item No %zu cannot be parsed: %s: %s", i, buffer_tostring(error), json);
+                       "STREAM PATH '%s': Array item No %zu cannot be parsed: %s: %s",
+                       rrdhost_hostname(host), i, buffer_tostring(error), json);
             }
             else
                 host->stream.path.used++;
