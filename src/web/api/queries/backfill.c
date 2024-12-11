@@ -3,14 +3,21 @@
 #include "backfill.h"
 
 struct backfill_request {
-    ND_UUID machine_guid;
-    STRING *rrdset;
-    uint32_t stream_receiver_state_id;
+    size_t rrdhost_receiver_state_id;
+    RRDSET_ACQUIRED *rsa;
+    uint32_t works;
+    uint32_t successful;
+    uint32_t failed;
     backfill_callback_t cb;
     void *data;
 };
 
-DEFINE_JUDYL_TYPED(BACKFILL, struct backfill_request *);
+struct backfill_dim_work {
+    RRDDIM_ACQUIRED *rda;
+    struct backfill_request *br;
+};
+
+DEFINE_JUDYL_TYPED(BACKFILL, struct backfill_dim_work *);
 
 static struct {
     struct completion completion;
@@ -29,13 +36,33 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data) {
     bool rc = true;
     spinlock_lock(&backfill_globals.spinlock);
     if(backfill_globals.running) {
+        size_t added = 0;
         struct backfill_request *br = callocz(1, sizeof(*br));
-        br->machine_guid = st->rrdhost->host_id;
-        br->rrdset = string_dup(st->id);
-        br->stream_receiver_state_id = __atomic_load_n(&st->rrdhost->stream.rcv.status.state_id, __ATOMIC_RELAXED);
-        br->cb = cb;
-        br->data = data;
-        BACKFILL_SET(&backfill_globals.queue, backfill_globals.id++, br);
+        br->rrdhost_receiver_state_id =__atomic_load_n(&st->rrdhost->stream.rcv.status.state_id, __ATOMIC_RELAXED);
+        br->rsa = rrdset_find_and_acquire(st->rrdhost, string2str(st->id));
+        if(br->rsa) {
+            br->cb = cb;
+            br->data = data;
+
+            RRDDIM *rd;
+            rrddim_foreach_read(rd, st) {
+                if (!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
+                    struct backfill_dim_work *bdm = callocz(1, sizeof(*bdm));
+                    bdm->rda = (RRDDIM_ACQUIRED *)dictionary_acquired_item_dup(st->rrddim_root_index, rd_dfe.item);
+                    bdm->br = br;
+                    br->works++;
+                    BACKFILL_SET(&backfill_globals.queue, backfill_globals.id++, bdm);
+                    added++;
+                }
+            }
+            rrddim_foreach_done(rd);
+        }
+
+        if (!added) {
+            rrdset_acquired_release(br->rsa);
+            freez(br);
+            rc = false;
+        }
     }
     else
         rc = false;
@@ -47,47 +74,46 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data) {
     return rc;
 }
 
-bool backfill_execute(struct backfill_request *br) {
-    char uuid_str[UUID_STR_LEN];
-    nd_uuid_unparse_lower(br->machine_guid.uuid, uuid_str);
+bool backfill_execute(struct backfill_dim_work *bdm) {
+    RRDSET *st = rrdset_acquired_to_rrdset(bdm->br->rsa);
 
-    RRDHOST_ACQUIRED *rha = rrdhost_find_and_acquire(uuid_str);
-    if(!rha) return false;
-
-    RRDHOST *host = rrdhost_acquired_to_rrdhost(rha);
-    if(br->stream_receiver_state_id != __atomic_load_n(&host->stream.rcv.status.state_id, __ATOMIC_RELAXED)) {
-        rrdhost_acquired_release(rha);
+    if(bdm->br->rrdhost_receiver_state_id !=__atomic_load_n(&st->rrdhost->stream.rcv.status.state_id, __ATOMIC_RELAXED))
         return false;
-    }
 
-    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(host, string2str(br->rrdset));
-    if(!rsa) {
-        rrdhost_acquired_release(rha);
-        return false;
-    }
+    RRDDIM *rd = rrddim_acquired_to_rrddim(bdm->rda);
 
-    RRDSET *st = rrdset_acquired_to_rrdset(rsa);
-    RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        if(!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
-            for (size_t tier = 1; tier < storage_tiers; tier++)
-                backfill_tier_from_smaller_tiers(rd, tier, now_realtime_sec());
-        }
+    size_t success = 0;
+    for (size_t tier = 1; tier < storage_tiers; tier++)
+        if(backfill_tier_from_smaller_tiers(rd, tier, now_realtime_sec()))
+            success++;
+
+    if(success > 0)
         rrddim_option_set(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS);
-    }
-    rrddim_foreach_done(rd);
 
-    rrdset_acquired_release(rsa);
-    rrdhost_acquired_release(rha);
-    return true;
+    return success > 0;
 }
 
-static void backfill_request_free(bool successful, struct backfill_request *br) {
-    if(br->cb)
-        br->cb(successful, br->data);
+static void backfill_dim_work_free(bool successful, struct backfill_dim_work *bdm) {
+    struct backfill_request *br = bdm->br;
 
-    string_freez(br->rrdset);
-    freez(br);
+    if(successful)
+        __atomic_add_fetch(&br->successful, 1, __ATOMIC_RELAXED);
+    else
+        __atomic_add_fetch(&br->failed, 1, __ATOMIC_RELAXED);
+
+    uint32_t works = __atomic_sub_fetch(&br->works, 1, __ATOMIC_RELAXED);
+    if(!works) {
+        if(br->cb)
+            br->cb(__atomic_load_n(&br->successful, __ATOMIC_RELAXED),
+                   __atomic_load_n(&br->failed, __ATOMIC_RELAXED),
+                   br->data);
+
+        rrdset_acquired_release(br->rsa);
+        freez(br);
+    }
+
+    rrddim_acquired_release(bdm->rda);
+    freez(bdm);
 }
 
 void *backfill_worker_thread(void *ptr __maybe_unused) {
@@ -95,18 +121,18 @@ void *backfill_worker_thread(void *ptr __maybe_unused) {
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS|SERVICE_STREAMING)) {
         spinlock_lock(&backfill_globals.spinlock);
         Word_t idx = 0;
-        struct backfill_request *br = BACKFILL_FIRST(&backfill_globals.queue, &idx);
-        if(br)
+        struct backfill_dim_work *bdm = BACKFILL_FIRST(&backfill_globals.queue, &idx);
+        if(bdm)
             BACKFILL_DEL(&backfill_globals.queue, idx);
         spinlock_unlock(&backfill_globals.spinlock);
 
-        if(br) {
-            bool success = backfill_execute(br);
-            backfill_request_free(success, br);
+        if(bdm) {
+            bool success = backfill_execute(bdm);
+            backfill_dim_work_free(success, bdm);
             continue;
         }
 
-        job_id = completion_wait_for_a_job_with_timeout(&backfill_globals.completion, job_id, 100000);
+        job_id = completion_wait_for_a_job_with_timeout(&backfill_globals.completion, job_id, 1000);
     }
 
     return NULL;
@@ -148,10 +174,10 @@ void *backfill_thread(void *ptr) {
     spinlock_lock(&backfill_globals.spinlock);
     backfill_globals.running = false;
     Word_t idx = 0;
-    for(struct backfill_request *br = BACKFILL_FIRST(&backfill_globals.queue, &idx);
-         br;
-         br = BACKFILL_NEXT(&backfill_globals.queue, &idx)) {
-        backfill_request_free(false, br);
+    for(struct backfill_dim_work *bdm = BACKFILL_FIRST(&backfill_globals.queue, &idx);
+         bdm;
+         bdm = BACKFILL_NEXT(&backfill_globals.queue, &idx)) {
+        backfill_dim_work_free(false, bdm);
     }
     spinlock_unlock(&backfill_globals.spinlock);
 

@@ -375,6 +375,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
 }
 
 struct backfill_request_data {
+    size_t rrdhost_receiver_state_id;
     PARSER *parser;
     RRDHOST *host;
     RRDSET *st;
@@ -383,18 +384,17 @@ struct backfill_request_data {
     time_t child_wall_clock_time;
 };
 
-static void backfill_callback(bool successful, void *data) {
+static void backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, void *data) {
     struct backfill_request_data *brd = data;
-    if(successful) {
-        if(!replicate_chart_request(
-            send_to_plugin, brd->parser, brd->host, brd->st,
-            brd->first_entry_child, brd->last_entry_child, brd->child_wall_clock_time, 0, 0))
-            netdata_log_error("PLUGINSD: 'host:%s' failed to initiate replication for 'chart:%s'",
-                              rrdhost_hostname(brd->host), rrdset_id(brd->st));
-    }
-    else {
-        netdata_log_error("PLUGINSD: 'host:%s' backfilling failed for 'chart:%s'",
-                          rrdhost_hostname(brd->host), rrdset_id(brd->st));
+    if (brd->rrdhost_receiver_state_id == __atomic_load_n(&brd->host->stream.rcv.status.state_id, __ATOMIC_RELAXED)) {
+        if (!replicate_chart_request(send_to_plugin, brd->parser, brd->host, brd->st,
+                                     brd->first_entry_child, brd->last_entry_child, brd->child_wall_clock_time,
+                                     0, 0)) {
+            netdata_log_error(
+                "PLUGINSD: 'host:%s' failed to initiate replication for 'chart:%s'",
+                rrdhost_hostname(brd->host),
+                rrdset_id(brd->st));
+        }
     }
     freez(brd);
 }
@@ -428,6 +428,7 @@ static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_w
         rrdhost_receiver_replicating_charts_plus_one(st->rrdhost);
 
         struct backfill_request_data *brd = callocz(1, sizeof(*brd));
+        brd->rrdhost_receiver_state_id =__atomic_load_n(&host->stream.rcv.status.state_id, __ATOMIC_RELAXED);
         brd->parser = parser;
         brd->host = host;
         brd->st = st;

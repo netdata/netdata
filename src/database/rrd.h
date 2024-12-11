@@ -278,7 +278,7 @@ struct rrddim_tier {
     STORAGE_COLLECT_HANDLE *sch;   // the data collection handle
 };
 
-void backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s);
+bool backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric
@@ -360,7 +360,7 @@ struct rrddim {
 
     // ------------------------------------------------------------------------
 
-    struct rrddim_tier tiers[];                     // our tiers of databases
+    struct rrddim_tier tiers[];                         // our tiers of databases
 };
 
 size_t rrddim_size(void);

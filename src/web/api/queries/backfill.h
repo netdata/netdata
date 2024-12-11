@@ -5,7 +5,7 @@
 
 #include "database/rrd.h"
 
-typedef void (*backfill_callback_t)(bool successful, void *data);
+typedef void (*backfill_callback_t)(size_t successful_dims, size_t failed_dims, void *data);
 
 void *backfill_thread(void *ptr);
 bool backfill_request_add(RRDSET *st, backfill_callback_t cb, void *data);
