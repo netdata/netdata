@@ -483,6 +483,96 @@ modules:
                 - name: operations
   - meta:
       plugin_name: windows.plugin
+      module_name: PerflibNetwork
+      monitored_instance:
+        name: Network Interface Metrics
+        link: "https://learn.microsoft.com/en-us/windows/win32/networking"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - network
+        - bandwidth
+        - protocol
+        - interfaces
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor network interface metrics about bandwidth, state, errors and more.
+        method_description: |
+          It queries 'Network Interface' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibNetwork
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: interface_speed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
+        metric: net.net
+        info: network interface ${label:device} current speed
+        os: "*"
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: System
+          description: "These metrics refer to the entire System."
+          labels: []
+          metrics:
+            - name: system.net
+              description: Physical Network Interfaces Aggregated Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibObjects
       monitored_instance:
         name: Semaphore statistics
