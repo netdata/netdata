@@ -15,8 +15,9 @@ jobs:
       - name: Check Labels
         id: label-check
         run: |
-          echo "Labels: '${{ toJSON(github.event.pull_request.labels) }}'"
-          if [[ ! '${{ toJSON(github.event.pull_request.labels) }}' =~ "integrations-update" ]]; then
+          LABELS='${{ toJSON(github.event.pull_request.labels) }}'
+          echo "Labels: $LABELS"
+          if [[ ! "$LABELS" =~ "integrations-update" ]]; then
             echo "This PR does not have the required label."
             exit 1
           fi
