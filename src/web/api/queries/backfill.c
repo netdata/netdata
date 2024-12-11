@@ -91,13 +91,6 @@ static void backfill_request_free(bool successful, struct backfill_request *br) 
 }
 
 void *backfill_worker_thread(void *ptr __maybe_unused) {
-    completion_init(&backfill_globals.completion);
-    BACKFILL_INIT(&backfill_globals.queue);
-
-    spinlock_lock(&backfill_globals.spinlock);
-    backfill_globals.running = true;
-    spinlock_unlock(&backfill_globals.spinlock);
-
     size_t job_id = 0;
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS|SERVICE_STREAMING)) {
         spinlock_lock(&backfill_globals.spinlock);
@@ -108,11 +101,12 @@ void *backfill_worker_thread(void *ptr __maybe_unused) {
         spinlock_unlock(&backfill_globals.spinlock);
 
         if(br) {
-            backfill_request_free(backfill_execute(br), br);
+            bool success = backfill_execute(br);
+            backfill_request_free(success, br);
             continue;
         }
 
-        job_id = completion_wait_for_a_job_with_timeout(&backfill_globals.completion, job_id, 1000);
+        job_id = completion_wait_for_a_job_with_timeout(&backfill_globals.completion, job_id, 100000);
     }
 
     return NULL;
@@ -123,6 +117,13 @@ void *backfill_thread(void *ptr) {
     if(!static_thread) return NULL;
 
     nd_thread_tag_set("BACKFILL[0]");
+
+    completion_init(&backfill_globals.completion);
+    BACKFILL_INIT(&backfill_globals.queue);
+
+    spinlock_lock(&backfill_globals.spinlock);
+    backfill_globals.running = true;
+    spinlock_unlock(&backfill_globals.spinlock);
 
     size_t threads = get_netdata_cpus();
     if(threads < 2) threads = 2;
@@ -153,6 +154,8 @@ void *backfill_thread(void *ptr) {
         backfill_request_free(false, br);
     }
     spinlock_unlock(&backfill_globals.spinlock);
+
+    completion_destroy(&backfill_globals.completion);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
