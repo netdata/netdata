@@ -38,7 +38,7 @@ jobs:
           sudo apt-get install python3-venv
           python3 -m venv ./virtualenv
           source ./virtualenv/bin/activate
-          pip install jsonschema referencing jinja2 ruamel.yaml
+          ./integrations/pip.sh
       - name: Generate Integrations
         id: generate
         run: |
