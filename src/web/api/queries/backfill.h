@@ -19,7 +19,7 @@ struct backfill_request_data {
 typedef void (*backfill_callback_t)(size_t successful_dims, size_t failed_dims, struct backfill_request_data *brd);
 
 void *backfill_thread(void *ptr);
-struct backfill_request_data *backfill_request_add(RRDSET *st, backfill_callback_t cb);
+bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_request_data *data);
 
 bool backfill_threads_detect_from_stream_conf(void);
 

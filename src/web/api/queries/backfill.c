@@ -36,17 +36,18 @@ static struct {
     .queue = { 0 },
 };
 
-struct backfill_request_data *backfill_request_add(RRDSET *st, backfill_callback_t cb) {
-    struct backfill_request_data *rc = NULL;
+bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_request_data *data) {
+    bool rc = false;
     size_t dimensions = dictionary_entries(st->rrddim_root_index);
     if(!dimensions || dimensions > 200)
-        return false;
+        return rc;
 
     size_t added = 0;
     struct backfill_dim_work *array[dimensions];
 
     if(backfill_globals.running) {
         struct backfill_request *br = aral_mallocz(backfill_globals.ar_br);
+        br->data = *data;
         br->rrdhost_receiver_state_id =__atomic_load_n(&st->rrdhost->stream.rcv.status.state_id, __ATOMIC_RELAXED);
         br->rsa = rrdset_find_and_acquire(st->rrdhost, string2str(st->id));
         if(br->rsa) {
@@ -79,7 +80,7 @@ struct backfill_request_data *backfill_request_add(RRDSET *st, backfill_callback
             spinlock_unlock(&backfill_globals.spinlock);
             completion_mark_complete_a_job(&backfill_globals.completion);
 
-            rc = &br->data;
+            rc = true;
         }
         else {
             // no dimensions added

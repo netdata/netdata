@@ -45,9 +45,9 @@ void stream_thread_process_waiting_list_unsafe(struct stream_thread *sth) {
                 sth->waiting_list.decrement = 1;
         }
     }
-    else {
-        sth->waiting_list.metadata = n_metadata;
-        sth->waiting_list.replication = n_replication;
+    else
         sth->waiting_list.decrement = ITERATIONS_TO_GET_ONE;
-    }
+
+    sth->waiting_list.metadata = n_metadata;
+    sth->waiting_list.replication = n_replication;
 }
