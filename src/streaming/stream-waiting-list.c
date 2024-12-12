@@ -3,15 +3,23 @@
 #define STREAM_INTERNALS
 #include "stream-waiting-list.h"
 
-// the thread calls us every 10ms, so we wait for 10 iterations (1 second)
-#define ITERATIONS_TO_GET_ONE 10
+// the thread calls us every 100ms
+#define ITERATIONS_TO_GET_ONE 20
 
 static __thread struct {
     size_t metadata;
+    size_t replication;
 } throttle = { 0 };
 
 void stream_thread_received_metadata(void) {
     throttle.metadata++;
+}
+void stream_thread_received_replication(void) {
+    throttle.replication++;
+}
+
+static inline size_t normalize_value(size_t v) {
+    return (v / 100) * 100;
 }
 
 void stream_thread_process_waiting_list_unsafe(struct stream_thread *sth) {
@@ -21,7 +29,10 @@ void stream_thread_process_waiting_list_unsafe(struct stream_thread *sth) {
     struct receiver_state *rpt = RECEIVERS_FIRST(&sth->queue.receivers, &idx);
     if(!rpt) return;
 
-    if(sth->waiting_list.metadata == throttle.metadata) {
+    size_t n_metadata = normalize_value(throttle.metadata);
+    size_t n_replication = normalize_value(throttle.replication);
+
+    if(sth->waiting_list.metadata == n_metadata && sth->waiting_list.replication == n_replication) {
         if(sth->waiting_list.decrement-- == 0) {
             sth->waiting_list.decrement = ITERATIONS_TO_GET_ONE;
 
@@ -33,7 +44,8 @@ void stream_thread_process_waiting_list_unsafe(struct stream_thread *sth) {
         }
     }
     else {
-        sth->waiting_list.metadata = throttle.metadata;
+        sth->waiting_list.metadata = n_metadata;
+        sth->waiting_list.replication = n_replication;
         sth->waiting_list.decrement = ITERATIONS_TO_GET_ONE;
     }
 }

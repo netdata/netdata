@@ -3,6 +3,7 @@
 #include "pluginsd_replication.h"
 #include "streaming/stream-receiver-internals.h"
 #include "streaming/replication.h"
+#include "streaming/stream-waiting-list.h"
 
 PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
@@ -358,6 +359,8 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
 
         host->stream.rcv.status.replication.percent = 100.0;
         worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, host->stream.rcv.status.replication.percent);
+
+        stream_thread_received_replication();
 
         return PARSER_RC_OK;
     }

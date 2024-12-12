@@ -153,6 +153,7 @@ struct stream_thread {
 
     struct {
         size_t metadata;
+        size_t replication;
         size_t decrement;
     } waiting_list;
 

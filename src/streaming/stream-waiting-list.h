@@ -4,6 +4,7 @@
 #define NETDATA_STREAM_WAITING_LIST_H
 
 void stream_thread_received_metadata(void);
+void stream_thread_received_replication(void);
 
 #ifdef STREAM_INTERNALS
 #include "stream-thread.h"
