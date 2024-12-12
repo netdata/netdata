@@ -1431,6 +1431,8 @@ set(RRD_PLUGIN_FILES
         src/database/rrdcollector-internals.h
         src/database/rrd-database-mode.h
         src/database/rrd-database-mode.c
+        src/database/rrdhost-state-id.c
+        src/database/rrdhost-state-id.h
 )
 
 if(ENABLE_DBENGINE)

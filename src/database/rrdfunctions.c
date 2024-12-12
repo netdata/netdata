@@ -15,11 +15,12 @@
 // ----------------------------------------------------------------------------
 
 static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *rrdhost) {
-    RRDHOST *host = rrdhost; (void)host;
+    RRDHOST *host = rrdhost;
     struct rrd_host_function *rdcf = func;
 
     rrd_collector_started();
     rdcf->collector = rrd_collector_acquire_current_thread();
+    rdcf->rrdhost_state_id = rrdhost_state_id(host);
 
     if(!rdcf->priority)
         rdcf->priority = RRDFUNCTIONS_PRIORITY_DEFAULT;
@@ -54,6 +55,17 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         struct rrd_collector *old_rdc = rdcf->collector;
         rdcf->collector = rrd_collector_acquire_current_thread();
         rrd_collector_release(old_rdc);
+        changed = true;
+    }
+
+    if(rdcf->rrdhost_state_id != rrdhost_state_id(host)) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: function '%s' of host '%s' changed state id from %u to %u",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host),
+               rdcf->rrdhost_state_id,
+            rrdhost_state_id(host));
+
+        rdcf->rrdhost_state_id = rrdhost_state_id(host);
         changed = true;
     }
 
@@ -260,6 +272,8 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
     strncpyz(buffer, name, sizeof(buffer) - 1);
     char *s = NULL;
 
+    RRDHOST_STATE state_id = rrdhost_state_id(host);
+
     bool found = false;
     *item = NULL;
     if(host->functions) {
@@ -268,7 +282,7 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
                 found = true;
 
                 struct rrd_host_function *rdcf = dictionary_acquired_item_value(*item);
-                if(rrd_collector_running(rdcf->collector)) {
+                if(rrd_collector_running(rdcf->collector) && rdcf->rrdhost_state_id == state_id) {
                     break;
                 }
                 else {
@@ -314,7 +328,7 @@ bool rrd_function_available(RRDHOST *host, const char *function) {
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->functions, function);
     if(item) {
         struct rrd_host_function *rdcf = dictionary_acquired_item_value(item);
-        if(rrd_collector_running(rdcf->collector))
+        if(rrd_collector_running(rdcf->collector) && rdcf->rrdhost_state_id == rrdhost_state_id(host))
             ret = true;
 
         dictionary_acquired_item_release(host->functions, item);

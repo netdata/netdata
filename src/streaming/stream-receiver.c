@@ -358,8 +358,6 @@ static void streaming_parser_init(struct receiver_state *rpt) {
 
     pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
 
-    rrd_collector_started();
-
     rpt->thread.compressed.start = 0;
     rpt->thread.compressed.used = 0;
     rpt->thread.compressed.enabled = stream_decompression_initialize(rpt);
@@ -806,7 +804,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     rrdhost_receiver_lock(host);
 
     if (!host->receiver) {
-        __atomic_add_fetch(&host->stream.rcv.status.state_id, 1, __ATOMIC_RELAXED);
+        rrdhost_state_id_increment(host);
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
 
@@ -870,7 +868,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
 
         if (host->receiver == rpt) {
-            __atomic_add_fetch(&host->stream.rcv.status.state_id, 1, __ATOMIC_RELAXED);
+            rrdhost_state_id_increment(host);
             rrdhost_flag_clear(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
             rrdhost_receiver_unlock(host);
             {

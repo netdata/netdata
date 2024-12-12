@@ -376,7 +376,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
 }
 
 static void backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, struct backfill_request_data *brd) {
-    if (brd->rrdhost_receiver_state_id == __atomic_load_n(&brd->host->stream.rcv.status.state_id, __ATOMIC_RELAXED)) {
+    if (brd->rrdhost_receiver_state_id == rrdhost_state_id(brd->host)) {
         if (!replicate_chart_request(send_to_plugin, brd->parser, brd->host, brd->st,
                                      brd->first_entry_child, brd->last_entry_child, brd->child_wall_clock_time,
                                      0, 0)) {
@@ -417,7 +417,7 @@ static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_w
         rrdhost_receiver_replicating_charts_plus_one(st->rrdhost);
 
         struct backfill_request_data brd = {
-            .rrdhost_receiver_state_id =__atomic_load_n(&host->stream.rcv.status.state_id, __ATOMIC_RELAXED),
+            .rrdhost_receiver_state_id = rrdhost_state_id(host),
             .parser = parser,
             .host = host,
             .st = st,

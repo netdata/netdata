@@ -487,6 +487,8 @@ void *stream_thread(void *ptr) {
     sth->snd.bytes_received = 0;
     sth->snd.bytes_sent = 0;
 
+    rrd_collector_started();
+
     while(!exit_thread && !nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
         usec_t now_ut = now_monotonic_usec();
 
@@ -596,6 +598,8 @@ void *stream_thread(void *ptr) {
     sth->tid = 0;
 
     worker_unregister();
+
+    rrd_collector_finished();
 
     return NULL;
 }

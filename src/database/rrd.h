@@ -11,6 +11,7 @@ extern "C" {
 #include "rrd-database-mode.h"
 #include "streaming/stream-traffic-types.h"
 #include "streaming/stream-sender-commit.h"
+#include "rrdhost-state-id.h"
 
 // non-existing structs instead of voids
 // to enable type checking at compile time
@@ -1238,7 +1239,7 @@ struct rrdhost {
 
             struct {
                 pid_t tid;
-                uint32_t state_id;                  // every time the receiver connects/disconnects, this is incremented
+                RRDHOST_STATE state_id;             // every time the receiver connects/disconnects, this is incremented
 
                 time_t last_connected;              // the time the last sender was connected
                 time_t last_disconnected;           // the time the last sender was disconnected
