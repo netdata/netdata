@@ -3,6 +3,10 @@
 #include "netdata-conf.h"
 
 bool netdata_conf_load(char *filename, char overwrite_used, const char **user) {
+    static bool run = false;
+    if(run) return false;
+    run = true;
+
     errno_clear();
 
     int ret = 0;
@@ -29,6 +33,7 @@ bool netdata_conf_load(char *filename, char overwrite_used, const char **user) {
         freez(filename);
     }
 
+    netdata_conf_backwards_compatibility();
     netdata_conf_section_global_run_as_user(user);
     return ret;
 }

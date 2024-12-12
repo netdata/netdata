@@ -911,7 +911,7 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
 }
 
 void analytics_reset(void) {
-        analytics_data.data_length = 0;
+    analytics_data.data_length = 0;
     analytics_set_data(&analytics_data.netdata_config_stream_enabled, "null");
     analytics_set_data(&analytics_data.netdata_config_memory_mode, "null");
     analytics_set_data(&analytics_data.netdata_config_exporting_enabled, "null");

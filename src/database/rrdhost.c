@@ -779,8 +779,6 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         dbengine_enabled = true;
     }
     else {
-        stream_conf_init();
-
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || stream_conf_receiver_needs_dbengine()) {
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "DBENGINE: Initializing ...");

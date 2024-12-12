@@ -1551,6 +1551,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-circular-buffer.h
         src/streaming/stream-control.c
         src/streaming/stream-control.h
+        src/streaming/stream-waiting-list.c
+        src/streaming/stream-waiting-list.h
 )
 
 set(WEB_PLUGIN_FILES
@@ -1564,6 +1566,8 @@ set(WEB_PLUGIN_FILES
         src/web/server/web_client_cache.h
         src/web/api/v3/api_v3_stream_info.c
         src/web/api/v3/api_v3_stream_path.c
+        src/web/api/queries/backfill.c
+        src/web/api/queries/backfill.h
 )
 
 set(CLAIM_PLUGIN_FILES

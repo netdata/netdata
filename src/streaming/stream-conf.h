@@ -83,7 +83,7 @@ struct stream_receiver_config {
 
 void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_receiver_config *config, const char *api_key, const char *machine_guid);
 
-bool stream_conf_init();
+void stream_conf_load();
 bool stream_conf_receiver_needs_dbengine();
 bool stream_conf_configured_as_parent();
 

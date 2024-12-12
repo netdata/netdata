@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#define STREAM_INTERNALS
 #include "stream-thread.h"
+#include "stream-waiting-list.h"
 
 struct stream_thread_globals stream_thread_globals = {
     .assign = {
@@ -30,7 +32,7 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
                 if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, ND_POLL_READ|ND_POLL_WRITE, m)) {
                     nd_log_limit_static_global_var(erl, 1, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
-                                 "STREAM SEND[%zu] '%s' [to %s]: cannot enable output on sender socket %d.",
+                                 "STREAM SND[%zu] '%s' [to %s]: cannot enable output on sender socket %d.",
                                  sth->id, rrdhost_hostname(m->s->host), m->s->connected_to, m->s->sock.fd);
                 }
                 msg->opcode &= ~(STREAM_OPCODE_SENDER_POLLOUT);
@@ -44,7 +46,7 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
                 if (!nd_poll_upd(sth->run.ndpl, m->rpt->sock.fd, ND_POLL_READ | ND_POLL_WRITE, m)) {
                     nd_log_limit_static_global_var(erl, 1, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
-                                 "STREAM RECEIVE[%zu] '%s' [from [%s]:%s]: cannot enable output on receiver socket %d.",
+                                 "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot enable output on receiver socket %d.",
                                  sth->id, rrdhost_hostname(m->rpt->host), m->rpt->client_ip, m->rpt->client_port, m->rpt->sock.fd);
                 }
                 msg->opcode &= ~(STREAM_OPCODE_RECEIVER_POLLOUT);
@@ -81,14 +83,14 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
 
     if(msg.meta != &rpt->thread.meta) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM RECEIVE '%s' [from [%s]:%s]: the receiver in the opcode the message does not match this receiver. "
+               "STREAM RCV '%s' [from [%s]:%s]: the receiver in the opcode the message does not match this receiver. "
                "Ignoring opcode.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
         return;
     }
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
     if(!sth) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM RECEIVE '%s' [from [%s]:%s]: the opcode (%u) message cannot be verified. Ignoring it.",
+               "STREAM RCV '%s' [from [%s]:%s]: the opcode (%u) message cannot be verified. Ignoring it.",
                rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, msg.opcode);
         return;
     }
@@ -135,7 +137,7 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
                 }
 #endif
 
-                fatal("STREAM RECEIVE '%s' [from [%s]:%s]: The streaming opcode queue is full, but this should never happen...",
+                fatal("STREAM RCV '%s' [from [%s]:%s]: The streaming opcode queue is full, but this should never happen...",
                       rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
             }
 
@@ -161,7 +163,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
 
     if(msg.meta != &s->thread.meta) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SEND '%s' [to %s]: the opcode message does not match this sender. "
+               "STREAM SND '%s' [to %s]: the opcode message does not match this sender. "
                "Ignoring opcode.", rrdhost_hostname(s->host), s->connected_to);
         return;
     }
@@ -169,7 +171,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
     if(!sth) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SEND[x] '%s' [to %s] the opcode (%u) message cannot be verified. Ignoring it.",
+               "STREAM SND[x] '%s' [to %s] the opcode (%u) message cannot be verified. Ignoring it.",
                rrdhost_hostname(s->host), s->connected_to, msg.opcode);
         return;
     }
@@ -216,7 +218,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
                 }
 #endif
 
-                fatal("STREAM SEND '%s' [to %s]: The streaming opcode queue is full, but this should never happen...",
+                fatal("STREAM SND '%s' [to %s]: The streaming opcode queue is full, but this should never happen...",
                       rrdhost_hostname(s->host), s->connected_to);
             }
 
@@ -448,6 +450,10 @@ void *stream_thread(void *ptr) {
                                       "ops processed", "messages",
                                       WORKER_METRIC_INCREMENTAL_TOTAL);
 
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_RECEIVERS_WAITING_LIST_SIZE,
+                                      "receivers waiting to be added", "nodes",
+                                      WORKER_METRIC_ABSOLUTE);
+
     if(pipe(sth->pipe.fds) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: cannot create required pipe.", sth->id);
         sth->pipe.fds[PIPE_READ] = -1;
@@ -477,6 +483,7 @@ void *stream_thread(void *ptr) {
 
     bool exit_thread = false;
     size_t replay_entries = 0;
+    size_t receivers_waiting = 0;
     sth->snd.bytes_received = 0;
     sth->snd.bytes_sent = 0;
 
@@ -488,9 +495,15 @@ void *stream_thread(void *ptr) {
 
             // move any pending hosts in the inbound queue, to the running list
             spinlock_lock(&sth->queue.spinlock);
+
             stream_thread_messages_resize_unsafe(sth);
-            stream_receiver_move_queue_to_running_unsafe(sth);
+
+            stream_thread_process_waiting_list_unsafe(sth, now_ut);
+            // stream_receiver_move_entire_queue_to_running_unsafe(sth);
+
             stream_sender_move_queue_to_running_unsafe(sth);
+
+            receivers_waiting = sth->queue.receivers_waiting;
             spinlock_unlock(&sth->queue.spinlock);
             last_dequeue_ut = now_ut;
         }
@@ -507,6 +520,8 @@ void *stream_thread(void *ptr) {
             worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)sth->snd.bytes_received);
             worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, (NETDATA_DOUBLE)sth->snd.bytes_sent);
             worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
+
+            worker_set_metric(WORKER_SENDER_JOB_RECEIVERS_WAITING_LIST_SIZE, (NETDATA_DOUBLE)receivers_waiting);
             replay_entries = 0;
             sth->snd.bytes_received = 0;
             sth->snd.bytes_sent = 0;
@@ -549,7 +564,7 @@ void *stream_thread(void *ptr) {
     // dequeue
     spinlock_lock(&sth->queue.spinlock);
     stream_sender_move_queue_to_running_unsafe(sth);
-    stream_receiver_move_queue_to_running_unsafe(sth);
+    stream_receiver_move_entire_queue_to_running_unsafe(sth);
     spinlock_unlock(&sth->queue.spinlock);
 
     // cleanup receiver and dispatcher
@@ -685,12 +700,12 @@ void stream_receiver_add_to_queue(struct receiver_state *rpt) {
     stream_thread_node_queued(rpt->host);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "STREAM RECEIVE[%zu] '%s': moving host to receiver queue...",
+           "STREAM RCV[%zu] '%s': moving host to receiver queue...",
            sth->id, rrdhost_hostname(rpt->host));
 
     spinlock_lock(&sth->queue.spinlock);
-    internal_fatal(RECEIVERS_GET(&sth->queue.receivers, (Word_t)rpt) != NULL, "Receiver is already in the receivers queue");
-    RECEIVERS_SET(&sth->queue.receivers, (Word_t)rpt, rpt);
+    RECEIVERS_SET(&sth->queue.receivers, ++sth->queue.id, rpt);
+    sth->queue.receivers_waiting++;
     spinlock_unlock(&sth->queue.spinlock);
 }
 
@@ -704,8 +719,7 @@ void stream_sender_add_to_queue(struct sender_state *s) {
            sth->id, rrdhost_hostname(s->host));
 
     spinlock_lock(&sth->queue.spinlock);
-    internal_fatal(SENDERS_GET(&sth->queue.senders, (Word_t)s) != NULL, "Sender is already in the senders queue");
-    SENDERS_SET(&sth->queue.senders, (Word_t)s, s);
+    SENDERS_SET(&sth->queue.senders, ++sth->queue.id, s);
     spinlock_unlock(&sth->queue.spinlock);
 }
 

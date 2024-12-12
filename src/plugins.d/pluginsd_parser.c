@@ -2,6 +2,8 @@
 
 #include "pluginsd_internals.h"
 #include "streaming/replication.h"
+#include "streaming/stream-waiting-list.h"
+#include "web/api/queries/backfill.h"
 
 static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;
@@ -373,6 +375,19 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
     return PARSER_RC_OK;
 }
 
+static void backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, struct backfill_request_data *brd) {
+    if (brd->rrdhost_receiver_state_id == __atomic_load_n(&brd->host->stream.rcv.status.state_id, __ATOMIC_RELAXED)) {
+        if (!replicate_chart_request(send_to_plugin, brd->parser, brd->host, brd->st,
+                                     brd->first_entry_child, brd->last_entry_child, brd->child_wall_clock_time,
+                                     0, 0)) {
+            netdata_log_error(
+                "PLUGINSD: 'host:%s' failed to initiate replication for 'chart:%s'",
+                rrdhost_hostname(brd->host),
+                rrdset_id(brd->st));
+        }
+    }
+}
+
 static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *parser) {
     const char *first_entry_txt = get_word(words, num_words, 1);
     const char *last_entry_txt = get_word(words, num_words, 2);
@@ -401,9 +416,20 @@ static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_w
         rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         rrdhost_receiver_replicating_charts_plus_one(st->rrdhost);
 
-        ok = replicate_chart_request(send_to_plugin, parser, host, st,
-                                     first_entry_child, last_entry_child, child_wall_clock_time,
-                                     0, 0);
+        struct backfill_request_data brd = {
+            .rrdhost_receiver_state_id =__atomic_load_n(&host->stream.rcv.status.state_id, __ATOMIC_RELAXED),
+            .parser = parser,
+            .host = host,
+            .st = st,
+            .first_entry_child = first_entry_child,
+            .last_entry_child = last_entry_child,
+            .child_wall_clock_time = child_wall_clock_time,
+        };
+
+        ok = backfill_request_add(st, backfill_callback, &brd);
+        if(!ok)
+            ok = replicate_chart_request(
+                send_to_plugin, parser, host, st, first_entry_child, last_entry_child, child_wall_clock_time, 0, 0);
     }
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     else {
@@ -411,6 +437,8 @@ static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_w
                        rrdhost_hostname(st->rrdhost), rrdset_id(st));
     }
 #endif
+
+    stream_thread_received_metadata();
 
     return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
 }

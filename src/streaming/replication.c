@@ -155,7 +155,7 @@ static struct replication_query *replication_query_prepare(
         if (st->last_updated.tv_sec > q->query.before) {
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
             internal_error(true,
-                           "STREAM SEND REPLAY: 'host:%s/chart:%s' "
+                           "STREAM SND REPLAY: 'host:%s/chart:%s' "
                            "has start_streaming = true, "
                            "adjusting replication before timestamp from %llu to %llu",
                            rrdhost_hostname(st->rrdhost), rrdset_id(st),
@@ -178,7 +178,7 @@ static struct replication_query *replication_query_prepare(
 
         if (unlikely(rd_dfe.counter >= q->dimensions)) {
             internal_error(true,
-                           "STREAM SEND REPLAY ERROR: 'host:%s/chart:%s' has more dimensions than the replicated ones",
+                           "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' has more dimensions than the replicated ones",
                            rrdhost_hostname(st->rrdhost), rrdset_id(st));
             break;
         }
@@ -364,7 +364,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
                 nd_log_limit_static_global_var(erl, 1, 0);
                 nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                            "STREAM SEND REPLAY: 'host:%s/chart:%s/dim:%s': db does not advance the query "
+                            "STREAM SND REPLAY: 'host:%s/chart:%s/dim:%s': db does not advance the query "
                             "beyond time %llu (tried 1000 times to get the next point and always got back a point in the past)",
                             rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st), rrddim_id(d->rd),
                             (unsigned long long) now);
@@ -414,7 +414,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
 #ifdef NETDATA_INTERNAL_CHECKS
             nd_log_limit_static_global_var(erl, 1, 0);
             nd_log_limit(&erl,  NDLS_DAEMON, NDLP_WARNING,
-                         "STREAM SEND REPLAY WARNING: 'host:%s/chart:%s' misaligned dimensions, "
+                         "STREAM SND REPLAY WARNING: 'host:%s/chart:%s' misaligned dimensions, "
                          "update every (min: %ld, max: %ld), "
                          "start time (min: %ld, max: %ld), "
                          "end time (min %ld, max %ld), "
@@ -450,7 +450,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 q->query.enable_streaming = false;
 
                 internal_error(true,
-                               "STREAM SEND REPLAY: current buffer size %zu is more than the "
+                               "STREAM SND REPLAY: current buffer size %zu is more than the "
                                "max message size %zu for chart '%s' of host '%s'. "
                                "Interrupting replication request (%ld to %ld, %s) at %ld to %ld, %s.",
                                buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
@@ -530,14 +530,14 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
         log_date(actual_after_buf, LOG_DATE_LENGTH, actual_after);
         log_date(actual_before_buf, LOG_DATE_LENGTH, actual_before);
         internal_error(true,
-                       "STREAM SEND REPLAY: 'host:%s/chart:%s': sending data %llu [%s] to %llu [%s] (requested %llu [delta %lld] to %llu [delta %lld])",
+                       "STREAM SND REPLAY: 'host:%s/chart:%s': sending data %llu [%s] to %llu [%s] (requested %llu [delta %lld] to %llu [delta %lld])",
                        rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st),
                        (unsigned long long)actual_after, actual_after_buf, (unsigned long long)actual_before, actual_before_buf,
                        (unsigned long long)after, (long long)(actual_after - after), (unsigned long long)before, (long long)(actual_before - before));
     }
     else
         internal_error(true,
-                       "STREAM SEND REPLAY: 'host:%s/chart:%s': nothing to send (requested %llu to %llu)",
+                       "STREAM SND REPLAY: 'host:%s/chart:%s': nothing to send (requested %llu to %llu)",
                        rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st),
                        (unsigned long long)after, (unsigned long long)before);
 #endif // NETDATA_LOG_REPLICATION_REQUESTS
@@ -708,13 +708,13 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
                     st->stream.snd.resync_time_s = 0;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
-                internal_error(true, "STREAM SEND REPLAY: 'host:%s/chart:%s' streaming starts",
+                internal_error(true, "STREAM SND REPLAY: 'host:%s/chart:%s' streaming starts",
                            rrdhost_hostname(st->rrdhost), rrdset_id(st));
 #endif
             }
             else
                 internal_error(true,
-                               "STREAM SEND REPLAY ERROR: 'host:%s/chart:%s' "
+                               "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' "
                                "received start streaming command, but the chart is not in progress replicating",
                                rrdhost_hostname(st->rrdhost), rrdset_id(st));
         }
@@ -775,7 +775,7 @@ static void replicate_log_request(struct replication_request_details *r, const c
     nd_log_limit_static_global_var(erl, 1, 0);
     nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
 #endif
-                "STREAM SEND REPLAY ERROR: 'host:%s/chart:%s' child sent: "
+                "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' child sent: "
                 "db from %ld to %ld%s, wall clock time %ld, "
                 "last request from %ld to %ld, "
                 "issue: %s - "
@@ -813,7 +813,7 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
         log_date(wanted_before_buf, LOG_DATE_LENGTH, r->wanted.before);
 
     internal_error(true,
-                   "STREAM SEND REPLAY: 'host:%s/chart:%s' sending replication request %ld [%s] to %ld [%s], start streaming '%s': %s: "
+                   "STREAM SND REPLAY: 'host:%s/chart:%s' sending replication request %ld [%s] to %ld [%s], start streaming '%s': %s: "
                    "last[%ld - %ld] child[%ld - %ld, now %ld %s] local[%ld - %ld, now %ld] gap[%ld - %ld %s] %s"
                    , rrdhost_hostname(r->host), rrdset_id(r->st)
                    , r->wanted.after, wanted_after_buf
@@ -842,7 +842,7 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
 
     ssize_t ret = r->caller.callback(buffer, r->caller.parser, STREAM_TRAFFIC_TYPE_REPLICATION);
     if (ret < 0) {
-        netdata_log_error("STREAM SEND REPLAY ERROR: 'host:%s/chart:%s' failed to send replication request to child (error %zd)",
+        netdata_log_error("STREAM SND REPLAY ERROR: 'host:%s/chart:%s' failed to send replication request to child (error %zd)",
               rrdhost_hostname(r->host), rrdset_id(r->st), ret);
         return false;
     }
@@ -1281,7 +1281,7 @@ static void replication_sort_entry_del(struct replication_request *rq, bool buff
         }
 
         if (!rse_to_delete)
-            fatal("STREAM SEND REPLAY: 'host:%s/chart:%s' Cannot find sort entry to delete for time %ld.",
+            fatal("STREAM SND REPLAY: 'host:%s/chart:%s' Cannot find sort entry to delete for time %ld.",
                   rrdhost_hostname(rq->sender->host), string2str(rq->chart_id), rq->after);
 
     }
@@ -1384,7 +1384,7 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
         // we can replace this command
         internal_error(
                 true,
-                "STREAM SEND '%s' [to %s]: REPLAY: 'host:%s/chart:%s' replacing duplicate replication command received (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
+                "STREAM SND '%s' [to %s]: REPLAY: 'host:%s/chart:%s' replacing duplicate replication command received (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
                 rrdhost_hostname(s->host), s->connected_to, rrdhost_hostname(s->host), dictionary_acquired_item_name(item),
                 (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false",
                 (unsigned long long)rq_new->after, (unsigned long long)rq_new->before, rq_new->start_streaming ? "true" : "false");
@@ -1397,7 +1397,7 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
         replication_sort_entry_add(rq);
         internal_error(
                 true,
-                "STREAM SEND '%s' [to %s]: REPLAY: 'host:%s/chart:%s' adding duplicate replication command received (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
+                "STREAM SND '%s' [to %s]: REPLAY: 'host:%s/chart:%s' adding duplicate replication command received (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
                 rrdhost_hostname(s->host), s->connected_to, rrdhost_hostname(s->host), dictionary_acquired_item_name(item),
                 (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false",
                 (unsigned long long)rq_new->after, (unsigned long long)rq_new->before, rq_new->start_streaming ? "true" : "false");
@@ -1405,7 +1405,7 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
     else {
         internal_error(
                 true,
-                "STREAM SEND '%s' [to %s]: REPLAY: 'host:%s/chart:%s' ignoring duplicate replication command received (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
+                "STREAM SND '%s' [to %s]: REPLAY: 'host:%s/chart:%s' ignoring duplicate replication command received (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
                 rrdhost_hostname(s->host), s->connected_to, rrdhost_hostname(s->host),
                 dictionary_acquired_item_name(item),
                 (unsigned long long) rq->after, (unsigned long long) rq->before, rq->start_streaming ? "true" : "false",
@@ -1449,7 +1449,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     }
 
     if(!rq->st) {
-        internal_error(true, "STREAM SEND REPLAY ERROR: 'host:%s/chart:%s' not found",
+        internal_error(true, "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' not found",
                        rrdhost_hostname(rq->sender->host), string2str(rq->chart_id));
 
         goto cleanup;
@@ -1577,7 +1577,7 @@ static size_t verify_host_charts_are_streaming_now(RRDHOST *host) {
             host->sender &&
             !stream_sender_pending_replication_requests(host->sender) &&
             dictionary_entries(host->sender->replication.requests) != 0,
-            "STREAM SEND REPLAY SUMMARY: 'host:%s' reports %zu pending replication requests, "
+            "STREAM SND REPLAY SUMMARY: 'host:%s' reports %zu pending replication requests, "
             "but its chart replication index says there are %zu charts pending replication",
             rrdhost_hostname(host),
         stream_sender_pending_replication_requests(host->sender),
@@ -1596,7 +1596,7 @@ static size_t verify_host_charts_are_streaming_now(RRDHOST *host) {
         if(!flags) {
             internal_error(
                     true,
-                    "STREAM SEND REPLAY SUMMARY: 'host:%s/chart:%s' is neither IN PROGRESS nor FINISHED",
+                    "STREAM SND REPLAY SUMMARY: 'host:%s/chart:%s' is neither IN PROGRESS nor FINISHED",
                     rrdhost_hostname(host), rrdset_id(st)
             );
             is_error = true;
@@ -1605,7 +1605,7 @@ static size_t verify_host_charts_are_streaming_now(RRDHOST *host) {
         if(!(flags & RRDSET_FLAG_SENDER_REPLICATION_FINISHED) || (flags & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
             internal_error(
                     true,
-                    "STREAM SEND REPLAY SUMMARY: 'host:%s/chart:%s' is IN PROGRESS although replication is finished",
+                    "STREAM SND REPLAY SUMMARY: 'host:%s/chart:%s' is IN PROGRESS although replication is finished",
                     rrdhost_hostname(host), rrdset_id(st)
             );
             is_error = true;
@@ -1619,7 +1619,7 @@ static size_t verify_host_charts_are_streaming_now(RRDHOST *host) {
     rrdset_foreach_done(st);
 
     internal_error(errors,
-                   "STREAM SEND REPLAY SUMMARY: 'host:%s' finished replicating %zu charts, but %zu charts are still in progress although replication finished",
+                   "STREAM SND REPLAY SUMMARY: 'host:%s' finished replicating %zu charts, but %zu charts are still in progress although replication finished",
                    rrdhost_hostname(host), ok, errors);
 
     return errors;

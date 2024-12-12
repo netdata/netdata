@@ -1964,16 +1964,16 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
 
-void backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
-    if(unlikely(tier >= storage_tiers)) return;
+bool backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
+    if(unlikely(tier >= storage_tiers)) return false;
 #ifdef ENABLE_DBENGINE
-    if(default_backfill == RRD_BACKFILL_NONE) return;
+    if(default_backfill == RRD_BACKFILL_NONE) return false;
 #else
-    return;
+    return false;
 #endif
 
     struct rrddim_tier *t = &rd->tiers[tier];
-    if(unlikely(!t)) return;
+    if(unlikely(!t)) return false;
 
     time_t latest_time_s = storage_engine_latest_time_s(t->seb, t->smh);
     time_t granularity = (time_t)t->tier_grouping * (time_t)rd->rrdset->update_every;
@@ -1981,13 +1981,13 @@ void backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
 
     // if the user wants only NEW backfilling, and we don't have any data
 #ifdef ENABLE_DBENGINE
-    if(default_backfill == RRD_BACKFILL_NEW && latest_time_s <= 0) return;
+    if(default_backfill == RRD_BACKFILL_NEW && latest_time_s <= 0) return false;
 #else
     return;
 #endif
 
     // there is really nothing we can do
-    if(now_s <= latest_time_s || time_diff < granularity) return;
+    if(now_s <= latest_time_s || time_diff < granularity) return false;
 
     stream_control_backfill_query_started();
 
@@ -2026,6 +2026,8 @@ void backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
     }
 
     stream_control_backfill_query_finished();
+
+    return true;
 }
 
 // ----------------------------------------------------------------------------

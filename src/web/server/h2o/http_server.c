@@ -423,6 +423,6 @@ void *h2o_main(void *ptr) {
     return NULL;
 }
 
-int httpd_is_enabled() {
+bool httpd_is_enabled() {
     return config_get_boolean(HTTPD_CONFIG_SECTION, "enabled", HTTPD_ENABLED_DEFAULT);
 }

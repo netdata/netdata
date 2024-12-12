@@ -2,6 +2,27 @@
 
 #include "netdata-conf-logs.h"
 
+static void debug_flags_initialize(void) {
+    // --------------------------------------------------------------------
+    // get the debugging flags from the configuration file
+
+    const char *flags = config_get(CONFIG_SECTION_LOGS, "debug flags",  "0x0000000000000000");
+    nd_setenv("NETDATA_DEBUG_FLAGS", flags, 1);
+
+    debug_flags = strtoull(flags, NULL, 0);
+    netdata_log_debug(D_OPTIONS, "Debug flags set to '0x%" PRIX64 "'.", debug_flags);
+
+    if(debug_flags != 0) {
+        struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
+        if(setrlimit(RLIMIT_CORE, &rl) != 0)
+            netdata_log_error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+
+#ifdef HAVE_SYS_PRCTL_H
+        prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+#endif
+    }
+}
+
 void netdata_conf_section_logs(void) {
     static bool run = false;
     if(run) return;
@@ -78,5 +99,6 @@ void netdata_conf_section_logs(void) {
         nd_log_set_user_settings(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
     }
 
+    debug_flags_initialize();
     aclk_config_get_query_scope();
 }

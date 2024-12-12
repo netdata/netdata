@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "web/api/queries/backfill.h"
 
 void *aclk_main(void *ptr);
 void *analytics_main(void *ptr);
@@ -123,6 +124,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .name = "h2o",
         .config_section = NULL,
         .config_name = NULL,
+        .enable_routine = httpd_is_enabled,
         .enabled = 0,
         .thread = NULL,
         .init_routine = NULL,
@@ -167,6 +169,16 @@ const struct netdata_static_thread static_threads_common[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = profile_main
+    },
+    {
+        .name = "BACKFILL",
+        .config_section = NULL,
+        .config_name = NULL,
+        .enable_routine = backfill_threads_detect_from_stream_conf,
+        .enabled = 0,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = backfill_thread
     },
 
     // terminator

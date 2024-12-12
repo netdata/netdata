@@ -29,7 +29,11 @@ typedef struct netdata_spinlock
 #define spinlock_trylock(spinlock) (netdata_mutex_trylock(&((spinlock)->inner)) == 0)
 #define spinlock_init(spinlock) netdata_mutex_init(&((spinlock)->inner)
 #else
+#ifdef NETDATA_INTERNAL_CHECKS
+#define SPINLOCK_INITIALIZER { .locked = false, .locker_pid = 0, .spins = 0 }
+#else
 #define SPINLOCK_INITIALIZER { .locked = false }
+#endif
 
 void spinlock_init_with_trace(SPINLOCK *spinlock, const char *func);
 #define spinlock_init(spinlock) spinlock_init_with_trace(spinlock, __FUNCTION__)

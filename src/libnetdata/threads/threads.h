@@ -41,6 +41,9 @@ struct netdata_static_thread {
     // internal use, to maintain a pointer to the created thread
     ND_THREAD *thread;
 
+    // a function to call to check it should be enabled or not
+    bool (*enable_routine) (void);
+
     // an initialization function to run before spawning the thread
     void (*init_routine) (void);
 

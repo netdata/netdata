@@ -44,7 +44,7 @@ struct _stream_receive stream_receive = {
     }
 };
 
-static void stream_conf_load() {
+static void stream_conf_load_internal() {
     errno_clear();
     char *filename = filename_from_path_entry_strdupz(netdata_configured_user_config_dir, "stream.conf");
     if(!appconfig_load(&stream_config, filename, 0, NULL)) {
@@ -88,8 +88,12 @@ bool stream_conf_receiver_needs_dbengine(void) {
     return stream_conf_needs_dbengine(&stream_config);
 }
 
-bool stream_conf_init() {
-    stream_conf_load();
+void stream_conf_load() {
+    static bool loaded = false;
+    if(loaded) return;
+    loaded = true;
+
+    stream_conf_load_internal();
 
     stream_send.enabled =
         appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", stream_send.enabled);
@@ -179,8 +183,6 @@ bool stream_conf_init() {
         nd_log_daemon(NDLP_ERR, "STREAM [send]: cannot enable sending thread - information is missing.");
         stream_send.enabled = false;
     }
-
-    return stream_send.enabled;
 }
 
 bool stream_conf_configured_as_parent() {
@@ -194,7 +196,7 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
         rrd_memory_mode_name(default_rrd_memory_mode))));
 
     if (unlikely(config->mode == RRD_MEMORY_MODE_DBENGINE && !dbengine_enabled)) {
-        netdata_log_error("STREAM RECEIVE '%s' [from [%s]:%s]: "
+        netdata_log_error("STREAM RCV '%s' [from [%s]:%s]: "
                           "dbengine is not enabled, falling back to default."
                           , rpt->hostname
                           , rpt->client_ip, rpt->client_port
