@@ -1162,7 +1162,7 @@ struct rrdhost {
     STRING *program_name;                           // the program name that collects metrics for this host
     STRING *program_version;                        // the program version that collects metrics for this host
 
-    int32_t state_refcount;
+    REFCOUNT state_refcount;
     RRDHOST_STATE state_id;                         // every time data collection (stream receiver) (dis)connects,
                                                     // this gets incremented - it is used to detect stale functions,
                                                     // stale backfilling requests, etc.

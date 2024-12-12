@@ -12,8 +12,10 @@ bool rrdhost_state_connected(RRDHOST *host) {
     int32_t desired;
 
     do {
-        if(expected >= 0)
+        if(expected >= 0) {
+            internal_fatal(true, "Cannot get the node connected");
             return false;
+        }
 
         desired = 0;
 
@@ -28,8 +30,10 @@ bool rrdhost_state_disconnected(RRDHOST *host) {
     int32_t desired;
 
     do {
-        if(expected < 0)
+        if(expected < 0) {
+            internal_fatal(true, "Cannot get the node disconnected");
             return false;
+        }
 
         desired = -1;
 
