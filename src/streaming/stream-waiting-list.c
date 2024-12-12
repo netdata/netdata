@@ -34,13 +34,15 @@ void stream_thread_process_waiting_list_unsafe(struct stream_thread *sth) {
 
     if(sth->waiting_list.metadata == n_metadata && sth->waiting_list.replication == n_replication) {
         if(sth->waiting_list.decrement-- == 0) {
-            sth->waiting_list.decrement = ITERATIONS_TO_GET_ONE;
 
             if(stream_control_children_should_be_accepted()) {
                 RECEIVERS_DEL(&sth->queue.receivers, idx);
                 stream_receiver_move_to_running_unsafe(sth, rpt);
                 sth->queue.receivers_waiting--;
+                sth->waiting_list.decrement = ITERATIONS_TO_GET_ONE;
             }
+            else
+                sth->waiting_list.decrement = 1;
         }
     }
     else {
