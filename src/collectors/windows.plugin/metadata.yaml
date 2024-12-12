@@ -485,7 +485,7 @@ modules:
       plugin_name: windows.plugin
       module_name: PerflibNetwork
       monitored_instance:
-        name: Network Interface Metrics
+        name: Network Subsystem
         link: "https://learn.microsoft.com/en-us/windows/win32/networking"
         categories:
           - data-collection.windows-systems
@@ -501,7 +501,7 @@ modules:
         - ip
         - udp
         - tcp
-        - interfaces
+        - interface
       most_popular: false
     overview:
       data_collection:
@@ -550,11 +550,26 @@ modules:
       problems:
         list: []
     alerts:
-      - name: interface_speed
+      - name: inbound_packets_dropped_ratio
+        metric: net.drops
+        info: Ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
+      - name: outbound_packets_dropped_ratio
+        metric: net.drops
+        info: Ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
+      - name: 1m_received_traffic_overflow
         metric: net.net
-        info: network interface ${label:device} current speed
-        os: "*"
+        info: Average inbound utilization for the network interface ${label:device} over the last minute
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
+      - name: 1m_sent_traffic_overflow
+        metric: net.net
+        info: Average outbound utilization for the network interface ${label:device} over the last minute
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
+      - name: network_interface_output_queue_length
+        metric: net.queue_length
+        info: Output Queue Length on interface ${label:device} should be zero, otherwise there are delays and bottlenecks.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
     metrics:
       folding:
         title: Metrics
@@ -562,13 +577,20 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: Global
+        - name: System
           description: "These metrics refer to the entire System."
           labels: []
           metrics:
             - name: system.net
               description: Physical Network Interfaces Aggregated Bandwidth
               unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ip.tcppackets
+              description: TCP Packets
+              unit: "packets/s"
               chart_type: area
               dimensions:
                 - name: received
@@ -585,28 +607,28 @@ modules:
             - name: ipv4.tcppackets
               description: IPv4 TCP Packets
               unit: "packets/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv4.udppackets
               description: IPv4 UDP Packets
               unit: "packets/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv4.icmp
               description: IPv4 ICMP Packets
               unit: "packets/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv4.errors
               description: IPv4 Errors
               unit: "packets/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: InDiscards
                 - name: OutDiscards
@@ -617,7 +639,7 @@ modules:
             - name: ipv4.icmpmsg
               description: IPv4 ICMP Packets
               unit: "packets/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: InEchoReps
                 - name: OutEchoReps
@@ -642,7 +664,7 @@ modules:
             - name: ipv6.packets
               description: IPv6 Packets
               unit: "packets/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: received
                 - name: sent
@@ -651,28 +673,28 @@ modules:
             - name: ipv6.tcppackets
               description: IPv6 TCP Packets
               unit: "packets/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv6.udppackets
               description: IPv6 UDP Packets
               unit: "packets/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv6.icmp
               description: IPv6 ICMP Packets
               unit: "packets/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: received
                 - name: sent
             - name: ipv6.errors
               description: IPv6 Errors
               unit: "packets/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: InDiscards
                 - name: OutDiscards
@@ -683,7 +705,7 @@ modules:
             - name: ipv6.icmpmsg
               description: IPv6 ICMP Packets
               unit: "packets/s"
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: InEchoReps
                 - name: OutEchoReps
@@ -705,20 +727,13 @@ modules:
                 - name: OutTimestamps
                 - name: InTimestampReps
                 - name: OutTimestampReps
-            - name: ip.tcppackets
-              description: TCP Packets
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
-        - name: netowrk device
-          description: "These metrics refer to the network card available on host."
+        - name: network device
+          description: "These metrics refer to Network Interfaces."
           labels:
             - name: interface_type
-              description: "Inform the interface type: real or virtual"
+              description: "Classification of the network interface (real or virtual)."
             - name: device
-              description: "The device name"
+              description: "System-assigned network interface identifier."
           metrics:
             - name: net.net
               description: Bandwidth
