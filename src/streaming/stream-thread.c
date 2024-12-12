@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#define STREAM_INTERNALS
 #include "stream-thread.h"
+#include "stream-waiting-list.h"
 
 struct stream_thread_globals stream_thread_globals = {
     .assign = {
@@ -448,6 +450,10 @@ void *stream_thread(void *ptr) {
                                       "ops processed", "messages",
                                       WORKER_METRIC_INCREMENTAL_TOTAL);
 
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_RECEIVERS_WAITING_LIST_SIZE,
+                                      "receivers waiting to be added", "nodes",
+                                      WORKER_METRIC_ABSOLUTE);
+
     if(pipe(sth->pipe.fds) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: cannot create required pipe.", sth->id);
         sth->pipe.fds[PIPE_READ] = -1;
@@ -477,6 +483,7 @@ void *stream_thread(void *ptr) {
 
     bool exit_thread = false;
     size_t replay_entries = 0;
+    size_t receivers_waiting = 0;
     sth->snd.bytes_received = 0;
     sth->snd.bytes_sent = 0;
 
@@ -488,9 +495,15 @@ void *stream_thread(void *ptr) {
 
             // move any pending hosts in the inbound queue, to the running list
             spinlock_lock(&sth->queue.spinlock);
+
             stream_thread_messages_resize_unsafe(sth);
-            stream_receiver_move_queue_to_running_unsafe(sth);
+
+            stream_thread_process_waiting_list_unsafe(sth);
+            // stream_receiver_move_entire_queue_to_running_unsafe(sth);
+
             stream_sender_move_queue_to_running_unsafe(sth);
+
+            receivers_waiting = sth->queue.receivers_waiting;
             spinlock_unlock(&sth->queue.spinlock);
             last_dequeue_ut = now_ut;
         }
@@ -507,6 +520,8 @@ void *stream_thread(void *ptr) {
             worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)sth->snd.bytes_received);
             worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, (NETDATA_DOUBLE)sth->snd.bytes_sent);
             worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
+
+            worker_set_metric(WORKER_SENDER_JOB_RECEIVERS_WAITING_LIST_SIZE, (NETDATA_DOUBLE)receivers_waiting);
             replay_entries = 0;
             sth->snd.bytes_received = 0;
             sth->snd.bytes_sent = 0;
@@ -549,7 +564,7 @@ void *stream_thread(void *ptr) {
     // dequeue
     spinlock_lock(&sth->queue.spinlock);
     stream_sender_move_queue_to_running_unsafe(sth);
-    stream_receiver_move_queue_to_running_unsafe(sth);
+    stream_receiver_move_entire_queue_to_running_unsafe(sth);
     spinlock_unlock(&sth->queue.spinlock);
 
     // cleanup receiver and dispatcher
@@ -689,8 +704,8 @@ void stream_receiver_add_to_queue(struct receiver_state *rpt) {
            sth->id, rrdhost_hostname(rpt->host));
 
     spinlock_lock(&sth->queue.spinlock);
-    internal_fatal(RECEIVERS_GET(&sth->queue.receivers, (Word_t)rpt) != NULL, "Receiver is already in the receivers queue");
-    RECEIVERS_SET(&sth->queue.receivers, (Word_t)rpt, rpt);
+    RECEIVERS_SET(&sth->queue.receivers, ++sth->queue.id, rpt);
+    sth->queue.receivers_waiting++;
     spinlock_unlock(&sth->queue.spinlock);
 }
 
@@ -704,8 +719,7 @@ void stream_sender_add_to_queue(struct sender_state *s) {
            sth->id, rrdhost_hostname(s->host));
 
     spinlock_lock(&sth->queue.spinlock);
-    internal_fatal(SENDERS_GET(&sth->queue.senders, (Word_t)s) != NULL, "Sender is already in the senders queue");
-    SENDERS_SET(&sth->queue.senders, (Word_t)s, s);
+    SENDERS_SET(&sth->queue.senders, ++sth->queue.id, s);
     spinlock_unlock(&sth->queue.spinlock);
 }
 

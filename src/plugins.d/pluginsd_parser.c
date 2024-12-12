@@ -2,6 +2,7 @@
 
 #include "pluginsd_internals.h"
 #include "streaming/replication.h"
+#include "streaming/stream-waiting-list.h"
 #include "web/api/queries/backfill.h"
 
 static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *parser) {
@@ -436,6 +437,8 @@ static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_w
                        rrdhost_hostname(st->rrdhost), rrdset_id(st));
     }
 #endif
+
+    stream_thread_received_metadata();
 
     return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
 }

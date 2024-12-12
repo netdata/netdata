@@ -404,7 +404,54 @@ static void stream_receive_log_database_gap(struct receiver_state *rpt) {
            rrdhost_hostname(host), rpt->client_ip, rpt->client_port, buf);
 }
 
-void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
+void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct receiver_state *rpt) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
+    worker_is_busy(WORKER_STREAM_JOB_DEQUEUE);
+
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "STREAM RCV[%zu] '%s' [from [%s]:%s]: moving host from receiver queue to receiver running...",
+           sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+
+    rpt->host->stream.rcv.status.tid = gettid_cached();
+    rpt->thread.meta.type = POLLFD_TYPE_RECEIVER;
+    rpt->thread.meta.rpt = rpt;
+
+    spinlock_lock(&rpt->thread.send_to_child.spinlock);
+    rpt->thread.send_to_child.scb = stream_circular_buffer_create();
+    rpt->thread.send_to_child.msg.thread_slot = (int32_t)sth->id;
+    rpt->thread.send_to_child.msg.session = os_random32();
+    rpt->thread.send_to_child.msg.meta = &rpt->thread.meta;
+    spinlock_unlock(&rpt->thread.send_to_child.spinlock);
+
+    internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) != NULL, "Receiver to be added is already in the list of receivers");
+    META_SET(&sth->run.meta, (Word_t)&rpt->thread.meta, &rpt->thread.meta);
+
+    if(sock_setnonblock(rpt->sock.fd) < 0)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM RCV '%s' [from [%s]:%s]: cannot set the non-blocking flag from socket %d",
+               rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->sock.fd);
+
+    if(!nd_poll_add(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM RCV[%zu] '%s' [from [%s]:%s]:"
+               "Failed to add receiver socket to nd_poll()",
+               sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+
+    stream_receive_log_database_gap(rpt);
+
+    // keep this last, since it sends commands back to the child
+    streaming_parser_init(rpt);
+}
+
+void stream_receiver_move_entire_queue_to_running_unsafe(struct stream_thread *sth) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     // process the queue
@@ -412,50 +459,8 @@ void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth) {
     for(struct receiver_state *rpt = RECEIVERS_FIRST(&sth->queue.receivers, &idx);
          rpt;
          rpt = RECEIVERS_NEXT(&sth->queue.receivers, &idx)) {
-        worker_is_busy(WORKER_STREAM_JOB_DEQUEUE);
-
-        RECEIVERS_DEL(&sth->queue.receivers, (Word_t)rpt);
-
-        ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
-            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
-            ND_LOG_FIELD_END(),
-        };
-        ND_LOG_STACK_PUSH(lgs);
-
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "STREAM RCV[%zu] '%s' [from [%s]:%s]: moving host from receiver queue to receiver running...",
-               sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
-
-        rpt->host->stream.rcv.status.tid = gettid_cached();
-        rpt->thread.meta.type = POLLFD_TYPE_RECEIVER;
-        rpt->thread.meta.rpt = rpt;
-
-        spinlock_lock(&rpt->thread.send_to_child.spinlock);
-        rpt->thread.send_to_child.scb = stream_circular_buffer_create();
-        rpt->thread.send_to_child.msg.thread_slot = (int32_t)sth->id;
-        rpt->thread.send_to_child.msg.session = os_random32();
-        rpt->thread.send_to_child.msg.meta = &rpt->thread.meta;
-        spinlock_unlock(&rpt->thread.send_to_child.spinlock);
-
-        internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) != NULL, "Receiver to be added is already in the list of receivers");
-        META_SET(&sth->run.meta, (Word_t)&rpt->thread.meta, &rpt->thread.meta);
-
-        if(sock_setnonblock(rpt->sock.fd) < 0)
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM RCV '%s' [from [%s]:%s]: cannot set the non-blocking flag from socket %d",
-                   rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->sock.fd);
-
-        if(!nd_poll_add(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM RCV[%zu] '%s' [from [%s]:%s]:"
-                   "Failed to add receiver socket to nd_poll()",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
-
-        stream_receive_log_database_gap(rpt);
-
-        // keep this last, since it sends commands back to the child
-        streaming_parser_init(rpt);
+        RECEIVERS_DEL(&sth->queue.receivers, idx);
+        stream_receiver_move_to_running_unsafe(sth, rpt);
     }
 }
 

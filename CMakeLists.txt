@@ -1551,6 +1551,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-circular-buffer.h
         src/streaming/stream-control.c
         src/streaming/stream-control.h
+        src/streaming/stream-waiting-list.c
+        src/streaming/stream-waiting-list.h
 )
 
 set(WEB_PLUGIN_FILES

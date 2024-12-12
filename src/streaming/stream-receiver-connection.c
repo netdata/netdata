@@ -165,15 +165,15 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             return false;
         }
 
-        if (unlikely(!stream_control_children_should_be_accepted())) {
-            stream_receiver_log_status(
-                rpt,
-                "rejecting streaming connection; the system is backfilling higher tiers with high-resolution data, retry later",
-                STREAM_STATUS_INITIALIZATION_IN_PROGRESS, NDLP_NOTICE);
-
-            stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INITIALIZATION);
-            return false;
-        }
+//        if (unlikely(!stream_control_children_should_be_accepted())) {
+//            stream_receiver_log_status(
+//                rpt,
+//                "rejecting streaming connection; the system is backfilling higher tiers with high-resolution data, retry later",
+//                STREAM_STATUS_INITIALIZATION_IN_PROGRESS, NDLP_NOTICE);
+//
+//            stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INITIALIZATION);
+//            return false;
+//        }
 
         if(!rrdhost_set_receiver(host, rpt)) {
             stream_receiver_log_status(

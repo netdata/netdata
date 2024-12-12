@@ -235,7 +235,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
          s = SENDERS_NEXT(&sth->queue.senders, &idx)) {
         worker_is_busy(WORKER_STREAM_JOB_DEQUEUE);
 
-        SENDERS_DEL(&sth->queue.senders, (Word_t)s);
+        SENDERS_DEL(&sth->queue.senders, idx);
 
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),

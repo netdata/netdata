@@ -36,55 +36,58 @@ struct stream_opcode {
 // IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
 
 // stream thread events
-#define WORKER_STREAM_JOB_LIST                                          (WORKER_PARSER_FIRST_JOB - 34)
-#define WORKER_STREAM_JOB_DEQUEUE                                       (WORKER_PARSER_FIRST_JOB - 33)
-#define WORKER_STREAM_JOB_PREP                                          (WORKER_PARSER_FIRST_JOB - 32)
-#define WORKER_STREAM_JOB_POLL_ERROR                                    (WORKER_PARSER_FIRST_JOB - 31)
-#define WORKER_SENDER_JOB_PIPE_READ                                     (WORKER_PARSER_FIRST_JOB - 30)
+#define WORKER_STREAM_JOB_LIST                                          0
+#define WORKER_STREAM_JOB_DEQUEUE                                       1
+#define WORKER_STREAM_JOB_PREP                                          2
+#define WORKER_STREAM_JOB_POLL_ERROR                                    3
+#define WORKER_SENDER_JOB_PIPE_READ                                     4
 
 // socket operations
-#define WORKER_STREAM_JOB_SOCKET_RECEIVE                                (WORKER_PARSER_FIRST_JOB - 29)
-#define WORKER_STREAM_JOB_SOCKET_SEND                                   (WORKER_PARSER_FIRST_JOB - 28)
-#define WORKER_STREAM_JOB_SOCKET_ERROR                                  (WORKER_PARSER_FIRST_JOB - 27)
+#define WORKER_STREAM_JOB_SOCKET_RECEIVE                                5
+#define WORKER_STREAM_JOB_SOCKET_SEND                                   6
+#define WORKER_STREAM_JOB_SOCKET_ERROR                                  7
 
 // compression
-#define WORKER_STREAM_JOB_COMPRESS                                      (WORKER_PARSER_FIRST_JOB - 26)
-#define WORKER_STREAM_JOB_DECOMPRESS                                    (WORKER_PARSER_FIRST_JOB - 25)
+#define WORKER_STREAM_JOB_COMPRESS                                      8
+#define WORKER_STREAM_JOB_DECOMPRESS                                    9
 
 // receiver events
-#define WORKER_RECEIVER_JOB_BYTES_READ                                  (WORKER_PARSER_FIRST_JOB - 24)
-#define WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED                          (WORKER_PARSER_FIRST_JOB - 23)
+#define WORKER_RECEIVER_JOB_BYTES_READ                                  10
+#define WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED                          11
 
 // sender received commands
-#define WORKER_SENDER_JOB_EXECUTE                                       (WORKER_PARSER_FIRST_JOB - 22)
-#define WORKER_SENDER_JOB_EXECUTE_REPLAY                                (WORKER_PARSER_FIRST_JOB - 21)
-#define WORKER_SENDER_JOB_EXECUTE_FUNCTION                              (WORKER_PARSER_FIRST_JOB - 20)
-#define WORKER_SENDER_JOB_EXECUTE_META                                  (WORKER_PARSER_FIRST_JOB - 19)
+#define WORKER_SENDER_JOB_EXECUTE                                       12
+#define WORKER_SENDER_JOB_EXECUTE_REPLAY                                13
+#define WORKER_SENDER_JOB_EXECUTE_FUNCTION                              14
+#define WORKER_SENDER_JOB_EXECUTE_META                                  15
 
-#define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW                           (WORKER_PARSER_FIRST_JOB - 18)
-#define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT                            (WORKER_PARSER_FIRST_JOB - 17)
-#define WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR                       (WORKER_PARSER_FIRST_JOB - 16)
-#define WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED                      (WORKER_PARSER_FIRST_JOB - 15)
-#define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR                      (WORKER_PARSER_FIRST_JOB - 14)
-#define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR                         (WORKER_PARSER_FIRST_JOB - 13)
-#define WORKER_SENDER_JOB_DISCONNECT_COMPRESSION_ERROR                  (WORKER_PARSER_FIRST_JOB - 12)
-#define WORKER_SENDER_JOB_DISCONNECT_RECEIVER_LEFT                      (WORKER_PARSER_FIRST_JOB - 11)
-#define WORKER_SENDER_JOB_DISCONNECT_HOST_CLEANUP                       (WORKER_PARSER_FIRST_JOB - 10)
+#define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW                           16
+#define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT                            17
+#define WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR                       18
+#define WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED                      19
+#define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR                      20
+#define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR                         21
+#define WORKER_SENDER_JOB_DISCONNECT_COMPRESSION_ERROR                  22
+#define WORKER_SENDER_JOB_DISCONNECT_RECEIVER_LEFT                      23
+#define WORKER_SENDER_JOB_DISCONNECT_HOST_CLEANUP                       24
 
 // dispatcher metrics
 // this has to be the same at pluginsd_parser.h
-#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION                      (WORKER_PARSER_FIRST_JOB - 9)
-#define WORKER_STREAM_METRIC_NODES                                      (WORKER_PARSER_FIRST_JOB - 8)
-#define WORKER_SENDER_JOB_BUFFER_RATIO                                  (WORKER_PARSER_FIRST_JOB - 7)
-#define WORKER_SENDER_JOB_BYTES_RECEIVED                                (WORKER_PARSER_FIRST_JOB - 6)
-#define WORKER_SENDER_JOB_BYTES_SENT                                    (WORKER_PARSER_FIRST_JOB - 5)
-#define WORKER_SENDER_JOB_BYTES_COMPRESSED                              (WORKER_PARSER_FIRST_JOB - 4)
-#define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED                            (WORKER_PARSER_FIRST_JOB - 3)
-#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO                       (WORKER_PARSER_FIRST_JOB - 2)
-#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE                              (WORKER_PARSER_FIRST_JOB - 1)
-#define WORKER_SENDER_JOB_MESSAGES                                      (WORKER_PARSER_FIRST_JOB - 0)
+#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION                      25
+#define WORKER_STREAM_METRIC_NODES                                      26
+#define WORKER_SENDER_JOB_BUFFER_RATIO                                  27
+#define WORKER_SENDER_JOB_BYTES_RECEIVED                                28
+#define WORKER_SENDER_JOB_BYTES_SENT                                    29
+#define WORKER_SENDER_JOB_BYTES_COMPRESSED                              30
+#define WORKER_SENDER_JOB_BYTES_UNCOMPRESSED                            31
+#define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO                       32
+#define WORKER_SENDER_JOB_REPLAY_DICT_SIZE                              33
+#define WORKER_SENDER_JOB_MESSAGES                                      34
+#define WORKER_SENDER_JOB_RECEIVERS_WAITING_LIST_SIZE                   35
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 35
+// IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 36
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 34
 #endif
 
@@ -141,9 +144,17 @@ struct stream_thread {
         // the incoming queue of the dispatcher thread
         // the connector thread leaves the connected senders in this list, for the dispatcher to pick them up
         SPINLOCK spinlock;
+        Word_t id;
         SENDERS_JudyLSet senders;
         RECEIVERS_JudyLSet receivers;
+
+        size_t receivers_waiting;
     } queue;
+
+    struct {
+        size_t metadata;
+        size_t decrement;
+    } waiting_list;
 
     struct {
         SPINLOCK spinlock;
@@ -177,7 +188,7 @@ struct rrdhost;
 extern struct stream_thread_globals stream_thread_globals;
 
 void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth);
-void stream_receiver_move_queue_to_running_unsafe(struct stream_thread *sth);
+void stream_receiver_move_entire_queue_to_running_unsafe(struct stream_thread *sth);
 void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t now_ut);
 
 void stream_receiver_add_to_queue(struct receiver_state *rpt);
@@ -197,6 +208,8 @@ void stream_thread_node_removed(struct rrdhost *host);
 
 // returns true if my_meta has received a message
 bool stream_thread_process_opcodes(struct stream_thread *sth, struct pollfd_meta *my_meta);
+
+void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct receiver_state *rpt);
 
 #include "stream-sender-internals.h"
 #include "stream-receiver-internals.h"
