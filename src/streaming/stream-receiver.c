@@ -444,6 +444,7 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
                sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
 
     stream_receive_log_database_gap(rpt);
+    rrdhost_state_connected(rpt->host);
 
     // keep this last, since it sends commands back to the child
     streaming_parser_init(rpt);
@@ -474,6 +475,8 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
            , rpt->client_ip ? rpt->client_ip : "-"
            , rpt->client_port ? rpt->client_port : "-"
            , why ? why : "");
+
+    rrdhost_state_disconnected(rpt->host);
 
     internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) == NULL, "Receiver to be removed is not found in the list of receivers");
     META_DEL(&sth->run.meta, (Word_t)&rpt->thread.meta);
@@ -804,8 +807,6 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     rrdhost_receiver_lock(host);
 
     if (!host->receiver) {
-        rrdhost_state_connected(host);
-
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
 
         host->stream.rcv.status.connections++;
@@ -869,7 +870,6 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
         if (host->receiver == rpt) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
-            rrdhost_state_disconnected(host);
 
             rrdhost_receiver_unlock(host);
             {

@@ -286,6 +286,19 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
                     break;
                 }
                 else {
+
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "Function '%s' is not available. "
+                           "host '%s', collector = { tid: %d, running: %s }, host tid { rcv: %d, snd: %d }, host state { id: %u, expected %u }, hops: %d",
+                           name,
+                           rrdhost_hostname(host),
+                           rrd_collector_tid(rdcf->collector),
+                           rrd_collector_running(rdcf->collector) ? "yes" : "no",
+                           host->stream.rcv.status.tid, host->stream.snd.status.tid,
+                           state_id, rdcf->rrdhost_state_id,
+                           host->system_info->hops
+                           );
+
                     dictionary_acquired_item_release(host->functions, *item);
                     *item = NULL;
                 }
