@@ -498,7 +498,9 @@ modules:
       keywords:
         - network
         - bandwidth
-        - protocol
+        - ip
+        - udp
+        - tcp
         - interfaces
       most_popular: false
     overview:
@@ -568,6 +570,145 @@ modules:
               description: Physical Network Interfaces Aggregated Bandwidth
               unit: "kilobits/s"
               chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.packets
+              description: IPv4 Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivered
+            - name: ipv4.tcppackets
+              description: IPv4 TCP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.udppackets
+              description: IPv4 UDP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.icmp
+              description: IPv4 ICMP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.errors
+              description: IPv4 Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: OutNoRoutes
+                - name: InAddrErrors
+                - name: InHdrErrors
+                - name: InUnknownProtos
+            - name: ipv4.icmpmsg
+              description: IPv4 ICMP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InEchoReps
+                - name: OutEchoReps
+                - name: InDestUnreachs
+                - name: OutDestUnreachs
+                - name: InRedirects
+                - name: OutRedirects
+                - name: InEchos
+                - name: OutEchos
+                - name: InRouterAdvert
+                - name: OutRouterAdvert
+                - name: InRouterSelect
+                - name: OutRouterSelect
+                - name: InTimeExcds
+                - name: OutTimeExcds
+                - name: InParmProbs
+                - name: OutParmProbs
+                - name: InTimestamps
+                - name: OutTimestamps
+                - name: InTimestampReps
+                - name: OutTimestampReps
+            - name: ipv6.packets
+              description: IPv6 Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivered
+            - name: ipv6.tcppackets
+              description: IPv6 TCP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.udppackets
+              description: IPv6 UDP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmp
+              description: IPv6 ICMP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.errors
+              description: IPv6 Errors
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: OutNoRoutes
+                - name: InAddrErrors
+                - name: InHdrErrors
+                - name: InUnknownProtos
+            - name: ipv6.icmpmsg
+              description: IPv6 ICMP Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: InEchoReps
+                - name: OutEchoReps
+                - name: InDestUnreachs
+                - name: OutDestUnreachs
+                - name: InRedirects
+                - name: OutRedirects
+                - name: InEchos
+                - name: OutEchos
+                - name: InRouterAdvert
+                - name: OutRouterAdvert
+                - name: InRouterSelect
+                - name: OutRouterSelect
+                - name: InTimeExcds
+                - name: OutTimeExcds
+                - name: InParmProbs
+                - name: OutParmProbs
+                - name: InTimestamps
+                - name: OutTimestamps
+                - name: InTimestampReps
+                - name: OutTimestampReps
+            - name: ip.tcppackets
+              description: TCP Packets
+              unit: "packets/s"
+              chart_type: line
               dimensions:
                 - name: received
                 - name: sent
