@@ -1759,7 +1759,6 @@ end_socket_loop: ; // the empty statement is here to allow code to be compiled b
         else {
             ebpf_release_pid_data(local_pid, fd, key.pid, EBPF_MODULE_SOCKET_IDX);
             ebpf_socket_release_publish(curr);
-            local_pid->socket = NULL;
         }
         memset(values, 0, length);
         memcpy(&key, &next_key, sizeof(key));

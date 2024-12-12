@@ -83,7 +83,8 @@ struct stream_opcode {
 #define WORKER_SENDER_JOB_BYTES_COMPRESSION_RATIO                       32
 #define WORKER_SENDER_JOB_REPLAY_DICT_SIZE                              33
 #define WORKER_SENDER_JOB_MESSAGES                                      34
-#define WORKER_SENDER_JOB_RECEIVERS_WAITING_LIST_SIZE                   35
+#define WORKER_STREAM_JOB_RECEIVERS_WAITING_LIST_SIZE                   35
+#define WORKER_STREAM_JOB_SEND_MISSES                                   36
 
 // IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
 
@@ -125,6 +126,7 @@ struct stream_thread {
     struct {
         size_t bytes_received;
         size_t bytes_sent;
+        size_t send_misses;
     } snd;
 
     struct {

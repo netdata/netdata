@@ -327,6 +327,8 @@ static RRDHOST *rrdhost_create(
     }
 
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
+    host->state_refcount = -1;
+
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
     strncpyz(host->machine_guid, guid, GUID_LEN + 1);
@@ -840,6 +842,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         return 1;
 
     rrdhost_flag_set(localhost, RRDHOST_FLAG_COLLECTOR_ONLINE);
+    rrdhost_state_connected(localhost);
 
     ml_host_start(localhost);
     dyncfg_host_init(localhost);

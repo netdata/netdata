@@ -450,9 +450,14 @@ void *stream_thread(void *ptr) {
                                       "ops processed", "messages",
                                       WORKER_METRIC_INCREMENTAL_TOTAL);
 
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_RECEIVERS_WAITING_LIST_SIZE,
+    worker_register_job_custom_metric(WORKER_STREAM_JOB_RECEIVERS_WAITING_LIST_SIZE,
                                       "receivers waiting to be added", "nodes",
                                       WORKER_METRIC_ABSOLUTE);
+
+    worker_register_job_custom_metric(WORKER_STREAM_JOB_SEND_MISSES,
+                                      "send misses", "misses",
+                                      WORKER_METRIC_INCREMENTAL_TOTAL);
+
 
     if(pipe(sth->pipe.fds) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: cannot create required pipe.", sth->id);
@@ -486,6 +491,8 @@ void *stream_thread(void *ptr) {
     size_t receivers_waiting = 0;
     sth->snd.bytes_received = 0;
     sth->snd.bytes_sent = 0;
+
+    rrd_collector_started();
 
     while(!exit_thread && !nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
         usec_t now_ut = now_monotonic_usec();
@@ -521,7 +528,8 @@ void *stream_thread(void *ptr) {
             worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, (NETDATA_DOUBLE)sth->snd.bytes_sent);
             worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE)replay_entries);
 
-            worker_set_metric(WORKER_SENDER_JOB_RECEIVERS_WAITING_LIST_SIZE, (NETDATA_DOUBLE)receivers_waiting);
+            worker_set_metric(WORKER_STREAM_JOB_RECEIVERS_WAITING_LIST_SIZE, (NETDATA_DOUBLE)receivers_waiting);
+            worker_set_metric(WORKER_STREAM_JOB_SEND_MISSES, (NETDATA_DOUBLE)sth->snd.send_misses);
             replay_entries = 0;
             sth->snd.bytes_received = 0;
             sth->snd.bytes_sent = 0;
@@ -596,6 +604,8 @@ void *stream_thread(void *ptr) {
     sth->tid = 0;
 
     worker_unregister();
+
+    rrd_collector_finished();
 
     return NULL;
 }

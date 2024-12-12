@@ -540,8 +540,10 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
                     return false;
                 }
             }
-            else
+            else {
+                sth->snd.send_misses++;
                 break;
+            }
         }
     }
 

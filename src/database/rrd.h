@@ -11,6 +11,7 @@ extern "C" {
 #include "rrd-database-mode.h"
 #include "streaming/stream-traffic-types.h"
 #include "streaming/stream-sender-commit.h"
+#include "rrdhost-state-id.h"
 
 // non-existing structs instead of voids
 // to enable type checking at compile time
@@ -1161,6 +1162,11 @@ struct rrdhost {
     STRING *program_name;                           // the program name that collects metrics for this host
     STRING *program_version;                        // the program version that collects metrics for this host
 
+    REFCOUNT state_refcount;
+    RRDHOST_STATE state_id;                         // every time data collection (stream receiver) (dis)connects,
+                                                    // this gets incremented - it is used to detect stale functions,
+                                                    // stale backfilling requests, etc.
+
     int32_t utc_offset;                             // the offset in seconds from utc
 
     RRDHOST_OPTIONS options;                        // configuration option for this RRDHOST (no atomics on this)
@@ -1238,7 +1244,6 @@ struct rrdhost {
 
             struct {
                 pid_t tid;
-                uint32_t state_id;                  // every time the receiver connects/disconnects, this is incremented
 
                 time_t last_connected;              // the time the last sender was connected
                 time_t last_disconnected;           // the time the last sender was disconnected

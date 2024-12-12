@@ -48,7 +48,7 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
     if(backfill_globals.running) {
         struct backfill_request *br = aral_mallocz(backfill_globals.ar_br);
         br->data = *data;
-        br->rrdhost_receiver_state_id =__atomic_load_n(&st->rrdhost->stream.rcv.status.state_id, __ATOMIC_RELAXED);
+        br->rrdhost_receiver_state_id = rrdhost_state_id(st->rrdhost);
         br->rsa = rrdset_find_and_acquire(st->rrdhost, string2str(st->id));
         if(br->rsa) {
             br->cb = cb;
@@ -95,19 +95,20 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
 bool backfill_execute(struct backfill_dim_work *bdm) {
     RRDSET *st = rrdset_acquired_to_rrdset(bdm->br->rsa);
 
-    if(bdm->br->rrdhost_receiver_state_id !=__atomic_load_n(&st->rrdhost->stream.rcv.status.state_id, __ATOMIC_RELAXED))
+    if(!rrdhost_state_acquire(st->rrdhost, bdm->br->rrdhost_receiver_state_id))
         return false;
 
+    size_t success = 0;
     RRDDIM *rd = rrddim_acquired_to_rrddim(bdm->rda);
 
-    size_t success = 0;
     for (size_t tier = 1; tier < storage_tiers; tier++)
-        if(backfill_tier_from_smaller_tiers(rd, tier, now_realtime_sec()))
+        if (backfill_tier_from_smaller_tiers(rd, tier, now_realtime_sec()))
             success++;
 
-    if(success > 0)
+    if (success > 0)
         rrddim_option_set(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS);
 
+    rrdhost_state_release(st->rrdhost);
     return success > 0;
 }
 
