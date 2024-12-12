@@ -7,17 +7,6 @@
 
 struct rrdeng_cmd;
 
-#ifdef PDC_USE_JULYL
-#define PDCJudyLIns             JulyLIns
-#define PDCJudyLGet             JulyLGet
-#define PDCJudyLFirst           JulyLFirst
-#define PDCJudyLNext            JulyLNext
-#define PDCJudyLLast            JulyLLast
-#define PDCJudyLPrev            JulyLPrev
-#define PDCJudyLFirstThenNext   JulyLFirstThenNext
-#define PDCJudyLLastThenPrev    JulyLLastThenPrev
-#define PDCJudyLFreeArray       JulyLFreeArray
-#else
 #define PDCJudyLIns             JudyLIns
 #define PDCJudyLGet             JudyLGet
 #define PDCJudyLFirst           JudyLFirst
@@ -27,7 +16,6 @@ struct rrdeng_cmd;
 #define PDCJudyLFirstThenNext   JudyLFirstThenNext
 #define PDCJudyLLastThenPrev    JudyLLastThenPrev
 #define PDCJudyLFreeArray       JudyLFreeArray
-#endif
 
 typedef struct extent_page_details_list EPDL;
 typedef void (*execute_extent_page_details_list_t)(struct rrdengine_instance *ctx, EPDL *epdl, enum storage_priority priority);

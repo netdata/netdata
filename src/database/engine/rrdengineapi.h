@@ -231,9 +231,6 @@ struct rrdeng_buffer_sizes {
 
     size_t wal;
     size_t xt_buf;
-#ifdef PDC_USE_JULYL
-    size_t julyl;
-#endif
 };
 
 struct rrdeng_buffer_sizes rrdeng_pulse_memory_sizes(void);
