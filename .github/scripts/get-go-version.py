@@ -32,8 +32,8 @@ for modfile in GO_SRC.glob('**/go.mod'):
         modules.append({
             'module': str(modfile.parent),
             'version': str(version),
-            'build_target': f'github.com/netdata/netdata/go/plugins/{ str(mainpath) }/',
+            'build_target': f'github.com/netdata/netdata/go/plugins/{str(mainpath)}/',
         })
 
 with GITHUB_OUTPUT.open('a') as f:
-    f.write(f'matrix={ json.dumps({"include": modules}) }\n')
+    f.write(f'matrix={json.dumps(modules)}\n')

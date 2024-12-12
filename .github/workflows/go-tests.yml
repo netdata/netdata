@@ -78,7 +78,8 @@ jobs:
       - matrix
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+      matrix:
+        include: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
       - name: Skip Check
         id: skip
@@ -124,4 +125,49 @@ jobs:
         run: |
           set -euo pipefail
           go test -json ./... -race -count=1 2>&1 | gotestfmt -hide all
+        working-directory: ${{ matrix.module }}
+
+  build-tests:
+    name: Go build tests
+    runs-on: ubuntu-latest
+    needs:
+      - file-check
+      - matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        platforms:
+          - linux/386
+          - linux/amd64
+          - linux/arm
+          - linux/arm64
+          - linux/ppc64le
+          - windows/amd64
+        include: ${{ fromJson(needs.matrix.outputs.matrix) }}
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.version }}
+      - name: Checkout
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set GOOS and GOARCH
+        run: |
+          echo "GOOS=$(echo "${{ matrix.platform }}" | cut -f 1 -d '/')" >> "${GITHUB_ENV}"
+          echo "GOARCH=$(echo "${{ matrix.platform }}" | cut -f 2 -d '/')" >> "${GITHUB_ENV}"
+      - name: Go mod download
+        if: needs.file-check.outputs.run == 'true'
+        run: go mod download
+        working-directory: ${{ matrix.module }}
+      - name: Compile
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          CGO_ENABLED=0 go build -o /tmp/go-test-build ${{ matrix.build_target }}
         working-directory: ${{ matrix.module }}
