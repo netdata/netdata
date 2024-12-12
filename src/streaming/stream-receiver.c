@@ -804,7 +804,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     rrdhost_receiver_lock(host);
 
     if (!host->receiver) {
-        rrdhost_state_id_increment(host);
+        rrdhost_state_connected(host);
 
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
 
@@ -868,8 +868,9 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
 
         if (host->receiver == rpt) {
-            rrdhost_state_id_increment(host);
             rrdhost_flag_clear(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+            rrdhost_state_disconnected(host);
+
             rrdhost_receiver_unlock(host);
             {
                 // run all these without having the receiver lock

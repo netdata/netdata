@@ -376,7 +376,12 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
 }
 
 static void backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, struct backfill_request_data *brd) {
-    if (brd->rrdhost_receiver_state_id == rrdhost_state_id(brd->host)) {
+    if(!rrdhost_state_acquire(brd->host))
+        return;
+
+    if(brd->rrdhost_receiver_state_id == rrdhost_state_id(brd->host)) {
+        // the state has not been changed (same data collection session)
+
         if (!replicate_chart_request(send_to_plugin, brd->parser, brd->host, brd->st,
                                      brd->first_entry_child, brd->last_entry_child, brd->child_wall_clock_time,
                                      0, 0)) {
@@ -386,6 +391,8 @@ static void backfill_callback(size_t successful_dims __maybe_unused, size_t fail
                 rrdset_id(brd->st));
         }
     }
+
+    rrdhost_state_release(brd->host);
 }
 
 static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *parser) {
