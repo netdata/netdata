@@ -1,18 +1,26 @@
 name: Update website
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - "integrations/integrations.json"
+  pull_request:
+    types: [closed]
 concurrency:
   group: website-trigger-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   trigger:
+    if: github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'master' &&
+      github.repository == 'netdata/netdata'
     runs-on: ubuntu-latest
-    if: github.repository == 'netdata/netdata'
     steps:
+      - name: Check Labels
+        id: label-check
+        run: |
+          LABELS='${{ toJSON(github.event.pull_request.labels) }}'
+          echo "Labels: $LABELS"
+          if [[ ! "$LABELS" =~ "integrations-update" ]]; then
+            echo "This PR does not have the required label."
+            exit 1
+          fi
       - name: Trigger netdata/website update-integrations workflow
         uses: benc-uk/workflow-dispatch@v1
         with:
