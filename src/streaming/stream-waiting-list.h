@@ -8,7 +8,7 @@ void stream_thread_received_replication(void);
 
 #ifdef STREAM_INTERNALS
 #include "stream-thread.h"
-void stream_thread_process_waiting_list_unsafe(struct stream_thread *sth);
+void stream_thread_process_waiting_list_unsafe(struct stream_thread *sth, usec_t now_ut);
 #endif
 
 #endif //NETDATA_STREAM_WAITING_LIST_H

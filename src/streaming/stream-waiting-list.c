@@ -3,8 +3,7 @@
 #define STREAM_INTERNALS
 #include "stream-waiting-list.h"
 
-// the thread calls us every 100ms
-#define ITERATIONS_TO_GET_ONE 20
+#define ACCEPT_NODES_EVERY_UT (5 * USEC_PER_SEC)
 
 static __thread struct {
     size_t metadata;
@@ -22,32 +21,28 @@ static inline size_t normalize_value(size_t v) {
     return (v / 100) * 100;
 }
 
-void stream_thread_process_waiting_list_unsafe(struct stream_thread *sth) {
+void stream_thread_process_waiting_list_unsafe(struct stream_thread *sth, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     Word_t idx = 0;
     struct receiver_state *rpt = RECEIVERS_FIRST(&sth->queue.receivers, &idx);
     if(!rpt) return;
 
+    if(sth->waiting_list.last_accepted_ut + ACCEPT_NODES_EVERY_UT > now_ut ||
+        !stream_control_children_should_be_accepted())
+        return;
+
     size_t n_metadata = normalize_value(throttle.metadata);
     size_t n_replication = normalize_value(throttle.replication);
 
-    if(sth->waiting_list.metadata == n_metadata && sth->waiting_list.replication == n_replication) {
-        if(sth->waiting_list.decrement-- == 0) {
-
-            if(stream_control_children_should_be_accepted()) {
-                RECEIVERS_DEL(&sth->queue.receivers, idx);
-                stream_receiver_move_to_running_unsafe(sth, rpt);
-                sth->queue.receivers_waiting--;
-                sth->waiting_list.decrement = ITERATIONS_TO_GET_ONE;
-            }
-            else
-                sth->waiting_list.decrement = 1;
-        }
+    if(sth->waiting_list.metadata != n_metadata ||
+        sth->waiting_list.replication != n_replication) {
+        sth->waiting_list.metadata = n_metadata;
+        sth->waiting_list.replication = n_replication;
+        return;
     }
-    else
-        sth->waiting_list.decrement = ITERATIONS_TO_GET_ONE;
 
-    sth->waiting_list.metadata = n_metadata;
-    sth->waiting_list.replication = n_replication;
+    RECEIVERS_DEL(&sth->queue.receivers, idx);
+    stream_receiver_move_to_running_unsafe(sth, rpt);
+    sth->queue.receivers_waiting--;
 }

@@ -152,9 +152,9 @@ struct stream_thread {
     } queue;
 
     struct {
+        usec_t last_accepted_ut;
         size_t metadata;
         size_t replication;
-        size_t decrement;
     } waiting_list;
 
     struct {

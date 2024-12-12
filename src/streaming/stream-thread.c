@@ -498,7 +498,7 @@ void *stream_thread(void *ptr) {
 
             stream_thread_messages_resize_unsafe(sth);
 
-            stream_thread_process_waiting_list_unsafe(sth);
+            stream_thread_process_waiting_list_unsafe(sth, now_ut);
             // stream_receiver_move_entire_queue_to_running_unsafe(sth);
 
             stream_sender_move_queue_to_running_unsafe(sth);
