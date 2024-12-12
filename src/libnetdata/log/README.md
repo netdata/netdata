@@ -42,7 +42,6 @@ On Windows, the default is `etw` and if that is not available it falls back to `
 | journal | journald-specific log format. Automatically selected when logging to systemd-journal.                  |
 | etw     | Event Tracing for Windows specific format. Structured logging in Event Viewer.                         |
 | wel     | Windows Event Log specific format. Basic field-based logging in Event Viewer.                          |
-| journal | journald-specific log format. Automatically selected when logging to systemd-journal.                  |
 | logfmt  | logs data as a series of key/value pairs. The default when logging to any output other than `journal`. |
 | json    | logs data in JSON format.                                                                              |
 
