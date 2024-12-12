@@ -287,7 +287,7 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
                 }
                 else {
 
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                    nd_log(NDLS_DAEMON, NDLP_DEBUG,
                            "Function '%s' is not available. "
                            "host '%s', collector = { tid: %d, running: %s }, host tid { rcv: %d, snd: %d }, host state { id: %u, expected %u }, hops: %d",
                            name,

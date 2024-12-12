@@ -12,7 +12,8 @@ RRDHOST_STATE rrdhost_state_id(struct rrdhost *host);
 
 bool rrdhost_state_connected(struct rrdhost *host);
 bool rrdhost_state_disconnected(struct rrdhost *host);
-bool rrdhost_state_acquire(struct rrdhost *host);
+
+bool rrdhost_state_acquire(struct rrdhost *host, RRDHOST_STATE wanted_state_id);
 void rrdhost_state_release(struct rrdhost *host);
 
 #endif //NETDATA_RRDHOST_STATE_ID_H
