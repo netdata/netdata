@@ -5,7 +5,7 @@
 
 #include "daemon/common.h"
 
-#define WORKER_PARSER_FIRST_JOB 35
+#define WORKER_PARSER_FIRST_JOB 36
 
 // this has to be in-sync with the same at stream-thread.c
 #define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION 25
