@@ -728,8 +728,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/functions_evloop/functions_evloop.h
         src/libnetdata/gorilla/gorilla.cc
         src/libnetdata/gorilla/gorilla.h
-        src/libnetdata/july/july.c
-        src/libnetdata/july/july.h
         src/libnetdata/inlined.h
         src/libnetdata/json/json.c
         src/libnetdata/json/json.h
