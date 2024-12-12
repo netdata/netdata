@@ -483,6 +483,330 @@ modules:
                 - name: operations
   - meta:
       plugin_name: windows.plugin
+      module_name: PerflibNetwork
+      monitored_instance:
+        name: Network Subsystem
+        link: "https://learn.microsoft.com/en-us/windows/win32/networking"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - network
+        - bandwidth
+        - ip
+        - udp
+        - tcp
+        - interface
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor network interface metrics about bandwidth, state, errors and more.
+        method_description: |
+          It queries 'Network Interface' and 'Network Adapter' objects from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all of the metrics, no further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibNetwork
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: inbound_packets_dropped_ratio
+        metric: net.drops
+        info: Ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
+      - name: outbound_packets_dropped_ratio
+        metric: net.drops
+        info: Ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
+      - name: 1m_received_traffic_overflow
+        metric: net.net
+        info: Average inbound utilization for the network interface ${label:device} over the last minute
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
+      - name: 1m_sent_traffic_overflow
+        metric: net.net
+        info: Average outbound utilization for the network interface ${label:device} over the last minute
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
+      - name: network_interface_output_queue_length
+        metric: net.queue_length
+        info: Output Queue Length on interface ${label:device} should be zero, otherwise there are delays and bottlenecks.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: System
+          description: "These metrics refer to the entire System."
+          labels: []
+          metrics:
+            - name: system.net
+              description: Physical Network Interfaces Aggregated Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ip.tcppackets
+              description: TCP Packets
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.packets
+              description: IPv4 Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivered
+            - name: ipv4.tcppackets
+              description: IPv4 TCP Packets
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.udppackets
+              description: IPv4 UDP Packets
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.icmp
+              description: IPv4 ICMP Packets
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv4.errors
+              description: IPv4 Errors
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: OutNoRoutes
+                - name: InAddrErrors
+                - name: InHdrErrors
+                - name: InUnknownProtos
+            - name: ipv4.icmpmsg
+              description: IPv4 ICMP Packets
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: InEchoReps
+                - name: OutEchoReps
+                - name: InDestUnreachs
+                - name: OutDestUnreachs
+                - name: InRedirects
+                - name: OutRedirects
+                - name: InEchos
+                - name: OutEchos
+                - name: InRouterAdvert
+                - name: OutRouterAdvert
+                - name: InRouterSelect
+                - name: OutRouterSelect
+                - name: InTimeExcds
+                - name: OutTimeExcds
+                - name: InParmProbs
+                - name: OutParmProbs
+                - name: InTimestamps
+                - name: OutTimestamps
+                - name: InTimestampReps
+                - name: OutTimestampReps
+            - name: ipv6.packets
+              description: IPv6 Packets
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+                - name: forwarded
+                - name: delivered
+            - name: ipv6.tcppackets
+              description: IPv6 TCP Packets
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.udppackets
+              description: IPv6 UDP Packets
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.icmp
+              description: IPv6 ICMP Packets
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: ipv6.errors
+              description: IPv6 Errors
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: InDiscards
+                - name: OutDiscards
+                - name: OutNoRoutes
+                - name: InAddrErrors
+                - name: InHdrErrors
+                - name: InUnknownProtos
+            - name: ipv6.icmpmsg
+              description: IPv6 ICMP Packets
+              unit: "packets/s"
+              chart_type: area
+              dimensions:
+                - name: InEchoReps
+                - name: OutEchoReps
+                - name: InDestUnreachs
+                - name: OutDestUnreachs
+                - name: InRedirects
+                - name: OutRedirects
+                - name: InEchos
+                - name: OutEchos
+                - name: InRouterAdvert
+                - name: OutRouterAdvert
+                - name: InRouterSelect
+                - name: OutRouterSelect
+                - name: InTimeExcds
+                - name: OutTimeExcds
+                - name: InParmProbs
+                - name: OutParmProbs
+                - name: InTimestamps
+                - name: OutTimestamps
+                - name: InTimestampReps
+                - name: OutTimestampReps
+        - name: network device
+          description: "These metrics refer to Network Interfaces."
+          labels:
+            - name: interface_type
+              description: "Classification of the network interface (real or virtual)."
+            - name: device
+              description: "System-assigned network interface identifier."
+          metrics:
+            - name: net.net
+              description: Bandwidth
+              unit: "kilobits/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.packets
+              description: Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: net.speed
+              description: Interface Speed
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: net.errors
+              description: Interface Errors
+              unit: "errors/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.drops
+              description: Interface Drops
+              unit: "drops/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: net.queue_length
+              description: Interface Output Queue Length
+              unit: "packets"
+              chart_type: line
+              dimensions:
+                - name: length
+            - name: net.rsc_connections
+              description: Active TCP Connections Offloaded by RSC
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: net.rsc_packets
+              description: TCP RSC Coalesced Packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: packets
+            - name: net.rsc_exceptions
+              description: TCP RSC Exceptions
+              unit: "exceptions/s"
+              chart_type: line
+              dimensions:
+                - name: exceptions
+            - name: net.rsc_average_packet_size
+              description: TCP RSC Average Packet Size
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: net.chimney_connections
+              description: Active TCP Connections Offloaded with Chimney
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: connections
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibObjects
       monitored_instance:
         name: Semaphore statistics
