@@ -385,7 +385,6 @@ static void backfill_callback(size_t successful_dims __maybe_unused, size_t fail
                 rrdset_id(brd->st));
         }
     }
-    freez(brd);
 }
 
 static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *parser) {
