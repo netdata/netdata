@@ -6,14 +6,20 @@
 
 **Merged pull requests:**
 
+- Move dependency handling for integrations to script. [\#19185](https://github.com/netdata/netdata/pull/19185) ([Ferroin](https://github.com/Ferroin))
+- Regenerate integrations docs [\#19184](https://github.com/netdata/netdata/pull/19184) ([netdatabot](https://github.com/netdatabot))
+- fix\(kickstart\): netdata\_avail\_check on Ubuntu [\#19183](https://github.com/netdata/netdata/pull/19183) ([ilyam8](https://github.com/ilyam8))
+- Disks Metadata \(Windows plugin\) [\#19182](https://github.com/netdata/netdata/pull/19182) ([thiagoftsm](https://github.com/thiagoftsm))
 - Bump repository config fetched by kickstart to latest version [\#19181](https://github.com/netdata/netdata/pull/19181) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d\): pass context to init/check/collect/cleanup [\#19180](https://github.com/netdata/netdata/pull/19180) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19177](https://github.com/netdata/netdata/pull/19177) ([netdatabot](https://github.com/netdatabot))
 - docs: reorder silent mode and add full pipeline command example [\#19176](https://github.com/netdata/netdata/pull/19176) ([Ancairon](https://github.com/Ancairon))
 - Add Objects metadata \(Windows Plugin\) [\#19175](https://github.com/netdata/netdata/pull/19175) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fixup URLs in package repo documentation to use index files. [\#19174](https://github.com/netdata/netdata/pull/19174) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#19173](https://github.com/netdata/netdata/pull/19173) ([netdatabot](https://github.com/netdatabot))
 - build\(deps\): bump github.com/docker/docker from 27.3.1+incompatible to 27.4.0+incompatible in /src/go [\#19172](https://github.com/netdata/netdata/pull/19172) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Processor Metadata \(Windows Plugin\) [\#19171](https://github.com/netdata/netdata/pull/19171) ([thiagoftsm](https://github.com/thiagoftsm))
+- Streaming improvements No 3 [\#19168](https://github.com/netdata/netdata/pull/19168) ([ktsaou](https://github.com/ktsaou))
 - Streaming improvements No 2 [\#19167](https://github.com/netdata/netdata/pull/19167) ([ktsaou](https://github.com/ktsaou))
 - send quit to plugins [\#19166](https://github.com/netdata/netdata/pull/19166) ([ktsaou](https://github.com/ktsaou))
 - add units per context to /api/v3/contexts [\#19165](https://github.com/netdata/netdata/pull/19165) ([ktsaou](https://github.com/ktsaou))
@@ -178,7 +184,6 @@
 - added /api/v3/stream\_path [\#18943](https://github.com/netdata/netdata/pull/18943) ([ktsaou](https://github.com/ktsaou))
 - Update Windows Documentation [\#18928](https://github.com/netdata/netdata/pull/18928) ([thiagoftsm](https://github.com/thiagoftsm))
 - IIS Metadata [\#18765](https://github.com/netdata/netdata/pull/18765) ([thiagoftsm](https://github.com/thiagoftsm))
-- Bump github.com/Wing924/ltsv from 0.3.1 to 0.4.0 in /src/go [\#18636](https://github.com/netdata/netdata/pull/18636) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.0.3](https://github.com/netdata/netdata/tree/v2.0.3) (2024-11-22)
 
@@ -444,11 +449,6 @@
 - Regenerate integrations.js [\#18647](https://github.com/netdata/netdata/pull/18647) ([netdatabot](https://github.com/netdatabot))
 - Use temporary file for commit date check. [\#18646](https://github.com/netdata/netdata/pull/18646) ([Ferroin](https://github.com/Ferroin))
 - Reorganize top-level headers in libnetdata. [\#18643](https://github.com/netdata/netdata/pull/18643) ([vkalintiris](https://github.com/vkalintiris))
-- New wording about edit-config script in docs [\#18639](https://github.com/netdata/netdata/pull/18639) ([Ancairon](https://github.com/Ancairon))
-- Update file names. [\#18638](https://github.com/netdata/netdata/pull/18638) ([vkalintiris](https://github.com/vkalintiris))
-- Move plugins.d directory outside of collectors [\#18637](https://github.com/netdata/netdata/pull/18637) ([vkalintiris](https://github.com/vkalintiris))
-- go.d/smartctl: fix exit status check in scan [\#18635](https://github.com/netdata/netdata/pull/18635) ([ilyam8](https://github.com/ilyam8))
-- go.d pkg/socket: keep only one timeout option [\#18633](https://github.com/netdata/netdata/pull/18633) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

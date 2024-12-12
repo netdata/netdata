@@ -63,6 +63,7 @@ jobs:
           commit-message: Regenerate integrations docs
           branch: integrations-regen
           title: Regenerate integrations docs
+          labels: integrations-update
           body: |
             Regenerate the integrations docs based on the
             latest metadata yaml code.
