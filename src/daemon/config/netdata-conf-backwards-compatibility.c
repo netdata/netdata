@@ -4,10 +4,6 @@
 #include "database/engine/rrdengineapi.h"
 
 void netdata_conf_backwards_compatibility(void) {
-    static bool run = false;
-    if(run) return;
-    run = true;
-
     // move [global] options to the [web] section
 
     config_move(CONFIG_SECTION_GLOBAL, "http port listen backlog",

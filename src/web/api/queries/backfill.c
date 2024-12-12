@@ -133,16 +133,12 @@ static void backfill_dim_work_free(bool successful, struct backfill_dim_work *bd
     aral_freez(backfill_globals.ar_bdm, bdm);
 }
 
-void *backfill_worker_thread(void *ptr) {
-    bool master = (ptr == (void *)0x01);
-
+void *backfill_worker_thread(void *ptr __maybe_unused) {
     worker_register("BACKFILL");
 
     worker_register_job_name(0, "get");
     worker_register_job_name(1, "backfill");
-
-    if(master)
-        worker_register_job_custom_metric(2, "backfill queue size", "dimensions", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(2, "backfill queue size", "dimensions", WORKER_METRIC_ABSOLUTE);
 
     size_t job_id = 0, queue_size = 0;
     while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS|SERVICE_STREAMING)) {
@@ -201,7 +197,7 @@ void *backfill_thread(void *ptr) {
         th[t] = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, backfill_worker_thread, NULL);
     }
 
-    backfill_worker_thread((void *)0x01);
+    backfill_worker_thread(NULL);
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     for(size_t t = 0; t < threads - 1 ;t++) {

@@ -18,9 +18,45 @@ static int get_hostname(char *buf, size_t buf_size) {
     return rc;
 }
 
-void netdata_conf_section_global(void) {
-    netdata_conf_backwards_compatibility();
+static void glibc_initialize(void) {
+    const char *pmax = config_get(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", "1");
+    if(pmax && *pmax)
+        setenv("MALLOC_ARENA_MAX", pmax, 1);
 
+#if defined(HAVE_C_MALLOPT)
+    int i = (int)config_get_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", 1);
+    if(i > 0)
+        mallopt(M_ARENA_MAX, 1);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    mallopt(M_PERTURB, 0x5A);
+    // mallopt(M_MXFAST, 0);
+#endif
+#endif
+}
+
+static void libuv_initialize(void) {
+    libuv_worker_threads = (int)get_netdata_cpus() * 6;
+
+    if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
+        libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+
+    if(libuv_worker_threads > MAX_LIBUV_WORKER_THREADS)
+        libuv_worker_threads = MAX_LIBUV_WORKER_THREADS;
+
+
+    libuv_worker_threads = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+    if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS) {
+        libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+        config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+    }
+
+    char buf[20 + 1];
+    snprintfz(buf, sizeof(buf) - 1, "%d", libuv_worker_threads);
+    setenv("UV_THREADPOOL_SIZE", buf, 1);
+}
+
+void netdata_conf_section_global(void) {
     // ------------------------------------------------------------------------
     // get the hostname
 
@@ -42,6 +78,9 @@ void netdata_conf_section_global(void) {
 
     os_get_system_cpus_uncached();
     os_get_system_pid_max();
+
+    glibc_initialize();
+    libuv_initialize();
 }
 
 void netdata_conf_section_global_run_as_user(const char **user) {

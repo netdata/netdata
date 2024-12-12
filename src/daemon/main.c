@@ -1324,112 +1324,71 @@ int netdata_main(int argc, char **argv) {
 
     if(!config_loaded) {
         netdata_conf_load(NULL, 0, &user);
-        stream_conf_load();
         cloud_conf_load(0);
     }
 
-    // ------------------------------------------------------------------------
-    // initialize netdata
-    {
-        const char *pmax = config_get(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", "1");
-        if(pmax && *pmax)
-            setenv("MALLOC_ARENA_MAX", pmax, 1);
+    // ----------------------------------------------------------------------------------------------------------------
+    // initialize the logging system
+    // IMPORTANT: KEEP THIS FIRST SO THAT THE REST OF NETDATA WILL LOG PROPERLY
 
-#if defined(HAVE_C_MALLOPT)
-        i = (int)config_get_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", 1);
-        if(i > 0)
-            mallopt(M_ARENA_MAX, 1);
+    netdata_conf_section_logs();
+    nd_log_limits_unlimited();
 
+    // initialize the log files
+    nd_log_initialize();
+    netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // global configuration
+
+    netdata_conf_section_global();
+
+    // Get execution path before switching user to avoid permission issues
+    get_netdata_execution_path();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // analytics
+
+    analytics_reset();
+    get_system_timezone();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // data collection plugins
+
+    // prepare configuration environment variables for the plugins
+    set_environment_for_plugins_and_scripts();
+
+    // cd into config_dir to allow the plugins refer to their config files using relative filenames
+    if(chdir(netdata_configured_user_config_dir) == -1)
+        fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // pulse (internal netdata instrumentation)
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        mallopt(M_PERTURB, 0x5A);
-        // mallopt(M_MXFAST, 0);
+    pulse_enabled = true;
+    pulse_extended_enabled = true;
 #endif
-#endif
 
-        // set libuv worker threads
-        libuv_worker_threads = (int)get_netdata_cpus() * 6;
+    pulse_extended_enabled =
+        config_get_boolean(CONFIG_SECTION_PULSE, "extended", pulse_extended_enabled);
 
-        if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
-            libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+    if(pulse_extended_enabled)
+        // this has to run before starting any other threads that use workers
+        workers_utilization_enable();
 
-        if(libuv_worker_threads > MAX_LIBUV_WORKER_THREADS)
-            libuv_worker_threads = MAX_LIBUV_WORKER_THREADS;
+    // ----------------------------------------------------------------------------------------------------------------
+    // streaming, replication, backfilling
 
+    stream_conf_load();
+    check_local_streaming_capabilities();
+    replication_initialize();
 
-        libuv_worker_threads = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
-        if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS) {
-            libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
-            config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
-        }
-
-        {
-            char buf[20 + 1];
-            snprintfz(buf, sizeof(buf) - 1, "%d", libuv_worker_threads);
-            setenv("UV_THREADPOOL_SIZE", buf, 1);
-        }
-
-        // prepare configuration environment variables for the plugins
-        netdata_conf_section_global();
-        set_environment_for_plugins_and_scripts();
-        analytics_reset();
-
-        // work while we are cd into config_dir
-        // to allow the plugins refer to their config
-        // files using relative filenames
-        if(chdir(netdata_configured_user_config_dir) == -1)
-            fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
-
-        // Get execution path before switching user to avoid permission issues
-        get_netdata_execution_path();
-    }
+    rrd_functions_inflight_init();
 
     {
         // --------------------------------------------------------------------
-        // get the debugging flags from the configuration file
-
-        const char *flags = config_get(CONFIG_SECTION_LOGS, "debug flags",  "0x0000000000000000");
-        nd_setenv("NETDATA_DEBUG_FLAGS", flags, 1);
-
-        debug_flags = strtoull(flags, NULL, 0);
-        netdata_log_debug(D_OPTIONS, "Debug flags set to '0x%" PRIX64 "'.", debug_flags);
-
-        if(debug_flags != 0) {
-            struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
-            if(setrlimit(RLIMIT_CORE, &rl) != 0)
-                netdata_log_error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
-
-#ifdef HAVE_SYS_PRCTL_H
-            prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
-#endif
-        }
-
-
-        // --------------------------------------------------------------------
-        // get log filenames and settings
-
-        netdata_conf_section_logs();
-        nd_log_limits_unlimited();
-
-        // initialize the log files
-        nd_log_initialize();
-        netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
-
-        check_local_streaming_capabilities();
-
-        get_system_timezone();
-
-        replication_initialize();
-
-        rrd_functions_inflight_init();
-
-        // --------------------------------------------------------------------
-        // get the certificate and start security
-
-        netdata_conf_web_security_init();
-
-        // --------------------------------------------------------------------
-        // This is the safest place to start the SILENCERS structure
+        // alerts SILENCERS
 
         health_set_silencers_filename();
         health_initialize_global_silencers();
@@ -1454,18 +1413,6 @@ int netdata_main(int argc, char **argv) {
         if (default_stacksize < 1 * 1024 * 1024)
             default_stacksize = 1 * 1024 * 1024;
 
-#ifdef NETDATA_INTERNAL_CHECKS
-        pulse_enabled = true;
-        pulse_extended_enabled = true;
-#endif
-
-        pulse_extended_enabled =
-            config_get_boolean(CONFIG_SECTION_PULSE, "extended", pulse_extended_enabled);
-
-        if(pulse_extended_enabled)
-            // this has to run before starting any other threads that use workers
-            workers_utilization_enable();
-
         for (i = 0; static_threads[i].name != NULL ; i++) {
             struct netdata_static_thread *st = &static_threads[i];
 
@@ -1489,6 +1436,9 @@ int netdata_main(int argc, char **argv) {
         // create the listening sockets
 
         delta_startup_time("initialize web server");
+
+        // get the certificate and start security
+        netdata_conf_web_security_init();
 
         nd_web_api_init();
         web_server_threading_selection();
