@@ -175,25 +175,25 @@ void aclk_check_node_info_and_collectors(void)
     if (context_loading || replicating || context_pp) {
         const char *context_loading_pre = "", *context_loading_body = "", *context_loading_post = "";
         if(context_loading == 1) {
-            context_loading_pre = "(host '";
+            context_loading_pre = " (host '";
             context_loading_body = string2str(context_loading_host);
             context_loading_post = "')";
         }
         const char *replicating_pre = "", *replicating_body = "", *replicating_post = "";
         if(replicating == 1) {
-            replicating_pre = "(host '";
+            replicating_pre = " (host '";
             replicating_body = string2str(replicating_host);
             replicating_post = "')";
         }
         const char *context_pp_pre = "", *context_pp_body = "", *context_pp_post = "";
         if(context_pp == 1) {
-            context_pp_pre = "(host '";
+            context_pp_pre = " (host '";
             context_pp_body = string2str(context_pp_host);
             context_pp_post = "')";
         }
         nd_log_limit_static_thread_var(erl, 10, 100 * USEC_PER_MS);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
-                     "%zu nodes loading contexts %s%s%s, %zu replicating data %s%s%s, %zu pending context post processing %s%s%s",
+                     "%zu nodes loading contexts%s%s%s, %zu replicating data%s%s%s, %zu pending context post processing%s%s%s",
                      context_loading, context_loading_pre, context_loading_body, context_loading_post,
                      replicating, replicating_pre, replicating_body, replicating_post,
                      context_pp, context_pp_pre, context_pp_body, context_pp_post
