@@ -1954,7 +1954,8 @@ static void *pgc_evict_thread(void *ptr) {
     worker_register_job_name(0, "signaled");
     worker_register_job_name(1, "scheduled");
 
-    unsigned job_id = 0, severe_pressure_counter = 0;
+    unsigned job_id = 0;
+    usec_t last_malloc_release_ut = 0;
 
     while (true) {
         worker_is_idle();
@@ -1971,18 +1972,17 @@ static void *pgc_evict_thread(void *ptr) {
 
         size_t size_to_evict = 0;
         if(cache_usage_per1000(cache, &size_to_evict) > cache->config.severe_pressure_per1000) {
-            severe_pressure_counter++;
+            usec_t now_ut = now_monotonic_usec();
 
-            if(severe_pressure_counter > 100) {
-                // so, we tried 100 times to reduce memory,
+            if(last_malloc_release_ut + USEC_PER_SEC < now_ut) {
+                last_malloc_release_ut = now_ut;
+
+                // so, we tried 100 times to reduce memory, and a second has passed,
                 // but it is still severe!
 
                 mallocz_release_as_much_memory_to_the_system();
-                severe_pressure_counter = 0;
             }
         }
-        else
-            severe_pressure_counter = 0;
     }
 
     worker_unregister();
