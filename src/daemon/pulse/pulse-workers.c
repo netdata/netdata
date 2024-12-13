@@ -113,7 +113,7 @@ struct worker_utilization {
 
 static struct worker_utilization all_workers_utilization[] = {
     { .name = "PULSE",       .family = "workers pulse",                   .priority = 1000000 },
-    { .name = "HEALTH",      .family = "workers health alarms",           .priority = 1000000 },
+    { .name = "HEALTH",      .family = "workers health alerts",           .priority = 1000000 },
     { .name = "MLTRAIN",     .family = "workers ML training",             .priority = 1000000 },
     { .name = "MLDETECT",    .family = "workers ML detection",            .priority = 1000000 },
     { .name = "STREAM",      .family = "workers streaming",               .priority = 1000000 },
