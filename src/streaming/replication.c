@@ -32,7 +32,7 @@
 #define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 30
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
 
-#define MAX_REPLICATION_THREADS 32
+#define MAX_REPLICATION_THREADS 256
 #define REQUESTS_AHEAD_PER_THREAD 1 // 1 = enable synchronous queries
 
 static struct replication_query_statistics replication_queries = {
@@ -1889,9 +1889,7 @@ void *replication_thread_main(void *ptr) {
 
     replication_initialize_workers(true);
 
-    int nodes = (int)dictionary_entries(rrdhost_root_index);
-    int cpus = (int)get_netdata_cpus();
-    int threads = cpus / 2;
+    int threads = stream_conf_configured_as_parent() ? (int)(get_netdata_cpus() / 2) : 1;
     if (threads < 1) threads = 1;
     else if (threads > MAX_REPLICATION_THREADS) threads = MAX_REPLICATION_THREADS;
 
@@ -1906,8 +1904,6 @@ void *replication_thread_main(void *ptr) {
         threads = MAX_REPLICATION_THREADS;
         config_set_number(CONFIG_SECTION_DB, "replication threads", threads);
     }
-
-    netdata_log_info("replication threads set to %d (cpu cores = %d, nodes = %d)", threads, cpus, nodes);
 
     if(--threads) {
         replication_globals.main_thread.threads = threads;

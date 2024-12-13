@@ -45,7 +45,11 @@ void ml_config_load(ml_config_t *cfg) {
     std::string anomaly_detection_grouping_method = config_get(config_section_ml, "anomaly detection grouping method", "average");
     time_t anomaly_detection_query_duration = config_get_duration_seconds(config_section_ml, "anomaly detection grouping duration", 5 * 60);
 
-    size_t num_worker_threads = config_get_number(config_section_ml, "num training threads", os_get_system_cpus() / 4);
+    size_t num_worker_threads = stream_conf_configured_as_parent() ? get_netdata_cpus() / 4 : 1;
+    if (num_worker_threads < 1) num_worker_threads = 1;
+    else if (num_worker_threads > 256) num_worker_threads = 256;
+    num_worker_threads = config_get_number(config_section_ml, "num training threads", num_worker_threads);
+
     size_t flush_models_batch_size = config_get_number(config_section_ml, "flush models batch size", 256);
 
     size_t suppression_window =
