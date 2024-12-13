@@ -70,6 +70,8 @@ static void *rrdeng_exit_background(void *ptr) {
 }
 
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
+    nd_log_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
+
     netdata_exit = 1;
 
     usec_t shutdown_start_time = now_monotonic_usec();
@@ -191,10 +193,10 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
                         pgc_main_stats = pgc_get_statistics(main_cache);
                         nd_log(NDLS_DAEMON, NDLP_INFO,
                                "Still waiting for DBENGINE tier %zu to flush its dirty pages "
-                               "(cache still has %zu pages, %zu bytes hot, for all tiers)...",
+                               "(cache pages { hot: %zu, dirty: %zu }, size { hot: %zu, dirty: %zu })...",
                                tier,
-                               pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries,
-                               pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size);
+                               pgc_main_stats.queues[PGC_QUEUE_HOT].entries, pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries,
+                               pgc_main_stats.queues[PGC_QUEUE_HOT].size, pgc_main_stats.queues[PGC_QUEUE_DIRTY].size);
                     }
                 }
             } while(waiting_tiers);
@@ -216,7 +218,6 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
                     running += rrdeng_collectors_running(multidb_ctx[tier]);
 
                 if (running) {
-                    nd_log_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE, "waiting for %zu collectors to finish", running);
                 }
                 count--;
@@ -232,6 +233,24 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
             ND_THREAD *th[storage_tiers];
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_JOINABLE, rrdeng_exit_background, multidb_ctx[tier]);
+
+            size_t iterations = 0;
+            do {
+                iterations++;
+                struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
+                if(iterations % 1000 == 0)
+                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
+                                 "DBENGINE flushing threads currently running: %zu "
+                                 "(cache pages { hot: %zu, dirty: %zu }, size { hot: %zu, dirty: %zu })...",
+                                 pgc_main_stats.workers_flush,
+                                 pgc_main_stats.queues[PGC_QUEUE_HOT].entries, pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries,
+                                 pgc_main_stats.queues[PGC_QUEUE_HOT].size, pgc_main_stats.queues[PGC_QUEUE_DIRTY].size);
+
+                if(!pgc_main_stats.workers_flush)
+                        break;
+                else
+                    yield_the_processor();
+            } while(true);
 
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 nd_thread_join(th[tier]);

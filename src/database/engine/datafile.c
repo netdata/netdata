@@ -588,13 +588,7 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         do {
             netdata_log_info("Acquiring datafiles write lock");
             uv_rwlock_wrlock(&ctx->datafiles.rwlock);
-            while(!spinlock_trylock(&datafile->writers.spinlock)) {
-                nd_log_limit_static_thread_var(erl, 1, 0);
-                nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
-                             "Acquiring datafile %u writers spinlock (%zu writing)",
-                             datafile->fileno, datafile->writers.running);
-                yield_the_processor();
-            }
+            spinlock_lock(&datafile->writers.spinlock);
             available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
 
             if(!available) {
