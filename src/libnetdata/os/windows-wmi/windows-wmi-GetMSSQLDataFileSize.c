@@ -18,6 +18,8 @@ size_t GetSQLDataFileSizeWMI()
 
     HRESULT hr;
     IEnumWbemClassObject *pEnumerator = NULL;
+    BSTR query = NULL;
+    BSTR wql = NULL;
 
     if (!DatabaseSize) {
         DatabaseSize = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
@@ -28,8 +30,12 @@ size_t GetSQLDataFileSizeWMI()
     }
 
     // Execute the query, including new properties
-    BSTR query = SysAllocString(L"SELECT Name, DataFilesSizeKB FROM Win32_PerfRawData_MSSQLSERVER_SQLServerDatabases WHERE Name <> '_Total'");
-    BSTR wql = SysAllocString(L"WQL");
+    if (!query)
+        query = SysAllocString(L"SELECT Name, DataFilesSizeKB FROM Win32_PerfRawData_MSSQLSERVER_SQLServerDatabases WHERE Name <> '_Total'");
+
+    if (!wql)
+        wql = SysAllocString(L"WQL");
+
     hr = nd_wmi.pSvc->lpVtbl->ExecQuery(nd_wmi.pSvc,
                                         wql,
                                         query,
