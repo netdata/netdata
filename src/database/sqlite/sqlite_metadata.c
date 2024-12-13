@@ -2316,6 +2316,22 @@ void metadata_sync_shutdown_prepare(void)
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Host scan complete; can continue with shutdown");
 }
 
+void *metadata_sync_shutdown_thread(void *ptr __maybe_unused) {
+    metadata_sync_shutdown_prepare();
+    metadata_sync_shutdown();
+    return NULL;
+}
+
+static ND_THREAD *metdata_sync_shutdown_background_wait_thread = NULL;
+void metadata_sync_shutdown_background(void) {
+    metdata_sync_shutdown_background_wait_thread = nd_thread_create(
+        "METASYNC-SHUTDOWN", NETDATA_THREAD_OPTION_JOINABLE, metadata_sync_shutdown_thread, NULL);
+}
+
+void metadata_sync_shutdown_background_wait(void) {
+    nd_thread_join(metdata_sync_shutdown_background_wait_thread);
+}
+
 // -------------------------------------------------------------
 // Init function called on agent startup
 

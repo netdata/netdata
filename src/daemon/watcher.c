@@ -73,13 +73,13 @@ void *watcher_main(void *arg)
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_REPLICATION_THREADS);
-    watcher_wait_for_step(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
     watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_CONTEXT_THREAD);
     watcher_wait_for_step(WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_ACLK_THREADS);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
     watcher_wait_for_step(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
+    watcher_wait_for_step(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
     watcher_wait_for_step(WATCHER_STEP_ID_FLUSH_DBENGINE_TIERS);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
     watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);

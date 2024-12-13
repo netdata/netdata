@@ -369,9 +369,6 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     service_wait_exit(SERVICE_REPLICATION, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_REPLICATION_THREADS);
 
-    metadata_sync_shutdown_prepare();
-    watcher_step_complete(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
-
     ml_stop_threads();
     ml_fini();
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS);
@@ -390,6 +387,9 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
     cancel_main_threads();
     watcher_step_complete(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
+
+    metadata_sync_shutdown_background();
+    watcher_step_complete(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
 
     if (ret)
     {
@@ -492,7 +492,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
         watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
 #endif
 
-        metadata_sync_shutdown();
+        metadata_sync_shutdown_background_wait();
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
 

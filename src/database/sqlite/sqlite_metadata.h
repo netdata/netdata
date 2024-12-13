@@ -70,6 +70,9 @@ void metadata_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae);
 void metadata_queue_ae_deletion(ALARM_ENTRY *ae);
 void commit_alert_transitions(RRDHOST *host);
 
+void metadata_sync_shutdown_background(void);
+void metadata_sync_shutdown_background_wait(void);
+
 // UNIT TEST
 int metadata_unittest(void);
 #endif //NETDATA_SQLITE_METADATA_H
