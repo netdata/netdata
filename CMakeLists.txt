@@ -876,6 +876,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/windows-wmi/windows-wmi.h
         src/libnetdata/os/windows-wmi/windows-wmi-GetDiskDriveInfo.c
         src/libnetdata/os/windows-wmi/windows-wmi-GetDiskDriveInfo.h
+        src/libnetdata/os/windows-wmi/windows-wmi-GetMSSQLDataFileSize.c
+        src/libnetdata/os/windows-wmi/windows-wmi-GetMSSQLDataFileSize.h
         src/libnetdata/os/windows-perflib/perflib.c
         src/libnetdata/os/windows-perflib/perflib.h
         src/libnetdata/os/windows-perflib/perflib-names.c
