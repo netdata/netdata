@@ -253,6 +253,14 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
                 iterations++;
             } while(true);
 
+            struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
+                         "DBENGINE flushing threads currently running: %zu "
+                         "(cache pages { hot: %zu, dirty: %zu }, size { hot: %zu, dirty: %zu })...",
+                         pgc_main_stats.workers_flush,
+                         pgc_main_stats.queues[PGC_QUEUE_HOT].entries, pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries,
+                         pgc_main_stats.queues[PGC_QUEUE_HOT].size, pgc_main_stats.queues[PGC_QUEUE_DIRTY].size);
+
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 nd_thread_join(th[tier]);
 
