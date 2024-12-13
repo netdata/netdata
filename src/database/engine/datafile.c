@@ -573,6 +573,9 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         struct rrdengine_datafile *datafile = ctx->datafiles.first;
         struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
+        // wait for all users of the datafile
+
+        netdata_log_info("DBENGINE: waiting for all users of data file %u of tier %d to finish...", datafile->fileno, ctx->config.tier);
         logged = false;
         size_t iterations = 10;
         while(!datafile_acquire_for_deletion(datafile, true) && datafile != ctx->datafiles.first->prev && --iterations > 0) {
@@ -583,16 +586,24 @@ void finalize_data_files(struct rrdengine_instance *ctx)
             sleep_usec(100 * USEC_PER_MS);
         }
 
+        // remove it from the list of datafiles
+
+        netdata_log_info("DBENGINE: removing data file %u of tier %d from the list of data files...", datafile->fileno, ctx->config.tier);
+        uv_rwlock_wrlock(&ctx->datafiles.rwlock);
+        datafile_list_delete_unsafe(ctx, datafile);
+        uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+
+        // wait for all writers to finish appending data to it
+
+        netdata_log_info("DBENGINE: waiting for all writers of data file %u of tier %d to finish...", datafile->fileno, ctx->config.tier);
         logged = false;
         bool available = false;
         do {
-            uv_rwlock_wrlock(&ctx->datafiles.rwlock);
             spinlock_lock(&datafile->writers.spinlock);
             available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
 
             if(!available) {
                 spinlock_unlock(&datafile->writers.spinlock);
-                uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
                 if(!logged) {
                     netdata_log_info("Waiting for writers to data file %u of tier %d to finish...", datafile->fileno, ctx->config.tier);
                     logged = true;
@@ -600,12 +611,15 @@ void finalize_data_files(struct rrdengine_instance *ctx)
                 sleep_usec(100 * USEC_PER_MS);
             }
         } while(!available);
+        spinlock_unlock(&datafile->writers.spinlock);
+
+        // close it
+        netdata_log_info("DBENGINE: closing and freeing data file %u of tier %d...", datafile->fileno, ctx->config.tier);
 
         journalfile_close(journalfile, datafile);
         close_data_file(datafile);
-        datafile_list_delete_unsafe(ctx, datafile);
-        spinlock_unlock(&datafile->writers.spinlock);
-        uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+
+        // free it
 
         freez(journalfile);
         freez(datafile);
