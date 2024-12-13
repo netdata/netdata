@@ -1315,6 +1315,10 @@ static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine
     worker_is_busy(UV_EVENT_DBENGINE_QUIESCE);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
     completion_mark_complete(&ctx->quiesce.completion);
+
+    for(size_t i = 0; i < pgc_max_flushers() ; i++)
+        rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+
     return data;
 }
 
