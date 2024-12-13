@@ -2318,7 +2318,6 @@ void metadata_sync_shutdown_prepare(void)
 
 void *metadata_sync_shutdown_thread(void *ptr __maybe_unused) {
     metadata_sync_shutdown_prepare();
-    metadata_sync_shutdown();
     return NULL;
 }
 
@@ -2330,6 +2329,7 @@ void metadata_sync_shutdown_background(void) {
 
 void metadata_sync_shutdown_background_wait(void) {
     nd_thread_join(metdata_sync_shutdown_background_wait_thread);
+    metadata_sync_shutdown();
 }
 
 // -------------------------------------------------------------
