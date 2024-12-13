@@ -6,6 +6,16 @@
 
 **Merged pull requests:**
 
+- Add cross-architecture build tests for Go code. [\#19195](https://github.com/netdata/netdata/pull/19195) ([Ferroin](https://github.com/Ferroin))
+- Remove July arrays [\#19194](https://github.com/netdata/netdata/pull/19194) ([stelfrag](https://github.com/stelfrag))
+- Streaming Improvements No 5 [\#19193](https://github.com/netdata/netdata/pull/19193) ([ktsaou](https://github.com/ktsaou))
+- Regenerate integrations docs [\#19192](https://github.com/netdata/netdata/pull/19192) ([netdatabot](https://github.com/netdatabot))
+- rw\_spinlocks: allow recursive readers, even when writers are waiting [\#19191](https://github.com/netdata/netdata/pull/19191) ([ktsaou](https://github.com/ktsaou))
+- docs: remove a duplicated row [\#19190](https://github.com/netdata/netdata/pull/19190) ([orisano](https://github.com/orisano))
+- build\(deps\): bump golang.org/x/crypto from 0.30.0 to 0.31.0 in /src/go [\#19189](https://github.com/netdata/netdata/pull/19189) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Network Metadata \(Windows plugin\) [\#19188](https://github.com/netdata/netdata/pull/19188) ([thiagoftsm](https://github.com/thiagoftsm))
+- ci: fix update-website workflow [\#19187](https://github.com/netdata/netdata/pull/19187) ([ilyam8](https://github.com/ilyam8))
+- Streaming improvements No 4 [\#19186](https://github.com/netdata/netdata/pull/19186) ([ktsaou](https://github.com/ktsaou))
 - Move dependency handling for integrations to script. [\#19185](https://github.com/netdata/netdata/pull/19185) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#19184](https://github.com/netdata/netdata/pull/19184) ([netdatabot](https://github.com/netdatabot))
 - fix\(kickstart\): netdata\_avail\_check on Ubuntu [\#19183](https://github.com/netdata/netdata/pull/19183) ([ilyam8](https://github.com/ilyam8))
@@ -442,13 +452,6 @@
 - add go.d/oracle [\#18654](https://github.com/netdata/netdata/pull/18654) ([ilyam8](https://github.com/ilyam8))
 - Handle mqtt ping timeouts [\#18653](https://github.com/netdata/netdata/pull/18653) ([stelfrag](https://github.com/stelfrag))
 - apps.plugin improvements [\#18652](https://github.com/netdata/netdata/pull/18652) ([ktsaou](https://github.com/ktsaou))
-- remove python implementation of oracledb [\#18651](https://github.com/netdata/netdata/pull/18651) ([Ancairon](https://github.com/Ancairon))
-- go.d remove duplicate chart check in tests [\#18650](https://github.com/netdata/netdata/pull/18650) ([ilyam8](https://github.com/ilyam8))
-- Improve windows installer [\#18649](https://github.com/netdata/netdata/pull/18649) ([thiagoftsm](https://github.com/thiagoftsm))
-- fixed freebsd cpu calculation [\#18648](https://github.com/netdata/netdata/pull/18648) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#18647](https://github.com/netdata/netdata/pull/18647) ([netdatabot](https://github.com/netdatabot))
-- Use temporary file for commit date check. [\#18646](https://github.com/netdata/netdata/pull/18646) ([Ferroin](https://github.com/Ferroin))
-- Reorganize top-level headers in libnetdata. [\#18643](https://github.com/netdata/netdata/pull/18643) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
