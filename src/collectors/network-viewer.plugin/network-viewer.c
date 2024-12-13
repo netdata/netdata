@@ -960,6 +960,7 @@ close_and_send:
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
     nd_thread_tag_set("NETWORK-VIEWER");
     nd_log_initialize_for_external_plugins("network-viewer.plugin");
+    netdata_threads_init_for_external_plugins(0);
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix(true) == -1) exit(1);

@@ -4006,6 +4006,7 @@ static void ebpf_manage_pid(pid_t pid)
 int main(int argc, char **argv)
 {
     nd_log_initialize_for_external_plugins(NETDATA_EBPF_PLUGIN_NAME);
+    netdata_threads_init_for_external_plugins(0);
 
     ebpf_set_global_variables();
     if (ebpf_can_plugin_load_code(running_on_kernel, NETDATA_EBPF_PLUGIN_NAME))
