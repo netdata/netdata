@@ -1235,9 +1235,12 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     struct completion completion = {};
     completion_init(&completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+
+    netdata_log_info("DBENGINE: waiting shutdown of tier %d", ctx->config.tier);
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
+    netdata_log_info("DBENGINE: finalizing files of tier %d", ctx->config.tier);
     finalize_rrd_files(ctx);
 
     if (unittest_running) //(ctx->config.unittest)

@@ -63,6 +63,12 @@ void cancel_main_threads(void) {
     static_threads = NULL;
 }
 
+static void *rrdeng_exit_background(void *ptr) {
+    struct rrdengine_instance *ctx = ptr;
+    rrdeng_exit(ctx);
+    return NULL;
+}
+
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
     netdata_exit = 1;
 
@@ -223,9 +229,14 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
             }
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
 
+            ND_THREAD *th[storage_tiers];
             for (size_t tier = 0; tier < storage_tiers; tier++)
-                rrdeng_exit(multidb_ctx[tier]);
-            rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+                th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_JOINABLE, rrdeng_exit_background, multidb_ctx[tier]);
+
+            for (size_t tier = 0; tier < storage_tiers; tier++)
+                nd_thread_join(th[tier]);
+
+            rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
         else {
