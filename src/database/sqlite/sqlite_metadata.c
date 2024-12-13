@@ -448,7 +448,8 @@ struct node_instance_list *get_node_list(void)
                 continue;
 
             if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
-                netdata_log_info(
+                nd_log_limit_static_global_var(erl, 1, 0);
+                nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
                     "ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
                 continue;
             }
