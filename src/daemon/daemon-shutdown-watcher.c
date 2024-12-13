@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "watcher.h"
+#include "daemon-shutdown-watcher.h"
 
 watcher_step_t *watcher_steps;
 
@@ -55,13 +55,13 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
         step_duration_txt, sizeof(step_duration_txt), (int64_t)(step_duration), "us", true);
 
     if (ok) {
-        netdata_log_info("shutdown step: [%d/%d] - {at %s} '%s' finished in %s",
+        netdata_log_info("shutdown step: [%d/%d] - {at %s} finished '%s' in %s",
                          (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
                          watcher_steps[step_id].msg, step_duration_txt);
     } else {
         // Do not call fatal() because it will try to execute the exit
         // sequence twice.
-        netdata_log_error("shutdown step: [%d/%d] - {at %s} '%s' takes too long (%s) - giving up...",
+        netdata_log_error("shutdown step: [%d/%d] - {at %s} timeout '%s' takes too long (%s) - giving up...",
                           (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
                           watcher_steps[step_id].msg, step_duration_txt);
 

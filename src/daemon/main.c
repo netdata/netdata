@@ -2,7 +2,7 @@
 
 #include "common.h"
 #include "buildinfo.h"
-#include "daemon/watcher.h"
+#include "daemon/daemon-shutdown-watcher.h"
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
 

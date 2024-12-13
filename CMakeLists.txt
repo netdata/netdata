@@ -1051,8 +1051,8 @@ set(DAEMON_FILES
         src/daemon/signals.c
         src/daemon/signals.h
         src/daemon/service.c
-        src/daemon/watcher.c
-        src/daemon/watcher.h
+        src/daemon/daemon-shutdown-watcher.c
+        src/daemon/daemon-shutdown-watcher.h
         src/daemon/static_threads.c
         src/daemon/static_threads.h
         src/daemon/commands.c
