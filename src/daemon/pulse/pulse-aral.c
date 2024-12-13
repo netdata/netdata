@@ -89,7 +89,6 @@ void pulse_aral_do(bool extended) {
 
         size_t allocated_total = malloc_allocated_bytes + mmap_allocated_bytes;
         size_t used_total = malloc_used_bytes + mmap_used_bytes;
-        size_t free_total = malloc_free_bytes + mmap_free_bytes;
 
         size_t structures_bytes = __atomic_load_n(&stats->structures.allocated_bytes, __ATOMIC_RELAXED);
 

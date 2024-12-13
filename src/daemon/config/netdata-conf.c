@@ -2,6 +2,8 @@
 
 #include "netdata-conf.h"
 
+struct config netdata_config = APPCONFIG_INITIALIZER;
+
 bool netdata_conf_load(char *filename, char overwrite_used, const char **user) {
     static bool run = false;
     if(run) return false;

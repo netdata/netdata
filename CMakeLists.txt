@@ -1114,6 +1114,10 @@ set(DAEMON_FILES
         src/daemon/config/netdata-conf-global.c
         src/daemon/config/netdata-conf-global.h
         src/daemon/config/netdata-conf.c
+        src/daemon/daemon-shutdown.c
+        src/daemon/daemon-shutdown.h
+        src/daemon/daemon-service.c
+        src/daemon/daemon-service.h
 )
 
 set(H2O_FILES
