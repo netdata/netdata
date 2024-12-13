@@ -8,6 +8,10 @@
 
 #include <curl/curl.h>
 
+#ifdef ENABLE_SENTRY
+#include "sentry-native/sentry-native.h"
+#endif
+
 void web_client_cache_destroy(void);
 
 extern struct netdata_static_thread *static_threads;
