@@ -1125,9 +1125,6 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     netdata_log_info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
 }
 
-void rrdeng_exit_mode(struct rrdengine_instance *ctx) {
-    __atomic_store_n(&ctx->quiesce.exit_mode, true, __ATOMIC_RELAXED);
-}
 /*
  * Returns 0 on success, negative on error
  */
@@ -1247,14 +1244,13 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     return 0;
 }
 
-void rrdeng_prepare_exit(struct rrdengine_instance *ctx) {
+void rrdeng_quiesce(struct rrdengine_instance *ctx) {
     if (NULL == ctx)
         return;
 
     // FIXME - ktsaou - properly cleanup ctx
     // 1. make sure all collectors are stopped
 
-    completion_init(&ctx->quiesce.completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 

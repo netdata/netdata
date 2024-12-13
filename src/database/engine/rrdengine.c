@@ -1314,7 +1314,6 @@ static void after_flush_all_hot_and_dirty_pages_of_section(struct rrdengine_inst
 static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(UV_EVENT_DBENGINE_QUIESCE);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
-    completion_mark_complete(&ctx->quiesce.completion);
 
     for(size_t i = 0; i < pgc_max_flushers() ; i++)
         rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);

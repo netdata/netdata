@@ -448,7 +448,6 @@ struct rrdengine_instance {
     struct {
         bool exit_mode;
         bool enabled;                               // when set (before shutdown), queries are prohibited
-        struct completion completion;
     } quiesce;
 
     struct {

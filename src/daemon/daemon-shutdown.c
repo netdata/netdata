@@ -69,10 +69,73 @@ static void *rrdeng_exit_background(void *ptr) {
     return NULL;
 }
 
-void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
-    nd_log_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
+#ifdef ENABLE_DBENGINE
+static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors) {
+    static size_t starting_size_to_flush = 0;
 
+    if(!pgc_hot_and_dirty_entries(main_cache))
+        return;
+
+    nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE dirty pages...");
+    for (size_t tier = 0; tier < storage_tiers; tier++)
+        rrdeng_quiesce(multidb_ctx[tier]);
+
+    struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
+    size_t size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
+    if(size_to_flush > starting_size_to_flush || !starting_size_to_flush)
+        starting_size_to_flush = size_to_flush;
+
+    if(wait_collectors) {
+        size_t running = 1;
+        size_t count = 10;
+        while (running && count) {
+            running = 0;
+            for (size_t tier = 0; tier < storage_tiers; tier++)
+                running += rrdeng_collectors_running(multidb_ctx[tier]);
+
+            if (running) {
+                nd_log_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
+                nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE, "waiting for %zu collectors to finish", running);
+            }
+            count--;
+        }
+    }
+
+    if(!wait_flush)
+        return;
+
+    for(size_t iterations = 0; true ;iterations++) {
+        pgc_main_stats = pgc_get_statistics(main_cache);
+        size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
+        if(!starting_size_to_flush || size_to_flush > starting_size_to_flush)
+            starting_size_to_flush = size_to_flush;
+
+        if(!size_to_flush)
+            break;
+
+        if(iterations % 10 == 0) {
+            char hot[64], dirty[64];
+            size_snprintf(hot, sizeof(hot), pgc_main_stats.queues[PGC_QUEUE_HOT].size, "B", false);
+            size_snprintf(dirty, sizeof(hot), pgc_main_stats.queues[PGC_QUEUE_DIRTY].size, "B", false);
+
+            nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE: flushing at %.2f%% { hot: %s, dirty: %s }...",
+                   (double)size_to_flush * 100.0 / (double)starting_size_to_flush,
+                   hot, dirty);
+        }
+        sleep_usec(100 * USEC_PER_MS);
+    }
+    nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE: flushing completed!");
+}
+#endif
+
+void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
     netdata_exit = 1;
+
+#ifdef ENABLE_DBENGINE
+    if(!ret && dbengine_enabled)
+        // flush all dirty pages asap
+        rrdeng_flush_everything_and_wait(false, false);
+#endif
 
     usec_t shutdown_start_time = now_monotonic_usec();
     watcher_shutdown_begin();
@@ -98,12 +161,6 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     netdata_main_spawn_server_cleanup();
     watcher_step_complete(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER);
 
-#ifdef ENABLE_DBENGINE
-    if(dbengine_enabled) {
-        for (size_t tier = 0; tier < storage_tiers; tier++)
-            rrdeng_exit_mode(multidb_ctx[tier]);
-    }
-#endif
     watcher_step_complete(WATCHER_STEP_ID_DBENGINE_EXIT_MODE);
 
     webrtc_close_all_connections();
@@ -122,6 +179,12 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     stream_threads_cancel();
     service_wait_exit(SERVICE_COLLECTORS | SERVICE_STREAMING, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS);
+
+#ifdef ENABLE_DBENGINE
+    if(!ret && dbengine_enabled)
+        // flush all dirty pages now that all collectors and streaming completed
+        rrdeng_flush_everything_and_wait(false, false);
+#endif
 
     service_wait_exit(SERVICE_REPLICATION, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_REPLICATION_THREADS);
@@ -150,116 +213,29 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
     if (ret)
     {
-        watcher_step_complete(WATCHER_STEP_ID_FLUSH_DBENGINE_TIERS);
         watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
         watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
-        watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
         watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
     else
     {
         // exit cleanly
-
-#ifdef ENABLE_DBENGINE
-        if(dbengine_enabled) {
-            nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE dirty pages...");
-            for (size_t tier = 0; tier < storage_tiers; tier++)
-                rrdeng_prepare_exit(multidb_ctx[tier]);
-
-            struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
-            nd_log(NDLS_DAEMON, NDLP_INFO, "Waiting for DBENGINE to commit unsaved data to disk (%zu pages, %zu bytes)...",
-                   pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries,
-                   pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size);
-
-            bool finished_tiers[RRD_STORAGE_TIERS] = { 0 };
-            size_t waiting_tiers, iterations = 0;
-            do {
-                waiting_tiers = 0;
-                iterations++;
-
-                for (size_t tier = 0; tier < storage_tiers; tier++) {
-                    if (!multidb_ctx[tier] || finished_tiers[tier])
-                        continue;
-
-                    waiting_tiers++;
-                    if (completion_timedwait_for(&multidb_ctx[tier]->quiesce.completion, 1)) {
-                        completion_destroy(&multidb_ctx[tier]->quiesce.completion);
-                        finished_tiers[tier] = true;
-                        waiting_tiers--;
-                        nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE tier %zu flushed dirty pages!", tier);
-                    }
-                    else if(iterations % 10 == 0) {
-                        pgc_main_stats = pgc_get_statistics(main_cache);
-                        nd_log(NDLS_DAEMON, NDLP_INFO,
-                               "Still waiting for DBENGINE tier %zu to flush its dirty pages "
-                               "(cache pages { hot: %zu, dirty: %zu }, size { hot: %zu, dirty: %zu })...",
-                               tier,
-                               pgc_main_stats.queues[PGC_QUEUE_HOT].entries, pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries,
-                               pgc_main_stats.queues[PGC_QUEUE_HOT].size, pgc_main_stats.queues[PGC_QUEUE_DIRTY].size);
-                    }
-                }
-            } while(waiting_tiers);
-            nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE flushing of dirty pages completed...");
-        }
-#endif
-        watcher_step_complete(WATCHER_STEP_ID_FLUSH_DBENGINE_TIERS);
-
         rrd_finalize_collection_for_all_hosts();
         watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
 
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
-            size_t running = 1;
-            size_t count = 10;
-            while(running && count) {
-                running = 0;
-                for (size_t tier = 0; tier < storage_tiers; tier++)
-                    running += rrdeng_collectors_running(multidb_ctx[tier]);
-
-                if (running) {
-                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE, "waiting for %zu collectors to finish", running);
-                }
-                count--;
-            }
+            // flush anything remaining and wait for collectors to finish
+            rrdeng_flush_everything_and_wait(true, true);
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
-
-            while (pgc_hot_and_dirty_entries(main_cache)) {
-                pgc_flush_all_hot_and_dirty_pages(main_cache, PGC_SECTION_ALL);
-                sleep_usec(100 * USEC_PER_MS);
-            }
-            watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
 
             ND_THREAD *th[storage_tiers];
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_JOINABLE, rrdeng_exit_background, multidb_ctx[tier]);
 
-            size_t iterations = 0;
-            do {
-                struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
-                if(iterations % 10 == 0)
-                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
-                                 "DBENGINE flushing threads currently running: %zu "
-                                 "(cache pages { hot: %zu, dirty: %zu }, size { hot: %zu, dirty: %zu })...",
-                                 pgc_main_stats.workers_flush,
-                                 pgc_main_stats.queues[PGC_QUEUE_HOT].entries, pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries,
-                                 pgc_main_stats.queues[PGC_QUEUE_HOT].size, pgc_main_stats.queues[PGC_QUEUE_DIRTY].size);
-
-                if(!pgc_main_stats.workers_flush)
-                        break;
-                else
-                    yield_the_processor();
-
-                iterations++;
-            } while(true);
-
-            struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
-            nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
-                         "DBENGINE flushing threads currently running: %zu "
-                         "(cache pages { hot: %zu, dirty: %zu }, size { hot: %zu, dirty: %zu })...",
-                         pgc_main_stats.workers_flush,
-                         pgc_main_stats.queues[PGC_QUEUE_HOT].entries, pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries,
-                         pgc_main_stats.queues[PGC_QUEUE_HOT].size, pgc_main_stats.queues[PGC_QUEUE_DIRTY].size);
+            // flush anything remaining again - just in case
+            rrdeng_flush_everything_and_wait(true, false);
 
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 nd_thread_join(th[tier]);
@@ -270,13 +246,11 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
         else {
             // Skip these steps
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
-            watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
 #else
         // Skip these steps
         watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
-        watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
         watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
 #endif
 
