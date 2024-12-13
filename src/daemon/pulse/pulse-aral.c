@@ -60,6 +60,7 @@ void pulse_aral_unregister(ARAL *ar) {
 
 void pulse_aral_init(void) {
     pulse_aral_register_statistics(aral_by_size_statistics(), "by-size");
+    pulse_aral_register_statistics(judy_aral_statistics(), "judy");
 }
 
 void pulse_aral_do(bool extended) {

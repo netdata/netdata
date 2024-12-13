@@ -7,6 +7,7 @@
 
 size_t judy_aral_free_bytes(void);
 size_t judy_aral_structures(void);
+struct aral_statistics *judy_aral_statistics(void);
 
 void JudyAllocThreadPulseReset(void);
 int64_t JudyAllocThreadPulseGetAndReset(void);
