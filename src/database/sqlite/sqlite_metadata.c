@@ -2177,7 +2177,7 @@ static void metadata_event_loop(void *arg)
                         cmd.completion = NULL;          // Do not complete after launching worker (worker will do)
                     }
                     else
-                        data->max_count = 50000;
+                        data->max_count = 5000;
 
                     metadata_flag_set(wc, METADATA_FLAG_PROCESSING);
                     if (uv_queue_work(loop, &data->request, start_metadata_hosts, after_metadata_hosts)) {

@@ -124,8 +124,6 @@ static void exporting_main_cleanup(void *pptr)
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    netdata_log_info("cleaning up...");
-
     if (!engine) {
         static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
         return;

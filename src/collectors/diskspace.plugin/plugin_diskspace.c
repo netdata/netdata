@@ -516,8 +516,6 @@ static void diskspace_slow_worker_cleanup(void *pptr) {
     struct slow_worker_data *data = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(data) return;
 
-    collector_info("cleaning up...");
-
     worker_unregister();
 }
 
@@ -607,8 +605,6 @@ static void diskspace_main_cleanup(void *pptr) {
     if(!static_thread) return;
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-
-    collector_info("cleaning up...");
 
     rrd_collector_finished();
     worker_unregister();

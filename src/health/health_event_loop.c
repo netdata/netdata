@@ -694,7 +694,6 @@ static void health_main_cleanup(void *pptr) {
 
     worker_unregister();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-    netdata_log_info("cleaning up...");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Health thread ended.");

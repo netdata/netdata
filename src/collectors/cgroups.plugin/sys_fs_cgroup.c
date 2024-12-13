@@ -1327,7 +1327,6 @@ static void cgroup_main_cleanup(void *pptr) {
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    collector_info("cleaning up...");
     worker_unregister();
 
     usec_t max = 2 * USEC_PER_SEC, step = 50000;

@@ -1685,8 +1685,6 @@ static void netdev_main_cleanup(void *pptr) {
     if(CLEANUP_FUNCTION_GET_PTR(pptr) != (void *)0x01)
         return;
 
-    collector_info("cleaning up...");
-
     worker_unregister();
 }
 
