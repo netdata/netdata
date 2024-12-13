@@ -1228,15 +1228,12 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
         count--;
     }
 
-    netdata_log_info("DBENGINE: flushing main cache for tier %d", ctx->config.tier);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
 
-    netdata_log_info("DBENGINE: shutting down tier %d", ctx->config.tier);
     struct completion completion = {};
     completion_init(&completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
 
-    netdata_log_info("DBENGINE: waiting shutdown of tier %d", ctx->config.tier);
     completion_wait_for(&completion);
     completion_destroy(&completion);
 

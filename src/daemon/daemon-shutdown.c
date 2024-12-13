@@ -236,9 +236,8 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
             size_t iterations = 0;
             do {
-                iterations++;
                 struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
-                if(iterations % 1000 == 0)
+                if(iterations % 10 == 0)
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
                                  "DBENGINE flushing threads currently running: %zu "
                                  "(cache pages { hot: %zu, dirty: %zu }, size { hot: %zu, dirty: %zu })...",
@@ -250,6 +249,8 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
                         break;
                 else
                     yield_the_processor();
+
+                iterations++;
             } while(true);
 
             for (size_t tier = 0; tier < storage_tiers; tier++)
