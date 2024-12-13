@@ -380,7 +380,7 @@ inline MRG *mrg_create(ssize_t partitions) {
 
         mrg->index[i].aral = aral_create(buf, sizeof(METRIC), 0, 16384, &mrg_aral_statistics, NULL, NULL, false, false);
     }
-    pulse_aral_register(mrg->index[0].aral, "mrg");
+    pulse_aral_register_statistics(&mrg_aral_statistics, "mrg");
 
     return mrg;
 }

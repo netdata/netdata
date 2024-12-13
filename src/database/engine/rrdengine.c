@@ -265,7 +265,7 @@ void page_descriptors_init(void) {
             NULL,
             NULL, NULL, false, false);
 
-    pulse_aral_register(rrdeng_main.xt_io_descr.ar, "descriptors");
+    pulse_aral_register(rrdeng_main.descriptors.ar, "descriptors");
 }
 
 struct page_descr_with_data *page_descriptor_get(void) {
