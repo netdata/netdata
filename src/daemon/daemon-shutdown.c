@@ -113,13 +113,15 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
         if(!size_to_flush)
             break;
 
+        size_t flushed = starting_size_to_flush - size_to_flush;
+
         if(iterations % 10 == 0) {
             char hot[64], dirty[64];
             size_snprintf(hot, sizeof(hot), pgc_main_stats.queues[PGC_QUEUE_HOT].size, "B", false);
             size_snprintf(dirty, sizeof(hot), pgc_main_stats.queues[PGC_QUEUE_DIRTY].size, "B", false);
 
             nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE: flushing at %.2f%% { hot: %s, dirty: %s }...",
-                   (double)size_to_flush * 100.0 / (double)starting_size_to_flush,
+                   (double)flushed * 100.0 / (double)starting_size_to_flush,
                    hot, dirty);
         }
         sleep_usec(100 * USEC_PER_MS);
