@@ -586,7 +586,9 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         logged = false;
         bool available = false;
         do {
+            netdata_log_info("Acquiring datafiles write lock");
             uv_rwlock_wrlock(&ctx->datafiles.rwlock);
+            netdata_log_info("Acquiring datafile %u writers spinlock", datafile->fileno);
             spinlock_lock(&datafile->writers.spinlock);
             available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
 
