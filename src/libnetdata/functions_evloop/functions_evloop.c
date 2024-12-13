@@ -151,7 +151,8 @@ static void worker_add_job(struct functions_evloop_globals *wg, const char *keyw
                function?function:"(unset)");
     }
     else {
-        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "WORKER JOB WITH PAYLOAD '%s'", payload ? buffer_tostring(payload) : "NONE");
+//        nd_log(NDLS_COLLECTORS, NDLP_INFO, "WORKER JOB: keyword '%s', transaction '%s', function '%s', timeout '%s', access '%s', source '%s', payload '%s'",
+//               keyword, transaction, function, timeout_s, access, source, payload ? buffer_tostring(payload) : "NONE");
 
         int timeout = str2i(timeout_s);
 
@@ -202,8 +203,6 @@ static void worker_add_job(struct functions_evloop_globals *wg, const char *keyw
 }
 
 static bool rrd_function_worker_global_process_input(struct functions_evloop_globals *wg) {
-    char *words[MAX_FUNCTION_PARAMETERS] = { NULL };
-
     if(wg->deferred.enabled) {
         char *s = (char *)buffer_tostring(wg->buffer);
 
@@ -217,8 +216,8 @@ static bool rrd_function_worker_global_process_input(struct functions_evloop_glo
             s[wg->deferred.last_len] = '\0';
             wg->buffer->len = wg->deferred.last_len;
             wg->buffer->content_type = content_type_string2id(wg->deferred.content_type);
-            worker_add_job(wg,
-                           PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN, wg->deferred.transaction, wg->deferred.function,
+            worker_add_job(wg, PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN,
+                           wg->deferred.transaction, wg->deferred.function,
                            wg->deferred.timeout_s, wg->buffer, wg->deferred.access, wg->deferred.source);
             buffer_flush(wg->buffer);
 
@@ -236,11 +235,11 @@ static bool rrd_function_worker_global_process_input(struct functions_evloop_glo
         return false;
     }
 
-    size_t num_words = quoted_strings_splitter_whitespace((char *)buffer_tostring(wg->buffer), words, _countof(words));
-    const char *keyword = get_word(words, num_words, 0);
+    size_t num_words = quoted_strings_splitter_whitespace((char *)buffer_tostring(wg->buffer), wg->words, _countof(wg->words));
+    const char *keyword = get_word(wg->words, num_words, 0);
 
+    char **words = wg->words;
     if(keyword && (strcmp(keyword, PLUGINSD_CALL_FUNCTION) == 0)) {
-        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "FUNCTION CALL");
         char *transaction = get_word(words, num_words, 1);
         char *timeout_s = get_word(words, num_words, 2);
         char *function = get_word(words, num_words, 3);
@@ -249,7 +248,6 @@ static bool rrd_function_worker_global_process_input(struct functions_evloop_glo
         worker_add_job(wg, keyword, transaction, function, timeout_s, NULL, access, source);
     }
     else if(keyword && (strcmp(keyword, PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN) == 0)) {
-        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "FUNCTION PAYLOAD CALL");
         char *transaction = get_word(words, num_words, 1);
         char *timeout_s = get_word(words, num_words, 2);
         char *function = get_word(words, num_words, 3);
@@ -267,7 +265,6 @@ static bool rrd_function_worker_global_process_input(struct functions_evloop_glo
         wg->deferred.enabled = true;
     }
     else if(keyword && strcmp(keyword, PLUGINSD_CALL_FUNCTION_CANCEL) == 0) {
-        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "FUNCTION CANCEL");
         char *transaction = get_word(words, num_words, 1);
         const DICTIONARY_ITEM *acquired = dictionary_get_and_acquire_item(wg->worker_queue, transaction);
         if(acquired) {
@@ -281,7 +278,6 @@ static bool rrd_function_worker_global_process_input(struct functions_evloop_glo
             nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received CANCEL for transaction '%s', but it not available here", transaction);
     }
     else if(keyword && strcmp(keyword, PLUGINSD_CALL_FUNCTION_PROGRESS) == 0) {
-        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "FUNCTION PROGRESS");
         char *transaction = get_word(words, num_words, 1);
         const DICTIONARY_ITEM *acquired = dictionary_get_and_acquire_item(wg->worker_queue, transaction);
         if(acquired) {
@@ -300,6 +296,8 @@ static bool rrd_function_worker_global_process_input(struct functions_evloop_glo
     }
     else
         nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received unknown command: %s", keyword ? keyword : "(unset)");
+
+    buffer_flush(wg->buffer);
 
     return false;
 }
@@ -327,8 +325,6 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
 
         if(rrd_function_worker_global_process_input(wg))
             break;
-
-        buffer_flush(wg->buffer);
     }
 
     int status = 0;
