@@ -265,7 +265,7 @@ void page_descriptors_init(void) {
             NULL,
             NULL, NULL, false, false);
 
-    pulse_aral_register(rrdeng_main.xt_io_descr.ar, "descriptors");
+    pulse_aral_register(rrdeng_main.descriptors.ar, "descriptors");
 }
 
 struct page_descr_with_data *page_descriptor_get(void) {
@@ -1314,7 +1314,10 @@ static void after_flush_all_hot_and_dirty_pages_of_section(struct rrdengine_inst
 static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(UV_EVENT_DBENGINE_QUIESCE);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
-    completion_mark_complete(&ctx->quiesce.completion);
+
+    for(size_t i = 0; i < pgc_max_flushers() ; i++)
+        rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+
     return data;
 }
 
@@ -1497,6 +1500,10 @@ void epdl_populate_pages_synchronously(struct rrdengine_instance *ctx, EPDL *epd
 
 void pdc_route_synchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
     pdc_to_epdl_router(ctx, pdc, epdl_populate_pages_synchronously, epdl_populate_pages_synchronously);
+}
+
+void pdc_route_synchronously_first(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
+    pdc_to_epdl_router(ctx, pdc, epdl_populate_pages_synchronously, epdl_populate_pages_asynchronously);
 }
 
 #define MAX_RETRIES_TO_START_INDEX (100)

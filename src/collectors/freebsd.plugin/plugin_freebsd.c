@@ -78,7 +78,6 @@ static void freebsd_main_cleanup(void *pptr)
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    collector_info("cleaning up...");
     worker_unregister();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;

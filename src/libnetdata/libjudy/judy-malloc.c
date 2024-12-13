@@ -42,6 +42,10 @@ size_t judy_aral_structures(void) {
     return aral_structures_bytes_from_stats(&judy_sizes_aral_statistics);
 }
 
+struct aral_statistics *judy_aral_statistics(void) {
+    return &judy_sizes_aral_statistics;
+}
+
 static ARAL *judy_size_aral(Word_t Words) {
     if(Words <= MAX_JUDY_SIZE_TO_ARAL && judy_sizes_aral[Words])
         return judy_sizes_aral[Words];

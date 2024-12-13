@@ -200,7 +200,7 @@ void pgd_init_arals(void) {
     pgd_alloc_globals.sizeof_gorilla_writer_t = aral_actual_element_size(pgd_alloc_globals.aral_gorilla_writer[0]);
     pgd_alloc_globals.sizeof_gorilla_buffer_32bit = aral_actual_element_size(pgd_alloc_globals.aral_gorilla_buffer[0]);
 
-    pulse_aral_register(pgd_alloc_globals.aral_pgd[0], "pgd");
+    pulse_aral_register_statistics(&pgd_aral_statistics, "pgd");
 }
 
 static ARAL *pgd_get_aral_by_size_and_partition(size_t size, size_t partition) {

@@ -845,8 +845,6 @@ static void tc_main_cleanup(void *pptr) {
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    collector_info("cleaning up...");
-
     if(tc_child_instance) {
         collector_info("TC: stopping the running tc-qos-helper script");
         int code = spawn_popen_wait(tc_child_instance); (void)code;

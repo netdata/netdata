@@ -227,6 +227,7 @@ void reset_metrics() {
 
 int main(int argc, char **argv) {
     nd_log_initialize_for_external_plugins("cups.plugin");
+    netdata_threads_init_for_external_plugins(0);
 
     parse_command_line(argc, argv);
 

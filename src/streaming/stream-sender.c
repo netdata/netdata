@@ -619,6 +619,8 @@ void stream_sender_cleanup(struct stream_thread *sth) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
+        s->exit.reason = STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN;
+        s->exit.shutdown = true;
         stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
     }
 }

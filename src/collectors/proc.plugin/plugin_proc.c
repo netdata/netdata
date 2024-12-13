@@ -94,8 +94,6 @@ static void proc_main_cleanup(void *pptr)
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    collector_info("cleaning up...");
-
     nd_thread_join(netdev_thread);
     worker_unregister();
 

@@ -55,7 +55,6 @@ static void pulse_cleanup(void *pptr)
 
     pulse_workers_cleanup();
     worker_unregister();
-    netdata_log_info("cleaning up...");
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
@@ -157,8 +156,6 @@ static void pulse_thread_sqlite3_cleanup(void *pptr)
         return;
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-
-    netdata_log_info("cleaning up...");
 
     worker_unregister();
 

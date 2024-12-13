@@ -376,13 +376,19 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
     return PARSER_RC_OK;
 }
 
-static void backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, struct backfill_request_data *brd) {
+static bool backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, struct backfill_request_data *brd) {
     if(!rrdhost_state_acquire(brd->host, brd->rrdhost_receiver_state_id))
-        return;
+        return false;
 
-    if (!replicate_chart_request(send_to_plugin, brd->parser, brd->host, brd->st,
-                                 brd->first_entry_child, brd->last_entry_child, brd->child_wall_clock_time,
-                                 0, 0)) {
+    bool rc = replicate_chart_request(send_to_plugin, brd->parser, brd->host, brd->st,
+                                      brd->first_entry_child, brd->last_entry_child, brd->child_wall_clock_time,
+                                      0, 0);
+    if (rc) {
+        rrdset_flag_set(brd->st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
+        rrdset_flag_clear(brd->st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        rrdhost_receiver_replicating_charts_plus_one(brd->st->rrdhost);
+    }
+    else {
         netdata_log_error(
             "PLUGINSD: 'host:%s' failed to initiate replication for 'chart:%s'",
             rrdhost_hostname(brd->host),
@@ -390,6 +396,7 @@ static void backfill_callback(size_t successful_dims __maybe_unused, size_t fail
     }
 
     rrdhost_state_release(brd->host);
+    return rc;
 }
 
 static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *parser) {
@@ -416,10 +423,6 @@ static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_w
         st->replay.before = 0;
 #endif
 
-        rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
-        rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
-        rrdhost_receiver_replicating_charts_plus_one(st->rrdhost);
-
         struct backfill_request_data brd = {
             .rrdhost_receiver_state_id = rrdhost_state_id(host),
             .parser = parser,
@@ -432,8 +435,7 @@ static inline PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_w
 
         ok = backfill_request_add(st, backfill_callback, &brd);
         if(!ok)
-            ok = replicate_chart_request(
-                send_to_plugin, parser, host, st, first_entry_child, last_entry_child, child_wall_clock_time, 0, 0);
+            ok = backfill_callback(0, 0, &brd);
     }
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     else {

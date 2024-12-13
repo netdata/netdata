@@ -549,10 +549,6 @@ void stream_connector_add(struct sender_state *s) {
 }
 
 static void stream_connector_remove(struct sender_state *s) {
-    nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "STREAM CONNECT '%s' [stopped]: stopped streaming connector for host, reason: %s",
-           rrdhost_hostname(s->host), stream_handshake_error_to_string(s->exit.reason));
-
     struct connector *sc = stream_connector_get(s);
     __atomic_sub_fetch(&sc->nodes, 1, __ATOMIC_RELAXED);
 

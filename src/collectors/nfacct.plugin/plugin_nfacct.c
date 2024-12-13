@@ -748,6 +748,7 @@ void nfacct_signals()
 
 int main(int argc, char **argv) {
     nd_log_initialize_for_external_plugins("nfacct.plugin");
+    netdata_threads_init_for_external_plugins(0);
 
     // ------------------------------------------------------------------------
     // parse command line parameters

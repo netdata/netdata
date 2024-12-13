@@ -19,7 +19,7 @@ static struct {
     ARAL_STATS_JudyLSet idx;
 } globals = { 0 };
 
-static void pulse_aral_register_statistics(struct aral_statistics *stats, const char *name) {
+void pulse_aral_register_statistics(struct aral_statistics *stats, const char *name) {
     if(!name || !stats)
         return;
 
@@ -60,6 +60,7 @@ void pulse_aral_unregister(ARAL *ar) {
 
 void pulse_aral_init(void) {
     pulse_aral_register_statistics(aral_by_size_statistics(), "by-size");
+    pulse_aral_register_statistics(judy_aral_statistics(), "judy");
 }
 
 void pulse_aral_do(bool extended) {
@@ -86,14 +87,17 @@ void pulse_aral_do(bool extended) {
             mmap_allocated_bytes = mmap_used_bytes;
         size_t mmap_free_bytes = mmap_allocated_bytes - mmap_used_bytes;
 
+        size_t allocated_total = malloc_allocated_bytes + mmap_allocated_bytes;
+        size_t used_total = malloc_used_bytes + mmap_used_bytes;
+
         size_t structures_bytes = __atomic_load_n(&stats->structures.allocated_bytes, __ATOMIC_RELAXED);
 
         size_t padding_bytes = __atomic_load_n(&stats->malloc.padding_bytes, __ATOMIC_RELAXED) +
                                __atomic_load_n(&stats->mmap.padding_bytes, __ATOMIC_RELAXED);
 
         NETDATA_DOUBLE utilization;
-        if((malloc_used_bytes + mmap_used_bytes != 0) && (malloc_allocated_bytes + mmap_allocated_bytes != 0))
-            utilization = 100.0 * (NETDATA_DOUBLE)(malloc_used_bytes + mmap_used_bytes) / (NETDATA_DOUBLE)(malloc_allocated_bytes + mmap_allocated_bytes);
+        if(allocated_total)
+            utilization = 100.0 * (NETDATA_DOUBLE)used_total / (NETDATA_DOUBLE)allocated_total;
         else
             utilization = 100.0;
 
@@ -160,10 +164,10 @@ void pulse_aral_do(bool extended) {
 
                 rrdlabels_add(ai->st_utilization->rrdlabels, "ARAL", ai->name, RRDLABEL_SRC_AUTO);
 
-                ai->rd_utilization = rrddim_add(ai->st_utilization, "utilization", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+                ai->rd_utilization = rrddim_add(ai->st_utilization, "utilization", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
             }
 
-            rrddim_set_by_pointer(ai->st_utilization, ai->rd_utilization, (collected_number)(utilization * 10000.0));
+            rrddim_set_by_pointer(ai->st_utilization, ai->rd_utilization, (collected_number)utilization * 1000LL);
             rrdset_done(ai->st_utilization);
         }
     }

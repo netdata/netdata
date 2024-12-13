@@ -346,6 +346,7 @@ void usage(void) {
 
 int main(int argc, char **argv) {
     nd_log_initialize_for_external_plugins("slabinfo.plugin");
+    netdata_threads_init_for_external_plugins(0);
 
     program_name = argv[0];
     int update_every = 1, i, n, freq = 0;

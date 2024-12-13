@@ -660,39 +660,31 @@ static void health_event_loop(void) {
             health_alarm_log_process_to_send_notifications(host, hrm);
             alerts_raised_summary_free(hrm);
 
-            if (unlikely(!service_running(SERVICE_HEALTH))) {
-                // wait for all notifications to finish before allowing health to be cleaned up
-                wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up();
-                break;
-            }
-        }
+            int32_t pending = __atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED);
+            if (pending)
+                commit_alert_transitions(host);
 
-        int32_t pending = __atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED);
-        if (pending)
-            commit_alert_transitions(host);
-
-        if (!__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED)) {
-            struct aclk_sync_cfg_t *wc = host->aclk_config;
-            if (wc && wc->send_snapshot == 1) {
-                wc->send_snapshot = 2;
-                rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-            } else {
-                if (process_alert_pending_queue(host))
+            if (!__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED)) {
+                struct aclk_sync_cfg_t *wc = host->aclk_config;
+                if (wc && wc->send_snapshot == 1) {
+                    wc->send_snapshot = 2;
                     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+                } else {
+                    if (process_alert_pending_queue(host))
+                        rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+                }
             }
         }
-
         dfe_done(host);
-
-        // wait for all notifications to finish before allowing health to be cleaned up
-        wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up();
 
         if(unlikely(!service_running(SERVICE_HEALTH)))
             break;
 
         health_sleep(next_run, loop);
-
     } // forever
+
+    // wait for all notifications to finish before allowing health to be cleaned up
+    wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up();
 }
 
 
@@ -702,7 +694,6 @@ static void health_main_cleanup(void *pptr) {
 
     worker_unregister();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-    netdata_log_info("cleaning up...");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Health thread ended.");
@@ -716,8 +707,8 @@ void *health_main(void *ptr) {
     worker_register_job_name(WORKER_HEALTH_JOB_CALC_EVAL, "calc eval");
     worker_register_job_name(WORKER_HEALTH_JOB_WARNING_EVAL, "warning eval");
     worker_register_job_name(WORKER_HEALTH_JOB_CRITICAL_EVAL, "critical eval");
-    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY, "alarm log entry");
-    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS, "alarm log process");
+    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY, "alert log entry");
+    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS, "alert log process");
     worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET, "rrdset init");
     worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM, "rrddim init");
 
