@@ -1189,13 +1189,15 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             max_size_to_evict /= 2; // do it in 2 steps
             if(per1000 >= cache->config.severe_pressure_per1000) {
                 under_sever_pressure = true;
-                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 4096;
-                // max_pages_to_evict = 1;
+                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 512;
+                if(max_pages_to_evict > 4096)
+                    max_pages_to_evict = 4096;
             }
             else if(per1000 >= cache->config.aggressive_evict_per1000) {
                 under_sever_pressure = false;
-                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 128;
-                // max_pages_to_evict = 1;
+                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 32;
+                if(max_pages_to_evict > 1024)
+                    max_pages_to_evict = 1024;
             }
             else {
                 under_sever_pressure = false;
