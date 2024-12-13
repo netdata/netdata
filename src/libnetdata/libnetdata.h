@@ -109,7 +109,6 @@ extern const char *netdata_configured_host_prefix;
 #include "template-enum.h"
 #include "libjudy/vendored/Judy.h"
 #include "libjudy/judyl-typed.h"
-#include "july/july.h"
 
 #include "string/string.h"
 #include "buffer/buffer.h"

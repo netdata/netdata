@@ -801,7 +801,6 @@ int get_system_info(struct rrdhost_system_info *system_info) {
 int buffer_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
-int julytest(void);
 int pluginsd_parser_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
@@ -1045,10 +1044,6 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mrgtest") == 0) {
                             unittest_running = true;
                             return mrg_unittest();
-                        }
-                        else if(strcmp(optarg, "julytest") == 0) {
-                            unittest_running = true;
-                            return julytest();
                         }
                         else if(strcmp(optarg, "parsertest") == 0) {
                             unittest_running = true;

@@ -1601,10 +1601,6 @@ struct rrdeng_buffer_sizes rrdeng_pulse_memory_sizes(void) {
         },
         .wal    = __atomic_load_n(&wal_globals.atomics.allocated, __ATOMIC_RELAXED) * (sizeof(WAL) + RRDENG_BLOCK_SIZE),
         .xt_buf = extent_buffer_cache_size(),
-
-#ifdef PDC_USE_JULYL
-        .julyl  = julyl_cache_size(),
-#endif
     };
 }
 
@@ -1626,10 +1622,6 @@ static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, vo
             journalfile_v2_data_unmount_cleanup(now_s);
         }
     }
-
-#ifdef PDC_USE_JULYL
-    julyl_cleanup1();
-#endif
 
     return data;
 }
