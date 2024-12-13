@@ -1234,7 +1234,6 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
-    netdata_log_info("DBENGINE: finalizing files of tier %d", ctx->config.tier);
     finalize_rrd_files(ctx);
 
     if (unittest_running) //(ctx->config.unittest)
