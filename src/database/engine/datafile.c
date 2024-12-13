@@ -595,7 +595,6 @@ void finalize_data_files(struct rrdengine_instance *ctx)
                              datafile->fileno, datafile->writers.running);
                 yield_the_processor();
             }
-            spinlock_lock(&datafile->writers.spinlock);
             available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
 
             if(!available) {
