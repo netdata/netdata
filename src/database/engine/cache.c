@@ -1186,7 +1186,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         else if(unlikely(wait)) {
             // evict as many as necessary for the cache to go at the predefined threshold
             per1000 = cache_usage_per1000(cache, &max_size_to_evict);
-            max_size_to_evict /= 2; // do it in 2 steps
+            max_size_to_evict /= 3; // do it in 3 steps
             if(per1000 >= cache->config.severe_pressure_per1000) {
                 under_sever_pressure = true;
                 max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 512;
