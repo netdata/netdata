@@ -225,6 +225,7 @@ struct metadata_wc {
     /* FIFO command queue */
     SPINLOCK cmd_queue_lock;
     struct metadata_cmd *cmd_base;
+    ARAL *ar;
 };
 
 #define metadata_flag_check(target_flags, flag) (__atomic_load_n(&((target_flags)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -1490,7 +1491,7 @@ static void metadata_free_cmd_queue(struct metadata_wc *wc)
     while(wc->cmd_base) {
         struct metadata_cmd *t = wc->cmd_base;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_base, t, prev, next);
-        freez(t);
+        aral_freez(wc->ar, t);
     }
     spinlock_unlock(&wc->cmd_queue_lock);
 }
@@ -1505,7 +1506,7 @@ static void metadata_enq_cmd(struct metadata_wc *wc, struct metadata_cmd *cmd)
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
         goto wakeup_event_loop;
 
-    struct metadata_cmd *t = mallocz(sizeof(*t));
+    struct metadata_cmd *t = aral_mallocz(wc->ar);
     *t = *cmd;
     t->prev = t->next = NULL;
 
@@ -1519,20 +1520,22 @@ wakeup_event_loop:
 
 static struct metadata_cmd metadata_deq_cmd(struct metadata_wc *wc)
 {
-    struct metadata_cmd ret;
+    struct metadata_cmd ret, *to_free = NULL;
 
     spinlock_lock(&wc->cmd_queue_lock);
     if(wc->cmd_base) {
         struct metadata_cmd *t = wc->cmd_base;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_base, t, prev, next);
         ret = *t;
-        freez(t);
+        to_free = t;
     }
     else {
         ret.opcode = METADATA_DATABASE_NOOP;
         ret.completion = NULL;
     }
     spinlock_unlock(&wc->cmd_queue_lock);
+
+    aral_freez(wc->ar, to_free);
 
     return ret;
 }
@@ -2063,6 +2066,8 @@ static void metadata_event_loop(void *arg)
     struct metadata_wc *wc = arg;
     enum metadata_opcode opcode;
 
+    wc->ar = aral_by_size_acquire(sizeof(struct metadata_cmd));
+
     uv_thread_set_name_np("METASYNC");
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
@@ -2263,6 +2268,7 @@ error_after_async_init:
     fatal_assert(0 == uv_loop_close(loop));
 error_after_loop_init:
     freez(loop);
+    aral_by_size_release(wc->ar);
     worker_unregister();
 }
 
