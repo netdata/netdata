@@ -1499,6 +1499,10 @@ void pdc_route_synchronously(struct rrdengine_instance *ctx, struct page_details
     pdc_to_epdl_router(ctx, pdc, epdl_populate_pages_synchronously, epdl_populate_pages_synchronously);
 }
 
+void pdc_route_synchronously_first(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
+    pdc_to_epdl_router(ctx, pdc, epdl_populate_pages_synchronously, epdl_populate_pages_asynchronously);
+}
+
 #define MAX_RETRIES_TO_START_INDEX (100)
 static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     unsigned count = 0;

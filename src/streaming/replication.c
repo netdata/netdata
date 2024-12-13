@@ -190,7 +190,7 @@ static struct replication_query *replication_query_prepare(
         d->rd = rd;
 
         STORAGE_PRIORITY priority = q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW;
-        if(synchronous) priority = STORAGE_PRIORITY_SYNCHRONOUS;
+        if(synchronous) priority = STORAGE_PRIORITY_SYNCHRONOUS_FIRST;
 
         stream_control_replication_query_started();
         storage_engine_query_init(q->backend, rd->tiers[0].smh, &d->handle,

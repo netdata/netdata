@@ -783,6 +783,8 @@ void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
         usec_t start_ut = now_monotonic_usec();
         if(likely(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS))
             pdc_route_synchronously(pdc->ctx, pdc);
+        else if(likely(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS_FIRST))
+            pdc_route_synchronously_first(pdc->ctx, pdc);
         else
             pdc_route_asynchronously(pdc->ctx, pdc);
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.prep_time_to_route, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
@@ -827,7 +829,7 @@ void pg_cache_preload(struct rrdeng_query_handle *handle) {
     if(ctx_is_available_for_queries(handle->ctx)) {
         handle->pdc->refcount++; // we get 1 for the query thread and 1 for the prep thread
 
-        if(unlikely(handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS))
+        if(unlikely(handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS || handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS_FIRST))
             rrdeng_prep_query(handle->pdc, false);
         else
             rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
