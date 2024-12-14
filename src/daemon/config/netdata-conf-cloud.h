@@ -5,6 +5,6 @@
 
 #include "libnetdata/libnetdata.h"
 
-int netdata_conf_cloud_query_threads(void);
+size_t netdata_conf_cloud_query_threads(void);
 
 #endif //NETDATA_NETDATA_CONF_CLOUD_H

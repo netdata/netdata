@@ -2046,11 +2046,11 @@ PGC *pgc_create(const char *name,
     cache->config.out_of_memory_protection_bytes    = dbengine_out_of_memory_protection;
 
     // partitions
-    if(partitions == 0) partitions = get_netdata_cpus();
-    if(partitions <= 4) partitions = 4;
+    if(partitions == 0) partitions  = netdata_conf_cpus();
+    if(partitions <= 4) partitions  = 4;
     if(partitions > 256) partitions = 256;
-    cache->config.partitions    = partitions;
-    cache->index                = callocz(cache->config.partitions, sizeof(struct pgc_index));
+    cache->config.partitions        = partitions;
+    cache->index                    = callocz(cache->config.partitions, sizeof(struct pgc_index));
 
     pgc_section_pages_static_aral_init();
 

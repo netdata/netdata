@@ -637,7 +637,7 @@ static struct stream_thread *stream_thread_get_unsafe(RRDHOST *host) {
         return host->stream.thread;
 
     if(!stream_thread_globals.assign.cores) {
-        stream_thread_globals.assign.cores = get_netdata_cpus() - 1;
+        stream_thread_globals.assign.cores = netdata_conf_cpus() - 1;
         if(stream_thread_globals.assign.cores < 4)
             stream_thread_globals.assign.cores = 4;
         else if(stream_thread_globals.assign.cores > STREAM_MAX_THREADS)

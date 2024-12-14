@@ -3,9 +3,9 @@
 #include "netdata-conf-cloud.h"
 #include "../common.h"
 
-int netdata_conf_cloud_query_threads(void) {
-    int cpus = MIN(get_netdata_cpus(), 256); // max 256 cores
-    int threads = MIN(cpus * (stream_conf_is_parent(false) ? 2 : 1), libuv_worker_threads / 2);
+size_t netdata_conf_cloud_query_threads(void) {
+    size_t cpus = MIN(netdata_conf_cpus(), 256); // max 256 cores
+    size_t threads = MIN(cpus * (stream_conf_is_parent(false) ? 2 : 1), (size_t)libuv_worker_threads / 2);
     threads = MAX(threads, 6);
 
     threads = config_get_number(CONFIG_SECTION_CLOUD, "query threads", threads);

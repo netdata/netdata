@@ -8,6 +8,8 @@
 void netdata_conf_section_global(void);
 void netdata_conf_section_global_run_as_user(const char **user);
 
+size_t netdata_conf_cpus(void);
+
 #include "netdata-conf.h"
 
 #endif //NETDATA_NETDATA_CONF_GLOBAL_H

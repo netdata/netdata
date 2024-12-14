@@ -121,7 +121,7 @@ int aral_size_sort_compare(const void *a, const void *b) {
 }
 
 void pgd_init_arals(void) {
-    size_t partitions = get_netdata_cpus();
+    size_t partitions = netdata_conf_cpus();
     if(partitions < 4) partitions = 4;
     if(partitions > PGD_ARAL_PARTITIONS_MAX) partitions = PGD_ARAL_PARTITIONS_MAX;
     pgd_alloc_globals.partitions = partitions;

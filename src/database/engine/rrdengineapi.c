@@ -1065,15 +1065,15 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    ssize_t cpus = (ssize_t)get_netdata_cpus() / (ssize_t)storage_tiers;
+    ssize_t cpus = (ssize_t)netdata_conf_cpus() / (ssize_t)storage_tiers;
     if(cpus > (ssize_t)datafiles)
         cpus = (ssize_t)datafiles;
 
     if(cpus > (ssize_t)libuv_worker_threads)
         cpus = (ssize_t)libuv_worker_threads;
 
-    if(cpus >= (ssize_t)get_netdata_cpus() / 2)
-        cpus = (ssize_t)(get_netdata_cpus() / 2 - 1);
+    if(cpus >= (ssize_t)netdata_conf_cpus() / 2)
+        cpus = (ssize_t)(netdata_conf_cpus() / 2 - 1);
 
     if(cpus < 1)
         cpus = 1;

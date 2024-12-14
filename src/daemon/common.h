@@ -96,8 +96,6 @@ extern int netdata_anonymous_statistics_enabled;
 extern bool netdata_ready;
 extern time_t netdata_start_time;
 
-long get_netdata_cpus(void);
-
 void set_environment_for_plugins_and_scripts(void);
 
 #ifdef __cplusplus
