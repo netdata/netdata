@@ -1291,7 +1291,7 @@ static bool rq_sender_acquire(struct replication_request *rq, bool force) {
     ssize_t desired;
 
     do {
-        if(!force && expected >= 5)
+        if(!force && expected >= 2)
             return false;
 
         desired = expected + 1;
