@@ -2012,3 +2012,33 @@ modules:
               chart_type: line
               dimensions:
                 - name: runtime
+            - name: netframework.clrlocksandthreads_queue_length
+              description: Threads waited to acquire a managed lock
+              unit: threads/s
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: netframework.clrlocksandthreads_current_logical_threads
+              description: Logical threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: logical
+            - name: netframework.clrlocksandthreads_current_physical_threads
+              description: Physical threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: physical
+            - name: netframework.clrlocksandthreads_recognized_threads
+              description: Threads recognized by the runtime
+              unit: threads/s
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: netframework.clrlocksandthreads_contentions
+              description: Fails to acquire a managed lock
+              unit: contentions/s
+              chart_type: line
+              dimensions:
+                - name: contentions
