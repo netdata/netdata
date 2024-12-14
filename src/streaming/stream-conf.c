@@ -185,8 +185,15 @@ void stream_conf_load() {
     }
 }
 
-bool stream_conf_configured_as_parent() {
-    return stream_conf_has_uuid_section(&stream_config);
+bool stream_conf_is_parent(bool recheck) {
+    static bool rc = false, queried = false;
+    if(!recheck && queried)
+        return rc;
+
+    rc = stream_conf_has_api_enabled(&stream_config);
+    queried = true;
+
+    return rc;
 }
 
 void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_receiver_config *config, const char *api_key, const char *machine_guid) {

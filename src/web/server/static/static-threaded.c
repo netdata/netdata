@@ -506,26 +506,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
 
     netdata_ssl_initialize_ctx(NETDATA_SSL_WEB_SERVER_CTX);
 
-    // 6 threads is the optimal value
-    // since 6 are the parallel connections browsers will do
-    // so, if the machine has more CPUs, avoid using resources unnecessarily
-    int def_thread_count = (int)get_netdata_cpus();
-    if(def_thread_count < 6) def_thread_count = 6;
-
-    if (!strcmp(config_get(CONFIG_SECTION_WEB, "mode", ""),"single-threaded")) {
-                netdata_log_info("Running web server with one thread, because mode is single-threaded");
-                config_set(CONFIG_SECTION_WEB, "mode", "static-threaded");
-                def_thread_count = 1;
-    }
-    static_threaded_workers_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
-
-    if (static_threaded_workers_count < 1) static_threaded_workers_count = 1;
-
-    // See https://github.com/netdata/netdata/issues/11081#issuecomment-831998240 for more details
-    if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) {
-        static_threaded_workers_count = 1;
-        netdata_log_info("You are running an OpenSSL older than 1.1.0, web server will not enable multithreading.");
-    }
+    static_threaded_workers_count = netdata_conf_web_query_threads();
 
     size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets",
                                                    (long long int)(rlimit_nofile.rlim_cur / 4));

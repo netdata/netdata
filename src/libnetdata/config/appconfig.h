@@ -181,7 +181,7 @@ _CONNECTOR_INSTANCE *add_connector_instance(struct config_section *connector, st
 #define config_section_option_destroy(section, name) appconfig_section_option_destroy_non_loaded(&netdata_config, section, name)
 
 bool stream_conf_needs_dbengine(struct config *root);
-bool stream_conf_has_uuid_section(struct config *root);
+bool stream_conf_has_api_enabled(struct config *root);
 
 void appconfig_foreach_section(struct config *root, void (*cb)(struct config *root, const char *name, void *data), void *data);
 

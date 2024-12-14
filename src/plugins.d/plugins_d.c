@@ -262,7 +262,7 @@ void *pluginsd_main(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(pluginsd_main_cleanup) cleanup_ptr = ptr;
 
     int automatic_run = config_get_boolean(CONFIG_SECTION_PLUGINS, "enable running new plugins", 1);
-    int scan_frequency = (int)config_get_number(CONFIG_SECTION_PLUGINS, "check for new plugins every", 60);
+    int scan_frequency = (int)config_get_duration_seconds(CONFIG_SECTION_PLUGINS, "check for new plugins every", 60);
     if (scan_frequency < 1)
         scan_frequency = 1;
 

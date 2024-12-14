@@ -14,6 +14,7 @@ bool netdata_conf_load(char *filename, char overwrite_used, const char **user);
 #include "netdata-conf-global.h"
 #include "netdata-conf-logs.h"
 #include "netdata-conf-web.h"
+#include "netdata-conf-cloud.h"
 
 #include "daemon/common.h"
 

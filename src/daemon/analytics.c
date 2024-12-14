@@ -519,7 +519,7 @@ void analytics_gather_mutable_meta_data(void)
     analytics_alarms_notifications();
 
     analytics_set_data(
-        &analytics_data.netdata_config_is_parent, (rrdhost_hosts_available() > 1 || stream_conf_configured_as_parent()) ? "true" : "false");
+        &analytics_data.netdata_config_is_parent, (rrdhost_hosts_available() > 1 || stream_conf_is_parent(false)) ? "true" : "false");
 
     analytics_set_data(&analytics_data.netdata_host_agent_claimed, is_agent_claimed() ? "true" : "false");
 
