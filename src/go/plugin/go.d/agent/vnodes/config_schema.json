@@ -1,0 +1,50 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Virtual Node configuration.",
+    "type": "object",
+    "properties": {
+      "hostname": {
+        "title": "Hostname",
+        "description": "The hostname that identifies this virtual node in the Netdata UI and API. Must be unique within your monitoring environment.",
+        "type": "string"
+      },
+      "guid": {
+        "title": "GUID",
+        "description": "Uniquely identifies the node. Must be in [UUID format](https://www.guidgen.com/). Changing this value will result in creating a **new Virtual Node** - the existing Virtual Node and its history will not be modified.",
+        "type": "string"
+      },
+      "labels": {
+        "title": "Labels",
+        "description": "Optional key-value pairs that help categorize and organize virtual nodes.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "guid"
+    ],
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "hostname": {
+      "ui:placeholder": "If not specified, the job name will be used as the hostname."
+    },
+    "guid": {
+      "ui:help": "Generate a UUID using the command line: `uuidgen` on macOS/Linux or `[guid]::NewGuid()` in PowerShell."
+    },
+    "labels": {
+      "ui:help": "Labels can be used for filtering and grouping in the Netdata UI. Common labels include environment, region, service, team, etc."
+    }
+  }
+}
