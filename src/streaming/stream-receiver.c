@@ -395,11 +395,18 @@ static void stream_receive_log_database_gap(struct receiver_state *rpt) {
     if(now < last_db_entry)
         last_db_entry = now;
 
-    char buf[128];
-    duration_snprintf(buf, sizeof(buf), now - last_db_entry, "s", true);
-    nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "STREAM RCV '%s' [from [%s]:%s]: node connected; last sample in the database %s ago",
-           rrdhost_hostname(host), rpt->client_ip, rpt->client_port, buf);
+    if(!last_db_entry) {
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "STREAM RCV '%s' [from [%s]:%s]: node connected; for the first time!",
+               rrdhost_hostname(host), rpt->client_ip, rpt->client_port);
+    }
+    else {
+        char buf[128];
+        duration_snprintf(buf, sizeof(buf), now - last_db_entry, "s", true);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "STREAM RCV '%s' [from [%s]:%s]: node connected; last sample in the database %s ago",
+               rrdhost_hostname(host), rpt->client_ip, rpt->client_port, buf);
+    }
 }
 
 void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct receiver_state *rpt) {
