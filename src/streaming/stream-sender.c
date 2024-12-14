@@ -66,6 +66,7 @@ static void stream_sender_charts_and_replication_reset(struct sender_state *s) {
 
     rrdhost_sender_replicating_charts_zero(s->host);
     stream_sender_replicating_charts_zero(s);
+    __atomic_store_n(&s->replication.atomic.threads, 0, __ATOMIC_RELAXED);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
