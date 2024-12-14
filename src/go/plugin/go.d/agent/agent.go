@@ -36,7 +36,6 @@ type Config struct {
 	CollectorsConfigDir       []string
 	CollectorsConfigWatchPath []string
 	ServiceDiscoveryConfigDir []string
-	VnodesConfigDir           []string
 	StateFile                 string
 	LockDir                   string
 	ModuleRegistry            module.Registry
@@ -54,7 +53,6 @@ type Agent struct {
 	CollectorsConfDir         multipath.MultiPath
 	CollectorsConfigWatchPath []string
 	ServiceDiscoveryConfigDir multipath.MultiPath
-	VnodesConfigDir           multipath.MultiPath
 
 	StateFile string
 	LockDir   string
@@ -81,7 +79,6 @@ func New(cfg Config) *Agent {
 		CollectorsConfDir:         cfg.CollectorsConfigDir,
 		ServiceDiscoveryConfigDir: cfg.ServiceDiscoveryConfigDir,
 		CollectorsConfigWatchPath: cfg.CollectorsConfigWatchPath,
-		VnodesConfigDir:           cfg.VnodesConfigDir,
 		StateFile:                 cfg.StateFile,
 		LockDir:                   cfg.LockDir,
 		RunModule:                 cfg.RunModule,
@@ -201,7 +198,7 @@ func (a *Agent) run(ctx context.Context) {
 	jobMgr.ConfigDefaults = discCfg.Registry
 	jobMgr.FnReg = fnMgr
 
-	if reg := a.setupVnodeRegistry(); reg != nil && reg.Len() > 0 {
+	if reg := a.setupVnodeRegistry(); len(reg) > 0 {
 		jobMgr.Vnodes = reg
 	}
 

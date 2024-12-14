@@ -3,67 +3,70 @@
 package vnodes
 
 import (
+	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
-
-	"github.com/netdata/netdata/go/plugins/logger"
+	"strings"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
+
+	"github.com/netdata/netdata/go/plugins/logger"
 )
 
-func New(confDir string) *Vnodes {
-	vn := &Vnodes{
-		Logger: logger.New().With(
-			slog.String("component", "vnodes"),
-		),
-
-		confDir: confDir,
-		vnodes:  make(map[string]*VirtualNode),
-	}
-
-	vn.readConfDir()
-
-	return vn
-}
-
-type (
-	Vnodes struct {
-		*logger.Logger
-
-		confDir string
-		vnodes  map[string]*VirtualNode
-	}
-	VirtualNode struct {
-		GUID     string            `yaml:"guid" json:"guid"`
-		Hostname string            `yaml:"hostname" json:"hostname"`
-		Labels   map[string]string `yaml:"labels" json:"labels"`
-	}
+var log = logger.New().With(
+	slog.String("component", "vnodes"),
 )
 
-func (vn *Vnodes) Lookup(key string) (*VirtualNode, bool) {
-	v, ok := vn.vnodes[key]
-	return v, ok
+func Load(dir string) map[string]*VirtualNode {
+	return readConfDir(dir)
 }
 
-func (vn *Vnodes) Len() int {
-	return len(vn.vnodes)
+type VirtualNode struct {
+	Name     string            `yaml:"name" json:"name"`
+	Hostname string            `yaml:"hostname" json:"hostname"`
+	GUID     string            `yaml:"guid" json:"guid"`
+	Labels   map[string]string `yaml:"labels,omitempty" json:"labels"`
+
+	Source     string `yaml:"-" json:"-"`
+	SourceType string `yaml:"-" json:"-"`
 }
 
-func (vn *Vnodes) readConfDir() {
-	_ = filepath.WalkDir(vn.confDir, func(path string, d fs.DirEntry, err error) error {
+func (v *VirtualNode) Copy() *VirtualNode {
+	if v == nil {
+		return nil
+	}
+
+	labels := make(map[string]string, len(v.Labels))
+	maps.Copy(labels, v.Labels)
+
+	return &VirtualNode{
+		Name:       v.Name,
+		Hostname:   v.Hostname,
+		GUID:       v.GUID,
+		Source:     v.Source,
+		SourceType: v.SourceType,
+		Labels:     labels,
+	}
+}
+
+func readConfDir(dir string) map[string]*VirtualNode {
+	vnodes := make(map[string]*VirtualNode)
+
+	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			vn.Warning(err)
+			log.Warning(err)
 			return nil
 		}
 
 		if d.Type()&os.ModeSymlink != 0 {
 			dst, err := os.Readlink(path)
 			if err != nil {
-				vn.Warningf("failed to resolve symlink '%s': %v", path, err)
+				log.Warningf("failed to resolve symlink '%s': %v", path, err)
 				return nil
 			}
 
@@ -73,52 +76,65 @@ func (vn *Vnodes) readConfDir() {
 
 			fi, err := os.Stat(dst)
 			if err != nil {
-				vn.Warningf("failed to stat resolved path '%s': %v", dst, err)
+				log.Warningf("failed to stat resolved path '%s': %v", dst, err)
 				return nil
 			}
 			if !fi.Mode().IsRegular() {
-				vn.Debugf("'%s' is not a regular file, skipping it", dst)
+				log.Debugf("'%s' is not a regular file, skipping it", dst)
 				return nil
 			}
 			path = dst
 		} else if !d.Type().IsRegular() {
-			vn.Debugf("'%s' is not a regular file, skipping it", path)
+			log.Debugf("'%s' is not a regular file, skipping it", path)
 			return nil
 		}
 
 		if !isConfigFile(path) {
-			vn.Debugf("'%s' is not a config file (wrong extension), skipping it", path)
+			log.Debugf("'%s' is not a config file (wrong extension), skipping it", path)
 			return nil
 		}
 
 		var cfg []VirtualNode
 
 		if err := loadConfigFile(&cfg, path); err != nil {
-			vn.Warning(err)
+			log.Warning(err)
 			return nil
 		}
 
 		for _, v := range cfg {
 			if v.Hostname == "" || v.GUID == "" {
-				vn.Warningf("skipping virtual node '%+v': required fields are missing (%s)", v, path)
+				log.Warningf("skipping virtual node '%+v': required fields are missing (%s)", v, path)
 				continue
 			}
 			if err := uuid.Validate(v.GUID); err != nil {
-				vn.Warningf("skipping virtual node '%+v': invalid GUID: %v (%s)", v, err, path)
+				log.Warningf("skipping virtual node '%+v': invalid GUID: %v (%s)", v, err, path)
 				continue
 			}
-			if _, ok := vn.vnodes[v.Hostname]; ok {
-				vn.Warningf("skipping virtual node '%+v': duplicate node (%s)", v, path)
+			if _, ok := vnodes[v.Hostname]; ok {
+				log.Warningf("skipping virtual node '%+v': duplicate node (%s)", v, path)
 				continue
 			}
 
 			v := v
-			vn.Debugf("adding virtual node'%+v' (%s)", v, path)
-			vn.vnodes[v.Hostname] = &v
+
+			if v.Name == "" {
+				v.Name = v.Hostname
+			}
+			v.Source = fmt.Sprintf("file=%s", path)
+			if isStockConfig(path) {
+				v.SourceType = "stock"
+			} else {
+				v.SourceType = "user"
+			}
+
+			log.Debugf("adding virtual node'%+v' (%s)", v, path)
+			vnodes[v.Hostname] = &v
 		}
 
 		return nil
 	})
+
+	return vnodes
 }
 
 func isConfigFile(path string) bool {
@@ -142,4 +158,15 @@ func loadConfigFile(conf any, path string) error {
 	}
 
 	return nil
+}
+
+var (
+	envNDStockConfigDir = os.Getenv("NETDATA_STOCK_CONFIG_DIR")
+)
+
+func isStockConfig(path string) bool {
+	if envNDStockConfigDir == "" {
+		return false
+	}
+	return strings.HasPrefix(path, envNDStockConfigDir)
 }

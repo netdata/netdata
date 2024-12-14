@@ -55,7 +55,6 @@ func main() {
 		CollectorsConfigDir:       cfg.collectorsDir,
 		ServiceDiscoveryConfigDir: cfg.serviceDiscoveryDir,
 		CollectorsConfigWatchPath: cfg.collectorsWatchPath,
-		VnodesConfigDir:           cfg.vnodesDir,
 		StateFile:                 cfg.stateFile,
 		LockDir:                   cfg.lockDir,
 		RunModule:                 opts.Module,

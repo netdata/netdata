@@ -16,6 +16,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
@@ -75,10 +76,7 @@ type JobConfig struct {
 	AutoDetectEvery int
 	Priority        int
 	IsStock         bool
-
-	VnodeGUID     string
-	VnodeHostname string
-	VnodeLabels   map[string]string
+	Vnode           vnodes.VirtualNode
 }
 
 const (
@@ -114,10 +112,8 @@ func NewJob(cfg JobConfig) *Job {
 		tick:                 make(chan int),
 		buf:                  &buf,
 		api:                  netdataapi.New(&buf),
-
-		vnodeGUID:     cfg.VnodeGUID,
-		vnodeHostname: cfg.VnodeHostname,
-		vnodeLabels:   cfg.VnodeLabels,
+		vnode:                cfg.Vnode,
+		updVnode:             make(chan *vnodes.VirtualNode, 1),
 	}
 
 	log := logger.New().With(
@@ -163,15 +159,14 @@ type Job struct {
 	buf                  *bytes.Buffer
 	api                  *netdataapi.API
 
+	vnodeCreated bool
+	vnode        vnodes.VirtualNode
+	updVnode     chan *vnodes.VirtualNode
+
 	retries int
 	prevRun time.Time
 
 	stop chan struct{}
-
-	vnodeCreated  bool
-	vnodeGUID     string
-	vnodeHostname string
-	vnodeLabels   map[string]string
 }
 
 // NetdataChartIDMaxLength is the chart ID max length. See RRD_ID_LENGTH_MAX in the netdata source code.
@@ -209,6 +204,10 @@ func (j *Job) RetryAutoDetection() bool {
 
 func (j *Job) Configuration() any {
 	return j.module.Configuration()
+}
+
+func (j *Job) Vnode() vnodes.VirtualNode {
+	return j.vnode
 }
 
 // AutoDetection invokes init, check and postCheck. It handles panic.
@@ -258,6 +257,14 @@ func (j *Job) AutoDetection() (err error) {
 	return nil
 }
 
+func (j *Job) UpdateVnode(vnode *vnodes.VirtualNode) {
+	select {
+	case <-j.updVnode:
+	default:
+	}
+	j.updVnode <- vnode
+}
+
 // Tick Tick.
 func (j *Job) Tick(clock int) {
 	select {
@@ -305,15 +312,15 @@ func (j *Job) Cleanup() {
 		return
 	}
 
-	if !j.vnodeCreated && j.vnodeGUID != "" {
+	if !j.vnodeCreated && j.vnode.GUID != "" {
 		j.api.HOSTINFO(netdataapi.HostInfo{
-			GUID:     j.vnodeGUID,
-			Hostname: j.vnodeHostname,
-			Labels:   j.vnodeLabels,
+			GUID:     j.vnode.GUID,
+			Hostname: j.vnode.Hostname,
+			Labels:   j.vnode.Labels,
 		})
 		j.vnodeCreated = true
 	}
-	j.api.HOST(j.vnodeGUID)
+	j.api.HOST(j.vnode.GUID)
 
 	if j.collectStatusChart.created {
 		j.collectStatusChart.MarkRemove()
@@ -410,32 +417,41 @@ func (j *Job) collect() (result map[string]int64) {
 }
 
 func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinceLastRun int) bool {
+	var createChart bool
+	if j.module.VirtualNode() != nil {
+		select {
+		case vnode := <-j.updVnode:
+			j.vnodeCreated = false
+			createChart = j.vnode.GUID != vnode.GUID
+			j.vnode = *vnode.Copy()
+		default:
+		}
+	}
+
 	if !j.vnodeCreated {
-		if j.vnodeGUID == "" {
+		if j.vnode.GUID == "" {
 			if v := j.module.VirtualNode(); v != nil && v.GUID != "" && v.Hostname != "" {
-				j.vnodeGUID = v.GUID
-				j.vnodeHostname = v.Hostname
-				j.vnodeLabels = v.Labels
+				j.vnode = *v
 			}
 		}
-		if j.vnodeGUID != "" {
+		if j.vnode.GUID != "" {
 			j.api.HOSTINFO(netdataapi.HostInfo{
-				GUID:     j.vnodeGUID,
-				Hostname: j.vnodeHostname,
-				Labels:   j.vnodeLabels,
+				GUID:     j.vnode.GUID,
+				Hostname: j.vnode.Hostname,
+				Labels:   j.vnode.Labels,
 			})
 			j.vnodeCreated = true
 		}
 	}
 
-	j.api.HOST(j.vnodeGUID)
+	j.api.HOST(j.vnode.GUID)
 
-	if !j.collectStatusChart.created {
+	if !j.collectStatusChart.created || createChart {
 		j.collectStatusChart.ID = fmt.Sprintf("%s_%s_data_collection_status", cleanPluginName(j.pluginName), j.FullName())
 		j.createChart(j.collectStatusChart)
 	}
 
-	if !j.collectDurationChart.created {
+	if !j.collectDurationChart.created || createChart {
 		j.collectDurationChart.ID = fmt.Sprintf("%s_%s_data_collection_duration", cleanPluginName(j.pluginName), j.FullName())
 		j.createChart(j.collectDurationChart)
 	}
@@ -444,7 +460,7 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 
 	var i, updated int
 	for _, chart := range *j.charts {
-		if !chart.created {
+		if !chart.created || createChart {
 			typeID := fmt.Sprintf("%s.%s", j.FullName(), chart.ID)
 			if len(typeID) >= NetdataChartIDMaxLength {
 				j.Warningf("chart 'type.id' length (%d) >= max allowed (%d), the chart is ignored (%s)",

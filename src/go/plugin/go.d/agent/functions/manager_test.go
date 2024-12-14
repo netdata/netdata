@@ -90,7 +90,7 @@ FUNCTION UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
 `,
 			expected: []Function{
 				{
-					key:         "FUNCTION",
+					key:         lineFunction,
 					UID:         "UID",
 					Timeout:     time.Second,
 					Name:        "fn1",
@@ -110,7 +110,7 @@ FUNCTION UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
 `,
 			expected: []Function{
 				{
-					key:         "FUNCTION",
+					key:         lineFunction,
 					UID:         "UID",
 					Timeout:     time.Second,
 					Name:        "fn1",
@@ -121,7 +121,7 @@ FUNCTION UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
 					Payload:     nil,
 				},
 				{
-					key:         "FUNCTION",
+					key:         lineFunction,
 					UID:         "UID",
 					Timeout:     time.Second,
 					Name:        "fn2",
@@ -143,7 +143,7 @@ FUNCTION_PAYLOAD_END
 `,
 			expected: []Function{
 				{
-					key:         "FUNCTION_PAYLOAD",
+					key:         lineFunctionPayload,
 					UID:         "UID",
 					Timeout:     time.Second,
 					Name:        "fn1",
@@ -170,7 +170,7 @@ FUNCTION_PAYLOAD_END
 `,
 			expected: []Function{
 				{
-					key:         "FUNCTION_PAYLOAD",
+					key:         lineFunctionPayload,
 					UID:         "UID",
 					Timeout:     time.Second,
 					Name:        "fn1",
@@ -181,7 +181,7 @@ FUNCTION_PAYLOAD_END
 					Payload:     []byte("payload line1\npayload line2"),
 				},
 				{
-					key:         "FUNCTION_PAYLOAD",
+					key:         lineFunctionPayload,
 					UID:         "UID",
 					Timeout:     time.Second,
 					Name:        "fn2",
@@ -211,7 +211,7 @@ FUNCTION_PAYLOAD_END
 `,
 			expected: []Function{
 				{
-					key:         "FUNCTION_PAYLOAD",
+					key:         lineFunctionPayload,
 					UID:         "UID",
 					Timeout:     time.Second,
 					Name:        "fn1",
@@ -222,7 +222,7 @@ FUNCTION_PAYLOAD_END
 					Payload:     []byte("payload line1\npayload line2"),
 				},
 				{
-					key:         "FUNCTION",
+					key:         lineFunction,
 					UID:         "UID",
 					Timeout:     time.Second,
 					Name:        "fn2",
@@ -233,7 +233,7 @@ FUNCTION_PAYLOAD_END
 					Payload:     nil,
 				},
 				{
-					key:         "FUNCTION",
+					key:         lineFunction,
 					UID:         "UID",
 					Timeout:     time.Second,
 					Name:        "fn3",
@@ -244,7 +244,7 @@ FUNCTION_PAYLOAD_END
 					Payload:     nil,
 				},
 				{
-					key:         "FUNCTION_PAYLOAD",
+					key:         lineFunctionPayload,
 					UID:         "UID",
 					Timeout:     time.Second,
 					Name:        "fn4",
