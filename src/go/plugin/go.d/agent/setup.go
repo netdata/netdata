@@ -161,20 +161,19 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 	}
 }
 
-func (a *Agent) setupVnodeRegistry() *vnodes.Vnodes {
-	a.Debugf("looking for 'vnodes/' in %v", a.VnodesConfigDir)
-
-	if len(a.VnodesConfigDir) == 0 {
+func (a *Agent) setupVnodeRegistry() map[string]*vnodes.VirtualNode {
+	a.Debugf("looking for 'vnodes/' in %v", a.ConfigDir)
+	if len(a.ConfigDir) == 0 {
 		return nil
 	}
 
-	dirPath, err := a.VnodesConfigDir.Find("vnodes/")
+	dirPath, err := a.ConfigDir.Find("vnodes/")
 	if err != nil || dirPath == "" {
 		return nil
 	}
 
-	reg := vnodes.New(dirPath)
-	a.Infof("found '%s' (%d vhosts)", dirPath, reg.Len())
+	reg := vnodes.Load(dirPath)
+	a.Infof("found '%s' (%d vhosts)", dirPath)
 
 	return reg
 }

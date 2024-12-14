@@ -65,7 +65,6 @@ type config struct {
 	collectorsDir       multipath.MultiPath
 	collectorsWatchPath []string
 	serviceDiscoveryDir multipath.MultiPath
-	vnodesDir           multipath.MultiPath
 	stateFile           string
 	lockDir             string
 }
@@ -79,7 +78,6 @@ func newConfig(opts *cli.Option, env *envConfig) *config {
 	cfg.collectorsDir = cfg.initCollectorsDir(opts)
 	cfg.collectorsWatchPath = cfg.initCollectorsWatchPaths(opts, env)
 	cfg.serviceDiscoveryDir = cfg.initServiceDiscoveryConfigDir()
-	cfg.vnodesDir = cfg.initVnodesDir()
 	cfg.stateFile = cfg.initStateFile(env)
 	cfg.lockDir = env.lockDir
 
@@ -151,18 +149,6 @@ func (c *config) initServiceDiscoveryConfigDir() multipath.MultiPath {
 
 	for _, v := range c.pluginDir {
 		mpath = append(mpath, filepath.Join(v, c.name, "sd"))
-	}
-
-	return mpath
-}
-
-func (c *config) initVnodesDir() multipath.MultiPath {
-	c.mustPluginDir()
-
-	var mpath multipath.MultiPath
-
-	for _, v := range c.pluginDir {
-		mpath = append(mpath, filepath.Join(v, "vnodes"))
 	}
 
 	return mpath

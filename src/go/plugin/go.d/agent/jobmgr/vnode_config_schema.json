@@ -1,0 +1,41 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Virtual Node configuration.",
+    "type": "object",
+    "properties": {
+      "guid": {
+        "title": "GUID",
+        "description": "Uniquely identifies the node.",
+        "type": "string"
+      },
+      "hostname": {
+        "title": "Hostname",
+        "description": "The hostname of the virtual node.",
+        "type": "string"
+      },
+      "labels": {
+        "title": "Labels",
+        "description": "Additional key-value pairs to associate with the Virtual Node.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "guid"
+    ],
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    }
+  }
+}

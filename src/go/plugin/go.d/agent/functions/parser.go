@@ -12,6 +12,12 @@ import (
 	"time"
 )
 
+const (
+	lineFunction           = "FUNCTION"
+	lineFunctionPayload    = "FUNCTION_PAYLOAD"
+	lineFunctionPayloadEnd = "FUNCTION_PAYLOAD_END"
+)
+
 type Function struct {
 	key         string
 	UID         string
@@ -49,9 +55,9 @@ func (p *inputParser) parse(line string) (*Function, error) {
 	}
 
 	switch {
-	case strings.HasPrefix(line, "FUNCTION "):
+	case strings.HasPrefix(line, lineFunction+" "):
 		return p.parseFunction(line)
-	case strings.HasPrefix(line, "FUNCTION_PAYLOAD "):
+	case strings.HasPrefix(line, lineFunctionPayload+" "):
 		fn, err := p.parseFunction(line)
 		if err != nil {
 			return nil, err
@@ -66,7 +72,7 @@ func (p *inputParser) parse(line string) (*Function, error) {
 }
 
 func (p *inputParser) handlePayloadLine(line string) (*Function, error) {
-	if line == "FUNCTION_PAYLOAD_END" {
+	if line == lineFunctionPayloadEnd {
 		p.readingPayload = false
 		p.currentFn.Payload = []byte(p.payloadBuf.String())
 		fn := p.currentFn
@@ -74,7 +80,7 @@ func (p *inputParser) handlePayloadLine(line string) (*Function, error) {
 		return fn, nil
 	}
 
-	if strings.HasPrefix(line, "FUNCTION") {
+	if strings.HasPrefix(line, lineFunction) {
 		p.readingPayload = false
 		p.currentFn = nil
 		p.payloadBuf.Reset()
