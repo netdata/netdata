@@ -18,33 +18,30 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
 
-//go:embed "vnode_config_schema.json"
-var vnodeConfigSchema string
-
 const (
-	dyncfgVnodeIDPrefix = "go.d:vnode:"
-	dyncfgVnodePath     = "/vnodes/vnode"
+	dyncfgVnodeID   = "go.d:vnode"
+	dyncfgVnodePath = "/collectors/vnodes"
 )
 
 func (m *Manager) dyncfgVnodeModuleCreate() {
 	m.api.CONFIGCREATE(netdataapi.ConfigOpts{
-		ID:                fmt.Sprintf("%s%s", dyncfgVnodeIDPrefix, "vnode"),
+		ID:                dyncfgVnodeID,
 		Status:            dyncfgAccepted.String(),
 		ConfigType:        "template",
 		Path:              dyncfgVnodePath,
 		SourceType:        "internal",
 		Source:            "internal",
-		SupportedCommands: "add schema userconfig",
+		SupportedCommands: "add schema userconfig test",
 	})
 }
 
 func (m *Manager) dyncfgVnodeJobCreate(cfg *vnodes.VirtualNode, status dyncfgStatus) {
-	cmds := "userconfig schema get update"
+	cmds := "userconfig schema get update test"
 	if cfg.SourceType == confgroup.TypeDyncfg {
 		cmds += " remove"
 	}
 	m.api.CONFIGCREATE(netdataapi.ConfigOpts{
-		ID:                fmt.Sprintf("%s%s:%s", dyncfgVnodeIDPrefix, "vnode", cfg.Name),
+		ID:                fmt.Sprintf("%s:%s", dyncfgVnodeID, cfg.Name),
 		Status:            status.String(),
 		ConfigType:        "job",
 		Path:              dyncfgVnodePath,
@@ -62,13 +59,7 @@ func (m *Manager) dyncfgVnodeExec(fn functions.Function) {
 		m.dyncfgVnodeUserconfig(fn)
 		return
 	case "schema":
-		m.dyncfgRespPayloadJSON(fn, vnodeConfigSchema)
-		return
-	case "get":
-		m.dyncfgVnodeGet(fn)
-		return
-	case "add":
-		m.dyncfgVnodeAdd(fn)
+		m.dyncfgRespPayloadJSON(fn, vnodes.ConfigSchema)
 		return
 	}
 
@@ -83,6 +74,12 @@ func (m *Manager) dyncfgVnodeSeqExec(fn functions.Function) {
 	action := strings.ToLower(fn.Args[1])
 
 	switch action {
+	case "test":
+		m.dyncfgVnodeTest(fn)
+	case "get":
+		m.dyncfgVnodeGet(fn)
+	case "add":
+		m.dyncfgVnodeAdd(fn)
 	case "update":
 		m.dyncfgVnodeUpdate(fn)
 	case "remove":
@@ -94,7 +91,8 @@ func (m *Manager) dyncfgVnodeSeqExec(fn functions.Function) {
 }
 
 func (m *Manager) dyncfgVnodeGet(fn functions.Function) {
-	name := strings.TrimPrefix(fn.Args[0], fmt.Sprintf("%svnode:", dyncfgVnodeIDPrefix))
+	id := fn.Args[0]
+	name := strings.TrimPrefix(id, dyncfgVnodeID+":")
 
 	cfg, ok := m.Vnodes[name]
 	if !ok {
@@ -141,12 +139,7 @@ func (m *Manager) dyncfgVnodeAdd(fn functions.Function) {
 		return
 	}
 
-	cfg.Name = name
-	if cfg.Hostname == "" {
-		cfg.Hostname = name
-	}
-	cfg.SourceType = confgroup.TypeDyncfg
-	cfg.Source = "type=dyncfg"
+	dyncfgUpdateVnodeConfig(cfg, name)
 
 	m.Vnodes[name] = cfg
 
@@ -156,7 +149,7 @@ func (m *Manager) dyncfgVnodeAdd(fn functions.Function) {
 
 func (m *Manager) dyncfgVnodeRemove(fn functions.Function) {
 	id := fn.Args[0]
-	name := strings.TrimPrefix(id, fmt.Sprintf("%svnode:", dyncfgVnodeIDPrefix))
+	name := strings.TrimPrefix(id, dyncfgVnodeID+":")
 
 	vnode, ok := m.Vnodes[name]
 	if !ok {
@@ -170,18 +163,9 @@ func (m *Manager) dyncfgVnodeRemove(fn functions.Function) {
 		return
 	}
 
-	var s strings.Builder
-	for _, ecfg := range m.exposedConfigs.items {
-		if ecfg.cfg.Vnode() == vnode.Name {
-			if s.Len() > 0 {
-				s.WriteString(", ")
-			}
-			s.WriteString(fmt.Sprintf("%s:%s", ecfg.cfg.Module(), ecfg.cfg.Name()))
-		}
-	}
-	if s.Len() > 0 {
-		m.Warningf("dyncfg: remove: vnode %s has running jobs (%s)", name, s.String())
-		m.dyncfgRespf(fn, 404, "The specified vnode '%s' has running jobs (%s).", name, s.String())
+	if s := m.dyncfgVnodeAffectedJobs(vnode.Name); s != "" {
+		m.Warningf("dyncfg: remove: vnode %s has running jobs (%s)", name, s)
+		m.dyncfgRespf(fn, 404, "The specified vnode '%s' has running jobs (%s).", name, s)
 		return
 	}
 
@@ -190,10 +174,49 @@ func (m *Manager) dyncfgVnodeRemove(fn functions.Function) {
 	m.dyncfgRespf(fn, 200, "")
 }
 
-func (m *Manager) dyncfgVnodeUpdate(fn functions.Function) {
-	name := strings.TrimPrefix(fn.Args[0], fmt.Sprintf("%svnode:", dyncfgVnodeIDPrefix))
+func (m *Manager) dyncfgVnodeTest(fn functions.Function) {
+	id := fn.Args[0]
+	name := strings.TrimPrefix(id, dyncfgVnodeID+":")
 
-	_, ok := m.Vnodes[name]
+	orig, ok := m.Vnodes[name]
+	if !ok {
+		m.Warningf("dyncfg: test: vnode %s not found", name)
+		m.dyncfgRespf(fn, 404, "The specified vnode '%s' is not registered.", name)
+		return
+	}
+
+	cfg, err := vnodeConfigFromPayload(fn)
+	if err != nil {
+		m.Warningf("dyncfg: test: vnode: failed to create config from payload: %v", err)
+		m.dyncfgRespf(fn, 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
+		return
+	}
+
+	if err := uuid.Validate(cfg.GUID); err != nil {
+		m.Warningf("dyncfg: test: vnode job %s: invalid guid: %v", name, err)
+		m.dyncfgRespf(fn, 400, "Failed to create configuration from payload. Invalid guid format: %v.", err)
+		return
+	}
+
+	dyncfgUpdateVnodeConfig(cfg, name)
+
+	if orig.Equal(cfg) {
+		m.dyncfgRespf(fn, 202, "Configuration unchanged.")
+		return
+	}
+
+	if s := m.dyncfgVnodeAffectedJobs(cfg.Name); s != "" {
+		m.dyncfgRespf(fn, 202, "Updated configuration will affect: %s.", s)
+	} else {
+		m.dyncfgRespf(fn, 202, "No jobs will be affected by this change.")
+	}
+}
+
+func (m *Manager) dyncfgVnodeUpdate(fn functions.Function) {
+	id := fn.Args[0]
+	name := strings.TrimPrefix(id, dyncfgVnodeID+":")
+
+	orig, ok := m.Vnodes[name]
 	if !ok {
 		m.Warningf("dyncfg: remove: vnode %s not found", name)
 		m.dyncfgRespf(fn, 404, "The specified vnode '%s' is not registered.", name)
@@ -207,6 +230,19 @@ func (m *Manager) dyncfgVnodeUpdate(fn functions.Function) {
 		return
 	}
 
+	if err := uuid.Validate(cfg.GUID); err != nil {
+		m.Warningf("dyncfg: update: vnode job %s: invalid guid: %v", name, err)
+		m.dyncfgRespf(fn, 400, "Failed to create configuration from payload. Invalid guid format: %v.", err)
+		return
+	}
+
+	dyncfgUpdateVnodeConfig(cfg, name)
+
+	if orig.Equal(cfg) {
+		m.dyncfgRespf(fn, 202, "")
+		return
+	}
+
 	m.Vnodes[name] = cfg
 
 	m.runningJobs.forEach(func(_ string, job *module.Job) {
@@ -214,7 +250,6 @@ func (m *Manager) dyncfgVnodeUpdate(fn functions.Function) {
 			job.UpdateVnode(cfg)
 		}
 	})
-
 	m.dyncfgRespf(fn, 202, "")
 	m.dyncfgVnodeJobCreate(cfg, dyncfgRunning)
 }
@@ -228,6 +263,28 @@ func (m *Manager) dyncfgVnodeUserconfig(fn functions.Function) {
 	}
 
 	m.dyncfgRespPayloadYAML(fn, string(bs))
+}
+
+func (m *Manager) dyncfgVnodeAffectedJobs(vnode string) string {
+	var s strings.Builder
+	for _, ecfg := range m.exposedConfigs.items {
+		if ecfg.cfg.Vnode() == vnode {
+			if s.Len() > 0 {
+				s.WriteString(", ")
+			}
+			s.WriteString(fmt.Sprintf("%s:%s", ecfg.cfg.Module(), ecfg.cfg.Name()))
+		}
+	}
+	return s.String()
+}
+
+func dyncfgUpdateVnodeConfig(cfg *vnodes.VirtualNode, name string) {
+	cfg.Name = name
+	if cfg.Hostname == "" {
+		cfg.Hostname = name
+	}
+	cfg.SourceType = confgroup.TypeDyncfg
+	cfg.Source = "type=dyncfg"
 }
 
 func vnodeConfigFromPayload(fn functions.Function) (*vnodes.VirtualNode, error) {
