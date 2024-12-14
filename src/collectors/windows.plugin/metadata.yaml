@@ -1958,3 +1958,33 @@ modules:
               chart_type: line
               dimensions:
                 - name: class_load
+            - name: netframework.clrremoting_channels
+              description: Registered channels
+              unit: channels/s
+              chart_type: line
+              dimensions:
+                - name: registered
+            - name: netframework.clrremoting_context_bound_classes_loaded
+              description: Loaded context-bound classes
+              unit: classes
+              chart_type: line
+              dimensions:
+                - name: loaded
+            - name: netframework.clrremoting_context_bound_objects
+              description: Allocated context-bound objects
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: objects
+            - name: netframework.clrremoting_context_proxies
+              description: Remoting proxy objects
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: contexts
+            - name: netframework.clrremoting_remote_calls
+              description: Remote Procedure Calls (RPC) invoked
+              unit: calls/s
+              chart_type: line
+              dimensions:
+                - name: rpc
