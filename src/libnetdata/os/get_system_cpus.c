@@ -29,7 +29,7 @@ size_t os_get_system_cpus_cached(bool cache) {
     #if defined(OS_MACOS)
         #define HW_CPU_NAME "hw.logicalcpu"
     #else
-        #define HW_CPU_NAME "hw.ncpu"
+        #define HW_CPU_NAME "kern.smp.cpus"
     #endif
 
     if (unlikely(GETSYSCTL_BY_NAME(HW_CPU_NAME, p) || p < 1))
