@@ -90,7 +90,6 @@ struct sender_state {
         time_t latest_completed_before_t;       // the timestamp of the latest replication request
 
         struct {
-            ssize_t threads;
             size_t pending_requests;            // the currently outstanding replication requests
             size_t charts_replicating;          // the number of unique charts having pending replication requests (on every request one is added and is removed when we finish it - it does not track completion of the replication for this chart)
             bool reached_max;                   // true when the sender buffer should not get more replication responses
