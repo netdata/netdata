@@ -82,6 +82,7 @@ static void stream_conf_load_internal() {
     appconfig_move_everywhere(&stream_config, "default postpone alarms on connect seconds", "postpone alerts on connect");
     appconfig_move_everywhere(&stream_config, "postpone alarms on connect seconds", "postpone alerts on connect");
     appconfig_move_everywhere(&stream_config, "health enabled by default", "health enabled");
+    appconfig_move_everywhere(&stream_config, "buffer size bytes", "buffer size");
 }
 
 bool stream_conf_receiver_needs_dbengine(void) {
@@ -119,8 +120,8 @@ void stream_conf_load() {
         config_get_duration_seconds(CONFIG_SECTION_DB, "replication step",
                                     stream_receive.replication.step);
 
-    stream_send.buffer_max_size = (size_t)appconfig_get_number(
-        &stream_config, CONFIG_SECTION_STREAM, "buffer size bytes",
+    stream_send.buffer_max_size = (size_t)appconfig_get_size_bytes(
+        &stream_config, CONFIG_SECTION_STREAM, "buffer size",
         stream_send.buffer_max_size);
 
     stream_send.parents.reconnect_delay_s = (unsigned int)appconfig_get_duration_seconds(
@@ -185,8 +186,15 @@ void stream_conf_load() {
     }
 }
 
-bool stream_conf_configured_as_parent() {
-    return stream_conf_has_uuid_section(&stream_config);
+bool stream_conf_is_parent(bool recheck) {
+    static bool rc = false, queried = false;
+    if(!recheck && queried)
+        return rc;
+
+    rc = stream_conf_has_api_enabled(&stream_config);
+    queried = true;
+
+    return rc;
 }
 
 void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_receiver_config *config, const char *api_key, const char *machine_guid) {

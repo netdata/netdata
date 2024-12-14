@@ -15,8 +15,6 @@ extern struct dictionary_stats dictionary_stats_category_rrdhealth;
 extern struct dictionary_stats dictionary_stats_category_functions;
 extern struct dictionary_stats dictionary_stats_category_replication;
 
-extern size_t rrddim_db_memory_size;
-
 #if defined(PULSE_INTERNALS)
 void pulse_dictionary_do(bool extended);
 #endif

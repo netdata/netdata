@@ -373,13 +373,13 @@ void netdata_conf_section_db(void) {
     // get default database size
 
     if(default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && default_rrd_memory_mode != RRD_MEMORY_MODE_NONE) {
-        default_rrd_history_entries = (int)config_get_number(
+        default_rrd_history_entries = (int)config_get_duration_seconds(
             CONFIG_SECTION_DB, "retention",
             align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
 
         long h = align_entries_to_pagesize(default_rrd_memory_mode, default_rrd_history_entries);
         if (h != default_rrd_history_entries) {
-            config_set_number(CONFIG_SECTION_DB, "retention", h);
+            config_set_duration_seconds(CONFIG_SECTION_DB, "retention", h);
             default_rrd_history_entries = (int)h;
         }
     }

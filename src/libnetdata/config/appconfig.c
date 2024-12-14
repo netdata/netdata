@@ -62,19 +62,30 @@ bool stream_conf_needs_dbengine(struct config *root) {
     return ret;
 }
 
-bool stream_conf_has_uuid_section(struct config *root) {
+bool stream_conf_has_api_enabled(struct config *root) {
     struct config_section *sect = NULL;
+    struct config_option *opt;
     bool is_parent = false;
 
     APPCONFIG_LOCK(root);
     for (sect = root->sections; sect; sect = sect->next) {
         nd_uuid_t uuid;
 
-        if (uuid_parse(string2str(sect->name), uuid) != -1 &&
-            appconfig_get_boolean_by_section(sect, "enabled", 0)) {
-            is_parent = true;
-            break;
-        }
+        if (uuid_parse(string2str(sect->name), uuid) != 0)
+            continue;
+
+        opt = appconfig_option_find(sect, "type");
+        // when the 'type' is missing, we assume it is 'api'
+        if(opt && string_strcmp(opt->value, "api") != 0)
+            continue;
+
+        opt = appconfig_option_find(sect, "enabled");
+        // when the 'enabled' is missing, we assume it is 'false'
+        if(!opt || !appconfig_test_boolean_value(string2str(opt->value)))
+            continue;
+
+        is_parent = true;
+        break;
     }
     APPCONFIG_UNLOCK(root);
 

@@ -1889,7 +1889,7 @@ void *replication_thread_main(void *ptr) {
 
     replication_initialize_workers(true);
 
-    int threads = stream_conf_configured_as_parent() ? (int)(get_netdata_cpus() / 2) : 1;
+    int threads = stream_conf_is_parent(false) ? (int)(get_netdata_cpus() / 2) : 1;
     if (threads < 1) threads = 1;
     else if (threads > MAX_REPLICATION_THREADS) threads = MAX_REPLICATION_THREADS;
 

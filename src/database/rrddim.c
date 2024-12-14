@@ -63,13 +63,13 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         if(!entries) entries = 5;
 
         rd->db.data = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false, NULL);
-        if(!rd->db.data) {
-            netdata_log_info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
-            ctr->memory_mode = RRD_MEMORY_MODE_ALLOC;
+        if(rd->db.data) {
+            rd->db.memsize = entries * sizeof(storage_number);
+            pulse_db_rrd_memory_add(rd->db.memsize);
         }
         else {
-            rd->db.memsize = entries * sizeof(storage_number);
-            __atomic_add_fetch(&rrddim_db_memory_size, rd->db.memsize, __ATOMIC_RELAXED);
+            netdata_log_info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
+            ctr->memory_mode = RRD_MEMORY_MODE_ALLOC;
         }
     }
 
@@ -79,7 +79,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
         rd->db.data = rrddim_alloc_db(entries);
         rd->db.memsize = entries * sizeof(storage_number);
-        __atomic_add_fetch(&rrddim_db_memory_size, rd->db.memsize, __ATOMIC_RELAXED);
+        pulse_db_rrd_memory_add(rd->db.memsize);
     }
 
     rd->rrd_memory_mode = ctr->memory_mode;
@@ -223,7 +223,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     }
 
     if(rd->db.data) {
-        __atomic_sub_fetch(&rrddim_db_memory_size, rd->db.memsize, __ATOMIC_RELAXED);
+        pulse_db_rrd_memory_sub(rd->db.memsize);
 
         if(rd->rrd_memory_mode == RRD_MEMORY_MODE_RAM)
             netdata_munmap(rd->db.data, rd->db.memsize);
