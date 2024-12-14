@@ -1988,3 +1988,27 @@ modules:
               chart_type: line
               dimensions:
                 - name: rpc
+            - name: netframework.clrsecurity_link_time_checks
+              description: Link-time code access security checks
+              unit: checks/s
+              chart_type: line
+              dimensions:
+                - name: linktime
+            - name: netframework.clrsecurity_checks_time
+              description: Time spent performing runtime code access security checks
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: netframework.clrsecurity_stack_walk_depth
+              description: Depth of the stack
+              unit: depth
+              chart_type: line
+              dimensions:
+                - name: stack
+            - name: netframework.clrsecurity_runtime_checks
+              description: Runtime code access security checks performed
+              unit: checks/s
+              chart_type: line
+              dimensions:
+                - name: runtime
