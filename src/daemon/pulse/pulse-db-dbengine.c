@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #define PULSE_INTERNALS 1
-#include "pulse-dbengine.h"
+#include "pulse-db-dbengine.h"
 
 size_t pulse_dbengine_total_memory = 0;
 

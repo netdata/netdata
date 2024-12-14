@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_PULSE_DBENGINE_H
-#define NETDATA_PULSE_DBENGINE_H
+#ifndef NETDATA_PULSE_DB_DBENGINE_H
+#define NETDATA_PULSE_DB_DBENGINE_H
 
 #include "daemon/common.h"
 
@@ -14,4 +14,4 @@ void pulse_dbengine_do(bool extended);
 
 #endif
 
-#endif //NETDATA_PULSE_DBENGINE_H
+#endif //NETDATA_PULSE_DB_DBENGINE_H

@@ -12,7 +12,9 @@ struct netdata_buffers_statistics netdata_buffers_statistics = {};
 void pulse_daemon_memory_do(bool extended) {
     {
         static RRDSET *st_memory = NULL;
-        static RRDDIM *rd_database = NULL;
+        static RRDDIM *rd_db_dbengine = NULL;
+        static RRDDIM *rd_db_rrd = NULL;
+
 #ifdef DICT_WITH_STATS
         static RRDDIM *rd_collectors = NULL;
         static RRDDIM *rd_rrdhosts = NULL;
@@ -50,7 +52,8 @@ void pulse_daemon_memory_do(bool extended) {
                 localhost->rrd_update_every,
                 RRDSET_TYPE_STACKED);
 
-            rd_database = rrddim_add(st_memory, "db", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_db_dbengine = rrddim_add(st_memory, "dbengine", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_db_rrd = rrddim_add(st_memory, "rrd", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
 #ifdef DICT_WITH_STATS
             rd_collectors = rrddim_add(st_memory, "collectors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -92,8 +95,8 @@ void pulse_daemon_memory_do(bool extended) {
         size_t strings = 0;
         string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
 
-        rrddim_set_by_pointer(st_memory, rd_database,
-                              (collected_number)pulse_dbengine_total_memory + (collected_number)rrddim_db_memory_size);
+        rrddim_set_by_pointer(st_memory, rd_db_dbengine, (collected_number)pulse_dbengine_total_memory);
+        rrddim_set_by_pointer(st_memory, rd_db_rrd, (collected_number)pulse_rrd_memory_size);
 
 #ifdef DICT_WITH_STATS
         rrddim_set_by_pointer(st_memory, rd_collectors,
@@ -157,11 +160,11 @@ void pulse_daemon_memory_do(bool extended) {
         rrddim_set_by_pointer(st_memory, rd_aral,
                               (collected_number)aral_by_size_structures_bytes());
 
-        rrddim_set_by_pointer(st_memory,
-                              rd_judy, (collected_number) judy_aral_structures());
+        rrddim_set_by_pointer(st_memory, rd_judy,
+                              (collected_number) judy_aral_structures());
 
-        rrddim_set_by_pointer(st_memory,
-                              rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
+        rrddim_set_by_pointer(st_memory, rd_other,
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
 
         rrdset_done(st_memory);
     }
