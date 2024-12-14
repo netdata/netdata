@@ -2,6 +2,7 @@ update_every: 123
 hostname: "ok"
 create_vnode: yes
 vnode:
+  name: "ok"
   guid: "ok"
   hostname: "ok"
   labels:

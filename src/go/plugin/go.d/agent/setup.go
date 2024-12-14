@@ -173,7 +173,7 @@ func (a *Agent) setupVnodeRegistry() map[string]*vnodes.VirtualNode {
 	}
 
 	reg := vnodes.Load(dirPath)
-	a.Infof("found '%s' (%d vhosts)", dirPath)
+	a.Infof("found '%s' (%d vhosts)", dirPath, len(reg))
 
 	return reg
 }

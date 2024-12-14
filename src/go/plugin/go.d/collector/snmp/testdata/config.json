@@ -3,6 +3,7 @@
   "hostname": "ok",
   "create_vnode": true,
   "vnode": {
+    "name": "ok",
     "guid": "ok",
     "hostname": "ok",
     "labels": {
