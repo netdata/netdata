@@ -708,6 +708,7 @@ declare -A pkg_pcre2=(
   ['debian']="libpcre2-dev"
   ['freebsd']="pcre2"
   ['macos']="pcre2"
+  ['rhel']="pcre2-devel"
   ['suse']="pcre2-devel"
   ['ubuntu']="libpcre2-dev"
   ['default']="NOTREQUIRED"
