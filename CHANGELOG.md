@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump k8s.io/client-go from 0.31.3 to 0.32.0 in /src/go [\#19210](https://github.com/netdata/netdata/pull/19210) ([dependabot[bot]](https://github.com/apps/dependabot))
+- dyncfg vnodes improvements [\#19207](https://github.com/netdata/netdata/pull/19207) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d.plugin\): add dyncfg vnodes [\#19205](https://github.com/netdata/netdata/pull/19205) ([ilyam8](https://github.com/ilyam8))
+- Streaming improvements No 7 [\#19204](https://github.com/netdata/netdata/pull/19204) ([ktsaou](https://github.com/ktsaou))
 - Streaming improvements No 6 [\#19196](https://github.com/netdata/netdata/pull/19196) ([ktsaou](https://github.com/ktsaou))
 - Add cross-architecture build tests for Go code. [\#19195](https://github.com/netdata/netdata/pull/19195) ([Ferroin](https://github.com/Ferroin))
 - Remove July arrays [\#19194](https://github.com/netdata/netdata/pull/19194) ([stelfrag](https://github.com/stelfrag))
@@ -448,10 +452,6 @@
 - Embed CPU architecture info in Windows installer filename. [\#18661](https://github.com/netdata/netdata/pull/18661) ([Ferroin](https://github.com/Ferroin))
 - Docs directory lint documentation and fix issues [\#18660](https://github.com/netdata/netdata/pull/18660) ([Ancairon](https://github.com/Ancairon))
 - bump go toolchain v1.22.8 [\#18659](https://github.com/netdata/netdata/pull/18659) ([ilyam8](https://github.com/ilyam8))
-- go.d sd fix sprig funcmap [\#18658](https://github.com/netdata/netdata/pull/18658) ([ilyam8](https://github.com/ilyam8))
-- Adjust content api/v1/info \(Windows\) [\#18656](https://github.com/netdata/netdata/pull/18656) ([thiagoftsm](https://github.com/thiagoftsm))
-- add go.d/oracle [\#18654](https://github.com/netdata/netdata/pull/18654) ([ilyam8](https://github.com/ilyam8))
-- Handle mqtt ping timeouts [\#18653](https://github.com/netdata/netdata/pull/18653) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

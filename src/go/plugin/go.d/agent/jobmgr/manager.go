@@ -157,7 +157,7 @@ func (m *Manager) run() {
 				switch id := fn.Args[0]; true {
 				case strings.HasPrefix(id, dyncfgCollectorIDPrefix):
 					m.dyncfgCollectorSeqExec(fn)
-				case strings.HasPrefix(id, dyncfgVnodeIDPrefix):
+				case strings.HasPrefix(id, dyncfgVnodeID):
 					m.dyncfgVnodeSeqExec(fn)
 				default:
 					m.dyncfgRespf(fn, 503, "unknown function '%s' (%s).", fn.Name, id)

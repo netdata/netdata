@@ -3,6 +3,7 @@
 package vnodes
 
 import (
+	_ "embed"
 	"fmt"
 	"io"
 	"io/fs"
@@ -17,6 +18,9 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 )
+
+//go:embed "config_schema.json"
+var ConfigSchema string
 
 var log = logger.New().With(
 	slog.String("component", "vnodes"),
@@ -52,6 +56,13 @@ func (v *VirtualNode) Copy() *VirtualNode {
 		SourceType: v.SourceType,
 		Labels:     labels,
 	}
+}
+
+func (v *VirtualNode) Equal(vn *VirtualNode) bool {
+	return v.Name == vn.Name &&
+		v.Hostname == vn.Hostname &&
+		v.GUID == vn.GUID &&
+		maps.Equal(v.Labels, vn.Labels)
 }
 
 func readConfDir(dir string) map[string]*VirtualNode {
