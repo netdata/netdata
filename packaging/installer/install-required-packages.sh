@@ -702,7 +702,14 @@ declare -A pkg_libsystemd_dev=(
 )
 
 declare -A pkg_pcre2=(
+  ['alpine']="pcre2-dev"
+  ['arch']="pcre2"
+  ['centos']="pcre2-devel"
+  ['debian']="libpcre2-dev"
+  ['freebsd']="pcre2"
   ['macos']="pcre2"
+  ['suse']="pcre2-devel"
+  ['ubuntu']="libpcre2-dev"
   ['default']="NOTREQUIRED"
 )
 
