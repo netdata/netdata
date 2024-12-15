@@ -78,7 +78,7 @@ done:
 error:
     spinlock_unlock(&spinlock);
     processors = 1;
-    netdata_log_error("Cannot open file '%s'. Assuming system has %zu processors.", filename, processors);
+    netdata_log_error("Cannot detect number of CPU cores. Assuming the system has %zu processors.", processors);
     return processors;
 }
 
