@@ -548,7 +548,7 @@ static void ebpf_update_shm_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_shm_t *out = &pids->shm;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_SHM_IDX);
+            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_SHM_IDX);
             netdata_publish_shm_t *in = local_pid->shm;
             if (!in)
                 continue;
@@ -582,7 +582,7 @@ static void ebpf_read_shm_apps_table(int maps_per_core)
 
         shm_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, EBPF_PIDS_SHM_IDX);
+        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, NETDATA_EBPF_PIDS_SHM_IDX);
         netdata_publish_shm_t *publish = local_pid->shm;
         if (!publish)
             local_pid->shm = publish = ebpf_shm_allocate_publish();
@@ -594,7 +594,7 @@ static void ebpf_read_shm_apps_table(int maps_per_core)
             if (kill(key, 0)) { // No PID found
                 ebpf_reset_specific_pid_data(local_pid);
             } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(local_pid, fd, key, EBPF_PIDS_SHM_IDX);
+                ebpf_release_pid_data(local_pid, fd, key, NETDATA_EBPF_PIDS_SHM_IDX);
                 ebpf_shm_release_publish(publish);
                 local_pid->shm = NULL;
             }
@@ -667,7 +667,7 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_tar
     memset(shm, 0, sizeof(netdata_publish_shm_t));
     for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, EBPF_PIDS_SHM_IDX);
+        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_SHM_IDX);
         netdata_publish_shm_t *w = pid_stat->shm;
         if (!w)
             continue;
@@ -1070,7 +1070,7 @@ void *ebpf_read_shm_thread(void *ptr)
 
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
-    pids_fd[EBPF_PIDS_SHM_IDX] = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
+    pids_fd[NETDATA_EBPF_PIDS_SHM_IDX] = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
@@ -1332,7 +1332,7 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_shm_thread(void *ptr)
 {
-    pids_fd[EBPF_PIDS_SHM_IDX] = -1;
+    pids_fd[NETDATA_EBPF_PIDS_SHM_IDX] = -1;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_shm_exit) cleanup_ptr = em;
