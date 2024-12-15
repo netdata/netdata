@@ -77,18 +77,6 @@ typedef struct __attribute__((packed)) netdata_publish_dcstat_pid {
     uint32_t not_found;
 } netdata_publish_dcstat_pid_t;
 
-typedef struct netdata_dcstat_pid {
-    uint64_t ct;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint32_t cache_access;
-    uint32_t file_system;
-    uint32_t not_found;
-} netdata_dcstat_pid_t;
-
 typedef struct __attribute__((packed)) netdata_publish_dcstat {
     uint64_t ct;
 
