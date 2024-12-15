@@ -207,17 +207,27 @@ for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.
 done
 
 if command -v setcap >/dev/null 2>&1; then
-    run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"
-    run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"
-    run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"
+  if ! run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"; then
+    run chmod 4750 "usr/libexec/netdata/plugins.d/apps.plugin"
+  fi
+  if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"; then
+    run chmod 4750 "usr/libexec/netdata/plugins.d/slabinfo.plugin"
+  fi
+  if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"; then
+    run chmod 4750 "usr/libexec/netdata/plugins.d/debugfs.plugin"
+  fi
+  if ! run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"; then
+    run chmod 4750 "usr/libexec/netdata/plugins.d/go.d.plugin"
+  fi
 
-    if command -v capsh >/dev/null 2>&1 && capsh --supports=cap_perfmon 2>/dev/null ; then
-        run setcap "cap_perfmon=ep" "usr/libexec/netdata/plugins.d/perf.plugin"
-    else
-        run setcap "cap_sys_admin=ep" "usr/libexec/netdata/plugins.d/perf.plugin"
-    fi
+  perf_caps="cap_sys_admin=ep"
+  if command -v capsh >/dev/null 2>&1 && capsh --supports=cap_perfmon 2>/dev/null; then
+    perf_caps="cap_perfmon=ep"
+  fi
 
-    run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"
+  if ! run setcap "${perf_caps}" "usr/libexec/netdata/plugins.d/perf.plugin"; then
+    run chmod 4750 "usr/libexec/netdata/plugins.d/perf.plugin"
+  fi
 else
   for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
     f="usr/libexec/netdata/plugins.d/${x}"
