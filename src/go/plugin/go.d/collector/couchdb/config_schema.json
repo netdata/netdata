@@ -30,6 +30,11 @@
         "description": "If set, the client will not follow HTTP redirects automatically.",
         "type": "boolean"
       },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
       "node": {
         "title": "Node name",
         "description": "CouchDB node name. Same as -name vm.args argument.",
@@ -133,7 +138,8 @@
             "timeout",
             "not_follow_redirects",
             "node",
-            "databases"
+            "databases",
+            "vnode"
           ]
         },
         {
@@ -176,6 +182,9 @@
     },
     "method": {
       "ui:widget": "hidden"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."

@@ -48,7 +48,8 @@ func New() *Collector {
 }
 
 type Config struct {
-	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode          string `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery    int    `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTPConfig `yaml:",inline" json:""`
 	PerServerStats matcher.SimpleExpr `yaml:"per_server_stats,omitempty" json:"per_server_stats"`
 	PerZoneStats   matcher.SimpleExpr `yaml:"per_zone_stats,omitempty" json:"per_zone_stats"`

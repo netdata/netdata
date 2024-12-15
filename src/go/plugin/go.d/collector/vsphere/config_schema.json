@@ -36,6 +36,11 @@
         "description": "If set, the client will not follow HTTP redirects automatically.",
         "type": "boolean"
       },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
       "host_include": {
         "title": "Host selectors",
         "description": "Configuration for monitoring specific hosts. The selector format follows the pattern `/Datacenter/Cluster/Host`, where each value can be set using [Netdata simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme).",
@@ -171,7 +176,8 @@
             "url",
             "timeout",
             "discovery_interval",
-            "not_follow_redirects"
+            "not_follow_redirects",
+            "vnode"
           ]
         },
         {
@@ -218,6 +224,9 @@
     },
     "method": {
       "ui:widget": "hidden"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "update_every": {
       "ui:help": "**Important**: vSphere generates real-time statistics every 20 seconds. Setting this value lower won't improve data accuracy. For larger vSphere deployments, consider increasing this value to ensure complete data collection during each cycle. To find the optimal value, run the collector in debug mode and see how long it takes to collect metrics."

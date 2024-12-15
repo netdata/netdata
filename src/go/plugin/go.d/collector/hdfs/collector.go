@@ -44,6 +44,7 @@ func New() *Collector {
 }
 
 type Config struct {
+	Vnode          string `yaml:"vnode,omitempty" json:"vnode"`
 	web.HTTPConfig `yaml:",inline" json:""`
 	UpdateEvery    int `yaml:"update_every" json:"update_every"`
 }

@@ -30,6 +30,11 @@
         "description": "If set, the client will not follow HTTP redirects automatically.",
         "type": "boolean"
       },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
       "username": {
         "title": "Username",
         "description": "The username for basic authentication.",
@@ -119,6 +124,9 @@
     "method": {
       "ui:widget": "hidden"
     },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    },
     "update_every": {
       "ui:help": "Riak updates metrics on the `/stats` endpoint every second.  To ensure accurate data representation, a polling interval of 2 seconds or more is suggested."
     },
@@ -146,7 +154,8 @@
             "update_every",
             "url",
             "timeout",
-            "not_follow_redirects"
+            "not_follow_redirects",
+            "vnode"
           ]
         },
         {

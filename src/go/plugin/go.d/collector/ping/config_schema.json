@@ -61,6 +61,11 @@
         "description": "The network device name (e.g., `eth0`, `wlan0`) used as the source for ICMP echo requests.",
         "type": "string",
         "default": ""
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
       }
     },
     "required": [
@@ -73,6 +78,9 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "update_every": {
       "ui:help": "Sets the frequency at which a specified number of ping packets (determined by 'packets') are sent to designated hosts."

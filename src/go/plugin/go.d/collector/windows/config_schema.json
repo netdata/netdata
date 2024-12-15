@@ -30,7 +30,7 @@
       },
       "vnode": {
         "title": "Vnode",
-        "description": "The hostname of the [virtual node](https://github.com/netdata/netdata/blob/master/docs/guides/using-host-labels.md#virtual-nodes) defined in the vnodes.conf configuration file.",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
         "type": "string"
       },
       "username": {
@@ -166,6 +166,9 @@
     },
     "method": {
       "ui:widget": "hidden"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "url": {
       "ui:placeholder": "http://203.0.113.0:9182/metrics"

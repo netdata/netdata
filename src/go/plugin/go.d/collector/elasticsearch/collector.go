@@ -58,7 +58,8 @@ func New() *Collector {
 }
 
 type Config struct {
-	UpdateEvery     int `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode           string `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery     int    `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTPConfig  `yaml:",inline" json:""`
 	ClusterMode     bool `yaml:"cluster_mode" json:"cluster_mode"`
 	DoNodeStats     bool `yaml:"collect_node_stats" json:"collect_node_stats"`

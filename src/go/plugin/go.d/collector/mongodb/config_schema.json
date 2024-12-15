@@ -59,6 +59,11 @@
             "uniqueItems": true
           }
         }
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
       }
     },
     "required": [
@@ -71,6 +76,9 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "uri": {
       "ui:placeholder": "mongodb://username:password@host:port"
@@ -89,7 +97,8 @@
           "fields": [
             "update_every",
             "uri",
-            "timeout"
+            "timeout",
+            "vnode"
           ]
         },
         {
