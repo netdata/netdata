@@ -18,10 +18,6 @@
 #define NETDATA_APPS_NET_GROUP "net"
 #define NETDATA_APPS_IPC_SHM_GROUP "ipc shm"
 
-#ifndef TASK_COMM_LEN
-#define TASK_COMM_LEN 16
-#endif
-
 #include "ebpf_process.h"
 #include "ebpf_dcstat.h"
 #include "ebpf_disk.h"
@@ -78,24 +74,6 @@ enum ebpf_main_index {
 
 // ----------------------------------------------------------------------------
 // Structures used to read information from kernel ring
-typedef struct ebpf_process_stat {
-    uint64_t ct;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint32_t tgid;
-    uint32_t pid;
-
-    //Counter
-    uint32_t exit_call;
-    uint32_t release_call;
-    uint32_t create_process;
-    uint32_t create_thread;
-
-    //Counter
-    uint32_t task_err;
-} ebpf_process_stat_t;
 
 typedef struct __attribute__((packed)) ebpf_publish_process {
     uint64_t ct;
