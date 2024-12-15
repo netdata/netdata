@@ -184,6 +184,8 @@ void stream_conf_load() {
         nd_log_daemon(NDLP_ERR, "STREAM [send]: cannot enable sending thread - information is missing.");
         stream_send.enabled = false;
     }
+
+    stream_conf_is_parent(true);
 }
 
 bool stream_conf_is_parent(bool recheck) {

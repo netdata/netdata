@@ -40,11 +40,6 @@
 
 extern const char *os_type;
 
-#define os_get_system_cpus() os_get_system_cpus_cached(true, false)
-#define os_get_system_cpus_uncached() os_get_system_cpus_cached(false, false)
-long os_get_system_cpus_cached(bool cache, bool for_netdata);
-unsigned long os_read_cpuset_cpus(const char *filename, long system_cpus);
-
 extern unsigned int system_hz;
 void os_get_system_HZ(void);
 

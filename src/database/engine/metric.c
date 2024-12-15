@@ -367,7 +367,7 @@ static inline METRIC *metric_get_and_acquire(MRG *mrg, nd_uuid_t *uuid, Word_t s
 
 inline MRG *mrg_create(ssize_t partitions) {
     if(partitions < 1)
-        partitions = get_netdata_cpus();
+        partitions = (ssize_t)netdata_conf_cpus();
 
     MRG *mrg = callocz(1, sizeof(MRG) + sizeof(struct mrg_partition) * partitions);
     mrg->partitions = partitions;

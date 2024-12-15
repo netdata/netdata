@@ -320,14 +320,12 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
     return hash % modulo;
 }
 
-long get_netdata_cpus(void);
-
 static inline size_t pgc_max_evictors(void) {
-    return 1 + get_netdata_cpus() / 2;
+    return 1 + netdata_conf_cpus() / 2;
 }
 
 static inline size_t pgc_max_flushers(void) {
-    return get_netdata_cpus();
+    return netdata_conf_cpus();
 }
 
 #endif // DBENGINE_CACHE_H

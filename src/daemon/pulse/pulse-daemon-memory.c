@@ -14,6 +14,7 @@ void pulse_daemon_memory_do(bool extended) {
         static RRDSET *st_memory = NULL;
         static RRDDIM *rd_db_dbengine = NULL;
         static RRDDIM *rd_db_rrd = NULL;
+        static RRDDIM *rd_db_sqlite3 = NULL;
 
 #ifdef DICT_WITH_STATS
         static RRDDIM *rd_collectors = NULL;
@@ -54,6 +55,7 @@ void pulse_daemon_memory_do(bool extended) {
 
             rd_db_dbengine = rrddim_add(st_memory, "dbengine", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_db_rrd = rrddim_add(st_memory, "rrd", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_db_sqlite3 = rrddim_add(st_memory, "sqlite3", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
 #ifdef DICT_WITH_STATS
             rd_collectors = rrddim_add(st_memory, "collectors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -93,11 +95,15 @@ void pulse_daemon_memory_do(bool extended) {
             netdata_buffers_statistics.buffers_web +
             replication_allocated_buffers() + aral_by_size_free_bytes() + judy_aral_free_bytes();
 
+        int sqlite3_memory_used_current = 0, sqlite3_memory_used_highwater = 0;
+        sqlite3_status(SQLITE_STATUS_MEMORY_USED, &sqlite3_memory_used_current, &sqlite3_memory_used_highwater, 1);
+
         size_t strings = 0;
         string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
 
         rrddim_set_by_pointer(st_memory, rd_db_dbengine, (collected_number)pulse_dbengine_total_memory);
         rrddim_set_by_pointer(st_memory, rd_db_rrd, (collected_number)pulse_rrd_memory_size);
+        rrddim_set_by_pointer(st_memory, rd_db_sqlite3, (collected_number)sqlite3_memory_used_highwater);
 
 #ifdef DICT_WITH_STATS
         rrddim_set_by_pointer(st_memory, rd_collectors,

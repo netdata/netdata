@@ -250,7 +250,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
     // fails on Windows.
     bool parallel_initialization = false;
 #else
-    bool parallel_initialization = (storage_tiers <= (size_t)get_netdata_cpus()) ? true : false;
+    bool parallel_initialization = (storage_tiers <= netdata_conf_cpus()) ? true : false;
 #endif
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};

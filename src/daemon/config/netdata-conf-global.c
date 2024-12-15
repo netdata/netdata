@@ -2,6 +2,43 @@
 
 #include "netdata-conf-global.h"
 
+size_t netdata_conf_cpus(void) {
+    static size_t processors = 0;
+
+    if(processors)
+        return processors;
+
+    SPINLOCK spinlock = SPINLOCK_INITIALIZER;
+    spinlock_lock(&spinlock);
+    size_t p = 0;
+
+    if(processors)
+        goto skip;
+
+#if defined(OS_LINUX)
+    p = os_read_cpuset_cpus("/sys/fs/cgroup/cpuset.cpus", p);
+    if(!p)
+        p = os_read_cpuset_cpus("/sys/fs/cgroup/cpuset/cpuset.cpus", p);
+#endif
+
+    if(!p)
+        p = os_get_system_cpus_uncached();
+
+    p = config_get_number(CONFIG_SECTION_GLOBAL, "cpu cores", p);
+    if(p < 1)
+        p = 1;
+
+    processors = p;
+
+    char buf[24];
+    snprintfz(buf, sizeof(buf), "%zu", processors);
+    nd_setenv("NETDATA_CONF_CPUS", buf, 1);
+
+skip:
+    spinlock_unlock(&spinlock);
+    return processors;
+}
+
 static int get_hostname(char *buf, size_t buf_size) {
     if (netdata_configured_host_prefix && *netdata_configured_host_prefix) {
         char filename[FILENAME_MAX + 1];
@@ -36,7 +73,7 @@ static void glibc_initialize(void) {
 }
 
 static void libuv_initialize(void) {
-    libuv_worker_threads = (int)get_netdata_cpus() * 6;
+    libuv_worker_threads = (int)netdata_conf_cpus() * 6;
 
     if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
         libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
@@ -96,3 +133,4 @@ void netdata_conf_section_global_run_as_user(const char **user) {
         *user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
     }
 }
+
