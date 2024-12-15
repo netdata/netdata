@@ -45,7 +45,7 @@
 
 #define EBPF_CLEANUP_FACTOR 2
 
-extern int pids_fd[EBPF_PIDS_END_IDX];
+extern int pids_fd[NETDATA_EBPF_PIDS_END_IDX];
 
 enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
@@ -297,7 +297,7 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
     ebpf_pid_data_t *ptr = ebpf_find_or_create_pid_data(pid);
     ptr->thread_collecting |= 1<<idx;
     // The caller is getting data to work.
-    if (!name && idx != EBPF_PIDS_PROC_FILE)
+    if (!name && idx != NETDATA_EBPF_PIDS_PROC_FILE)
         return ptr;
 
     if (ptr->pid == pid) {
@@ -315,7 +315,7 @@ static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, ch
 
     ptr->next = ebpf_pids_link_list;
     ebpf_pids_link_list = ptr;
-    if (idx == EBPF_PIDS_PROC_FILE) {
+    if (idx == NETDATA_EBPF_PIDS_PROC_FILE) {
         ebpf_all_pids_count++;
     }
 
@@ -337,7 +337,7 @@ static inline void ebpf_reset_specific_pid_data(ebpf_pid_data_t *ptr)
 {
     int idx;
     uint32_t pid = ptr->pid;
-    for (idx = EBPF_PIDS_PROCESS_IDX; idx < EBPF_PIDS_PROC_FILE; idx++) {
+    for (idx = NETDATA_EBPF_PIDS_PROCESS_IDX; idx < NETDATA_EBPF_PIDS_PROC_FILE; idx++) {
         if (!(ptr->thread_collecting & (1<<idx)))  {
             continue;
         }
@@ -350,28 +350,28 @@ static inline void ebpf_reset_specific_pid_data(ebpf_pid_data_t *ptr)
         ebpf_hash_table_pids_count--;
         void *clean;
         switch (idx) {
-            case EBPF_PIDS_PROCESS_IDX:
+            case NETDATA_EBPF_PIDS_PROCESS_IDX:
                 clean = ptr->process;
                 break;
-            case EBPF_PIDS_SOCKET_IDX:
+            case NETDATA_EBPF_PIDS_SOCKET_IDX:
                 clean = ptr->socket;
                 break;
-            case EBPF_PIDS_CACHESTAT_IDX:
+            case NETDATA_EBPF_PIDS_CACHESTAT_IDX:
                 clean = ptr->cachestat;
                 break;
-            case EBPF_PIDS_DCSTAT_IDX:
+            case NETDATA_EBPF_PIDS_DCSTAT_IDX:
                 clean = ptr->dc;
                 break;
-            case EBPF_PIDS_SWAP_IDX:
+            case NETDATA_EBPF_PIDS_SWAP_IDX:
                 clean = ptr->swap;
                 break;
-            case EBPF_PIDS_VFS_IDX:
+            case NETDATA_EBPF_PIDS_VFS_IDX:
                 clean = ptr->vfs;
                 break;
-            case EBPF_PIDS_FD_IDX:
+            case NETDATA_EBPF_PIDS_FD_IDX:
                 clean = ptr->fd;
                 break;
-            case EBPF_PIDS_SHM_IDX:
+            case NETDATA_EBPF_PIDS_SHM_IDX:
                 clean = ptr->shm;
                 break;
             default:
