@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#ifndef NETDATA_SHARED_DATA_H
+#define NETDATA_SHARED_DATA_H 1
+
+#if defined(OS_LINUX)
+enum ebpf_pids_index {
+    EBPF_PIDS_PROCESS_IDX,
+    EBPF_PIDS_SOCKET_IDX,
+    EBPF_PIDS_CACHESTAT_IDX,
+    EBPF_PIDS_DCSTAT_IDX,
+    EBPF_PIDS_SWAP_IDX,
+    EBPF_PIDS_VFS_IDX,
+    EBPF_PIDS_FD_IDX,
+    EBPF_PIDS_SHM_IDX,
+
+    EBPF_PIDS_PROC_FILE,
+    EBPF_PIDS_END_IDX
+};
+
+#endif
+
+#endif //NETDATA_SHARED_DATA_H
