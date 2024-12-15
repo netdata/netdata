@@ -33,6 +33,11 @@
         "description": "Timeout for establishing a connection and communication (reading and writing) in seconds.",
         "type": "number",
         "default": 1
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
       }
     },
     "required": [
@@ -46,6 +51,9 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."

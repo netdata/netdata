@@ -46,6 +46,11 @@
         "description": "The body content to send along with the HTTP request (if applicable).",
         "type": "string"
       },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
       "status_accepted": {
         "title": "Status code check",
         "description": "Specifies the list of **HTTP response status codes** that are considered **acceptable**. Responses with status codes not included in this list will be categorized as 'bad status' in the status chart.",
@@ -194,7 +199,8 @@
             "timeout",
             "not_follow_redirects",
             "method",
-            "body"
+            "body",
+            "vnode"
           ]
         },
         {
@@ -240,6 +246,9 @@
     },
     "uiOptions": {
       "fullPage": true
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "url": {
       "ui:placeholder": "http://127.0.0.1"

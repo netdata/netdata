@@ -33,6 +33,11 @@
         "description": "Whether to check the revocation status of the certificate.",
         "type": "boolean"
       },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
       "tls_skip_verify": {
         "title": "Skip TLS verification",
         "description": "If set, TLS certificate verification will be skipped.",
@@ -68,6 +73,9 @@
     "uiOptions": {
       "fullPage": true
     },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    },
     "source": {
       "ui:placeholder": "https://example.com:443",
       "ui:help": " Website: `https://domainName:443`. Local file: `file:///path/to/cert.pem`. SMTP: `smtp://smtp.example.com:587`."
@@ -85,7 +93,8 @@
             "source",
             "timeout",
             "check_full_chain",
-            "check_revocation_status"
+            "check_revocation_status",
+            "vnode"
           ]
         },
         {

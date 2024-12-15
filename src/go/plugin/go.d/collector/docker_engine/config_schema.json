@@ -30,6 +30,11 @@
         "description": "If set, the client will not follow HTTP redirects automatically.",
         "type": "boolean"
       },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
       "username": {
         "title": "Username",
         "description": "The username for basic authentication.",
@@ -122,7 +127,8 @@
             "update_every",
             "url",
             "timeout",
-            "not_follow_redirects"
+            "not_follow_redirects",
+            "vnode"
           ]
         },
         {
@@ -162,6 +168,9 @@
     },
     "method": {
       "ui:widget": "hidden"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."

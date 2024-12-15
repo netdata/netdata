@@ -143,6 +143,13 @@ func (m *Manager) dyncfgVnodeAdd(fn functions.Function) {
 
 	m.Vnodes[name] = cfg
 
+	if orig, ok := m.Vnodes[name]; ok && !orig.Equal(cfg) {
+		m.runningJobs.forEach(func(_ string, job *module.Job) {
+			if job.Vnode().Name == name {
+				job.UpdateVnode(cfg)
+			}
+		})
+	}
 	m.dyncfgRespf(fn, 202, "")
 	m.dyncfgVnodeJobCreate(cfg, dyncfgRunning)
 }
@@ -175,15 +182,13 @@ func (m *Manager) dyncfgVnodeRemove(fn functions.Function) {
 }
 
 func (m *Manager) dyncfgVnodeTest(fn functions.Function) {
-	id := fn.Args[0]
-	name := strings.TrimPrefix(id, dyncfgVnodeID+":")
-
-	orig, ok := m.Vnodes[name]
-	if !ok {
-		m.Warningf("dyncfg: test: vnode %s not found", name)
-		m.dyncfgRespf(fn, 404, "The specified vnode '%s' is not registered.", name)
+	if len(fn.Args) < 3 {
+		m.Warningf("dyncfg: test: missing required arguments, want 3 got %d", len(fn.Args))
+		m.dyncfgRespf(fn, 400, "Missing required arguments. Need at least 3, but got %d.", len(fn.Args))
 		return
 	}
+
+	name := fn.Args[2]
 
 	cfg, err := vnodeConfigFromPayload(fn)
 	if err != nil {
@@ -200,8 +205,11 @@ func (m *Manager) dyncfgVnodeTest(fn functions.Function) {
 
 	dyncfgUpdateVnodeConfig(cfg, name)
 
-	if orig.Equal(cfg) {
-		m.dyncfgRespf(fn, 202, "Configuration unchanged.")
+	id := fn.Args[0]
+	_, ok := m.Vnodes[name]
+
+	if id == dyncfgVnodeID || !ok {
+		m.dyncfgRespf(fn, 200, "")
 		return
 	}
 
@@ -308,10 +316,7 @@ func (m *Manager) vnodeUserconfigFromPayload(fn functions.Function) ([]byte, err
 		name = fn.Args[2]
 	}
 
-	cfg.Name = name
-	if cfg.Hostname == "" {
-		cfg.Hostname = name
-	}
+	dyncfgUpdateVnodeConfig(cfg, name)
 
 	bs, err := yaml.Marshal([]any{cfg})
 	if err != nil {

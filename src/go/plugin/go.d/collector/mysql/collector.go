@@ -57,6 +57,7 @@ func New() *Collector {
 }
 
 type Config struct {
+	Vnode       string           `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
 	DSN         string           `yaml:"dsn" json:"dsn"`
 	MyCNF       string           `yaml:"my.cnf,omitempty" json:"my.cnf"`

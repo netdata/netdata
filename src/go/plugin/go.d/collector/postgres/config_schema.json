@@ -24,6 +24,11 @@
         "minimum": 0.5,
         "default": 2
       },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
       "collect_databases_matching": {
         "title": "Database selector",
         "description": "Configuration for monitoring specific databases using [Netdata simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme). If left empty, no database metrics will be collected.",
@@ -107,7 +112,8 @@
           "fields": [
             "update_every",
             "dsn",
-            "timeout"
+            "timeout",
+            "vnode"
           ]
         },
         {
@@ -126,6 +132,9 @@
           ]
         }
       ]
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "dsn": {
       "ui:placeholder": "postgres://username:password@host:port/dbname"

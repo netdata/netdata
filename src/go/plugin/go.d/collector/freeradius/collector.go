@@ -37,6 +37,7 @@ func New() *Collector {
 }
 
 type Config struct {
+	Vnode       string           `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery int              `yaml:"update_every" json:"update_every"`
 	Address     string           `yaml:"address" json:"address"`
 	Port        int              `yaml:"port" json:"port"`
