@@ -1848,6 +1848,7 @@ set(TC_PLUGIN_FILES
 
 set(NETDATA_FILES
         src/collectors/all.h
+        src/collectors/shared_data.h
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${EXPORTING_ENGINE_FILES}
