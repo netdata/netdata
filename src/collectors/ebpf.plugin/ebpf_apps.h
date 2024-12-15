@@ -3,6 +3,7 @@
 #ifndef NETDATA_EBPF_APPS_H
 #define NETDATA_EBPF_APPS_H 1
 
+#include "collectors/shared_data.h"
 #include "libnetdata/locks/locks.h"
 #include "libnetdata/avl/avl.h"
 #include "libnetdata/clocks/clocks.h"
@@ -43,20 +44,6 @@
 #define EBPF_MAX_NAME 100
 
 #define EBPF_CLEANUP_FACTOR 2
-
-enum ebpf_pids_index {
-    EBPF_PIDS_PROCESS_IDX,
-    EBPF_PIDS_SOCKET_IDX,
-    EBPF_PIDS_CACHESTAT_IDX,
-    EBPF_PIDS_DCSTAT_IDX,
-    EBPF_PIDS_SWAP_IDX,
-    EBPF_PIDS_VFS_IDX,
-    EBPF_PIDS_FD_IDX,
-    EBPF_PIDS_SHM_IDX,
-
-    EBPF_PIDS_PROC_FILE,
-    EBPF_PIDS_END_IDX
-};
 
 extern int pids_fd[EBPF_PIDS_END_IDX];
 
