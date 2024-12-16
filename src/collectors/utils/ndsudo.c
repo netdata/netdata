@@ -216,6 +216,7 @@ struct command {
         .search = {
             [0] = "megacli",
             [1] = "MegaCli",
+            [2] = "MegaCli64",
         },
     },
     {
@@ -224,6 +225,7 @@ struct command {
         .search = {
             [0] = "megacli",
             [1] = "MegaCli",
+            [2] = "MegaCli64",
         },
     },
     {
