@@ -13,30 +13,21 @@ VERSION="${VERSION:-"$(git describe)"}"
 BASENAME="$NAME-$BUILDARCH-$VERSION"
 
 prepare_build() {
-  progress "Preparing build"
-  (
-    test -d artifacts || mkdir -p artifacts
-  ) >&2
+  test -d artifacts || mkdir -p artifacts
 }
 
 build_static() {
-  progress "Building static ${BUILDARCH}"
-  (
-    EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}" USER="" ./packaging/makeself/build-static.sh "${BUILDARCH}"
-  ) >&2
+  EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}" USER="" ./packaging/makeself/build-static.sh "${BUILDARCH}"
 }
 
 prepare_assets() {
-  progress "Preparing assets"
-  (
-    cp packaging/version artifacts/latest-version.txt
+  cp packaging/version artifacts/latest-version.txt
 
-    cd artifacts || exit 1
-    ln -s "${BASENAME}.gz.run" "netdata-${BUILDARCH}-latest.gz.run"
-    if [ "${BUILDARCH}" = "x86_64" ]; then
-      ln -s "${BASENAME}.gz.run" netdata-latest.gz.run
-    fi
-  ) >&2
+  cd artifacts || exit 1
+  ln -s "${BASENAME}.gz.run" "netdata-${BUILDARCH}-latest.gz.run"
+  if [ "${BUILDARCH}" = "x86_64" ]; then
+    ln -s "${BASENAME}.gz.run" netdata-latest.gz.run
+  fi
 }
 
 steps="prepare_build build_static"
