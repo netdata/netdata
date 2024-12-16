@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #define PULSE_INTERNALS 1
-#include "pulse-dbengine.h"
+#include "pulse-db-dbengine.h"
 
 size_t pulse_dbengine_total_memory = 0;
 
@@ -638,11 +638,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
     }
 }
 
-
 void pulse_dbengine_do(bool extended) {
-    if(!main_cache || !main_mrg || !extended)
-        return;
-
     static struct dbengine2_cache_pointers main_cache_ptrs = {}, open_cache_ptrs = {}, extent_cache_ptrs = {};
     static struct rrdeng_cache_efficiency_stats cache_efficiency_stats = {}, cache_efficiency_stats_old = {};
     static struct pgc_statistics pgc_main_stats = {}, pgc_main_stats_old = {}; (void)pgc_main_stats_old;
@@ -685,6 +681,10 @@ void pulse_dbengine_do(bool extended) {
         pgc_main_stats.size + (ssize_t)pgc_open_stats.size + pgc_extent_stats.size +
         mrg_stats.size +
         buffers_total_size + aral_structures_total_size + aral_padding_total_size + pgd_padding_bytes();
+
+    // we need all the above for the total dbengine memory as reported by the non-extended netdata memory chart
+    if(!main_cache || !main_mrg || !extended)
+        return;
 
     size_t priority = 135000;
 

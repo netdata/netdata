@@ -59,6 +59,20 @@ struct functions_evloop_globals {
     } dyncfg;
 
     struct rrd_functions_expectation *expectations;
+
+    struct buffered_reader reader;
+    BUFFER *buffer;
+    char *words[MAX_FUNCTION_PARAMETERS];
+    struct {
+        size_t last_len; // to remember the last pos - do not use a pointer, the buffer may realloc...
+        bool enabled;
+        char *transaction;
+        char *function;
+        char *timeout_s;
+        char *access;
+        char *source;
+        char *content_type;
+    } deferred;
 };
 
 static void rrd_functions_worker_canceller(void *data) {
@@ -137,7 +151,8 @@ static void worker_add_job(struct functions_evloop_globals *wg, const char *keyw
                function?function:"(unset)");
     }
     else {
-        // nd_log(NDLS_COLLECTORS, NDLP_INFO, "WORKER JOB WITH PAYLOAD '%s'", payload ? buffer_tostring(payload) : "NONE");
+//        nd_log(NDLS_COLLECTORS, NDLP_INFO, "WORKER JOB: keyword '%s', transaction '%s', function '%s', timeout '%s', access '%s', source '%s', payload '%s'",
+//               keyword, transaction, function, timeout_s, access, source, payload ? buffer_tostring(payload) : "NONE");
 
         int timeout = str2i(timeout_s);
 
@@ -187,28 +202,116 @@ static void worker_add_job(struct functions_evloop_globals *wg, const char *keyw
     }
 }
 
+static bool rrd_function_worker_global_process_input(struct functions_evloop_globals *wg) {
+    if(wg->deferred.enabled) {
+        char *s = (char *)buffer_tostring(wg->buffer);
+
+        if(strstr(&s[wg->deferred.last_len], PLUGINSD_CALL_FUNCTION_PAYLOAD_END "\n") != NULL) {
+            // nd_log(NDLS_COLLECTORS, NDLP_INFO, "FUNCTION PAYLOAD END");
+
+            if(wg->deferred.last_len > 0)
+                // remove the trailing newline from the buffer
+                wg->deferred.last_len--;
+
+            s[wg->deferred.last_len] = '\0';
+            wg->buffer->len = wg->deferred.last_len;
+            wg->buffer->content_type = content_type_string2id(wg->deferred.content_type);
+            worker_add_job(wg, PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN,
+                           wg->deferred.transaction, wg->deferred.function,
+                           wg->deferred.timeout_s, wg->buffer, wg->deferred.access, wg->deferred.source);
+            buffer_flush(wg->buffer);
+
+            freez(wg->deferred.transaction);
+            freez(wg->deferred.function);
+            freez(wg->deferred.timeout_s);
+            freez(wg->deferred.access);
+            freez(wg->deferred.source);
+            freez(wg->deferred.content_type);
+            memset(&wg->deferred, 0, sizeof(wg->deferred));
+        }
+        else
+            wg->deferred.last_len = wg->buffer->len;
+
+        return false;
+    }
+
+    size_t num_words = quoted_strings_splitter_whitespace((char *)buffer_tostring(wg->buffer), wg->words, _countof(wg->words));
+    const char *keyword = get_word(wg->words, num_words, 0);
+
+    char **words = wg->words;
+    if(keyword && (strcmp(keyword, PLUGINSD_CALL_FUNCTION) == 0)) {
+        char *transaction = get_word(words, num_words, 1);
+        char *timeout_s = get_word(words, num_words, 2);
+        char *function = get_word(words, num_words, 3);
+        char *access = get_word(words, num_words, 4);
+        char *source = get_word(words, num_words, 5);
+        worker_add_job(wg, keyword, transaction, function, timeout_s, NULL, access, source);
+    }
+    else if(keyword && (strcmp(keyword, PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN) == 0)) {
+        char *transaction = get_word(words, num_words, 1);
+        char *timeout_s = get_word(words, num_words, 2);
+        char *function = get_word(words, num_words, 3);
+        char *access = get_word(words, num_words, 4);
+        char *source = get_word(words, num_words, 5);
+        char *content_type = get_word(words, num_words, 6);
+
+        wg->deferred.transaction = strdupz(transaction ? transaction : "");
+        wg->deferred.timeout_s = strdupz(timeout_s ? timeout_s : "");
+        wg->deferred.function = strdupz(function ? function : "");
+        wg->deferred.access = strdupz(access ? access : "");
+        wg->deferred.source = strdupz(source ? source : "");
+        wg->deferred.content_type = strdupz(content_type ? content_type : "");
+        wg->deferred.last_len = 0;
+        wg->deferred.enabled = true;
+    }
+    else if(keyword && strcmp(keyword, PLUGINSD_CALL_FUNCTION_CANCEL) == 0) {
+        char *transaction = get_word(words, num_words, 1);
+        const DICTIONARY_ITEM *acquired = dictionary_get_and_acquire_item(wg->worker_queue, transaction);
+        if(acquired) {
+            struct functions_evloop_worker_job *j = dictionary_acquired_item_value(acquired);
+            __atomic_store_n(&j->cancelled, true, __ATOMIC_RELAXED);
+            dictionary_acquired_item_release(wg->worker_queue, acquired);
+            dictionary_del(wg->worker_queue, transaction);
+            dictionary_garbage_collect(wg->worker_queue);
+        }
+        else
+            nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received CANCEL for transaction '%s', but it not available here", transaction);
+    }
+    else if(keyword && strcmp(keyword, PLUGINSD_CALL_FUNCTION_PROGRESS) == 0) {
+        char *transaction = get_word(words, num_words, 1);
+        const DICTIONARY_ITEM *acquired = dictionary_get_and_acquire_item(wg->worker_queue, transaction);
+        if(acquired) {
+            struct functions_evloop_worker_job *j = dictionary_acquired_item_value(acquired);
+
+            functions_stop_monotonic_update_on_progress(&j->stop_monotonic_ut);
+
+            dictionary_acquired_item_release(wg->worker_queue, acquired);
+        }
+        else
+            nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received PROGRESS for transaction '%s', but it not available here", transaction);
+    }
+    else if(keyword && strcmp(keyword, PLUGINSD_CALL_QUIT) == 0) {
+        *wg->plugin_should_exit = true;
+        return true;
+    }
+    else
+        nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received unknown command: %s", keyword ? keyword : "(unset)");
+
+    buffer_flush(wg->buffer);
+
+    return false;
+}
+
 static void *rrd_functions_worker_globals_reader_main(void *arg) {
     struct functions_evloop_globals *wg = arg;
 
-    struct {
-        size_t last_len; // to remember the last pos - do not use a pointer, the buffer may realloc...
-        bool enabled;
-        char *transaction;
-        char *function;
-        char *timeout_s;
-        char *access;
-        char *source;
-        char *content_type;
-    } deferred = { 0 };
-
-    struct buffered_reader reader = { 0 };
-    buffered_reader_init(&reader);
-    BUFFER *buffer = buffer_create(sizeof(reader.read_buffer) + 2, NULL);
+    buffered_reader_init(&wg->reader);
+    wg->buffer = buffer_create(sizeof(wg->reader.read_buffer) + 2, NULL);
 
     while(!(*wg->plugin_should_exit)) {
-        if(unlikely(!buffered_reader_next_line(&reader, buffer))) {
+        if(unlikely(!buffered_reader_next_line(&wg->reader, wg->buffer))) {
             buffered_reader_ret_t ret = buffered_reader_read_timeout(
-                &reader,
+                &wg->reader,
                 fileno((FILE *)stdin),
                 2 * 60 * MSEC_PER_SEC,
                 false
@@ -220,106 +323,8 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
             continue;
         }
 
-        if(deferred.enabled) {
-            char *s = (char *)buffer_tostring(buffer);
-
-            if(strstr(&s[deferred.last_len], PLUGINSD_CALL_FUNCTION_PAYLOAD_END "\n") != NULL) {
-                // nd_log(NDLS_COLLECTORS, NDLP_INFO, "FUNCTION PAYLOAD END");
-
-                if(deferred.last_len > 0)
-                    // remove the trailing newline from the buffer
-                    deferred.last_len--;
-
-                s[deferred.last_len] = '\0';
-                buffer->len = deferred.last_len;
-                buffer->content_type = content_type_string2id(deferred.content_type);
-                worker_add_job(wg,
-                    PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN, deferred.transaction, deferred.function,
-                               deferred.timeout_s, buffer, deferred.access, deferred.source);
-                buffer_flush(buffer);
-
-                freez(deferred.transaction);
-                freez(deferred.function);
-                freez(deferred.timeout_s);
-                freez(deferred.access);
-                freez(deferred.source);
-                freez(deferred.content_type);
-                memset(&deferred, 0, sizeof(deferred));
-            }
-            else
-                deferred.last_len = buffer->len;
-
-            continue;
-        }
-
-        char *words[MAX_FUNCTION_PARAMETERS] = { NULL };
-        size_t num_words = quoted_strings_splitter_whitespace((char *)buffer_tostring(buffer), words, MAX_FUNCTION_PARAMETERS);
-
-        const char *keyword = get_word(words, num_words, 0);
-
-        if(keyword && (strcmp(keyword, PLUGINSD_CALL_FUNCTION) == 0)) {
-            // nd_log(NDLS_COLLECTORS, NDLP_INFO, "FUNCTION CALL");
-            char *transaction = get_word(words, num_words, 1);
-            char *timeout_s = get_word(words, num_words, 2);
-            char *function = get_word(words, num_words, 3);
-            char *access = get_word(words, num_words, 4);
-            char *source = get_word(words, num_words, 5);
-            worker_add_job(wg, keyword, transaction, function, timeout_s, NULL, access, source);
-        }
-        else if(keyword && (strcmp(keyword, PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN) == 0)) {
-            // nd_log(NDLS_COLLECTORS, NDLP_INFO, "FUNCTION PAYLOAD CALL");
-            char *transaction = get_word(words, num_words, 1);
-            char *timeout_s = get_word(words, num_words, 2);
-            char *function = get_word(words, num_words, 3);
-            char *access = get_word(words, num_words, 4);
-            char *source = get_word(words, num_words, 5);
-            char *content_type = get_word(words, num_words, 6);
-
-            deferred.transaction = strdupz(transaction ? transaction : "");
-            deferred.timeout_s = strdupz(timeout_s ? timeout_s : "");
-            deferred.function = strdupz(function ? function : "");
-            deferred.access = strdupz(access ? access : "");
-            deferred.source = strdupz(source ? source : "");
-            deferred.content_type = strdupz(content_type ? content_type : "");
-            deferred.last_len = 0;
-            deferred.enabled = true;
-        }
-        else if(keyword && strcmp(keyword, PLUGINSD_CALL_FUNCTION_CANCEL) == 0) {
-            // nd_log(NDLS_COLLECTORS, NDLP_INFO, "FUNCTION CANCEL");
-            char *transaction = get_word(words, num_words, 1);
-            const DICTIONARY_ITEM *acquired = dictionary_get_and_acquire_item(wg->worker_queue, transaction);
-            if(acquired) {
-                struct functions_evloop_worker_job *j = dictionary_acquired_item_value(acquired);
-                __atomic_store_n(&j->cancelled, true, __ATOMIC_RELAXED);
-                dictionary_acquired_item_release(wg->worker_queue, acquired);
-                dictionary_del(wg->worker_queue, transaction);
-                dictionary_garbage_collect(wg->worker_queue);
-            }
-            else
-                nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received CANCEL for transaction '%s', but it not available here", transaction);
-        }
-        else if(keyword && strcmp(keyword, PLUGINSD_CALL_FUNCTION_PROGRESS) == 0) {
-            // nd_log(NDLS_COLLECTORS, NDLP_INFO, "FUNCTION PROGRESS");
-            char *transaction = get_word(words, num_words, 1);
-            const DICTIONARY_ITEM *acquired = dictionary_get_and_acquire_item(wg->worker_queue, transaction);
-            if(acquired) {
-                struct functions_evloop_worker_job *j = dictionary_acquired_item_value(acquired);
-
-                functions_stop_monotonic_update_on_progress(&j->stop_monotonic_ut);
-
-                dictionary_acquired_item_release(wg->worker_queue, acquired);
-            }
-            else
-                nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received PROGRESS for transaction '%s', but it not available here", transaction);
-        }
-        else if(keyword && strcmp(keyword, PLUGINSD_CALL_QUIT) == 0) {
-            *wg->plugin_should_exit = true;
+        if(rrd_function_worker_global_process_input(wg))
             break;
-        }
-        else
-            nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received unknown command: %s", keyword ? keyword : "(unset)");
-
-        buffer_flush(buffer);
     }
 
     int status = 0;
@@ -329,6 +334,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
     }
 
     *wg->plugin_should_exit = true;
+    buffer_free(wg->buffer);
     exit(status);
 }
 

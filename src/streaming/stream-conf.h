@@ -85,7 +85,7 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
 
 void stream_conf_load();
 bool stream_conf_receiver_needs_dbengine();
-bool stream_conf_configured_as_parent();
+bool stream_conf_is_parent(bool recheck);
 
 bool stream_conf_is_key_type(const char *api_key, const char *type);
 bool stream_conf_api_key_is_enabled(const char *api_key, bool enabled);

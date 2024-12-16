@@ -52,7 +52,9 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si __maybe_unused) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)rrddim_metric_get(si, &rd->metric_uuid);
     while(!mh) {
         netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
+        JudyAllocThreadPulseReset();
         Pvoid_t *PValue = JudyHSIns(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(nd_uuid_t), PJE0);
+        int64_t mem = JudyAllocThreadPulseGetAndReset();
         mh = *PValue;
         if(!mh) {
             mh = callocz(1, sizeof(struct mem_metric_handle));
@@ -60,7 +62,7 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si __maybe_unused) {
             mh->refcount = 1;
             update_metric_handle_from_rrddim(mh, rd);
             *PValue = mh;
-            __atomic_add_fetch(&rrddim_db_memory_size, sizeof(struct mem_metric_handle) + JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(nd_uuid_t)), __ATOMIC_RELAXED);
+            pulse_db_rrd_memory_change(mem + (int64_t)sizeof(struct mem_metric_handle));
         }
         else {
             if(__atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) <= 0)
@@ -107,11 +109,13 @@ void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh __maybe_unused) {
 
             RRDDIM *rd = mh->rd;
             netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
+            JudyAllocThreadPulseReset();
             JudyHSDel(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(nd_uuid_t), PJE0);
+            int64_t mem = JudyAllocThreadPulseGetAndReset();
             netdata_rwlock_wrunlock(&rrddim_JudyHS_rwlock);
 
             freez(mh);
-            __atomic_sub_fetch(&rrddim_db_memory_size, sizeof(struct mem_metric_handle) + JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(nd_uuid_t)), __ATOMIC_RELAXED);
+            pulse_db_rrd_memory_change(mem - (int64_t)sizeof(struct mem_metric_handle));
         }
     }
 }
@@ -147,7 +151,7 @@ STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *smh, uint32_t
     ch->rd = rd;
     ch->smh = smh;
 
-    __atomic_add_fetch(&rrddim_db_memory_size, sizeof(struct mem_collect_handle), __ATOMIC_RELAXED);
+    pulse_db_rrd_memory_add(sizeof(struct mem_collect_handle));
 
     return (STORAGE_COLLECT_HANDLE *)ch;
 }
@@ -235,7 +239,7 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *sch,
 
 int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *sch) {
     freez(sch);
-    __atomic_sub_fetch(&rrddim_db_memory_size, sizeof(struct mem_collect_handle), __ATOMIC_RELAXED);
+    pulse_db_rrd_memory_sub(sizeof(struct mem_collect_handle));
     return 0;
 }
 
@@ -355,7 +359,7 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_h
 
     // netdata_log_info("RRDDIM QUERY INIT: start %ld, end %ld, next %ld, first %ld, last %ld, dt %ld", start_time, end_time, h->next_timestamp, h->slot_timestamp, h->last_timestamp, h->dt);
 
-    __atomic_add_fetch(&rrddim_db_memory_size, sizeof(struct mem_query_handle), __ATOMIC_RELAXED);
+    pulse_db_rrd_memory_add(sizeof(struct mem_query_handle));
     seqh->handle = (STORAGE_QUERY_HANDLE *)h;
 }
 
@@ -419,7 +423,7 @@ void rrddim_query_finalize(struct storage_engine_query_handle *seqh) {
 
 #endif
     freez(seqh->handle);
-    __atomic_sub_fetch(&rrddim_db_memory_size, sizeof(struct mem_query_handle), __ATOMIC_RELAXED);
+    pulse_db_rrd_memory_sub(sizeof(struct mem_query_handle));
 }
 
 time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *seqh) {

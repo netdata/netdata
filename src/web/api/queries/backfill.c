@@ -188,7 +188,7 @@ void *backfill_thread(void *ptr) {
     backfill_globals.running = true;
     spinlock_unlock(&backfill_globals.spinlock);
 
-    size_t threads = get_netdata_cpus() / 2;
+    size_t threads = netdata_conf_cpus() / 2;
     if(threads < 2) threads = 2;
     if(threads > 16) threads = 16;
     ND_THREAD *th[threads - 1];
@@ -228,5 +228,5 @@ void *backfill_thread(void *ptr) {
 }
 
 bool backfill_threads_detect_from_stream_conf(void) {
-    return stream_conf_configured_as_parent();
+    return stream_conf_is_parent(false);
 }

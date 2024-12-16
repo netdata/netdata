@@ -666,6 +666,7 @@ static bool apps_plugin_exit = false;
 
 int main(int argc, char **argv) {
     nd_log_initialize_for_external_plugins("apps.plugin");
+    netdata_threads_init_for_external_plugins(0);
 
     pagesize = (size_t)sysconf(_SC_PAGESIZE);
 

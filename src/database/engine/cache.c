@@ -580,8 +580,12 @@ static void pgc_section_pages_static_aral_init(void) {
 
     spinlock_lock(&spinlock);
 
-    if(!pgc_sections_aral)
-        pgc_sections_aral = aral_by_size_acquire(sizeof(struct section_pages));
+    if(!pgc_sections_aral) {
+        pgc_sections_aral = aral_create(
+            "pgc-sections", sizeof(struct section_pages), 0, 0, &pgc_aral_statistics, NULL, NULL, false, false);
+
+        pulse_aral_register_statistics(&pgc_aral_statistics, "pgc");
+    }
 
     spinlock_unlock(&spinlock);
 }
@@ -1182,16 +1186,18 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         else if(unlikely(wait)) {
             // evict as many as necessary for the cache to go at the predefined threshold
             per1000 = cache_usage_per1000(cache, &max_size_to_evict);
-            max_size_to_evict /= 2; // do it in 2 steps
+            max_size_to_evict /= 3; // do it in 3 steps
             if(per1000 >= cache->config.severe_pressure_per1000) {
                 under_sever_pressure = true;
-                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 4096;
-                // max_pages_to_evict = 1;
+                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 512;
+                if(max_pages_to_evict > 4096)
+                    max_pages_to_evict = 4096;
             }
             else if(per1000 >= cache->config.aggressive_evict_per1000) {
                 under_sever_pressure = false;
-                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 128;
-                // max_pages_to_evict = 1;
+                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 32;
+                if(max_pages_to_evict > 1024)
+                    max_pages_to_evict = 1024;
             }
             else {
                 under_sever_pressure = false;
@@ -1948,7 +1954,8 @@ static void *pgc_evict_thread(void *ptr) {
     worker_register_job_name(0, "signaled");
     worker_register_job_name(1, "scheduled");
 
-    unsigned job_id = 0, severe_pressure_counter = 0;
+    unsigned job_id = 0;
+    usec_t last_malloc_release_ut = 0;
 
     while (true) {
         worker_is_idle();
@@ -1965,18 +1972,17 @@ static void *pgc_evict_thread(void *ptr) {
 
         size_t size_to_evict = 0;
         if(cache_usage_per1000(cache, &size_to_evict) > cache->config.severe_pressure_per1000) {
-            severe_pressure_counter++;
+            usec_t now_ut = now_monotonic_usec();
 
-            if(severe_pressure_counter > 100) {
-                // so, we tried 100 times to reduce memory,
+            if(last_malloc_release_ut + USEC_PER_SEC < now_ut) {
+                last_malloc_release_ut = now_ut;
+
+                // so, we tried 100 times to reduce memory, and a second has passed,
                 // but it is still severe!
 
                 mallocz_release_as_much_memory_to_the_system();
-                severe_pressure_counter = 0;
             }
         }
-        else
-            severe_pressure_counter = 0;
     }
 
     worker_unregister();
@@ -2040,11 +2046,11 @@ PGC *pgc_create(const char *name,
     cache->config.out_of_memory_protection_bytes    = dbengine_out_of_memory_protection;
 
     // partitions
-    if(partitions == 0) partitions = get_netdata_cpus();
-    if(partitions <= 4) partitions = 4;
+    if(partitions == 0) partitions  = netdata_conf_cpus();
+    if(partitions <= 4) partitions  = 4;
     if(partitions > 256) partitions = 256;
-    cache->config.partitions    = partitions;
-    cache->index                = callocz(cache->config.partitions, sizeof(struct pgc_index));
+    cache->config.partitions        = partitions;
+    cache->index                    = callocz(cache->config.partitions, sizeof(struct pgc_index));
 
     pgc_section_pages_static_aral_init();
 
@@ -2066,8 +2072,6 @@ PGC *pgc_create(const char *name,
                 false);
         }
     }
-
-    pulse_aral_register(cache->index[0].aral, "pgc");
 #endif
 
 

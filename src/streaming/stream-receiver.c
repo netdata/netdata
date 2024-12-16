@@ -395,11 +395,18 @@ static void stream_receive_log_database_gap(struct receiver_state *rpt) {
     if(now < last_db_entry)
         last_db_entry = now;
 
-    char buf[128];
-    duration_snprintf(buf, sizeof(buf), now - last_db_entry, "s", true);
-    nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "STREAM RCV '%s' [from [%s]:%s]: node connected; last sample in the database %s ago",
-           rrdhost_hostname(host), rpt->client_ip, rpt->client_port, buf);
+    if(!last_db_entry) {
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "STREAM RCV '%s' [from [%s]:%s]: node connected; for the first time!",
+               rrdhost_hostname(host), rpt->client_ip, rpt->client_port);
+    }
+    else {
+        char buf[128];
+        duration_snprintf(buf, sizeof(buf), now - last_db_entry, "s", true);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "STREAM RCV '%s' [from [%s]:%s]: node connected; last sample in the database %s ago",
+               rrdhost_hostname(host), rpt->client_ip, rpt->client_port, buf);
+    }
 }
 
 void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct receiver_state *rpt) {
@@ -466,14 +473,18 @@ void stream_receiver_move_entire_queue_to_running_unsafe(struct stream_thread *s
 static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, const char *why) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
+    PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
+    size_t count = parser ? parser->user.data_collections_count : 0;
+
     errno_clear();
     nd_log(NDLS_DAEMON, NDLP_ERR,
            "STREAM RCV[%zu] '%s' [from [%s]:%s]: "
-           "receiver disconnected: %s"
+           "receiver disconnected (after %zu received messages): %s"
            , sth->id
            , rpt->hostname ? rpt->hostname : "-"
            , rpt->client_ip ? rpt->client_ip : "-"
            , rpt->client_port ? rpt->client_port : "-"
+           , count
            , why ? why : "");
 
     rrdhost_state_disconnected(rpt->host);
@@ -498,8 +509,6 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
     buffer_free(rpt->thread.buffer);
     rpt->thread.buffer = NULL;
 
-    size_t count = 0;
-    PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
     if(parser) {
         parser->user.v2.stream_buffer.wb = NULL;
 
@@ -509,18 +518,10 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
         parser->fd_output = -1;
         parser->sock = NULL;
         spinlock_unlock(&parser->writer.spinlock);
-
-        count = parser->user.data_collections_count;
     }
 
     // the parser stopped
     receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_EXIT, false);
-
-    {
-        char msg[100 + 1];
-        snprintfz(msg, sizeof(msg) - 1, "receiver disconnected (completed %zu updates)", count);
-        stream_receiver_log_status(rpt, msg, STREAM_STATUS_DISCONNECTED, NDLP_WARNING);
-    }
 
     // in case we are connected to netdata cloud,
     // we inform cloud that a child got disconnected
@@ -786,6 +787,7 @@ void stream_receiver_cleanup(struct stream_thread *sth) {
          m = META_NEXT(&sth->run.meta, &idx)) {
         if (m->type != POLLFD_TYPE_RECEIVER) continue;
         struct receiver_state *rpt = m->rpt;
+        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
         stream_receiver_remove(sth, rpt, "shutdown");
     }
 }

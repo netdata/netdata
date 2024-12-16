@@ -50,6 +50,11 @@
         "description": "If set, the client will not follow HTTP redirects automatically.",
         "type": "boolean"
       },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
       "username": {
         "title": "Username",
         "description": "The username for basic authentication.",
@@ -130,6 +135,9 @@
     "uiOptions": {
       "fullPage": true
     },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    },
     "address": {
       "ui:placeholder": "127.0.0.1:9000"
     },
@@ -171,7 +179,8 @@
             "url",
             "address",
             "socket",
-            "not_follow_redirects"
+            "not_follow_redirects",
+            "vnode"
           ]
         },
         {

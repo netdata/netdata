@@ -1051,8 +1051,8 @@ set(DAEMON_FILES
         src/daemon/signals.c
         src/daemon/signals.h
         src/daemon/service.c
-        src/daemon/watcher.c
-        src/daemon/watcher.h
+        src/daemon/daemon-shutdown-watcher.c
+        src/daemon/daemon-shutdown-watcher.h
         src/daemon/static_threads.c
         src/daemon/static_threads.h
         src/daemon/commands.c
@@ -1086,8 +1086,8 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-daemon-memory.h
         src/daemon/pulse/pulse-sqlite3.c
         src/daemon/pulse/pulse-sqlite3.h
-        src/daemon/pulse/pulse-dbengine.c
-        src/daemon/pulse/pulse-dbengine.h
+        src/daemon/pulse/pulse-db-dbengine.c
+        src/daemon/pulse/pulse-db-dbengine.h
         src/daemon/pulse/pulse-string.c
         src/daemon/pulse/pulse-string.h
         src/daemon/pulse/pulse-heartbeat.c
@@ -1114,6 +1114,14 @@ set(DAEMON_FILES
         src/daemon/config/netdata-conf-global.c
         src/daemon/config/netdata-conf-global.h
         src/daemon/config/netdata-conf.c
+        src/daemon/daemon-shutdown.c
+        src/daemon/daemon-shutdown.h
+        src/daemon/daemon-service.c
+        src/daemon/daemon-service.h
+        src/daemon/pulse/pulse-db-rrd.c
+        src/daemon/pulse/pulse-db-rrd.h
+        src/daemon/config/netdata-conf-cloud.c
+        src/daemon/config/netdata-conf-cloud.h
 )
 
 set(H2O_FILES

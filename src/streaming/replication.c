@@ -32,7 +32,7 @@
 #define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 30
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
 
-#define MAX_REPLICATION_THREADS 32
+#define MAX_REPLICATION_THREADS 256
 #define REQUESTS_AHEAD_PER_THREAD 1 // 1 = enable synchronous queries
 
 static struct replication_query_statistics replication_queries = {
@@ -190,7 +190,7 @@ static struct replication_query *replication_query_prepare(
         d->rd = rd;
 
         STORAGE_PRIORITY priority = q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW;
-        if(synchronous) priority = STORAGE_PRIORITY_SYNCHRONOUS;
+        if(synchronous) priority = STORAGE_PRIORITY_SYNCHRONOUS_FIRST;
 
         stream_control_replication_query_started();
         storage_engine_query_init(q->backend, rd->tiers[0].smh, &d->handle,
@@ -1889,34 +1889,30 @@ void *replication_thread_main(void *ptr) {
 
     replication_initialize_workers(true);
 
-    int nodes = (int)dictionary_entries(rrdhost_root_index);
-    int cpus = (int)get_netdata_cpus();
-    int threads = cpus / 2;
+    size_t threads = stream_conf_is_parent(false) ? (netdata_conf_cpus() / 2) : 1;
     if (threads < 1) threads = 1;
     else if (threads > MAX_REPLICATION_THREADS) threads = MAX_REPLICATION_THREADS;
 
     threads = config_get_number(CONFIG_SECTION_DB, "replication threads", threads);
     if(threads < 1) {
-        netdata_log_error("replication threads given %d is invalid, resetting to 1", threads);
+        netdata_log_error("replication threads given %zu is invalid, resetting to 1", threads);
         threads = 1;
         config_set_number(CONFIG_SECTION_DB, "replication threads", threads);
     }
     else if(threads > MAX_REPLICATION_THREADS) {
-        netdata_log_error("replication threads given %d is invalid, resetting to %d", threads, (int)MAX_REPLICATION_THREADS);
+        netdata_log_error("replication threads given %zu is invalid, resetting to %d", threads, (int)MAX_REPLICATION_THREADS);
         threads = MAX_REPLICATION_THREADS;
         config_set_number(CONFIG_SECTION_DB, "replication threads", threads);
     }
-
-    netdata_log_info("replication threads set to %d (cpu cores = %d, nodes = %d)", threads, cpus, nodes);
 
     if(--threads) {
         replication_globals.main_thread.threads = threads;
         replication_globals.main_thread.threads_ptrs = mallocz(threads * sizeof(ND_THREAD *));
         __atomic_add_fetch(&replication_buffers_allocated, threads * sizeof(ND_THREAD *), __ATOMIC_RELAXED);
 
-        for(int i = 0; i < threads ;i++) {
+        for(size_t i = 0; i < threads ;i++) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];
-            snprintfz(tag, NETDATA_THREAD_TAG_MAX, "REPLAY[%d]", i + 2);
+            snprintfz(tag, NETDATA_THREAD_TAG_MAX, "REPLAY[%zu]", i + 2);
             replication_globals.main_thread.threads_ptrs[i] = mallocz(sizeof(ND_THREAD *));
             __atomic_add_fetch(&replication_buffers_allocated, sizeof(ND_THREAD *), __ATOMIC_RELAXED);
             replication_globals.main_thread.threads_ptrs[i] = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,

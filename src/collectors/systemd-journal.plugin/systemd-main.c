@@ -20,6 +20,7 @@ static bool journal_data_directories_exist() {
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
     nd_thread_tag_set("sd-jrnl.plugin");
     nd_log_initialize_for_external_plugins("systemd-journal.plugin");
+    netdata_threads_init_for_external_plugins(0);
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix(true) == -1) exit(1);

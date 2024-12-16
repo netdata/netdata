@@ -1065,15 +1065,15 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    ssize_t cpus = (ssize_t)get_netdata_cpus() / (ssize_t)storage_tiers;
+    ssize_t cpus = (ssize_t)netdata_conf_cpus() / (ssize_t)storage_tiers;
     if(cpus > (ssize_t)datafiles)
         cpus = (ssize_t)datafiles;
 
     if(cpus > (ssize_t)libuv_worker_threads)
         cpus = (ssize_t)libuv_worker_threads;
 
-    if(cpus >= (ssize_t)get_netdata_cpus() / 2)
-        cpus = (ssize_t)(get_netdata_cpus() / 2 - 1);
+    if(cpus >= (ssize_t)netdata_conf_cpus() / 2)
+        cpus = (ssize_t)(netdata_conf_cpus() / 2 - 1);
 
     if(cpus < 1)
         cpus = 1;
@@ -1125,9 +1125,6 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     netdata_log_info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
 }
 
-void rrdeng_exit_mode(struct rrdengine_instance *ctx) {
-    __atomic_store_n(&ctx->quiesce.exit_mode, true, __ATOMIC_RELAXED);
-}
 /*
  * Returns 0 on success, negative on error
  */
@@ -1228,13 +1225,12 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
         count--;
     }
 
-    netdata_log_info("DBENGINE: flushing main cache for tier %d", ctx->config.tier);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
 
-    netdata_log_info("DBENGINE: shutting down tier %d", ctx->config.tier);
     struct completion completion = {};
     completion_init(&completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
@@ -1247,14 +1243,13 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     return 0;
 }
 
-void rrdeng_prepare_exit(struct rrdengine_instance *ctx) {
+void rrdeng_quiesce(struct rrdengine_instance *ctx) {
     if (NULL == ctx)
         return;
 
     // FIXME - ktsaou - properly cleanup ctx
     // 1. make sure all collectors are stopped
 
-    completion_init(&ctx->quiesce.completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 

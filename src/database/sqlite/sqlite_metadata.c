@@ -225,6 +225,7 @@ struct metadata_wc {
     /* FIFO command queue */
     SPINLOCK cmd_queue_lock;
     struct metadata_cmd *cmd_base;
+    ARAL *ar;
 };
 
 #define metadata_flag_check(target_flags, flag) (__atomic_load_n(&((target_flags)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -447,7 +448,8 @@ struct node_instance_list *get_node_list(void)
                 continue;
 
             if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
-                netdata_log_info(
+                nd_log_limit_static_global_var(erl, 1, 0);
+                nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
                     "ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
                 continue;
             }
@@ -1490,7 +1492,7 @@ static void metadata_free_cmd_queue(struct metadata_wc *wc)
     while(wc->cmd_base) {
         struct metadata_cmd *t = wc->cmd_base;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_base, t, prev, next);
-        freez(t);
+        aral_freez(wc->ar, t);
     }
     spinlock_unlock(&wc->cmd_queue_lock);
 }
@@ -1505,7 +1507,7 @@ static void metadata_enq_cmd(struct metadata_wc *wc, struct metadata_cmd *cmd)
     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN)))
         goto wakeup_event_loop;
 
-    struct metadata_cmd *t = mallocz(sizeof(*t));
+    struct metadata_cmd *t = aral_mallocz(wc->ar);
     *t = *cmd;
     t->prev = t->next = NULL;
 
@@ -1519,20 +1521,22 @@ wakeup_event_loop:
 
 static struct metadata_cmd metadata_deq_cmd(struct metadata_wc *wc)
 {
-    struct metadata_cmd ret;
+    struct metadata_cmd ret, *to_free = NULL;
 
     spinlock_lock(&wc->cmd_queue_lock);
     if(wc->cmd_base) {
         struct metadata_cmd *t = wc->cmd_base;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wc->cmd_base, t, prev, next);
         ret = *t;
-        freez(t);
+        to_free = t;
     }
     else {
         ret.opcode = METADATA_DATABASE_NOOP;
         ret.completion = NULL;
     }
     spinlock_unlock(&wc->cmd_queue_lock);
+
+    aral_freez(wc->ar, to_free);
 
     return ret;
 }
@@ -1695,7 +1699,7 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
 
     RRDHOST *host;
 
-    size_t max_threads = MIN(get_netdata_cpus() / 2, 6);
+    size_t max_threads = MIN(netdata_conf_cpus() / 2, 6);
     if (max_threads < 1)
         max_threads = 1;
 
@@ -2063,6 +2067,8 @@ static void metadata_event_loop(void *arg)
     struct metadata_wc *wc = arg;
     enum metadata_opcode opcode;
 
+    wc->ar = aral_by_size_acquire(sizeof(struct metadata_cmd));
+
     uv_thread_set_name_np("METASYNC");
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
@@ -2263,6 +2269,7 @@ error_after_async_init:
     fatal_assert(0 == uv_loop_close(loop));
 error_after_loop_init:
     freez(loop);
+    aral_by_size_release(wc->ar);
     worker_unregister();
 }
 
@@ -2314,6 +2321,22 @@ void metadata_sync_shutdown_prepare(void)
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Waiting for host scan completion");
     completion_wait_for(wc->scan_complete);
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "METADATA: Host scan complete; can continue with shutdown");
+}
+
+void *metadata_sync_shutdown_thread(void *ptr __maybe_unused) {
+    metadata_sync_shutdown_prepare();
+    return NULL;
+}
+
+static ND_THREAD *metdata_sync_shutdown_background_wait_thread = NULL;
+void metadata_sync_shutdown_background(void) {
+    metdata_sync_shutdown_background_wait_thread = nd_thread_create(
+        "METASYNC-SHUTDOWN", NETDATA_THREAD_OPTION_JOINABLE, metadata_sync_shutdown_thread, NULL);
+}
+
+void metadata_sync_shutdown_background_wait(void) {
+    nd_thread_join(metdata_sync_shutdown_background_wait_thread);
+    metadata_sync_shutdown();
 }
 
 // -------------------------------------------------------------

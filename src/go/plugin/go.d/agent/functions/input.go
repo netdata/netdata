@@ -12,24 +12,27 @@ type input interface {
 }
 
 var stdinInput = func() input {
-	r := &stdinReader{chLines: make(chan string)}
+	r := &stdinReader{
+		linesCh: make(chan string),
+	}
+
 	go r.run()
+
 	return r
 }()
 
 type stdinReader struct {
-	chLines chan string
+	linesCh chan string
 }
 
 func (in *stdinReader) run() {
 	sc := bufio.NewScanner(bufio.NewReader(os.Stdin))
 
 	for sc.Scan() {
-		text := sc.Text()
-		in.chLines <- text
+		in.linesCh <- sc.Text()
 	}
 }
 
 func (in *stdinReader) lines() chan string {
-	return in.chLines
+	return in.linesCh
 }

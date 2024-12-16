@@ -1086,8 +1086,6 @@ void statsd_collector_thread_cleanup(void *pptr) {
     d->status->running = false;
     spinlock_unlock(&d->status->spinlock);
 
-    collector_info("cleaning up...");
-
 #ifdef HAVE_RECVMMSG
     size_t i;
     for (i = 0; i < d->size; i++)
@@ -2399,7 +2397,6 @@ static void statsd_main_cleanup(void *pptr) {
     if(!static_thread) return;
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-    collector_info("cleaning up...");
 
     if (statsd.collection_threads_status) {
         int i;

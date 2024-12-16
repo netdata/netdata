@@ -3,6 +3,27 @@
 #include "netdata-conf-web.h"
 #include "daemon/static_threads.h"
 
+size_t netdata_conf_web_query_threads(void) {
+    // See https://github.com/netdata/netdata/issues/11081#issuecomment-831998240 for more details
+    if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) {
+        config_set_number(CONFIG_SECTION_WEB, "web server threads", 1);
+        netdata_log_info("You are running an OpenSSL older than 1.1.0, web server will not enable multithreading.");
+        return 1;
+    }
+
+    size_t cpus = MIN(netdata_conf_cpus(), 256); // max 256 cores
+    size_t threads = cpus * (stream_conf_is_parent(false) ? 2 : 1);
+    threads = MAX(threads, 6);
+
+    threads = config_get_number(CONFIG_SECTION_WEB, "web server threads", threads);
+    if(threads < 1) {
+        netdata_log_error("[" CONFIG_SECTION_WEB "].web server threads in netdata.conf needs to be at least 1. Overwriting it.");
+        threads = 1;
+        config_set_number(CONFIG_SECTION_WEB, "web server threads", threads);
+    }
+    return threads;
+}
+
 static int make_dns_decision(const char *section_name, const char *config_name, const char *default_value, SIMPLE_PATTERN *p) {
     const char *value = config_get(section_name,config_name,default_value);
 
@@ -141,3 +162,4 @@ void netdata_conf_web_security_init(void) {
 
     netdata_ssl_initialize_openssl();
 }
+

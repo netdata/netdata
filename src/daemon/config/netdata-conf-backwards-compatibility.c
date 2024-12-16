@@ -132,11 +132,11 @@ void netdata_conf_backwards_compatibility(void) {
     config_move(CONFIG_SECTION_DB,      "page cache size",
                 CONFIG_SECTION_DB,      "dbengine page cache size MB");
 
-    config_move(CONFIG_SECTION_GLOBAL,  "page cache uses malloc",
-                CONFIG_SECTION_DB,      "dbengine page cache with malloc");
-
-    config_move(CONFIG_SECTION_DB,      "page cache with malloc",
-                CONFIG_SECTION_DB,      "dbengine page cache with malloc");
+//    config_move(CONFIG_SECTION_GLOBAL,  "page cache uses malloc",
+//                CONFIG_SECTION_DB,      "dbengine page cache with malloc");
+//
+//    config_move(CONFIG_SECTION_DB,      "page cache with malloc",
+//                CONFIG_SECTION_DB,      "dbengine page cache with malloc");
 
     config_move(CONFIG_SECTION_GLOBAL,  "memory deduplication (ksm)",
                 CONFIG_SECTION_DB,      "memory deduplication (ksm)");
@@ -176,6 +176,9 @@ void netdata_conf_backwards_compatibility(void) {
 
     config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
                 CONFIG_SECTION_DB,      "enable zero metrics");
+
+    config_move(CONFIG_SECTION_CLOUD,  "query thread count",
+                CONFIG_SECTION_CLOUD,  "query threads");
 
     // ----------------------------------------------------------------------------------------------------------------
     // global statistics -> telemetry -> pulse

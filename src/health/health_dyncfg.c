@@ -802,7 +802,7 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
                ap->config.source_type, string2str(ap->config.source),
                DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE |
                    DYNCFG_CMD_UPDATE | DYNCFG_CMD_USERCONFIG |
-                   (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !ap->_internal.is_on_disk ? DYNCFG_CMD_REMOVE : 0),
+                   (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG /* && !ap->_internal.is_on_disk */ ? DYNCFG_CMD_REMOVE : 0),
                HTTP_ACCESS_NONE,
                HTTP_ACCESS_NONE,
                dyncfg_health_cb, NULL);

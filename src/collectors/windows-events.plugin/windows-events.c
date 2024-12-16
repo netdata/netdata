@@ -1292,6 +1292,7 @@ void function_windows_events(const char *transaction, char *function, usec_t *st
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
     nd_thread_tag_set("wevt.plugin");
     nd_log_initialize_for_external_plugins("windows-events.plugin");
+    netdata_threads_init_for_external_plugins(0);
 
     // ------------------------------------------------------------------------
     // initialization

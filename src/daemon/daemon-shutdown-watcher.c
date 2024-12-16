@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "watcher.h"
+#include "daemon-shutdown-watcher.h"
 
 watcher_step_t *watcher_steps;
 
@@ -20,15 +20,28 @@ void watcher_step_complete(watcher_step_id_t step_id) {
     completion_mark_complete(&watcher_steps[step_id].p);
 }
 
-static void watcher_wait_for_step(const watcher_step_id_t step_id)
+static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdown_start_time)
 {
-    unsigned timeout = 90;
-
     usec_t step_start_time = now_monotonic_usec();
+    usec_t step_start_duration = step_start_time - shutdown_start_time;
+
+    char start_duration_txt[64];
+    duration_snprintf(
+        start_duration_txt, sizeof(start_duration_txt), (int64_t)step_start_duration, "us", true);
+
+    netdata_log_info("shutdown step: [%d/%d] - {at %s} started '%s'...",
+                     (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
+                     watcher_steps[step_id].msg);
 
 #ifdef ENABLE_SENTRY
     // Wait with a timeout
-    bool ok = completion_timedwait_for(&watcher_steps[step_id].p, timeout);
+    time_t timeout = 135; // systemd gives us 150, we timeout at 135
+
+    time_t remaining_seconds = timeout - (time_t)(step_start_duration / USEC_PER_SEC);
+    if(remaining_seconds < 0)
+        remaining_seconds = 0;
+
+    bool ok = completion_timedwait_for(&watcher_steps[step_id].p, remaining_seconds);
 #else
     // Wait indefinitely
     bool ok = true;
@@ -37,16 +50,20 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id)
 
     usec_t step_duration = now_monotonic_usec() - step_start_time;
 
+    char step_duration_txt[64];
+    duration_snprintf(
+        step_duration_txt, sizeof(step_duration_txt), (int64_t)(step_duration), "us", true);
+
     if (ok) {
-        netdata_log_info("shutdown step: [%d/%d] - '%s' finished in %llu milliseconds",
-                         (int)step_id + 1, (int)WATCHER_STEP_ID_MAX,
-                         watcher_steps[step_id].msg, step_duration / USEC_PER_MS);
+        netdata_log_info("shutdown step: [%d/%d] - {at %s} finished '%s' in %s",
+                         (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
+                         watcher_steps[step_id].msg, step_duration_txt);
     } else {
         // Do not call fatal() because it will try to execute the exit
         // sequence twice.
-        netdata_log_error("shutdown step: [%d/%d] - '%s' took more than %u seconds (ie. %llu milliseconds)",
-              (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, watcher_steps[step_id].msg,
-              timeout, step_duration / USEC_PER_MS);
+        netdata_log_error("shutdown step: [%d/%d] - {at %s} timeout '%s' takes too long (%s) - giving up...",
+                          (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, start_duration_txt,
+                          watcher_steps[step_id].msg, step_duration_txt);
 
         abort();
     }
@@ -64,32 +81,30 @@ void *watcher_main(void *arg)
 
     usec_t shutdown_start_time = now_monotonic_usec();
 
-    watcher_wait_for_step(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
-    watcher_wait_for_step(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER);
-    watcher_wait_for_step(WATCHER_STEP_ID_DBENGINE_EXIT_MODE);
-    watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
-    watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_REPLICATION_THREADS);
-    watcher_wait_for_step(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
-    watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_CONTEXT_THREAD);
-    watcher_wait_for_step(WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_ACLK_THREADS);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
-    watcher_wait_for_step(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
-    watcher_wait_for_step(WATCHER_STEP_ID_FLUSH_DBENGINE_TIERS);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
-    watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
-    watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
-    watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
-    watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_PID_FILE);
-    watcher_wait_for_step(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
-    watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE);
+    watcher_wait_for_step(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_DESTROY_MAIN_SPAWN_SERVER, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_DBENGINE_EXIT_MODE, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_REPLICATION_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_CONTEXT_THREAD, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_ACLK_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_CANCEL_MAIN_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_DBENGINE_TIERS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_METASYNC_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_DATABASES, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_PID_FILE, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE, shutdown_start_time);
 
     completion_wait_for(&shutdown_end_completion);
     usec_t shutdown_end_time = now_monotonic_usec();
@@ -136,14 +151,10 @@ void watcher_thread_start() {
         "stop all remaining worker threads";
     watcher_steps[WATCHER_STEP_ID_CANCEL_MAIN_THREADS].msg =
         "cancel main threads";
-    watcher_steps[WATCHER_STEP_ID_FLUSH_DBENGINE_TIERS].msg =
-        "flush dbengine tiers";
     watcher_steps[WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS].msg =
         "stop collection for all hosts";
     watcher_steps[WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH].msg =
         "wait for dbengine collectors to finish";
-    watcher_steps[WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING].msg =
-        "wait for dbengine main cache to finish flushing";
     watcher_steps[WATCHER_STEP_ID_STOP_DBENGINE_TIERS].msg =
         "stop dbengine tiers";
     watcher_steps[WATCHER_STEP_ID_STOP_METASYNC_THREADS].msg =

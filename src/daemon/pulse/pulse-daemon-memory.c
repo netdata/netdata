@@ -12,7 +12,10 @@ struct netdata_buffers_statistics netdata_buffers_statistics = {};
 void pulse_daemon_memory_do(bool extended) {
     {
         static RRDSET *st_memory = NULL;
-        static RRDDIM *rd_database = NULL;
+        static RRDDIM *rd_db_dbengine = NULL;
+        static RRDDIM *rd_db_rrd = NULL;
+        static RRDDIM *rd_db_sqlite3 = NULL;
+
 #ifdef DICT_WITH_STATS
         static RRDDIM *rd_collectors = NULL;
         static RRDDIM *rd_rrdhosts = NULL;
@@ -50,7 +53,9 @@ void pulse_daemon_memory_do(bool extended) {
                 localhost->rrd_update_every,
                 RRDSET_TYPE_STACKED);
 
-            rd_database = rrddim_add(st_memory, "db", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_db_dbengine = rrddim_add(st_memory, "dbengine", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_db_rrd = rrddim_add(st_memory, "rrd", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_db_sqlite3 = rrddim_add(st_memory, "sqlite3", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
 #ifdef DICT_WITH_STATS
             rd_collectors = rrddim_add(st_memory, "collectors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -75,8 +80,9 @@ void pulse_daemon_memory_do(bool extended) {
             rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
+        // each of these should also be analyzed below at the buffers chart
         size_t buffers =
-            netdata_buffers_statistics.query_targets_size +
+            netdata_buffers_statistics.query_targets_size + onewayalloc_allocated_memory() +
             netdata_buffers_statistics.rrdset_done_rda_size +
             netdata_buffers_statistics.buffers_aclk +
             netdata_buffers_statistics.buffers_api +
@@ -89,11 +95,15 @@ void pulse_daemon_memory_do(bool extended) {
             netdata_buffers_statistics.buffers_web +
             replication_allocated_buffers() + aral_by_size_free_bytes() + judy_aral_free_bytes();
 
+        int sqlite3_memory_used_current = 0, sqlite3_memory_used_highwater = 0;
+        sqlite3_status(SQLITE_STATUS_MEMORY_USED, &sqlite3_memory_used_current, &sqlite3_memory_used_highwater, 1);
+
         size_t strings = 0;
         string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
 
-        rrddim_set_by_pointer(st_memory, rd_database,
-                              (collected_number)pulse_dbengine_total_memory + (collected_number)rrddim_db_memory_size);
+        rrddim_set_by_pointer(st_memory, rd_db_dbengine, (collected_number)pulse_dbengine_total_memory);
+        rrddim_set_by_pointer(st_memory, rd_db_rrd, (collected_number)pulse_rrd_memory_size);
+        rrddim_set_by_pointer(st_memory, rd_db_sqlite3, (collected_number)sqlite3_memory_used_highwater);
 
 #ifdef DICT_WITH_STATS
         rrddim_set_by_pointer(st_memory, rd_collectors,
@@ -157,11 +167,11 @@ void pulse_daemon_memory_do(bool extended) {
         rrddim_set_by_pointer(st_memory, rd_aral,
                               (collected_number)aral_by_size_structures_bytes());
 
-        rrddim_set_by_pointer(st_memory,
-                              rd_judy, (collected_number) judy_aral_structures());
+        rrddim_set_by_pointer(st_memory, rd_judy,
+                              (collected_number) judy_aral_structures());
 
-        rrddim_set_by_pointer(st_memory,
-                              rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
+        rrddim_set_by_pointer(st_memory, rd_other,
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
 
         rrdset_done(st_memory);
     }
@@ -221,6 +231,7 @@ void pulse_daemon_memory_do(bool extended) {
             rd_buffers_judy = rrddim_add(st_memory_buffers, "aral-judy free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
+        // the sum of all these needs to be above at the total buffers calculation
         rrddim_set_by_pointer(st_memory_buffers, rd_queries, (collected_number)netdata_buffers_statistics.query_targets_size + (collected_number) onewayalloc_allocated_memory());
         rrddim_set_by_pointer(st_memory_buffers, rd_collectors, (collected_number)netdata_buffers_statistics.rrdset_done_rda_size);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aclk, (collected_number)netdata_buffers_statistics.buffers_aclk);
@@ -231,8 +242,8 @@ void pulse_daemon_memory_do(bool extended) {
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_health, (collected_number)netdata_buffers_statistics.buffers_health);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_streaming, (collected_number)netdata_buffers_statistics.buffers_streaming);
         rrddim_set_by_pointer(st_memory_buffers, rd_cbuffers_streaming, (collected_number)netdata_buffers_statistics.cbuffers_streaming);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_allocated_buffers());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_web, (collected_number)netdata_buffers_statistics.buffers_web);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_allocated_buffers());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aral, (collected_number)aral_by_size_free_bytes());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_judy, (collected_number)judy_aral_free_bytes());
 

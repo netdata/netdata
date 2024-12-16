@@ -13,8 +13,6 @@ struct dictionary_stats dictionary_stats_category_rrdhealth = { .name = "health"
 struct dictionary_stats dictionary_stats_category_functions = { .name = "functions" };
 struct dictionary_stats dictionary_stats_category_replication = { .name = "replication" };
 
-size_t rrddim_db_memory_size = 0;
-
 #ifdef DICT_WITH_STATS
 struct dictionary_categories {
     struct dictionary_stats *stats;

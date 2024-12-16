@@ -6,6 +6,17 @@
 
 **Merged pull requests:**
 
+- add pcre2 dev to install-requires-packages.sh [\#19217](https://github.com/netdata/netdata/pull/19217) ([ilyam8](https://github.com/ilyam8))
+- remove ENABLE\_H2O=1 from installer [\#19216](https://github.com/netdata/netdata/pull/19216) ([ilyam8](https://github.com/ilyam8))
+- fix: use setuid as a fallback for static builds when setcap fails for plugins [\#19215](https://github.com/netdata/netdata/pull/19215) ([ilyam8](https://github.com/ilyam8))
+- add dyncfg vnode option to collectors [\#19214](https://github.com/netdata/netdata/pull/19214) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/vmware/govmomi from 0.46.2 to 0.46.3 [\#19213](https://github.com/netdata/netdata/pull/19213) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump k8s.io/client-go from 0.31.3 to 0.32.0 in /src/go [\#19210](https://github.com/netdata/netdata/pull/19210) ([dependabot[bot]](https://github.com/apps/dependabot))
+- dyncfg vnodes improvements [\#19207](https://github.com/netdata/netdata/pull/19207) ([ilyam8](https://github.com/ilyam8))
+- Streaming improvements No 8 [\#19206](https://github.com/netdata/netdata/pull/19206) ([ktsaou](https://github.com/ktsaou))
+- feat\(go.d.plugin\): add dyncfg vnodes [\#19205](https://github.com/netdata/netdata/pull/19205) ([ilyam8](https://github.com/ilyam8))
+- Streaming improvements No 7 [\#19204](https://github.com/netdata/netdata/pull/19204) ([ktsaou](https://github.com/ktsaou))
+- Streaming improvements No 6 [\#19196](https://github.com/netdata/netdata/pull/19196) ([ktsaou](https://github.com/ktsaou))
 - Add cross-architecture build tests for Go code. [\#19195](https://github.com/netdata/netdata/pull/19195) ([Ferroin](https://github.com/Ferroin))
 - Remove July arrays [\#19194](https://github.com/netdata/netdata/pull/19194) ([stelfrag](https://github.com/stelfrag))
 - Streaming Improvements No 5 [\#19193](https://github.com/netdata/netdata/pull/19193) ([ktsaou](https://github.com/ktsaou))
@@ -441,17 +452,6 @@
 - Properly set start/shutdown times to parent/child [\#18668](https://github.com/netdata/netdata/pull/18668) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#18667](https://github.com/netdata/netdata/pull/18667) ([netdatabot](https://github.com/netdatabot))
 - apps\_groups.conf: add oracledb [\#18666](https://github.com/netdata/netdata/pull/18666) ([ilyam8](https://github.com/ilyam8))
-- Docs lint on `packaging/` dir [\#18665](https://github.com/netdata/netdata/pull/18665) ([Ancairon](https://github.com/Ancairon))
-- Add FAQ to SCIM integration doc [\#18664](https://github.com/netdata/netdata/pull/18664) ([juacker](https://github.com/juacker))
-- Fix win apps uptime [\#18662](https://github.com/netdata/netdata/pull/18662) ([ktsaou](https://github.com/ktsaou))
-- Embed CPU architecture info in Windows installer filename. [\#18661](https://github.com/netdata/netdata/pull/18661) ([Ferroin](https://github.com/Ferroin))
-- Docs directory lint documentation and fix issues [\#18660](https://github.com/netdata/netdata/pull/18660) ([Ancairon](https://github.com/Ancairon))
-- bump go toolchain v1.22.8 [\#18659](https://github.com/netdata/netdata/pull/18659) ([ilyam8](https://github.com/ilyam8))
-- go.d sd fix sprig funcmap [\#18658](https://github.com/netdata/netdata/pull/18658) ([ilyam8](https://github.com/ilyam8))
-- Adjust content api/v1/info \(Windows\) [\#18656](https://github.com/netdata/netdata/pull/18656) ([thiagoftsm](https://github.com/thiagoftsm))
-- add go.d/oracle [\#18654](https://github.com/netdata/netdata/pull/18654) ([ilyam8](https://github.com/ilyam8))
-- Handle mqtt ping timeouts [\#18653](https://github.com/netdata/netdata/pull/18653) ([stelfrag](https://github.com/stelfrag))
-- apps.plugin improvements [\#18652](https://github.com/netdata/netdata/pull/18652) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

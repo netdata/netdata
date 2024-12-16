@@ -1288,6 +1288,7 @@ void parse_command_line(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     nd_log_initialize_for_external_plugins("perf.plugin");
+    netdata_threads_init_for_external_plugins(0);
 
     parse_command_line(argc, argv);
 

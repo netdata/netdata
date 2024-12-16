@@ -186,8 +186,6 @@ static void profile_main_cleanup(void *pptr) {
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    netdata_log_info("cleaning up...");
-
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 

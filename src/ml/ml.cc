@@ -161,7 +161,8 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
     int rc = 0;
 
     if (unlikely(!ml_db)) {
-        error_report("Database has not been initialized");
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "ML: Database has not been initialized to add ML models");
         return 1;
     }
 
@@ -235,7 +236,8 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
     int param = 0;
 
     if (unlikely(!ml_db)) {
-        error_report("Database has not been initialized");
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "ML: Database has not been initialized to delete ML models");
         return 1;
     }
 
@@ -285,7 +287,8 @@ ml_prune_old_models(size_t num_models_to_prune)
     int param = 0;
 
     if (unlikely(!ml_db)) {
-        error_report("Database has not been initialized");
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "ML: Database has not been initialized to prune old ML models");
         return 1;
     }
 
@@ -348,7 +351,8 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     int param = 0;
 
     if (unlikely(!ml_db)) {
-        error_report("Database has not been initialized");
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "ML: Database has not been initialized to load ML models");
         return 1;
     }
 

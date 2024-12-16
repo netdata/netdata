@@ -44,6 +44,11 @@
         "description": "If set, this value will be used in the chart context as 'prometheus.{app}.{metric_name}'.",
         "type": "string"
       },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
       "selector": {
         "title": "Selectors",
         "description": "Configuration for selecting and filtering a set of time series using Prometheus selectors. If left empty, no filtering is applied.",
@@ -229,7 +234,8 @@
             "timeout",
             "not_follow_redirects",
             "expected_prefix",
-            "app"
+            "app",
+            "vnode"
           ]
         },
         {
@@ -283,6 +289,9 @@
           ]
         }
       ]
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "url": {
       "ui:placeholder": "http://203.0.113.0"
