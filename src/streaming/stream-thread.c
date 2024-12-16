@@ -271,8 +271,8 @@ static void stream_thread_read_pipe_messages(struct stream_thread *sth) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static int set_pipe_size(int pipe_fd, int new_size) {
-    int default_size = new_size;
+static int set_pipe_size(int pipe_fd __maybe_unused, int new_size) {
+    int default_size = new_size; (void)default_size;
     int result = new_size;
 
 #ifdef F_GETPIPE_SZ

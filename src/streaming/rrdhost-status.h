@@ -84,7 +84,7 @@ ENUM_STR_DEFINE_FUNCTIONS_EXTERN(RRDHOST_DYNCFG_STATUS);
 #include "stream-capabilities.h"
 #include "database/rrd.h"
 
-typedef struct rrdhost_status {
+typedef struct rrdhost_status_t {
     RRDHOST *host;
     time_t now;
 

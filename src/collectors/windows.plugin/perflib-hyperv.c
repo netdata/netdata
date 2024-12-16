@@ -985,7 +985,6 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
-        static bool charts_created = false;
         pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
         if (!pi)
             break;

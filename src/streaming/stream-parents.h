@@ -6,7 +6,7 @@
 #include "libnetdata/libnetdata.h"
 
 struct rrdhost;
-struct rrdhost_status;
+struct rrdhost_status_t;
 struct stream_parent;
 typedef struct stream_parent STREAM_PARENT;
 
@@ -37,7 +37,7 @@ bool stream_parent_connect_to_one(
     size_t connected_to_size,
     STREAM_PARENT **destination);
 
-void rrdhost_stream_parents_to_json(BUFFER *wb, struct rrdhost_status *s);
+void rrdhost_stream_parents_to_json(BUFFER *wb, struct rrdhost_status_t *s);
 STREAM_HANDSHAKE stream_parent_get_disconnect_reason(STREAM_PARENT *d);
 void stream_parent_set_disconnect_reason(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t since);
 void stream_parent_set_reconnect_delay(STREAM_PARENT *d, STREAM_HANDSHAKE reason, time_t secs);

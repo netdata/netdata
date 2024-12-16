@@ -39,12 +39,12 @@ private:
 
 class Profiler {
 public:
-    Profiler(size_t ID, size_t NumCharts, size_t NumDimsPerChart, time_t SecondsToBackfill, int UpdateEvery) :
-        ID(ID),
-        NumCharts(NumCharts),
-        NumDimsPerChart(NumDimsPerChart),
-        SecondsToBackfill(SecondsToBackfill),
-        UpdateEvery(UpdateEvery),
+    Profiler(size_t ID_arg, size_t NumCharts_arg, size_t NumDimsPerChart_arg, time_t SecondsToBackfill_arg, int UpdateEvery_arg) :
+        ID(ID_arg),
+        NumCharts(NumCharts_arg),
+        NumDimsPerChart(NumDimsPerChart_arg),
+        SecondsToBackfill(SecondsToBackfill_arg),
+        UpdateEvery(UpdateEvery_arg),
         Gen(1024 * 1024)
     {}
 

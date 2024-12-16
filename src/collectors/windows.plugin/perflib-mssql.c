@@ -1117,7 +1117,7 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mli, const
     rrdset_done(mli->st_db_active_transactions);
 }
 
-static void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
+static inline void mssql_data_file_size_chart(struct mssql_db_instance *mli, const char *db, int update_every) {
     char id[RRD_ID_LENGTH_MAX + 1];
 
     if (!mli->st_db_data_file_size) {
