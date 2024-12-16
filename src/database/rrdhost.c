@@ -743,7 +743,7 @@ RRDHOST *rrdhost_find_or_create(
     return host;
 }
 
-inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s) {
+bool rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s) {
     if(host != protected_host
        && host != localhost
        && rrdhost_receiver_replicating_charts(host) == 0
@@ -752,9 +752,18 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
        && !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_HEALTH_RUNNING_NOW | RRDHOST_FLAG_COLLECTOR_ONLINE)
        && host->stream.rcv.status.last_disconnected
        && host->stream.rcv.status.last_disconnected + rrdhost_free_orphan_time_s < now_s)
-        return 1;
+        return true;
 
-    return 0;
+    return false;
+}
+
+bool rrdhost_should_run_health(RRDHOST *host) {
+    if (!host->health.enabled ||
+        !rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE) ||
+        rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))
+        return false;
+
+    return true;
 }
 
 void api_v1_management_init(void);

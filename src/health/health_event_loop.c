@@ -2,6 +2,7 @@
 
 #include "health.h"
 #include "health_internals.h"
+#include "health-alert-entry.h"
 
 #define WORKER_HEALTH_JOB_RRD_LOCK              0
 #define WORKER_HEALTH_JOB_HOST_LOCK             1
@@ -211,8 +212,7 @@ static void do_eval_expression(
 static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run) {
     size_t runnable = 0;
 
-    if (unlikely(!host->health.enabled ||
-                 !rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE)))
+    if(unlikely(!rrdhost_should_run_health(host)))
         return;
 
     //#define rrdhost_pending_alert_transitions(host) (__atomic_load_n(&((host)->aclk_config.alert_transition.pending), __ATOMIC_RELAXED))
@@ -270,8 +270,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     // the first loop is to lookup values from the db
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(!service_running(SERVICE_HEALTH) ||
-                     !rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE)))
+        if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host)))
             break;
 
         rrdcalc_update_info_using_rrdset_labels(rc);
@@ -404,8 +403,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
     if (unlikely(runnable && service_running(SERVICE_HEALTH))) {
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
-            if(unlikely(!service_running(SERVICE_HEALTH) ||
-                         !rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE)))
+            if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host)))
                 break;
 
             if (unlikely(!(rc->run_flags & RRDCALC_FLAG_RUNNABLE)))
@@ -539,7 +537,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
         // process repeating alarms
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
-            if(unlikely(!service_running(SERVICE_HEALTH)))
+            if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host)))
                 break;
 
             int repeat_every = 0;
@@ -598,7 +596,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         foreach_rrdcalc_in_rrdhost_done(rc);
     }
 
-    if (unlikely(!service_running(SERVICE_HEALTH)))
+    if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host)))
         return;
 
     // execute notifications
