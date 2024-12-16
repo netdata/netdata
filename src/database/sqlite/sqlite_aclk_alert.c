@@ -815,11 +815,11 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *wc, uint64
         nd_log(
             NDLS_ACCESS,
             NDLP_DEBUG,
-            "Alert check on \"%s\", node \"%s\" (version: cloud %zu, local %zu)",
+            "Alert check on \"%s\", node \"%s\" (version: cloud %llu, local %llu)",
             rrdhost_hostname(wc->host),
             wc->node_id,
-            cloud_version,
-            local_version);
+            (unsigned long long)cloud_version,
+            (unsigned long long)local_version);
     wc->checkpoint_count++;
 }
 
