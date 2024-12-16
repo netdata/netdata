@@ -27,6 +27,7 @@
 // hashtable for keeping the namespaces
 // key and value is the namespace inode
 
+#define SIMPLE_HASHTABLE_VALUE_TYPE_IS_NOT_POINTER
 #define SIMPLE_HASHTABLE_VALUE_TYPE uint64_t
 #define SIMPLE_HASHTABLE_NAME _NET_NS
 #include "libnetdata/simple_hashtable/simple_hashtable.h"

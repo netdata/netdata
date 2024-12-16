@@ -412,10 +412,11 @@ static inline void simple_hashtable_set_slot_named(
     if(unlikely(data == (SIMPLE_HASHTABLE_VALUE_TYPE)0))
         v = simple_hashtable_data_usernull;
     else {
-        if (sizeof(SIMPLE_HASHTABLE_VALUE_TYPE) == sizeof(uintptr_t))
-            v = (uint64_t)(uintptr_t)data;
-        else
-            v = (uint64_t)data;
+#ifdef SIMPLE_HASHTABLE_VALUE_TYPE_IS_NOT_POINTER
+        v = (uint64_t)data;
+#else
+        v = (uint64_t)(uintptr_t)data;
+#endif
     }
 
     if(unlikely(v == simple_hashtable_data_unset || v == simple_hashtable_data_deleted)) {
