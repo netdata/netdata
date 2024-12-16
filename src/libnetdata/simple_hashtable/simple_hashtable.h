@@ -108,7 +108,7 @@ typedef struct simple_hashtable_slot_named {
     SIMPLE_HASHTABLE_HASH hash;
     union {
         SIMPLE_HASHTABLE_VALUE_TYPE data;
-        uint64_t v; // make sure it is always 64bit
+        uint64_t v; // make sure it is always 64bit (required to store our deleted or usernull values)
     };
 } SIMPLE_HASHTABLE_SLOT_NAMED;
 
@@ -408,29 +408,39 @@ static inline void simple_hashtable_set_slot_named(
         SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_SLOT_NAMED *sl,
         SIMPLE_HASHTABLE_HASH hash, SIMPLE_HASHTABLE_VALUE_TYPE data) {
 
-    uint64_t v = (uint64_t)data;
-    if(v == 0)
-        v = simple_hashtable_data_usernull;
+    uint64_t v = (data == (SIMPLE_HASHTABLE_VALUE_TYPE)0) ? simple_hashtable_data_usernull : (uint64_t)data;
 
     if(unlikely(v == simple_hashtable_data_unset || v == simple_hashtable_data_deleted)) {
+        // the new value is unset or deleted,
+        // mark the slot as deleted (updating the sorted array as necessary)
         simple_hashtable_del_slot_named(ht, sl);
         return;
     }
 
     if(likely(simple_hashtable_is_slot_unset(sl))) {
+        // the slot is empty,
+        // add the new value to the sorted array (when sorting is requested)
         simple_hashtable_add_value_sorted_named(ht, data);
         ht->used++;
     }
 
     else if(unlikely(simple_hashtable_is_slot_deleted(sl))) {
+        // the slot is deleted,
+        // add the new value to the sorted array (when sorting is requested)
+        simple_hashtable_add_value_sorted_named(ht, data);
         ht->deleted--;
     }
 
-    else
+    else {
+        // the slot is occupied,
+        // replace the old value with the new value in the sorted array (when sorting is requested)
         simple_hashtable_replace_value_sorted_named(ht, SIMPLE_HASHTABLE_SLOT_DATA(sl), data);
+    }
 
+    // update the slot with the new value
     sl->hash = hash;
     sl->v = v;
+
     ht->additions++;
 }
 
