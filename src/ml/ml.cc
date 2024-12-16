@@ -536,10 +536,6 @@ ml_dimension_deserialize_kmeans(const char *json_str)
 
     AcquiredDimension AcqDim(DLI);
     if (!AcqDim.acquired()) {
-        nd_log_limit_static_global_var(erl, 10, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
-                     "ML: Failed to deserialize kmeans: could not acquire dimension (machine-guid: %s, dimension: '%s.%s', reason: %s)",
-                     DLI.machineGuid(), DLI.chartId(), DLI.dimensionId(), AcqDim.acquire_failure());
         json_object_put(root);
         return false;
     }
@@ -1045,10 +1041,6 @@ static enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, ml_
     AcquiredDimension AcqDim(req.DLI);
 
     if (!AcqDim.acquired()) {
-        nd_log_limit_static_global_var(erl, 10, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
-                     "ML: Failed to create new model: could not acquire dimension (machine-guid: %s, dimension: '%s.%s', reason: %s)",
-                     req.DLI.machineGuid(), req.DLI.chartId(), req.DLI.dimensionId(), AcqDim.acquire_failure());
         return ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION;
     }
 
@@ -1063,10 +1055,6 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
     AcquiredDimension AcqDim(req.DLI);
 
     if (!AcqDim.acquired()) {
-        nd_log_limit_static_global_var(erl, 10, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
-                     "ML: Failed to add existing model: could not acquire dimension (machine-guid: %s, dimension: '%s.%s', reason: %s)",
-                     req.DLI.machineGuid(), req.DLI.chartId(), req.DLI.dimensionId(), AcqDim.acquire_failure());
         return ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION;
     }
 
