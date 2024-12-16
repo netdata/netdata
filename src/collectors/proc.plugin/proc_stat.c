@@ -729,7 +729,7 @@ int do_proc_stat(int update_every, usec_t dt) {
 
                     if (core > 0) {
                         char cpu_core[50 + 1];
-                        snprintfz(cpu_core, 50, "cpu%lu", core - 1);
+                        snprintfz(cpu_core, 50, "cpu%zu", core - 1);
                         rrdlabels_add(cpu_chart->st->rrdlabels, "cpu", cpu_core, RRDLABEL_SRC_AUTO);
                     }
 
