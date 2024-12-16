@@ -896,7 +896,7 @@ static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t famil
     struct nlmsghdr *nlh = mnl_nlmsg_put_header(buf);
     nlh->nlmsg_type = SOCK_DIAG_BY_FAMILY;
     nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
-    nlh->nlmsg_seq = ls->ns_state.nl_seq ? ls->ns_state.nl_seq++ : time(NULL);
+    nlh->nlmsg_seq = ls->ns_state.nl_seq ? ls->ns_state.nl_seq++ : (uint32_t)time(NULL);
 
     struct inet_diag_req_v2 req = {
         .sdiag_family = family,

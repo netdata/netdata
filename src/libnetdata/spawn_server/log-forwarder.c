@@ -90,8 +90,7 @@ void log_forwarder_stop(LOG_FORWARDER *lf) {
 
     // Send a byte to the pipe to wake up the thread
     char ch = 0;
-    if(write(lf->pipe_fds[PIPE_WRITE], &ch, 1) <= 0)
-        ;
+    if(write(lf->pipe_fds[PIPE_WRITE], &ch, 1) <= 0) { ; }
     spinlock_unlock(&lf->spinlock);
 
     // Wait for the thread to finish
