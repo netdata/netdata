@@ -52,7 +52,7 @@ bool is_system_ieee754_double(void) {
 
         if(*ptr != tests[i].i && (tests[i].original == tests[i].d || (isnan(tests[i].original) && isnan(tests[i].d)))) {
             if(!logged)
-                netdata_log_info("IEEE754: test #%zu, value " NETDATA_DOUBLE_FORMAT_G " is represented in this system as %lX, but it was expected as %lX",
+                netdata_log_info("IEEE754: test #%zu, value " NETDATA_DOUBLE_FORMAT_G " is represented in this system as %llX, but it was expected as %llX",
                      i+1, tests[i].original, *ptr, tests[i].i);
             errors++;
         }
