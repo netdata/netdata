@@ -3,7 +3,7 @@
 ## System Requirements
 
 | Component                  | Details                                                                                                                                        |
-|:---------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------|
+| :------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Kubernetes**             | - Version 1.23 or newer<br/>- Metrics server installed (for autoscaling)<br/>- Default storage class configured (SSD-based preferred)          |
 | **TLS certificate**        | - Single certificate for all endpoints, or separate certificates for frontend, API, and MQTT<br/>- Must be trusted by all connecting entities. |
 | **Netdata Cloud Services** | - 4 CPU cores<br/>- 15GiB memory<br/>- Note: Cloud services are ephemeral                                                                      |
@@ -23,11 +23,11 @@
 All components below are included in the `netdata-cloud-dependency` package:
 
 | Component              | Version | Purpose                             |
-|------------------------|---------|-------------------------------------|
+| ---------------------- | ------- | ----------------------------------- |
 | **PostgreSQL**         | 13.7    | Main metadata database              |
 | **EMQX**               | 5.11    | MQTT Broker for Agent communication |
 | **Apache Pulsar**      | 2.10+   | Inter-container message broker      |
-| **Traefik**            | 2.7.x   | Internal API Gateway                |
+| **Traefik**            | 2.11.x  | Internal API Gateway                |
 | **Elasticsearch**      | 8.8.x   | Events feed storage                 |
 | **Redis**              | 6.2     | Caching layer                       |
 | **Ingress Controller** | -       | HTTPS support                       |
@@ -75,26 +75,28 @@ All components below are included in the `netdata-cloud-dependency` package:
    helm pull oci://362923047827.dkr.ecr.us-east-1.amazonaws.com/netdata-cloud-dependency --untar  # Optional
    helm pull oci://362923047827.dkr.ecr.us-east-1.amazonaws.com/netdata-cloud-onprem --untar
    ```
+
    The charts will be extracted to your current working directory.
 
 4. **Install Dependencies**
 
    The `netdata-cloud-dependency` chart installs all required third-party applications. While we provide this for easy setup, **production environments should use their own configured versions of these components**:
 
-    - Configure the installation by editing `values.yaml` in your `netdata-cloud-dependency` chart directory.
-    - Install the dependencies:
-        ```bash
-        cd [your helm chart location]
-        helm upgrade --wait --install netdata-cloud-dependency -n netdata-cloud --create-namespace -f values.yaml .
-        ```
+   - Configure the installation by editing `values.yaml` in your `netdata-cloud-dependency` chart directory.
+   - Install the dependencies:
+     ```bash
+     cd [your helm chart location]
+     helm upgrade --wait --install netdata-cloud-dependency -n netdata-cloud --create-namespace -f values.yaml .
+     ```
+
 5. **Install Netdata Cloud On-Prem**
 
-    - Configure the installation by editing `values.yaml` in your `netdata-cloud-onprem` chart directory.
-    - Install the application:
-         ```bash
-         cd [your helm chart location]
-         helm upgrade --wait --install netdata-cloud-onprem -n netdata-cloud --create-namespace -f values.yaml .
-         ```
+   - Configure the installation by editing `values.yaml` in your `netdata-cloud-onprem` chart directory.
+   - Install the application:
+     ```bash
+     cd [your helm chart location]
+     helm upgrade --wait --install netdata-cloud-onprem -n netdata-cloud --create-namespace -f values.yaml .
+     ```
 
    > **Important**:
    >
@@ -107,7 +109,7 @@ All components below are included in the `netdata-cloud-dependency` package:
 <details><summary>View detailed microservices description</summary>
 
 | Microservice                           | Description                                                                                                                                                                                                                                                                                                                                                                                        |
-|:---------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| :------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | cloud-accounts-service                 | Handles user registration & authentication                                                                                                                                                                                                                                                                                                                                                         |
 | cloud-agent-data-ctrl-service          | Forwards request from the OCP to the relevant Agents. The requests include fetching Chart metadata, Chart data and Function data from the Agents.                                                                                                                                                                                                                                                  |
 | cloud-agent-mqtt-input-service         | Forwards MQTT messages emitted by the Agent to the internal Pulsar broker. They are related to the Agent entities and include Agent connection state updates.                                                                                                                                                                                                                                      |
