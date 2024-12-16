@@ -8,14 +8,13 @@ The Agent-Cloud Link (ACLK) provides secure communication between your Netdata A
 
 For ACLK to function properly, your Agents need outbound access to Netdata Cloud services.
 
-| Allowlisting Method | Required Access                                         |
-|---------------------|---------------------------------------------------------|
-| Domain              | • `app.netdata.cloud`<br/>• `mqtt.netdata.cloud`        |
-| IP                  | • 54.198.178.11<br/>• 44.207.131.212<br/>• 44.196.50.41 |
+| Allowlisting Method | Required Access                                                            |
+|---------------------|----------------------------------------------------------------------------|
+| Domain              | • `app.netdata.cloud`<br/>• `api.netdata.cloud`<br/>• `mqtt.netdata.cloud` |
 
 > **Important**
 >
-> IP addresses can change without notice. Always **prefer domain allowlisting**. If you must use IP addresses, verify them regularly with the host command.
+> IP addresses can change without notice! Always **prefer domain allowlisting**. If you must use IP addresses, be aware that they vary based on your geographic location due to CDN-edge servers. You'll need to regularly verify the IP addresses specific to your region.
 
 ## Data privacy
 
