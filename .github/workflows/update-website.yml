@@ -19,9 +19,12 @@ jobs:
           echo "Labels: $LABELS"
           if [[ ! "$LABELS" =~ "integrations-update" ]]; then
             echo "This PR does not have the required label."
-            exit 1
+            echo "has_label=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_label=true" >> $GITHUB_OUTPUT
           fi
       - name: Trigger netdata/website update-integrations workflow
+        if: steps.label-check.outputs.has_label == 'true'
         uses: benc-uk/workflow-dispatch@v1
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
