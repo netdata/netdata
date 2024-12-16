@@ -749,8 +749,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
        && rrdhost_receiver_replicating_charts(host) == 0
        && rrdhost_sender_replicating_charts(host) == 0
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
-       && !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)
-       && !host->receiver
+       && !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_HEALTH_RUNNING_NOW | RRDHOST_FLAG_COLLECTOR_ONLINE)
        && host->stream.rcv.status.last_disconnected
        && host->stream.rcv.status.last_disconnected + rrdhost_free_orphan_time_s < now_s)
         return 1;
