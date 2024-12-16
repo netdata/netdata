@@ -177,7 +177,7 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
     if(likely(st->pluginsd.dims_with_slots)) {
         // caching with slots
 
-        if(unlikely(slot < 1 || slot > st->pluginsd.size)) {
+        if(unlikely(slot < 1 || slot > (ssize_t)st->pluginsd.size)) {
             netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s with slot %zd, but slots in the range [1 - %u] are expected.",
                               rrdhost_hostname(host), rrdset_id(st), cmd, slot, st->pluginsd.size);
             return NULL;

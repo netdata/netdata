@@ -351,7 +351,9 @@ static int http_proxy_connect(mqtt_wss_client client)
     char *r_buf_ptr = rbuf_get_linear_insert_range(r_buf, &r_buf_linear_insert_capacity);
     snprintf(r_buf_ptr, r_buf_linear_insert_capacity,"%s %s:%d %s" HTTP_ENDLINE "Host: %s" HTTP_ENDLINE, PROXY_CONNECT,
              client->target_host, client->target_port, PROXY_HTTP, client->target_host);
-    write(client->sockfd, r_buf_ptr, strlen(r_buf_ptr));
+
+    if(write(client->sockfd, r_buf_ptr, strlen(r_buf_ptr)) <= 0)
+        ;
 
     if (client->proxy_uname) {
         size_t creds_plain_len = strlen(client->proxy_uname) + strlen(client->proxy_passwd) + 2;
@@ -383,10 +385,15 @@ static int http_proxy_connect(mqtt_wss_client client)
 
         r_buf_ptr = rbuf_get_linear_insert_range(r_buf, &r_buf_linear_insert_capacity);
         snprintf(r_buf_ptr, r_buf_linear_insert_capacity,"Proxy-Authorization: Basic %s" HTTP_ENDLINE, creds_base64);
-        write(client->sockfd, r_buf_ptr, strlen(r_buf_ptr));
+
+        if(write(client->sockfd, r_buf_ptr, strlen(r_buf_ptr)) <= 0)
+            ;
+
         freez(creds_base64);
     }
-    write(client->sockfd, HTTP_ENDLINE, strlen(HTTP_ENDLINE));
+
+    if(write(client->sockfd, HTTP_ENDLINE, strlen(HTTP_ENDLINE)) <= 0)
+        ;
 
     // read until you find CRLF, CRLF (HTTP HDR end)
     // or ring buffer is full
@@ -727,7 +734,8 @@ static void mqtt_wss_wakeup(mqtt_wss_client client)
 char throwaway[THROWAWAY_BUF_SIZE];
 static void util_clear_pipe(int fd)
 {
-    (void)read(fd, throwaway, THROWAWAY_BUF_SIZE);
+    if(read(fd, throwaway, THROWAWAY_BUF_SIZE) <= 0)
+        ;
 }
 
 static void set_socket_pollfds(mqtt_wss_client client, int ssl_ret) {
