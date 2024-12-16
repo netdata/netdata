@@ -174,6 +174,16 @@ typedef struct netdata_ebpf_shm {
     uint32_t ctl;
 } netdata_ebpf_shm_t;
 
+typedef struct netdata_ebpf_pid_stats {
+    ebpf_process_stat_t process;
+    netdata_socket_t socket;
+    netdata_cachestat_pid_t cachestat;
+    netdata_dcstat_pid_t directory_cache;
+    netdata_ebpf_swap_t swap;
+    netdata_ebpf_vfs_t vfs;
+    netdata_fd_stat_t shm;
+} netdata_ebpf_pid_stats_t;
+
 // ----------------------------------------------------------------------------
 // Helpers used during integration
 
