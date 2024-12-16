@@ -27,6 +27,8 @@
 // hashtable for keeping the namespaces
 // key and value is the namespace inode
 
+#define SIMPLE_HASHTABLE_KEY_TYPE uint64_t
+#define SIMPLE_HASHTABLE_VALUE_TYPE_IS_NOT_POINTER
 #define SIMPLE_HASHTABLE_VALUE_TYPE uint64_t
 #define SIMPLE_HASHTABLE_NAME _NET_NS
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
@@ -36,7 +38,7 @@
 // key is the inode
 
 struct pid_socket;
-#define SIMPLE_HASHTABLE_VALUE_TYPE struct pid_socket
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct pid_socket *
 #define SIMPLE_HASHTABLE_NAME _PID_SOCKET
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 
@@ -45,7 +47,7 @@ struct pid_socket;
 // key is the inode
 
 struct local_socket;
-#define SIMPLE_HASHTABLE_VALUE_TYPE struct local_socket
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct local_socket *
 #define SIMPLE_HASHTABLE_NAME _LOCAL_SOCKET
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 
@@ -54,7 +56,7 @@ struct local_socket;
 // key is XXH3_64bits hash of the IP
 
 union ipv46;
-#define SIMPLE_HASHTABLE_VALUE_TYPE union ipv46
+#define SIMPLE_HASHTABLE_VALUE_TYPE union ipv46 *
 #define SIMPLE_HASHTABLE_NAME _LOCAL_IP
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 
@@ -63,7 +65,7 @@ union ipv46;
 // key is XXH3_64bits hash of the family, protocol, port number, namespace
 
 struct local_port;
-#define SIMPLE_HASHTABLE_VALUE_TYPE struct local_port
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct local_port *
 #define SIMPLE_HASHTABLE_NAME _LISTENING_PORT
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 
@@ -674,8 +676,8 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                     snprintfz(filename, sizeof(filename), "%s/%s/ns/net", proc_filename, proc_entry->d_name);
                     if(local_sockets_read_proc_inode_link(ls, filename, &net_ns_inode, "net")) {
                         XXH64_hash_t net_ns_inode_hash = XXH3_64bits(&net_ns_inode, sizeof(net_ns_inode));
-                        SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode_hash, (uint64_t *)net_ns_inode, true);
-                        simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode, (uint64_t *)net_ns_inode);
+                        SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode_hash, &net_ns_inode, true);
+                        simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode, net_ns_inode);
                     }
                 }
 
@@ -896,7 +898,7 @@ static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t famil
     struct nlmsghdr *nlh = mnl_nlmsg_put_header(buf);
     nlh->nlmsg_type = SOCK_DIAG_BY_FAMILY;
     nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
-    nlh->nlmsg_seq = ls->ns_state.nl_seq ? ls->ns_state.nl_seq++ : time(NULL);
+    nlh->nlmsg_seq = ls->ns_state.nl_seq ? ls->ns_state.nl_seq++ : (uint32_t)time(NULL);
 
     struct inet_diag_req_v2 req = {
         .sdiag_family = family,

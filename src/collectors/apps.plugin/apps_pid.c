@@ -8,7 +8,7 @@ static inline void link_pid_to_its_parent(struct pid_stat *p);
 // The index of all pids
 
 #define SIMPLE_HASHTABLE_NAME _PID
-#define SIMPLE_HASHTABLE_VALUE_TYPE struct pid_stat
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct pid_stat *
 #define SIMPLE_HASHTABLE_KEY_TYPE int32_t
 #define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION pid_stat_to_pid_ptr
 #define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION pid_ptr_eq

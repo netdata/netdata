@@ -1867,7 +1867,7 @@ static inline void metric_check_obsoletion(STATSD_METRIC *m) {
     if(statsd.set_obsolete_after &&
        !rrdset_flag_check(m->st, RRDSET_FLAG_OBSOLETE) &&
        m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED &&
-       m->last_collected + statsd.set_obsolete_after < now_realtime_sec()) {
+       m->last_collected + (time_t)statsd.set_obsolete_after < now_realtime_sec()) {
         rrdset_is_obsolete___safe_from_collector_thread(m->st);
         m->options |= STATSD_METRIC_OPTION_OBSOLETE;
     }

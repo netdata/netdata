@@ -716,7 +716,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
 
     // allow to be called without update every (when loading pages from disk)
     if(!update_every_s) {
-        vd.update_every_s = (vd.entries > 1) ? ((vd.end_time_s - vd.start_time_s) / (time_t) (vd.entries - 1))
+        vd.update_every_s = (vd.entries > 1) ? ((uint32_t)(vd.end_time_s - vd.start_time_s) / (vd.entries - 1))
                                              : overwrite_zero_update_every_s;
 
         update_every_s = vd.update_every_s;

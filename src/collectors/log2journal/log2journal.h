@@ -35,7 +35,7 @@ static inline void l2j_log(const char *format, ...) {
 struct hashed_key;
 static inline int compare_keys(struct hashed_key *k1, struct hashed_key *k2);
 #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_keys
-#define SIMPLE_HASHTABLE_VALUE_TYPE HASHED_KEY
+#define SIMPLE_HASHTABLE_VALUE_TYPE HASHED_KEY *
 #define SIMPLE_HASHTABLE_NAME _KEY
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 

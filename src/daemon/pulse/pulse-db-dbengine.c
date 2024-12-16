@@ -648,21 +648,17 @@ void pulse_dbengine_do(bool extended) {
 
     pgc_main_stats_old = pgc_main_stats;
     pgc_main_stats = pgc_get_statistics(main_cache);
-    dbengine2_cache_statistics_charts(&main_cache_ptrs, &pgc_main_stats, &pgc_main_stats_old, "main", 135100);
 
     pgc_open_stats_old = pgc_open_stats;
     pgc_open_stats = pgc_get_statistics(open_cache);
-    dbengine2_cache_statistics_charts(&open_cache_ptrs, &pgc_open_stats, &pgc_open_stats_old, "open", 135200);
 
     pgc_extent_stats_old = pgc_extent_stats;
     pgc_extent_stats = pgc_get_statistics(extent_cache);
-    dbengine2_cache_statistics_charts(&extent_cache_ptrs, &pgc_extent_stats, &pgc_extent_stats_old, "extent", 135300);
 
     cache_efficiency_stats_old = cache_efficiency_stats;
     cache_efficiency_stats = rrdeng_get_cache_efficiency_stats();
 
     mrg_stats_old = mrg_stats;
-    mrg_get_statistics(main_mrg, &mrg_stats);
 
     struct rrdeng_buffer_sizes dbmem = rrdeng_pulse_memory_sizes();
 
@@ -685,6 +681,11 @@ void pulse_dbengine_do(bool extended) {
     // we need all the above for the total dbengine memory as reported by the non-extended netdata memory chart
     if(!main_cache || !main_mrg || !extended)
         return;
+
+    dbengine2_cache_statistics_charts(&main_cache_ptrs, &pgc_main_stats, &pgc_main_stats_old, "main", 135100);
+    dbengine2_cache_statistics_charts(&open_cache_ptrs, &pgc_open_stats, &pgc_open_stats_old, "open", 135200);
+    dbengine2_cache_statistics_charts(&extent_cache_ptrs, &pgc_extent_stats, &pgc_extent_stats_old, "extent", 135300);
+    mrg_get_statistics(main_mrg, &mrg_stats);
 
     size_t priority = 135000;
 

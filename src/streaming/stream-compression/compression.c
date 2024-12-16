@@ -576,8 +576,8 @@ cleanup:
         fprintf(stderr, "Compression with %s: FAILED (%d errors)\n", name, errors);
     else
         fprintf(stderr, "Compression with %s: OK "
-                        "(compression %zu usec, decompression %zu usec, bytes raw %zu, compressed %zu, savings ratio %0.2f%%)\n",
-                        name, compression_ut, decompression_ut,
+                        "(compression %llu usec, decompression %llu usec, bytes raw %zu, compressed %zu, savings ratio %0.2f%%)\n",
+                        name, (long long unsigned)compression_ut, (long long unsigned)decompression_ut,
                         bytes_uncompressed, bytes_compressed,
                         100.0 - (double)bytes_compressed * 100.0 / (double)bytes_uncompressed);
 

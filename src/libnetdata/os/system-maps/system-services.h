@@ -10,7 +10,7 @@
 // hashtable for caching port and protocol to service name mappings
 // key is the combination of protocol and port packed into an uint64_t, value is service name (STRING)
 
-#define SIMPLE_HASHTABLE_VALUE_TYPE STRING
+#define SIMPLE_HASHTABLE_VALUE_TYPE STRING *
 #define SIMPLE_HASHTABLE_NAME _SERVICENAMES_CACHE
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 

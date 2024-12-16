@@ -498,21 +498,16 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
     bool ret = false;
 
     size_t env_size = 0;
-    void *encoded_env = argv_encode(request->envp, &env_size);
-    if (!encoded_env)
-        goto cleanup;
-
     size_t argv_size = 0;
+
+    void *encoded_env = argv_encode(request->envp, &env_size);
     void *encoded_argv = argv_encode(request->argv, &argv_size);
-    if (!encoded_argv)
-        goto cleanup;
 
     struct msghdr msg = {0};
     struct cmsghdr *cmsg;
     SPAWN_SERVER_MSG msg_type = SPAWN_SERVER_MSG_REQUEST;
     char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)];
     struct iovec iov[11];
-
 
     // We send 1 request with 10 iovec in it
     // The request will be received in 2 parts
