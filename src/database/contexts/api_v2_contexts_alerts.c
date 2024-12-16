@@ -52,7 +52,7 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
                 if(ctl->alerts.alert_name_pattern && !simple_pattern_matches_string(ctl->alerts.alert_name_pattern, rcl->config.name))
                     continue;
 
-                if(ctl->alerts.alarm_id_filter && ctl->alerts.alarm_id_filter != rcl->id)
+                if(ctl->alerts.alarm_id_filter && ctl->alerts.alarm_id_filter != (time_t)rcl->id)
                     continue;
 
                 size_t m = ctl->request->alerts.status & CONTEXTS_ALERT_STATUSES ? 0 : 1;

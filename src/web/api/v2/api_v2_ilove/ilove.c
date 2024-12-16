@@ -147,7 +147,8 @@ static double ibm_plex_sans_bold_word_width(const char *s, double fontSize) {
             totalWidth += ibm_plex_sans_bold_250_em_size;
         }
         else {
-            if (*s >= 0 && *s <= 126) // Check if it's a valid ASCII character (including '\0')
+            uint8_t c = (uint8_t)*s;
+            if (c <= 126) // Check if it's a valid ASCII character (including '\0')
                 totalWidth += ibm_plex_sans_bold_250[(unsigned char)*s][(unsigned char)s[1]];
 
             s++;

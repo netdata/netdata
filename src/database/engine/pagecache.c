@@ -264,7 +264,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             break;
         }
 
-        if (page_start_time_s - previous_page_end_time_s > dt_s)
+        if (page_start_time_s - previous_page_end_time_s > (time_t)dt_s)
             (*cache_gaps)++;
 
         Pvoid_t *PValue = PDCJudyLIns(JudyL_page_array, (Word_t) page_start_time_s, PJE0);

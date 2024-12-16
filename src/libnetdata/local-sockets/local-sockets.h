@@ -27,6 +27,7 @@
 // hashtable for keeping the namespaces
 // key and value is the namespace inode
 
+#define SIMPLE_HASHTABLE_KEY_TYPE uint64_t
 #define SIMPLE_HASHTABLE_VALUE_TYPE_IS_NOT_POINTER
 #define SIMPLE_HASHTABLE_VALUE_TYPE uint64_t
 #define SIMPLE_HASHTABLE_NAME _NET_NS
@@ -675,7 +676,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                     snprintfz(filename, sizeof(filename), "%s/%s/ns/net", proc_filename, proc_entry->d_name);
                     if(local_sockets_read_proc_inode_link(ls, filename, &net_ns_inode, "net")) {
                         XXH64_hash_t net_ns_inode_hash = XXH3_64bits(&net_ns_inode, sizeof(net_ns_inode));
-                        SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode_hash, (uint64_t *)net_ns_inode, true);
+                        SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode_hash, &net_ns_inode, true);
                         simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode, net_ns_inode);
                     }
                 }

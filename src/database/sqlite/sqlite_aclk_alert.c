@@ -466,11 +466,11 @@ static void aclk_push_alert_event(RRDHOST *host __maybe_unused)
         nd_log(
             NDLS_ACCESS,
             NDLP_DEBUG,
-            "ACLK RES [%s (%s)]: ALERTS SENT from %ld - %ld",
+            "ACLK RES [%s (%s)]: ALERTS SENT from %lld - %lld",
             node_id_str,
             rrdhost_hostname(host),
-            first_id,
-            last_id);
+            (long long)first_id,
+            (long long)last_id);
 
         delete_alert_from_submit_queue(host, first_id, last_id);
         // Mark to do one more check
@@ -802,11 +802,11 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *wc, uint64
         nd_log(
             NDLS_ACCESS,
             NDLP_NOTICE,
-            "Scheduling alert snapshot for host \"%s\", node \"%s\" (version: cloud %zu, local %zu)",
+            "Scheduling alert snapshot for host \"%s\", node \"%s\" (version: cloud %llu, local %llu)",
             rrdhost_hostname(wc->host),
             wc->node_id,
-            cloud_version,
-            local_version);
+            (long long unsigned)cloud_version,
+            (long long unsigned)local_version);
 
         wc->send_snapshot = 1;
         rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
@@ -979,12 +979,12 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     nd_log(
         NDLS_ACCESS,
         NDLP_DEBUG,
-        "ACLK REQ [%s (%s)]: Sent! %d alerts snapshot, snapshot_uuid %s  (version = %zu)",
+        "ACLK REQ [%s (%s)]: Sent! %d alerts snapshot, snapshot_uuid %s  (version = %llu)",
         wc->node_id,
         rrdhost_hostname(host),
         cnt,
         snapshot_uuid,
-        version);
+        (long long unsigned)version);
 
 done:
     REPORT_BIND_FAIL(res, param);

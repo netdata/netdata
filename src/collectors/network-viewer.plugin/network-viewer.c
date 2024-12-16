@@ -176,6 +176,7 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
                 server_endpoint = &n->remote;
                 break;
 
+            default:
             case SOCKET_DIRECTION_NONE:
                 server_address = NULL;
                 client_address_space = NULL;
