@@ -59,7 +59,7 @@ typedef struct provider {
 // A hashtable implementation for Providers
 // using the Provider GUID as key and PROVIDER as value
 #define SIMPLE_HASHTABLE_NAME _PROVIDER
-#define SIMPLE_HASHTABLE_VALUE_TYPE PROVIDER
+#define SIMPLE_HASHTABLE_VALUE_TYPE PROVIDER *
 #define SIMPLE_HASHTABLE_KEY_TYPE PROVIDER_KEY
 #define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION provider_value_to_key
 #define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION provider_cache_compar

@@ -49,7 +49,7 @@ typedef uint64_t SIMPLE_HASHTABLE_HASH;
 #endif
 
 #ifndef SIMPLE_HASHTABLE_VALUE_TYPE
-#define SIMPLE_HASHTABLE_VALUE_TYPE void
+#define SIMPLE_HASHTABLE_VALUE_TYPE void *
 #endif
 
 #ifndef SIMPLE_HASHTABLE_KEY_TYPE
@@ -60,8 +60,12 @@ typedef uint64_t SIMPLE_HASHTABLE_HASH;
 #undef SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION
 #endif
 
+// check during compilation
+_Static_assert(sizeof(SIMPLE_HASHTABLE_VALUE_TYPE) <= sizeof(uint64_t),
+               "simple hashtable value cannot be bigger than 8 bytes");
+
 #if defined(SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION)
-static inline SIMPLE_HASHTABLE_KEY_TYPE *SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION(SIMPLE_HASHTABLE_VALUE_TYPE *);
+static inline SIMPLE_HASHTABLE_KEY_TYPE *SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION(SIMPLE_HASHTABLE_VALUE_TYPE);
 #endif
 
 #if defined(SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION)
@@ -102,7 +106,10 @@ static inline bool SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION(SIMPLE_HASHTABLE_KEY_T
 
 typedef struct simple_hashtable_slot_named {
     SIMPLE_HASHTABLE_HASH hash;
-    SIMPLE_HASHTABLE_VALUE_TYPE *data;
+    union {
+        SIMPLE_HASHTABLE_VALUE_TYPE data;
+        uint64_t v; // make sure it is always 64bit
+    };
 } SIMPLE_HASHTABLE_SLOT_NAMED;
 
 typedef struct simple_hashtable_named {
@@ -121,13 +128,13 @@ typedef struct simple_hashtable_named {
     struct {
         size_t used;
         size_t size;
-        SIMPLE_HASHTABLE_VALUE_TYPE **array;
+        SIMPLE_HASHTABLE_VALUE_TYPE *array;
     } sorted;
 #endif
 } SIMPLE_HASHTABLE_NAMED;
 
 #ifdef SIMPLE_HASHTABLE_SORT_FUNCTION
-static inline size_t simple_hashtable_sorted_binary_search_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE *value) {
+static inline size_t simple_hashtable_sorted_binary_search_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE value) {
     size_t left = 0, right = ht->sorted.used;
 
     while (left < right) {
@@ -141,15 +148,15 @@ static inline size_t simple_hashtable_sorted_binary_search_named(SIMPLE_HASHTABL
     return left;
 }
 
-static inline void simple_hashtable_add_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE *value) {
+static inline void simple_hashtable_add_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE value) {
     size_t index = simple_hashtable_sorted_binary_search_named(ht, value);
 
     // Ensure there's enough space in the sorted array
     if (ht->sorted.used >= ht->sorted.size) {
         size_t size = ht->sorted.size ? ht->sorted.size * 2 : 64;
-        SIMPLE_HASHTABLE_VALUE_TYPE **array = mallocz(size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE *));
+        SIMPLE_HASHTABLE_VALUE_TYPE *array = mallocz(size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE));
         if(ht->sorted.array) {
-            memcpy(array, ht->sorted.array, ht->sorted.size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE *));
+            memcpy(array, ht->sorted.array, ht->sorted.size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE));
             freez(ht->sorted.array);
         }
         ht->sorted.array = array;
@@ -157,24 +164,24 @@ static inline void simple_hashtable_add_value_sorted_named(SIMPLE_HASHTABLE_NAME
     }
 
     // Use memmove to shift elements and create space for the new element
-    memmove(&ht->sorted.array[index + 1], &ht->sorted.array[index], (ht->sorted.used - index) * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE *));
+    memmove(&ht->sorted.array[index + 1], &ht->sorted.array[index], (ht->sorted.used - index) * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE));
 
     ht->sorted.array[index] = value;
     ht->sorted.used++;
 }
 
-static inline void simple_hashtable_del_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE *value) {
+static inline void simple_hashtable_del_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE value) {
     size_t index = simple_hashtable_sorted_binary_search_named(ht, value);
 
     // Check if the value exists at the found index
     assert(index < ht->sorted.used && ht->sorted.array[index] == value);
 
     // Use memmove to shift elements and close the gap
-    memmove(&ht->sorted.array[index], &ht->sorted.array[index + 1], (ht->sorted.used - index - 1) * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE *));
+    memmove(&ht->sorted.array[index], &ht->sorted.array[index + 1], (ht->sorted.used - index - 1) * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE));
     ht->sorted.used--;
 }
 
-static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE *old_value, SIMPLE_HASHTABLE_VALUE_TYPE *new_value) {
+static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE old_value, SIMPLE_HASHTABLE_VALUE_TYPE new_value) {
     if(new_value == old_value)
         return;
 
@@ -200,7 +207,7 @@ static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_
         size_t shift_end = new_value_index - 1;
         size_t shift_size = shift_end - old_value_index;
 
-        memmove(&ht->sorted.array[old_value_index], &ht->sorted.array[shift_start], shift_size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE *));
+        memmove(&ht->sorted.array[old_value_index], &ht->sorted.array[shift_start], shift_size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE));
         ht->sorted.array[shift_end] = new_value;
     }
     else {
@@ -209,19 +216,19 @@ static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_
         size_t shift_end = old_value_index;
         size_t shift_size = shift_end - new_value_index;
 
-        memmove(&ht->sorted.array[new_value_index + 1], &ht->sorted.array[shift_start], shift_size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE *));
+        memmove(&ht->sorted.array[new_value_index + 1], &ht->sorted.array[shift_start], shift_size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE));
         ht->sorted.array[new_value_index] = new_value;
     }
 }
 
-static inline SIMPLE_HASHTABLE_VALUE_TYPE **simple_hashtable_sorted_array_first_read_only_named(SIMPLE_HASHTABLE_NAMED *ht) {
+static inline SIMPLE_HASHTABLE_VALUE_TYPE *simple_hashtable_sorted_array_first_read_only_named(SIMPLE_HASHTABLE_NAMED *ht) {
     if (ht->sorted.used > 0) {
         return &ht->sorted.array[0];
     }
     return NULL;
 }
 
-static inline SIMPLE_HASHTABLE_VALUE_TYPE **simple_hashtable_sorted_array_next_read_only_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE **last) {
+static inline SIMPLE_HASHTABLE_VALUE_TYPE *simple_hashtable_sorted_array_next_read_only_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE *last) {
     if (!last) return NULL;
 
     // Calculate the current position in the sorted array
@@ -244,9 +251,9 @@ static inline SIMPLE_HASHTABLE_VALUE_TYPE **simple_hashtable_sorted_array_next_r
 #define SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY_VALUE(var) (*(var))
 
 #else
-static inline void simple_hashtable_add_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE *value __maybe_unused) { ; }
-static inline void simple_hashtable_del_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE *value __maybe_unused) { ; }
-static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE *old_value __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE *new_value __maybe_unused) { ; }
+static inline void simple_hashtable_add_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE value __maybe_unused) { ; }
+static inline void simple_hashtable_del_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE value __maybe_unused) { ; }
+static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE old_value __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE new_value __maybe_unused) { ; }
 #endif
 
 static inline void simple_hashtable_init_named(SIMPLE_HASHTABLE_NAMED *ht, size_t size) {
@@ -266,13 +273,13 @@ static inline void simple_hashtable_destroy_named(SIMPLE_HASHTABLE_NAMED *ht) {
 
 static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht);
 
-#define simple_hashtable_data_unset ((void *)NULL)
-#define simple_hashtable_data_deleted ((void *)UINT64_MAX)
-#define simple_hashtable_data_usernull ((void *)(UINT64_MAX - 1))
-#define simple_hashtable_is_slot_unset(sl) ((sl)->data == simple_hashtable_data_unset)
-#define simple_hashtable_is_slot_deleted(sl) ((sl)->data == simple_hashtable_data_deleted)
-#define simple_hashtable_is_slot_usernull(sl) ((sl)->data == simple_hashtable_data_usernull)
-#define SIMPLE_HASHTABLE_SLOT_DATA(sl) ((simple_hashtable_is_slot_unset(sl) || simple_hashtable_is_slot_deleted(sl) || simple_hashtable_is_slot_usernull(sl)) ? NULL : (sl)->data)
+#define simple_hashtable_data_unset ((uint64_t)0)
+#define simple_hashtable_data_deleted ((uint64_t)UINT64_MAX)
+#define simple_hashtable_data_usernull ((uint64_t)(UINT64_MAX - 1))
+#define simple_hashtable_is_slot_unset(sl) ((sl)->v == simple_hashtable_data_unset)
+#define simple_hashtable_is_slot_deleted(sl) ((sl)->v == simple_hashtable_data_deleted)
+#define simple_hashtable_is_slot_usernull(sl) ((sl)->v == simple_hashtable_data_usernull)
+#define SIMPLE_HASHTABLE_SLOT_DATA(sl) ((simple_hashtable_is_slot_unset(sl) || simple_hashtable_is_slot_deleted(sl) || simple_hashtable_is_slot_usernull(sl)) ? (uintptr_t)0 : (sl)->data)
 
 static inline bool simple_hashtable_can_use_slot_named(
         SIMPLE_HASHTABLE_SLOT_NAMED *sl, SIMPLE_HASHTABLE_HASH hash,
@@ -390,18 +397,19 @@ static inline bool simple_hashtable_del_slot_named(SIMPLE_HASHTABLE_NAMED *ht, S
 
     simple_hashtable_del_value_sorted_named(ht, SIMPLE_HASHTABLE_SLOT_DATA(sl));
 
-    sl->data = simple_hashtable_data_deleted;
+    sl->v = simple_hashtable_data_deleted;
     return true;
 }
 
 static inline void simple_hashtable_set_slot_named(
         SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_SLOT_NAMED *sl,
-        SIMPLE_HASHTABLE_HASH hash, SIMPLE_HASHTABLE_VALUE_TYPE *data) {
+        SIMPLE_HASHTABLE_HASH hash, SIMPLE_HASHTABLE_VALUE_TYPE data) {
 
-    if(data == NULL)
-        data = simple_hashtable_data_usernull;
+    uint64_t v = (uint64_t)data;
+    if(v == 0)
+        v = simple_hashtable_data_usernull;
 
-    if(unlikely(data == simple_hashtable_data_unset || data == simple_hashtable_data_deleted)) {
+    if(unlikely(v == simple_hashtable_data_unset || v == simple_hashtable_data_deleted)) {
         simple_hashtable_del_slot_named(ht, sl);
         return;
     }
@@ -419,7 +427,7 @@ static inline void simple_hashtable_set_slot_named(
         simple_hashtable_replace_value_sorted_named(ht, SIMPLE_HASHTABLE_SLOT_DATA(sl), data);
 
     sl->hash = hash;
-    sl->data = data;
+    sl->v = v;
     ht->additions++;
 }
 
@@ -446,7 +454,7 @@ static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht) {
         SIMPLE_HASHTABLE_KEY_TYPE *key = NULL;
 
 #if defined(SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION) && defined(SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION)
-        SIMPLE_HASHTABLE_VALUE_TYPE *value = SIMPLE_HASHTABLE_SLOT_DATA(slot);
+        SIMPLE_HASHTABLE_VALUE_TYPE value = SIMPLE_HASHTABLE_SLOT_DATA(slot);
         key = SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION(value);
 #endif
 
@@ -517,14 +525,14 @@ static inline SIMPLE_HASHTABLE_SLOT_NAMED *simple_hashtable_next_read_only_named
 #define simple_hashtable_get_named CONCAT(simple_hashtable_get, SIMPLE_HASHTABLE_NAME)
 #define simple_hashtable_del_named CONCAT(simple_hashtable_del, SIMPLE_HASHTABLE_NAME)
 
-static inline SIMPLE_HASHTABLE_VALUE_TYPE *simple_hashtable_set_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_KEY_TYPE *key, size_t key_len, SIMPLE_HASHTABLE_VALUE_TYPE *data) {
+static inline SIMPLE_HASHTABLE_VALUE_TYPE simple_hashtable_set_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_KEY_TYPE *key, size_t key_len, SIMPLE_HASHTABLE_VALUE_TYPE data) {
     XXH64_hash_t hash = XXH3_64bits((void *)key, key_len);
     SIMPLE_HASHTABLE_SLOT_NAMED *sl = simple_hashtable_get_slot_named(ht, hash, key, true);
     simple_hashtable_set_slot_named(ht, sl, hash, data);
     return SIMPLE_HASHTABLE_SLOT_DATA(sl);
 }
 
-static inline SIMPLE_HASHTABLE_VALUE_TYPE *simple_hashtable_get_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_KEY_TYPE *key, size_t key_len) {
+static inline SIMPLE_HASHTABLE_VALUE_TYPE simple_hashtable_get_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_KEY_TYPE *key, size_t key_len) {
     XXH64_hash_t hash = XXH3_64bits((void *)key, key_len);
     SIMPLE_HASHTABLE_SLOT_NAMED *sl = simple_hashtable_get_slot_named(ht, hash, key, true);
     return SIMPLE_HASHTABLE_SLOT_DATA(sl);

@@ -106,7 +106,7 @@ static inline bool is_valid_string_hash(const char *s) {
 
 struct facet_value;
 // #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_facet_value
-#define SIMPLE_HASHTABLE_VALUE_TYPE struct facet_value
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct facet_value *
 #define SIMPLE_HASHTABLE_NAME _VALUE
 #include "../simple_hashtable/simple_hashtable.h"
 
@@ -118,7 +118,7 @@ struct facet_value;
 
 struct facet_key;
 // #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_facet_key
-#define SIMPLE_HASHTABLE_VALUE_TYPE struct facet_key
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct facet_key *
 #define SIMPLE_HASHTABLE_NAME _KEY
 #include "../simple_hashtable/simple_hashtable.h"
 

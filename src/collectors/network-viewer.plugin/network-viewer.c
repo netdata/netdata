@@ -29,7 +29,7 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
 #define NETWORK_CONNECTIONS_VIEWER_HELP "Network connections explorer"
 
-#define SIMPLE_HASHTABLE_VALUE_TYPE LOCAL_SOCKET
+#define SIMPLE_HASHTABLE_VALUE_TYPE LOCAL_SOCKET *
 #define SIMPLE_HASHTABLE_NAME _AGGREGATED_SOCKETS
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 

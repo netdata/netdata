@@ -11,7 +11,7 @@
 #include "../simple_hashtable/simple_hashtable_undef.h"
 
 struct query;
-#define SIMPLE_HASHTABLE_VALUE_TYPE struct query
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct query *
 #define SIMPLE_HASHTABLE_KEY_TYPE nd_uuid_t
 #define SIMPLE_HASHTABLE_NAME _QUERY
 #define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION query_transaction

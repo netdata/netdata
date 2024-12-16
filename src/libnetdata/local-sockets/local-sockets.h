@@ -36,7 +36,7 @@
 // key is the inode
 
 struct pid_socket;
-#define SIMPLE_HASHTABLE_VALUE_TYPE struct pid_socket
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct pid_socket *
 #define SIMPLE_HASHTABLE_NAME _PID_SOCKET
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 
@@ -45,7 +45,7 @@ struct pid_socket;
 // key is the inode
 
 struct local_socket;
-#define SIMPLE_HASHTABLE_VALUE_TYPE struct local_socket
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct local_socket *
 #define SIMPLE_HASHTABLE_NAME _LOCAL_SOCKET
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 
@@ -54,7 +54,7 @@ struct local_socket;
 // key is XXH3_64bits hash of the IP
 
 union ipv46;
-#define SIMPLE_HASHTABLE_VALUE_TYPE union ipv46
+#define SIMPLE_HASHTABLE_VALUE_TYPE union ipv46 *
 #define SIMPLE_HASHTABLE_NAME _LOCAL_IP
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 
@@ -63,7 +63,7 @@ union ipv46;
 // key is XXH3_64bits hash of the family, protocol, port number, namespace
 
 struct local_port;
-#define SIMPLE_HASHTABLE_VALUE_TYPE struct local_port
+#define SIMPLE_HASHTABLE_VALUE_TYPE struct local_port *
 #define SIMPLE_HASHTABLE_NAME _LISTENING_PORT
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 
@@ -675,7 +675,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                     if(local_sockets_read_proc_inode_link(ls, filename, &net_ns_inode, "net")) {
                         XXH64_hash_t net_ns_inode_hash = XXH3_64bits(&net_ns_inode, sizeof(net_ns_inode));
                         SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode_hash, (uint64_t *)net_ns_inode, true);
-                        simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode, (uint64_t *)net_ns_inode);
+                        simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode, net_ns_inode);
                     }
                 }
 
