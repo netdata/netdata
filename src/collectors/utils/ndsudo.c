@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 
-#define MAX_SEARCH 2
+#define MAX_SEARCH 3
 #define MAX_PARAMETERS 128
 #define ERROR_BUFFER_SIZE 1024
 
@@ -216,6 +216,7 @@ struct command {
         .search = {
             [0] = "megacli",
             [1] = "MegaCli",
+            [2] = "MegaCli64",
         },
     },
     {
@@ -224,6 +225,7 @@ struct command {
         .search = {
             [0] = "megacli",
             [1] = "MegaCli",
+            [2] = "MegaCli64",
         },
     },
     {
