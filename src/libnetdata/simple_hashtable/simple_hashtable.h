@@ -279,7 +279,10 @@ static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht);
 #define simple_hashtable_is_slot_unset(sl) ((sl)->v == simple_hashtable_data_unset)
 #define simple_hashtable_is_slot_deleted(sl) ((sl)->v == simple_hashtable_data_deleted)
 #define simple_hashtable_is_slot_usernull(sl) ((sl)->v == simple_hashtable_data_usernull)
-#define SIMPLE_HASHTABLE_SLOT_DATA(sl) ((simple_hashtable_is_slot_unset(sl) || simple_hashtable_is_slot_deleted(sl) || simple_hashtable_is_slot_usernull(sl)) ? (uintptr_t)0 : (sl)->data)
+#define SIMPLE_HASHTABLE_SLOT_DATA(sl) \
+    ((simple_hashtable_is_slot_unset(sl) || simple_hashtable_is_slot_deleted(sl) || simple_hashtable_is_slot_usernull(sl)) \
+     ? (typeof((sl)->data))0 \
+     : (sl)->data)
 
 static inline bool simple_hashtable_can_use_slot_named(
         SIMPLE_HASHTABLE_SLOT_NAMED *sl, SIMPLE_HASHTABLE_HASH hash,
