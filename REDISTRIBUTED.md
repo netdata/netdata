@@ -7,7 +7,7 @@ Released under [GPL v3 or later](https://raw.githubusercontent.com/netdata/netda
 Netdata uses SPDX license tags to identify the license for its files.
 Individual licenses referenced in the tags are available on the [SPDX project site](http://spdx.org/licenses/).
 
-Netdata redistributes the Netdata Cloud UI, licensed under [Netdata Cloud UI License v1.0 (NCUL1)](https://app.netdata.cloud/LICENSE.txt). Netdata Cloud UI includes [third party open-source software](https://raw.githubusercontent.com/netdata/netdata/master/src/web/gui/v2/3D_PARTY_LICENSES.txt).
+Netdata redistributes the Netdata Cloud UI, licensed under [Netdata Cloud UI License v1.0 (NCUL1)](https://app.netdata.cloud/LICENSE.txt). Netdata Cloud UI includes [third party open-source software](https://app.netdata.cloud/3D_PARTY_LICENSES.txt).
 
 Netdata redistributes the following third-party software.
 We have decided to redistribute all these, instead of using them through a CDN, to allow Netdata to work in cases where Internet connectivity is not available.
