@@ -3,7 +3,7 @@
 #ifndef NETDATA_EBPF_APPS_H
 #define NETDATA_EBPF_APPS_H 1
 
-#include "collectors/shared_data.h"
+#include "collectors/collectors-ipc/collectors-ipc.h"
 #include "libnetdata/locks/locks.h"
 #include "libnetdata/avl/avl.h"
 #include "libnetdata/clocks/clocks.h"
