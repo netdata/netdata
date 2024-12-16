@@ -408,7 +408,15 @@ static inline void simple_hashtable_set_slot_named(
         SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_SLOT_NAMED *sl,
         SIMPLE_HASHTABLE_HASH hash, SIMPLE_HASHTABLE_VALUE_TYPE data) {
 
-    uint64_t v = (data == (SIMPLE_HASHTABLE_VALUE_TYPE)0) ? simple_hashtable_data_usernull : (uint64_t)data;
+    uint64_t v;
+    if(unlikely(data == (SIMPLE_HASHTABLE_VALUE_TYPE)0))
+        v = simple_hashtable_data_usernull;
+    else {
+        if (sizeof(SIMPLE_HASHTABLE_VALUE_TYPE) == sizeof(uintptr_t))
+            v = (uint64_t)(uintptr_t)data;
+        else
+            v = (uint64_t)data;
+    }
 
     if(unlikely(v == simple_hashtable_data_unset || v == simple_hashtable_data_deleted)) {
         // the new value is unset or deleted,
