@@ -1,53 +1,69 @@
 # Node Membership Rules
 
-Any Node in your Space can be dynamically included or excluded from any of your Rooms. This is done via creating Rules matching on host labels. It allows for dynamic and automated organization of Nodes based on their characteristics.
+Node Membership Rules automate Node organization within Rooms based on host labels. This simplifies infrastructure management by dynamically assigning Nodes to appropriate Rooms, eliminating manual intervention.
 
-> **Note**
->
-> Node Membership Rules are available for all Rooms except the "All Nodes" Room, as it includes all Nodes by default.
->
-> Only users who have the permission to add Nodes can create or edit Node Membership Rules.
+**Important**:
 
-## Structure
+- Rules work with all Rooms except the "All Nodes" Room, as it includes all Nodes by default.
+- Creating and editing Rules requires Node management permissions.
+- Rules are evaluated in real-time as labels change.
+- Exclusion rules always override inclusion rules.
 
-Rules are composed of the following elements:
+## Rule Structure
 
-| element | description                                                             |
-|:--------|:------------------------------------------------------------------------|
-| Action  | Can be either "Included" or "Excluded"                                  |
-| Clauses | A collection of conditions that must **all be satisfied** (logical AND) |
+The rules consist of the following elements:
 
-## Clauses
+| Element | Description                                                                                       |
+|:--------|:--------------------------------------------------------------------------------------------------|
+| Action  | Determines whether matching Nodes will be included or excluded from the Room                      |
+| Clauses | Set of conditions that determine which Nodes match the Rule (all must be satisfied - logical AND) |
 
 Each clause consists of:
 
-| element  | description                                  |
-|:---------|:---------------------------------------------|
-| Label    | The name of the host label to evaluate       |
-| Value    | The value to compare against                 |
-| Operator | The operator between the label and the value |
+| Element  | Description                  |
+|:---------|:-----------------------------|
+| Label    | The host label to check      |
+| Value    | The comparison method        |
+| Operator | The value to compare against |
 
-## Creation
+Below is a conceptual representation of a rule that includes all production database Nodes. The structure is shown in YAML format for clarity:
 
-To create a new Rule on your Room:
+```yaml
+Action: Include
+Clauses:
+  - Label: environment
+    Operator: equals
+    Value: production
+  - Label: service-type
+    Operator: equals
+    Value: database
+```
 
-1. Go to Room settings (Cog next to your Room's name)
-2. Click on the "Nodes" tab
-3. Click the "Add new Rule" prompt
-4. Fill in your Rule's details and save it
+## Rule Evaluation Order
 
-## Evaluation
+- Inclusion rules are checked first
+- Exclusion rules are checked second
+  If both match, exclusion wins
 
-Rules are evaluated in a specific order to determine Node Membership in a Room. If a Node is both included and excluded by two Rules, the exclusion is honored.
+## Creating Rules
 
-## Membership
+1. Access Settings
+    - Click ⚙️ (Room settings)
+    - Select "Nodes" tab
+2. Create Rule
+    - Click "Add new Rule"
+    - Select Action (Include/Exclude)
+    - Add clause(s)
+    - Save changes
 
-Each Node in the Room has a Membership status of `STATIC`, `RULE`, or both.
+## Membership Status
 
-| status          | description                                                                            |
-|:----------------|:---------------------------------------------------------------------------------------|
-| STATIC          | The Node has been statically assigned to this Room                                     |
-| RULE            | The Node has been automatically assigned to this Room as a result of a Membership Rule |
-| STATIC and RULE | The Node is statically assigned and also matches one or more Membership Rules          |
+Nodes can have multiple membership types in a Room:
 
-You can view each Node's Membership status from the same-named column in the Room's Nodes table.
+| Status          | Description                |
+|:----------------|:---------------------------|
+| STATIC          | Manually added to the Room |
+| RULE            | Added by matching Rule(s)  |
+| STATIC and RULE | Both manual and Rule-based |
+
+You can view each Node's membership status in the Room's Nodes table under the "Membership" column.
