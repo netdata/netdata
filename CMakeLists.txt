@@ -1419,6 +1419,11 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/mem-available.h
 )
 
+set(INTECOMMUNICATION_COLLECTORS_FILES
+        src/collectors/collectors-ipc/collectors-ipc.c
+        src/collectors/collectors-ipc/collectors-ipc.h
+)
+
 set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/plugins_d.c
         src/plugins.d/plugins_d.h
@@ -2652,7 +2657,9 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/libbpf_api/ebpf.h
     )
 
-    add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES})
+    add_executable(ebpf.plugin
+                   ${EBPF_PLUGIN_FILES}
+                   ${INTECOMMUNICATION_COLLECTORS_FILES})
     target_link_libraries(ebpf.plugin libnetdata)
 
     netdata_add_libbpf_to_target(ebpf.plugin)
