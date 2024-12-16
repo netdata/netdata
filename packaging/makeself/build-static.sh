@@ -29,19 +29,23 @@ DOCKER_IMAGE_NAME="netdata/static-builder:v1"
 if [ "${BUILDARCH}" != "$(uname -m)" ] && [ -z "${SKIP_EMULATION}" ]; then
     if [ "$(uname -m)" = "x86_64" ]; then
         ${docker} run --rm --privileged multiarch/qemu-user-static --reset -p yes || exit 1
-
-        case "${BUILDARCH}" in
-            x86_64) QEMU_CPU="Nehalem-v2" ;; # x86-64-v2 equivalent
-            armv6l) QEMU_CPU="arm1176" ;; # Raspbery Pi 1 equivalent
-            armv7l) QEMU_CPU="cortex-a7" ;; # Baseline ARMv7 CPU
-            aarch64) QEMU_CPU="cortex-a53" ;; # Baseline ARMv8 CPU
-            ppc64le) QEMU_CPU="power8nvl" ;; # Baseline POWER8+ CPU
-        esac
     else
         echo "Automatic cross-architecture builds are only supported on x86_64 hosts."
         exit 1
     fi
 fi
+
+case "${BUILDARCH}" in
+    x86_64) QEMU_CPU="Nehalem-v2" ;; # x86-64-v2 equivalent
+    armv6l) # Raspberry Pi 1 equivalent
+        QEMU_CPU="arm1176"
+        CFLAGS="${CFLAGS} -march=armv6zk -mtune=arm1176jzf-s"
+        CXXFLAGS="${CXXFLAGS} -march=armv6zk -mtune=arm1176jzf-s"
+        ;;
+    armv7l) QEMU_CPU="cortex-a7" ;; # Baseline ARMv7 CPU
+    aarch64) QEMU_CPU="cortex-a53" ;; # Baseline ARMv8 CPU
+    ppc64le) QEMU_CPU="power8nvl" ;; # Baseline POWER8+ CPU
+esac
 
 if ${docker} inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
     if ${docker} image inspect "${DOCKER_IMAGE_NAME}" | grep -q 'Variant'; then
@@ -64,11 +68,13 @@ if [ -t 1 ]; then
   run ${docker} run --rm -e BUILDARCH="${BUILDARCH}" -a stdin -a stdout -a stderr -i -t -v "$(pwd)":/netdata:rw \
     --platform "${platform}" ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
     ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
+    ${CFLAGS:+-e CFLAGS="${CFLAGS}"} ${CXXFLAGS:+-e CXXFLAGS="${CXXFLAGS}"} \
     "${DOCKER_IMAGE_NAME}" /bin/sh /netdata/packaging/makeself/build.sh "${@}"
 else
   run ${docker} run --rm -e BUILDARCH="${BUILDARCH}" -v "$(pwd)":/netdata:rw \
     -e GITHUB_ACTIONS="${GITHUB_ACTIONS}" --platform "${platform}" \
     ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
     ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
+    ${CFLAGS:+-e CFLAGS="${CFLAGS}"} ${CXXFLAGS:+-e CXXFLAGS="${CXXFLAGS}"} \
     "${DOCKER_IMAGE_NAME}" /bin/sh /netdata/packaging/makeself/build.sh "${@}"
 fi
