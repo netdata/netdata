@@ -2,6 +2,7 @@
 
 #include "database/rrd.h"
 #include "health_internals.h"
+#include "health-alert-entry.h"
 
 // ----------------------------------------------------------------------------
 // RRDCALC helpers

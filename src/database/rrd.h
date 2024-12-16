@@ -12,6 +12,7 @@ extern "C" {
 #include "streaming/stream-traffic-types.h"
 #include "streaming/stream-sender-commit.h"
 #include "rrdhost-state-id.h"
+#include "health/health-alert-log.h"
 
 // non-existing structs instead of voids
 // to enable type checking at compile time
@@ -953,21 +954,23 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     // Health
     RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION  = (1 << 17), // contains charts and dims with uninitialized variables
     RRDHOST_FLAG_INITIALIZED_HEALTH             = (1 << 18), // the host has initialized health structures
+    RRDHOST_FLAG_HEALTH_RUNNING_NOW             = (1 << 19), // health is currently executing health check on this host
+
     // Exporting
-    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 19), // send it to external databases
-    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 20), // don't send it to external databases
+    RRDHOST_FLAG_EXPORTING_SEND                 = (1 << 20), // send it to external databases
+    RRDHOST_FLAG_EXPORTING_DONT_SEND            = (1 << 21), // don't send it to external databases
 
     // ACLK
-    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 21), // when set, we should send ACLK stream context updates
-    RRDHOST_FLAG_ACLK_STREAM_ALERTS             = (1 << 22), // Host should stream alerts
+    RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 22), // when set, we should send ACLK stream context updates
+    RRDHOST_FLAG_ACLK_STREAM_ALERTS             = (1 << 23), // Host should stream alerts
 
     // Metadata
-    RRDHOST_FLAG_METADATA_UPDATE                = (1 << 23), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_LABELS                = (1 << 24), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_INFO                  = (1 << 25), // metadata needs to be stored in the database
-    RRDHOST_FLAG_PENDING_CONTEXT_LOAD           = (1 << 26), // Context needs to be loaded
+    RRDHOST_FLAG_METADATA_UPDATE                = (1 << 24), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_LABELS                = (1 << 25), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_INFO                  = (1 << 26), // metadata needs to be stored in the database
+    RRDHOST_FLAG_PENDING_CONTEXT_LOAD           = (1 << 27), // Context needs to be loaded
 
-    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 27), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 28), // metadata needs to be stored in the database
 
     RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 29), // set when the host has updated global functions
 } RRDHOST_FLAGS;
@@ -1008,100 +1011,6 @@ typedef enum __attribute__ ((__packed__)) {
      rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS) &&        \
      rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE)                  \
     )
-
-// ----------------------------------------------------------------------------
-// Health data
-
-struct alarm_entry {
-    uint32_t unique_id;
-    uint32_t alarm_id;
-    uint32_t alarm_event_id;
-    usec_t global_id;
-    nd_uuid_t config_hash_id;
-    nd_uuid_t transition_id;
-
-    time_t when;
-    time_t duration;
-    time_t non_clear_duration;
-
-    STRING *name;
-    STRING *chart;
-    STRING *chart_context;
-    STRING *chart_name;
-
-    STRING *classification;
-    STRING *component;
-    STRING *type;
-
-    STRING *exec;
-    STRING *recipient;
-    time_t exec_run_timestamp;
-    int exec_code;
-
-    STRING *source;
-    STRING *units;
-    STRING *summary;
-    STRING *info;
-
-    NETDATA_DOUBLE old_value;
-    NETDATA_DOUBLE new_value;
-
-    STRING *old_value_string;
-    STRING *new_value_string;
-
-    RRDCALC_STATUS old_status;
-    RRDCALC_STATUS new_status;
-
-    uint32_t flags;
-    int32_t pending_save_count;
-
-    int delay;
-    time_t delay_up_to_timestamp;
-
-    uint32_t updated_by_id;
-    uint32_t updates_id;
-
-    time_t last_repeat;
-
-    POPEN_INSTANCE *popen_instance;
-
-    struct alarm_entry *next;
-    struct alarm_entry *next_in_progress;
-    struct alarm_entry *prev_in_progress;
-};
-
-#define ae_name(ae) string2str((ae)->name)
-#define ae_chart_id(ae) string2str((ae)->chart)
-#define ae_chart_name(ae) string2str((ae)->chart_name)
-#define ae_chart_context(ae) string2str((ae)->chart_context)
-#define ae_classification(ae) string2str((ae)->classification)
-#define ae_exec(ae) string2str((ae)->exec)
-#define ae_recipient(ae) string2str((ae)->recipient)
-#define ae_source(ae) string2str((ae)->source)
-#define ae_units(ae) string2str((ae)->units)
-#define ae_summary(ae) string2str((ae)->summary)
-#define ae_info(ae) string2str((ae)->info)
-#define ae_old_value_string(ae) string2str((ae)->old_value_string)
-#define ae_new_value_string(ae) string2str((ae)->new_value_string)
-
-typedef struct alarm_log {
-    uint32_t next_log_id;
-    uint32_t next_alarm_id;
-    unsigned int count;
-    unsigned int max;
-    uint32_t health_log_retention_s;                   // the health log retention in seconds to be kept in db
-    ALARM_ENTRY *alarms;
-    RW_SPINLOCK spinlock;
-} ALARM_LOG;
-
-typedef struct health {
-    time_t delay_up_to;                             // a timestamp to delay alarms processing up to
-    STRING *default_exec;                           // the full path of the alarms notifications program
-    STRING *default_recipient;                      // the default recipient for all alarms
-    bool enabled;                                   // 1 when this host has health enabled
-    bool use_summary_for_notifications;             // whether to use the summary field as a subject for notifications
-    int32_t pending_transitions;                    // pending alert transitions to store
-} HEALTH;
 
 // ----------------------------------------------------------------------------
 // RRD HOST
@@ -1520,7 +1429,8 @@ void rrdhost_free_all(void);
 void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force);
 
-int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
+bool rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
+bool rrdhost_should_run_health(RRDHOST *host);
 
 void rrdset_update_heterogeneous_flag(RRDSET *st);
 

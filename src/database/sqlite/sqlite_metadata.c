@@ -2,6 +2,8 @@
 
 #include "sqlite_metadata.h"
 #include "database/sqlite/vendored/sqlite3recover.h"
+#include "health/health-alert-entry.h"
+
 //#include "sqlite_db_migration.h"
 
 #define DB_METADATA_VERSION 18

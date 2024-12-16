@@ -1297,6 +1297,8 @@ set(HEALTH_PLUGIN_FILES
         src/health/rrdcalc.h
         src/health/rrdvar.c
         src/health/rrdvar.h
+        src/health/health-alert-entry.h
+        src/health/health-alert-log.h
 )
 
 set(IDLEJITTER_PLUGIN_FILES src/collectors/idlejitter.plugin/plugin_idlejitter.c)

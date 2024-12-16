@@ -4,6 +4,7 @@
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
 #include "health/health_internals.h"
+#include "health/health-alert-entry.h"
 
 #define MAX_HEALTH_SQL_SIZE 2048
 #define SQLITE3_BIND_STRING_OR_NULL(res, param, key)                                                                   \
