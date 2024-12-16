@@ -254,6 +254,7 @@ func (c *mongoClient) initClient(uri string, timeout time.Duration) error {
 	defer cancelPing()
 
 	if err := client.Ping(ctxPing, nil); err != nil {
+		_ = client.Disconnect(ctxConn)
 		return err
 	}
 
