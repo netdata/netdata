@@ -240,6 +240,8 @@ enum netdata_integration_selector {
 const char *netdata_integration_pipename(enum netdata_integration_selector idx);
 void netdata_integration_init(enum netdata_integration_selector idx);
 
+extern uint32_t plot_intercommunication_charts;
+
 #ifdef __cplusplus
 }
 #endif

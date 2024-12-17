@@ -4311,6 +4311,7 @@ int main(int argc, char **argv)
 
             if (em->functions.apps_routine && (em->apps_charts || em->cgroup_charts)) {
                 collect_pids |= 1 << i;
+                plot_intercommunication_charts |= 1 << i;
             }
             st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, em);
         } else {
