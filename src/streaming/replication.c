@@ -33,7 +33,7 @@
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
 
 #define MAX_REPLICATION_THREADS 256
-#define REQUESTS_AHEAD_PER_THREAD 1 // 1 = enable synchronous queries
+#define REQUESTS_AHEAD_PER_THREAD 4 // 0 = dynamic, 1 = enable synchronous queries, > 1 static
 
 static struct replication_query_statistics replication_queries = {
         .spinlock = SPINLOCK_INITIALIZER,
@@ -1722,7 +1722,18 @@ static int replication_pipeline_execute_next(void) {
     struct replication_request *rq;
 
     if(unlikely(!rtp.rqs)) {
+#if REQUESTS_AHEAD_PER_THREAD == 0
+        rtp.max_requests_ahead = (int)netdata_conf_cpus() / 2;
+
+        if (rtp.max_requests_ahead > libuv_worker_threads * 2)
+            rtp.max_requests_ahead = libuv_worker_threads * 2;
+
+        if (rtp.max_requests_ahead < 2)
+            rtp.max_requests_ahead = 2;
+#else
         rtp.max_requests_ahead = REQUESTS_AHEAD_PER_THREAD;
+#endif
+
         rtp.rqs = callocz(rtp.max_requests_ahead, sizeof(struct replication_request));
         __atomic_add_fetch(&replication_buffers_allocated, rtp.max_requests_ahead * sizeof(struct replication_request), __ATOMIC_RELAXED);
     }
