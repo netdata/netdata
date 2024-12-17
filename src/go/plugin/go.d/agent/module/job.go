@@ -418,7 +418,7 @@ func (j *Job) collect() (result map[string]int64) {
 
 func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinceLastRun int) bool {
 	var createChart bool
-	if j.module.VirtualNode() != nil {
+	if j.module.VirtualNode() == nil {
 		select {
 		case vnode := <-j.updVnode:
 			j.vnodeCreated = false
