@@ -48,180 +48,116 @@ struct pgc_size_histogram {
 };
 
 struct pgc_queue_statistics {
-    CACHE_LINE_PADDING();
     struct pgc_size_histogram size_histogram;
 
-    CACHE_LINE_PADDING();
-    size_t entries;
-    CACHE_LINE_PADDING();
-    size_t size;
+    PAD64(size_t) entries;
+    PAD64(size_t) size;
 
-    CACHE_LINE_PADDING();
-    size_t max_entries;
-    CACHE_LINE_PADDING();
-    size_t max_size;
+    PAD64(size_t) max_entries;
+    PAD64(size_t) max_size;
 
-    CACHE_LINE_PADDING();
-    size_t added_entries;
-    CACHE_LINE_PADDING();
-    size_t added_size;
+    PAD64(size_t) added_entries;
+    PAD64(size_t) added_size;
 
-    CACHE_LINE_PADDING();
-    size_t removed_entries;
-    CACHE_LINE_PADDING();
-    size_t removed_size;
-
-    CACHE_LINE_PADDING();
+    PAD64(size_t) removed_entries;
+    PAD64(size_t) removed_size;
 };
 
 struct pgc_statistics {
-    CACHE_LINE_PADDING();
-    size_t wanted_cache_size;
-    CACHE_LINE_PADDING();
-    size_t current_cache_size;
-    CACHE_LINE_PADDING();
+    PAD64(size_t) wanted_cache_size;
+    PAD64(size_t) current_cache_size;
 
     // ----------------------------------------------------------------------------------------------------------------
     // volume
 
-    CACHE_LINE_PADDING();
-    size_t entries;                 // all the entries (includes clean, dirty, hot)
-    CACHE_LINE_PADDING();
-    size_t size;                    // all the entries (includes clean, dirty, hot)
+    PAD64(size_t) entries;                 // all the entries (includes clean, dirty, hot)
+    PAD64(size_t) size;                    // all the entries (includes clean, dirty, hot)
 
-    CACHE_LINE_PADDING();
-    size_t referenced_entries;      // all the entries currently referenced
-    CACHE_LINE_PADDING();
-    size_t referenced_size;         // all the entries currently referenced
+    PAD64(size_t) referenced_entries;      // all the entries currently referenced
+    PAD64(size_t) referenced_size;         // all the entries currently referenced
 
-    CACHE_LINE_PADDING();
-    size_t added_entries;
-    CACHE_LINE_PADDING();
-    size_t added_size;
+    PAD64(size_t) added_entries;
+    PAD64(size_t) added_size;
 
-    CACHE_LINE_PADDING();
-    size_t removed_entries;
-    CACHE_LINE_PADDING();
-    size_t removed_size;
+    PAD64(size_t) removed_entries;
+    PAD64(size_t) removed_size;
 
 #ifdef PGC_COUNT_POINTS_COLLECTED
-    CACHE_LINE_PADDING();
-    size_t points_collected;
+    PAD64(size_t) points_collected;
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------
     // migrations
 
-    CACHE_LINE_PADDING();
-    size_t evicting_entries;
-    CACHE_LINE_PADDING();
-    size_t evicting_size;
+    PAD64(size_t) evicting_entries;
+    PAD64(size_t) evicting_size;
 
-    CACHE_LINE_PADDING();
-    size_t flushing_entries;
-    CACHE_LINE_PADDING();
-    size_t flushing_size;
+    PAD64(size_t) flushing_entries;
+    PAD64(size_t) flushing_size;
 
-    CACHE_LINE_PADDING();
-    size_t hot2dirty_entries;
-    CACHE_LINE_PADDING();
-    size_t hot2dirty_size;
+    PAD64(size_t) hot2dirty_entries;
+    PAD64(size_t) hot2dirty_size;
 
-    CACHE_LINE_PADDING();
-    size_t hot_empty_pages_evicted_immediately;
-    CACHE_LINE_PADDING();
-    size_t hot_empty_pages_evicted_later;
+    PAD64(size_t) hot_empty_pages_evicted_immediately;
+    PAD64(size_t) hot_empty_pages_evicted_later;
 
     // ----------------------------------------------------------------------------------------------------------------
     // workload
 
-    CACHE_LINE_PADDING();
-    size_t acquires;
-    CACHE_LINE_PADDING();
-    size_t releases;
+    PAD64(size_t) acquires;
+    PAD64(size_t) releases;
 
-    CACHE_LINE_PADDING();
-    size_t acquires_for_deletion;
+    PAD64(size_t) acquires_for_deletion;
 
-    CACHE_LINE_PADDING();
-    size_t searches_exact;
-    CACHE_LINE_PADDING();
-    size_t searches_exact_hits;
-    CACHE_LINE_PADDING();
-    size_t searches_exact_misses;
+    PAD64(size_t) searches_exact;
+    PAD64(size_t) searches_exact_hits;
+    PAD64(size_t) searches_exact_misses;
 
-    CACHE_LINE_PADDING();
-    size_t searches_closest;
-    CACHE_LINE_PADDING();
-    size_t searches_closest_hits;
-    CACHE_LINE_PADDING();
-    size_t searches_closest_misses;
+    PAD64(size_t) searches_closest;
+    PAD64(size_t) searches_closest_hits;
+    PAD64(size_t) searches_closest_misses;
 
-    CACHE_LINE_PADDING();
-    size_t flushes_completed;
-    CACHE_LINE_PADDING();
-    size_t flushes_completed_size;
-    CACHE_LINE_PADDING();
-    size_t flushes_cancelled_size;
+    PAD64(size_t) flushes_completed;
+    PAD64(size_t) flushes_completed_size;
+    PAD64(size_t) flushes_cancelled_size;
 
     // ----------------------------------------------------------------------------------------------------------------
     // critical events
 
-    CACHE_LINE_PADDING();
-    size_t events_cache_under_severe_pressure;
-    CACHE_LINE_PADDING();
-    size_t events_cache_needs_space_aggressively;
-    CACHE_LINE_PADDING();
-    size_t events_flush_critical;
+    PAD64(size_t) events_cache_under_severe_pressure;
+    PAD64(size_t) events_cache_needs_space_aggressively;
+    PAD64(size_t) events_flush_critical;
 
     // ----------------------------------------------------------------------------------------------------------------
     // worker threads
 
-    CACHE_LINE_PADDING();
-    size_t workers_search;
-    CACHE_LINE_PADDING();
-    size_t workers_add;
-    CACHE_LINE_PADDING();
-    size_t workers_evict;
-    CACHE_LINE_PADDING();
-    size_t workers_flush;
-    CACHE_LINE_PADDING();
-    size_t workers_jv2_flush;
-    CACHE_LINE_PADDING();
-    size_t workers_hot2dirty;
+    PAD64(size_t) workers_search;
+    PAD64(size_t) workers_add;
+    PAD64(size_t) workers_evict;
+    PAD64(size_t) workers_flush;
+    PAD64(size_t) workers_jv2_flush;
+    PAD64(size_t) workers_hot2dirty;
 
     // ----------------------------------------------------------------------------------------------------------------
     // waste events
 
     // waste events - spins
-    CACHE_LINE_PADDING();
-    size_t waste_insert_spins;
-    CACHE_LINE_PADDING();
-    size_t waste_evict_useless_spins;
-    CACHE_LINE_PADDING();
-    size_t waste_release_spins;
-    CACHE_LINE_PADDING();
-    size_t waste_acquire_spins;
-    CACHE_LINE_PADDING();
-    size_t waste_delete_spins;
+    PAD64(size_t) waste_insert_spins;
+    PAD64(size_t) waste_evict_useless_spins;
+    PAD64(size_t) waste_release_spins;
+    PAD64(size_t) waste_acquire_spins;
+    PAD64(size_t) waste_delete_spins;
 
     // waste events - eviction
-    CACHE_LINE_PADDING();
-    size_t waste_evict_relocated;
-    CACHE_LINE_PADDING();
-    size_t waste_evict_thread_signals;
-    CACHE_LINE_PADDING();
-    size_t waste_evictions_inline_on_add;
-    CACHE_LINE_PADDING();
-    size_t waste_evictions_inline_on_release;
+    PAD64(size_t) waste_evict_relocated;
+    PAD64(size_t) waste_evict_thread_signals;
+    PAD64(size_t) waste_evictions_inline_on_add;
+    PAD64(size_t) waste_evictions_inline_on_release;
 
     // waste events - flushing
-    CACHE_LINE_PADDING();
-    size_t waste_flush_on_add;
-    CACHE_LINE_PADDING();
-    size_t waste_flush_on_release;
-    CACHE_LINE_PADDING();
-    size_t waste_flushes_cancelled;
+    PAD64(size_t) waste_flush_on_add;
+    PAD64(size_t) waste_flush_on_release;
+    PAD64(size_t) waste_flushes_cancelled;
 
     // ----------------------------------------------------------------------------------------------------------------
     // per queue statistics

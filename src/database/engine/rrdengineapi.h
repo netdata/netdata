@@ -128,83 +128,92 @@ typedef struct rrdengine_size_statistics {
     double average_page_size_bytes;
 } RRDENG_SIZE_STATS;
 
-struct rrdeng_cache_efficiency_stats {
-    size_t queries;
-    size_t queries_planned_with_gaps;
-    size_t queries_executed_with_gaps;
-    size_t queries_open;
-    size_t queries_journal_v2;
+struct time_and_count {
+    size_t count;
+    usec_t usec;
+};
 
-    size_t currently_running_queries;
+static inline void time_and_count_add(struct time_and_count *tc, usec_t dt) {
+    __atomic_add_fetch(&tc->count, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&tc->usec, dt, __ATOMIC_RELAXED);
+}
+
+struct rrdeng_cache_efficiency_stats {
+    PAD64(size_t) queries_planned_with_gaps;
+    PAD64(size_t) queries_executed_with_gaps;
+
+    PAD64(size_t) currently_running_queries;
 
     // query planner output of the queries
-    size_t pages_total;
-    size_t pages_to_load_from_disk;
-    size_t extents_loaded_from_disk;
+    PAD64(size_t) pages_total;
+    PAD64(size_t) pages_to_load_from_disk;
+    PAD64(size_t) extents_loaded_from_disk;
 
     // pages metadata sources
-    size_t pages_meta_source_main_cache;
-    size_t pages_meta_source_open_cache;
-    size_t pages_meta_source_journal_v2;
+    PAD64(size_t) pages_meta_source_main_cache;
+    PAD64(size_t) pages_meta_source_open_cache;
+    PAD64(size_t) pages_meta_source_journal_v2;
 
     // preloading
-    size_t page_next_wait_failed;
-    size_t page_next_wait_loaded;
-    size_t page_next_nowait_failed;
-    size_t page_next_nowait_loaded;
+    PAD64(size_t) page_next_wait_failed;
+    PAD64(size_t) page_next_wait_loaded;
+    PAD64(size_t) page_next_nowait_failed;
+    PAD64(size_t) page_next_nowait_loaded;
 
     // pages data sources
-    size_t pages_data_source_main_cache;
-    size_t pages_data_source_main_cache_at_pass4;
-    size_t pages_data_source_disk;
-    size_t pages_data_source_extent_cache;              // loaded by a cached extent
+    PAD64(size_t) pages_data_source_main_cache;
+    PAD64(size_t) pages_data_source_main_cache_at_pass4;
+    PAD64(size_t) pages_data_source_disk;
+    PAD64(size_t) pages_data_source_extent_cache;              // loaded by a cached extent
 
     // cache hits at different points
-    size_t pages_load_ok_loaded_but_cache_hit_while_inserting; // found in cache while inserting it (conflict)
+    PAD64(size_t) pages_load_ok_loaded_but_cache_hit_while_inserting; // found in cache while inserting it (conflict)
 
     // loading
-    size_t pages_load_extent_merged;
-    size_t pages_load_ok_uncompressed;
-    size_t pages_load_ok_compressed;
-    size_t pages_load_fail_invalid_page_in_extent;
-    size_t pages_load_fail_cant_mmap_extent;
-    size_t pages_load_fail_datafile_not_available;
-    size_t pages_load_fail_unroutable;
-    size_t pages_load_fail_not_found;
-    size_t pages_load_fail_invalid_extent;
-    size_t pages_load_fail_cancelled;
+    PAD64(size_t) pages_load_extent_merged;
+    PAD64(size_t) pages_load_ok_uncompressed;
+    PAD64(size_t) pages_load_ok_compressed;
+    PAD64(size_t) pages_load_fail_invalid_page_in_extent;
+    PAD64(size_t) pages_load_fail_cant_mmap_extent;
+    PAD64(size_t) pages_load_fail_datafile_not_available;
+    PAD64(size_t) pages_load_fail_unroutable;
+    PAD64(size_t) pages_load_fail_not_found;
+    PAD64(size_t) pages_load_fail_invalid_extent;
+    PAD64(size_t) pages_load_fail_cancelled;
 
-    // timings for query preparation
-    size_t prep_time_to_route;
-    size_t prep_time_in_main_cache_lookup;
-    size_t prep_time_in_open_cache_lookup;
-    size_t prep_time_in_journal_v2_lookup;
-    size_t prep_time_in_pass4_lookup;
+    // count of queries and times spent in them
+    PAD64(struct time_and_count) prep_time_to_route_sync;
+    PAD64(struct time_and_count) prep_time_to_route_syncfirst;
+    PAD64(struct time_and_count) prep_time_to_route_async;
+    PAD64(struct time_and_count) prep_time_in_main_cache_lookup;
+    PAD64(struct time_and_count) prep_time_in_open_cache_lookup;
+    PAD64(struct time_and_count) prep_time_in_journal_v2_lookup;
+    PAD64(struct time_and_count) prep_time_in_pass4_lookup;
 
     // timings the query thread experiences
-    size_t query_time_init;
-    size_t query_time_wait_for_prep;
-    size_t query_time_to_slow_disk_next_page;
-    size_t query_time_to_fast_disk_next_page;
-    size_t query_time_to_slow_preload_next_page;
-    size_t query_time_to_fast_preload_next_page;
+    PAD64(struct time_and_count) query_time_init;
+    PAD64(struct time_and_count) query_time_wait_for_prep;
+    PAD64(struct time_and_count) query_time_to_slow_disk_next_page;
+    PAD64(struct time_and_count) query_time_to_fast_disk_next_page;
+    PAD64(struct time_and_count) query_time_to_slow_preload_next_page;
+    PAD64(struct time_and_count) query_time_to_fast_preload_next_page;
 
     // query issues
-    size_t pages_zero_time_skipped;
-    size_t pages_past_time_skipped;
-    size_t pages_overlapping_skipped;
-    size_t pages_invalid_size_skipped;
-    size_t pages_invalid_update_every_fixed;
-    size_t pages_invalid_entries_fixed;
+    PAD64(size_t) pages_zero_time_skipped;
+    PAD64(size_t) pages_past_time_skipped;
+    PAD64(size_t) pages_overlapping_skipped;
+    PAD64(size_t) pages_invalid_size_skipped;
+    PAD64(size_t) pages_invalid_update_every_fixed;
+    PAD64(size_t) pages_invalid_entries_fixed;
 
     // database events
-    size_t journal_v2_mapped;
-    size_t journal_v2_unmapped;
-    size_t datafile_creation_started;
-    size_t datafile_deletion_started;
-    size_t datafile_deletion_spin;
-    size_t journal_v2_indexing_started;
-    size_t metrics_retention_started;
+    PAD64(size_t) journal_v2_mapped;
+    PAD64(size_t) journal_v2_unmapped;
+    PAD64(size_t) datafile_creation_started;
+    PAD64(size_t) datafile_deletion_started;
+    PAD64(size_t) datafile_deletion_spin;
+    PAD64(size_t) journal_v2_indexing_started;
+    PAD64(size_t) metrics_retention_started;
 };
 
 typedef enum rrdeng_mem {

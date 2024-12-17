@@ -773,7 +773,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
 
         pg_cache_preload(handle);
 
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.query_time_init, now_monotonic_usec() - started_ut, __ATOMIC_RELAXED);
+        time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_init, now_monotonic_usec() - started_ut);
     }
     else {
         handle->start_time_s = start_time_s;

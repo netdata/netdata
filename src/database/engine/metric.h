@@ -30,21 +30,14 @@ struct mrg_statistics {
 
     // --- atomic --- multiple readers / writers
 
-    CACHE_LINE_PADDING();
-    size_t entries_referenced;
+    PAD64(size_t) entries_referenced;
+    PAD64(size_t) current_references;
 
-    CACHE_LINE_PADDING();
-    size_t current_references;
+    PAD64(size_t) search_hits;
+    PAD64(size_t) search_misses;
 
-    CACHE_LINE_PADDING();
-    size_t search_hits;
-    CACHE_LINE_PADDING();
-    size_t search_misses;
-
-    CACHE_LINE_PADDING();
-    size_t writers;
-    CACHE_LINE_PADDING();
-    size_t writers_conflicts;
+    PAD64(size_t) writers;
+    PAD64(size_t) writers_conflicts;
 };
 
 MRG *mrg_create(ssize_t partitions);

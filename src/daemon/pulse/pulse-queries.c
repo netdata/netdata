@@ -5,50 +5,31 @@
 #include "streaming/replication.h"
 
 static struct query_statistics {
-    CACHE_LINE_PADDING();
-    uint64_t api_data_queries_made;
-    CACHE_LINE_PADDING();
-    uint64_t api_data_db_points_read;
-    CACHE_LINE_PADDING();
-    uint64_t api_data_result_points_generated;
+    PAD64(uint64_t) api_data_queries_made;
+    PAD64(uint64_t) api_data_db_points_read;
+    PAD64(uint64_t) api_data_result_points_generated;
 
-    CACHE_LINE_PADDING();
-    uint64_t api_weights_queries_made;
-    CACHE_LINE_PADDING();
-    uint64_t api_weights_db_points_read;
-    CACHE_LINE_PADDING();
-    uint64_t api_weights_result_points_generated;
+    PAD64(uint64_t) api_weights_queries_made;
+    PAD64(uint64_t) api_weights_db_points_read;
+    PAD64(uint64_t) api_weights_result_points_generated;
 
-    CACHE_LINE_PADDING();
-    uint64_t api_badges_queries_made;
-    CACHE_LINE_PADDING();
-    uint64_t api_badges_db_points_read;
-    CACHE_LINE_PADDING();
-    uint64_t api_badges_result_points_generated;
+    PAD64(uint64_t) api_badges_queries_made;
+    PAD64(uint64_t) api_badges_db_points_read;
+    PAD64(uint64_t) api_badges_result_points_generated;
 
-    CACHE_LINE_PADDING();
-    uint64_t health_queries_made;
-    CACHE_LINE_PADDING();
-    uint64_t health_db_points_read;
-    CACHE_LINE_PADDING();
-    uint64_t health_result_points_generated;
+    PAD64(uint64_t) health_queries_made;
+    PAD64(uint64_t) health_db_points_read;
+    PAD64(uint64_t) health_result_points_generated;
 
-    CACHE_LINE_PADDING();
-    uint64_t ml_queries_made;
-    CACHE_LINE_PADDING();
-    uint64_t ml_db_points_read;
-    CACHE_LINE_PADDING();
-    uint64_t ml_result_points_generated;
+    PAD64(uint64_t) ml_queries_made;
+    PAD64(uint64_t) ml_db_points_read;
+    PAD64(uint64_t) ml_result_points_generated;
 
-    CACHE_LINE_PADDING();
-    uint64_t backfill_queries_made;
-    CACHE_LINE_PADDING();
-    uint64_t backfill_db_points_read;
+    PAD64(uint64_t) backfill_queries_made;
+    PAD64(uint64_t) backfill_db_points_read;
 
-    CACHE_LINE_PADDING();
-    uint64_t exporters_queries_made;
-    CACHE_LINE_PADDING();
-    uint64_t exporters_db_points_read;
+    PAD64(uint64_t) exporters_queries_made;
+    PAD64(uint64_t) exporters_db_points_read;
 } query_statistics;
 
 void pulse_queries_ml_query_completed(size_t points_read) {

@@ -6,15 +6,11 @@
 static struct gorilla_statistics {
     bool enabled;
 
-    CACHE_LINE_PADDING();
-    uint64_t tier0_hot_gorilla_buffers;
+    PAD64(uint64_t) tier0_hot_gorilla_buffers;
 
-    CACHE_LINE_PADDING();
-    uint64_t gorilla_tier0_disk_actual_bytes;
-    CACHE_LINE_PADDING();
-    uint64_t gorilla_tier0_disk_optimal_bytes;
-    CACHE_LINE_PADDING();
-    uint64_t gorilla_tier0_disk_original_bytes;
+    PAD64(uint64_t) gorilla_tier0_disk_actual_bytes;
+    PAD64(uint64_t) gorilla_tier0_disk_optimal_bytes;
+    PAD64(uint64_t) gorilla_tier0_disk_original_bytes;
 } gorilla_statistics = { 0 };
 
 void pulse_gorilla_hot_buffer_added() {

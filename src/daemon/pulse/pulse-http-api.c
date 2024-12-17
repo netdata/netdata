@@ -8,26 +8,17 @@
 static struct web_statistics {
     bool extended;
 
-    CACHE_LINE_PADDING();
-    uint16_t connected_clients;
-    CACHE_LINE_PADDING();
-    uint64_t web_client_count;  // oops! this is used for giving unique IDs to web_clients!
+    PAD64(uint16_t) connected_clients;
+    PAD64(uint64_t) web_client_count;  // oops! this is used for giving unique IDs to web_clients!
 
-    CACHE_LINE_PADDING();
-    uint64_t web_requests;
-    CACHE_LINE_PADDING();
-    uint64_t web_usec;
-    CACHE_LINE_PADDING();
-    uint64_t web_usec_max;
-    CACHE_LINE_PADDING();
-    uint64_t bytes_received;
-    CACHE_LINE_PADDING();
-    uint64_t bytes_sent;
+    PAD64(uint64_t) web_requests;
+    PAD64(uint64_t) web_usec;
+    PAD64(uint64_t) web_usec_max;
+    PAD64(uint64_t) bytes_received;
+    PAD64(uint64_t) bytes_sent;
 
-    CACHE_LINE_PADDING();
-    uint64_t content_size_uncompressed;
-    CACHE_LINE_PADDING();
-    uint64_t content_size_compressed;
+    PAD64(uint64_t) content_size_uncompressed;
+    PAD64(uint64_t) content_size_compressed;
 } web_statistics;
 
 uint64_t pulse_web_client_connected(void) {

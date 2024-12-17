@@ -396,7 +396,7 @@ typedef uint32_t uid_t;
 
 #define CONCAT_INDIRECT(a, b) a##b
 #define CONCAT(a, b) CONCAT_INDIRECT(a, b)
-#define CACHE_LINE_PADDING() uint8_t CONCAT(padding, __COUNTER__)[64 - sizeof(size_t)];
+#define PAD64(type) uint8_t CONCAT(padding, __COUNTER__)[64 - sizeof(type)]; type
 
 // --------------------------------------------------------------------------------------------------------------------
 

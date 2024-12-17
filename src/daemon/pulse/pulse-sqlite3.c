@@ -6,34 +6,20 @@
 static struct sqlite3_statistics {
     bool enabled;
 
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_queries_made;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_queries_ok;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_queries_failed;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_queries_failed_busy;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_queries_failed_locked;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_rows;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_metadata_cache_hit;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_context_cache_hit;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_metadata_cache_miss;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_context_cache_miss;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_metadata_cache_spill;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_context_cache_spill;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_metadata_cache_write;
-    CACHE_LINE_PADDING();
-    uint64_t sqlite3_context_cache_write;
+    PAD64(uint64_t) sqlite3_queries_made;
+    PAD64(uint64_t) sqlite3_queries_ok;
+    PAD64(uint64_t) sqlite3_queries_failed;
+    PAD64(uint64_t) sqlite3_queries_failed_busy;
+    PAD64(uint64_t) sqlite3_queries_failed_locked;
+    PAD64(uint64_t) sqlite3_rows;
+    PAD64(uint64_t) sqlite3_metadata_cache_hit;
+    PAD64(uint64_t) sqlite3_context_cache_hit;
+    PAD64(uint64_t) sqlite3_metadata_cache_miss;
+    PAD64(uint64_t) sqlite3_context_cache_miss;
+    PAD64(uint64_t) sqlite3_metadata_cache_spill;
+    PAD64(uint64_t) sqlite3_context_cache_spill;
+    PAD64(uint64_t) sqlite3_metadata_cache_write;
+    PAD64(uint64_t) sqlite3_context_cache_write;
 } sqlite3_statistics = { };
 
 void pulse_sqlite3_query_completed(bool success, bool busy, bool locked) {
