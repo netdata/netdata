@@ -1701,7 +1701,7 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
 
     RRDHOST *host;
 
-    size_t max_threads = MIN(netdata_conf_cpus() / 2, 6);
+    size_t max_threads = netdata_conf_cpus() / 2;
     if (max_threads < 1)
         max_threads = 1;
 
