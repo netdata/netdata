@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "collectors-ipc.h"
+#include "ebpf-ipc.h"
 #include "libnetdata/libnetdata.h"
 
 #if defined(OS_LINUX)
