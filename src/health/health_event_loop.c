@@ -596,8 +596,10 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         foreach_rrdcalc_in_rrdhost_done(rc);
     }
 
-    if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host)))
+    if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
+        alerts_raised_summary_free(hrm);
         return;
+    }
 
     // execute notifications
     // and cleanup
