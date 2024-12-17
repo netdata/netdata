@@ -20,6 +20,8 @@ struct integration_ebpf_context {
     unsigned command_string_size;
 };
 
+uint32_t plot_intercommunication_charts = 0;
+
 static integration_cmd_status_t cmd_ping_execute(char *args, char **message);
 
 static integration_command_info_t command_info_array[] = {
