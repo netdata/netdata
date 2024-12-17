@@ -258,25 +258,27 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
         return;
     }
 
-    RRDHOST *host = st->rrdhost;
+    if (!netdata_exit) {
+        RRDHOST *host = st->rrdhost;
 
-    time_t now = now_realtime_sec();
+        time_t now = now_realtime_sec();
 
-    if (likely(rc->status != RRDCALC_STATUS_REMOVED)) {
-        ALARM_ENTRY *ae = health_create_alarm_entry(
-            host,
-            rc,
-            now,
-            now - rc->last_status_change,
-            rc->old_value,
-            rc->value,
-            rc->status,
-            RRDCALC_STATUS_REMOVED,
-            0,
-            0);
+        if (likely(rc->status != RRDCALC_STATUS_REMOVED)) {
+            ALARM_ENTRY *ae = health_create_alarm_entry(
+                host,
+                rc,
+                now,
+                now - rc->last_status_change,
+                rc->old_value,
+                rc->value,
+                rc->status,
+                RRDCALC_STATUS_REMOVED,
+                0,
+                0);
 
-        health_log_alert(host, ae);
-        health_alarm_log_add_entry(host, ae);
+            health_log_alert(host, ae);
+            health_alarm_log_add_entry(host, ae);
+        }
     }
 
     // unlink it
