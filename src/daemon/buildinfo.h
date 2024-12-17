@@ -9,7 +9,7 @@ void print_build_info_json(void);
 
 char *get_value_from_key(char *buffer, char *key);
 
-void get_install_type(char **install_type, char **prebuilt_arch, char **prebuilt_dist);
+void get_install_type(struct rrdhost_system_info *system_info);
 
 void build_info_to_json_object(BUFFER *b);
 

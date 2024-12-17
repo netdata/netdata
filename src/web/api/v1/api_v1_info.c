@@ -38,7 +38,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts_status(BUFFER *
     buffer_json_add_array_item_object(wb);
 
     buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
-    buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+    buffer_json_member_add_uint64(wb, "hops", host->system_info ? rrdhost_system_info_hops(host->system_info) : (host == localhost) ? 0 : 1);
     buffer_json_member_add_boolean(wb, "reachable", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)));
 
     buffer_json_member_add_string(wb, "guid", host->machine_guid);
@@ -115,36 +115,7 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarms");
 
-    buffer_json_member_add_string_or_empty(wb, "os_name", host->system_info->host_os_name);
-    buffer_json_member_add_string_or_empty(wb, "os_id", host->system_info->host_os_id);
-    buffer_json_member_add_string_or_empty(wb, "os_id_like", host->system_info->host_os_id_like);
-    buffer_json_member_add_string_or_empty(wb, "os_version", host->system_info->host_os_version);
-    buffer_json_member_add_string_or_empty(wb, "os_version_id", host->system_info->host_os_version_id);
-    buffer_json_member_add_string_or_empty(wb, "os_detection", host->system_info->host_os_detection);
-    buffer_json_member_add_string_or_empty(wb, "cores_total", host->system_info->host_cores);
-    buffer_json_member_add_string_or_empty(wb, "total_disk_space", host->system_info->host_disk_space);
-    buffer_json_member_add_string_or_empty(wb, "cpu_freq", host->system_info->host_cpu_freq);
-    buffer_json_member_add_string_or_empty(wb, "ram_total", host->system_info->host_ram_total);
-
-    buffer_json_member_add_string_or_omit(wb, "container_os_name", host->system_info->container_os_name);
-    buffer_json_member_add_string_or_omit(wb, "container_os_id", host->system_info->container_os_id);
-    buffer_json_member_add_string_or_omit(wb, "container_os_id_like", host->system_info->container_os_id_like);
-    buffer_json_member_add_string_or_omit(wb, "container_os_version", host->system_info->container_os_version);
-    buffer_json_member_add_string_or_omit(wb, "container_os_version_id", host->system_info->container_os_version_id);
-    buffer_json_member_add_string_or_omit(wb, "container_os_detection", host->system_info->container_os_detection);
-    buffer_json_member_add_string_or_omit(wb, "is_k8s_node", host->system_info->is_k8s_node);
-
-    buffer_json_member_add_string_or_empty(wb, "kernel_name", host->system_info->kernel_name);
-    buffer_json_member_add_string_or_empty(wb, "kernel_version", host->system_info->kernel_version);
-    buffer_json_member_add_string_or_empty(wb, "architecture", host->system_info->architecture);
-    buffer_json_member_add_string_or_empty(wb, "virtualization", host->system_info->virtualization);
-    buffer_json_member_add_string_or_empty(wb, "virt_detection", host->system_info->virt_detection);
-    buffer_json_member_add_string_or_empty(wb, "container", host->system_info->container);
-    buffer_json_member_add_string_or_empty(wb, "container_detection", host->system_info->container_detection);
-
-    buffer_json_member_add_string_or_omit(wb, "cloud_provider_type", host->system_info->cloud_provider_type);
-    buffer_json_member_add_string_or_omit(wb, "cloud_instance_type", host->system_info->cloud_instance_type);
-    buffer_json_member_add_string_or_omit(wb, "cloud_instance_region", host->system_info->cloud_instance_region);
+    rrdhost_system_info_to_json_v1(wb, host->system_info);
 
     host_labels2json(host, wb, "host_labels");
     host_functions2json(host, wb);

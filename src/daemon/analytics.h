@@ -4,6 +4,7 @@
 #define NETDATA_ANALYTICS_H 1
 
 #include "daemon/common.h"
+#include "database/rrdhost-system-info.h"
 
 /* Max number of seconds before the first META analytics is sent */
 #define ANALYTICS_INIT_SLEEP_SEC 120
@@ -76,7 +77,6 @@ struct analytics_data {
     bool exporting_enabled;
 };
 
-struct rrdhost_system_info;
 void set_late_analytics_variables(struct rrdhost_system_info *system_info);
 void analytics_free_data(void);
 void analytics_log_shell(void);

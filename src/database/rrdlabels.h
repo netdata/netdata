@@ -3,7 +3,7 @@
 #ifndef NETDATA_RRDLABELS_H
 #define NETDATA_RRDLABELS_H
 
-#include "rrd.h"
+#include "libnetdata/libnetdata.h"
 
 struct pattern_array_item {
     Word_t size;
@@ -29,6 +29,9 @@ typedef enum __attribute__ ((__packed__)) rrdlabel_source {
 } RRDLABEL_SRC;
 
 #define RRDLABEL_FLAG_INTERNAL (RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW | RRDLABEL_FLAG_DONT_DELETE)
+
+struct rrdlabels;
+typedef struct rrdlabels RRDLABELS;
 
 RRDLABELS *rrdlabels_create(void);
 void rrdlabels_destroy(RRDLABELS *labels_dict);

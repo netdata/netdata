@@ -113,10 +113,9 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
             return 0;
     }
 
-    struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
-    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
+    struct rrdhost_system_info *system_info = rrdhost_system_info_create();
 
-    system_info->hops = (int16_t)str2i((const char *) argv[IDX_HOPS]);
+    rrdhost_system_info_hops_set(system_info, (int16_t)str2i((const char *) argv[IDX_HOPS]));
 
     sql_build_host_system_info((nd_uuid_t *)argv[IDX_HOST_ID], system_info);
 

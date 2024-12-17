@@ -428,9 +428,9 @@ static RRDHOST *rrdhost_create(
     //
 
     if (is_localhost && host->system_info) {
-        host->system_info->ml_capable = ml_capable();
-        host->system_info->ml_enabled = ml_enabled(host);
-        host->system_info->mc_version = metric_correlations_version;
+        rrdhost_system_info_ml_capable_set(host->system_info, ml_capable());
+        rrdhost_system_info_ml_enabled_set(host->system_info, ml_enabled(host));
+        rrdhost_system_info_mc_version_set(host->system_info, metric_correlations_version);
     }
 
     // ------------------------------------------------------------------------
@@ -670,8 +670,10 @@ RRDHOST *rrdhost_find_or_create(
     RRDHOST *host = rrdhost_find_by_guid(guid);
     if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
 
-        if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
+        if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
+            rrdhost_system_info_free(system_info);
             return host;
+        }
 
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
         nd_log(NDLS_DAEMON, NDLP_INFO,
@@ -739,6 +741,9 @@ RRDHOST *rrdhost_find_or_create(
                 , replication_step
                 , system_info);
     }
+
+    if(!host)
+        rrdhost_system_info_free(system_info);
 
     return host;
 }
@@ -872,45 +877,6 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
 // ----------------------------------------------------------------------------
 // RRDHOST - free
 
-void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
-    if(likely(system_info)) {
-        __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
-
-        freez(system_info->cloud_provider_type);
-        freez(system_info->cloud_instance_type);
-        freez(system_info->cloud_instance_region);
-        freez(system_info->host_os_name);
-        freez(system_info->host_os_id);
-        freez(system_info->host_os_id_like);
-        freez(system_info->host_os_version);
-        freez(system_info->host_os_version_id);
-        freez(system_info->host_os_detection);
-        freez(system_info->host_cores);
-        freez(system_info->host_cpu_freq);
-        freez(system_info->host_cpu_model);
-        freez(system_info->host_ram_total);
-        freez(system_info->host_disk_space);
-        freez(system_info->container_os_name);
-        freez(system_info->container_os_id);
-        freez(system_info->container_os_id_like);
-        freez(system_info->container_os_version);
-        freez(system_info->container_os_version_id);
-        freez(system_info->container_os_detection);
-        freez(system_info->kernel_name);
-        freez(system_info->kernel_version);
-        freez(system_info->architecture);
-        freez(system_info->virtualization);
-        freez(system_info->virt_detection);
-        freez(system_info->container);
-        freez(system_info->container_detection);
-        freez(system_info->is_k8s_node);
-        freez(system_info->install_type);
-        freez(system_info->prebuilt_arch);
-        freez(system_info->prebuilt_dist);
-        freez(system_info);
-    }
-}
-
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     if(!host) return;
 
@@ -1026,117 +992,6 @@ void rrd_finalize_collection_for_all_hosts(void) {
     dfe_done(host);
 }
 
-struct rrdhost_system_info *rrdhost_labels_to_system_info(RRDLABELS *labels) {
-    struct rrdhost_system_info *info = callocz(1, sizeof(struct rrdhost_system_info));
-    info->hops = 1;
-
-    rrdlabels_get_value_strdup_or_null(labels, &info->cloud_provider_type, "_cloud_provider_type");
-    rrdlabels_get_value_strdup_or_null(labels, &info->cloud_instance_type, "_cloud_instance_type");
-    rrdlabels_get_value_strdup_or_null(labels, &info->cloud_instance_region, "_cloud_instance_region");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_name, "_os_name");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_version, "_os_version");
-    rrdlabels_get_value_strdup_or_null(labels, &info->kernel_version, "_kernel_version");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_cores, "_system_cores");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_cpu_freq, "_system_cpu_freq");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_cpu_model, "_system_cpu_model");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_ram_total, "_system_ram_total");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_disk_space, "_system_disk_space");
-    rrdlabels_get_value_strdup_or_null(labels, &info->architecture, "_architecture");
-    rrdlabels_get_value_strdup_or_null(labels, &info->virtualization, "_virtualization");
-    rrdlabels_get_value_strdup_or_null(labels, &info->container, "_container");
-    rrdlabels_get_value_strdup_or_null(labels, &info->container_detection, "_container_detection");
-    rrdlabels_get_value_strdup_or_null(labels, &info->virt_detection, "_virt_detection");
-    rrdlabels_get_value_strdup_or_null(labels, &info->is_k8s_node, "_is_k8s_node");
-    rrdlabels_get_value_strdup_or_null(labels, &info->install_type, "_install_type");
-    rrdlabels_get_value_strdup_or_null(labels, &info->prebuilt_arch, "_prebuilt_arch");
-    rrdlabels_get_value_strdup_or_null(labels, &info->prebuilt_dist, "_prebuilt_dist");
-
-    return info;
-}
-
-static void rrdhost_load_auto_labels(void) {
-    RRDLABELS *labels = localhost->rrdlabels;
-
-    if (localhost->system_info->cloud_provider_type)
-        rrdlabels_add(labels, "_cloud_provider_type", localhost->system_info->cloud_provider_type, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->cloud_instance_type)
-        rrdlabels_add(labels, "_cloud_instance_type", localhost->system_info->cloud_instance_type, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->cloud_instance_region)
-        rrdlabels_add(labels, "_cloud_instance_region", localhost->system_info->cloud_instance_region, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->host_os_name)
-        rrdlabels_add(labels, "_os_name", localhost->system_info->host_os_name, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->host_os_version)
-        rrdlabels_add(labels, "_os_version", localhost->system_info->host_os_version, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->kernel_version)
-        rrdlabels_add(labels, "_kernel_version", localhost->system_info->kernel_version, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->host_cores)
-        rrdlabels_add(labels, "_system_cores", localhost->system_info->host_cores, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->host_cpu_freq)
-        rrdlabels_add(labels, "_system_cpu_freq", localhost->system_info->host_cpu_freq, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->host_cpu_model)
-        rrdlabels_add(labels, "_system_cpu_model", localhost->system_info->host_cpu_model, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->host_ram_total)
-        rrdlabels_add(labels, "_system_ram_total", localhost->system_info->host_ram_total, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->host_disk_space)
-        rrdlabels_add(labels, "_system_disk_space", localhost->system_info->host_disk_space, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->architecture)
-        rrdlabels_add(labels, "_architecture", localhost->system_info->architecture, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->virtualization)
-        rrdlabels_add(labels, "_virtualization", localhost->system_info->virtualization, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->container)
-        rrdlabels_add(labels, "_container", localhost->system_info->container, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->container_detection)
-        rrdlabels_add(labels, "_container_detection", localhost->system_info->container_detection, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->virt_detection)
-        rrdlabels_add(labels, "_virt_detection", localhost->system_info->virt_detection, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->is_k8s_node)
-        rrdlabels_add(labels, "_is_k8s_node", localhost->system_info->is_k8s_node, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->install_type)
-        rrdlabels_add(labels, "_install_type", localhost->system_info->install_type, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->prebuilt_arch)
-        rrdlabels_add(labels, "_prebuilt_arch", localhost->system_info->prebuilt_arch, RRDLABEL_SRC_AUTO);
-
-    if (localhost->system_info->prebuilt_dist)
-        rrdlabels_add(labels, "_prebuilt_dist", localhost->system_info->prebuilt_dist, RRDLABEL_SRC_AUTO);
-
-    add_aclk_host_labels();
-
-    // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
-    // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.
-
-    int is_ephemeral = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "is ephemeral node", CONFIG_BOOLEAN_NO);
-    rrdlabels_add(labels, "_is_ephemeral", is_ephemeral ? "true" : "false", RRDLABEL_SRC_AUTO);
-
-    int has_unstable_connection = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "has unstable connection", CONFIG_BOOLEAN_NO);
-    rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
-
-    rrdlabels_add(labels, "_is_parent", (stream_receivers_currently_connected() > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
-
-    rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
-    rrdlabels_add(labels, "_os", string2str(localhost->os), RRDLABEL_SRC_AUTO);
-
-    if (localhost->stream.snd.destination)
-        rrdlabels_add(labels, "_streams_to", string2str(localhost->stream.snd.destination), RRDLABEL_SRC_AUTO);
-}
-
 void rrdhost_set_is_parent_label(void) {
     uint32_t count = stream_receivers_currently_connected();
 
@@ -1194,6 +1049,30 @@ static void rrdhost_load_kubernetes_labels(void) {
                label_script);
 }
 
+static void rrdhost_load_auto_labels(void) {
+    RRDLABELS *labels = localhost->rrdlabels;
+
+    rrdhost_system_info_to_rrdlabels(localhost->system_info, labels);
+    add_aclk_host_labels();
+
+    // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
+    // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.
+
+    int is_ephemeral = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "is ephemeral node", CONFIG_BOOLEAN_NO);
+    rrdlabels_add(labels, "_is_ephemeral", is_ephemeral ? "true" : "false", RRDLABEL_SRC_AUTO);
+
+    int has_unstable_connection = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "has unstable connection", CONFIG_BOOLEAN_NO);
+    rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
+
+    rrdlabels_add(labels, "_is_parent", (stream_receivers_currently_connected() > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
+
+    rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_os", string2str(localhost->os), RRDLABEL_SRC_AUTO);
+
+    if (localhost->stream.snd.destination)
+        rrdlabels_add(labels, "_streams_to", string2str(localhost->stream.snd.destination), RRDLABEL_SRC_AUTO);
+}
+
 void reload_host_labels(void) {
     if(!localhost->rrdlabels)
         localhost->rrdlabels = rrdlabels_create();
@@ -1225,144 +1104,6 @@ void rrdhost_finalize_collection(RRDHOST *host) {
     rrdset_foreach_read(st, host)
         rrdset_finalize_collection(st, true);
     rrdset_foreach_done(st);
-}
-
-// ----------------------------------------------------------------------------
-// RRDHOST - set system info from environment variables
-// system_info fields must be heap allocated or NULL
-int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value) {
-    int res = 0;
-
-    if (!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
-        return res;
-    else if(!strcmp(name, "NETDATA_INSTANCE_CLOUD_TYPE")){
-        freez(system_info->cloud_provider_type);
-        system_info->cloud_provider_type = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE")){
-        freez(system_info->cloud_instance_type);
-        system_info->cloud_instance_type = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_INSTANCE_CLOUD_INSTANCE_REGION")){
-        freez(system_info->cloud_instance_region);
-        system_info->cloud_instance_region = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_CONTAINER_OS_NAME")){
-        freez(system_info->container_os_name);
-        system_info->container_os_name = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_CONTAINER_OS_ID")){
-        freez(system_info->container_os_id);
-        system_info->container_os_id = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_CONTAINER_OS_ID_LIKE")){
-        freez(system_info->container_os_id_like);
-        system_info->container_os_id_like = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_CONTAINER_OS_VERSION")){
-        freez(system_info->container_os_version);
-        system_info->container_os_version = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_CONTAINER_OS_VERSION_ID")){
-        freez(system_info->container_os_version_id);
-        system_info->container_os_version_id = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_CONTAINER_OS_DETECTION")){
-        freez(system_info->container_os_detection);
-        system_info->container_os_detection = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_NAME")){
-        freez(system_info->host_os_name);
-        system_info->host_os_name = strdupz(value);
-        json_fix_string(system_info->host_os_name);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_ID")){
-        freez(system_info->host_os_id);
-        system_info->host_os_id = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_ID_LIKE")){
-        freez(system_info->host_os_id_like);
-        system_info->host_os_id_like = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_VERSION")){
-        freez(system_info->host_os_version);
-        system_info->host_os_version = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_VERSION_ID")){
-        freez(system_info->host_os_version_id);
-        system_info->host_os_version_id = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_DETECTION")){
-        freez(system_info->host_os_detection);
-        system_info->host_os_detection = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_NAME")){
-        freez(system_info->kernel_name);
-        system_info->kernel_name = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT")){
-        freez(system_info->host_cores);
-        system_info->host_cores = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_CPU_FREQ")){
-        freez(system_info->host_cpu_freq);
-        system_info->host_cpu_freq = strdupz(value);
-    }
-    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_MODEL")){
-        freez(system_info->host_cpu_model);
-        system_info->host_cpu_model = strdupz(value);
-    } 
-    else if(!strcmp(name, "NETDATA_SYSTEM_TOTAL_RAM")){
-        freez(system_info->host_ram_total);
-        system_info->host_ram_total = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_TOTAL_DISK_SIZE")){
-        freez(system_info->host_disk_space);
-        system_info->host_disk_space = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_VERSION")){
-        freez(system_info->kernel_version);
-        system_info->kernel_version = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_ARCHITECTURE")){
-        freez(system_info->architecture);
-        system_info->architecture = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_VIRTUALIZATION")){
-        freez(system_info->virtualization);
-        system_info->virtualization = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_VIRT_DETECTION")){
-        freez(system_info->virt_detection);
-        system_info->virt_detection = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER")){
-        freez(system_info->container);
-        system_info->container = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER_DETECTION")){
-        freez(system_info->container_detection);
-        system_info->container_detection = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_IS_K8S_NODE")){
-        freez(system_info->is_k8s_node);
-        system_info->is_k8s_node = strdupz(value);
-    }
-    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_VENDOR"))
-        return res;
-    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_DETECTION"))
-        return res;
-    else if (!strcmp(name, "NETDATA_SYSTEM_RAM_DETECTION"))
-        return res;
-    else if (!strcmp(name, "NETDATA_SYSTEM_DISK_DETECTION"))
-        return res;
-    else if (!strcmp(name, "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE"))
-        return res;
-    else {
-        res = 1;
-    }
-
-    return res;
 }
 
 bool rrdhost_matches_window(RRDHOST *host, time_t after, time_t before, time_t now) {

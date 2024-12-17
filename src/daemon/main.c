@@ -179,56 +179,6 @@ int help(int exitcode) {
     return exitcode;
 }
 
-// coverity[ +tainted_string_sanitize_content : arg-0 ]
-static inline void coverity_remove_taint(char *s)
-{
-    (void)s;
-}
-
-int get_system_info(struct rrdhost_system_info *system_info) {
-#if !defined(OS_WINDOWS)
-    char *script;
-    script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
-    sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
-    if (unlikely(access(script, R_OK) != 0)) {
-        netdata_log_error("System info script %s not found.",script);
-        freez(script);
-        return 1;
-    }
-
-    POPEN_INSTANCE *instance = spawn_popen_run(script);
-    if(instance) {
-        char line[200 + 1];
-        // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
-        // One time init code, but I'm curious about the warning...
-        while (fgets(line, 200, spawn_popen_stdout(instance)) != NULL) {
-            char *value=line;
-            while (*value && *value != '=') value++;
-            if (*value=='=') {
-                *value='\0';
-                value++;
-                char *end = value;
-                while (*end && *end != '\n') end++;
-                *end = '\0';    // Overwrite newline if present
-                coverity_remove_taint(line);    // I/O is controlled result of system_info.sh - not tainted
-                coverity_remove_taint(value);
-
-                if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
-                    netdata_log_error("Unexpected environment variable %s=%s", line, value);
-                } else {
-                    nd_setenv(line, value, 1);
-                }
-            }
-        }
-        spawn_popen_wait(instance);
-    }
-    freez(script);
-#else
-    netdata_windows_get_system_info(system_info);
-#endif
-    return 0;
-}
-
 /* Any config setting that can be accessed without a default value i.e. configget(...,...,NULL) *MUST*
    be set in this procedure to be called in all the relevant code paths.
 */
@@ -963,9 +913,8 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("collecting system info");
 
     netdata_anonymous_statistics_enabled=-1;
-    struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
-    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
-    get_system_info(system_info);
+    struct rrdhost_system_info *system_info = rrdhost_system_info_create();
+    rrdhost_system_info_detect(system_info);
 
     const char *guid = registry_get_this_machine_guid();
 #ifdef ENABLE_SENTRY
@@ -974,8 +923,7 @@ int netdata_main(int argc, char **argv) {
     UNUSED(guid);
 #endif
 
-    system_info->hops = 0;
-    get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
+    get_install_type(system_info);
 
     delta_startup_time("initialize RRD structures");
 

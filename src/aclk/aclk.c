@@ -858,7 +858,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 
             node_instance_creation_t node_instance_creation = {
                 .claim_id = claim_id_is_set(claim_id) ? claim_id.str : NULL,
-                .hops = host->system_info->hops,
+                .hops = rrdhost_system_info_hops(host->system_info),
                 .hostname = rrdhost_hostname(host),
                 .machine_guid = host->machine_guid};
 
@@ -868,7 +868,8 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
             create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
             create_query->data.bin_payload.msg_name = "CreateNodeInstance";
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "Registering host=%s, hops=%d", host->machine_guid, host->system_info->hops);
+                   "Registering host=%s, hops=%d", host->machine_guid,
+                   rrdhost_system_info_hops(host->system_info));
 
             aclk_execute_query(create_query);
             return;
@@ -877,7 +878,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 
     aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
     node_instance_connection_t node_state_update = {
-        .hops = host->system_info->hops,
+        .hops = rrdhost_system_info_hops(host->system_info),
         .live = cmd,
         .queryable = queryable,
         .session_id = aclk_session_newarch
@@ -893,7 +894,9 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "Queuing status update for node=%s, live=%d, hops=%d, queryable=%d",
-           (char*)node_state_update.node_id, cmd, host->system_info->hops, queryable);
+           (char*)node_state_update.node_id, cmd,
+           rrdhost_system_info_hops(host->system_info), queryable);
+
     freez((void*)node_state_update.node_id);
     query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
@@ -1063,7 +1066,9 @@ char *aclk_state(void)
                 buffer_sprintf(wb, "\n\tNode ID: %s\n", node_id_str);
             }
 
-            buffer_sprintf(wb, "\tStreaming Hops: %d\n\tRelationship: %s", host->system_info->hops, host == localhost ? "self" : "child");
+            buffer_sprintf(wb, "\tStreaming Hops: %d\n\tRelationship: %s",
+                           rrdhost_system_info_hops(host->system_info),
+                           host == localhost ? "self" : "child");
 
             if (host != localhost)
                 buffer_sprintf(wb, "\n\tStreaming Connection Live: %s", host->receiver ? "true" : "false");
@@ -1197,7 +1202,7 @@ char *aclk_state_json(void)
             json_object_object_add(nodeinstance, "node-id", tmp);
         }
 
-        tmp = json_object_new_int(host->system_info->hops);
+        tmp = json_object_new_int(rrdhost_system_info_hops(host->system_info));
         json_object_object_add(nodeinstance, "streaming-hops", tmp);
 
         tmp = json_object_new_string(host == localhost ? "self" : "child");

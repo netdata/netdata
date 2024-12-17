@@ -356,17 +356,16 @@ void analytics_alarms_notifications(void)
     buffer_free(b);
 }
 
-static void analytics_get_install_type(struct rrdhost_system_info *system_info)
-{
-    if (system_info->install_type == NULL) {
-        analytics_set_data_str(&analytics_data.netdata_install_type, "unknown");
-    } else {
-        analytics_set_data_str(&analytics_data.netdata_install_type, system_info->install_type);
-    }
+static void analytics_get_install_type(struct rrdhost_system_info *system_info) {
+    const char *install_type = rrdhost_system_info_install_type(system_info);
+    if(!install_type)
+        install_type = "unknown";
 
-    if (system_info->prebuilt_dist != NULL) {
-        analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, system_info->prebuilt_dist);
-    }
+    analytics_set_data_str(&analytics_data.netdata_install_type, install_type);
+
+    const char *prebuilt_dist = rrdhost_system_info_prebuilt_dist(system_info);
+    if(prebuilt_dist)
+        analytics_set_data_str(&analytics_data.netdata_prebuilt_distro, prebuilt_dist);
 }
 
 /*

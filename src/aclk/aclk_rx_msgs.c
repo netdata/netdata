@@ -286,7 +286,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
             node_state_update.hops = 0;
         } else {
             node_state_update.live = (!rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN));
-            node_state_update.hops = host->system_info->hops;
+            node_state_update.hops = rrdhost_system_info_hops(host->system_info);
         }
         node_state_update.capabilities = aclk_get_node_instance_capas(host);
     }

@@ -1294,4 +1294,16 @@ static inline BUFFER *buffer_dup(BUFFER *src) {
     return dst;
 }
 
+char *url_encode(const char *str);
+static inline void buffer_key_value_urlencode(BUFFER *wb, const char *key, const char *value) {
+    char *encoded = NULL;
+
+    if(value && *value)
+        encoded = url_encode(value);
+
+    buffer_sprintf(wb, "%s=%s", key, encoded ? encoded : "");
+
+    freez(encoded);
+}
+
 #endif /* NETDATA_WEB_BUFFER_H */

@@ -13,6 +13,7 @@ extern "C" {
 #include "streaming/stream-sender-commit.h"
 #include "rrdhost-state-id.h"
 #include "health/health-alert-log.h"
+#include "rrdhost-system-info.h"
 
 // non-existing structs instead of voids
 // to enable type checking at compile time
@@ -26,8 +27,6 @@ typedef struct rrddim RRDDIM;
 typedef struct rrdset RRDSET;
 typedef struct rrdcalc RRDCALC;
 typedef struct alarm_entry ALARM_ENTRY;
-
-typedef struct rrdlabels RRDLABELS;
 
 typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
 typedef struct rrdcalc_acquired RRDCALC_ACQUIRED;
@@ -1015,47 +1014,6 @@ typedef enum __attribute__ ((__packed__)) {
 // ----------------------------------------------------------------------------
 // RRD HOST
 
-struct rrdhost_system_info {
-    char *cloud_provider_type;
-    char *cloud_instance_type;
-    char *cloud_instance_region;
-
-    char *host_os_name;
-    char *host_os_id;
-    char *host_os_id_like;
-    char *host_os_version;
-    char *host_os_version_id;
-    char *host_os_detection;
-    char *host_cores;
-    char *host_cpu_freq;
-    char *host_cpu_model;
-    char *host_ram_total;
-    char *host_disk_space;
-    char *container_os_name;
-    char *container_os_id;
-    char *container_os_id_like;
-    char *container_os_version;
-    char *container_os_version_id;
-    char *container_os_detection;
-    char *kernel_name;
-    char *kernel_version;
-    char *architecture;
-    char *virtualization;
-    char *virt_detection;
-    char *container;
-    char *container_detection;
-    char *is_k8s_node;
-    int16_t hops;
-    bool ml_capable;
-    bool ml_enabled;
-    char *install_type;
-    char *prebuilt_arch;
-    char *prebuilt_dist;
-    int mc_version;
-};
-
-struct rrdhost_system_info *rrdhost_labels_to_system_info(RRDLABELS *labels);
-
 struct stream_thread;
 
 struct rrdhost {
@@ -1365,8 +1323,6 @@ RRDHOST *rrdhost_find_or_create(
     struct rrdhost_system_info *system_info,
     bool is_archived);
 
-int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);
-
 // ----------------------------------------------------------------------------
 // RRDSET functions
 
@@ -1426,7 +1382,6 @@ RRDSET *rrdset_create_localhost(
 
 void rrdhost_free_all(void);
 
-void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force);
 
 bool rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s);

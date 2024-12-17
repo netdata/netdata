@@ -460,7 +460,7 @@ struct node_instance_list *get_node_list(void)
             node_list[row].queryable = 1;
             node_list[row].live =
                 (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
-            node_list[row].hops = host->system_info ? host->system_info->hops :
+            node_list[row].hops = host->system_info ? rrdhost_system_info_hops(host->system_info) :
                                   uuid_eq(*host_id, localhost->host_id.uuid) ? 0 : 1;
             node_list[row].hostname =
                 sqlite3_column_bytes(res, 2) ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
@@ -520,7 +520,7 @@ void sql_build_host_system_info(nd_uuid_t *host_id, struct rrdhost_system_info *
 
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        rrdhost_set_system_info_variable(
+        rrdhost_system_info_set_by_name(
             system_info, (char *)sqlite3_column_text(res, 0), (char *)sqlite3_column_text(res, 1));
     }
 
@@ -957,7 +957,7 @@ static int store_host_metadata(RRDHOST *host)
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_os(host), 1));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_timezone(host), 1));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, "", 1));
-    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->system_info ? host->system_info->hops : 0));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->system_info ? rrdhost_system_info_hops(host->system_info) : 0));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->rrd_memory_mode));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_abbrev_timezone(host), 1));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->utc_offset));
@@ -1018,34 +1018,7 @@ static bool store_host_systeminfo(RRDHOST *host)
     if (unlikely(!system_info))
         return false;
 
-    int ret = 0;
-
-    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_NAME", system_info->container_os_name, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_ID", system_info->container_os_id, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_ID_LIKE", system_info->container_os_id_like, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_VERSION", system_info->container_os_version, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_VERSION_ID", system_info->container_os_version_id, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_CONTAINER_OS_DETECTION", system_info->host_os_detection, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_NAME", system_info->host_os_name, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_ID", system_info->host_os_id, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_ID_LIKE", system_info->host_os_id_like, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_VERSION", system_info->host_os_version, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_VERSION_ID", system_info->host_os_version_id, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_OS_DETECTION", system_info->host_os_detection, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_KERNEL_NAME", system_info->kernel_name, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", system_info->host_cores, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_CPU_FREQ", system_info->host_cpu_freq, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_TOTAL_RAM", system_info->host_ram_total, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_TOTAL_DISK_SIZE", system_info->host_disk_space, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_KERNEL_VERSION", system_info->kernel_version, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_ARCHITECTURE", system_info->architecture, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_VIRTUALIZATION", system_info->virtualization, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_VIRT_DETECTION", system_info->virt_detection, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_CONTAINER", system_info->container, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_SYSTEM_CONTAINER_DETECTION", system_info->container_detection, &host->host_id.uuid);
-    ret += add_host_sysinfo_key_value("NETDATA_HOST_IS_K8S_NODE", system_info->is_k8s_node, &host->host_id.uuid);
-
-    return !(24 == ret);
+    return (24 != rrdhost_system_info_foreach(system_info, add_host_sysinfo_key_value, &host->host_id.uuid));
 }
 
 
