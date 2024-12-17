@@ -10,8 +10,6 @@ extern "C" {
 #include <stdlib.h>
 #include <stdio.h>
 
-#if defined(OS_LINUX)
-
 #include <uv.h>
 
 #ifndef TASK_COMM_LEN
@@ -33,6 +31,39 @@ enum ebpf_pids_index {
     NETDATA_EBPF_PIDS_PROC_FILE,
     NETDATA_EBPF_PIDS_END_IDX
 };
+
+typedef enum integration_cmd_status {
+    INTEGRATION_CMD_STATUS_SUCCESS = 0,
+    INTEGRATION_CMD_STATUS_FAILURE,
+    INTEGRATION_CMD_STATUS_BUSY
+} integration_cmd_status_t;
+
+// ----------------------------------------------------------------------------
+// Comands
+typedef enum ebpf_cmds {
+    NETDATA_EBPF_CMD_PING,
+    NETDATA_EBPF_CMD_COLLECT,
+    NETDATA_EBPF_CMD_BEGIN,
+    NETDATA_EBPF_CMD_PROCESS,
+    NETDATA_EBPF_CMD_SOCKET,
+    NETDATA_EBPF_CMD_CACHESTAT,
+    NETDATA_EBPF_CMD_DCSTAT,
+    NETDATA_EBPF_CMD_SWAP,
+    NETDATA_EBPF_CMD_VFS,
+    NETDATA_EBPF_CMD_FD,
+    NETDATA_EBPF_CMD_SHM,
+    NETDATA_EBPF_CMD_END,
+    NETDATA_EBPF_CMD_SLEEP,
+
+    NETDATA_EBPF_CMDS_TOTAL
+} ebpf_cmds_t;
+
+typedef integration_cmd_status_t (integration_command_action_t) (char *args, char **message);
+
+typedef struct integration_command_info {
+    char *cmd_str;              // the command string
+    integration_command_action_t *func;     // the function that executes the command
+} integration_command_info_t;
 
 // ----------------------------------------------------------------------------
 // Structures used to read data from kernel ring
@@ -207,11 +238,10 @@ enum netdata_integration_selector {
 };
 
 const char *netdata_integration_pipename(enum netdata_integration_selector idx);
-
-#endif // defined(OS_LINUX)
+void netdata_integration_init(enum netdata_integration_selector idx);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif //NETDATA_SHARED_DATA_H
+#endif // NETDATA_SHARED_DATA_H
