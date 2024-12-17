@@ -2564,7 +2564,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
             page_release(cache, page, false);
         }
 
-        if(pages % 500 == 0)
+        if(pages % 5 == 0)
             yield_the_processor();
 
         pgc_queue_lock(cache, &cache->hot);
@@ -2612,7 +2612,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         }
         JudyLFreeArray(&JudyL_metrics, PJE0);
 
-        if(pages % 500 == 0)
+        if(pages % 5 == 0)
             yield_the_processor();
     }
     usec_t t3 = now_monotonic_usec();
