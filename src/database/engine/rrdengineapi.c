@@ -1234,7 +1234,8 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
-    finalize_rrd_files(ctx);
+    // No need to release the datafiles list
+    //finalize_rrd_files(ctx);
 
     if (unittest_running) //(ctx->config.unittest)
         freez(ctx);
