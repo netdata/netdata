@@ -670,8 +670,10 @@ RRDHOST *rrdhost_find_or_create(
     RRDHOST *host = rrdhost_find_by_guid(guid);
     if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
 
-        if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
+        if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
+            rrdhost_system_info_free(system_info);
             return host;
+        }
 
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
         nd_log(NDLS_DAEMON, NDLP_INFO,
@@ -739,6 +741,9 @@ RRDHOST *rrdhost_find_or_create(
                 , replication_step
                 , system_info);
     }
+
+    if(!host)
+        rrdhost_system_info_free(system_info);
 
     return host;
 }

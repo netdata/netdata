@@ -148,7 +148,7 @@ int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, cha
 }
 
 struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labels) {
-    struct rrdhost_system_info *info = callocz(1, sizeof(struct rrdhost_system_info));
+    struct rrdhost_system_info *info = rrdhost_system_info_create();
     info->hops = 1;
 
     rrdlabels_get_value_strdup_or_null(labels, &info->cloud_provider_type, "_cloud_provider_type");

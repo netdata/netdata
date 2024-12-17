@@ -140,6 +140,8 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             rpt->config.replication.step,
             rpt->system_info,
             0);
+        // IMPORTANT: system_info is now consumed!
+        rpt->system_info = NULL;
 
         if(!host) {
             stream_receiver_log_status(
@@ -150,10 +152,6 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INTERNAL_ERROR);
             return false;
         }
-        // IMPORTANT: KEEP THIS FIRST AFTER CHECKING host RESPONSE!
-        // THIS IS HOW WE KNOW THE system_info IS GONE NOW...
-        // system_info has been consumed by the host structure
-        rpt->system_info = NULL;
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
             stream_receiver_log_status(
