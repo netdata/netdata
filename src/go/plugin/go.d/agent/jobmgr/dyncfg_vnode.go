@@ -141,15 +141,25 @@ func (m *Manager) dyncfgVnodeAdd(fn functions.Function) {
 
 	dyncfgUpdateVnodeConfig(cfg, name)
 
+	if err := m.verifyVnodeUnique(cfg); err != nil {
+		m.Warningf("dyncfg: add: vnode job %s: %v", name, err)
+		m.dyncfgRespf(fn, 400, "Failed to create configuration from payload: %v.", err)
+		return
+	}
+
+	if orig, ok := m.Vnodes[name]; ok && orig.Equal(cfg) {
+		m.dyncfgRespf(fn, 202, "")
+		m.dyncfgVnodeJobCreate(cfg, dyncfgRunning)
+		return
+	}
+
 	m.Vnodes[name] = cfg
 
-	if orig, ok := m.Vnodes[name]; ok && !orig.Equal(cfg) {
-		m.runningJobs.forEach(func(_ string, job *module.Job) {
-			if job.Vnode().Name == name {
-				job.UpdateVnode(cfg)
-			}
-		})
-	}
+	m.runningJobs.forEach(func(_ string, job *module.Job) {
+		if job.Vnode().Name == name {
+			job.UpdateVnode(cfg)
+		}
+	})
 	m.dyncfgRespf(fn, 202, "")
 	m.dyncfgVnodeJobCreate(cfg, dyncfgRunning)
 }
@@ -205,11 +215,9 @@ func (m *Manager) dyncfgVnodeTest(fn functions.Function) {
 
 	dyncfgUpdateVnodeConfig(cfg, name)
 
-	id := fn.Args[0]
-	_, ok := m.Vnodes[name]
-
-	if id == dyncfgVnodeID || !ok {
-		m.dyncfgRespf(fn, 200, "")
+	if err := m.verifyVnodeUnique(cfg); err != nil {
+		m.Warningf("dyncfg: test: vnode job %s: %v", name, err)
+		m.dyncfgRespf(fn, 400, "Failed to create configuration from payload: %v.", err)
 		return
 	}
 
@@ -263,7 +271,7 @@ func (m *Manager) dyncfgVnodeUpdate(fn functions.Function) {
 }
 
 func (m *Manager) dyncfgVnodeUserconfig(fn functions.Function) {
-	bs, err := m.vnodeUserconfigFromPayload(fn)
+	bs, err := vnodeUserconfigFromPayload(fn)
 	if err != nil {
 		m.Warningf("dyncfg: userconfig: vnode: failed to create config from payload: %v", err)
 		m.dyncfgRespf(fn, 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
@@ -286,6 +294,21 @@ func (m *Manager) dyncfgVnodeAffectedJobs(vnode string) string {
 	return s.String()
 }
 
+func (m *Manager) verifyVnodeUnique(newCfg *vnodes.VirtualNode) error {
+	for _, cfg := range m.Vnodes {
+		if cfg.Name == newCfg.Name {
+			continue
+		}
+		if cfg.Hostname == newCfg.Hostname {
+			return fmt.Errorf("duplicate virtual node name detected (job '%s')", cfg.Name)
+		}
+		if cfg.GUID == newCfg.GUID {
+			return fmt.Errorf("duplicate virtual node guid detected (job '%s')", cfg.Name)
+		}
+	}
+	return nil
+}
+
 func dyncfgUpdateVnodeConfig(cfg *vnodes.VirtualNode, name string) {
 	cfg.Name = name
 	if cfg.Hostname == "" {
@@ -305,7 +328,7 @@ func vnodeConfigFromPayload(fn functions.Function) (*vnodes.VirtualNode, error) 
 	return &cfg, nil
 }
 
-func (m *Manager) vnodeUserconfigFromPayload(fn functions.Function) ([]byte, error) {
+func vnodeUserconfigFromPayload(fn functions.Function) ([]byte, error) {
 	cfg, err := vnodeConfigFromPayload(fn)
 	if err != nil {
 		return nil, err
