@@ -372,32 +372,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
             buffer_json_member_add_string(wb, "v", rrdhost_program_version(host));
 
             host_labels2json(host, wb, "labels");
-
-            if (host->system_info) {
-                buffer_json_member_add_object(wb, "hw");
-                {
-                    buffer_json_member_add_string_or_empty(wb, "architecture", host->system_info->architecture);
-                    buffer_json_member_add_string_or_empty(wb, "cpu_frequency", host->system_info->host_cpu_freq);
-                    buffer_json_member_add_string_or_empty(wb, "cpus", host->system_info->host_cores);
-                    buffer_json_member_add_string_or_empty(wb, "memory", host->system_info->host_ram_total);
-                    buffer_json_member_add_string_or_empty(wb, "disk_space", host->system_info->host_disk_space);
-                    buffer_json_member_add_string_or_empty(wb, "virtualization", host->system_info->virtualization);
-                    buffer_json_member_add_string_or_empty(wb, "container", host->system_info->container);
-                }
-                buffer_json_object_close(wb);
-
-                buffer_json_member_add_object(wb, "os");
-                {
-                    buffer_json_member_add_string_or_empty(wb, "id", host->system_info->host_os_id);
-                    buffer_json_member_add_string_or_empty(wb, "nm", host->system_info->host_os_name);
-                    buffer_json_member_add_string_or_empty(wb, "v", host->system_info->host_os_version);
-                    buffer_json_member_add_object(wb, "kernel");
-                    buffer_json_member_add_string_or_empty(wb, "nm", host->system_info->kernel_name);
-                    buffer_json_member_add_string_or_empty(wb, "v", host->system_info->kernel_version);
-                    buffer_json_object_close(wb);
-                }
-                buffer_json_object_close(wb);
-            }
+            rrdhost_system_info_to_json_v2(wb, host->system_info);
 
             // created      - the node is created but never connected to cloud
             // unreachable  - not currently connected

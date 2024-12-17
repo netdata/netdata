@@ -200,7 +200,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         stream_receive.replication.enabled,
         stream_receive.replication.period,
         stream_receive.replication.step,
-        rrdhost_labels_to_system_info(parser->user.host_define.rrdlabels),
+        rrdhost_system_info_from_host_labels(parser->user.host_define.rrdlabels),
         false);
 
     rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);

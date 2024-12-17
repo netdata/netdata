@@ -130,7 +130,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     s->ingest.reason = (online) ? STREAM_HANDSHAKE_NEVER : host->stream.rcv.status.exit_reason;
 
     rrdhost_receiver_lock(host);
-    s->ingest.hops = (int16_t)(host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+    s->ingest.hops = (int16_t)(host->system_info ? rrdhost_system_info_hops(host->system_info) : (host == localhost) ? 0 : 1);
     bool has_receiver = false;
     if (host->receiver && rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE)) {
         has_receiver = true;

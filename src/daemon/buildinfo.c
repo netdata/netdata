@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#define RRDHOST_SYSTEM_INFO_INTERNALS
 #include <stdio.h>
 #include "./config.h"
 #include "common.h"
@@ -1260,7 +1261,6 @@ __attribute__((constructor)) void initialize_build_info(void) {
 // ----------------------------------------------------------------------------
 // system info
 
-int get_system_info(struct rrdhost_system_info *system_info);
 static void populate_system_info(void) {
     static bool populated = false;
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
@@ -1288,8 +1288,8 @@ static void populate_system_info(void) {
             netdata_main_spawn_server_init(NULL, 0, NULL);
         }
 
-        system_info = callocz(1, sizeof(struct rrdhost_system_info));
-        get_system_info(system_info);
+        system_info = rrdhost_system_info_create();
+        rrdhost_system_info_detect(system_info);
         free_system_info = true;
 
         if(started_spawn_server)
@@ -1349,11 +1349,11 @@ char *get_value_from_key(char *buffer, char *key) {
     return s;
 }
 
-void get_install_type(char **install_type, char **prebuilt_arch __maybe_unused, char **prebuilt_dist __maybe_unused) {
+void get_install_type_internal(char **install_type, char **prebuilt_arch __maybe_unused, char **prebuilt_dist __maybe_unused) {
 #ifndef OS_WINDOWS
     char *install_type_filename;
 
-    int install_type_filename_len = (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 3);
+    unsigned long install_type_filename_len = (strlen(netdata_configured_user_config_dir) + strlen(".install-type") + 3);
     install_type_filename = mallocz(sizeof(char) * install_type_filename_len);
     snprintfz(install_type_filename, install_type_filename_len - 1, "%s/%s", netdata_configured_user_config_dir, ".install-type");
 
@@ -1378,6 +1378,10 @@ void get_install_type(char **install_type, char **prebuilt_arch __maybe_unused, 
 #endif
 }
 
+void get_install_type(struct rrdhost_system_info *system_info) {
+    get_install_type_internal(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
+}
+
 static struct {
     SPINLOCK spinlock;
     bool populated;
@@ -1392,7 +1396,7 @@ static void populate_packaging_info() {
         if(!BUILD_PACKAGING_INFO.populated) {
             BUILD_PACKAGING_INFO.populated = true;
 
-            get_install_type(&BUILD_PACKAGING_INFO.install_type, &BUILD_PACKAGING_INFO.prebuilt_arch, &BUILD_PACKAGING_INFO.prebuilt_distro);
+            get_install_type_internal(&BUILD_PACKAGING_INFO.install_type, &BUILD_PACKAGING_INFO.prebuilt_arch, &BUILD_PACKAGING_INFO.prebuilt_distro);
 
             if(!BUILD_PACKAGING_INFO.install_type)
                 BUILD_PACKAGING_INFO.install_type = "unknown";

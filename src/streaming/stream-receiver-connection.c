@@ -291,10 +291,9 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 #endif
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
-    __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
 
-    rpt->system_info = callocz(1, sizeof(struct rrdhost_system_info));
-    rpt->system_info->hops = rpt->hops;
+    rpt->system_info = rrdhost_system_info_create();
+    rrdhost_system_info_hops_set(rpt->system_info, rpt->hops);
 
     nd_sock_init(&rpt->sock, netdata_ssl_web_server_ctx, false);
     rpt->client_ip         = strdupz(w->client_ip);
@@ -339,17 +338,19 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         else if(!strcmp(name, "utc_offset"))
             rpt->utc_offset = (int32_t)strtol(value, NULL, 0);
 
-        else if(!strcmp(name, "hops"))
-            rpt->hops = rpt->system_info->hops = (int16_t)strtol(value, NULL, 0);
+        else if(!strcmp(name, "hops")) {
+            rpt->hops = (int16_t)strtol(value, NULL, 0);
+            rrdhost_system_info_hops_set(rpt->system_info, rpt->hops);
+        }
 
         else if(!strcmp(name, "ml_capable"))
-            rpt->system_info->ml_capable = strtoul(value, NULL, 0);
+            rrdhost_system_info_ml_capable_set(rpt->system_info, str2i(value));
 
         else if(!strcmp(name, "ml_enabled"))
-            rpt->system_info->ml_enabled = strtoul(value, NULL, 0);
+            rrdhost_system_info_ml_enabled_set(rpt->system_info, str2i(value));
 
         else if(!strcmp(name, "mc_version"))
-            rpt->system_info->mc_version = strtoul(value, NULL, 0);
+            rrdhost_system_info_mc_version_set(rpt->system_info, str2i(value));
 
         else if(!strcmp(name, "ver") && (rpt->capabilities & STREAM_CAP_INVALID))
             rpt->capabilities = convert_stream_version_to_capabilities(strtoul(value, NULL, 0), NULL, false);
@@ -377,7 +378,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
             else if(!strcmp(name, "NETDATA_PROTOCOL_VERSION") && (rpt->capabilities & STREAM_CAP_INVALID))
                 rpt->capabilities = convert_stream_version_to_capabilities(1, NULL, false);
 
-            if (unlikely(rrdhost_set_system_info_variable(rpt->system_info, name, value))) {
+            if (unlikely(rrdhost_system_info_set_by_name(rpt->system_info, name, value))) {
                 nd_log_daemon(NDLP_NOTICE, "STREAM RCV '%s' [from [%s]:%s]: "
                                            "request has parameter '%s' = '%s', which is not used."
                               , (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-"

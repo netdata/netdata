@@ -70,29 +70,15 @@ static void build_node_info(RRDHOST *host)
 
     node_info.data.name = rrdhost_hostname(host);
     node_info.data.os = rrdhost_os(host);
-    node_info.data.os_name = host->system_info->host_os_name;
-    node_info.data.os_version = host->system_info->host_os_version;
-    node_info.data.kernel_name = host->system_info->kernel_name;
-    node_info.data.kernel_version = host->system_info->kernel_version;
-    node_info.data.architecture = host->system_info->architecture;
-    node_info.data.cpus = host->system_info->host_cores ? str2uint32_t(host->system_info->host_cores, NULL) : 0;
-    node_info.data.cpu_frequency = host->system_info->host_cpu_freq ? host->system_info->host_cpu_freq : "0";
-    node_info.data.memory = host->system_info->host_ram_total ? host->system_info->host_ram_total : "0";
-    node_info.data.disk_space = host->system_info->host_disk_space ? host->system_info->host_disk_space : "0";
     node_info.data.version = host_version ? host_version : NETDATA_VERSION;
     node_info.data.release_channel = get_release_channel();
     node_info.data.timezone = rrdhost_abbrev_timezone(host);
-    node_info.data.virtualization_type = host->system_info->virtualization ? host->system_info->virtualization : "unknown";
-    node_info.data.container_type = host->system_info->container ? host->system_info->container : "unknown";
     node_info.data.custom_info = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
     node_info.data.machine_guid = host->machine_guid;
-
     node_info.node_capabilities = (struct capability *)aclk_get_agent_capas();
-
-    node_info.data.ml_info.ml_capable = host->system_info->ml_capable;
-    node_info.data.ml_info.ml_enabled = host->system_info->ml_enabled;
-
     node_info.data.host_labels_ptr = host->rrdlabels;
+
+    rrdhost_system_info_to_node_info(host->system_info, &node_info);
 
     aclk_update_node_info(&node_info);
     nd_log(

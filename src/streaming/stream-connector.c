@@ -266,17 +266,6 @@ stream_connect_validate_first_response(RRDHOST *host, struct sender_state *s, ch
     return false;
 }
 
-static inline void buffer_key_value_urlencode(BUFFER *wb, const char *key, const char *value) {
-    char *encoded = NULL;
-
-    if(value && *value)
-        encoded = url_encode(value);
-
-    buffer_sprintf(wb, "%s=%s", key, encoded ? encoded : "");
-
-    freez(encoded);
-}
-
 bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeout) {
     worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_CONNECTING);
 
@@ -285,7 +274,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     // make sure the socket is closed
     nd_sock_close(&s->sock);
 
-    s->hops = (int16_t)(host->system_info->hops + 1);
+    s->hops = (int16_t)(rrdhost_system_info_hops(host->system_info) + 1);
 
     // reset this to make sure we have its current value
     s->sock.verify_certificate = netdata_ssl_validate_certificate_sender;
@@ -322,37 +311,8 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     buffer_key_value_urlencode(wb, "&abbrev_timezone", rrdhost_abbrev_timezone(host));
     buffer_sprintf(wb, "&utc_offset=%d", host->utc_offset);
     buffer_sprintf(wb, "&hops=%d", s->hops);
-    buffer_sprintf(wb, "&ml_capable=%d", host->system_info->ml_capable);
-    buffer_sprintf(wb, "&ml_enabled=%d", host->system_info->ml_enabled);
-    buffer_sprintf(wb, "&mc_version=%d", host->system_info->mc_version);
     buffer_sprintf(wb, "&ver=%u", s->capabilities);
-    buffer_key_value_urlencode(wb, "&NETDATA_INSTANCE_CLOUD_TYPE", host->system_info->cloud_provider_type);
-    buffer_key_value_urlencode(wb, "&NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE", host->system_info->cloud_instance_type);
-    buffer_key_value_urlencode(wb, "&NETDATA_INSTANCE_CLOUD_INSTANCE_REGION", host->system_info->cloud_instance_region);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_OS_NAME", host->system_info->host_os_name);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_OS_ID", host->system_info->host_os_id);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_OS_ID_LIKE", host->system_info->host_os_id_like);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_OS_VERSION", host->system_info->host_os_version);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_OS_VERSION_ID", host->system_info->host_os_version_id);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_OS_DETECTION", host->system_info->host_os_detection);
-    buffer_key_value_urlencode(wb, "&NETDATA_HOST_IS_K8S_NODE", host->system_info->is_k8s_node);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_KERNEL_NAME", host->system_info->kernel_name);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_KERNEL_VERSION", host->system_info->kernel_version);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_ARCHITECTURE", host->system_info->architecture);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_VIRTUALIZATION", host->system_info->virtualization);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_VIRT_DETECTION", host->system_info->virt_detection);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_CONTAINER", host->system_info->container);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_CONTAINER_DETECTION", host->system_info->container_detection);
-    buffer_key_value_urlencode(wb, "&NETDATA_CONTAINER_OS_NAME", host->system_info->container_os_name);
-    buffer_key_value_urlencode(wb, "&NETDATA_CONTAINER_OS_ID", host->system_info->container_os_id);
-    buffer_key_value_urlencode(wb, "&NETDATA_CONTAINER_OS_ID_LIKE", host->system_info->container_os_id_like);
-    buffer_key_value_urlencode(wb, "&NETDATA_CONTAINER_OS_VERSION", host->system_info->container_os_version);
-    buffer_key_value_urlencode(wb, "&NETDATA_CONTAINER_OS_VERSION_ID", host->system_info->container_os_version_id);
-    buffer_key_value_urlencode(wb, "&NETDATA_CONTAINER_OS_DETECTION", host->system_info->container_os_detection);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", host->system_info->host_cores);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_CPU_FREQ", host->system_info->host_cpu_freq);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_TOTAL_RAM", host->system_info->host_ram_total);
-    buffer_key_value_urlencode(wb, "&NETDATA_SYSTEM_TOTAL_DISK_SIZE", host->system_info->host_disk_space);
+    rrdhost_system_info_to_url_encode_stream(wb, host->system_info);
     buffer_key_value_urlencode(wb, "&NETDATA_PROTOCOL_VERSION", STREAMING_PROTOCOL_VERSION);
     buffer_strcat(wb, HTTP_1_1 HTTP_ENDL);
     buffer_sprintf(wb, "User-Agent: %s/%s" HTTP_ENDL, rrdhost_program_name(host), rrdhost_program_version(host));
