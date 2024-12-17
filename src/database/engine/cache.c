@@ -2431,6 +2431,8 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_indexing_started, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&cache->stats.workers_jv2_flush, 1, __ATOMIC_RELAXED);
 
+    usec_t t0 = now_monotonic_usec();
+
     pgc_queue_lock(cache, &cache->hot);
 
     Pvoid_t JudyL_metrics = NULL;
@@ -2568,8 +2570,10 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
     pgc_queue_unlock(cache, &cache->hot);
 
     // callback
+    usec_t t1 = now_monotonic_usec();
     cb(section, datafile_fileno, type, JudyL_metrics, JudyL_extents_pos, count_of_unique_extents, count_of_unique_metrics, count_of_unique_pages, data);
 
+    usec_t t2 = now_monotonic_usec();
     {
         Pvoid_t *PValue1;
         bool metric_id_first = true;
@@ -2602,6 +2606,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         }
         JudyLFreeArray(&JudyL_metrics, PJE0);
     }
+    usec_t t3 = now_monotonic_usec();
 
     {
         Pvoid_t *PValue;
@@ -2622,6 +2627,12 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
     // balance-parents: do not flush, there is nothing dirty
     // flush_pages(cache, cache->config.max_flushes_inline, PGC_SECTION_ALL, false, false);
+
+    usec_t t4 = now_monotonic_usec();
+    nd_log(NDLS_DAEMON, NDLP_WARNING,
+           "V2_GEN: t0 = %llu, t1 = %llu, t3 = %llu, t4 = %llu : extents = %zu, metrics = %zu, pages = %zu",
+           t1 - t0, t2 - t1, t3 - t2, t4 - t3,
+           count_of_unique_extents, count_of_unique_metrics, count_of_unique_pages);
 }
 
 static bool match_page_data(PGC_PAGE *page, void *data) {
