@@ -155,7 +155,7 @@ void pulse_queries_do(bool extended __maybe_unused) {
                 , "queries"
                 , NULL
                 , "Time-Series Queries"
-                , NULL
+                , "netdata.db_queries"
                 , "Netdata Time-Series DB Queries"
                 , "queries/s"
                 , "netdata"
