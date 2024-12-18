@@ -1522,7 +1522,7 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
             .tier = qwd->qwr->tier,
             .timeout_ms = qwd->qwr->timeout_ms,
             .query_source = QUERY_SOURCE_API_WEIGHTS,
-            .priority = STORAGE_PRIORITY_NORMAL,
+            .priority = STORAGE_PRIORITY_SYNCHRONOUS_FIRST,
     };
 
     ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);

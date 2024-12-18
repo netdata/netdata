@@ -1121,7 +1121,7 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
                                       NULL, &latest_timestamp,
                                       NULL, NULL, NULL,
                                       &value_is_null, NULL, 0, 0,
-                                      QUERY_SOURCE_API_BADGE, STORAGE_PRIORITY_NORMAL);
+                                      QUERY_SOURCE_API_BADGE, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
 
         // if the value cannot be calculated, show empty badge
         if (ret != HTTP_RESP_OK) {

@@ -2,7 +2,7 @@
 
 #include "libnetdata/libnetdata.h"
 
-#define MAX_USEC 2048 // Maximum backoff limit in microseconds
+#define MAX_USEC 512 // Maximum backoff limit in microseconds
 
 // ----------------------------------------------------------------------------
 // spinlock implementation

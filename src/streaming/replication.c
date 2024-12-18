@@ -33,7 +33,7 @@
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
 
 #define MAX_REPLICATION_THREADS 256
-#define REQUESTS_AHEAD_PER_THREAD 1 // 0 = dynamic, 1 = enable synchronous queries, > 1 static
+#define REQUESTS_AHEAD_PER_THREAD 0 // 0 = dynamic, 1 = enable synchronous queries, > 1 static
 
 static struct replication_query_statistics replication_queries = {
         .spinlock = SPINLOCK_INITIALIZER,
@@ -189,8 +189,7 @@ static struct replication_query *replication_query_prepare(
         d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
         d->rd = rd;
 
-        STORAGE_PRIORITY priority = q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW;
-        if(synchronous) priority = STORAGE_PRIORITY_SYNCHRONOUS_FIRST;
+        STORAGE_PRIORITY priority = (synchronous) ? STORAGE_PRIORITY_SYNCHRONOUS_FIRST : STORAGE_PRIORITY_LOW;
 
         stream_control_replication_query_started();
         storage_engine_query_init(q->backend, rd->tiers[0].smh, &d->handle,
@@ -1728,8 +1727,8 @@ static int replication_pipeline_execute_next(void) {
         if (rtp.max_requests_ahead > libuv_worker_threads * 2)
             rtp.max_requests_ahead = libuv_worker_threads * 2;
 
-        if (rtp.max_requests_ahead < 2)
-            rtp.max_requests_ahead = 2;
+        if (rtp.max_requests_ahead < 5)
+            rtp.max_requests_ahead = 5;
 #else
         rtp.max_requests_ahead = REQUESTS_AHEAD_PER_THREAD;
 #endif

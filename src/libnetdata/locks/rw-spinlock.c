@@ -2,7 +2,7 @@
 
 #include "libnetdata/libnetdata.h"
 
-#define MAX_USEC 2048 // Maximum backoff limit in microseconds
+#define MAX_USEC 512 // Maximum backoff limit in microseconds
 #define SPIN_THRESHOLD 10 // Spins before introducing sleep
 
 // ----------------------------------------------------------------------------
@@ -33,9 +33,8 @@ bool rw_spinlock_tryread_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *f
             break;
         }
 
-        if (++spins > SPIN_THRESHOLD) {
-            microsleep(1);
-        }
+        if (++spins > SPIN_THRESHOLD)
+            tinysleep();
     }
 
     worker_spinlock_contention(func, spins);
@@ -70,7 +69,7 @@ void rw_spinlock_read_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func
         }
 
         if (++spins > SPIN_THRESHOLD)
-            microsleep(1);
+            tinysleep();
     }
 
     worker_spinlock_contention(func, spins);
@@ -128,7 +127,7 @@ void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *fun
 
         // Spin if readers or another writer is active
         if (++spins > SPIN_THRESHOLD)
-            microsleep(1);
+            tinysleep();
     }
 
     worker_spinlock_contention(func, spins);
