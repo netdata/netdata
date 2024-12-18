@@ -2,6 +2,8 @@
 
 #include "libnetdata/libnetdata.h"
 
+#define MAX_USEC 2048 // Maximum backoff limit in microseconds
+
 // ----------------------------------------------------------------------------
 // spinlock implementation
 // https://www.youtube.com/watch?v=rmGJc9PXpuE&t=41s
@@ -16,18 +18,18 @@ void spinlock_lock_with_trace(SPINLOCK *spinlock, const char *func) {
     size_t spins = 0;
     usec_t usec = 1;
 
-    for(int i = 1;
-         __atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) ||
-         __atomic_test_and_set(&spinlock->locked, __ATOMIC_ACQUIRE)
-             ; i++
-    ) {
+    while (true) {
+        if (!__atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) &&
+            !__atomic_test_and_set(&spinlock->locked, __ATOMIC_ACQUIRE)) {
+            // Acquired the lock
+            break;
+        }
 
+        // Backoff strategy with exponential growth
         spins++;
         microsleep(usec);
-        usec *= 2;
+        usec = usec > MAX_USEC ? MAX_USEC : usec * 2;
     }
-
-    // we have the lock
 
 #ifdef NETDATA_INTERNAL_CHECKS
     spinlock->spins += spins;
@@ -49,9 +51,9 @@ void spinlock_unlock_with_trace(SPINLOCK *spinlock, const char *func __maybe_unu
 }
 
 bool spinlock_trylock_with_trace(SPINLOCK *spinlock, const char *func __maybe_unused) {
-    if(!__atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) &&
+    if (!__atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) &&
         !__atomic_test_and_set(&spinlock->locked, __ATOMIC_ACQUIRE)) {
-        // we got the lock
+        // Acquired the lock
         nd_thread_spinlock_locked();
         return true;
     }

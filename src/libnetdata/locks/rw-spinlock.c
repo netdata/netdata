@@ -2,6 +2,9 @@
 
 #include "libnetdata/libnetdata.h"
 
+#define MAX_USEC 2048 // Maximum backoff limit in microseconds
+#define SPIN_THRESHOLD 10 // Spins before introducing sleep
+
 // ----------------------------------------------------------------------------
 // rw_spinlock implementation
 
@@ -29,6 +32,10 @@ bool rw_spinlock_tryread_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *f
                 )) {
             break;
         }
+
+        if (++spins > SPIN_THRESHOLD) {
+            microsleep(1);
+        }
     }
 
     worker_spinlock_contention(func, spins);
@@ -46,7 +53,7 @@ void rw_spinlock_read_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func
             // Writer is active, spin
             spins++;
             microsleep(usec);
-            usec *= 2;
+            usec = usec > MAX_USEC ? MAX_USEC : usec * 2;
             continue;
         }
 
@@ -61,6 +68,9 @@ void rw_spinlock_read_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func
                 )) {
             break;
         }
+
+        if (++spins > SPIN_THRESHOLD)
+            microsleep(1);
     }
 
     worker_spinlock_contention(func, spins);
@@ -72,7 +82,7 @@ void rw_spinlock_read_unlock_with_trace(RW_SPINLOCK *rw_spinlock, const char *fu
     __atomic_sub_fetch(&rw_spinlock->counter, 1, __ATOMIC_RELEASE);
 #else
     int32_t x = __atomic_sub_fetch(&rw_spinlock->counter, 1, __ATOMIC_RELEASE);
-    if(x < 0)
+    if (x < 0)
         fatal("RW_SPINLOCK: readers is negative %d", x);
 #endif
 
@@ -117,7 +127,8 @@ void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *fun
         }
 
         // Spin if readers or another writer is active
-        spins++;
+        if (++spins > SPIN_THRESHOLD)
+            microsleep(1);
     }
 
     worker_spinlock_contention(func, spins);
@@ -125,6 +136,12 @@ void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *fun
 }
 
 void rw_spinlock_write_unlock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func __maybe_unused) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    int32_t x = __atomic_load_n(&rw_spinlock->counter, __ATOMIC_RELAXED);
+    if (x != -1)
+        fatal("RW_SPINLOCK: writer unlock encountered unexpected state: %d", x);
+#endif
+
     __atomic_store_n(&rw_spinlock->counter, 0, __ATOMIC_RELEASE); // Release writer lock
     nd_thread_rwspinlock_write_unlocked();
 }
