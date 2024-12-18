@@ -32,6 +32,8 @@ static integration_command_info_t command_info_array[] = {
     {"ping", cmd_ping_execute}
 };
 
+static uv_rwlock_t exclusive_rwlock;
+
 static int command_server_initialized = 0;
 
 static uv_thread_t thread;
@@ -71,10 +73,11 @@ static void netdata_integration_pipe_write_cb(uv_write_t* req, int status)
 
 integration_cmd_status_t netdata_integration_execute_command(ebpf_cmds_t idx, char *args, char **message)
 {
-    // TODO: ADD PROPER LOCK AFTER TESTS
     integration_cmd_status_t status;
 
+    uv_rwlock_wrlock(&exclusive_rwlock);
     status = command_info_array[idx].func(args, message);
+    uv_rwlock_wrunlock(&exclusive_rwlock);
 
     return status;
 }
@@ -387,6 +390,8 @@ void netdata_integration_init(enum netdata_integration_selector idx)
 
     if (netdata_integration_initialize_shm())
         return;
+
+    fatal_assert(0 == uv_rwlock_init(&exclusive_rwlock));
 
     completion_init(&completion);
 
