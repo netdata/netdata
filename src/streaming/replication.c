@@ -33,7 +33,7 @@
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
 
 #define MAX_REPLICATION_THREADS 256
-#define REQUESTS_AHEAD_PER_THREAD 4 // 0 = dynamic, 1 = enable synchronous queries, > 1 static
+#define REQUESTS_AHEAD_PER_THREAD 1 // 0 = dynamic, 1 = enable synchronous queries, > 1 static
 
 static struct replication_query_statistics replication_queries = {
         .spinlock = SPINLOCK_INITIALIZER,
@@ -1900,7 +1900,7 @@ void *replication_thread_main(void *ptr) {
 
     replication_initialize_workers(true);
 
-    size_t threads = netdata_conf_is_parent() ? (netdata_conf_cpus() / 2) : 1;
+    size_t threads = netdata_conf_is_parent() ? (netdata_conf_cpus() / 3) : 1;
     if (threads < 1) threads = 1;
     else if (threads > MAX_REPLICATION_THREADS) threads = MAX_REPLICATION_THREADS;
 
