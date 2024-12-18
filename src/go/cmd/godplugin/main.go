@@ -3,7 +3,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -15,7 +14,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/cli"
 
-	"github.com/jessevdk/go-flags"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
@@ -75,8 +73,7 @@ func main() {
 func parseCLI() *cli.Option {
 	opt, err := cli.Parse(os.Args)
 	if err != nil {
-		var flagsErr *flags.Error
-		if errors.As(err, &flagsErr) && errors.Is(flagsErr.Type, flags.ErrHelp) {
+		if cli.IsHelp(err) {
 			os.Exit(0)
 		}
 		os.Exit(1)

@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	"github.com/jessevdk/go-flags"
+
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
 // Option defines command line options.
@@ -24,7 +26,7 @@ func Parse(args []string) (*Option, error) {
 		UpdateEvery: 1,
 	}
 	parser := flags.NewParser(opt, flags.Default)
-	parser.Name = "orchestrator"
+	parser.Name = executable.Name
 	parser.Usage = "[OPTIONS] [update every]"
 
 	rest, err := parser.ParseArgs(args)
@@ -39,4 +41,8 @@ func Parse(args []string) (*Option, error) {
 	}
 
 	return opt, nil
+}
+
+func IsHelp(err error) bool {
+	return flags.WroteHelp(err)
 }
