@@ -36,15 +36,31 @@ if [ "${BUILDARCH}" != "$(uname -m)" ] && [ -z "${SKIP_EMULATION}" ]; then
 fi
 
 case "${BUILDARCH}" in
-    x86_64) QEMU_CPU="Nehalem-v2" ;; # x86-64-v2 equivalent
+    x86_64) # x86-64-v2 equivalent
+        QEMU_CPU="Nehalem-v2"
+        TUNING_FLAGS="-march=x86-64"
+        GOAMD64="v1"
+        ;;
     armv6l) # Raspberry Pi 1 equivalent
         QEMU_CPU="arm1176"
-        CFLAGS="${CFLAGS} -march=armv6zk -mtune=arm1176jzf-s"
-        CXXFLAGS="${CXXFLAGS} -march=armv6zk -mtune=arm1176jzf-s"
+        TUNING_FLAGS="-march=armv6zk -mtune=arm1176jzf-s"
+        GOARM="6"
         ;;
-    armv7l) QEMU_CPU="cortex-a7" ;; # Baseline ARMv7 CPU
-    aarch64) QEMU_CPU="cortex-a53" ;; # Baseline ARMv8 CPU
-    ppc64le) QEMU_CPU="power8nvl" ;; # Baseline POWER8+ CPU
+    armv7l) # Baseline ARMv7 CPU
+        QEMU_CPU="cortex-a7"
+        TUNING_FLAGS="-march=armv7-a"
+        GOARM="7"
+        ;;
+    aarch64) # Baseline ARMv8 CPU
+        QEMU_CPU="cortex-a53"
+        TUNING_FLAGS="-march=armv8-a"
+        GOARM64="v8.0"
+        ;;
+    ppc64le) # Baseline POWER8+ CPU
+        QEMU_CPU="power8nvl"
+        TUNING_FLAGS="-mcpu=power8 -mtune=power9"
+        GOPPC64="power8"
+        ;;
 esac
 
 if ${docker} inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
@@ -68,13 +84,17 @@ if [ -t 1 ]; then
   run ${docker} run --rm -e BUILDARCH="${BUILDARCH}" -a stdin -a stdout -a stderr -i -t -v "$(pwd)":/netdata:rw \
     --platform "${platform}" ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
     ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
-    ${CFLAGS:+-e CFLAGS="${CFLAGS}"} ${CXXFLAGS:+-e CXXFLAGS="${CXXFLAGS}"} \
+    -e TUNING_FLAGS="${TUNING_FLAGS}" \
+    ${GOAMD64:+-e GOAMD64="${GOAMD64}"} ${GOARM:+-e GOARM="${GOARM}"} \
+    ${GOARM64:+-e GOARM64="${GOARM64}"} ${GOPPC64:+-e GOPPC64="${GOPPC64}"} \
     "${DOCKER_IMAGE_NAME}" /bin/sh /netdata/packaging/makeself/build.sh "${@}"
 else
   run ${docker} run --rm -e BUILDARCH="${BUILDARCH}" -v "$(pwd)":/netdata:rw \
     -e GITHUB_ACTIONS="${GITHUB_ACTIONS}" --platform "${platform}" \
     ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
     ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
-    ${CFLAGS:+-e CFLAGS="${CFLAGS}"} ${CXXFLAGS:+-e CXXFLAGS="${CXXFLAGS}"} \
+    -e TUNING_FLAGS="${TUNING_FLAGS}" \
+    ${GOAMD64:+-e GOAMD64="${GOAMD64}"} ${GOARM:+-e GOARM="${GOARM}"} \
+    ${GOARM64:+-e GOARM64="${GOARM64}"} ${GOPPC64:+-e GOPPC64="${GOPPC64}"} \
     "${DOCKER_IMAGE_NAME}" /bin/sh /netdata/packaging/makeself/build.sh "${@}"
 fi

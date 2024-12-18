@@ -27,8 +27,9 @@ fi
 
 cd "${NETDATA_MAKESELF_PATH}/tmp/curl" || exit 1
 
-export CFLAGS="${CFLAGS} -I/openssl-static/include -pipe"
-export LDFLAGS="${CFLAGS} -static -L/openssl-static/lib64"
+export CFLAGS="${TUNING_FLAGS} -I/openssl-static/include -pipe"
+export CXXFLAGS="${CFLAGS}"
+export LDFLAGS="-static -L/openssl-static/lib64"
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/openssl-static/lib64/pkgconfig"
 

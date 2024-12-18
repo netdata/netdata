@@ -12,8 +12,9 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building libnetfilter_acct" || true
 
-export CFLAGS="${CFLAGS} -static -I/usr/include/libmnl -pipe"
-export LDFLAGS="${LDFLAGS} -static -L/usr/lib -lmnl"
+export CFLAGS="${TUNING_FLAGS} -static -I/usr/include/libmnl -pipe"
+export CXXFLAGS="${CFLAGS}"
+export LDFLAGS="-static -L/usr/lib -lmnl"
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/usr/lib/pkgconfig"
 
