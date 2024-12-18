@@ -769,14 +769,16 @@ int netdata_main(int argc, char **argv) {
         workers_utilization_enable();
 
     // ----------------------------------------------------------------------------------------------------------------
-    // streaming, replication, backfilling
+    // profiles
 
     stream_conf_load();
-    netdata_conf_global_profile(true);
-
     check_local_streaming_capabilities();
-    replication_initialize();
+    netdata_conf_apply_profile();
 
+    // ----------------------------------------------------------------------------------------------------------------
+    // streaming, replication, functions initialization
+
+    replication_initialize();
     rrd_functions_inflight_init();
 
     {
