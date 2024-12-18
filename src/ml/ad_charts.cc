@@ -21,7 +21,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
                     id_buf,
                     name_buf, // name
                     NETDATA_ML_CHART_FAMILY, // family
-                    "netdata.machine_learning_status", // ctx
+                    "netdata.ml_status", // ctx
                     "Machine learning status", // title
                     "dimensions", // units
                     NETDATA_ML_PLUGIN, // plugin
@@ -63,7 +63,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
                     id_buf, // id
                     name_buf, // name
                     NETDATA_ML_CHART_FAMILY, // family
-                    "netdata.metric_types", // ctx
+                    "netdata.ml_metric_types", // ctx
                     "Dimensions by metric type", // title
                     "dimensions", // units
                     NETDATA_ML_PLUGIN, // plugin
@@ -105,7 +105,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
                     id_buf, // id
                     name_buf, // name
                     NETDATA_ML_CHART_FAMILY, // family
-                    "netdata.training_status", // ctx
+                    "netdata.ml_training_status", // ctx
                     "Training status of dimensions", // title
                     "dimensions", // units
                     NETDATA_ML_PLUGIN, // plugin
@@ -418,7 +418,7 @@ void ml_update_training_statistics_chart(ml_worker_t *worker, const ml_queue_sta
                     id_buf, // id
                     name_buf, // name
                     NETDATA_ML_CHART_FAMILY, // family
-                    "netdata.queue_ops", // ctx
+                    "netdata.ml_queue_ops", // ctx
                     "Training queue operations", // title
                     "count", // units
                     NETDATA_ML_PLUGIN, // plugin
@@ -468,7 +468,7 @@ void ml_update_training_statistics_chart(ml_worker_t *worker, const ml_queue_sta
                     id_buf, // id
                     name_buf, // name
                     NETDATA_ML_CHART_FAMILY, // family
-                    "netdata.queue_size", // ctx
+                    "netdata.ml_queue_size", // ctx
                     "Training queue size", // title
                     "count", // units
                     NETDATA_ML_PLUGIN, // plugin
@@ -507,7 +507,7 @@ void ml_update_training_statistics_chart(ml_worker_t *worker, const ml_queue_sta
                     id_buf, // id
                     name_buf, // name
                     NETDATA_ML_CHART_FAMILY, // family
-                    "netdata.training_time_stats", // ctx
+                    "netdata.ml_training_time_stats", // ctx
                     "Training time stats", // title
                     "microseconds", // units
                     NETDATA_ML_PLUGIN, // plugin
@@ -553,7 +553,7 @@ void ml_update_training_statistics_chart(ml_worker_t *worker, const ml_queue_sta
                     id_buf, // id
                     name_buf, // name
                     NETDATA_ML_CHART_FAMILY, // family
-                    "netdata.training_results", // ctx
+                    "netdata.ml_training_results", // ctx
                     "Training results", // title
                     "events", // units
                     NETDATA_ML_PLUGIN, // plugin

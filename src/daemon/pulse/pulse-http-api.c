@@ -80,7 +80,7 @@ void pulse_web_do(bool extended) {
                 , "clients"
                 , NULL
                 , "HTTP API"
-                , NULL
+                , "netdata.http_api_clients"
                 , "Netdata Web API Clients"
                 , "connected clients"
                 , "netdata"
@@ -109,7 +109,7 @@ void pulse_web_do(bool extended) {
                 , "requests"
                 , NULL
                 , "HTTP API"
-                , NULL
+                , "netdata.http_api_requests"
                 , "Netdata Web API Requests Received"
                 , "requests/s"
                 , "netdata"
@@ -139,7 +139,7 @@ void pulse_web_do(bool extended) {
                 , "net"
                 , NULL
                 , "HTTP API"
-                , NULL
+                , "netdata.http_api_traffic"
                 , "Netdata Web API Network Traffic"
                 , "kilobits/s"
                 , "netdata"
@@ -174,7 +174,7 @@ void pulse_web_do(bool extended) {
                 , "response_time"
                 , NULL
                 , "HTTP API"
-                , NULL
+                , "netdata.http_api_response_time"
                 , "Netdata Web API Response Time"
                 , "milliseconds/request"
                 , "netdata"
@@ -228,7 +228,7 @@ void pulse_web_do(bool extended) {
                 , "compression_ratio"
                 , NULL
                 , "HTTP API"
-                , NULL
+                , "netdata.http_api_compression_ratio"
                 , "Netdata Web API Responses Compression Savings Ratio"
                 , "percentage"
                 , "netdata"
