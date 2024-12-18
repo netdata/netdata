@@ -42,9 +42,8 @@ static uv_pipe_t server_pipe;
 
 static int command_thread_error;
 static int command_thread_shutdown;
-static enum netdata_integration_selector interated;
 
-const char *pipes[] = {"NETDATA_APPS_PIPENAME", "NETDATA_CGROUP_PIPENAME", "NETDATA_NV_PIPENAME"};
+const char *pipes = "NETDATA_EBPF_INTEGRATION_PIPENAME";
 
 static integration_cmd_status_t cmd_ping_execute(char *args, char **message)
 {
@@ -270,7 +269,7 @@ static void netdata_integration_parser_thread(void *arg)
         goto error_after_pipe_init;
     }
 
-    const char *pipename = netdata_integration_pipename(interated);
+    const char *pipename = netdata_integration_pipename();
 
     (void)uv_fs_unlink(loop, &req, pipename, NULL);
     uv_fs_req_cleanup(&req);
@@ -302,12 +301,12 @@ static void netdata_integration_parser_thread(void *arg)
         uv_run(loop, UV_RUN_DEFAULT);
     }
     /* cleanup operations of the event loop */
-    netdata_log_info("Shutting down pipe %s event loop.", pipes[interated]);
+    netdata_log_info("Shutting down pipe %s event loop.", pipes);
     uv_close((uv_handle_t *)&async, NULL);
     uv_close((uv_handle_t*)&server_pipe, NULL);
     uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
 
-    netdata_log_info("Shutting down pipe %s loop complete.", pipes[interated]);
+    netdata_log_info("Shutting down pipe %s loop complete.", pipes);
     fatal_assert(0 == uv_loop_close(loop));
     freez(loop);
 
@@ -366,8 +365,6 @@ end_shm:
 
 void netdata_integration_init(enum netdata_integration_selector idx)
 {
-    interated = idx;
-
     if (command_server_initialized)
         return;
 
@@ -400,32 +397,16 @@ after_error:
     netdata_log_error("Failed to initialize command server. The netdata cli tool will be unable to send commands.");
 }
 
-const char *netdata_integration_pipename(enum netdata_integration_selector idx)
+const char *netdata_integration_pipename()
 {
-    const char *pipename = getenv(pipes[idx]);
+    const char *pipename = getenv(pipes);
     if (pipename)
         return pipename;
 
 #ifdef _WIN32
-    switch (idx) {
-        case NETDATA_INTEGRATION_NETWORK_VIEWER_EBPF:
-            return "\\\\?\\pipe\\netdata-nv-cli";
-        case NETDATA_INTEGRATION_CGROUPS_EBPF:
-            return "\\\\?\\pipe\\netdata-cg-cli";
-        case NETDATA_INTEGRATION_APPS_EBPF:
-        default:
-            return "\\\\?\\pipe\\netdata-apps-cli";
-    }
+    return "\\\\?\\pipe\\netdata-ebpf-integration";
 #else
-    switch (idx) {
-        case NETDATA_INTEGRATION_NETWORK_VIEWER_EBPF:
-            return "/tmp/netdata-nv-ipc";
-        case NETDATA_INTEGRATION_CGROUPS_EBPF:
-            return "/tmp/netdata-cg-ipc";
-        default:
-        case NETDATA_INTEGRATION_APPS_EBPF:
-            return "/tmp/netdata-apps-ipc";
-    }
+    return "/tmp/netdata-ebpf-integration";
 #endif
 }
 

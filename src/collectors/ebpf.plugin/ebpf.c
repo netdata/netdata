@@ -4292,11 +4292,7 @@ int main(int argc, char **argv)
     cgroup_integration_thread.thread =
         nd_thread_create(cgroup_integration_thread.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_cgroup_integration, NULL);
 
-    netdata_integration_init(NETDATA_INTEGRATION_APPS_EBPF);
-    /* TODO: WE ARE KEEPING THIS COMMENTEND, BEAUSE WE STILL DID NOT INTEGRATE THEM
-    netdata_integration_init(NETDATA_INTEGRATION_CGROUPS_EBPF);
-    netdata_integration_init(NETDATA_INTEGRATION_NETWORK_VIEWER_EBPF);
-     */
+    netdata_integration_init();
 
     uint32_t i;
     for (i = 0; ebpf_threads[i].name != NULL; i++) {

@@ -237,8 +237,8 @@ enum netdata_integration_selector {
     NETDATA_INTEGRATION_END
 };
 
-const char *netdata_integration_pipename(enum netdata_integration_selector idx);
-void netdata_integration_init(enum netdata_integration_selector idx);
+const char *netdata_integration_pipename();
+void netdata_integration_init();
 
 extern uint32_t plot_intercommunication_charts;
 
