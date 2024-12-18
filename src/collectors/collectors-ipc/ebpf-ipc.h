@@ -242,6 +242,12 @@ void netdata_integration_init(enum netdata_integration_selector idx);
 
 extern uint32_t plot_intercommunication_charts;
 
+// ----------------------------------------------------------------------------
+// Shared Memory used with other aplications
+
+#define NETDATA_EBPF_INTEGRATION_NAME "netdata_shm_integration_ebpf"
+#define NETDATA_EBPF_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpf"
+
 #ifdef __cplusplus
 }
 #endif

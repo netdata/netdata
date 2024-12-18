@@ -6,6 +6,10 @@
 #if defined(OS_LINUX)
 #define NETDATA_EBPF_INTEGRATION_CMD_LENGTH 128
 
+netdata_ebpf_pid_stats_t *integration_shm;
+int shm_fd_ebpf_integration = -1;
+sem_t *shm_mutex_ebpf_integration = SEM_FAILED;
+
 struct integration_ebpf_context {
     /* embedded client pipe structure at address 0 */
     uv_pipe_t client;
@@ -324,11 +328,50 @@ error_after_loop_init:
     completion_mark_complete(&completion);
 }
 
+static int netdata_integration_initialize_shm()
+{
+    shm_fd_ebpf_integration = shm_open(NETDATA_EBPF_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
+    if (shm_fd_ebpf_integration < 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot initialize shared memory. Integration won't happen.");
+        return -1;
+    }
+
+    size_t length = os_get_system_pid_max() * sizeof(netdata_ebpf_pid_stats_t);
+    if (ftruncate(shm_fd_ebpf_integration, (off_t)length)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot set size for shared memory.");
+        goto end_shm;
+    }
+
+    integration_shm = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd_ebpf_integration, 0);
+    if (unlikely(MAP_FAILED == integration_shm)) {
+        integration_shm = NULL;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot map shared memory used between cgroup and eBPF, integration won't happen");
+        goto end_shm;
+    }
+
+    shm_mutex_ebpf_integration = sem_open(NETDATA_EBPF_SHM_INTEGRATION_NAME, O_CREAT,
+                                          S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH,
+                                          1);
+    if (shm_mutex_ebpf_integration != SEM_FAILED) {
+        return 0;
+    }
+
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create semaphore, integration between won't happen");
+    munmap(integration_shm, length);
+    integration_shm = NULL;
+
+end_shm:
+    return -1;
+}
+
 void netdata_integration_init(enum netdata_integration_selector idx)
 {
     interated = idx;
 
     if (command_server_initialized)
+        return;
+
+    if (netdata_integration_initialize_shm())
         return;
 
     completion_init(&completion);
@@ -385,5 +428,7 @@ const char *netdata_integration_pipename(enum netdata_integration_selector idx)
     }
 #endif
 }
+
+
 
 #endif // defined(OS_LINUX)
