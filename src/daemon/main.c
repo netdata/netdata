@@ -968,7 +968,6 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("start the static threads");
 
     netdata_conf_section_web();
-    backfill_threads_detect_from_stream_conf();
 
     set_late_analytics_variables(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {

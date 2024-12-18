@@ -12,7 +12,7 @@ size_t netdata_conf_web_query_threads(void) {
     }
 
     size_t cpus = MIN(netdata_conf_cpus(), 256); // max 256 cores
-    size_t threads = cpus * (stream_conf_is_parent(false) ? 2 : 1);
+    size_t threads = cpus * (netdata_conf_is_parent() ? 2 : 1);
     threads = MAX(threads, 6);
 
     threads = config_get_number(CONFIG_SECTION_WEB, "web server threads", threads);

@@ -138,6 +138,15 @@ void pgd_init_arals(void) {
     for(size_t i = 0; i < RRD_STORAGE_TIERS ;i++)
         aral_sizes[i] = tier_page_size[i];
 
+    if(!netdata_conf_is_parent()) {
+        // this agent is not a parent
+        // do not use ARAL for sizes above 4KiB
+        for(size_t i = RRD_STORAGE_TIERS ; i < _countof(aral_sizes) ;i++) {
+            if(aral_sizes[i] > 4096)
+                aral_sizes[i] = 0;
+        }
+    }
+
     size_t max_delta = 0;
     for(size_t i = 0; i < aral_sizes_count ;i++) {
         size_t wanted = aral_sizes[i];

@@ -199,6 +199,10 @@ bool stream_conf_is_parent(bool recheck) {
     return rc;
 }
 
+bool stream_conf_is_child(void) {
+    return stream_send.enabled;
+}
+
 void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_receiver_config *config, const char *api_key, const char *machine_guid) {
     config->mode = rrd_memory_mode_id(
         appconfig_get(&stream_config, machine_guid, "db",

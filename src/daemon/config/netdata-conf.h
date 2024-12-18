@@ -12,6 +12,7 @@ bool netdata_conf_load(char *filename, char overwrite_used, const char **user);
 #include "netdata-conf-db.h"
 #include "netdata-conf-directories.h"
 #include "netdata-conf-global.h"
+#include "netdata-conf-global-profile.h"
 #include "netdata-conf-logs.h"
 #include "netdata-conf-web.h"
 #include "netdata-conf-cloud.h"
