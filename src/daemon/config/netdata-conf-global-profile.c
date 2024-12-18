@@ -16,10 +16,10 @@ ENUM_STR_MAP_DEFINE(ND_CONF_PROFILE) = {
 
 BITMAP_STR_DEFINE_FUNCTIONS(ND_CONF_PROFILE, ND_CONF_PROFILE_NONE, "");
 
-ND_CONF_PROFILE netdata_conf_global_profile(void) {
+ND_CONF_PROFILE netdata_conf_global_profile(bool recheck) {
     static ND_CONF_PROFILE profile = ND_CONF_PROFILE_NONE;
 
-    if(profile != ND_CONF_PROFILE_NONE)
+    if(!recheck && profile != ND_CONF_PROFILE_NONE)
         return profile;
 
     ND_CONF_PROFILE def_profile = ND_CONF_PROFILE_NONE;
@@ -33,10 +33,10 @@ ND_CONF_PROFILE netdata_conf_global_profile(void) {
     if(def_profile == ND_CONF_PROFILE_NONE)
         def_profile = ND_CONF_PROFILE_STANDALONE;
 
-    CLEAN_BUFFER *def_wb = buffer_create(0, NULL);
-    ND_CONF_PROFILE_2buffer(def_wb, def_profile, " ");
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    ND_CONF_PROFILE_2buffer(wb, def_profile, " ");
 
-    CLEAN_CHAR_P *s = strdupz(config_get(CONFIG_SECTION_GLOBAL, "profile", buffer_tostring(def_wb)));
+    CLEAN_CHAR_P *s = strdupz(config_get(CONFIG_SECTION_GLOBAL, "profile", buffer_tostring(wb)));
 
     char *words[100];
     size_t n = quoted_strings_splitter(s, words, _countof(words), isspace_map_whitespace);
@@ -49,14 +49,20 @@ ND_CONF_PROFILE netdata_conf_global_profile(void) {
     }
 
     if(pt == ND_CONF_PROFILE_NONE || !(pt & (ND_CONF_PROFILE_CHILD|ND_CONF_PROFILE_PARENT|ND_CONF_PROFILE_STANDALONE))) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot understand the netdata.conf [global].profile set, falling back to: %s", buffer_tostring(def_wb));
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot understand the netdata.conf [global].profile set, falling back to: %s", buffer_tostring(wb));
         pt = def_profile;
+        config_set(CONFIG_SECTION_GLOBAL, "profile", buffer_tostring(wb));
     }
     else {
         if((pt & (ND_CONF_PROFILE_PARENT|ND_CONF_PROFILE_STANDALONE)) == (ND_CONF_PROFILE_PARENT|ND_CONF_PROFILE_STANDALONE) ||
-            (pt & (ND_CONF_PROFILE_CHILD|ND_CONF_PROFILE_STANDALONE)) == (ND_CONF_PROFILE_CHILD|ND_CONF_PROFILE_STANDALONE))
+            (pt & (ND_CONF_PROFILE_CHILD|ND_CONF_PROFILE_STANDALONE)) == (ND_CONF_PROFILE_CHILD|ND_CONF_PROFILE_STANDALONE)) {
             // standalone cannot be combined with parent or child
+            nd_log(NDLS_DAEMON, NDLP_ERR, "The netdata.conf setting [global].profile 'standalone' cannot be combined with 'child' or 'parent'; removing 'standalone'");
             pt &= ~(ND_CONF_PROFILE_STANDALONE);
+            buffer_flush(wb);
+            ND_CONF_PROFILE_2buffer(wb, pt, " ");
+            config_set(CONFIG_SECTION_GLOBAL, "profile", buffer_tostring(wb));
+        }
     }
 
     profile = pt;

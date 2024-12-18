@@ -772,6 +772,8 @@ int netdata_main(int argc, char **argv) {
     // streaming, replication, backfilling
 
     stream_conf_load();
+    netdata_conf_global_profile(true);
+
     check_local_streaming_capabilities();
     replication_initialize();
 

@@ -14,14 +14,14 @@ typedef enum {
 
 BITMAP_STR_DEFINE_FUNCTIONS_EXTERN(ND_CONF_PROFILE);
 
-ND_CONF_PROFILE netdata_conf_global_profile(void);
+ND_CONF_PROFILE netdata_conf_global_profile(bool recheck);
 
 static inline bool netdata_conf_is_child_only(void) {
-    return (netdata_conf_global_profile() & (ND_CONF_PROFILE_CHILD | ND_CONF_PROFILE_PARENT)) == ND_CONF_PROFILE_CHILD;
+    return (netdata_conf_global_profile(false) & (ND_CONF_PROFILE_CHILD | ND_CONF_PROFILE_PARENT)) == ND_CONF_PROFILE_CHILD;
 }
 
 static inline bool netdata_conf_is_parent(void) {
-    return (netdata_conf_global_profile() & ND_CONF_PROFILE_PARENT) == ND_CONF_PROFILE_PARENT;
+    return (netdata_conf_global_profile(false) & ND_CONF_PROFILE_PARENT) == ND_CONF_PROFILE_PARENT;
 }
 
 #endif //NETDATA_NETDATA_CONF_GLOBAL_PROFILE_H

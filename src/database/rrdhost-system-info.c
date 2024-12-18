@@ -4,6 +4,7 @@
 #include "rrdhost-system-info.h"
 #include "daemon/common.h"
 #include "aclk/schema-wrappers/node_info.h"
+#include "daemon/win_system-info.h"
 
 // coverity[ +tainted_string_sanitize_content : arg-0 ]
 static inline void coverity_remove_taint(char *s __maybe_unused) { }
