@@ -225,49 +225,27 @@ static inline size_t pgc_indexing_partition(PGC *cache, Word_t metric_id) {
     return last_partition;
 }
 
-static inline void pgc_index_read_lock(PGC *cache, size_t partition) {
-    rw_spinlock_read_lock(&cache->index[partition].rw_spinlock);
-}
-static inline void pgc_index_read_unlock(PGC *cache, size_t partition) {
-    rw_spinlock_read_unlock(&cache->index[partition].rw_spinlock);
-}
-static inline void pgc_index_write_lock(PGC *cache, size_t partition) {
-    rw_spinlock_write_lock(&cache->index[partition].rw_spinlock);
-}
-static inline void pgc_index_write_unlock(PGC *cache, size_t partition) {
-    rw_spinlock_write_unlock(&cache->index[partition].rw_spinlock);
-}
-static inline bool pgc_index_trywrite_lock(PGC *cache, size_t partition, bool force) {
-    if(force) {
-        rw_spinlock_write_lock(&cache->index[partition].rw_spinlock);
-        return true;
-    }
-    return rw_spinlock_trywrite_lock(&cache->index[partition].rw_spinlock);
-}
+#define pgc_index_read_lock(cache, partition) rw_spinlock_read_lock(&(cache)->index[partition].rw_spinlock)
+#define pgc_index_read_unlock(cache, partition) rw_spinlock_read_unlock(&(cache)->index[partition].rw_spinlock)
+#define pgc_index_write_lock(cache, partition) rw_spinlock_write_lock(&(cache)->index[partition].rw_spinlock)
+#define pgc_index_write_unlock(cache, partition) rw_spinlock_write_unlock(&(cache)->index[partition].rw_spinlock)
+#define pgc_index_trywrite_lock(cache, partition, force) ({                             \
+    bool _result;                                                                       \
+    if (force) {                                                                        \
+        rw_spinlock_write_lock(&(cache)->index[partition].rw_spinlock);                 \
+        _result = true;                                                                 \
+    } else                                                                              \
+        _result = rw_spinlock_trywrite_lock(&(cache)->index[partition].rw_spinlock);    \
+    _result;                                                                            \
+})
 
-static inline bool pgc_queue_trylock(PGC *cache __maybe_unused, struct pgc_queue *ll) {
-    return spinlock_trylock(&ll->spinlock);
-}
+#define pgc_queue_trylock(cache, ll) spinlock_trylock(&(ll)->spinlock)
+#define pgc_queue_lock(cache, ll) spinlock_lock(&(ll)->spinlock)
+#define pgc_queue_unlock(cache, ll) spinlock_unlock(&(ll)->spinlock)
 
-static inline void pgc_queue_lock(PGC *cache __maybe_unused, struct pgc_queue *ll) {
-    spinlock_lock(&ll->spinlock);
-}
-
-static inline void pgc_queue_unlock(PGC *cache __maybe_unused, struct pgc_queue *ll) {
-    spinlock_unlock(&ll->spinlock);
-}
-
-static inline bool page_transition_trylock(PGC *cache __maybe_unused, PGC_PAGE *page) {
-    return spinlock_trylock(&page->transition_spinlock);
-}
-
-static inline void page_transition_lock(PGC *cache __maybe_unused, PGC_PAGE *page) {
-    spinlock_lock(&page->transition_spinlock);
-}
-
-static inline void page_transition_unlock(PGC *cache __maybe_unused, PGC_PAGE *page) {
-    spinlock_unlock(&page->transition_spinlock);
-}
+#define page_transition_trylock(cache, page) spinlock_trylock(&(page)->transition_spinlock)
+#define page_transition_lock(cache, page) spinlock_lock(&(page)->transition_spinlock)
+#define page_transition_unlock(cache, page) spinlock_unlock(&(page)->transition_spinlock)
 
 // ----------------------------------------------------------------------------
 // size histogram
@@ -2562,7 +2540,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         }
 
         yield_the_processor(); // do not lock too aggressively
-        pgc_queue_lock(cache, &cache->hot);
+            pgc_queue_lock(cache, &cache->hot);
     }
 
     spinlock_unlock(&sp->migration_to_v2_spinlock);
