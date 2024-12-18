@@ -5,7 +5,6 @@
 #include "netdata-conf.h"
 
 ENUM_STR_MAP_DEFINE(ND_CONF_PROFILE) = {
-    { .id = ND_CONF_PROFILE_NONE,       .name = "default" },
     { .id = ND_CONF_PROFILE_STANDALONE, .name = "standalone" },
     { .id = ND_CONF_PROFILE_CHILD,      .name = "child" },
     { .id = ND_CONF_PROFILE_PARENT,     .name = "parent" },
