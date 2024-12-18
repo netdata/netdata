@@ -527,7 +527,7 @@ inline int madvise_sequential(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_SEQUENTIAL);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_SEQUENTIAL) failed.");
+        netdata_log_error("madvise(MADV_SEQUENTIAL) of size %zu, failed.", len);
     return ret;
 }
 
@@ -536,7 +536,7 @@ inline int madvise_random(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_RANDOM);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_RANDOM) failed.");
+        netdata_log_error("madvise(MADV_RANDOM) of size %zu, failed.", len);
     return ret;
 }
 
@@ -545,7 +545,7 @@ inline int madvise_dontfork(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_DONTFORK);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_DONTFORK) failed.");
+        netdata_log_error("madvise(MADV_DONTFORK) of size %zu, failed.", len);
     return ret;
 }
 
@@ -554,7 +554,7 @@ inline int madvise_willneed(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_WILLNEED);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_WILLNEED) failed.");
+        netdata_log_error("madvise(MADV_WILLNEED) of size %zu, failed.", len);
     return ret;
 }
 
@@ -563,7 +563,7 @@ inline int madvise_dontneed(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_DONTNEED);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_DONTNEED) failed.");
+        netdata_log_error("madvise(MADV_DONTNEED) of size %zu, failed.", len);
     return ret;
 }
 
@@ -573,7 +573,7 @@ inline int madvise_dontdump(void *mem __maybe_unused, size_t len __maybe_unused)
     int ret = madvise(mem, len, MADV_DONTDUMP);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_DONTDUMP) failed.");
+        netdata_log_error("madvise(MADV_DONTDUMP) of size %zu, failed.", len);
     return ret;
 #else
     return 0;
@@ -586,7 +586,7 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
     int ret = madvise(mem, len, MADV_MERGEABLE);
 
     if (ret != 0 && logger-- > 0)
-        netdata_log_error("madvise(MADV_MERGEABLE) failed.");
+        netdata_log_error("madvise(MADV_MERGEABLE) of size %zu, failed.", len);
     return ret;
 #else
     return 0;
