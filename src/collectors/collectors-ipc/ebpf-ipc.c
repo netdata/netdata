@@ -26,10 +26,12 @@ struct integration_ebpf_context {
 
 uint32_t plot_intercommunication_charts = 0;
 
-static integration_cmd_status_t cmd_ping_execute(char *args, char **message);
+static integration_cmd_status_t integration_cmd_ping_execute(char *args, char **message);
+static integration_cmd_status_t integration_cmd_charts_execute(char *args, char **message);
 
 static integration_command_info_t command_info_array[] = {
-    {"ping", cmd_ping_execute}
+    {"ping", integration_cmd_ping_execute},
+    {"charts", integration_cmd_charts_execute}
 };
 
 static uv_rwlock_t exclusive_rwlock;
@@ -47,11 +49,23 @@ static int command_thread_shutdown;
 
 const char *pipes = "NETDATA_EBPF_INTEGRATION_PIPENAME";
 
-static integration_cmd_status_t cmd_ping_execute(char *args, char **message)
+static integration_cmd_status_t integration_cmd_ping_execute(char *args, char **message)
 {
     (void)args;
 
     *message = strdupz("pong");
+
+    return INTEGRATION_CMD_STATUS_SUCCESS;
+}
+
+static integration_cmd_status_t integration_cmd_charts_execute(char *args, char **message)
+{
+    (void)args;
+    char total[16];
+
+    snprintfz(total, 15, "%u", plot_intercommunication_charts);
+
+    *message = strdupz(total);
 
     return INTEGRATION_CMD_STATUS_SUCCESS;
 }
@@ -147,9 +161,7 @@ static void netdata_integration_parse_commands(struct integration_ebpf_context *
 
     /* Skip white-space characters */
     for (pos = cmd_ctx->command_string ; isspace((uint8_t)*pos) && ('\0' != *pos) ; ++pos) ;
-    // TODO: ADD ALL COMMANDS
-    // for (i = 0 ; i < NETDATA_EBPF_CMDS_TOTAL ; ++i) {
-    for (i = 0 ; i < NETDATA_EBPF_CMD_COLLECT ; ++i) {
+    for (i = 0 ; i < NETDATA_EBPF_CMDS_TOTAL ; ++i) {
         if (!strncmp(pos, command_info_array[i].cmd_str, strlen(command_info_array[i].cmd_str))) {
             for (lstrip=pos + strlen(command_info_array[i].cmd_str); isspace((uint8_t)*lstrip) && ('\0' != *lstrip); ++lstrip) ;
             for (rstrip=lstrip+strlen(lstrip)-1; rstrip>lstrip && isspace((uint8_t)*rstrip); *(rstrip--) = 0 ) ;
