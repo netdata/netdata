@@ -487,10 +487,10 @@ static void aclk_synchronization(void *arg)
         uv_close((uv_handle_t *)&config->timer_req, NULL);
 
     uv_close((uv_handle_t *)&config->async, NULL);
-    uv_run(loop, UV_RUN_DEFAULT);
+    uv_run(loop, UV_RUN_NOWAIT);
 
     uv_walk(loop, (uv_walk_cb) close_callback, NULL);
-    uv_run(loop, UV_RUN_DEFAULT);
+    uv_run(loop, UV_RUN_NOWAIT);
 
     (void) uv_loop_close(loop);
 
