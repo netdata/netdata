@@ -58,7 +58,7 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb);
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
 
 int health_alarm_log_open(RRDHOST *host);
-void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
+void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async);
 void health_alarm_log_load(RRDHOST *host);
 
 ALARM_ENTRY* health_create_alarm_entry(
@@ -73,7 +73,7 @@ ALARM_ENTRY* health_create_alarm_entry(
     int delay,
     HEALTH_ENTRY_FLAGS flags);
 
-void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
+void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async);
 
 const char *health_user_config_dir(void);
 const char *health_stock_config_dir(void);

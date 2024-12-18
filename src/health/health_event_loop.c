@@ -303,7 +303,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
                 if (ae) {
                     health_log_alert(host, ae);
-                    health_alarm_log_add_entry(host, ae);
+                    health_alarm_log_add_entry(host, ae, false);
                     rc->old_status = rc->status;
                     rc->status = RRDCALC_STATUS_REMOVED;
                     rc->last_status_change = now_tmp;
@@ -506,7 +506,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     );
 
                 health_log_alert(host, ae);
-                health_alarm_log_add_entry(host, ae);
+                health_alarm_log_add_entry(host, ae, false);
 
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
                        "[%s]: Alert event for [%s.%s], value [%s], status [%s].",
