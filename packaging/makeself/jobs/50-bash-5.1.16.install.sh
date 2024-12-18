@@ -12,7 +12,7 @@
 fetch "bash-${BASH_VERSION}" "${BASH_ARTIFACT_SOURCE}/bash-${BASH_VERSION}.tar.gz" \
     "${BASH_ARTIFACT_SHA256}" bash
 
-export CFLAGS="-pipe"
+export CFLAGS="${CFLAGS} -pipe"
 export PKG_CONFIG_PATH="/openssl-static/lib64/pkgconfig"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then

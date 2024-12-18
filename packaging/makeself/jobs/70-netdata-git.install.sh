@@ -7,12 +7,12 @@
 cd "${NETDATA_SOURCE_PATH}" || exit 1
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
-  export CFLAGS="-ffunction-sections -fdata-sections -static -O2 -funroll-loops -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/curl-local/include/curl -I/usr/include/libmnl -pipe"
+  export CFLAGS="${CFLAGS} -ffunction-sections -fdata-sections -static -O2 -funroll-loops -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/curl-local/include/curl -I/usr/include/libmnl -pipe"
 else
-  export CFLAGS="-static -O1 -pipe -ggdb -Wall -Wextra -Wformat-signedness -DNETDATA_INTERNAL_CHECKS=1 -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/curl-local/include/curl -I/usr/include/libmnl"
+  export CFLAGS="${CFLAGS} -static -O1 -pipe -ggdb -Wall -Wextra -Wformat-signedness -DNETDATA_INTERNAL_CHECKS=1 -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/curl-local/include/curl -I/usr/include/libmnl"
 fi
 
-export LDFLAGS="-Wl,--gc-sections -static -L/openssl-static/lib64 -L/libnetfilter-acct-static/lib -lnetfilter_acct -L/usr/lib -lmnl -L/usr/lib -lzstd -L/curl-local/lib"
+export LDFLAGS="${LDFLAGS} -Wl,--gc-sections -static -L/openssl-static/lib64 -L/libnetfilter-acct-static/lib -lnetfilter_acct -L/usr/lib -lmnl -L/usr/lib -lzstd -L/curl-local/lib"
 
 # We export this to 'yes', installer sets this to .environment.
 # The updater consumes this one, so that it can tell whether it should update a static install or a non-static one

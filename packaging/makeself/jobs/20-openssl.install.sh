@@ -8,8 +8,8 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building OpenSSL" || true
 
-export CFLAGS='-fno-lto -pipe'
-export LDFLAGS='-static'
+export CFLAGS="${CFLAGS} -fno-lto -pipe"
+export LDFLAGS="${LDFLAGS} -static"
 export PKG_CONFIG="pkg-config --static"
 
 if [ -d "${NETDATA_MAKESELF_PATH}/tmp/openssl" ]; then
