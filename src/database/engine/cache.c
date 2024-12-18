@@ -459,9 +459,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 static inline bool flushing_critical(PGC *cache);
 static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wait, bool all_of_them);
 
-static void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
+static void evict_pages_inline(PGC *cache, bool on_release) {
     const size_t per1000 = cache_usage_per1000(cache, NULL);
-
+    
     if(!(cache->config.options & PGC_OPTIONS_EVICT_PAGES_NO_INLINE)) {
         if (per1000 > cache->config.aggressive_evict_per1000 && !on_release) {
             // the threads that add pages, turn into evictors when the cache needs evictions aggressively
@@ -484,11 +484,11 @@ static void signal_evict_thread_or_evict_inline(PGC *cache, bool on_release) {
 }
 
 static inline void evict_on_clean_page_added(PGC *cache) {
-    signal_evict_thread_or_evict_inline(cache, false);
+    evict_pages_inline(cache, false);
 }
 
 static inline void evict_on_page_release_when_permitted(PGC *cache) {
-    signal_evict_thread_or_evict_inline(cache, true);
+    evict_pages_inline(cache, true);
 }
 
 static inline void flush_inline(PGC *cache, bool on_release) {
@@ -1164,20 +1164,17 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         else if(unlikely(wait)) {
             // evict as many as necessary for the cache to go at the predefined threshold
             per1000 = cache_usage_per1000(cache, &max_size_to_evict);
-            max_size_to_evict /= 3; // do it in 3 steps
             if(per1000 >= cache->config.severe_pressure_per1000) {
                 under_sever_pressure = true;
-                max_pages_to_evict = 1;
-//                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 512;
-//                if(max_pages_to_evict > 4096)
-//                    max_pages_to_evict = 4096;
+                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 16;
+                if(max_pages_to_evict > 64)
+                    max_pages_to_evict = 64;
             }
             else if(per1000 >= cache->config.aggressive_evict_per1000) {
                 under_sever_pressure = false;
-                max_pages_to_evict = 1;
-//                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 32;
-//                if(max_pages_to_evict > 1024)
-//                    max_pages_to_evict = 1024;
+                max_pages_to_evict = max_pages_to_evict ? max_pages_to_evict * 2 : 4;
+                if(max_pages_to_evict > 16)
+                    max_pages_to_evict = 16;
             }
             else {
                 under_sever_pressure = false;
