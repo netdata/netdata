@@ -93,11 +93,11 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 
 	m.FnReg.Register("config", m.dyncfgConfig)
 
-	//m.dyncfgVnodeModuleCreate()
-	//
-	//for _, cfg := range m.Vnodes {
-	//	m.dyncfgVnodeJobCreate(cfg, dyncfgRunning)
-	//}
+	m.dyncfgVnodeModuleCreate()
+
+	for _, cfg := range m.Vnodes {
+		m.dyncfgVnodeJobCreate(cfg, dyncfgRunning)
+	}
 
 	for name := range m.Modules {
 		m.dyncfgCollectorModuleCreate(name)
