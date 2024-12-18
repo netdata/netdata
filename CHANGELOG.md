@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- Do not call finalize on shutdown [\#19241](https://github.com/netdata/netdata/pull/19241) ([stelfrag](https://github.com/stelfrag))
+- fix the renamed function under windows [\#19240](https://github.com/netdata/netdata/pull/19240) ([ktsaou](https://github.com/ktsaou))
+- update netdata internal metrics ctx [\#19239](https://github.com/netdata/netdata/pull/19239) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d.plugin\): enable dyncfg vnodes [\#19238](https://github.com/netdata/netdata/pull/19238) ([ilyam8](https://github.com/ilyam8))
+- docs: fix win deploy command for nightly [\#19236](https://github.com/netdata/netdata/pull/19236) ([ilyam8](https://github.com/ilyam8))
+- RRDHOST system-info isolation [\#19235](https://github.com/netdata/netdata/pull/19235) ([ktsaou](https://github.com/ktsaou))
+- Allow more threads to load contexts during startup [\#19234](https://github.com/netdata/netdata/pull/19234) ([stelfrag](https://github.com/stelfrag))
+- Fix memory leak  [\#19233](https://github.com/netdata/netdata/pull/19233) ([stelfrag](https://github.com/stelfrag))
 - fix\(go.d/mongodb\): add missing disconnect in initClient [\#19232](https://github.com/netdata/netdata/pull/19232) ([ilyam8](https://github.com/ilyam8))
 - docs: update ui 3rd party link [\#19231](https://github.com/netdata/netdata/pull/19231) ([ilyam8](https://github.com/ilyam8))
 - docs: split redistributed and add judy and dlib [\#19230](https://github.com/netdata/netdata/pull/19230) ([ilyam8](https://github.com/ilyam8))
@@ -444,14 +452,6 @@
 - fix\(cgroups.plugin\): handle containers no env vars [\#18691](https://github.com/netdata/netdata/pull/18691) ([daniel-sampliner](https://github.com/daniel-sampliner))
 - MSSQL Metrics \(Part II\). [\#18689](https://github.com/netdata/netdata/pull/18689) ([thiagoftsm](https://github.com/thiagoftsm))
 - Log to windows [\#18688](https://github.com/netdata/netdata/pull/18688) ([ktsaou](https://github.com/ktsaou))
-- fix sanitization issues [\#18687](https://github.com/netdata/netdata/pull/18687) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#18686](https://github.com/netdata/netdata/pull/18686) ([netdatabot](https://github.com/netdatabot))
-- go.d/chrony: collect serverstats using chronyc [\#18685](https://github.com/netdata/netdata/pull/18685) ([ilyam8](https://github.com/ilyam8))
-- UTF8 support for chart ids, names and other metadata [\#18684](https://github.com/netdata/netdata/pull/18684) ([ktsaou](https://github.com/ktsaou))
-- Send node info update after ACLK connection timeout [\#18683](https://github.com/netdata/netdata/pull/18683) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#18682](https://github.com/netdata/netdata/pull/18682) ([netdatabot](https://github.com/netdatabot))
-- Bump github.com/tidwall/gjson from 1.17.3 to 1.18.0 in /src/go [\#18681](https://github.com/netdata/netdata/pull/18681) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump github.com/prometheus/common from 0.59.1 to 0.60.0 in /src/go [\#18680](https://github.com/netdata/netdata/pull/18680) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
