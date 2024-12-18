@@ -33,7 +33,7 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
 
     spinlock_init(&datafile->users.spinlock);
     spinlock_init(&datafile->writers.spinlock);
-    spinlock_init(&datafile->extent_queries.spinlock);
+    rw_spinlock_init(&datafile->extent_epdl.spinlock);
 
     return datafile;
 }

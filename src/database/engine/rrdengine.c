@@ -1289,6 +1289,22 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
         netdata_log_info("DBENGINE: deleted data file \"%s\".", path);
         deleted_bytes += datafile_bytes;
     }
+
+    {
+        rw_spinlock_write_lock(&datafile->extent_epdl.spinlock);
+        bool first = true;
+        Word_t idx = 0;
+        Pvoid_t *PValue;
+        while ((PValue = JudyLFirstThenNext(datafile->extent_epdl.epdl_per_extent, &idx, &first))) {
+            EPDL_EXTENT *e = *PValue;
+            internal_fatal(e->base, "The should not be any EPDLs ");
+            freez(e);
+            *PValue = NULL;
+        }
+        JudyLFreeArray(&datafile->extent_epdl.epdl_per_extent, PJE0);
+        rw_spinlock_write_unlock(&datafile->extent_epdl.spinlock);
+    }
+
     freez(journal_file);
     freez(datafile);
 
