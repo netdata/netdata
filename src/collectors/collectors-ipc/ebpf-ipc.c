@@ -300,15 +300,6 @@ static void netdata_integration_parser_thread(void *arg)
     while (command_thread_shutdown == 0) {
         uv_run(loop, UV_RUN_DEFAULT);
     }
-    /* cleanup operations of the event loop */
-    netdata_log_info("Shutting down pipe %s event loop.", pipes);
-    uv_close((uv_handle_t *)&async, NULL);
-    uv_close((uv_handle_t*)&server_pipe, NULL);
-    uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
-
-    netdata_log_info("Shutting down pipe %s loop complete.", pipes);
-    fatal_assert(0 == uv_loop_close(loop));
-    freez(loop);
 
     return;
 
@@ -325,6 +316,32 @@ error_after_loop_init:
 
     /* wake up initialization thread */
     completion_mark_complete(&completion);
+}
+
+void netdata_integration_cleanup_shm()
+{
+    /* cleanup operations of the event loop */
+    netdata_log_info("Shutting down pipe %s event loop.", pipes);
+    uv_close((uv_handle_t *)&async, NULL);
+    uv_close((uv_handle_t*)&server_pipe, NULL);
+    uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
+
+    netdata_log_info("Shutting down pipe %s loop complete.", pipes);
+    fatal_assert(0 == uv_loop_close(loop));
+    freez(loop);
+
+    if (shm_mutex_ebpf_integration != SEM_FAILED) {
+        sem_close(shm_mutex_ebpf_integration);
+    }
+
+    if (integration_shm) {
+        size_t length  = os_get_system_pid_max() * sizeof(netdata_ebpf_pid_stats_t);
+        munmap(integration_shm, length);
+    }
+
+    if (shm_fd_ebpf_integration > 0) {
+        close(shm_fd_ebpf_integration);
+    }
 }
 
 static int netdata_integration_initialize_shm()

@@ -983,6 +983,8 @@ static void ebpf_exit()
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
 
+    netdata_integration_cleanup_shm();
+
     exit(0);
 }
 
