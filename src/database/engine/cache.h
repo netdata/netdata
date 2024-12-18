@@ -131,33 +131,33 @@ struct pgc_statistics {
     // ----------------------------------------------------------------------------------------------------------------
     // worker threads
 
-    PAD64(size_t) workers_search;
-    PAD64(size_t) workers_add;
-    PAD64(size_t) workers_evict;
-    PAD64(size_t) workers_flush;
-    PAD64(size_t) workers_jv2_flush;
-    PAD64(size_t) workers_hot2dirty;
+    PAD64(size_t) p2_workers_search;
+    PAD64(size_t) p2_workers_add;
+    PAD64(size_t) p0_workers_evict; // priority 0, we always need this when inline evictions are enabled
+    PAD64(size_t) p2_workers_flush;
+    PAD64(size_t) p2_workers_jv2_flush;
+    PAD64(size_t) p2_workers_hot2dirty;
 
     // ----------------------------------------------------------------------------------------------------------------
     // waste events
 
     // waste events - spins
-    PAD64(size_t) waste_insert_spins;
-    PAD64(size_t) waste_evict_useless_spins;
-    PAD64(size_t) waste_release_spins;
-    PAD64(size_t) waste_acquire_spins;
-    PAD64(size_t) waste_delete_spins;
+    PAD64(size_t) p2_waste_insert_spins;
+    PAD64(size_t) p2_waste_evict_useless_spins;
+    PAD64(size_t) p2_waste_release_spins;
+    PAD64(size_t) p2_waste_acquire_spins;
+    PAD64(size_t) p2_waste_delete_spins;
 
     // waste events - eviction
-    PAD64(size_t) waste_evict_relocated;
-    PAD64(size_t) waste_evict_thread_signals;
-    PAD64(size_t) waste_evictions_inline_on_add;
-    PAD64(size_t) waste_evictions_inline_on_release;
+    PAD64(size_t) p2_waste_evict_relocated;
+    PAD64(size_t) p2_waste_evict_thread_signals;
+    PAD64(size_t) p2_waste_evictions_inline_on_add;
+    PAD64(size_t) p2_waste_evictions_inline_on_release;
 
     // waste events - flushing
-    PAD64(size_t) waste_flush_on_add;
-    PAD64(size_t) waste_flush_on_release;
-    PAD64(size_t) waste_flushes_cancelled;
+    PAD64(size_t) p2_waste_flush_on_add;
+    PAD64(size_t) p2_waste_flush_on_release;
+    PAD64(size_t) p2_waste_flushes_cancelled;
 
     // ----------------------------------------------------------------------------------------------------------------
     // per queue statistics

@@ -580,18 +580,18 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             priority++;
         }
 
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_relocated, (collected_number)pgc_stats->waste_evict_relocated);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flushes_cancelled, (collected_number)pgc_stats->waste_flushes_cancelled);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_acquire_spins, (collected_number)pgc_stats->waste_acquire_spins);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_release_spins, (collected_number)pgc_stats->waste_release_spins);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_insert_spins, (collected_number)pgc_stats->waste_insert_spins);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_delete_spins, (collected_number)pgc_stats->waste_delete_spins);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_spins, (collected_number)pgc_stats->waste_evict_useless_spins);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_thread_signals, (collected_number)pgc_stats->waste_evict_thread_signals);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_inline_on_add, (collected_number)pgc_stats->waste_evictions_inline_on_add);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_inline_on_release, (collected_number)pgc_stats->waste_evictions_inline_on_release);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flush_inline_on_add, (collected_number)pgc_stats->waste_flush_on_add);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flush_inline_on_release, (collected_number)pgc_stats->waste_flush_on_release);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_relocated, (collected_number)pgc_stats->p2_waste_evict_relocated);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flushes_cancelled, (collected_number)pgc_stats->p2_waste_flushes_cancelled);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_acquire_spins, (collected_number)pgc_stats->p2_waste_acquire_spins);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_release_spins, (collected_number)pgc_stats->p2_waste_release_spins);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_insert_spins, (collected_number)pgc_stats->p2_waste_insert_spins);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_delete_spins, (collected_number)pgc_stats->p2_waste_delete_spins);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_spins, (collected_number)pgc_stats->p2_waste_evict_useless_spins);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_thread_signals, (collected_number)pgc_stats->p2_waste_evict_thread_signals);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_inline_on_add, (collected_number)pgc_stats->p2_waste_evictions_inline_on_add);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_inline_on_release, (collected_number)pgc_stats->p2_waste_evictions_inline_on_release);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flush_inline_on_add, (collected_number)pgc_stats->p2_waste_flush_on_add);
+        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flush_inline_on_release, (collected_number)pgc_stats->p2_waste_flush_on_release);
 
         rrdset_done(ptrs->st_pgc_waste);
     }
@@ -634,12 +634,12 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             priority++;
         }
 
-        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_searchers, (collected_number)pgc_stats->workers_search);
-        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_adders, (collected_number)pgc_stats->workers_add);
-        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_evictors, (collected_number)pgc_stats->workers_evict);
-        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_flushers, (collected_number)pgc_stats->workers_flush);
-        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_hot2dirty, (collected_number)pgc_stats->workers_hot2dirty);
-        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_jv2_flushers, (collected_number)pgc_stats->workers_jv2_flush);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_searchers, (collected_number)pgc_stats->p2_workers_search);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_adders, (collected_number)pgc_stats->p2_workers_add);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_evictors, (collected_number)pgc_stats->p0_workers_evict);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_flushers, (collected_number)pgc_stats->p2_workers_flush);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_hot2dirty, (collected_number)pgc_stats->p2_workers_hot2dirty);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_jv2_flushers, (collected_number)pgc_stats->p2_workers_jv2_flush);
 
         rrdset_done(ptrs->st_pgc_workers);
     }
