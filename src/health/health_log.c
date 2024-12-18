@@ -5,9 +5,12 @@
 
 // ----------------------------------------------------------------------------
 
-inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
+inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async)
 {
-    metadata_queue_ae_save(host, ae);
+    if (async)
+        metadata_queue_ae_save(host, ae);
+    else
+        sql_health_alarm_log_save(host, ae);
 }
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function) {
@@ -168,7 +171,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     return ae;
 }
 
-inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae)
+inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async)
 {
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
 
@@ -195,7 +198,7 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae)
                    (t->old_status == RRDCALC_STATUS_WARNING || t->old_status == RRDCALC_STATUS_CRITICAL))
                     ae->non_clear_duration += t->non_clear_duration;
 
-                health_alarm_log_save(host, t);
+                health_alarm_log_save(host, t, async);
             }
 
             // no need to continue
@@ -204,7 +207,7 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae)
     }
     rw_spinlock_read_unlock(&host->health_log.spinlock);
 
-    health_alarm_log_save(host, ae);
+    health_alarm_log_save(host, ae, async);
 }
 
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
