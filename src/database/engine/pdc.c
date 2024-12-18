@@ -470,16 +470,23 @@ static EPDL_EXTENT *epdl_find_extent_base(EPDL *epdl) {
     rw_spinlock_read_unlock(&epdl->datafile->extent_epdl.spinlock);
 
     if(!e) {
+        EPDL_EXTENT *e_to_free = NULL;
+        e = callocz(1, sizeof(*e));
+
         rw_spinlock_write_lock(&epdl->datafile->extent_epdl.spinlock);
         Pvoid_t *PValue = JudyLIns(&epdl->datafile->extent_epdl.epdl_per_extent, epdl->extent_offset, PJE0);
         internal_fatal(!PValue || PValue == PJERR, "DBENGINE: corrupted pending extent judy");
         if(!*PValue) {
-            *PValue = e = callocz(1, sizeof(*e));
+            *PValue = e;
             spinlock_init(&e->spinlock);
         }
-        else
+        else {
+            e_to_free = e;
             e = *PValue;
+        }
         rw_spinlock_write_unlock(&epdl->datafile->extent_epdl.spinlock);
+
+        freez(e_to_free);
     }
 
     return e;
