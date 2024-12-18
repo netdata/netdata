@@ -14,6 +14,7 @@ void spinlock_init_with_trace(SPINLOCK *spinlock, const char *func __maybe_unuse
 
 void spinlock_lock_with_trace(SPINLOCK *spinlock, const char *func) {
     size_t spins = 0;
+    usec_t usec = 1;
 
     for(int i = 1;
          __atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) ||
@@ -22,10 +23,8 @@ void spinlock_lock_with_trace(SPINLOCK *spinlock, const char *func) {
     ) {
 
         spins++;
-        if(unlikely(i % 8 == 0)) {
-            i = 0;
-            tinysleep();
-        }
+        microsleep(usec);
+        usec *= 2;
     }
 
     // we have the lock
