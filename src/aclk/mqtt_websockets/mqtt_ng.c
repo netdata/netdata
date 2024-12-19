@@ -823,12 +823,6 @@ mqtt_msg_data mqtt_ng_generate_connect(struct transaction_buffer *trx_buf,
         // at his own risk!
         nd_log(NDLS_DAEMON, NDLP_WARNING, "client_id provided is empty string. This might not be allowed by server [MQTT-3.1.3-6]");
     }
-    if(len > MQTT_MAX_CLIENT_ID) {
-        // [MQTT-3.1.3-5] server MUST allow client_id length 1-32
-        // server MAY allow longer client_id, if user provides longer client_id
-        // warn them he is doing so at his own risk!
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "client_id provided is longer than 23 bytes, server might not allow that [MQTT-3.1.3-5]");
-    }
 
     if (lwt) {
         if (lwt->will_message && lwt->will_message_size > 65535) {

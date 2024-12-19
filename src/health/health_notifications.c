@@ -485,7 +485,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
         else
             netdata_log_error("Failed to execute alarm notification");
 
-        health_alarm_log_save(host, ae);
+        health_alarm_log_save(host, ae, false);
     }
     else
         netdata_log_error("Failed to format command arguments");
@@ -497,7 +497,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
 
     return; //health_alarm_wait_for_execution
 done:
-    health_alarm_log_save(host, ae);
+    health_alarm_log_save(host, ae, false);
 }
 
 bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, nd_uuid_t *transitions_id) {
