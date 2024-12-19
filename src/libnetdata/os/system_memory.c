@@ -98,21 +98,21 @@ static OS_SYSTEM_MEMORY os_system_memory_cgroup_v1(bool query_total_ram __maybe_
     }
 
     if (read_txt_file("/sys/fs/cgroup/memory.stat", buf, sizeof(buf)) != 0) {
-        //        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot read /sys/fs/cgroup/memory.stat");
+//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot read /sys/fs/cgroup/memory.stat");
         goto done;
     }
 
     const char *inactive_str = strstr(buf, "total_inactive_file ");
     if(!inactive_str) {
-        //        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot file 'inactive_file ' in /sys/fs/cgroup/memory.stat");
+//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot file 'inactive_file ' in /sys/fs/cgroup/memory.stat");
         goto done;
     }
     inactive_str += 20;
 
     inactive = strtoull(inactive_str, NULL, 0);
     if(!inactive || inactive > used) {
-        //        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: inactive is %llu, used is %llu: inactive is invalid",
-        //               inactive, used);
+//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: inactive is %llu, used is %llu: inactive is invalid",
+//               inactive, used);
         inactive = 0;
         goto done;
     }
@@ -163,21 +163,21 @@ static OS_SYSTEM_MEMORY os_system_memory_cgroup_v2(bool query_total_ram __maybe_
     }
 
     if (read_txt_file("/sys/fs/cgroup/memory.stat", buf, sizeof(buf)) != 0) {
-        //        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot read /sys/fs/cgroup/memory.stat");
+//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot read /sys/fs/cgroup/memory.stat");
         goto done;
     }
 
     const char *inactive_str = strstr(buf, "inactive_file ");
     if(!inactive_str) {
-        //        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot file 'inactive_file ' in /sys/fs/cgroup/memory.stat");
+//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: cannot file 'inactive_file ' in /sys/fs/cgroup/memory.stat");
         goto done;
     }
     inactive_str += 14;
 
     inactive = strtoull(inactive_str, NULL, 0);
     if(!inactive || inactive > used) {
-        //        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: inactive is %llu, used is %llu: inactive is invalid",
-        //               inactive, used);
+//        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: inactive is %llu, used is %llu: inactive is invalid",
+//               inactive, used);
         inactive = 0;
         goto done;
     }
