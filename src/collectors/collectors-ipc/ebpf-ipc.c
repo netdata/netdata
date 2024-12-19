@@ -395,7 +395,7 @@ end_shm:
     return -1;
 }
 
-void netdata_integration_init(enum netdata_integration_selector idx)
+void netdata_integration_init()
 {
     if (command_server_initialized)
         return;

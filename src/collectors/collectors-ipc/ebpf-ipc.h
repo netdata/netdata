@@ -11,6 +11,12 @@ extern "C" {
 #include <stdio.h>
 
 #include <uv.h>
+#include <bpf/bpf.h>
+#include <bpf/libbpf.h>
+#ifdef LIBBPF_DEPRECATED
+#include <bpf/btf.h>
+#include <linux/btf.h>
+#endif
 
 #ifndef TASK_COMM_LEN
 #define TASK_COMM_LEN 16
@@ -204,6 +210,7 @@ typedef struct netdata_ebpf_shm {
 } netdata_ebpf_shm_t;
 
 typedef struct netdata_ebpf_pid_stats {
+    uint32_t thread_collecting;
     ebpf_process_stat_t process;
     netdata_socket_t socket;
     netdata_cachestat_pid_t cachestat;
@@ -236,6 +243,24 @@ extern uint32_t plot_intercommunication_charts;
 
 #define NETDATA_EBPF_INTEGRATION_NAME "netdata_shm_integration_ebpf"
 #define NETDATA_EBPF_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpf"
+
+extern sem_t *shm_mutex_ebpf_integration;
+extern netdata_ebpf_pid_stats_t *integration_shm;
+
+static inline void netdata_integration_release_pid(netdata_ebpf_pid_stats_t *neps,
+                                                   int fd,
+                                                   uint32_t pid,
+                                                   enum ebpf_pids_index idx)
+{
+    if (fd) {
+        bpf_map_delete_elem(fd, &pid);
+    }
+
+    neps->thread_collecting &= ~(1<<idx);
+    if (neps->process.release_call || !neps->thread_collecting) {
+        memset(neps, '\0', sizeof(*neps));
+    }
+}
 
 #ifdef __cplusplus
 }
