@@ -35,7 +35,7 @@ ND_CONF_PROFILE netdata_conf_global_profile(bool recheck) {
     OS_SYSTEM_MEMORY mem = os_system_memory(true);
     size_t cpus = os_get_system_cpus_uncached();
 
-    if(cpus <= 1 || (mem.ram_total_bytes && mem.ram_total_bytes < 1 * 1024 * 1024 * 1024))
+    if(cpus <= 1 || (mem.ram_total_bytes && mem.ram_total_bytes < 1ULL * 1024 * 1024 * 1024))
         def_profile = ND_CONF_PROFILE_IOT;
 
     else if(stream_conf_is_parent(true))
@@ -94,6 +94,7 @@ void netdata_conf_apply_profile(void) {
     if(netdata_conf_is_iot()) {
         storage_tiers = 1;
         default_rrd_update_every = 2;
+        netdata_conf_glibc_malloc_initialize(1, 32 * 1024);
         // web server threads = 6
         // aclk query threads = 6
         // backfill threads = 0
@@ -107,6 +108,7 @@ void netdata_conf_apply_profile(void) {
     else if(netdata_conf_is_parent()) {
         storage_tiers = 3;
         default_rrd_update_every = 1;
+        netdata_conf_glibc_malloc_initialize(os_get_system_cpus_cached(true), 256 * 1024);
         // web server threads = dynamic
         // aclk query threads = dynamic
         // backfill threads = dynamic
@@ -117,6 +119,7 @@ void netdata_conf_apply_profile(void) {
     else if(netdata_conf_is_child()) {
         storage_tiers = 3;
         default_rrd_update_every = 1;
+        netdata_conf_glibc_malloc_initialize(1, 64 * 1024);
         // web server threads = 6
         // aclk query threads = 6
         // backfill threads = 0
@@ -127,6 +130,7 @@ void netdata_conf_apply_profile(void) {
     else /* if(netdata_conf_is_standalone()) */ {
         storage_tiers = 3;
         default_rrd_update_every = 1;
+        netdata_conf_glibc_malloc_initialize(1, 64 * 1024);
         // web server threads = 6
         // aclk query threads = 6
         // backfill threads = 0
