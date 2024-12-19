@@ -113,6 +113,7 @@ static OS_SYSTEM_MEMORY os_system_memory_cgroup_v1(bool query_total_ram __maybe_
     if(!inactive || inactive > used) {
         //        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: inactive is %llu, used is %llu: inactive is invalid",
         //               inactive, used);
+        inactive = 0;
         goto done;
     }
 
@@ -177,6 +178,7 @@ static OS_SYSTEM_MEMORY os_system_memory_cgroup_v2(bool query_total_ram __maybe_
     if(!inactive || inactive > used) {
         //        nd_log(NDLS_DAEMON, NDLP_ERR, "SYSTEM_MEMORY: cgroups v2: inactive is %llu, used is %llu: inactive is invalid",
         //               inactive, used);
+        inactive = 0;
         goto done;
     }
 
