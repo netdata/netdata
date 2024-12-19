@@ -61,6 +61,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/mongodb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/monit"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/mysql"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/nats"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/nginx"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/nginxplus"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/nginxunit"
