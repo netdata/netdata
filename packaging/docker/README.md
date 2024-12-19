@@ -28,8 +28,9 @@ along with their descriptions.
 |       Component       |          Privileges           | Description                                                                                                              |
 |:---------------------:|:-----------------------------:|--------------------------------------------------------------------------------------------------------------------------|
 |    cgroups.plugin     |   host PID mode, SYS_ADMIN    | Container network interfaces monitoring. Map virtual interfaces in the system namespace to interfaces inside containers. |
-|      proc.plugin      |       host network mode       | Host system networking stack monitoring.                                                                                 |
-|      go.d.plugin      |       host network mode       | Monitoring applications running on the host and inside containers.                                                       |
+|      proc.plugin      |       host network mode, DAC_READ_SEARCH       | Host system networking stack monitoring and assorted host driver monitoring |
+| debugfs.plugin | DAC_READ_SEARCH | Host system driver monitoring |
+|      go.d.plugin      |       host network mode, NET_RAW       | Monitoring applications running on the host and inside containers.                                                       |
 |    local-listeners    | host network mode, SYS_PTRACE | Discovering local services/applications. Map open (listening) ports to running services/applications.                    |
 | network-viewer.plugin | host network mode, SYS_ADMIN  | Discovering all current network sockets and building a network-map.                                                      |
 
@@ -41,6 +42,7 @@ along with their descriptions.
 |       Component        |           Mounts           | Description                                                                                                                                |
 |:----------------------:|:--------------------------:|--------------------------------------------------------------------------------------------------------------------------------------------|
 |        netdata         |      /etc/os-release       | Host info detection.                                                                                                                       |
+|        netdata         | /etc/localtime, /etc/timezone | Host timezone detection. |
 |    diskspace.plugin    |             /              | Host mount points monitoring.                                                                                                              |
 |     cgroups.plugin     | /sys, /var/run/docker.sock | Docker containers monitoring and name resolution.                                                                                          |
 |      go.d.plugin       |    /var/run/docker.sock    | Docker Engine and containers monitoring. See [docker](https://github.com/netdata/go.d.plugin/tree/master/modules/docker#readme) collector. |
@@ -82,10 +84,12 @@ docker run -d --name=netdata \
   -v /var/log:/host/var/log:ro \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   --restart unless-stopped \
-  --cap-add SYS_PTRACE \
+  --cap-add DAC_READ_SEARCH \
+  --cap-add NET_RAW \
   --cap-add SYS_ADMIN \
+  --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
-  netdata/netdata
+  netdata/netdata:edge
 ```
 
 </TabItem>
@@ -100,14 +104,16 @@ directory, start Netdata by running `docker-compose up -d`.
 version: '3'
 services:
   netdata:
-    image: netdata/netdata
+    image: netdata/netdata:edge
     container_name: netdata
     pid: host
     network_mode: host
     restart: unless-stopped
     cap_add:
-      - SYS_PTRACE
+      - DAC_READ_SEARCH
+      - NET_RAW
       - SYS_ADMIN
+      - SYS_PTRACE
     security_opt:
       - apparmor:unconfined
     volumes:
@@ -128,6 +134,59 @@ volumes:
   netdataconfig:
   netdatalib:
   netdatacache:
+```
+
+</TabItem>
+
+<TabItem value="podman_quadlet" label="podman quadlet">
+
+<h3>Using the Podman Quadlet systemd generator</h3>
+
+Create a file named `netdata.service` in `/etc/containers/systemd` and paste the code below. Start Netdata by running `systemctl daemon-reload` and then `systemctl start netdata.service`.
+
+```ini
+[Unit]
+Description=Real time performance monitoring
+After=network.target network-online.target nss-lookup.target
+Wants=network-online.target nss-lookup.target
+
+[Container]
+ContainerName=netdata
+Image=quay.io/netdata/netdata:edge
+AutoUpdate=registry
+PodmanArgs=--pid=host
+PodmanArgs=--security-opt apparmor=unconfined
+AddCapability=DAC_READ_SEARCH
+AddCapability=NET_RAW
+AddCapability=SYS_ADMIN
+AddCapability=SYS_PTRACE
+SeccompProfile=unconfined
+Network=host
+HostName=%l
+Timezone=local
+Volume=netdataconfig:/etc/netdata
+Volume=netdatalib:/var/lib/netdata
+Volume=netdatacache:/var/cache/netdata
+Volume=/:/host/root:ro,rslave
+Volume=/etc/passwd:/host/etc/passwd:ro
+Volume=/etc/group:/host/etc/group:ro
+Volume=/etc/timezone:/etc/timezone:ro
+Volume=/proc:/host/proc:ro
+Volume=/sys:/host/sys:ro
+Volume=/etc/os-release:/host/etc/os-release:ro
+Volume=/etc/hostname:/etc/hostname:ro
+Volume=/var/log:/host/var/log:ro
+Volume=/run/podman/podman.sock:/var/run/docker.sock:ro
+
+[Service]
+Restart=always
+RestartSec=30
+TimeoutStopSec=150
+CPUSchedulingPolicy=batch
+OOMPolicy=kill
+
+[Install]
+WantedBy=default.target
 ```
 
 </TabItem>
@@ -162,6 +221,13 @@ Add `-v /run/dbus:/run/dbus:ro` to your `docker run`.
 <h3> Using the <code>docker-compose</code> command</h3>
 
 Add `- /run/dbus:/run/dbus:ro` to the netdata service `volumes`.
+
+</TabItem>
+<TabItem vaule="podman_quadlet" label="podman quadlet">
+
+<h3> Using the Podman Quadlet systemd generator</h3>
+
+Add `Volume=/run/dbus:/run/dbus:ro` to the `[Container]` section of the unit file.
 
 </TabItem>
 </Tabs>
@@ -199,6 +265,12 @@ Add the following to the netdata service.
 ```
 
 </TabItem>
+<TabItem value="podman_quadlet" label="podman quadlet">
+
+<h3>Using the Podman Quadlet systemd generator</h3>
+
+Add `PodmanArgs=--gpus all,capabilities=utility` to the `[Container]` section of the unit file.
+</TabItem>
 </Tabs>
 
 ### With host-editable configuration
@@ -235,10 +307,12 @@ docker run -d --name=netdata \
   -v /var/log:/host/var/log:ro \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   --restart unless-stopped \
-  --cap-add SYS_PTRACE \
+  --cap-add DAC_READ_SEARCH \
+  --cap-add NET_RAW \
   --cap-add SYS_ADMIN \
+  --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
-  netdata/netdata
+  netdata/netdata:edge
 ```
 
 </TabItem>
@@ -259,8 +333,10 @@ services:
     network_mode: host
     restart: unless-stopped
     cap_add:
-      - SYS_PTRACE
+      - DAC_READ_SEARCH
+      - NET_RAW
       - SYS_ADMIN
+      - SYS_PTRACE
     security_opt:
       - apparmor:unconfined
     volumes:
@@ -522,7 +598,7 @@ docker run -d --name=netdata \
   -v /run/user/$UID/docker.sock:/var/run/docker.sock:ro \
   --restart unless-stopped \
   --security-opt apparmor=unconfined \
-  netdata/netdata
+  netdata/netdata:edge
 ```
 
 </TabItem>

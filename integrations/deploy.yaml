@@ -230,7 +230,7 @@
     - containers
   install_description: |
     Install and connect new Docker containers
-    Find the commands for `docker run`, `docker compose` or `Docker Swarm`. On the last two you can copy the configs, then run `docker-compose up -d` in the same directory as the `docker-compose.yml`
+    Find the commands for `docker run`, `docker compose`, `Docker Swarm` or `Podman Quadlet`. On the last two you can copy the configs, then run `docker-compose up -d` in the same directory as the `docker-compose.yml`
 
     > Netdata container requires different privileges and mounts to provide functionality similar to that provided by Netdata installed on the host. More info [here](https://learn.netdata.cloud/docs/installing/docker?_gl=1*f2xcnf*_ga*MTI1MTUwMzU0OS4xNjg2NjM1MDA1*_ga_J69Z2JCTFB*MTY5MDMxMDIyMS40MS4xLjE2OTAzMTAzNjkuNTguMC4w#create-a-new-netdata-agent-container)
     > Netdata will use the hostname from the container in which it is run instead of that of the host system. To change the default hostname check [here](https://learn.netdata.cloud/docs/agent/packaging/docker?_gl=1*i5weve*_ga*MTI1MTUwMzU0OS4xNjg2NjM1MDA1*_ga_J69Z2JCTFB*MTY5MDMxMjM4Ny40Mi4xLjE2OTAzMTIzOTAuNTcuMC4w#change-the-default-hostname)
@@ -255,8 +255,10 @@
             -v /var/log:/host/var/log:ro \
             -v /var/run/docker.sock:/var/run/docker.sock:ro \
             --restart unless-stopped \
-            --cap-add SYS_PTRACE \
+            --cap-add DAC_READ_SEARCH \
+            --cap-add NET_RAW \
             --cap-add SYS_ADMIN \
+            --cap-add SYS_PTRACE \
             --security-opt apparmor=unconfined \
             {% if $showClaimingOptions %}
             -e NETDATA_CLAIM_TOKEN={% claim_token %} \
@@ -304,8 +306,10 @@
                 network_mode: host
                 restart: unless-stopped
                 cap_add:
-                  - SYS_PTRACE
+                  - DAC_READ_SEARCH
+                  - NET_RAW
                   - SYS_ADMIN
+                  - SYS_PTRACE
                 security_opt:
                   - apparmor:unconfined
                 volumes:
@@ -342,8 +346,10 @@
                 network_mode: host
                 restart: unless-stopped
                 cap_add:
-                  - SYS_PTRACE
+                  - DAC_READ_SEARCH
+                  - NET_RAW
                   - SYS_ADMIN
+                  - SYS_PTRACE
                 security_opt:
                   - apparmor:unconfined
                 volumes:
@@ -380,8 +386,10 @@
                 pid: host
                 network_mode: host
                 cap_add:
-                  - SYS_PTRACE
+                  - DAC_READ_SEARCH
+                  - NET_RAW
                   - SYS_ADMIN
+                  - SYS_PTRACE
                 security_opt:
                   - apparmor:unconfined
                 volumes:
@@ -421,8 +429,10 @@
                 pid: host
                 network_mode: host
                 cap_add:
-                  - SYS_PTRACE
+                  - DAC_READ_SEARCH
+                  - NET_RAW
                   - SYS_ADMIN
+                  - SYS_PTRACE
                 security_opt:
                   - apparmor:unconfined
                 volumes:
@@ -453,6 +463,106 @@
               netdataconfig:
               netdatalib:
               netdatacache:
+    - method: Podman Quadlet
+      commands:
+        - channel: nightly
+          command: |
+            [Unit]
+            Description=Real time performance monitoring
+            After=network.target network-online.target nss-lookup.target
+            Wants=network-online.target nss-lookup.target
+
+            [Container]
+            ContainerName=netdata
+            Image=quay.io/netdata/netdata:edge
+            AutoUpdate=registry
+            PodmanArgs=--pid=host
+            PodmanArgs=--security-opt apparmor=unconfined
+            AddCapability=DAC_READ_SEARCH
+            AddCapability=NET_RAW
+            AddCapability=SYS_ADMIN
+            AddCapability=SYS_PTRACE
+            SeccompProfile=unconfined
+            Network=host
+            HostName=%l
+            Timezone=local
+            Volume=netdataconfig:/etc/netdata
+            Volume=netdatalib:/var/lib/netdata
+            Volume=netdatacache:/var/cache/netdata
+            Volume=/:/host/root:ro,rslave
+            Volume=/etc/passwd:/host/etc/passwd:ro
+            Volume=/etc/group:/host/etc/group:ro
+            Volume=/etc/timezone:/etc/timezone:ro
+            Volume=/proc:/host/proc:ro
+            Volume=/sys:/host/sys:ro
+            Volume=/etc/os-release:/host/etc/os-release:ro
+            Volume=/etc/hostname:/etc/hostname:ro
+            Volume=/var/log:/host/var/log:ro
+            Volume=/run/podman/podman.sock:/var/run/docker.sock:ro
+            {% if $showClaimingOptions %}
+            Environment=NETDATA_CLAIM_TOKEN={% claim_token %}
+            Environment=NETDATA_CLAIM_URL={% claim_url %}
+            Environment=NETDATA_CLAIM_ROOMS={% $claim_rooms %}
+            {% /if %}
+
+            [Service]
+            Restart=always
+            RestartSec=30
+            TimeoutStopSec=150
+            CPUSchedulingPolicy=batch
+            OOMPolicy=kill
+
+            [Install]
+            WantedBy=default.target
+        - channel: stable
+          command: |
+            [Unit]
+            Description=Real time performance monitoring
+            After=network.target network-online.target nss-lookup.target
+            Wants=network-online.target nss-lookup.target
+
+            [Container]
+            ContainerName=netdata
+            Image=quay.io/netdata/netdata:stable
+            AutoUpdate=registry
+            PodmanArgs=--pid=host
+            PodmanArgs=--security-opt apparmor=unconfined
+            AddCapability=DAC_READ_SEARCH
+            AddCapability=NET_RAW
+            AddCapability=SYS_ADMIN
+            AddCapability=SYS_PTRACE
+            SeccompProfile=unconfined
+            Network=host
+            HostName=%l
+            Timezone=local
+            Volume=netdataconfig:/etc/netdata
+            Volume=netdatalib:/var/lib/netdata
+            Volume=netdatacache:/var/cache/netdata
+            Volume=/:/host/root:ro,rslave
+            Volume=/etc/passwd:/host/etc/passwd:ro
+            Volume=/etc/group:/host/etc/group:ro
+            Volume=/etc/timezone:/etc/timezone:ro
+            Volume=/proc:/host/proc:ro
+            Volume=/sys:/host/sys:ro
+            Volume=/etc/os-release:/host/etc/os-release:ro
+            Volume=/etc/hostname:/etc/hostname:ro
+            Volume=/var/log:/host/var/log:ro
+            Volume=/run/podman/podman.sock:/var/run/docker.sock:ro
+            {% if $showClaimingOptions %}
+            Environment=NETDATA_CLAIM_TOKEN={% claim_token %}
+            Environment=NETDATA_CLAIM_URL={% claim_url %}
+            Environment=NETDATA_CLAIM_ROOMS={% $claim_rooms %}
+            {% /if %}
+
+            [Service]
+            Restart=always
+            RestartSec=30
+            TimeoutStopSec=150
+            CPUSchedulingPolicy=batch
+            OOMPolicy=kill
+
+            [Install]
+            WantedBy=default.target
   additional_info: ""
   related_resources: {}
   platform_info:
