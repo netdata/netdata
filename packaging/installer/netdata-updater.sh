@@ -352,6 +352,91 @@ disable_netdata_updater() {
   return 0
 }
 
+auto_update_status() {
+  case "$(_get_scheduler_type)" in
+    systemd) info "The default auto-update scheduling method for this system is: systemd timer units" ;;
+    crontab) info "The default auto-update scheduling method for this system is: drop-in crontab" ;;
+    interval) info "The default auto-update scheduling method for this system is: drop-in periodic script" ;;
+    *) info "No recognized auto-update scheduling method found" ; return ;;
+  esac
+
+  duplicate=""
+  enabled=""
+
+  if issystemd; then
+    if ( systemctl list-units --full -all | grep -Fq "netdata-updater.timer" ); then
+      if systemctl is-enabled netdata-updater.timer; then
+        info "Auto-updates using a systemd timer unit are ENABLED"
+        enabled="systemd"
+      else
+        info "Auto-updates using a systemd timer unit are DISABLED"
+      fi
+    else
+      info "Auto-updates using a systemd timer unit are NOT SUPPORTED due to: Required unit files not installed"
+    fi
+  else
+    info "Auto-updates using a systemd timer unit are NOT SUPPORTED due to: Systemd not present"
+  fi
+
+  interval_found=""
+
+  if [ -d /etc/cron.daily ]; then
+    interval_found="1"
+
+    if [ -x /etc/cron.daily/netdata-updater.sh ] || [ -x /etc/cron.daily/netdata-updater ]; then
+      info "Auto-updates using a drop-in periodic script in /etc/cron.daily are ENABLED"
+
+      if [ -n "${enabled}" ]; then
+        duplicate="1"
+      else
+        enabled="cron.daily"
+      fi
+    else
+      info "Auto-updates using a drop-in periodic script in /etc/cron.daily are DISABLED"
+    fi
+  else
+    info "Auto-updates using a drop-in periodic script in /etc/cron.daily are NOT SUPPORTED: due to: Directory does not exist"
+  fi
+
+  if [ -d /etc/periodic/daily ]; then
+    if [ -x /etc/periodic/daily/netdata-updater.sh ] || [ -x /etc/periodic/daily/netdata-updater ]; then
+      info "Auto-updates using a drop-in periodic script in /etc/periodic/daily are ENABLED"
+
+      if [ -n "${enabled}" ]; then
+        duplicate="1"
+      else
+        enabled="periodic/daily"
+      fi
+    else
+      if [ -z "${interval_found}" ]; then
+        info "Auto-updates using a drop-in periodic script in /etc/periodic/daily are DISABLED"
+      fi
+    fi
+  elif [ -z "${interval_found}" ]; then
+    info "Auto-updates using a drop-in periodic script in /etc/periodic/daily are NOT SUPPORTED due to: Directory does not exist"
+  fi
+
+  if [ -d /etc/cron.d ]; then
+    if [ -f /etc/cron.d/netdata-updater ] || [ -f /etc/cron.d/netdata-updater-daily ]; then
+      info "Auto-updates using a drop-in crontab are ENABLED"
+
+      if [ -n "${enabled}" ]; then
+        duplicate="1"
+      else
+        enabled="cron.d"
+      fi
+    else
+      info "Auto-updates using a drop-in crontab are DISABLED"
+    fi
+  else
+    info "Auto-updates using a drop-in crontab are NOT SUPPORTED due to: Directory does not exist"
+  fi
+
+  if [ -n "${duplicate}" ]; then
+    warning "More than one method of auto-updates is enabled! Please disable and re-enable auto-updates to correct this."
+  fi
+}
+
 str_in_list() {
   printf "%s\n" "${2}" | tr ' ' "\n" | grep -qE "^${1}\$"
   return $?
@@ -1121,6 +1206,10 @@ while [ -n "${1}" ]; do
     --disable-auto-updates)
       disable_netdata_updater
       exit $?
+      ;;
+    --auto-update-status)
+      auto_update_status
+      exit 0
       ;;
     *) fatal "Unrecognized option ${1}" U001A ;;
   esac
