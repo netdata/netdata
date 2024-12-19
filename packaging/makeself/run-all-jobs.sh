@@ -1,6 +1,7 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+set -x
 set -e
 
 LC_ALL=C
@@ -13,15 +14,24 @@ umask 002
 export NETDATA_INSTALL_PATH="${1-/opt/netdata}"
 
 # our source directory
-NETDATA_MAKESELF_PATH="$(dirname "${0}")"
+NETDATA_MAKESELF_PATH="$(
+    self=${0}
+    while [ -L "${self}" ]
+    do
+        cd "${self%/*}" || exit 1
+        self=$(readlink "${self}")
+    done
+    cd "${self%/*}" || exit 1
+    pwd -P
+)"
 export NETDATA_MAKESELF_PATH
-if [ "${NETDATA_MAKESELF_PATH:0:1}" != "/" ]; then
-  NETDATA_MAKESELF_PATH="$(pwd)/${NETDATA_MAKESELF_PATH}"
-  export NETDATA_MAKESELF_PATH
-fi
 
 # netdata source directory
-export NETDATA_SOURCE_PATH="${NETDATA_MAKESELF_PATH}/../.."
+NETDATA_SOURCE_PATH="$(
+    cd "${NETDATA_MAKESELF_PATH}/../.." || exit 1
+    pwd -P
+)"
+export NETDATA_SOURCE_PATH
 
 # make sure ${NULL} is empty
 export NULL=

@@ -35,6 +35,34 @@ if [ "${BUILDARCH}" != "$(uname -m)" ] && [ -z "${SKIP_EMULATION}" ]; then
     fi
 fi
 
+case "${BUILDARCH}" in
+    x86_64) # x86-64-v2 equivalent
+        QEMU_CPU="Nehalem-v2"
+        TUNING_FLAGS="-march=x86-64"
+        GOAMD64="v1"
+        ;;
+    armv6l) # Raspberry Pi 1 equivalent
+        QEMU_CPU="arm1176"
+        TUNING_FLAGS="-march=armv6zk -mtune=arm1176jzf-s"
+        GOARM="6"
+        ;;
+    armv7l) # Baseline ARMv7 CPU
+        QEMU_CPU="cortex-a7"
+        TUNING_FLAGS="-march=armv7-a"
+        GOARM="7"
+        ;;
+    aarch64) # Baseline ARMv8 CPU
+        QEMU_CPU="cortex-a53"
+        TUNING_FLAGS="-march=armv8-a"
+        GOARM64="v8.0"
+        ;;
+    ppc64le) # Baseline POWER8+ CPU
+        QEMU_CPU="power8nvl"
+        TUNING_FLAGS="-mcpu=power8 -mtune=power9"
+        GOPPC64="power8"
+        ;;
+esac
+
 if ${docker} inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
     if ${docker} image inspect "${DOCKER_IMAGE_NAME}" | grep -q 'Variant'; then
         img_platform="$(${docker} image inspect "${DOCKER_IMAGE_NAME}" --format '{{.Os}}/{{.Architecture}}/{{.Variant}}')"
@@ -55,10 +83,18 @@ fi
 if [ -t 1 ]; then
   run ${docker} run --rm -e BUILDARCH="${BUILDARCH}" -a stdin -a stdout -a stderr -i -t -v "$(pwd)":/netdata:rw \
     --platform "${platform}" ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
+    ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
+    -e TUNING_FLAGS="${TUNING_FLAGS}" \
+    ${GOAMD64:+-e GOAMD64="${GOAMD64}"} ${GOARM:+-e GOARM="${GOARM}"} \
+    ${GOARM64:+-e GOARM64="${GOARM64}"} ${GOPPC64:+-e GOPPC64="${GOPPC64}"} \
     "${DOCKER_IMAGE_NAME}" /bin/sh /netdata/packaging/makeself/build.sh "${@}"
 else
   run ${docker} run --rm -e BUILDARCH="${BUILDARCH}" -v "$(pwd)":/netdata:rw \
     -e GITHUB_ACTIONS="${GITHUB_ACTIONS}" --platform "${platform}" \
     ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
+    ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
+    -e TUNING_FLAGS="${TUNING_FLAGS}" \
+    ${GOAMD64:+-e GOAMD64="${GOAMD64}"} ${GOARM:+-e GOARM="${GOARM}"} \
+    ${GOARM64:+-e GOARM64="${GOARM64}"} ${GOPPC64:+-e GOPPC64="${GOPPC64}"} \
     "${DOCKER_IMAGE_NAME}" /bin/sh /netdata/packaging/makeself/build.sh "${@}"
 fi

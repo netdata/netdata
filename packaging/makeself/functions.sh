@@ -6,10 +6,22 @@
 # allow running the jobs by hand
 [ -z "${NETDATA_BUILD_WITH_DEBUG}" ] && export NETDATA_BUILD_WITH_DEBUG=0
 [ -z "${NETDATA_INSTALL_PATH}" ] && export NETDATA_INSTALL_PATH="${1-/opt/netdata}"
-[ -z "${NETDATA_MAKESELF_PATH}" ] && NETDATA_MAKESELF_PATH="$(dirname "${0}")/../.."
-[ "${NETDATA_MAKESELF_PATH:0:1}" != "/" ] && NETDATA_MAKESELF_PATH="$(pwd)/${NETDATA_MAKESELF_PATH}"
-[ -z "${NETDATA_SOURCE_PATH}" ] && export NETDATA_SOURCE_PATH="${NETDATA_MAKESELF_PATH}/../.."
-export NETDATA_MAKESELF_PATH NETDATA_MAKESELF_PATH
+[ -z "${NETDATA_MAKESELF_PATH}" ] && NETDATA_MAKESELF_PATH="$(
+    self=${0}
+    while [ -L "${self}" ]
+    do
+        cd "${self%/*}" || exit 1
+        self=$(readlink "${self}")
+    done
+    cd "${self%/*}" || exit 1
+    cd ../.. || exit 1
+    echo "$(pwd -P)/${self##*/}"
+)"
+[ -z "${NETDATA_SOURCE_PATH}" ] && NETDATA_SOURCE_PATH="$(
+    cd "${NETDATA_MAKESELF_PATH}/../.." || exit 1
+    pwd -P
+)"
+export NETDATA_MAKESELF_PATH NETDATA_SOURCE_PATH
 export NULL=
 
 # make sure the path does not end with /
