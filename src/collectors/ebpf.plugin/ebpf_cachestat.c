@@ -701,6 +701,7 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core)
         length *= ebpf_nprocs;
 
     uint32_t key = 0, next_key = 0;
+    sem_wait(shm_mutex_ebpf_integration);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, cv)) {
             goto end_cachestat_loop;
@@ -724,6 +725,7 @@ end_cachestat_loop:
         memset(cv, 0, length);
         key = next_key;
     }
+    sem_post(shm_mutex_ebpf_integration);
 }
 
 /**
