@@ -67,8 +67,10 @@ void rw_spinlock_read_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func
                 ))
             break;
 
-        if (++spins > SPIN_THRESHOLD)
+        if (++spins > SPIN_THRESHOLD) {
             tinysleep();
+            yield_the_processor();
+        }
     }
 
     locks_held_by_thread++;
@@ -129,9 +131,30 @@ void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *fun
             break;
         }
 
-        // Spin if readers or another writer is active
-        if (++spins > SPIN_THRESHOLD)
-            tinysleep();
+        spins++;
+
+        if (spins > SPIN_THRESHOLD) {
+            if(expected == -1) {
+                // another writer is holding the lock
+                tinysleep();
+                yield_the_processor();
+            }
+            else {
+                // readers are active
+                int32_t w = __atomic_load_n(&rw_spinlock->writers_waiting, __ATOMIC_RELAXED);
+                if (w > 1) {
+                    // multiple writers are waiting, while readers are holding the lock
+                    uint32_t r = 1 + (gettid_cached() % w);
+                    microsleep(r);
+                    if (r % 2 == 0)
+                        yield_the_processor();
+                }
+                else {
+                    // I am the only writer waiting, while readers are holding the lock
+                    tinysleep();
+                }
+            }
+        }
     }
 
     __atomic_sub_fetch(&rw_spinlock->writers_waiting, 1, __ATOMIC_RELAXED);
