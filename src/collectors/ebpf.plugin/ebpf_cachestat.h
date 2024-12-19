@@ -69,14 +69,14 @@ enum cachestat_tables {
     NETDATA_CACHESTAT_CTRL
 };
 
-typedef struct __attribute__((packed)) netdata_cachestat {
+typedef struct netdata_cachestat {
     uint32_t add_to_page_cache_lru;
     uint32_t mark_page_accessed;
     uint32_t account_page_dirtied;
     uint32_t mark_buffer_dirty;
 } netdata_cachestat_t;
 
-typedef struct __attribute__((packed)) netdata_publish_cachestat {
+typedef struct netdata_publish_cachestat {
     uint64_t ct;
 
     long long ratio;
@@ -84,8 +84,8 @@ typedef struct __attribute__((packed)) netdata_publish_cachestat {
     long long hit;
     long long miss;
 
-    netdata_cachestat_t current;
-    netdata_cachestat_t prev;
+    netdata_cachestat_pid_t current;
+    netdata_cachestat_pid_t prev;
 } netdata_publish_cachestat_t;
 
 void *ebpf_cachestat_thread(void *ptr);

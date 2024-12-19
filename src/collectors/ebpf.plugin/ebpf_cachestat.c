@@ -686,27 +686,6 @@ static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_pe
 }
 
 /**
- * Save Pid values
- *
- * Save the current values inside the structure
- *
- * @param out     vector used to plot charts
- * @param in vector with values read from hash tables.
- */
-static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, netdata_cachestat_pid_t *in)
-{
-    out->ct = in->ct;
-    if (out->current.mark_page_accessed) {
-        memcpy(&out->prev, &out->current, sizeof(netdata_cachestat_t));
-    }
-
-    out->current.account_page_dirtied = in[0].account_page_dirtied;
-    out->current.add_to_page_cache_lru = in[0].add_to_page_cache_lru;
-    out->current.mark_buffer_dirty = in[0].mark_buffer_dirty;
-    out->current.mark_page_accessed = in[0].mark_page_accessed;
-}
-
-/**
  * Read APPS table
  *
  * Read the apps table and store data inside the structure.
@@ -729,21 +708,14 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core)
 
         cachestat_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, cv->tgid, cv->name, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
-        netdata_publish_cachestat_t *publish = local_pid->cachestat;
-        if (!publish)
-            local_pid->cachestat = publish = ebpf_cachestat_allocate_publish();
+        netdata_ebpf_pid_stats_t *local_pid = &integration_shm[key];
+        netdata_cachestat_pid_t *publish = &local_pid->cachestat;
 
         if (!publish->ct || publish->ct != cv->ct){
-            cachestat_save_pid_values(publish, cv);
-            local_pid->not_updated = 0;
+            memcpy(publish, &cv[0], sizeof(*publish));
         } else {
-            if (kill(key, 0)) { // No PID found
-                ebpf_reset_specific_pid_data(local_pid);
-            } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(local_pid, fd, key, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
-                ebpf_cachestat_release_publish(publish);
-                local_pid->cachestat = NULL;
+            if (local_pid->process.release_call || kill((pid_t)key, 0)) { // No PID found
+                netdata_integration_release_pid(local_pid, fd, key, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
             }
         }
 
@@ -771,12 +743,10 @@ static void ebpf_update_cachestat_cgroup()
             int pid = pids->pid;
             netdata_publish_cachestat_t *out = &pids->cachestat;
 
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
-            netdata_publish_cachestat_t *in = local_pid->cachestat;
-            if (!in)
-                continue;
+            netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
+            netdata_cachestat_pid_t *publish = &local_pid->cachestat;
 
-            memcpy(&out->current, &in->current, sizeof(netdata_cachestat_t));
+            memcpy(&out->current, publish, sizeof(*publish));
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
@@ -795,15 +765,12 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
     memcpy(&publish->prev, &publish->current,sizeof(publish->current));
     memset(&publish->current, 0, sizeof(publish->current));
 
-    netdata_cachestat_t *dst = &publish->current;
+    netdata_cachestat_pid_t *dst = &publish->current;
     for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
-        netdata_publish_cachestat_t *w = local_pid->cachestat;
-        if (!w)
-            continue;
+        netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
+        netdata_cachestat_pid_t *src = &local_pid->cachestat;
 
-        netdata_cachestat_t *src = &w->current;
         dst->account_page_dirtied += src->account_page_dirtied;
         dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
         dst->mark_buffer_dirty += src->mark_buffer_dirty;
@@ -1028,8 +995,8 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_CACHESTAT_IDX))))
             continue;
 
-        netdata_cachestat_t *current = &w->cachestat.current;
-        netdata_cachestat_t *prev = &w->cachestat.prev;
+        netdata_cachestat_pid_t *current = &w->cachestat.current;
+        netdata_cachestat_pid_t *prev = &w->cachestat.prev;
 
         uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
         uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
@@ -1075,9 +1042,9 @@ void ebpf_cachestat_sum_cgroup_pids(netdata_publish_cachestat_t *publish, struct
     memcpy(&publish->prev, &publish->current,sizeof(publish->current));
     memset(&publish->current, 0, sizeof(publish->current));
 
-    netdata_cachestat_t *dst = &publish->current;
+    netdata_cachestat_pid_t *dst = &publish->current;
     for (; root; root = root->next) {
-        netdata_cachestat_t *src = &root->cachestat.current;
+        netdata_cachestat_pid_t *src = &root->cachestat.current;
 
         dst->account_page_dirtied += src->account_page_dirtied;
         dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
@@ -1097,8 +1064,8 @@ void ebpf_cachestat_calc_chart_values()
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         ebpf_cachestat_sum_cgroup_pids(&ect->publish_cachestat, ect->pids);
 
-        netdata_cachestat_t *current = &ect->publish_cachestat.current;
-        netdata_cachestat_t *prev = &ect->publish_cachestat.prev;
+        netdata_cachestat_pid_t *current = &ect->publish_cachestat.current;
+        netdata_cachestat_pid_t *prev = &ect->publish_cachestat.prev;
 
         uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
         uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
