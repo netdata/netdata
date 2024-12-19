@@ -85,7 +85,7 @@ int api_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w, ch
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
     buffer_strcat(wb, "{");
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         buffer_sprintf(wb, "%s\n\t\"tier%zu\": {", tier?",":"", tier);
         web_client_api_v1_dbengine_stats_for_tier(wb, tier);
         buffer_strcat(wb, "\n\t}");

@@ -1498,7 +1498,7 @@ void pulse_dbengine_do(bool extended) {
             if (!rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
 
                 /* get localhost's DB engine's statistics for each tier */
-                for(size_t tier = 0; tier < storage_tiers ;tier++) {
+                for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
                     if(host->db[tier].mode != RRD_MEMORY_MODE_DBENGINE) continue;
                     if(!host->db[tier].si) continue;
 

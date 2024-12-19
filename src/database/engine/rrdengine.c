@@ -359,7 +359,7 @@ static void wal_cleanup1(void) {
     if(!spinlock_trylock(&wal_globals.protected.spinlock))
         return;
 
-    if(wal_globals.protected.available_items && wal_globals.protected.available > storage_tiers) {
+    if(wal_globals.protected.available_items && wal_globals.protected.available > nd_profile.storage_tiers) {
         wal = wal_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
@@ -1710,7 +1710,7 @@ static void retention_timer_cb(uv_timer_t *handle) {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
-    for (size_t tier = 0; tier < storage_tiers; tier++) {
+    for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = localhost->db[tier].eng;
         if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
             continue;
@@ -1847,7 +1847,7 @@ void calculate_tier_disk_space_percentage(void)
         return;
 
     uint64_t total_diskspace = 0;
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         STORAGE_ENGINE *eng = localhost->db[tier].eng;
         if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE) {
             tier_space[tier] = 0;
@@ -1861,7 +1861,7 @@ void calculate_tier_disk_space_percentage(void)
     }
 
     if (total_diskspace) {
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
+        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             multidb_ctx[tier]->config.disk_percentage = (100 * tier_space[tier] / total_diskspace);
         }
     }
@@ -1877,7 +1877,7 @@ void dbengine_retention_statistics(void)
 
     calculate_tier_disk_space_percentage();
 
-    for (size_t tier = 0; tier < storage_tiers; tier++) {
+    for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = localhost->db[tier].eng;
         if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
             continue;

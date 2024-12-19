@@ -101,7 +101,7 @@ bool backfill_execute(struct backfill_dim_work *bdm) {
     size_t success = 0;
     RRDDIM *rd = rrddim_acquired_to_rrddim(bdm->rda);
 
-    for (size_t tier = 1; tier < storage_tiers; tier++)
+    for (size_t tier = 1; tier < nd_profile.storage_tiers; tier++)
         if (backfill_tier_from_smaller_tiers(rd, tier, now_realtime_sec()))
             success++;
 

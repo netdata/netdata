@@ -1122,8 +1122,8 @@ set(DAEMON_FILES
         src/daemon/pulse/pulse-db-rrd.h
         src/daemon/config/netdata-conf-cloud.c
         src/daemon/config/netdata-conf-cloud.h
-        src/daemon/config/netdata-conf-global-profile.c
-        src/daemon/config/netdata-conf-global-profile.h
+        src/daemon/config/netdata-conf-profile.c
+        src/daemon/config/netdata-conf-profile.h
 )
 
 set(H2O_FILES

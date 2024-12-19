@@ -271,7 +271,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // initialize the db tiers
     {
-        for(size_t tier = 0; tier < storage_tiers ; tier++) {
+        for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
             if(!eng) continue;
 
@@ -318,7 +318,7 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
         rrddim_foreach_done(rd);
     }
 
-    for(size_t tier = 0; tier < storage_tiers ; tier++) {
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
         if(!eng) continue;
 
@@ -672,7 +672,7 @@ time_t rrdset_first_entry_s(RRDSET *st) {
 }
 
 time_t rrdset_first_entry_s_of_tier(RRDSET *st, size_t tier) {
-    if(unlikely(tier > storage_tiers))
+    if(unlikely(tier > nd_profile.storage_tiers))
         return 0;
 
     RRDDIM *rd;
@@ -843,7 +843,7 @@ void rrdset_reset(RRDSET *st) {
         rd->collector.counter = 0;
 
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
-            for(size_t tier = 0; tier < storage_tiers ;tier++)
+            for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++)
                 storage_engine_store_flush(rd->tiers[tier].sch);
         }
     }
@@ -1273,7 +1273,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
         .flags = flags
     };
 
-    for(size_t tier = 1; tier < storage_tiers ;tier++) {
+    for(size_t tier = 1; tier < nd_profile.storage_tiers;tier++) {
         if(unlikely(!rd->tiers[tier].smh)) continue;
 
         struct rrddim_tier *t = &rd->tiers[tier];
@@ -2020,7 +2020,7 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     // switch update every to the storage engine
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
+        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             if (rd->tiers[tier].sch)
                 storage_engine_store_change_collection_frequency(
                         rd->tiers[tier].sch,

@@ -178,7 +178,7 @@ typedef enum __attribute__ ((__packed__)) {
     RRD_BACKFILL_NEW
 } RRD_BACKFILL;
 
-#define UPDATE_EVERY 1
+#define UPDATE_EVERY_MIN 1
 #define UPDATE_EVERY_MAX 3600
 
 #define RRD_DEFAULT_HISTORY_ENTRIES 3600
@@ -490,7 +490,7 @@ static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND s
         return rrdeng_global_first_time_s(si);
 #endif
 
-    return now_realtime_sec() - (time_t)(default_rrd_history_entries * default_rrd_update_every);
+    return now_realtime_sec() - (time_t)(default_rrd_history_entries * nd_profile.update_every);
 }
 
 size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *si);

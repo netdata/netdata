@@ -81,7 +81,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
         return;
 
     nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE dirty pages...");
-    for (size_t tier = 0; tier < storage_tiers; tier++)
+    for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
         rrdeng_quiesce(multidb_ctx[tier]);
 
     struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
@@ -94,7 +94,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
         size_t count = 10;
         while (running && count) {
             running = 0;
-            for (size_t tier = 0; tier < storage_tiers; tier++)
+            for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
                 running += rrdeng_collectors_running(multidb_ctx[tier]);
 
             if (running) {
@@ -236,14 +236,14 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
             rrdeng_flush_everything_and_wait(true, true);
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
 
-            ND_THREAD *th[storage_tiers];
-            for (size_t tier = 0; tier < storage_tiers; tier++)
+            ND_THREAD *th[nd_profile.storage_tiers];
+            for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
                 th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_JOINABLE, rrdeng_exit_background, multidb_ctx[tier]);
 
             // flush anything remaining again - just in case
             rrdeng_flush_everything_and_wait(true, false);
 
-            for (size_t tier = 0; tier < storage_tiers; tier++)
+            for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
                 nd_thread_join(th[tier]);
 
             rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);

@@ -305,7 +305,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     buffer_key_value_urlencode(wb, "&hostname", rrdhost_hostname(host));
     buffer_key_value_urlencode(wb, "&registry_hostname", rrdhost_registry_hostname(host));
     buffer_key_value_urlencode(wb, "&machine_guid", host->machine_guid);
-    buffer_sprintf(wb, "&update_every=%d", default_rrd_update_every);
+    buffer_sprintf(wb, "&update_every=%d", (int)nd_profile.update_every);
     buffer_key_value_urlencode(wb, "&os", rrdhost_os(host));
     buffer_key_value_urlencode(wb, "&timezone", rrdhost_timezone(host));
     buffer_key_value_urlencode(wb, "&abbrev_timezone", rrdhost_abbrev_timezone(host));

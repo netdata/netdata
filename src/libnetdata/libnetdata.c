@@ -449,19 +449,11 @@ void posix_memfree(void *ptr) {
 #endif
 
 void mallocz_release_as_much_memory_to_the_system(void) {
-#if defined(HAVE_C_MALLOPT) || defined(HAVE_C_MALLOC_TRIM)
+#if defined(HAVE_C_MALLOC_TRIM)
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
 
-#ifdef HAVE_C_MALLOPT
-    // the default is 128KiB
-    size_t trim_threshold = 65ULL * 1024;
-    mallopt(M_TRIM_THRESHOLD, (int)trim_threshold);
-#endif
-
-#ifdef HAVE_C_MALLOC_TRIM
     malloc_trim(0);
-#endif
 
     spinlock_unlock(&spinlock);
 #endif

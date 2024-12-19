@@ -261,7 +261,7 @@ static struct statsd {
     size_t udp_packets_received;
     size_t udp_bytes_read;
 
-    int32_t update_every;
+    time_t update_every;
     bool enabled;
     bool private_charts_hidden;
     SIMPLE_PATTERN *charts_for;
@@ -2487,11 +2487,12 @@ void *statsd_main(void *ptr) {
 
     statsd.enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, "statsd", statsd.enabled);
 
-    statsd.update_every = default_rrd_update_every;
+    statsd.update_every = nd_profile.update_every;
     statsd.update_every = (int)config_get_duration_seconds(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
-    if(statsd.update_every < default_rrd_update_every) {
-        collector_error("STATSD: minimum flush interval %d given, but the minimum is the update every of netdata. Using %d", statsd.update_every, default_rrd_update_every);
-        statsd.update_every = default_rrd_update_every;
+    if(statsd.update_every < nd_profile.update_every) {
+        collector_error("STATSD: minimum flush interval %d given, but the minimum is the update every of netdata. Using %d",
+                        (int)statsd.update_every, (int)nd_profile.update_every);
+        statsd.update_every = nd_profile.update_every;
         config_set_duration_seconds(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
     }
 

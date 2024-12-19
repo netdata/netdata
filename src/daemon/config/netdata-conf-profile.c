@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "netdata-conf-global-profile.h"
+#include "netdata-conf-profile.h"
 #include "streaming/stream-conf.h"
 #include "netdata-conf.h"
 
-ENUM_STR_MAP_DEFINE(ND_CONF_PROFILE) = {
-    { .id = ND_CONF_PROFILE_STANDALONE, .name = "standalone" },
-    { .id = ND_CONF_PROFILE_PARENT,     .name = "parent" },
-    { .id = ND_CONF_PROFILE_CHILD,      .name = "child" },
-    { .id = ND_CONF_PROFILE_IOT,        .name = "iot" },
+ENUM_STR_MAP_DEFINE(ND_PROFILE) = {
+    { .id = ND_PROFILE_STANDALONE, .name = "standalone" },
+    { .id = ND_PROFILE_PARENT,     .name = "parent" },
+    { .id = ND_PROFILE_CHILD,      .name = "child" },
+    { .id = ND_PROFILE_IOT,        .name = "iot" },
 
     // terminator
     { . id = 0, .name = NULL }
 };
 
-BITMAP_STR_DEFINE_FUNCTIONS(ND_CONF_PROFILE, ND_CONF_PROFILE_NONE, "");
+BITMAP_STR_DEFINE_FUNCTIONS(ND_PROFILE, ND_PROFILE_NONE, "");
 
-static inline ND_CONF_PROFILE prefer_profile(ND_CONF_PROFILE setting, ND_CONF_PROFILE preferred, ND_CONF_PROFILE out_of) {
+static inline ND_PROFILE prefer_profile(ND_PROFILE setting, ND_PROFILE preferred, ND_PROFILE out_of) {
     if(setting & preferred) {
         setting &= ~out_of;
         setting |= preferred;
@@ -24,60 +24,60 @@ static inline ND_CONF_PROFILE prefer_profile(ND_CONF_PROFILE setting, ND_CONF_PR
     return setting;
 }
 
-ND_CONF_PROFILE netdata_conf_global_profile(bool recheck) {
-    static ND_CONF_PROFILE profile = ND_CONF_PROFILE_NONE;
+ND_PROFILE nd_profile_detect_and_configure(bool recheck) {
+    static ND_PROFILE profile = ND_PROFILE_NONE;
 
-    if(!recheck && profile != ND_CONF_PROFILE_NONE)
+    if(!recheck && profile != ND_PROFILE_NONE)
         return profile;
 
-    ND_CONF_PROFILE def_profile = ND_CONF_PROFILE_NONE;
+    ND_PROFILE def_profile = ND_PROFILE_NONE;
 
     OS_SYSTEM_MEMORY mem = os_system_memory(true);
     size_t cpus = os_get_system_cpus_uncached();
 
     if(cpus <= 1 || (mem.ram_total_bytes && mem.ram_total_bytes < 1ULL * 1024 * 1024 * 1024))
-        def_profile = ND_CONF_PROFILE_IOT;
+        def_profile = ND_PROFILE_IOT;
 
     else if(stream_conf_is_parent(true))
-        def_profile = ND_CONF_PROFILE_PARENT;
+        def_profile = ND_PROFILE_PARENT;
 
     else if(stream_conf_is_child())
-        def_profile = ND_CONF_PROFILE_CHILD;
+        def_profile = ND_PROFILE_CHILD;
 
     else
-        def_profile = ND_CONF_PROFILE_STANDALONE;
+        def_profile = ND_PROFILE_STANDALONE;
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    ND_CONF_PROFILE_2buffer(wb, def_profile, " ");
+    ND_PROFILE_2buffer(wb, def_profile, " ");
 
     CLEAN_CHAR_P *s = strdupz(config_get(CONFIG_SECTION_GLOBAL, "profile", buffer_tostring(wb)));
 
     char *words[100];
     size_t n = quoted_strings_splitter(s, words, _countof(words), isspace_map_whitespace);
-    ND_CONF_PROFILE pt = ND_CONF_PROFILE_NONE;
+    ND_PROFILE pt = ND_PROFILE_NONE;
     for(size_t i = 0; i < n ;i++) {
-        ND_CONF_PROFILE ptt = ND_CONF_PROFILE_2id_one(words[i]);
-        if(ptt == ND_CONF_PROFILE_NONE)
+        ND_PROFILE ptt = ND_PROFILE_2id_one(words[i]);
+        if(ptt == ND_PROFILE_NONE)
             nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot understand netdata.conf [global].profile = %s", words[i]);
         pt |= ptt;
     }
 
     // sanity checks
 
-    ND_CONF_PROFILE started = pt;
+    ND_PROFILE started = pt;
 
     if(!(pt & ND_CONF_PROFILES_SYSTEM))
         // system profile is missing from the settings
         pt |= (def_profile & ND_CONF_PROFILES_SYSTEM);
 
-    pt = prefer_profile(pt, ND_CONF_PROFILE_PARENT, ND_CONF_PROFILES_SYSTEM);
-    pt = prefer_profile(pt, ND_CONF_PROFILE_STANDALONE, ND_CONF_PROFILES_SYSTEM);
-    pt = prefer_profile(pt, ND_CONF_PROFILE_CHILD, ND_CONF_PROFILES_SYSTEM);
-    pt = prefer_profile(pt, ND_CONF_PROFILE_IOT, ND_CONF_PROFILES_SYSTEM);
+    pt = prefer_profile(pt, ND_PROFILE_PARENT, ND_CONF_PROFILES_SYSTEM);
+    pt = prefer_profile(pt, ND_PROFILE_STANDALONE, ND_CONF_PROFILES_SYSTEM);
+    pt = prefer_profile(pt, ND_PROFILE_CHILD, ND_CONF_PROFILES_SYSTEM);
+    pt = prefer_profile(pt, ND_PROFILE_IOT, ND_CONF_PROFILES_SYSTEM);
 
     if(pt != started) {
         buffer_flush(wb);
-        ND_CONF_PROFILE_2buffer(wb, pt, " ");
+        ND_PROFILE_2buffer(wb, pt, " ");
         config_set(CONFIG_SECTION_GLOBAL, "profile", buffer_tostring(wb));
 
         nd_log(NDLS_DAEMON, NDLP_WARNING,
@@ -89,12 +89,15 @@ ND_CONF_PROFILE netdata_conf_global_profile(bool recheck) {
     return profile;
 }
 
-void netdata_conf_apply_profile(void) {
-    ND_CONF_PROFILE profile = netdata_conf_global_profile(true); (void)profile;
+struct nd_profile_t nd_profile = { 0 };
+
+void nd_profile_apply(void) {
+    ND_PROFILE profile = nd_profile_detect_and_configure(true); (void)profile;
     if(netdata_conf_is_iot()) {
-        storage_tiers = 1;
-        default_rrd_update_every = 2;
-        netdata_conf_glibc_malloc_initialize(1, 32 * 1024);
+        nd_profile.storage_tiers = 1;
+        nd_profile.update_every = 2;
+        nd_profile.malloc_arenas = 1;
+        nd_profile.malloc_trim = 32 * 1024;
         // web server threads = 6
         // aclk query threads = 6
         // backfill threads = 0
@@ -106,9 +109,10 @@ void netdata_conf_apply_profile(void) {
         // disable sqlite
     }
     else if(netdata_conf_is_parent()) {
-        storage_tiers = 3;
-        default_rrd_update_every = 1;
-        netdata_conf_glibc_malloc_initialize(os_get_system_cpus_cached(true), 256 * 1024);
+        nd_profile.storage_tiers = 3;
+        nd_profile.update_every = 1;
+        nd_profile.malloc_arenas = os_get_system_cpus_cached(true);
+        nd_profile.malloc_trim = 256 * 1024;
         // web server threads = dynamic
         // aclk query threads = dynamic
         // backfill threads = dynamic
@@ -117,9 +121,10 @@ void netdata_conf_apply_profile(void) {
         // health enabled = true
     }
     else if(netdata_conf_is_child()) {
-        storage_tiers = 3;
-        default_rrd_update_every = 1;
-        netdata_conf_glibc_malloc_initialize(1, 64 * 1024);
+        nd_profile.storage_tiers = 3;
+        nd_profile.update_every = 1;
+        nd_profile.malloc_arenas = 1;
+        nd_profile.malloc_trim = 32 * 1024;
         // web server threads = 6
         // aclk query threads = 6
         // backfill threads = 0
@@ -128,9 +133,10 @@ void netdata_conf_apply_profile(void) {
         // health enabled = false
     }
     else /* if(netdata_conf_is_standalone()) */ {
-        storage_tiers = 3;
-        default_rrd_update_every = 1;
-        netdata_conf_glibc_malloc_initialize(1, 64 * 1024);
+        nd_profile.storage_tiers = 3;
+        nd_profile.update_every = 1;
+        nd_profile.malloc_arenas = 1;
+        nd_profile.malloc_trim = 64 * 1024;
         // web server threads = 6
         // aclk query threads = 6
         // backfill threads = 0
@@ -138,4 +144,6 @@ void netdata_conf_apply_profile(void) {
         // ml enabled = true
         // health enabled = true
     }
+
+    netdata_conf_glibc_malloc_initialize(nd_profile.malloc_arenas, nd_profile.malloc_trim);
 }

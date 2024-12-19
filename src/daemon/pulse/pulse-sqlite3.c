@@ -57,7 +57,7 @@ static inline void sqlite3_statistics_copy(struct sqlite3_statistics *gs) {
     gs->sqlite3_queries_failed_locked = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
     gs->sqlite3_rows                  = __atomic_load_n(&sqlite3_statistics.sqlite3_rows, __ATOMIC_RELAXED);
 
-    usec_t timeout = default_rrd_update_every * USEC_PER_SEC + default_rrd_update_every * USEC_PER_SEC / 3;
+    usec_t timeout = nd_profile.update_every * USEC_PER_SEC + nd_profile.update_every * USEC_PER_SEC / 3;
     usec_t now = now_monotonic_usec();
     if(!last_run)
         last_run = now;

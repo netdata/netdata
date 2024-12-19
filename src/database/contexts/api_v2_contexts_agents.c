@@ -104,7 +104,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
         buffer_json_member_add_array(wb, "db_size");
         size_t group_seconds;
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
+        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             STORAGE_ENGINE *eng = localhost->db[tier].eng;
             if (!eng) continue;
 

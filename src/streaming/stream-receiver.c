@@ -310,7 +310,7 @@ static ssize_t send_to_child(const char *txt, void *data, STREAM_TRAFFIC_TYPE ty
 
 static void streaming_parser_init(struct receiver_state *rpt) {
     rpt->thread.cd = (struct plugind){
-        .update_every = default_rrd_update_every,
+        .update_every = nd_profile.update_every,
         .unsafe = {
             .spinlock = SPINLOCK_INITIALIZER,
             .running = true,

@@ -189,7 +189,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         netdata_configured_utc_offset,
         program_name,
         NETDATA_VERSION,
-        default_rrd_update_every,
+        nd_profile.update_every,
         default_rrd_history_entries,
         default_rrd_memory_mode,
         health_plugin_enabled(),

@@ -437,7 +437,8 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
                 , NULL
                 , web_client_first_request_timeout
                 , web_client_timeout
-                , default_rrd_update_every * 1000 // timer_milliseconds
+                ,
+        nd_profile.update_every * 1000 // timer_milliseconds
                 , ptr // timer_data
                 , worker_private->max_sockets
     );

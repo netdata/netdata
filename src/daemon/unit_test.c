@@ -1269,7 +1269,7 @@ int run_test(struct test *test)
     fprintf(stderr, "\nRunning test '%s':\n%s\n", test->name, test->description);
 
     default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
-    default_rrd_update_every = test->update_every;
+    nd_profile.update_every = test->update_every;
 
     char name[101];
     snprintfz(name, sizeof(name) - 1, "unittest-%s", test->name);
@@ -1538,7 +1538,7 @@ int unit_test(long delay, long shift)
 
     //debug_flags = 0xffffffff;
     default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
-    default_rrd_update_every = 1;
+    nd_profile.update_every = 1;
 
     int do_abs = 1;
     int do_inc = 1;

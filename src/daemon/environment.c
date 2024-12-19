@@ -36,7 +36,7 @@ static const char *verify_or_create_required_private_directory(const char *dir) 
 void set_environment_for_plugins_and_scripts(void) {
     {
         char b[16];
-        snprintfz(b, sizeof(b) - 1, "%d", default_rrd_update_every);
+        snprintfz(b, sizeof(b) - 1, "%d", (int)nd_profile.update_every);
         nd_setenv("NETDATA_UPDATE_EVERY", b, 1);
     }
 

@@ -296,7 +296,7 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
 void journalfile_v2_data_unmount_cleanup(time_t now_s) {
     // DO NOT WAIT ON ANY LOCK!!!
 
-    for(size_t tier = 0; tier < (size_t)storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < (size_t)nd_profile.storage_tiers;tier++) {
         struct rrdengine_instance *ctx = multidb_ctx[tier];
         if(!ctx) continue;
 

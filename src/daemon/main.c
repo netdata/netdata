@@ -213,10 +213,10 @@ int windows_perflib_dump(const char *key);
 int unittest_prepare_rrd(const char **user) {
     netdata_conf_section_global_run_as_user(user);
     netdata_conf_section_global();
-    default_rrd_update_every = 1;
+    nd_profile.update_every = 1;
     default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
     health_plugin_disable();
-    storage_tiers = 1;
+    nd_profile.storage_tiers = 1;
     registry_init();
     if(rrd_init("unittest", NULL, true)) {
         fprintf(stderr, "rrd_init failed for unittest\n");
@@ -464,7 +464,7 @@ int netdata_main(int argc, char **argv) {
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
                             netdata_conf_section_global_run_as_user(&user);
                             netdata_conf_section_global();
-                            default_rrd_update_every = 1;
+                            nd_profile.update_every = 1;
                             registry_init();
                             if(rrd_init("dbengine-dataset", NULL, true)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
@@ -773,7 +773,7 @@ int netdata_main(int argc, char **argv) {
 
     stream_conf_load();
     check_local_streaming_capabilities();
-    netdata_conf_apply_profile();
+    nd_profile_apply();
 
     // ----------------------------------------------------------------------------------------------------------------
     // streaming, replication, functions initialization

@@ -297,7 +297,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
 
-    rpt->config.update_every = default_rrd_update_every;
+    rpt->config.update_every = nd_profile.update_every;
 
     // parse the parameters and fill rpt and rpt->system_info
 

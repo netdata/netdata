@@ -248,7 +248,7 @@ bool rrdmetric_update_retention(RRDMETRIC *rm) {
     }
     else {
         RRDHOST *rrdhost = rm->ri->rc->rrdhost;
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
+        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             STORAGE_ENGINE *eng = rrdhost->db[tier].eng;
 
             time_t first_time_t, last_time_t;
