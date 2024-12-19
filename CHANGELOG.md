@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- chore\(aclk/mqtt\): remove client\_id len check [\#19247](https://github.com/netdata/netdata/pull/19247) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d\): simplify cli is help [\#19246](https://github.com/netdata/netdata/pull/19246) ([ilyam8](https://github.com/ilyam8))
+- Health transition saving optimization [\#19245](https://github.com/netdata/netdata/pull/19245) ([stelfrag](https://github.com/stelfrag))
+- Avoid blocking waiting for an event during shutdown [\#19244](https://github.com/netdata/netdata/pull/19244) ([stelfrag](https://github.com/stelfrag))
 - Do not call finalize on shutdown [\#19241](https://github.com/netdata/netdata/pull/19241) ([stelfrag](https://github.com/stelfrag))
 - fix the renamed function under windows [\#19240](https://github.com/netdata/netdata/pull/19240) ([ktsaou](https://github.com/ktsaou))
 - update netdata internal metrics ctx [\#19239](https://github.com/netdata/netdata/pull/19239) ([ilyam8](https://github.com/ilyam8))
@@ -447,11 +451,6 @@
 - fix system-info disk space in LXC [\#18696](https://github.com/netdata/netdata/pull/18696) ([ilyam8](https://github.com/ilyam8))
 - fix ram usage calculation in LXC [\#18695](https://github.com/netdata/netdata/pull/18695) ([ilyam8](https://github.com/ilyam8))
 - cgroups.plugin: call `setresuid` before spawn server init [\#18694](https://github.com/netdata/netdata/pull/18694) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18693](https://github.com/netdata/netdata/pull/18693) ([netdatabot](https://github.com/netdatabot))
-- go.d/nvidia\_smi: use configured "timeout" in loop mode [\#18692](https://github.com/netdata/netdata/pull/18692) ([ilyam8](https://github.com/ilyam8))
-- fix\(cgroups.plugin\): handle containers no env vars [\#18691](https://github.com/netdata/netdata/pull/18691) ([daniel-sampliner](https://github.com/daniel-sampliner))
-- MSSQL Metrics \(Part II\). [\#18689](https://github.com/netdata/netdata/pull/18689) ([thiagoftsm](https://github.com/thiagoftsm))
-- Log to windows [\#18688](https://github.com/netdata/netdata/pull/18688) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
