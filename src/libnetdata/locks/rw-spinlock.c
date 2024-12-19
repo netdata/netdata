@@ -46,30 +46,33 @@ void rw_spinlock_read_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *func
     size_t spins = 0;
     usec_t usec = 1;
 
+    int32_t expected = rw_spinlock->counter;
     while (true) {
-        int32_t count = __atomic_load_n(&rw_spinlock->counter, __ATOMIC_RELAXED);
-        if (count == -1 || (!locks_held_by_thread && __atomic_load_n(&rw_spinlock->writers_waiting, __ATOMIC_RELAXED))) {
-            // Writer is active or waiting, spin
-            spins++;
-            microsleep(usec);
-            usec = usec >= MAX_USEC ? MAX_USEC : usec * 2;
-            continue;
-        }
+        if(expected < 0)
+            // we should not increase it if it is negative (a writer holds the lock)
+            expected = 0;
 
         // Attempt to increment reader count
         if (__atomic_compare_exchange_n(
                 &rw_spinlock->counter,
-                &count,
-                count + 1,
+                &expected,
+                expected + 1,
                 false, // Strong CAS
                 __ATOMIC_ACQUIRE, // Success memory order
                 __ATOMIC_RELAXED  // Failure memory order
                 ))
             break;
 
-        if (++spins > SPIN_THRESHOLD) {
+        spins++;
+
+        if (expected == -1 || (!locks_held_by_thread && __atomic_load_n(&rw_spinlock->writers_waiting, __ATOMIC_RELAXED))) {
+            // Writer is active or waiting
+            microsleep(usec);
+            usec = usec >= MAX_USEC ? MAX_USEC : usec * 2;
+        }
+        else if (spins > SPIN_THRESHOLD) {
+            // no writers, but the expected count was wrong
             tinysleep();
-            yield_the_processor();
         }
     }
 
