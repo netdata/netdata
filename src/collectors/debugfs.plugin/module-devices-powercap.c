@@ -126,7 +126,7 @@ static struct zone_t *get_main_rapl_zones(void) {
     return base;
 }
 
-int do_sys_devices_virtual_powercap(int update_every, const char *name __maybe_unused) {
+int do_module_devices_powercap(int update_every, const char *name __maybe_unused) {
 
     if (unlikely(!rapl_zones)) {
         rapl_zones = get_main_rapl_zones();

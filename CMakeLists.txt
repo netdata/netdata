@@ -2186,23 +2186,44 @@ list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
 #
 
 if(ENABLE_PLUGIN_DEBUGFS)
+    # Check for libcap (optional)
     pkg_check_modules(CAP QUIET libcap)
 
-    set(DEBUGFS_PLUGIN_FILES src/collectors/debugfs.plugin/debugfs_plugin.c
-                             src/collectors/debugfs.plugin/debugfs_plugin.h
-                             src/collectors/debugfs.plugin/debugfs_extfrag.c
-                             src/collectors/debugfs.plugin/debugfs_zswap.c
-                             src/collectors/debugfs.plugin/sys_devices_virtual_powercap.c)
+    # Define debugfs.plugin source files
+    set(DEBUGFS_PLUGIN_FILES
+            src/collectors/debugfs.plugin/debugfs_plugin.c
+            src/collectors/debugfs.plugin/debugfs_plugin.h
+            src/collectors/debugfs.plugin/module-numa-extfrag.c
+            src/collectors/debugfs.plugin/module-zswap.c
+            src/collectors/debugfs.plugin/module-devices-powercap.c
+            src/collectors/debugfs.plugin/module-libsensors.c
+    )
 
+    # Add executable for debugfs.plugin
     add_executable(debugfs.plugin ${DEBUGFS_PLUGIN_FILES})
-    target_link_libraries(debugfs.plugin libnetdata ${CAP_LIBRARIES})
+
+    # Find libsensors (optional)
+    find_package(LibSensors QUIET)
+    if(LibSensors_FOUND)
+        message(STATUS "libsensors found: ${LibSensors_INCLUDE_DIRS}, ${LibSensors_LIBRARIES}")
+        target_include_directories(debugfs.plugin PRIVATE ${LibSensors_INCLUDE_DIRS})
+        target_link_libraries(debugfs.plugin PRIVATE ${LibSensors_LIBRARIES})
+        target_compile_definitions(debugfs.plugin PRIVATE HAVE_LIBSENSORS)
+    else()
+        message(WARNING "libsensors not found. Building debugfs.plugin without it.")
+    endif()
+
+    # Link against libnetdata and optionally libcap
+    target_link_libraries(debugfs.plugin PRIVATE libnetdata ${CAP_LIBRARIES})
     target_include_directories(debugfs.plugin PRIVATE ${CAP_INCLUDE_DIRS})
     target_compile_options(debugfs.plugin PRIVATE ${CAP_CFLAGS_OTHER})
 
+    # Install the debugfs.plugin binary
     install(TARGETS debugfs.plugin
             COMPONENT plugin-debugfs
             DESTINATION usr/libexec/netdata/plugins.d)
 
+    # Install additional packaging files if building for packaging
     if(BUILD_FOR_PACKAGING)
         install(FILES
                 ${PKG_FILES_PATH}/copyright

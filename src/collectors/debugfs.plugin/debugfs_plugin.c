@@ -15,14 +15,28 @@ static struct debugfs_module {
 
     int (*func)(int update_every, const char *name);
 }  debugfs_modules[] = {
-    // Memory Fragmentation
-    { .name = "/sys/kernel/debug/extfrag", .enabled = CONFIG_BOOLEAN_YES,
-      .func = do_debugfs_extfrag},
-    { .name = "/sys/kernel/debug/zswap", .enabled = CONFIG_BOOLEAN_YES,
-      .func = do_debugfs_zswap},
-    // Linux powercap metrics is here because it needs privilege to read each RAPL zone
-    { .name = "/sys/devices/virtual/powercap", .enabled = CONFIG_BOOLEAN_YES,
-      .func = do_sys_devices_virtual_powercap},
+    {
+        // Memory Fragmentation
+        .name = "/sys/kernel/debug/extfrag",
+        .enabled = CONFIG_BOOLEAN_YES,
+        .func = do_module_numa_extfrag
+    },
+    {
+        .name = "/sys/kernel/debug/zswap",
+        .enabled = CONFIG_BOOLEAN_YES,
+        .func = do_module_zswap
+    },
+    {
+        // Linux powercap metrics is here because it needs privilege to read each RAPL zone
+        .name = "/sys/devices/virtual/powercap",
+        .enabled = CONFIG_BOOLEAN_YES,
+        .func = do_module_devices_powercap
+    },
+    {// Linux powercap metrics is here because it needs privilege to read each RAPL zone
+     .name = "libsensors",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .func = do_module_libsensors
+    },
 
     // The terminator
     { .name = NULL, .enabled = CONFIG_BOOLEAN_NO, .func = NULL}

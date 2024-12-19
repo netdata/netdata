@@ -59,7 +59,7 @@ static void extfrag_send_chart(char *chart_id, collected_number *values)
     fflush(stdout);
 }
 
-int do_debugfs_extfrag(int update_every, const char *name) {
+int do_module_numa_extfrag(int update_every, const char *name) {
     static procfile *ff = NULL;;
 
     if (unlikely(!ff)) {

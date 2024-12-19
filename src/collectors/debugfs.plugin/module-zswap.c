@@ -378,7 +378,7 @@ static int debugfs_is_zswap_enabled()
     return 1;
 }
 
-int do_debugfs_zswap(int update_every, const char *name)
+int do_module_zswap(int update_every, const char *name)
 {
     static int check_if_enabled = 1;
 
