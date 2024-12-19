@@ -548,6 +548,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core)
         length *= ebpf_nprocs;
 
     uint32_t key = 0, next_key = 0;
+    sem_wait(shm_mutex_ebpf_integration);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, cv)) {
             goto end_dc_loop;
@@ -555,25 +556,15 @@ static void ebpf_read_dc_apps_table(int maps_per_core)
 
         ebpf_dcstat_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(key, cv->tgid, cv->name, NETDATA_EBPF_PIDS_DCSTAT_IDX);
-        netdata_publish_dcstat_t *publish = pid_stat->dc;
-        if (!publish)
-            pid_stat->dc = publish = ebpf_dcallocate_publish();
+        netdata_ebpf_pid_stats_t *local_pid = &integration_shm[key];
+        netdata_dcstat_pid_t *w = &local_pid->directory_cache;
 
-        if (!publish->ct || publish->ct != cv->ct) {
-            publish->ct = cv->ct;
-            publish->curr.not_found = cv[0].not_found;
-            publish->curr.file_system = cv[0].file_system;
-            publish->curr.cache_access = cv[0].cache_access;
-
-            pid_stat->not_updated = 0;
+        if (!w->ct || w->ct != cv->ct) {
+            local_pid->thread_collecting |= NETDATA_EBPF_PIDS_DCSTAT_IDX;
+            memcpy(w, &cv[0], sizeof(*w));
         } else {
-            if (kill(key, 0)) { // No PID found
-                ebpf_reset_specific_pid_data(pid_stat);
-            } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(pid_stat, fd, key, NETDATA_EBPF_PIDS_DCSTAT_IDX);
-                ebpf_dc_release_publish(publish);
-                pid_stat->dc = NULL;
+            if (local_pid->process.release_call || kill((pid_t)key, 0)) { // No PID found
+                netdata_integration_release_pid(local_pid, fd, key, NETDATA_EBPF_PIDS_PROCESS_IDX);
             }
         }
 
@@ -582,6 +573,7 @@ end_dc_loop:
         memset(cv, 0, length);
         key = next_key;
     }
+    sem_post(shm_mutex_ebpf_integration);
 }
 
 /**
@@ -597,14 +589,12 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
     memset(&publish->curr, 0, sizeof(netdata_publish_dcstat_pid_t));
     for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *pid_stat = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_DCSTAT_IDX);
-        netdata_publish_dcstat_t *w = pid_stat->dc;
-        if (!w)
-            continue;
+        netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
+        netdata_dcstat_pid_t *w = &local_pid->directory_cache;
 
-        publish->curr.cache_access += w->curr.cache_access;
-        publish->curr.file_system += w->curr.file_system;
-        publish->curr.not_found += w->curr.not_found;
+        publish->curr.cache_access += w->cache_access;
+        publish->curr.file_system += w->file_system;
+        publish->curr.not_found += w->not_found;
     }
 }
 
@@ -783,12 +773,10 @@ static void ebpf_update_dc_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_DCSTAT_IDX);
-            netdata_publish_dcstat_t *in = local_pid->dc;
-            if (!in)
-                continue;
+            netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
+            netdata_dcstat_pid_t *in = &local_pid->directory_cache;
 
-            memcpy(out, &in->curr, sizeof(netdata_publish_dcstat_pid_t));
+            memcpy(out, in, sizeof(*in));
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
