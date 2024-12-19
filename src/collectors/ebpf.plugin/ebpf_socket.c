@@ -1672,6 +1672,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     // can have values from the previous one.
     memset(values, 0, length);
     time_t update_time = time(NULL);
+    sem_wait(shm_mutex_ebpf_integration);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         test = bpf_map_lookup_elem(fd, &key, values);
         bool deleted = true;
@@ -1749,20 +1750,20 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
 end_socket_loop: ; // the empty statement is here to allow code to be compiled by old compilers
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key.pid, 0, values[0].name, EBPF_MODULE_SOCKET_IDX);
-        ebpf_socket_publish_apps_t *curr = local_pid->socket;
-        if (!curr)
-            local_pid->socket = curr = ebpf_socket_allocate_publish();
+        netdata_ebpf_pid_stats_t *local_pid = &integration_shm[key.pid];
+        netdata_socket_t *curr = &local_pid->socket;
 
-        if (!deleted)
-            ebpf_socket_fill_publish_apps(curr, values);
+        if (!deleted) {
+            local_pid->thread_collecting |= NETDATA_EBPF_PIDS_SOCKET_IDX;
+            memcpy(curr, &values[0], sizeof(*curr));
+        }
         else {
-            ebpf_release_pid_data(local_pid, fd, key.pid, EBPF_MODULE_SOCKET_IDX);
-            ebpf_socket_release_publish(curr);
+            netdata_integration_release_pid(local_pid, fd, key.pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
         }
         memset(values, 0, length);
         memcpy(&key, &next_key, sizeof(key));
     }
+    sem_post(shm_mutex_ebpf_integration);
 }
 /**
  * Resume apps data
@@ -1781,20 +1782,18 @@ void ebpf_socket_resume_apps_data()
         memset(&w->socket, 0, sizeof(ebpf_socket_publish_apps_t));
         for (; move; move = move->next) {
             int32_t pid = move->pid;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SOCKET_IDX);
-            ebpf_socket_publish_apps_t *ws = local_pid->socket;
-            if (!ws)
-                continue;
+            netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
+            netdata_socket_t *ws = &local_pid->socket;
 
-            values->call_tcp_v4_connection = ws->call_tcp_v4_connection;
-            values->call_tcp_v6_connection = ws->call_tcp_v6_connection;
-            values->bytes_sent = ws->bytes_sent;
-            values->bytes_received = ws->bytes_received;
-            values->call_tcp_sent = ws->call_tcp_sent;
-            values->call_tcp_received = ws->call_tcp_received;
-            values->retransmit = ws->retransmit;
-            values->call_udp_sent = ws->call_udp_sent;
-            values->call_udp_received = ws->call_udp_received;
+            values->call_tcp_v4_connection = ws->tcp.ipv4_connect;
+            values->call_tcp_v6_connection = ws->tcp.ipv6_connect;
+            values->bytes_sent = ws->tcp.tcp_bytes_sent;
+            values->bytes_received = ws->tcp.tcp_bytes_received;
+            values->call_tcp_sent = ws->tcp.call_tcp_sent;
+            values->call_tcp_received = ws->tcp.call_tcp_received;
+            values->retransmit = ws->tcp.retransmit;
+            values->call_udp_sent = ws->udp.udp_bytes_sent;
+            values->call_udp_received = ws->udp.udp_bytes_received;
         }
     }
 }
@@ -1978,27 +1977,6 @@ static void ebpf_socket_read_hash_global_tables(netdata_idx_t *stats, int maps_p
 }
 
 /**
- * Fill publish apps when necessary.
- *
- * @param current_pid  the PID that I am updating
- * @param ns           the structure with data read from memory.
- */
-void ebpf_socket_fill_publish_apps(ebpf_socket_publish_apps_t *curr, netdata_socket_t *ns)
-{
-    curr->bytes_sent = ns->tcp.tcp_bytes_sent;
-    curr->bytes_received = ns->tcp.tcp_bytes_received;
-    curr->call_tcp_sent = ns->tcp.call_tcp_sent;
-    curr->call_tcp_received = ns->tcp.call_tcp_received;
-    curr->retransmit = ns->tcp.retransmit;
-    curr->call_close = ns->tcp.close;
-    curr->call_tcp_v4_connection = ns->tcp.ipv4_connect;
-    curr->call_tcp_v6_connection = ns->tcp.ipv6_connect;
-
-    curr->call_udp_sent = ns->udp.call_udp_sent;
-    curr->call_udp_received = ns->udp.call_udp_received;
-}
-
-/**
  * Update cgroup
  *
  * Update cgroup data based in PIDs.
@@ -2013,21 +1991,20 @@ static void ebpf_update_socket_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, EBPF_MODULE_SOCKET_IDX);
-            ebpf_socket_publish_apps_t *in = local_pid->socket;
-            if (!in)
-                continue;
 
-            publish->bytes_sent = in->bytes_sent;
-            publish->bytes_received = in->bytes_received;
-            publish->call_tcp_sent = in->call_tcp_sent;
-            publish->call_tcp_received = in->call_tcp_received;
-            publish->retransmit = in->retransmit;
-            publish->call_udp_sent = in->call_udp_sent;
-            publish->call_udp_received = in->call_udp_received;
-            publish->call_close = in->call_close;
-            publish->call_tcp_v4_connection = in->call_tcp_v4_connection;
-            publish->call_tcp_v6_connection = in->call_tcp_v6_connection;
+            netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
+            netdata_socket_t *in = &local_pid->socket;
+
+            publish->bytes_sent = in->tcp.tcp_bytes_sent;
+            publish->bytes_received = in->tcp.tcp_bytes_received;
+            publish->call_tcp_sent = in->tcp.call_tcp_sent;
+            publish->call_tcp_received = in->tcp.call_tcp_received;
+            publish->retransmit = in->tcp.retransmit;
+            publish->call_udp_sent = in->udp.call_udp_sent;
+            publish->call_udp_received = in->udp.call_udp_received;
+            publish->call_close = in->tcp.close;
+            publish->call_tcp_v4_connection = in->tcp.ipv4_connect;
+            publish->call_tcp_v6_connection = in->tcp.ipv6_connect;
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
