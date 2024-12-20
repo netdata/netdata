@@ -14,7 +14,7 @@ struct pid_on_target2 {
     int updated;
 
     netdata_ebpf_swap_t swap;
-    netdata_publish_fd_stat_t fd;
+    netdata_fd_stat_t fd;
     netdata_publish_vfs_t vfs;
     ebpf_publish_process_t ps;
     netdata_dcstat_pid_t dc;
