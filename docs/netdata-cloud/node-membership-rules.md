@@ -1,4 +1,4 @@
-# Node Membership Rules
+# Node Membership Rules (Dynamic Room Allocation)
 
 Node Membership Rules automate Node organization within Rooms based on host labels. This simplifies infrastructure management by dynamically assigning Nodes to appropriate Rooms, eliminating manual intervention.
 
