@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-
-# netdata
-# real-time performance and health monitoring, done right!
-# (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
-# GPL v3+
 #
 # charts.d.plugin allows easy development of BASH plugins
 #

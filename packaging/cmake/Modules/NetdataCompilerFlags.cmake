@@ -1,7 +1,5 @@
-# Functions to simplify handling of extra compiler flags.
-#
-# Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
+# Functions to simplify handling of extra compiler flags.
 
 include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)

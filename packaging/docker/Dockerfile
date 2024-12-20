@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# author  : paulfantom
 
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007

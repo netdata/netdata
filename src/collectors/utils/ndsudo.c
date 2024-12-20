@@ -381,7 +381,7 @@ void show_help() {
     fprintf(stdout, "\n");
     fprintf(stdout, "ndsudo\n");
     fprintf(stdout, "\n");
-    fprintf(stdout, "(C) Netdata Inc.\n");
+    fprintf(stdout, "Copyright 2018-2025 Netdata Inc.\n");
     fprintf(stdout, "\n");
     fprintf(stdout, "A helper to allow Netdata run privileged commands.\n");
     fprintf(stdout, "\n");

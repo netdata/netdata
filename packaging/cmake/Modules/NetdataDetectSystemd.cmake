@@ -1,7 +1,5 @@
-# CMake Module to handle all the systemd-related checks for Netdata.
-#
-# Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
+# CMake Module to handle all the systemd-related checks for Netdata.
 
 macro(detect_systemd)
    find_library(SYSTEMD_LIBRARY NAMES systemd)

@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-#
-# Copyright: © 2021 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os

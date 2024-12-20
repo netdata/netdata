@@ -19,9 +19,6 @@ fi
 exec "$pybinary"  "$0" "${filtered[@]}" # '''
 
 # -*- coding: utf-8 -*-
-# Description:
-# Author: Pawel Krupa (paulfantom)
-# Author: Ilya Mashchenko (l2isbad)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import collections

@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# netdata	Real-time performance monitoring, done right
+# Netdata -	Monitoring and troubleshooting, transformed!
 # chkconfig: 345 99 01
 # description:  Netdata is a daemon that collects data in real-time (per second)
 #               and presents a web site to view and analyze them. The presentation
