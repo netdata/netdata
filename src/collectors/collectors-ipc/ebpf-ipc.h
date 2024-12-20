@@ -217,7 +217,7 @@ typedef struct netdata_ebpf_pid_stats {
     netdata_dcstat_pid_t directory_cache;
     netdata_ebpf_swap_t swap;
     netdata_ebpf_vfs_t vfs;
-    netdata_fd_stat_t shm;
+    netdata_ebpf_shm_t shm;
 } netdata_ebpf_pid_stats_t;
 
 // ----------------------------------------------------------------------------

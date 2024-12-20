@@ -18,7 +18,7 @@ struct pid_on_target2 {
     netdata_publish_vfs_t vfs;
     ebpf_publish_process_t ps;
     netdata_dcstat_pid_t dc;
-    netdata_publish_shm_t shm;
+    netdata_ebpf_shm_t shm;
     netdata_socket_t socket;
     netdata_publish_cachestat_t cachestat;
 
