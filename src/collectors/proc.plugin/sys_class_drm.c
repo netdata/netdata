@@ -668,6 +668,7 @@ static int read_clk_freq_file(procfile **p_ff, const char *const pathname, colle
     }
 
     procfile_close((*p_ff));
+    *p_ff = NULL;
     return -4;
 }
 
