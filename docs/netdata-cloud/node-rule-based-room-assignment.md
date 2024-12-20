@@ -1,6 +1,6 @@
-# Node Membership Rules
+# Node Rule-Based Room Assignment
 
-Node Membership Rules automate Node organization within Rooms based on host labels. This simplifies infrastructure management by dynamically assigning Nodes to appropriate Rooms, eliminating manual intervention.
+Organize Nodes within Rooms automatically using configurable label-based rules. This feature simplifies infrastructure management by dynamically assigning Nodes to appropriate Rooms based on their host labels, eliminating manual intervention.
 
 **Important**:
 
