@@ -646,10 +646,12 @@ cleanup:
 static int read_clk_freq_file(procfile **p_ff, const char *const pathname, collected_number *num){
     if(unlikely(!*p_ff)){
         *p_ff = procfile_open(pathname, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-        if(unlikely(!*p_ff)) return -2;
+        if(unlikely(!*p_ff))
+            return -1;
     }
 
-    if(unlikely(NULL == (*p_ff = procfile_readall(*p_ff)))) return -3;
+    if(unlikely(NULL == (*p_ff = procfile_readall(*p_ff))))
+        return -1;
 
     for(size_t l = 0; l < procfile_lines(*p_ff) ; l++) {
         char *str_with_units = NULL;
@@ -666,9 +668,8 @@ static int read_clk_freq_file(procfile **p_ff, const char *const pathname, colle
         }
     }
 
-    procfile_close((*p_ff));
-    *p_ff = NULL;
-    return -4;
+    *num = 0; // the card is not active, so no speed reporting
+    return 0;
 }
 
 static char *set_id(const char *const suf_1, const char *const suf_2, const char *const suf_3){
@@ -835,8 +836,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
     int chart_prio = NETDATA_CHART_PRIO_DRM_AMDGPU;
 
     if(unlikely(!drm_dir)) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/drm");
+        char filename[FILENAME_MAX];
+        snprintfz(filename, sizeof(filename), "%s%s", netdata_configured_host_prefix, "/sys/class/drm");
         const char *drm_dir_name = config_get(CONFIG_SECTION_PLUGIN_PROC_DRM, "directory to monitor", filename);
         if(unlikely(NULL == (drm_dir = opendir(drm_dir_name)))){
             collector_error("Cannot read directory '%s'", drm_dir_name);
@@ -849,23 +850,23 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                  (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0'))) continue;
             
             if(de->d_type == DT_LNK && !strncmp(de->d_name, "card", 4) && !strchr(de->d_name, '-')) {
-                snprintfz(filename, FILENAME_MAX, "%s/%s/%s", drm_dir_name, de->d_name, "device/uevent");
+                snprintfz(filename, sizeof(filename), "%s/%s/%s", drm_dir_name, de->d_name, "device/uevent");
                 if(check_card_is_amdgpu(filename)) continue;
 
                 /* Get static info */              
 
                 struct card *const c = callocz(1, sizeof(struct card));
-                snprintfz(filename, FILENAME_MAX, "%s/%s", drm_dir_name, de->d_name);
+                snprintfz(filename, sizeof(filename), "%s/%s", drm_dir_name, de->d_name);
                 c->pathname = strdupz(filename);
 
-                snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/device");
+                snprintfz(filename, sizeof(filename), "%s/%s", c->pathname, "device/device");
                 if(read_single_base64_or_hex_number_file(filename, &c->id.asic_id)){
                     collector_error("Cannot read asic_id from '%s'", filename);
                     card_free(c);
                     continue;
                 }
 
-                snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, "device/revision");
+                snprintfz(filename, sizeof(filename), "%s/%s", c->pathname, "device/revision");
                 if(read_single_base64_or_hex_number_file(filename, &c->id.pci_rev_id)){
                     collector_error("Cannot read pci_rev_id from '%s'", filename);
                     card_free(c);
@@ -883,10 +884,17 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
 
                 collected_number tmp_val; 
-                #define set_prop_pathname(prop_filename, prop_pathname, p_ff) do {              \
-                    snprintfz(filename, FILENAME_MAX, "%s/%s", c->pathname, prop_filename);     \
-                    if((p_ff && !read_clk_freq_file(p_ff, filename, &tmp_val)) ||               \
-                          !read_single_number_file(filename, (unsigned long long *) &tmp_val))  \
+                #define set_prop_pathname_single_number_file(prop_filename, prop_pathname) do { \
+                    snprintfz(filename, sizeof(filename), "%s/%s", c->pathname, prop_filename); \
+                    if(!read_single_number_file(filename, (unsigned long long *) &tmp_val))     \
+                        prop_pathname = strdupz(filename);                                      \
+                    else                                                                        \
+                        collector_info("Cannot read file '%s'", filename);                      \
+                } while(0)
+
+                #define set_prop_pathname_clock_file(prop_filename, prop_pathname, p_ff) do {   \
+                    snprintfz(filename, sizeof(filename), "%s/%s", c->pathname, prop_filename); \
+                    if(!read_clk_freq_file(p_ff, filename, &tmp_val))                           \
                         prop_pathname = strdupz(filename);                                      \
                     else                                                                        \
                         collector_info("Cannot read file '%s'", filename);                      \
@@ -894,7 +902,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 /* Initialize GPU and VRAM utilization metrics */
 
-                set_prop_pathname("device/gpu_busy_percent", c->pathname_util_gpu, NULL);
+                set_prop_pathname_single_number_file("device/gpu_busy_percent", c->pathname_util_gpu);
                 
                 if(c->pathname_util_gpu){
                     c->st_util_gpu = rrdset_create_localhost(
@@ -919,7 +927,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     add_do_rrd_x(c, do_rrd_util_gpu);
                 }
 
-                set_prop_pathname("device/mem_busy_percent", c->pathname_util_mem, NULL);
+                set_prop_pathname_single_number_file("device/mem_busy_percent", c->pathname_util_mem);
 
                 if(c->pathname_util_mem){
                     c->st_util_mem = rrdset_create_localhost(
@@ -947,7 +955,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 /* Initialize GPU and VRAM clock frequency metrics */
 
-                set_prop_pathname("device/pp_dpm_sclk", c->pathname_clk_gpu, &c->ff_clk_gpu);
+                set_prop_pathname_clock_file("device/pp_dpm_sclk", c->pathname_clk_gpu, &c->ff_clk_gpu);
                 
                 if(c->pathname_clk_gpu){
                     c->st_clk_gpu = rrdset_create_localhost(
@@ -973,7 +981,7 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 }
 
-                set_prop_pathname("device/pp_dpm_mclk", c->pathname_clk_mem, &c->ff_clk_mem);
+                set_prop_pathname_clock_file("device/pp_dpm_mclk", c->pathname_clk_mem, &c->ff_clk_mem);
 
                 if(c->pathname_clk_mem){
                     c->st_clk_mem = rrdset_create_localhost(
@@ -1001,8 +1009,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
 
                 /* Initialize GPU memory usage metrics */
 
-                set_prop_pathname("device/mem_info_vram_used",      c->pathname_mem_used_vram,      NULL);
-                set_prop_pathname("device/mem_info_vram_total",     c->pathname_mem_total_vram,     NULL);
+                set_prop_pathname_single_number_file("device/mem_info_vram_used",      c->pathname_mem_used_vram);
+                set_prop_pathname_single_number_file("device/mem_info_vram_total",     c->pathname_mem_total_vram);
                 if(c->pathname_mem_total_vram) c->total_vram = tmp_val;
                 
                 if(c->pathname_mem_used_vram && c->pathname_mem_total_vram){
@@ -1050,8 +1058,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     add_do_rrd_x(c, do_rrd_vram);
                 }
 
-                set_prop_pathname("device/mem_info_vis_vram_used",  c->pathname_mem_used_vis_vram,  NULL);
-                set_prop_pathname("device/mem_info_vis_vram_total", c->pathname_mem_total_vis_vram, NULL);
+                set_prop_pathname_single_number_file("device/mem_info_vis_vram_used",  c->pathname_mem_used_vis_vram);
+                set_prop_pathname_single_number_file("device/mem_info_vis_vram_total", c->pathname_mem_total_vis_vram);
                 if(c->pathname_mem_total_vis_vram) c->total_vis_vram = tmp_val;
 
                 if(c->pathname_mem_used_vis_vram && c->pathname_mem_total_vis_vram){
@@ -1099,8 +1107,8 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                     add_do_rrd_x(c, do_rrd_vis_vram);
                 }
 
-                set_prop_pathname("device/mem_info_gtt_used",       c->pathname_mem_used_gtt,       NULL);
-                set_prop_pathname("device/mem_info_gtt_total",      c->pathname_mem_total_gtt,      NULL);
+                set_prop_pathname_single_number_file("device/mem_info_gtt_used",       c->pathname_mem_used_gtt);
+                set_prop_pathname_single_number_file("device/mem_info_gtt_total",      c->pathname_mem_total_gtt);
                 if(c->pathname_mem_total_gtt) c->total_gtt = tmp_val;
 
                 if(c->pathname_mem_used_gtt && c->pathname_mem_total_gtt){
