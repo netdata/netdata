@@ -429,7 +429,7 @@ if [ "$(id -u)" -ne 0 ] && [ -z "${NETDATA_PREPARE_ONLY}" ]; then
 fi
 
 netdata_banner
-progress "real-time performance monitoring, done right!"
+progress "monitoring and troubleshooting, transformed!"
 cat << BANNER1
 
   You are about to build and install netdata to your system.
@@ -999,7 +999,7 @@ fi
 # -----------------------------------------------------------------------------
 # check if we can re-start netdata
 
-# TODO(paulfantom): Creation of configuration file should be handled by a build system. Additionally we shouldn't touch configuration files in /etc/netdata/...
+# TODO: Creation of configuration file should be handled by a build system. Additionally we shouldn't touch configuration files in /etc/netdata/...
 started=0
 if [ ${DONOTSTART} -eq 1 ]; then
   create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"

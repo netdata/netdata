@@ -1,8 +1,6 @@
-# Custom CMake module to find the Go toolchain
-#
-# Copyright (c) 2024 Netdata Inc
-#
 # SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Custom CMake module to find the Go toolchain
 #
 # This is a relatively orthodox CMake Find Module. It can be used by
 # simply including it and then invoking `find_package(Go)`.

@@ -1,0 +1,22 @@
+{
+  "vnode": "ok",
+  "update_every": 123,
+  "url": "ok",
+  "body": "ok",
+  "method": "ok",
+  "headers": {
+    "ok": "ok"
+  },
+  "username": "ok",
+  "password": "ok",
+  "proxy_url": "ok",
+  "proxy_username": "ok",
+  "proxy_password": "ok",
+  "timeout": 123.123,
+  "not_follow_redirects": true,
+  "tls_ca": "ok",
+  "tls_cert": "ok",
+  "tls_key": "ok",
+  "tls_skip_verify": true,
+  "force_http2": true
+}

@@ -2201,21 +2201,11 @@ void ebpf_update_disabled_plugin_stats(ebpf_module_t *em)
  */
 void ebpf_print_help()
 {
-    const time_t t = time(NULL);
-    struct tm ct;
-    struct tm *test = localtime_r(&t, &ct);
-    int year;
-    if (test)
-        year = ct.tm_year;
-    else
-        year = 0;
-
     fprintf(stderr,
             "\n"
             " Netdata ebpf.plugin %s\n"
-            " Copyright (C) 2016-%d Costa Tsaousis <costa@tsaousis.gr>\n"
+            " Copyright 2018-2025 Netdata Inc.\n"
             " Released under GNU General Public License v3 or later.\n"
-            " All rights reserved.\n"
             "\n"
             " This eBPF.plugin is a data collector plugin for netdata.\n"
             "\n"
@@ -2267,8 +2257,7 @@ void ebpf_print_help()
             "\n"
             " [-]-core              Use CO-RE when available(Working in progress).\n"
             "\n",
-            NETDATA_VERSION,
-            (year >= 116) ? year + 1900 : 2020);
+            NETDATA_VERSION);
 }
 
 /*****************************************************************

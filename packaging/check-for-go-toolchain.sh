@@ -1,6 +1,4 @@
 #!/bin/sh
-#
-# Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-v3+
 #
 # Check if we need to install a Go toolchain.

@@ -1,7 +1,5 @@
-# Functions and macros for handling of JSON-C
-#
-# Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
+# Functions and macros for handling of JSON-C
 
 # Handle bundling of json-c.
 #

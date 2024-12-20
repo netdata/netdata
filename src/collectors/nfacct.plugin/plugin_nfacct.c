@@ -774,9 +774,8 @@ int main(int argc, char **argv) {
             fprintf(stderr,
                     "\n"
                     " netdata nfacct.plugin %s\n"
-                    " Copyright (C) 2015-2017 Costa Tsaousis <costa@tsaousis.gr>\n"
+                    " Copyright 2018-2025 Netdata Inc.\n"
                     " Released under GNU General Public License v3 or later.\n"
-                    " All rights reserved.\n"
                     "\n"
                     " This program is a data collector plugin for netdata.\n"
                     "\n"

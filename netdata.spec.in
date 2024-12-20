@@ -120,7 +120,7 @@ AutoReqProv: yes
 # Filter known bogus deps that would be caught by AutoReqProv.
 %global __requires_exclude_from ^%{_libdir}/%{name}/system/.*$
 
-Summary:	Real-time performance monitoring, done right!
+Summary:	Netdata - Monitoring and troubleshooting, transformed!
 Name:		netdata
 Version:	%{version}
 Release:	1%{?dist}
@@ -1051,7 +1051,7 @@ fi
 - Fix /etc/netdata permissions
 * Mon Sep 23 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-9
 - Do not build CUPS plugin subpackage on CentOS 6 and CentOS 7
-* Tue Aug 20 2019 Pavlos Emm. Katsoulakis <paul@netdat.acloud> - 0.0.0-8
+* Tue Aug 20 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-8
 - Split CUPS functionality on separate package
 * Fri Jun 28 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-7
 - Raise the path overrides to the spec file level, not just the configure.

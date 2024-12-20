@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC1117
-
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
 # cgroup-network-helper.sh
 # detect container and virtual machine interfaces
 #
-# (C) 2023 Netdata Inc.
-# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # This script is called as root (by cgroup-network), with either a pid, or a cgroup path.
 # It tries to find all the network interfaces that belong to the same cgroup.
@@ -20,6 +18,7 @@
 #
 # 3. this script, calls virsh to find libvirt network interfaces.
 #
+# shellcheck disable=SC1117
 
 # -----------------------------------------------------------------------------
 

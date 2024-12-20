@@ -14,8 +14,8 @@
 
 All capabilities are set automatically during Netdata installation using the [official installation method](/packaging/installer/methods/kickstart.md).
 
-| Capability          |                                               Required by                                               |
-|:--------------------|:-------------------------------------------------------------------------------------------------------:|
+| Capability          |                                                Required by                                                |
+|:--------------------|:---------------------------------------------------------------------------------------------------------:|
 | CAP_NET_RAW         |      [Ping](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ping#readme)      |
 | CAP_NET_ADMIN       | [Wireguard](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/wireguard#readme) |
 | CAP_DAC_READ_SEARCH | [Filecheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/filecheck#readme) |
@@ -25,8 +25,8 @@ All capabilities are set automatically during Netdata installation using the [of
 <details>
 <summary>Data Collection Modules</summary>
 
-| Name                                                                                                               |           Monitors            |
-|:-------------------------------------------------------------------------------------------------------------------|:-----------------------------:|
+| Name                                                                                                                 |           Monitors            |
+|:---------------------------------------------------------------------------------------------------------------------|:-----------------------------:|
 | [adaptec_raid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/adaptecraid)              |     Adaptec Hardware RAID     |
 | [activemq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/activemq)                     |           ActiveMQ            |
 | [ap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ap)                                 |          Wireless AP          |
@@ -84,6 +84,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [mongoDB](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/mongodb)                       |            MongoDB            |
 | [monit](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/monit)                           |             Monit             |
 | [mysql](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/mysql)                           |             MySQL             |
+| [nats](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nats)                             |             NATS              |
 | [nginx](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nginx)                           |             NGINX             |
 | [nginxplus](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nginxplus)                   |          NGINX Plus           |
 | [nginxunit](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/nginxunit)                   |          NGINX Unit           |

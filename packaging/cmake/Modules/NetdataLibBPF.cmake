@@ -1,7 +1,5 @@
-# Handling for libbpf (used by the eBPF plugin)
-#
-# Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
+# Handling for libbpf (used by the eBPF plugin)
 
 include(ExternalProject)
 include(NetdataUtil)

@@ -1,5 +1,15 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.1.0...HEAD)
+
+**Merged pull requests:**
+
+- Regenerate integrations docs [\#19254](https://github.com/netdata/netdata/pull/19254) ([netdatabot](https://github.com/netdatabot))
+- docs: fix nats metadata suffix [\#19253](https://github.com/netdata/netdata/pull/19253) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d\): add  NATS collector [\#19252](https://github.com/netdata/netdata/pull/19252) ([ilyam8](https://github.com/ilyam8))
+
 ## [v2.1.0](https://github.com/netdata/netdata/tree/v2.1.0) (2024-12-19)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.0.3...v2.1.0)
@@ -448,9 +458,6 @@
 - Update windows documentation [\#18703](https://github.com/netdata/netdata/pull/18703) ([Ancairon](https://github.com/Ancairon))
 - Detect when swap is disabled when agent is running [\#18702](https://github.com/netdata/netdata/pull/18702) ([stelfrag](https://github.com/stelfrag))
 - Bump golang.org/x/net from 0.29.0 to 0.30.0 in /src/go [\#18701](https://github.com/netdata/netdata/pull/18701) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Load chart labels on demand [\#18699](https://github.com/netdata/netdata/pull/18699) ([stelfrag](https://github.com/stelfrag))
-- Add hyper-v metrics [\#18697](https://github.com/netdata/netdata/pull/18697) ([stelfrag](https://github.com/stelfrag))
-- fix system-info disk space in LXC [\#18696](https://github.com/netdata/netdata/pull/18696) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

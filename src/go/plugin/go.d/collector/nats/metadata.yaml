@@ -1,0 +1,248 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-nats
+      plugin_name: go.d.plugin
+      module_name: nats
+      monitored_instance:
+        name: NATS
+        link: https://nats.io/
+        categories:
+          - data-collection.message-brokers
+        icon_filename: nats.svg
+      related_resources:
+        integrations:
+          list: []
+      alternative_monitored_instances: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - nats
+        - messaging
+        - broker
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the activity and performance of NATS servers.
+        method_description: |
+          It sends HTTP requests to the NATS HTTP server's dedicated [monitoring port](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#monitoring-nats).
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector can automatically detect NATS instances running on:
+
+            - localhost that are listening on port 8222
+            - within Docker containers
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Enable NATS monitoring
+            description: |
+              See [Enable monitoring](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#enabling-monitoring).
+      configuration:
+        file:
+          name: go.d/nats.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:8222
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8222
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8222
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: NATS with enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8222
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8222
+                
+                  - name: remote
+                    url: http://192.0.2.1:8222
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: server
+          description: These metrics refer to NATS servers.
+          labels: []
+          metrics:
+            - name: nats.server_traffic
+              description: Server Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.server_messages
+              description: Server Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.server_connections_current
+              description: Server Current Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nats.server_connections_rate
+              description: Server Connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: nats.server_health_probe_status
+              description: Server Health Probe Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: error
+            - name: nats.server_cpu_usage
+              description: Server CPU Usage
+              unit: percent
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: nats.server_mem_usage
+              description: Server Memory Usage
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: nats.server_uptime
+              description: Server Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: http endpoint
+          description: These metrics refer to HTTP endpoints.
+          labels:
+            - name: http_endpoint
+              description: "HTTP endpoint path."
+          metrics:
+            - name: nats.http_endpoint_requests
+              description: HTTP Endpoint Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
