@@ -169,11 +169,22 @@ int do_module_libsensors(int update_every, const char *name) {
         if(libsensors_initialized)
             sensors_cleanup();
 
-        if (sensors_init(NULL) != 0) {
+        FILE *fp = NULL;
+        const char *etc_netdata_dir = getenv("NETDATA_CONFIG_DIR");
+        if(etc_netdata_dir) {
+            // In static installs, we copy the file sensors3.conf to /opt/netdata/etc
+            char filename[FILENAME_MAX];
+            snprintfz(filename, sizeof(filename), "%s/../sensors3.conf", etc_netdata_dir);
+            fp = fopen(filename, "r");
+        }
+
+        if (sensors_init(fp) != 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "cannot initialize libsensors - disabling sensors monitoring");
             return 0;
         }
 
+        if(fp)
+            fclose(fp);
         libsensors_initialized = true;
     }
 
