@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2020 Timotej Šiškovič
+// Copyright 2018-2025 Netdata Inc.
 
 #include <unistd.h>
 #include <stdio.h>

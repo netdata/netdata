@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
             fprintf(stderr,
                     "\n"
                     " Netdata local-listeners\n"
-                    " (C) 2024 Netdata Inc.\n"
+                    " Copyright 2018-2025 Netdata Inc.\n"
                     "\n"
                     " This program prints a list of all the processes that have a listening socket.\n"
                     " It is used by Netdata to auto-detect the services running.\n"

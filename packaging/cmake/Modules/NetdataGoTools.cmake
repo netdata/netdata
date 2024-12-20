@@ -1,6 +1,6 @@
 # Macros and functions to assist in working with Go
 #
-# Copyright (c) 2024 Netdata Inc
+# Copyright 2018-2025 Netdata Inc.
 #
 # SPDX-License-Identifier: GPL
 

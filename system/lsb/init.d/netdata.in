@@ -2,12 +2,8 @@
 #
 # Netdata LSB start script
 #
-# Copyright:
-#         SPDX-License-Identifier: GPL-3.0-or-later
-#
-# Author:
-#         Costa Tsaousis  <costa@netdata.cloud>
-#         Pavlos Emm. Katsoulakis <paul@netdata.cloud>
+# Copyright 2018-2025 Netdata Inc.
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ### BEGIN INIT INFO
 # Provides:          netdata

@@ -5,7 +5,7 @@
 /* ------------------------------------------------------------------------- */
 /*
  * avl_insert(), avl_remove() and avl_search()
- * are adaptations (by Costa Tsaousis) of the AVL algorithm found in libavl
+ * are adaptations (by Netdata Inc.) of the AVL algorithm found in libavl
  * v2.0.3, so that they do not use any memory allocations and their memory
  * footprint is optimized (by eliminating non-necessary data members).
  *
@@ -279,7 +279,7 @@ avl_t *avl_remove(avl_tree_type *tree, avl_t *item) {
 }
 
 /* ------------------------------------------------------------------------- */
-// below are functions by (C) Costa Tsaousis
+// below are functions by Copyright 2018-2025 Netdata Inc.
 
 // ---------------------------
 // traversing

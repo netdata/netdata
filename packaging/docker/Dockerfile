@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# author  : paulfantom
+# Copyright 2018-2025 Netdata Inc.
 
 # This image contains preinstalled dependencies
 # hadolint ignore=DL3007

@@ -2,11 +2,9 @@
 #
 # Entry point script for netdata
 #
-# Copyright: 2018 and later Netdata Inc.
+# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-#
-# Author  : Pavlos Emm. Katsoulakis <paul@netdata.cloud>
-# Author  : Austin S. Hemmelgarn <austin@netdata.cloud>
+
 set -e
 
 if [ ! -w / ] && [ "${EUID}" -eq 0 ]; then

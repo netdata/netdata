@@ -3,9 +3,8 @@
 # Installation script for the alpine host
 # to prepare the static binary
 #
+# Copyright 2018-2025 Netdata Inc.
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
-#
-# Author: Paul Emm. Katsoulakis <paul@netdata.cloud>
 
 apk update || exit 1
 apk upgrade || exit 1

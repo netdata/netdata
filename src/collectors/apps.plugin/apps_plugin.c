@@ -2,8 +2,7 @@
 
 /*
  * netdata apps.plugin
- * (C) Copyright 2023 Netdata Inc.
- * Released under GPL v3+
+ * Copyright 2018-2025 Netdata Inc.
  */
 
 #include "apps_plugin.h"
@@ -509,7 +508,7 @@ static void parse_args(int argc, char **argv)
             fprintf(stderr,
                     "\n"
                     " netdata apps.plugin %s\n"
-                    " Copyright (C) 2016-2017 Costa Tsaousis <costa@tsaousis.gr>\n"
+                    " Copyright 2018-2025 Netdata Inc.\n"
                     " Released under GNU General Public License v3 or later.\n"
                     " All rights reserved.\n"
                     "\n"

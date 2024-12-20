@@ -10,10 +10,11 @@
 # 1) PKG_CLOUD_TOKEN variable exported
 # 2) To properly install package_cloud when not found, it requires: ruby gcc gcc-c++ ruby-devel
 #
-# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright 2018-2025 Netdata Inc.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
 #shellcheck disable=SC2068,SC2145
+
 set -e
 PKG_CLOUD_CONFIG="$HOME/.package_cloud_configuration.cfg"
 

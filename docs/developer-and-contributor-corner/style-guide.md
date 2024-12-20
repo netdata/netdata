@@ -160,15 +160,15 @@ capitalization. In summary:
   Docker, Apache, NGINX)
 - Avoid camel case (NetData) or all caps (NETDATA).
 
-Whenever you refer to the company Netdata, Inc., or the open-source monitoring Agent the company develops, capitalize both words.
+Whenever you refer to the company Netdata Inc., or the open-source monitoring Agent the company develops, capitalize both words.
 
 However, if you’re referring to a process, user, or group on a Linux system, use lowercase and fence the word in an
 inline code block: `` `netdata` ``.
 
 |                 |                                                                                                |
 |-----------------|------------------------------------------------------------------------------------------------|
-| Not recommended | The netdata agent, which spawns the netdata process, is actively maintained by netdata, inc.   |
-| **Recommended** | The Netdata Agent, which spawns the `netdata` process, is actively maintained by Netdata, Inc. |
+| Not recommended | The netdata agent, which spawns the netdata process, is actively maintained by Netdata Inc.    |
+| **Recommended** | The Netdata Agent, which spawns the `netdata` process, is actively maintained by Netdata Inc.  |
 
 #### Capitalization of document titles and page headings
 

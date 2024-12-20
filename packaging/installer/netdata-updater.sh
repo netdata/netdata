@@ -21,12 +21,8 @@
 #  - TMPDIR (set to a usable temporary directory)
 #  - NETDATA_NIGHTLIES_BASEURL (set the base url for downloading the dist tarball)
 #
-# Copyright: 2018-2023 Netdata Inc.
+# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-#
-# Author: Paweł Krupa <paulfantom@gmail.com>
-# Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud>
-# Author: Austin S. Hemmelgarn <austin@netdata.cloud>
 
 # Next unused error code: U001D
 

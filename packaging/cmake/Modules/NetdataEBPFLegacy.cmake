@@ -1,6 +1,6 @@
 # Handling for eBPF legacy programs
 #
-# Copyright (c) 2024 Netdata Inc.
+# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 include(ExternalProject)

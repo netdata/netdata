@@ -1,6 +1,6 @@
 # Functions and macros for handling of libYAML
 #
-# Copyright (c) 2024 Netdata Inc.
+# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Handle bundling of libyaml.

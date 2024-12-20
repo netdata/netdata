@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description:
-# Author: Pawel Krupa (paulfantom)
-# Author: Ilya Mashchenko (ilyam8)
+# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import urllib3

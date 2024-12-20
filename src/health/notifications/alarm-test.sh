@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# netdata
-# real-time performance and health monitoring, done right!
-# (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
+# Netdata
+# Monitoring and troubleshooting, transformed!
+# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Script to test alarm notifications for netdata

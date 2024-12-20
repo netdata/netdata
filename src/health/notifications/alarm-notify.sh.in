@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #shellcheck source=/dev/null disable=SC2086,SC2154
 
-# netdata
-# real-time performance and health monitoring, done right!
-# (C) 2023 Netdata Inc.
+# Netdata
+# Monitoring and troubleshooting, transformed!
+# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Script to send alarm notifications for netdata
