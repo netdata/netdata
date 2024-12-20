@@ -498,7 +498,7 @@ static void ebpf_update_swap_cgroup()
  * @param swap
  * @param root
  */
-static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_target *root)
+static void ebpf_swap_sum_pids(netdata_ebpf_swap_t *swap, struct ebpf_pid_on_target *root)
 {
     uint64_t local_read = 0;
     uint64_t local_write = 0;
@@ -698,7 +698,7 @@ void ebpf_swap_send_apps_data(struct ebpf_target *root)
  * @param swap
  * @param root
  */
-static void ebpf_swap_sum_cgroup_pids(netdata_publish_swap_t *swap, struct pid_on_target2 *pids)
+static void ebpf_swap_sum_cgroup_pids(netdata_ebpf_swap_t *swap, struct pid_on_target2 *pids)
 {
     uint64_t local_read = 0;
     uint64_t local_write = 0;
@@ -801,7 +801,7 @@ static void ebpf_obsolete_specific_swap_charts(char *type, int update_every)
  * @param type   chart type
  * @param values structure with values that will be sent to netdata
  */
-static void ebpf_send_specific_swap_data(char *type, netdata_publish_swap_t *values)
+static void ebpf_send_specific_swap_data(char *type, netdata_ebpf_swap_t *values)
 {
     ebpf_write_begin_chart(type, NETDATA_MEM_SWAP_READ_CHART, "");
     write_chart_dimension(swap_publish_aggregated[NETDATA_KEY_SWAP_READPAGE_CALL].name, (long long) values->read);

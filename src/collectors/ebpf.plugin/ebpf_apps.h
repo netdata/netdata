@@ -106,7 +106,7 @@ struct ebpf_target {
     // Changes made to simplify integration between apps and eBPF.
     netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dcstat;
-    netdata_publish_swap_t swap;
+    netdata_ebpf_swap_t swap;
     netdata_publish_vfs_t vfs;
     netdata_fd_stat_t fd;
     netdata_publish_shm_t shm;
@@ -156,7 +156,7 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
     struct ebpf_pid_data *next;
 
     netdata_publish_fd_stat_t *fd;
-    netdata_publish_swap_t *swap;
+    netdata_ebpf_swap_t *swap;
     netdata_publish_shm_t *shm; // this has a leak issue
     netdata_publish_dcstat_t *dc;
     netdata_publish_vfs_t *vfs;
@@ -227,18 +227,6 @@ static inline void *ebpf_socket_allocate_publish()
 }
 
 static inline void ebpf_socket_release_publish(ebpf_socket_publish_apps_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_swap_allocate_publish_swap()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_swap_t));
-}
-
-static inline void ebpf_swap_release_publish(netdata_publish_swap_t *ptr)
 {
     ebpf_hash_table_pids_count--;
     freez(ptr);
@@ -389,7 +377,7 @@ typedef struct ebpf_pid_stat {
     netdata_fd_stat_t fd;
     ebpf_process_stat_t process;
     netdata_publish_shm_t shm;
-    netdata_publish_swap_t swap;
+    netdata_ebpf_swap_t swap;
     ebpf_socket_publish_apps_t socket;
     netdata_publish_vfs_t vfs;
 
