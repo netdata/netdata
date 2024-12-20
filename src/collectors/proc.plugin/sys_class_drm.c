@@ -653,16 +653,15 @@ static int read_clk_freq_file(procfile **p_ff, const char *const pathname, colle
 
     for(size_t l = 0; l < procfile_lines(*p_ff) ; l++) {
         char *str_with_units = NULL;
-        if((*p_ff)->lines->lines[l].words >= 3 && !strcmp(procfile_lineword((*p_ff), l, 2), "*")) //format: X: collected_number *
+
+        if(procfile_linewords(*p_ff, l) >= 3 && !strcmp(procfile_lineword((*p_ff), l, 2), "*")) //format: X: collected_number *
             str_with_units = procfile_lineword((*p_ff), l, 1);
-        else if ((*p_ff)->lines->lines[l].words == 2 && !strcmp(procfile_lineword((*p_ff), l, 1), "*")) //format:   collected_number *
+        else if (procfile_linewords(*p_ff, l) == 2 && !strcmp(procfile_lineword((*p_ff), l, 1), "*")) //format:   collected_number *
             str_with_units = procfile_lineword((*p_ff), l, 0);
 
         if (str_with_units) {
-            char *delim = strchr(str_with_units, 'M');
-            char str_without_units[10];
-            memcpy(str_without_units, str_with_units, delim - str_with_units);
-            *num = str2ll(str_without_units, NULL);
+            char *units = NULL;
+            *num = str2ll(str_with_units, &units);
             return 0;
         }
     }
