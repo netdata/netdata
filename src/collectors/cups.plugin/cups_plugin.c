@@ -1,11 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/*
- * netdata cups.plugin
- * (C) Copyright 2017-2018 Simon Nagl <simon.nagl@gmx.de>
- * Released under GPL v3+
- */
-
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
@@ -53,9 +47,9 @@ void print_help() {
             "\n"
             "netdata cups.plugin %s\n"
             "\n"
-            "Copyright (C) 2017-2018 Simon Nagl <simon.nagl@gmx.de>\n"
+            "Copyright 2018-2025 Netdata Inc.\n"
+            "Original Author: Simon Nagl <simon.nagl@gmx.de>\n"
             "Released under GNU General Public License v3+.\n"
-            "All rights reserved.\n"
             "\n"
             "This program is a data collector plugin for netdata.\n"
             "\n"

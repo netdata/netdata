@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2020 Timotej Šiškovič
 
 #include <unistd.h>
 #include <stdio.h>

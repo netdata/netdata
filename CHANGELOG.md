@@ -2,10 +2,21 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.0.3...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.1.0...HEAD)
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#19254](https://github.com/netdata/netdata/pull/19254) ([netdatabot](https://github.com/netdatabot))
+- docs: fix nats metadata suffix [\#19253](https://github.com/netdata/netdata/pull/19253) ([ilyam8](https://github.com/ilyam8))
+- feat\(go.d\): add  NATS collector [\#19252](https://github.com/netdata/netdata/pull/19252) ([ilyam8](https://github.com/ilyam8))
+
+## [v2.1.0](https://github.com/netdata/netdata/tree/v2.1.0) (2024-12-19)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.0.3...v2.1.0)
+
+**Merged pull requests:**
+
+- use inactive memory when calculating cgroups total memory [\#19249](https://github.com/netdata/netdata/pull/19249) ([ktsaou](https://github.com/ktsaou))
 - chore\(aclk/mqtt\): remove client\_id len check [\#19247](https://github.com/netdata/netdata/pull/19247) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d\): simplify cli is help [\#19246](https://github.com/netdata/netdata/pull/19246) ([ilyam8](https://github.com/ilyam8))
 - Health transition saving optimization [\#19245](https://github.com/netdata/netdata/pull/19245) ([stelfrag](https://github.com/stelfrag))
@@ -25,6 +36,7 @@
 - Fix: fix heap use after free in health [\#19228](https://github.com/netdata/netdata/pull/19228) ([ktsaou](https://github.com/ktsaou))
 - ci: replace exit 1 with conditional skip in website update workflow [\#19227](https://github.com/netdata/netdata/pull/19227) ([ilyam8](https://github.com/ilyam8))
 - fix\(ml\): remove logging for earch not acquired dimension [\#19226](https://github.com/netdata/netdata/pull/19226) ([ilyam8](https://github.com/ilyam8))
+- Fix static builds to ensure usability on intended baseline hardware. [\#19224](https://github.com/netdata/netdata/pull/19224) ([Ferroin](https://github.com/Ferroin))
 - add MegaCli64 to ndsudo [\#19223](https://github.com/netdata/netdata/pull/19223) ([ilyam8](https://github.com/ilyam8))
 - removing IP address information. Bumping traefik version [\#19222](https://github.com/netdata/netdata/pull/19222) ([M4itee](https://github.com/M4itee))
 - fix compiler warnings [\#19221](https://github.com/netdata/netdata/pull/19221) ([ktsaou](https://github.com/ktsaou))
@@ -446,11 +458,6 @@
 - Update windows documentation [\#18703](https://github.com/netdata/netdata/pull/18703) ([Ancairon](https://github.com/Ancairon))
 - Detect when swap is disabled when agent is running [\#18702](https://github.com/netdata/netdata/pull/18702) ([stelfrag](https://github.com/stelfrag))
 - Bump golang.org/x/net from 0.29.0 to 0.30.0 in /src/go [\#18701](https://github.com/netdata/netdata/pull/18701) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Load chart labels on demand [\#18699](https://github.com/netdata/netdata/pull/18699) ([stelfrag](https://github.com/stelfrag))
-- Add hyper-v metrics [\#18697](https://github.com/netdata/netdata/pull/18697) ([stelfrag](https://github.com/stelfrag))
-- fix system-info disk space in LXC [\#18696](https://github.com/netdata/netdata/pull/18696) ([ilyam8](https://github.com/ilyam8))
-- fix ram usage calculation in LXC [\#18695](https://github.com/netdata/netdata/pull/18695) ([ilyam8](https://github.com/ilyam8))
-- cgroups.plugin: call `setresuid` before spawn server init [\#18694](https://github.com/netdata/netdata/pull/18694) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

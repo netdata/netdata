@@ -12,7 +12,8 @@
 fetch "ioping-${IOPING_VERSION}" "${IOPING_SOURCE}/archive/refs/tags/v${IOPING_VERSION}.tar.gz" \
     "${IOPING_ARTIFACT_SHA256}" ioping
 
-export CFLAGS="-static -pipe"
+export CFLAGS="${TUNING_FLAGS} -static -pipe"
+export CXXFLAGS="${CFLAGS}"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     run make clean

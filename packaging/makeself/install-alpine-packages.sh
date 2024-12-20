@@ -1,11 +1,8 @@
 #!/usr/bin/env sh
+# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Installation script for the alpine host
 # to prepare the static binary
-#
-# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
-#
-# Author: Paul Emm. Katsoulakis <paul@netdata.cloud>
 
 apk update || exit 1
 apk upgrade || exit 1

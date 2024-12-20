@@ -1,9 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /*
- *  netdata freeipmi.plugin
- *  Copyright (C) 2023 Netdata Inc.
- *  GPL v3+
- *
  *  Based on:
  *  ipmimonitoring-sensors.c,v 1.51 2016/11/02 23:46:24 chu11 Exp
  *  ipmimonitoring-sel.c,v 1.51 2016/11/02 23:46:24 chu11 Exp
@@ -1740,9 +1736,8 @@ int main (int argc, char **argv) {
             fprintf(stderr,
                     "\n"
                     " netdata %s %s\n"
-                    " Copyright (C) 2023 Netdata Inc.\n"
+                    " Copyright 2018-2025 Netdata Inc.\n"
                     " Released under GNU General Public License v3 or later.\n"
-                    " All rights reserved.\n"
                     "\n"
                     " This program is a data collector plugin for netdata.\n"
                     "\n"

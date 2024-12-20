@@ -1,7 +1,5 @@
-# CMake module to handle fetching and installing the dashboard code
-#
-# Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
+# CMake module to handle fetching and installing the dashboard code
 
 include(NetdataUtil)
 

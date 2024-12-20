@@ -1,7 +1,5 @@
-# Extra tools for working with FetchContent on older CMake
-#
-# Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
+# Extra tools for working with FetchContent on older CMake
 
 # FetchContent_MakeAvailable_NoInstall
 #

@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-
-# netdata
-# real-time performance and health monitoring, done right!
-# (C) 2023 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # This script is a helper to allow netdata collect tc data.

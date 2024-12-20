@@ -1,7 +1,7 @@
 # Redistributed software
 
 Netdata copyright info:<br/>
-Copyright 2023, Netdata Inc.<br/>
+Copyright 2018-2025 Netdata Inc.<br/>
 Released under [GPL v3 or later](https://raw.githubusercontent.com/netdata/netdata/master/LICENSE).
 
 Netdata uses SPDX license tags to identify the license for its files.

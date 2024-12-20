@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
-#
-# Entry point script for netdata
-#
-# Copyright: 2018 and later Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Author  : Pavlos Emm. Katsoulakis <paul@netdata.cloud>
-# Author  : Austin S. Hemmelgarn <austin@netdata.cloud>
+# Entry point script for netdata
+
 set -e
 
 if [ ! -w / ] && [ "${EUID}" -eq 0 ]; then

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+set -x
+
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
@@ -13,6 +15,7 @@ run cd "${NETDATA_SOURCE_PATH}" || exit 1
 # find the netdata version
 
 VERSION="$("${NETDATA_INSTALL_PARENT}/netdata/bin/netdata" -v | cut -f 2 -d ' ')"
+[ -z "${VERSION}" ] && VERSION="$(cat "${NETDATA_SOURCE_PATH}/packaging/version")"
 
 if [ "${VERSION}" == "" ]; then
   echo >&2 "Cannot find version number. Create makeself executable from source code with git tree structure."

@@ -1,7 +1,5 @@
-# Utility functions used by other modules.
-#
-# Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
+# Utility functions used by other modules.
 
 include_guard()
 

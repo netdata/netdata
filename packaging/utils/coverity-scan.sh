@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck disable=SC1091,SC2230,SC2086
 #
 # Coverity scan script
 #
-# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
-#
-# Author  : Costa Tsaousis (costa@netdata.cloud)
-# Author  : Pawel Krupa (paulfantom)
-# Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
-# shellcheck disable=SC1091,SC2230,SC2086
-
 # To run manually, save configuration to .coverity-scan.conf like this:
 #
 # the repository to report to coverity - devs can set here their own fork

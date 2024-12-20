@@ -1212,9 +1212,8 @@ void parse_command_line(int argc, char **argv) {
             fprintf(stderr,
                     "\n"
                     " netdata perf.plugin %s\n"
-                    " Copyright (C) 2019 Netdata Inc.\n"
+                    " Copyright 2018-2025 Netdata Inc.\n"
                     " Released under GNU General Public License v3 or later.\n"
-                    " All rights reserved.\n"
                     "\n"
                     " This program is a data collector plugin for netdata.\n"
                     "\n"
