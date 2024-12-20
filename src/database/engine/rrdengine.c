@@ -620,19 +620,10 @@ static void journalfile_extent_build(struct rrdengine_instance *ctx, struct exte
     crc32set(jf_trailer->checksum, crc);
 }
 
-static void after_extent_flushed_to_open(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    if(completion)
-        completion_mark_complete(completion);
-
-    if(ctx_is_available_for_queries(ctx))
-        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-}
-
-static void *extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr)
+{
     worker_is_busy(UV_EVENT_DBENGINE_FLUSHED_TO_OPEN);
 
-    uv_fs_t *uv_fs_request = data;
-    struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
     struct page_descr_with_data *descr;
     struct rrdengine_datafile *datafile;
     unsigned i;
@@ -656,7 +647,6 @@ static void *extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __m
         page_descriptor_release(descr);
     }
 
-    uv_fs_req_cleanup(uv_fs_request);
     posix_memfree(xt_io_descr->buf);
     extent_io_descriptor_release(xt_io_descr);
 
@@ -668,39 +658,10 @@ static void *extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __m
         // we just finished a flushing on a datafile that is not the active one
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
-    return data;
+    worker_is_idle();
 }
 
 // Main event loop callback
-static void after_extent_write_datafile_io(uv_fs_t *uv_fs_request) {
-    worker_is_busy(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EXTENT_WRITE);
-
-    struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
-    struct rrdengine_datafile *datafile = xt_io_descr->datafile;
-    struct rrdengine_instance *ctx = datafile->ctx;
-
-    if (uv_fs_request->result < 0) {
-        ctx_io_error(ctx);
-        netdata_log_error("DBENGINE: %s: uv_fs_write(): %s", __func__, uv_strerror((int)uv_fs_request->result));
-    }
-
-    journalfile_v1_extent_write(ctx, xt_io_descr->datafile, xt_io_descr->wal, &rrdeng_main.loop);
-
-    spinlock_lock(&datafile->writers.spinlock);
-    datafile->writers.running--;
-    datafile->writers.flushed_to_open_running++;
-    spinlock_unlock(&datafile->writers.spinlock);
-
-    rrdeng_enq_cmd(xt_io_descr->ctx,
-                   RRDENG_OPCODE_FLUSHED_TO_OPEN,
-                   uv_fs_request,
-                   xt_io_descr->completion,
-                   STORAGE_PRIORITY_INTERNAL_DBENGINE,
-                   NULL,
-                   NULL);
-
-    worker_is_idle();
-}
 
 static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile) {
     bool ret = false;
@@ -766,7 +727,8 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
 /*
  * Take a page list in a judy array and write them
  */
-static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_data *base, struct completion *completion) {
+static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_data *base)
+{
     int ret;
     unsigned i, count, size_bytes, pos, real_io_size;
     uint32_t uncompressed_payload_length, max_compressed_size, payload_offset;
@@ -790,9 +752,6 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     }
 
     if (!count) {
-        if (completion)
-            completion_mark_complete(completion);
-
         __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
         return NULL;
     }
@@ -885,7 +844,6 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
 
     xt_io_descr->bytes = size_bytes;
     xt_io_descr->uv_fs_request.data = xt_io_descr;
-    xt_io_descr->completion = completion;
 
     trailer = xt_io_descr->buf + size_bytes - sizeof(*trailer);
     crc = crc32(0L, Z_NULL, 0);
@@ -902,27 +860,55 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     return xt_io_descr;
 }
 
-static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused) {
-    struct extent_io_descriptor *xt_io_descr = data;
-
-    if(xt_io_descr) {
-        int ret = uv_fs_write(&rrdeng_main.loop,
-                              &xt_io_descr->uv_fs_request,
-                              xt_io_descr->datafile->file,
-                              &xt_io_descr->iov,
-                              1,
-                              (int64_t) xt_io_descr->pos,
-                              after_extent_write_datafile_io);
-
-        fatal_assert(-1 != ret);
-    }
+static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
+{
+    ;
 }
 
-static void *extent_write_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+static void *extent_write_tp_worker(
+    struct rrdengine_instance *ctx,
+    void *data,
+    struct completion *completion __maybe_unused,
+    uv_work_t *req __maybe_unused)
+{
     worker_is_busy(UV_EVENT_DBENGINE_EXTENT_WRITE);
     struct page_descr_with_data *base = data;
-    struct extent_io_descriptor *xt_io_descr = datafile_extent_build(ctx, base, completion);
-    return xt_io_descr;
+    struct extent_io_descriptor *xt_io_descr = datafile_extent_build(ctx, base);
+
+    if (!xt_io_descr)
+        goto done;
+
+    struct rrdengine_datafile *datafile = xt_io_descr->datafile;
+
+    int ret = uv_fs_write(NULL, &xt_io_descr->uv_fs_request, datafile->file, &xt_io_descr->iov, 1, (int64_t)xt_io_descr->pos, NULL);
+
+    // CHECK PROPERLY
+    fatal_assert(-1 != ret);
+
+    if (xt_io_descr->uv_fs_request.result < 0) {
+        ctx_io_error(ctx);
+        netdata_log_error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)xt_io_descr->uv_fs_request.result));
+    } else {
+        netdata_log_debug(D_RRDENGINE, "%s: Data block was written to disk.", __func__);
+    }
+
+    journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
+
+    spinlock_lock(&datafile->writers.spinlock);
+    datafile->writers.running--;
+    datafile->writers.flushed_to_open_running++;
+    spinlock_unlock(&datafile->writers.spinlock);
+
+    extent_flushed_to_open_tp_worker(ctx, xt_io_descr);
+
+     if(ctx_is_available_for_queries(ctx))
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+done:
+    if(completion)
+        completion_mark_complete(completion);
+
+    worker_is_idle();
+    return NULL;
 }
 
 static void after_database_rotate(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
@@ -1696,7 +1682,7 @@ static void retention_timer_cb(uv_timer_t *handle) {
     if (!localhost)
         return;
 
-    worker_is_busy(RRDENG_TIMER_CB);
+    worker_is_busy(RRDENG_RETENTION_TIMER_CB);
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
@@ -1870,7 +1856,6 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_QUERY,                                    "query");
     worker_register_job_name(RRDENG_OPCODE_EXTENT_WRITE,                             "extent write");
     worker_register_job_name(RRDENG_OPCODE_EXTENT_READ,                              "extent read");
-    worker_register_job_name(RRDENG_OPCODE_FLUSHED_TO_OPEN,                          "flushed to open");
     worker_register_job_name(RRDENG_OPCODE_DATABASE_ROTATE,                          "db rotate");
     worker_register_job_name(RRDENG_OPCODE_JOURNAL_INDEX,                            "journal index");
     worker_register_job_name(RRDENG_OPCODE_FLUSH_MAIN,                               "flush init");
@@ -1884,7 +1869,6 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_QUERY,                "query cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EXTENT_WRITE,         "extent write cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EXTENT_READ,          "extent read cb");
-    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSHED_TO_OPEN,      "flushed to open cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_DATABASE_ROTATE,      "db rotate cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_JOURNAL_INDEX,        "journal index cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_MAIN,           "flush init cb");
@@ -1893,8 +1877,8 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_QUIESCE,          "ctx quiesce cb");
 
     // special jobs
+    worker_register_job_name(RRDENG_RETENTION_TIMER_CB,                              "retention timer");
     worker_register_job_name(RRDENG_TIMER_CB,                                        "timer");
-    worker_register_job_name(RRDENG_FLUSH_TRANSACTION_BUFFER_CB,                     "transaction buffer flush cb");
 
     worker_register_job_custom_metric(RRDENG_OPCODES_WAITING,  "opcodes waiting",  "opcodes", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(RRDENG_WORKS_DISPATCHED, "works dispatched", "works",   WORKER_METRIC_ABSOLUTE);
@@ -1935,15 +1919,6 @@ void dbengine_event_loop(void* arg) {
                     struct page_descr_with_data *base = cmd.data;
                     struct completion *completion = cmd.completion; // optional
                     work_dispatch(ctx, base, completion, opcode, extent_write_tp_worker, after_extent_write);
-                    break;
-                }
-
-                case RRDENG_OPCODE_FLUSHED_TO_OPEN: {
-                    struct rrdengine_instance *ctx = cmd.ctx;
-                    uv_fs_t *uv_fs_request = cmd.data;
-                    struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
-                    struct completion *completion = xt_io_descr->completion;
-                    work_dispatch(ctx, uv_fs_request, completion, opcode, extent_flushed_to_open_tp_worker, after_extent_flushed_to_open);
                     break;
                 }
 
