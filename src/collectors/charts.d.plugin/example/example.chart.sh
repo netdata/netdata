@@ -1,10 +1,6 @@
-# shellcheck shell=bash
 # no need for shebang - this file is loaded from charts.d.plugin
-
-# Netdata
-# Monitoring and troubleshooting, transformed!
-# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck shell=bash
 
 # if this chart is called X.chart.sh, then all functions and global variables
 # must start with X_

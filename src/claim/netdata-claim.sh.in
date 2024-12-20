@@ -1,6 +1,4 @@
 #!/bin/sh
-#
-# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # %%NEW_CLAIMING_METHOD%%

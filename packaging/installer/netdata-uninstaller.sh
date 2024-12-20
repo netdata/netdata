@@ -1,13 +1,11 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # This is the netdata uninstaller script
 #
 # Variables needed by script and taken from '.environment' file:
 #  - NETDATA_PREFIX
 #  - NETDATA_ADDED_TO_GROUPS
-#
-# Copyright 2018-2025 Netdata Inc.
-# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Next unused error code: R0005
 

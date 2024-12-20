@@ -1,8 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-/*
- *  netdata systemd-journal.plugin
- *  Copyright 2018-2025 Netdata Inc.
- */
 
 /*
  * TODO

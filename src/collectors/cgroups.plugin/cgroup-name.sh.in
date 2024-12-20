@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-#shellcheck disable=SC2001
-
-# Netdata
-# Monitoring and troubleshooting, transformed!
-# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Script to find a better name for cgroups
 #
+#shellcheck disable=SC2001
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin:@sbindir_POST@"
 export LC_ALL=C

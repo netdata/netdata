@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-#
-# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 # shellcheck disable=SC1091,SC2230,SC2086
 #

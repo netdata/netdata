@@ -1,11 +1,6 @@
-# shellcheck shell=bash disable=SC1117,SC2154,SC2086
 # no need for shebang - this file is loaded from charts.d.plugin
-
-# Netdata
-# Monitoring and troubleshooting, transformed!
-# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-#
+# shellcheck shell=bash disable=SC1117,SC2154,SC2086
 
 opensips_opts="fifo get_statistics all"
 opensips_cmd=

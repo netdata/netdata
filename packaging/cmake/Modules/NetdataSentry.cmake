@@ -1,8 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Functions and macros for handling of Sentry
 #
-# Copyright 2018-2025 Netdata Inc.
-# SPDX-License-Identifier: GPL-3.0-or-later
-
 # Handle bundling of Sentry.
 #
 # This pulls it in as a sub-project using FetchContent functionality.

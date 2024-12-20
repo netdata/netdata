@@ -1,6 +1,4 @@
-# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-
 # Function to provide information regarding the Netdata version.
 #
 # The high-level logic is (a) use git-describe, (b) fallback to info from

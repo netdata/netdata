@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /*
- *  netdata freeipmi.plugin
- *  Copyright 2018-2025 Netdata Inc.
- *
  *  Based on:
  *  ipmimonitoring-sensors.c,v 1.51 2016/11/02 23:46:24 chu11 Exp
  *  ipmimonitoring-sel.c,v 1.51 2016/11/02 23:46:24 chu11 Exp

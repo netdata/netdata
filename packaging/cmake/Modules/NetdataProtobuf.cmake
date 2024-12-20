@@ -1,7 +1,5 @@
-# Macros and functions for handling of Protobuf
-#
-# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
+# Macros and functions for handling of Protobuf
 
 # Prepare a vendored copy of Protobuf for use with Netdata.
 function(netdata_bundle_protobuf)

@@ -1,11 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/*
- * netdata cups.plugin
- * Copyright 2018-2025 Netdata Inc.
- * Original Author: Simon Nagl <simon.nagl@gmx.de>
- */
-
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 

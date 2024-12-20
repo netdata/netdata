@@ -1,12 +1,7 @@
-# shellcheck shell=bash disable=SC1117
 # no need for shebang - this file is loaded from charts.d.plugin
-
-# Netdata
-# Monitoring and troubleshooting, transformed!
-# Copyright 2018-2025 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck shell=bash disable=SC1117
 #
-
 # _update_every is a special variable - it holds the number of seconds
 # between the calls of the _update() function
 libreswan_update_every=1

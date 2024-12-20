@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # This is a tool to help removal of packages from packagecloud.io
 # It utilizes the package_cloud utility provided from packagecloud.io
@@ -9,9 +10,6 @@
 # Requires:
 # 1) PKG_CLOUD_TOKEN variable exported
 # 2) To properly install package_cloud when not found, it requires: ruby gcc gcc-c++ ruby-devel
-#
-# Copyright 2018-2025 Netdata Inc.
-# SPDX-License-Identifier: GPL-3.0-or-later
 #
 #shellcheck disable=SC2068,SC2145
 

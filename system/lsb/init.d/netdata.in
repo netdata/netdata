@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Netdata LSB start script
-#
-# Copyright 2018-2025 Netdata Inc.
-# SPDX-License-Identifier: GPL-3.0-or-later
 
 ### BEGIN INIT INFO
 # Provides:          netdata

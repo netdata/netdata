@@ -1,8 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Macros and functions to assist in working with Go
-#
-# Copyright 2018-2025 Netdata Inc.
-#
-# SPDX-License-Identifier: GPL
 
 if(CMAKE_BUILD_TYPE STREQUAL Debug)
     set(GO_LDFLAGS "-X github.com/netdata/netdata/go/plugins/pkg/buildinfo.Version=${NETDATA_VERSION_STRING}")

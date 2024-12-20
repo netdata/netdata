@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/*
- * netdata apps.plugin
- * Copyright 2018-2025 Netdata Inc.
- */
-
 #include "apps_plugin.h"
 #include "libnetdata/required_dummies.h"
 
