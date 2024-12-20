@@ -1070,7 +1070,7 @@ static inline void vfs_aggregate_set_vfs(netdata_publish_vfs_t *vfs, netdata_ebp
  * @param vfs the output structure.
  * @param w   the input data.
  */
-static inline void vfs_aggregate_publish_vfs(netdata_publish_vfs_t *vfs, netdata_publish_vfs_t *w)
+static inline void vfs_aggregate_publish_vfs(netdata_publish_vfs_t *vfs, netdata_ebpf_vfs_t *w)
 {
     vfs->write_call += w->write_call;
     vfs->writev_call += w->writev_call;
@@ -1110,12 +1110,10 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_tar
 
     for (; root; root = root->next) {
         int32_t pid = root->pid;
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_VFS_IDX);
-        netdata_publish_vfs_t *w = local_pid->vfs;
-        if (!w)
-            continue;
+        netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
+        netdata_ebpf_vfs_t *in = &local_pid->vfs;
 
-        vfs_aggregate_publish_vfs(vfs, w);
+        vfs_aggregate_publish_vfs(vfs, in);
     }
 }
 
@@ -1250,6 +1248,7 @@ static void ebpf_vfs_read_apps(int maps_per_core, uint32_t max_period)
         length *= ebpf_nprocs;
 
     uint32_t key = 0, next_key = 0;
+    sem_wait(shm_mutex_ebpf_integration);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, vv)) {
             goto end_vfs_loop;
@@ -1257,21 +1256,15 @@ static void ebpf_vfs_read_apps(int maps_per_core, uint32_t max_period)
 
         vfs_apps_accumulator(vv, maps_per_core);
 
-        ebpf_pid_data_t *local_pid = ebpf_get_pid_data(key, vv->tgid, vv->name, NETDATA_EBPF_PIDS_VFS_IDX);
-        netdata_publish_vfs_t *publish = local_pid->vfs;
-        if (!publish)
-            local_pid->vfs = publish = ebpf_vfs_allocate_publish();
+        netdata_ebpf_pid_stats_t *local_pid = &integration_shm[key];
+        netdata_ebpf_vfs_t *publish = &local_pid->vfs;
 
         if (!publish->ct || publish->ct != vv->ct) {
-            vfs_aggregate_set_vfs(publish, vv);
-            local_pid->not_updated = 0;
-        } else if (++local_pid->not_updated >= max_period){
-            if (kill(key, 0)) { // No PID found
-                ebpf_reset_specific_pid_data(local_pid);
-            } else { // There is PID, but there is not data anymore
-                ebpf_release_pid_data(local_pid, fd, key, NETDATA_EBPF_PIDS_VFS_IDX);
-                ebpf_vfs_release_publish(publish);
-                local_pid->vfs = NULL;
+            local_pid->thread_collecting |= NETDATA_EBPF_PIDS_VFS_IDX;
+            memcpy(publish, &process_stat_vector[0], sizeof(*publish));
+        } else {
+            if (local_pid->process.release_call || kill((pid_t)key, 0)) { // No PID found
+                netdata_integration_release_pid(local_pid, fd, key, NETDATA_EBPF_PIDS_VFS_IDX);
             }
         }
 
@@ -1280,6 +1273,7 @@ end_vfs_loop:
         memset(vv, 0, length);
         key = next_key;
     }
+    sem_post(shm_mutex_ebpf_integration);
 }
 
 /**
@@ -1298,12 +1292,9 @@ static void read_update_vfs_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_vfs_t *out = &pids->vfs;
-            memset(out, 0, sizeof(netdata_publish_vfs_t));
 
-            ebpf_pid_data_t *local_pid = ebpf_get_pid_data(pid, 0, NULL, NETDATA_EBPF_PIDS_VFS_IDX);
-            netdata_publish_vfs_t *in = local_pid->vfs;
-            if (!in)
-                continue;
+            netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
+            netdata_ebpf_vfs_t *in = &local_pid->vfs;
 
             vfs_aggregate_publish_vfs(out, in);
         }
