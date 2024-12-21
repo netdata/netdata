@@ -80,7 +80,7 @@ Metrics:
 
 ### Per account
 
-These metrics refer to [accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
+These metrics refer to [Accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
 
 Labels:
 
@@ -99,6 +99,25 @@ Metrics:
 | nats.account_subscriptions | active | subscriptions |
 | nats.account_slow_consumers | slow | consumers/s |
 | nats.account_leaf_nodes | leafnode | servers |
+
+### Per route
+
+These metrics refer to [Routes](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#route-information).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| route_id | A unique identifier for a route within the NATS cluster. |
+| remote_id | he unique identifier of the remote server connected via the route. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nats.route_traffic | in, out | bytes/s |
+| nats.route_messages | in, out | messages/s |
+| nats.route_subscriptions | active | subscriptions |
 
 ### Per http endpoint
 
