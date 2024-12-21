@@ -76,6 +76,10 @@ modules:
               description: HTTP request timeout.
               default_value: 1
               required: false
+            - name: healthz_check
+              description: "Controls the behavior of the `/healthz` endpoint [health check](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#health)."
+              default_value: "default"
+              required: false
             - name: username
               description: Username for basic HTTP authentication.
               default_value: ""
@@ -188,17 +192,17 @@ modules:
               unit: bytes/s
               chart_type: area
               dimensions:
-                - name: in
-                - name: out
+                - name: received
+                - name: sent
             - name: nats.server_messages
               description: Server Messages
               unit: messages/s
               chart_type: line
               dimensions:
-                - name: in
-                - name: out
-            - name: nats.server_connections_current
-              description: Server Current Connections
+                - name: received
+                - name: sent
+            - name: nats.server_connections
+              description: Server Active Connections
               unit: connections
               chart_type: line
               dimensions:
@@ -234,6 +238,84 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+        - name: account
+          description: These metrics refer to [Accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
+          labels:
+            - name: account
+              description: "Account name."
+          metrics:
+            - name: nats.account_traffic
+              description: Account Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: nats.account_messages
+              description: Account Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: nats.account_connections
+              description: Account Active Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nats.account_connections_rate
+              description: Account Connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: nats.account_subscriptions
+              description: Account Active Subscriptions
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nats.account_slow_consumers
+              description: Account Slow Consumers
+              unit: consumers/s
+              chart_type: line
+              dimensions:
+                - name: slow
+            - name: nats.account_leaf_nodes
+              description: Account Leaf Nodes
+              unit: servers
+              chart_type: line
+              dimensions:
+                - name: leafnode
+        - name: route
+          description: These metrics refer to [Routes](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#route-information).
+          labels:
+            - name: route_id
+              description: "A unique identifier for a route within the NATS cluster."
+            - name: remote_id
+              description: "he unique identifier of the remote server connected via the route."
+          metrics:
+            - name: nats.route_traffic
+              description: Route Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.route_messages
+              description: Route Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.route_subscriptions
+              description: Route Active Subscriptions
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: active
         - name: http endpoint
           description: These metrics refer to HTTP endpoints.
           labels:

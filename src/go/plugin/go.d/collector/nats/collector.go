@@ -37,14 +37,18 @@ func New() *Collector {
 					Timeout: confopt.Duration(time.Second),
 				},
 			},
+			HealthzCheck: "default",
 		},
-		charts: serverCharts.Copy(),
+		charts:       serverCharts.Copy(),
+		seenAccounts: make(map[string]bool),
+		seenRoutes:   make(map[uint64]bool),
 	}
 }
 
 type Config struct {
 	Vnode          string `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery    int    `yaml:"update_every,omitempty" json:"update_every"`
+	HealthzCheck   string `yaml:"healthz_check,omitempty" json:"healthz_check"`
 	web.HTTPConfig `yaml:",inline" json:""`
 }
 
@@ -55,6 +59,9 @@ type Collector struct {
 	charts *module.Charts
 
 	httpClient *http.Client
+
+	seenAccounts map[string]bool
+	seenRoutes   map[uint64]bool
 }
 
 func (c *Collector) Configuration() any {
