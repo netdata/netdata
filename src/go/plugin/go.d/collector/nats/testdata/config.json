@@ -1,6 +1,7 @@
 {
   "vnode": "ok",
   "update_every": 123,
+  "healthz_check": "ok",
   "url": "ok",
   "body": "ok",
   "method": "ok",

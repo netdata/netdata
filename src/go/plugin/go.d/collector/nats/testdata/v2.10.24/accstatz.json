@@ -1,0 +1,54 @@
+{
+  "server_id": "NDR5FR76SWSTAP5LSKUNYG7ADXPFLXXWNC7ALU3WGX6WLFMMCIDQAD4J",
+  "now": "2024-12-21T15:43:05.910221284Z",
+  "account_statz": [
+    {
+      "acc": "$SYS",
+      "conns": 0,
+      "leafnodes": 0,
+      "total_conns": 0,
+      "num_subscriptions": 220,
+      "sent": {
+        "msgs": 0,
+        "bytes": 0
+      },
+      "received": {
+        "msgs": 0,
+        "bytes": 0
+      },
+      "slow_consumers": 0
+    },
+    {
+      "acc": "$G",
+      "conns": 0,
+      "leafnodes": 0,
+      "total_conns": 0,
+      "num_subscriptions": 5,
+      "sent": {
+        "msgs": 0,
+        "bytes": 0
+      },
+      "received": {
+        "msgs": 0,
+        "bytes": 0
+      },
+      "slow_consumers": 0
+    },
+    {
+      "acc": "default",
+      "conns": 44,
+      "leafnodes": 0,
+      "total_conns": 44,
+      "num_subscriptions": 1133,
+      "sent": {
+        "msgs": 2546732,
+        "bytes": 529749990
+      },
+      "received": {
+        "msgs": 916392,
+        "bytes": 62023455
+      },
+      "slow_consumers": 1
+    }
+  ]
+}

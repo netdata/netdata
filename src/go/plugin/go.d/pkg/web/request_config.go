@@ -103,3 +103,7 @@ func NewHTTPRequestWithPath(cfg RequestConfig, urlPath string) (*http.Request, e
 
 	return NewHTTPRequest(cfg)
 }
+
+func URLQuery(key, value string) string {
+	return url.Values{key: []string{value}}.Encode()
+}
