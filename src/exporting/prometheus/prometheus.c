@@ -2,6 +2,13 @@
 
 #include "prometheus.h"
 
+DEFINE_JUDYL_TYPED(PROM_CONTEXT_OPTIONS, PROMETHEUS_OUTPUT_OPTIONS);
+
+static void PROM_CONTEXT_OPTIONS_free_cb(Word_t index, PROMETHEUS_OUTPUT_OPTIONS options __maybe_unused) {
+    STRING *context_id = (STRING *)index;
+    string_freez(context_id);
+}
+
 // ----------------------------------------------------------------------------
 // PROMETHEUS
 // /api/v1/allmetrics?format=prometheus and /api/v1/allmetrics?format=prometheus_all_hosts
@@ -335,6 +342,7 @@ struct host_variables_callback_options {
     SIMPLE_PATTERN *pattern;
     struct instance *instance;
     STRING *prometheus;
+    PROM_CONTEXT_OPTIONS_JudyLSet *context_options;
 };
 
 /**
@@ -458,10 +466,14 @@ static void generate_as_collected_from_metric(BUFFER *wb,
                                               int prometheus_collector,
                                               RRDLABELS *chart_labels)
 {
-    buffer_sprintf(wb, "%s_%s", p->prefix, p->context);
+    buffer_strcat(wb, p->prefix);
+    buffer_putc(wb, '_');
+    buffer_strcat(wb, p->context);
 
-    if (!homogeneous)
-        buffer_sprintf(wb, "_%s", p->dimension);
+    if (!homogeneous) {
+        buffer_putc(wb, '_');
+        buffer_strcat(wb, p->dimension);
+    }
 
     buffer_sprintf(wb, "%s{%schart=\"%s\"", p->suffix, p->labels_prefix, p->chart);
 
@@ -472,21 +484,23 @@ static void generate_as_collected_from_metric(BUFFER *wb,
 
     rrdlabels_walkthrough_read(chart_labels, format_prometheus_chart_label_callback, wb);
 
-    buffer_sprintf(wb, "%s} ", p->labels);
+    buffer_strcat(wb, p->labels);
+    buffer_putc(wb, '}');
+    buffer_putc(wb, ' ');
 
     if (prometheus_collector)
-        buffer_sprintf(
-            wb,
-            NETDATA_DOUBLE_FORMAT,
+        buffer_print_netdata_double(wb,
             (NETDATA_DOUBLE)p->rd->collector.last_collected_value * (NETDATA_DOUBLE)p->rd->multiplier /
             (NETDATA_DOUBLE)p->rd->divisor);
     else
-        buffer_sprintf(wb, COLLECTED_NUMBER_FORMAT, p->rd->collector.last_collected_value);
+        buffer_print_int64(wb, p->rd->collector.last_collected_value);
 
-    if (p->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-        buffer_sprintf(wb, " %"PRIu64"\n", timeval_msec(&p->rd->collector.last_collected_time));
-    else
-        buffer_sprintf(wb, "\n");
+    if (p->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS) {
+        buffer_putc(wb, ' ');
+        buffer_print_uint64(wb, timeval_msec(&p->rd->collector.last_collected_time));
+    }
+
+    buffer_putc(wb, '\n');
 }
 
 static void prometheus_print_os_info(
@@ -605,6 +619,22 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
         prometheus_label_copy(family, rrdset_family(st), sizeof(family));
         prometheus_name_copy(context, rrdset_context(st), sizeof(context));
 
+        if(opts->output_options & PROMETHEUS_OUTPUT_HELP_TYPE) {
+            // we do not want to print HELP and TYPE for the same context twice
+            STRING *context_id = string_strdupz(context);
+            PROMETHEUS_OUTPUT_OPTIONS ctx_opts = PROM_CONTEXT_OPTIONS_GET(opts->context_options, (Word_t)context_id);
+            if (!(ctx_opts & PROMETHEUS_OUTPUT_HELP_TYPE)) {
+                // it is not printed for this context yet
+                ctx_opts = opts->output_options;
+                PROM_CONTEXT_OPTIONS_SET(opts->context_options, (Word_t)context_id, ctx_opts);
+            }
+            else {
+                // we have printed HELP and TYPE for this context already
+                opts->output_options &= ~PROMETHEUS_OUTPUT_HELP_TYPE;
+                string_freez(context_id);
+            }
+        }
+
         int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(opts->exporting_options)
                             == EXPORTING_SOURCE_DATA_AS_COLLECTED);
         int homogeneous = 1;
@@ -667,7 +697,7 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                     }
 
                     if (opts->output_options & PROMETHEUS_OUTPUT_HELP_TYPE) {
-                        generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
+                        generate_as_collected_prom_help(wb, prefix, context, units, p.suffix, st);
                         generate_as_collected_prom_type(wb, prefix, context, units, p.suffix, p.type);
                         opts->output_options &= ~PROMETHEUS_OUTPUT_HELP_TYPE;
                     }
@@ -699,8 +729,7 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                     NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(opts->instance, rd, &last_time);
 
                     if (!isnan(value) && !isinf(value)) {
-                        if (EXPORTING_OPTIONS_DATA_SOURCE(opts->exporting_options)
-                            == EXPORTING_SOURCE_DATA_AVERAGE)
+                        if (EXPORTING_OPTIONS_DATA_SOURCE(opts->exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE)
                             suffix = "_average";
                         else if (EXPORTING_OPTIONS_DATA_SOURCE(opts->exporting_options)
                                  == EXPORTING_SOURCE_DATA_SUM)
@@ -713,7 +742,7 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
 
                         if (opts->output_options & PROMETHEUS_OUTPUT_HELP_TYPE) {
                             generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
-                            generate_as_collected_prom_type(wb, prefix, context, units, p.suffix, "gauge");
+                            generate_as_collected_prom_type(wb, prefix, context, units, suffix, "gauge");
                             opts->output_options &= ~PROMETHEUS_OUTPUT_HELP_TYPE;
                         }
 
@@ -740,7 +769,7 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                                            value,
                                            last_time * MSEC_PER_SEC);
                         else
-                        buffer_sprintf(wb, "%s_%s%s%s{%s%s} " NETDATA_DOUBLE_FORMAT "\n",
+                            buffer_sprintf(wb, "%s_%s%s%s{%s%s} " NETDATA_DOUBLE_FORMAT "\n",
                                            prefix,
                                            context,
                                            units,
@@ -783,6 +812,8 @@ static inline int prometheus_rrdcontext_callback(const DICTIONARY_ITEM *item, vo
     return HTTP_RESP_OK;
 }
 
+
+
 /**
  * Write metrics in Prometheus format to a buffer.
  *
@@ -803,7 +834,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     const char *prefix,
     EXPORTING_OPTIONS exporting_options,
     int allhosts,
-    PROMETHEUS_OUTPUT_OPTIONS output_options)
+    PROMETHEUS_OUTPUT_OPTIONS output_options,
+    PROM_CONTEXT_OPTIONS_JudyLSet *context_options)
 {
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
 
@@ -854,7 +886,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         .host_header_printed = 0,
         .pattern = filter,
         .instance = instance,
-        .prometheus = string_strdupz("prometheus")
+        .prometheus = string_strdupz("prometheus"),
+        .context_options = context_options,
     };
 
     // send custom variables set for the host
@@ -946,8 +979,13 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
         server,
         prometheus_exporter_instance->before);
 
+    PROM_CONTEXT_OPTIONS_JudyLSet context_options;
+    PROM_CONTEXT_OPTIONS_INIT(&context_options);
+
     rrd_stats_api_v1_charts_allmetrics_prometheus(
-        prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 0, output_options);
+        prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 0, output_options, &context_options);
+
+    PROM_CONTEXT_OPTIONS_FREE(&context_options, PROM_CONTEXT_OPTIONS_free_cb);
 }
 
 /**
@@ -982,10 +1020,15 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
         server,
         prometheus_exporter_instance->before);
 
+    PROM_CONTEXT_OPTIONS_JudyLSet context_options;
+    PROM_CONTEXT_OPTIONS_INIT(&context_options);
+
     dfe_start_reentrant(rrdhost_root_index, host)
     {
         rrd_stats_api_v1_charts_allmetrics_prometheus(
-            prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 1, output_options);
+            prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 1, output_options, &context_options);
     }
     dfe_done(host);
+
+    PROM_CONTEXT_OPTIONS_FREE(&context_options, PROM_CONTEXT_OPTIONS_free_cb);
 }
