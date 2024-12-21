@@ -73,22 +73,6 @@ enum ebpf_main_index {
 };
 
 // ----------------------------------------------------------------------------
-// Structures used to read information from kernel ring
-
-typedef struct __attribute__((packed)) ebpf_publish_process {
-    uint64_t ct;
-
-    //Counter
-    uint32_t exit_call;
-    uint32_t release_call;
-    uint32_t create_process;
-    uint32_t create_thread;
-
-    //Counter
-    uint32_t task_err;
-} ebpf_publish_process_t;
-
-// ----------------------------------------------------------------------------
 // pid_stat
 //
 struct ebpf_target {
@@ -161,7 +145,7 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
     netdata_publish_dcstat_t *dc;
     netdata_publish_vfs_t *vfs;
     netdata_publish_cachestat_t *cachestat;
-    ebpf_publish_process_t *process;
+    ebpf_process_stat_t *process;
     ebpf_socket_publish_apps_t *socket;
 
 } ebpf_pid_data_t;
@@ -215,18 +199,6 @@ static inline void *ebpf_vfs_allocate_publish()
 }
 
 static inline void ebpf_vfs_release_publish(netdata_publish_vfs_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_process_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(ebpf_publish_process_t));
-}
-
-static inline void ebpf_process_release_publish(ebpf_publish_process_t *ptr)
 {
     ebpf_hash_table_pids_count--;
     freez(ptr);

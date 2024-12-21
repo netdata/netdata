@@ -16,7 +16,7 @@ struct pid_on_target2 {
     netdata_ebpf_swap_t swap;
     netdata_fd_stat_t fd;
     netdata_publish_vfs_t vfs;
-    ebpf_publish_process_t ps;
+    ebpf_process_stat_t ps;
     netdata_dcstat_pid_t dc;
     netdata_ebpf_shm_t shm;
     netdata_socket_t socket;
@@ -57,7 +57,7 @@ typedef struct ebpf_cgroup_target {
     netdata_ebpf_swap_t publish_systemd_swap;
     netdata_fd_stat_t publish_systemd_fd;
     netdata_publish_vfs_t publish_systemd_vfs;
-    ebpf_publish_process_t publish_systemd_ps;
+    ebpf_process_stat_t publish_systemd_ps;
     netdata_publish_dcstat_t publish_dc;
     int oomkill;
     netdata_ebpf_shm_t publish_shm;
