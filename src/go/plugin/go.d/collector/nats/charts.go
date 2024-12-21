@@ -4,6 +4,7 @@ package nats
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -27,6 +28,10 @@ const (
 	prioAccountSubscriptions
 	prioAccountSlowConsumers
 	prioAccountLeafNodes
+
+	prioRouteTraffic
+	prioRouteMessages
+	prioRouteSubscriptions
 )
 
 var serverCharts = func() module.Charts {
@@ -290,7 +295,79 @@ func (c *Collector) addAccountCharts(acc string) {
 }
 
 func (c *Collector) removeAccountCharts(acc string) {
-	px := fmt.Sprintf("accstatz_acc_%s_", acc)
+	px := fmt.Sprintf("account_%s_", acc)
+	c.removeCharts(px)
+}
+
+var routeChartsTmpl = module.Charts{
+	routeTrafficTmpl.Copy(),
+	routeMessagesTmpl.Copy(),
+	routeSubscriptionsTmpl.Copy(),
+}
+
+var (
+	routeTrafficTmpl = module.Chart{
+		ID:       "route_%d_traffic",
+		Title:    "Route Traffic",
+		Units:    "bytes/s",
+		Fam:      "route traffic",
+		Ctx:      "nats.route_traffic",
+		Priority: prioRouteTraffic,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "routez_route_id_%d_in_bytes", Name: "in", Algo: module.Incremental},
+			{ID: "routez_route_id_%d_out_bytes", Name: "out", Mul: -1, Algo: module.Incremental},
+		},
+	}
+	routeMessagesTmpl = module.Chart{
+		ID:       "route_%d_messages",
+		Title:    "Route Messages",
+		Units:    "messages/s",
+		Fam:      "route traffic",
+		Ctx:      "nats.route_messages",
+		Priority: prioRouteMessages,
+		Type:     module.Line,
+		Dims: module.Dims{
+			{ID: "routez_route_id_%d_in_msgs", Name: "in", Algo: module.Incremental},
+			{ID: "routez_route_id_%d_out_msgs", Name: "out", Mul: -1, Algo: module.Incremental},
+		},
+	}
+	routeSubscriptionsTmpl = module.Chart{
+		ID:       "route_%d_subscriptions",
+		Title:    "Route Active Subscriptions",
+		Units:    "subscriptions",
+		Fam:      "route subscriptions",
+		Ctx:      "nats.route_subscriptions",
+		Priority: prioRouteSubscriptions,
+		Type:     module.Line,
+		Dims: module.Dims{
+			{ID: "routez_route_id_%d_num_subs", Name: "active"},
+		},
+	}
+)
+
+func (c *Collector) addRouteCharts(rid uint64, remoteId string) {
+	charts := routeChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, rid)
+		chart.Labels = []module.Label{
+			{Key: "route_id", Value: strconv.FormatUint(rid, 10)},
+			{Key: "remote_id", Value: remoteId},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, rid)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add charts for route id %d: %s", rid, err)
+	}
+
+}
+
+func (c *Collector) removeRouteCharts(rid uint64) {
+	px := fmt.Sprintf("route_%d_", rid)
 	c.removeCharts(px)
 }
 

@@ -41,6 +41,7 @@ func New() *Collector {
 		},
 		charts:       serverCharts.Copy(),
 		seenAccounts: make(map[string]bool),
+		seenRoutes:   make(map[uint64]bool),
 	}
 }
 
@@ -60,6 +61,7 @@ type Collector struct {
 	httpClient *http.Client
 
 	seenAccounts map[string]bool
+	seenRoutes   map[uint64]bool
 }
 
 func (c *Collector) Configuration() any {

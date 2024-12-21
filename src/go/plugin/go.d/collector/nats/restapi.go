@@ -17,6 +17,8 @@ const (
 	urlPathHealthz = "/healthz"
 	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics
 	urlPathAccstatz = "/accstatz"
+	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#route-information
+	urlPathRoutez = "/routez"
 )
 
 var (
@@ -95,4 +97,17 @@ type accstatzResponse struct {
 		} `json:"received"`
 		SlowConsumers int64 `json:"slow_consumers"`
 	} `json:"account_statz"`
+}
+
+// https://github.com/nats-io/nats-server/blob/v2.10.24/server/monitor.go#L752
+type routezResponse struct {
+	Routes []struct {
+		Rid      uint64 `json:"rid"`
+		RemoteID string `json:"remote_id"`
+		InMsgs   int64  `json:"in_msgs"`
+		OutMsgs  int64  `json:"out_msgs"`
+		InBytes  int64  `json:"in_bytes"`
+		OutBytes int64  `json:"out_bytes"`
+		NumSubs  uint32 `json:"subscriptions"`
+	} `json:"routes"`
 }

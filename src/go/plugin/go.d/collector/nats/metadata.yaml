@@ -239,7 +239,7 @@ modules:
               dimensions:
                 - name: uptime
         - name: account
-          description: These metrics refer to [accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
+          description: These metrics refer to [Accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
           labels:
             - name: account
               description: "Account name."
@@ -288,6 +288,34 @@ modules:
               chart_type: line
               dimensions:
                 - name: leafnode
+        - name: route
+          description: These metrics refer to [Routes](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#route-information).
+          labels:
+            - name: route_id
+              description: "A unique identifier for a route within the NATS cluster."
+            - name: remote_id
+              description: "he unique identifier of the remote server connected via the route."
+          metrics:
+            - name: nats.route_traffic
+              description: Route Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.route_messages
+              description: Route Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.route_subscriptions
+              description: Route Active Subscriptions
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: active
         - name: http endpoint
           description: These metrics refer to HTTP endpoints.
           labels:
