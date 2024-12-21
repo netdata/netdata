@@ -23,6 +23,7 @@ var (
 	dataVer210HealthzOk, _ = os.ReadFile("testdata/v2.10.24/healthz-ok.json")
 	dataVer210Varz, _      = os.ReadFile("testdata/v2.10.24/varz.json")
 	dataVer210Accstatz, _  = os.ReadFile("testdata/v2.10.24/accstatz.json")
+	dataVer210Routez, _    = os.ReadFile("testdata/v2.10.24/routez.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -32,6 +33,7 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataVer210HealthzOk": dataVer210HealthzOk,
 		"dataVer210Varz":      dataVer210Varz,
 		"dataVer210Accstatz":  dataVer210Accstatz,
+		"dataVer210Routez":    dataVer210Routez,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -126,8 +128,10 @@ func TestCollector_Collect(t *testing.T) {
 		wantMetrics     map[string]int64
 	}{
 		"success on valid response": {
-			prepare:         caseOk,
-			wantNumOfCharts: len(serverCharts) + len(accountChartsTmpl)*3,
+			prepare: caseOk,
+			wantNumOfCharts: len(serverCharts) +
+				len(accountChartsTmpl)*3 +
+				len(routeChartsTmpl)*1,
 			wantMetrics: map[string]int64{
 				"accstatz_acc_$G_conns":               0,
 				"accstatz_acc_$G_leaf_nodes":          0,
@@ -156,6 +160,11 @@ func TestCollector_Collect(t *testing.T) {
 				"accstatz_acc_default_sent_msgs":      2546732,
 				"accstatz_acc_default_slow_consumers": 1,
 				"accstatz_acc_default_total_conns":    44,
+				"routez_route_id_1_in_bytes":          4,
+				"routez_route_id_1_in_msgs":           1,
+				"routez_route_id_1_num_subs":          1,
+				"routez_route_id_1_out_bytes":         4,
+				"routez_route_id_1_out_msgs":          1,
 				"varz_http_endpoint_/_req":            5710,
 				"varz_http_endpoint_/accountz_req":    2201,
 				"varz_http_endpoint_/accstatz_req":    6,
@@ -240,6 +249,8 @@ func caseOk(t *testing.T) (*Collector, func()) {
 					return
 				}
 				_, _ = w.Write(dataVer210Accstatz)
+			case urlPathRoutez:
+				_, _ = w.Write(dataVer210Routez)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}

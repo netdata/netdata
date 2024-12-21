@@ -1,0 +1,20 @@
+{
+  "server_id": "NACDVKFBUW4C4XA24OOT6L4MDP56MW76J5RJDFXG7HLABSB46DCMWCOW",
+  "now": "2019-06-24T14:29:16.046656-07:00",
+  "num_routes": 1,
+  "routes": [
+    {
+      "rid": 1,
+      "remote_id": "de475c0041418afc799bccf0fdd61b47",
+      "did_solicit": true,
+      "ip": "127.0.0.1",
+      "port": 61791,
+      "pending_size": 0,
+      "in_msgs": 1,
+      "out_msgs": 1,
+      "in_bytes": 4,
+      "out_bytes": 4,
+      "subscriptions": 1
+    }
+  ]
+}

@@ -22,6 +22,9 @@ func (c *Collector) collect() (map[string]int64, error) {
 	if err := c.collectAccstatz(mx); err != nil {
 		return mx, err
 	}
+	if err := c.collectRoutez(mx); err != nil {
+		return mx, err
+	}
 
 	return mx, nil
 }
@@ -132,6 +135,45 @@ func (c *Collector) collectAccstatz(mx map[string]int64) error {
 		if !seen[acc] {
 			delete(c.seenAccounts, acc)
 			c.removeAccountCharts(acc)
+		}
+	}
+
+	return nil
+}
+
+func (c *Collector) collectRoutez(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathRoutez)
+	if err != nil {
+		return err
+	}
+
+	var resp routezResponse
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
+		return err
+	}
+
+	seen := make(map[uint64]bool)
+
+	for _, route := range resp.Routes {
+		seen[route.Rid] = true
+		if !c.seenRoutes[route.Rid] {
+			c.seenRoutes[route.Rid] = true
+			c.addRouteCharts(route.Rid, route.RemoteID)
+		}
+
+		px := fmt.Sprintf("routez_route_id_%d_", route.Rid)
+
+		mx[px+"in_bytes"] = route.InBytes
+		mx[px+"out_bytes"] = route.OutBytes
+		mx[px+"in_msgs"] = route.InMsgs
+		mx[px+"out_msgs"] = route.OutMsgs
+		mx[px+"num_subs"] = int64(route.NumSubs)
+	}
+
+	for rid := range c.seenRoutes {
+		if !seen[rid] {
+			delete(c.seenRoutes, rid)
+			c.removeRouteCharts(rid)
 		}
 	}
 
