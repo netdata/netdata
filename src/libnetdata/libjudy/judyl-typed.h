@@ -6,7 +6,7 @@
 #include <Judy.h>
 
 #define DEFINE_JUDYL_TYPED(NAME, TYPE)                                           \
-    _Static_assert(sizeof(TYPE) == sizeof(Word_t),                               \
+    _Static_assert(sizeof(TYPE) <= sizeof(Word_t),                               \
                    #NAME "_type_must_have_same_size_as_Word_t");                 \
     typedef struct {                                                             \
         Pvoid_t judyl;                                                           \
@@ -60,14 +60,14 @@
         return (pValue != NULL) ? (TYPE)(uintptr_t)(*pValue) : (TYPE)0;          \
     }                                                                            \
                                                                                  \
-    static inline void NAME##_FREE(NAME##_JudyLSet *set, void (*callback)(TYPE)) { \
+    static inline void NAME##_FREE(NAME##_JudyLSet *set, void (*callback)(Word_t, TYPE)) { \
         Word_t index = 0;                                                        \
         Pvoid_t *pValue;                                                         \
         if (callback) {                                                          \
             for (pValue = JudyLFirst(set->judyl, &index, PJE0);                  \
                  pValue != NULL;                                                 \
                  pValue = JudyLNext(set->judyl, &index, PJE0)) {                 \
-                callback((TYPE)(uintptr_t)(*pValue));                            \
+                callback(index, (TYPE)(uintptr_t)(*pValue));                     \
             }                                                                    \
         }                                                                        \
         JudyLFreeArray(&set->judyl, PJE0);                                       \
