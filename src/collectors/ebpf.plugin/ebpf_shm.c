@@ -536,7 +536,7 @@ static void shm_apps_accumulator(netdata_ebpf_shm_t *out, int maps_per_core)
 static void ebpf_update_shm_cgroup()
 {
     netdata_ebpf_shm_t *cv = shm_vector;
-    size_t length = sizeof(netdata_publish_shm_t);
+    size_t length = sizeof(netdata_ebpf_shm_t);
 
     ebpf_cgroup_target_t *ect;
 
@@ -657,9 +657,9 @@ static void ebpf_shm_read_global_table(netdata_idx_t *stats, int maps_per_core)
 /**
  * Sum values for all targets.
  */
-static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_target *root)
+static void ebpf_shm_sum_pids(netdata_ebpf_shm_t *shm, struct ebpf_pid_on_target *root)
 {
-    memset(shm, 0, sizeof(netdata_publish_shm_t));
+    memset(shm, 0, sizeof(netdata_ebpf_shm_t));
     for (; root; root = root->next) {
         int32_t pid = root->pid;
         netdata_ebpf_pid_stats_t *local_pid = &integration_shm[pid];
@@ -707,21 +707,18 @@ void ebpf_shm_send_apps_data(struct ebpf_target *root)
 /**
  * Sum values for all targets.
  */
-static void ebpf_shm_sum_cgroup_pids(netdata_publish_shm_t *shm, struct pid_on_target2 *root)
+static void ebpf_shm_sum_cgroup_pids(netdata_ebpf_shm_t *shm, struct pid_on_target2 *root)
 {
-    netdata_publish_shm_t shmv;
-    memset(&shmv, 0, sizeof(shmv));
+    memset(shm, 0, sizeof(*shm));
     while (root) {
         netdata_ebpf_shm_t *w = &root->shm;
-        shmv.get += w->get;
-        shmv.at += w->at;
-        shmv.dt += w->dt;
-        shmv.ctl += w->ctl;
+        shm->get += w->get;
+        shm->at += w->at;
+        shm->dt += w->dt;
+        shm->ctl += w->ctl;
 
         root = root->next;
     }
-
-    memcpy(shm, &shmv, sizeof(shmv));
 }
 
 /**
@@ -965,7 +962,7 @@ static void ebpf_send_systemd_shm_charts()
  * @param type   chart type
  * @param values structure with values that will be sent to netdata
  */
-static void ebpf_send_specific_shm_data(char *type, netdata_publish_shm_t *values)
+static void ebpf_send_specific_shm_data(char *type, netdata_ebpf_shm_t *values)
 {
     ebpf_write_begin_chart(type, NETDATA_SHMGET_CHART, "");
     write_chart_dimension(shm_publish_aggregated[NETDATA_KEY_SHMGET_CALL].name, (long long)values->get);
@@ -1241,7 +1238,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
 static void ebpf_shm_allocate_global_vectors(int apps)
 {
     UNUSED(apps);
-    shm_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_shm_t));
+    shm_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_ebpf_shm_t));
     shm_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
     memset(shm_hash_values, 0, sizeof(shm_hash_values));

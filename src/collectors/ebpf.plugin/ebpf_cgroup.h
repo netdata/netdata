@@ -60,7 +60,7 @@ typedef struct ebpf_cgroup_target {
     ebpf_publish_process_t publish_systemd_ps;
     netdata_publish_dcstat_t publish_dc;
     int oomkill;
-    netdata_publish_shm_t publish_shm;
+    netdata_ebpf_shm_t publish_shm;
     ebpf_socket_publish_apps_t publish_socket;
     netdata_publish_cachestat_t publish_cachestat;
 

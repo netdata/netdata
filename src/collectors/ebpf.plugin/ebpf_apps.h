@@ -109,7 +109,7 @@ struct ebpf_target {
     netdata_ebpf_swap_t swap;
     netdata_publish_vfs_t vfs;
     netdata_fd_stat_t fd;
-    netdata_publish_shm_t shm;
+    netdata_ebpf_shm_t shm;
     ebpf_process_stat_t process;
     ebpf_socket_publish_apps_t socket;
 
@@ -157,7 +157,7 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
 
     netdata_fd_stat_t *fd;
     netdata_ebpf_swap_t *swap;
-    netdata_publish_shm_t *shm; // this has a leak issue
+    netdata_ebpf_shm_t *shm; // this has a leak issue
     netdata_publish_dcstat_t *dc;
     netdata_publish_vfs_t *vfs;
     netdata_publish_cachestat_t *cachestat;
@@ -191,18 +191,6 @@ static inline void *ebpf_dcallocate_publish()
 }
 
 static inline void ebpf_dc_release_publish(netdata_publish_dcstat_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_shm_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_shm_t));
-}
-
-static inline void ebpf_shm_release_publish(netdata_publish_shm_t *ptr)
 {
     ebpf_hash_table_pids_count--;
     freez(ptr);
@@ -364,7 +352,7 @@ typedef struct ebpf_pid_stat {
     netdata_publish_dcstat_t dc;
     netdata_fd_stat_t fd;
     ebpf_process_stat_t process;
-    netdata_publish_shm_t shm;
+    netdata_ebpf_shm_t shm;
     netdata_ebpf_swap_t swap;
     ebpf_socket_publish_apps_t socket;
     netdata_publish_vfs_t vfs;
@@ -457,8 +445,6 @@ void ebpf_vfs_release(netdata_publish_vfs_t *stat);
 
 extern ARAL *ebpf_aral_shm_pid;
 void ebpf_shm_aral_init();
-netdata_publish_shm_t *ebpf_shm_stat_get(void);
-void ebpf_shm_release(netdata_publish_shm_t *stat);
 void ebpf_parse_proc_files();
 
 // ARAL Section end
