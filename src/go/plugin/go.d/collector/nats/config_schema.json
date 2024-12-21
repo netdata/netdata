@@ -30,6 +30,17 @@
         "description": "If set, the client will not follow HTTP redirects automatically.",
         "type": "boolean"
       },
+      "healthz_check": {
+        "title": "Health Check Mode",
+        "description": "Controls the behavior of the `/healthz` endpoint [health check](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#health).",
+        "type": "string",
+        "enum": [
+          "default",
+          "js-enabled-only",
+          "js-server-only"
+        ],
+        "default": "default"
+      },
       "vnode": {
         "title": "Vnode",
         "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
@@ -127,6 +138,9 @@
     "vnode": {
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
+    "healthz_check": {
+      "ui:help": "`default` performs a full health check, ensuring the server can accept connections and that JetStream is functional, including checking accounts, streams, and consumers. `js-enabled-only` returns an error if JetStream is disabled. `js-server-only` checks if the server can accept connections and that JetStream is enabled, but skips health checks of accounts, streams, and consumers."
+    },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     },
@@ -152,6 +166,7 @@
             "url",
             "timeout",
             "not_follow_redirects",
+            "healthz_check",
             "vnode"
           ]
         },

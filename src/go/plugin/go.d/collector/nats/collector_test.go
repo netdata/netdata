@@ -20,16 +20,18 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataVer210Varz, _      = os.ReadFile("testdata/v2.10.24/varz.json")
 	dataVer210HealthzOk, _ = os.ReadFile("testdata/v2.10.24/healthz-ok.json")
+	dataVer210Varz, _      = os.ReadFile("testdata/v2.10.24/varz.json")
+	dataVer210Accstatz, _  = os.ReadFile("testdata/v2.10.24/accstatz.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
 		"dataConfigJSON":      dataConfigJSON,
 		"dataConfigYAML":      dataConfigYAML,
-		"dataVer210Varz":      dataVer210Varz,
 		"dataVer210HealthzOk": dataVer210HealthzOk,
+		"dataVer210Varz":      dataVer210Varz,
+		"dataVer210Accstatz":  dataVer210Accstatz,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -125,37 +127,64 @@ func TestCollector_Collect(t *testing.T) {
 	}{
 		"success on valid response": {
 			prepare:         caseOk,
-			wantNumOfCharts: len(serverCharts),
+			wantNumOfCharts: len(serverCharts) + len(accountChartsTmpl)*3,
 			wantMetrics: map[string]int64{
-				"connections":                  0,
-				"cpu":                          0,
-				"healthz_status_error":         0,
-				"healthz_status_ok":            1,
-				"http_endpoint_/_req":          3,
-				"http_endpoint_/accountz_req":  2,
-				"http_endpoint_/accstatz_req":  2,
-				"http_endpoint_/connz_req":     2,
-				"http_endpoint_/gatewayz_req":  2,
-				"http_endpoint_/healthz_req":   2017,
-				"http_endpoint_/ipqueuesz_req": 0,
-				"http_endpoint_/jsz_req":       3,
-				"http_endpoint_/leafz_req":     2,
-				"http_endpoint_/raftz_req":     0,
-				"http_endpoint_/routez_req":    2,
-				"http_endpoint_/stacksz_req":   0,
-				"http_endpoint_/subsz_req":     1,
-				"http_endpoint_/varz_req":      3750,
-				"in_bytes":                     0,
-				"in_msgs":                      0,
-				"mem":                          21725184,
-				"out_bytes":                    0,
-				"out_msgs":                     0,
-				"remotes":                      0,
-				"routes":                       0,
-				"slow_consumers":               0,
-				"subscriptions":                57,
-				"total_connections":            0,
-				"uptime":                       27513,
+				"accstatz_acc_$G_conns":               0,
+				"accstatz_acc_$G_leaf_nodes":          0,
+				"accstatz_acc_$G_num_subs":            5,
+				"accstatz_acc_$G_received_bytes":      0,
+				"accstatz_acc_$G_received_msgs":       0,
+				"accstatz_acc_$G_sent_bytes":          0,
+				"accstatz_acc_$G_sent_msgs":           0,
+				"accstatz_acc_$G_slow_consumers":      0,
+				"accstatz_acc_$G_total_conns":         0,
+				"accstatz_acc_$SYS_conns":             0,
+				"accstatz_acc_$SYS_leaf_nodes":        0,
+				"accstatz_acc_$SYS_num_subs":          220,
+				"accstatz_acc_$SYS_received_bytes":    0,
+				"accstatz_acc_$SYS_received_msgs":     0,
+				"accstatz_acc_$SYS_sent_bytes":        0,
+				"accstatz_acc_$SYS_sent_msgs":         0,
+				"accstatz_acc_$SYS_slow_consumers":    0,
+				"accstatz_acc_$SYS_total_conns":       0,
+				"accstatz_acc_default_conns":          44,
+				"accstatz_acc_default_leaf_nodes":     0,
+				"accstatz_acc_default_num_subs":       1133,
+				"accstatz_acc_default_received_bytes": 62023455,
+				"accstatz_acc_default_received_msgs":  916392,
+				"accstatz_acc_default_sent_bytes":     529749990,
+				"accstatz_acc_default_sent_msgs":      2546732,
+				"accstatz_acc_default_slow_consumers": 1,
+				"accstatz_acc_default_total_conns":    44,
+				"varz_http_endpoint_/_req":            5710,
+				"varz_http_endpoint_/accountz_req":    2201,
+				"varz_http_endpoint_/accstatz_req":    6,
+				"varz_http_endpoint_/connz_req":       3649,
+				"varz_http_endpoint_/gatewayz_req":    2204,
+				"varz_http_endpoint_/healthz_req":     3430,
+				"varz_http_endpoint_/ipqueuesz_req":   0,
+				"varz_http_endpoint_/jsz_req":         2958,
+				"varz_http_endpoint_/leafz_req":       9,
+				"varz_http_endpoint_/raftz_req":       0,
+				"varz_http_endpoint_/routez_req":      2202,
+				"varz_http_endpoint_/stacksz_req":     0,
+				"varz_http_endpoint_/subsz_req":       4412,
+				"varz_http_endpoint_/varz_req":        7114,
+				"varz_srv_connections":                44,
+				"varz_srv_cpu":                        10,
+				"varz_srv_healthz_status_error":       0,
+				"varz_srv_healthz_status_ok":          1,
+				"varz_srv_in_bytes":                   62024985,
+				"varz_srv_in_msgs":                    916475,
+				"varz_srv_mem":                        95731712,
+				"varz_srv_out_bytes":                  529775656,
+				"varz_srv_out_msgs":                   2546840,
+				"varz_srv_remotes":                    0,
+				"varz_srv_routes":                     0,
+				"varz_srv_slow_consumers":             1,
+				"varz_srv_subscriptions":              1358,
+				"varz_srv_total_connections":          74932,
+				"varz_srv_uptime":                     339394,
 			},
 		},
 		"fail on unexpected JSON response": {
@@ -201,10 +230,16 @@ func caseOk(t *testing.T) (*Collector, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
-			case urlPathVarz:
-				_, _ = w.Write(dataVer210Varz)
 			case urlPathHealthz:
 				_, _ = w.Write(dataVer210HealthzOk)
+			case urlPathVarz:
+				_, _ = w.Write(dataVer210Varz)
+			case urlPathAccstatz:
+				if r.URL.RawQuery != urlQueryAccstatz {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				_, _ = w.Write(dataVer210Accstatz)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
