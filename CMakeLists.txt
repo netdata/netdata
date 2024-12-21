@@ -2204,10 +2204,15 @@ if(ENABLE_PLUGIN_DEBUGFS)
 
     # Add vendored libsensors library
     add_subdirectory(src/collectors/debugfs.plugin/libsensors)
-    target_link_libraries(debugfs.plugin PRIVATE vendored_libsensors)
 
     # Link debugfs.plugin with vendored libsensors
     target_link_libraries(debugfs.plugin PRIVATE vendored_libsensors)
+
+    # Include vendored libsensors headers
+    target_include_directories(debugfs.plugin PRIVATE
+            src/collectors/debugfs.plugin/libsensors/vendored/lib
+            ${CMAKE_CURRENT_BINARY_DIR}/src/collectors/debugfs.plugin/libsensors # For generated headers
+    )
 
     # Link against libnetdata and optionally libcap
     target_link_libraries(debugfs.plugin PRIVATE libnetdata ${CAP_LIBRARIES})
