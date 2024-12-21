@@ -2202,21 +2202,20 @@ if(ENABLE_PLUGIN_DEBUGFS)
     # Add executable for debugfs.plugin
     add_executable(debugfs.plugin ${DEBUGFS_PLUGIN_FILES})
 
-    # Find libsensors (optional)
-    find_package(LibSensors QUIET)
-    if(LibSensors_FOUND)
-        message(STATUS "libsensors found: ${LibSensors_INCLUDE_DIRS}, ${LibSensors_LIBRARIES}")
-        target_include_directories(debugfs.plugin PRIVATE ${LibSensors_INCLUDE_DIRS})
-        target_link_libraries(debugfs.plugin PRIVATE ${LibSensors_LIBRARIES})
-        target_compile_definitions(debugfs.plugin PRIVATE HAVE_LIBSENSORS)
-    else()
-        message(WARNING "libsensors not found. Building debugfs.plugin without it.")
-    endif()
+    # Add vendored libsensors library
+    add_subdirectory(src/collectors/debugfs.plugin/libsensors)
+    target_link_libraries(debugfs.plugin PRIVATE vendored_libsensors)
+
+    # Link debugfs.plugin with vendored libsensors
+    target_link_libraries(debugfs.plugin PRIVATE vendored_libsensors)
 
     # Link against libnetdata and optionally libcap
     target_link_libraries(debugfs.plugin PRIVATE libnetdata ${CAP_LIBRARIES})
     target_include_directories(debugfs.plugin PRIVATE ${CAP_INCLUDE_DIRS})
     target_compile_options(debugfs.plugin PRIVATE ${CAP_CFLAGS_OTHER})
+
+    # Add libsensors compile definition
+    target_compile_definitions(debugfs.plugin PRIVATE HAVE_LIBSENSORS)
 
     # Install the debugfs.plugin binary
     install(TARGETS debugfs.plugin

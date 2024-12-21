@@ -508,6 +508,17 @@ typedef struct sensor {
     STRING *log_msg;
 } SENSOR;
 
+static inline msec_t chip_update_interval(const char *path, msec_t default_interval_ms) {
+    char filename[FILENAME_MAX];
+    snprintfz(filename, sizeof(filename), "%s/update_interval", path);
+
+    unsigned long long result = 0;
+    if(read_single_number_file(filename, &result) != 0)
+        result = default_interval_ms;
+
+    return result;
+}
+
 static inline double sft_value(SENSOR *ft, SENSOR_SUBFEATURE_TYPE type) {
     double value = NAN;
 
