@@ -4,6 +4,8 @@
 
 #if defined(HAVE_LIBSENSORS)
 
+#define NETDATA_CALCULATED_STATES 1
+
 #include <sensors/sensors.h>
 #include <sensors/error.h>
 
@@ -27,14 +29,14 @@ ENUM_STR_DEFINE_FUNCTIONS(SENSOR_BUS_TYPE, SENSORS_BUS_TYPE_ANY, "any");
 
 typedef sensors_feature_type SENSOR_FEATURE_TYPE;
 ENUM_STR_MAP_DEFINE(SENSOR_FEATURE_TYPE) = {
-    { .id = SENSORS_FEATURE_IN, .name = "voltage", },
+    { .id = SENSORS_FEATURE_IN, .name = "in", },
     { .id = SENSORS_FEATURE_FAN, .name = "fan", },
-    { .id = SENSORS_FEATURE_TEMP, .name = "temperature", },
+    { .id = SENSORS_FEATURE_TEMP, .name = "temp", },
     { .id = SENSORS_FEATURE_POWER, .name = "power", },
     { .id = SENSORS_FEATURE_ENERGY, .name = "energy", },
-    { .id = SENSORS_FEATURE_CURR, .name = "current", },
+    { .id = SENSORS_FEATURE_CURR, .name = "curr", },
     { .id = SENSORS_FEATURE_HUMIDITY, .name = "humidity", },
-    { .id = SENSORS_FEATURE_VID, .name = "voltage_identification", },
+    { .id = SENSORS_FEATURE_VID, .name = "vid", },
     { .id = SENSORS_FEATURE_INTRUSION, .name = "intrusion", },
     { .id = SENSORS_FEATURE_BEEP_ENABLE, .name = "beep_enable", },
     { .id = SENSORS_FEATURE_UNKNOWN, .name = "unknown", },
@@ -185,8 +187,13 @@ typedef struct sensor {
 
     bool report_state;
     bool report_value;
-    bool is_average;
-    double value;
+
+    bool exposed_input;
+    bool exposed_average;
+    bool exposed_state;
+
+    double input;
+    double average;
 
     STRING *title;
     STRING *units;
@@ -228,60 +235,80 @@ static inline double sft_value(SENSOR *ft, SENSOR_SUBFEATURE_TYPE type) {
 static void set_sensor_state(SENSOR *ft) {
     ft->state = FEATURE_STATE_CLEAR;
 
+#ifdef NETDATA_CALCULATED_STATES
+    FEATURE_STATE custom_states = FEATURE_STATE_FAULT;
+#else
+    FEATURE_STATE custom_states = FEATURE_STATE_NONE;
+#endif
+
     switch(ft->feature.type) {
         case SENSORS_FEATURE_IN: {
-            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_FAULT|FEATURE_STATE_CRITICAL|FEATURE_STATE_ALARM);
+            ft->supported_states = FEATURE_STATE_CLEAR;
 
-            ft->value = sft_value(ft, SENSORS_SUBFEATURE_IN_INPUT);
-            if (isnan(ft->value)) {
-                ft->value = sft_value(ft, SENSORS_SUBFEATURE_IN_AVERAGE);
-                if (isnan(ft->value)) {
-                    ft->state = FEATURE_STATE_FAULT;
-                    return;
-                }
-                else
-                    ft->is_average = true;
-            }
-            else
-                ft->is_average = false;
+            ft->input = sft_value(ft, SENSORS_SUBFEATURE_IN_INPUT);
+            ft->average = sft_value(ft, SENSORS_SUBFEATURE_IN_AVERAGE);
+
+            double lcrit_alarm = sft_value(ft, SENSORS_SUBFEATURE_IN_LCRIT_ALARM);
+            double crit_alarm = sft_value(ft, SENSORS_SUBFEATURE_IN_CRIT_ALARM);
+            if(!isnan(lcrit_alarm) || !isnan(crit_alarm))
+                ft->supported_states |= FEATURE_STATE_CRITICAL;
+
+            double alarm = sft_value(ft, SENSORS_SUBFEATURE_IN_ALARM);
+            double min_alarm = sft_value(ft, SENSORS_SUBFEATURE_IN_MIN_ALARM);
+            double max_alarm = sft_value(ft, SENSORS_SUBFEATURE_IN_MAX_ALARM);
+            if(!isnan(alarm) || !isnan(min_alarm) || !isnan(max_alarm))
+                ft->supported_states |= FEATURE_STATE_ALARM;
 
             // the following are kernel driver reported states
-            if (
-                sft_value(ft, SENSORS_SUBFEATURE_IN_LCRIT_ALARM) > 0 ||
-                sft_value(ft, SENSORS_SUBFEATURE_IN_CRIT_ALARM) > 0)
+            if (lcrit_alarm > 0 || crit_alarm > 0)
                 ft->state = FEATURE_STATE_CRITICAL;
-            else if (
-                sft_value(ft, SENSORS_SUBFEATURE_IN_ALARM) > 0 ||
-                sft_value(ft, SENSORS_SUBFEATURE_IN_MIN_ALARM) > 0 ||
-                sft_value(ft, SENSORS_SUBFEATURE_IN_MAX_ALARM) > 0)
+            else if (alarm > 0 || min_alarm > 0 || max_alarm > 0)
                 ft->state = FEATURE_STATE_ALARM;
 
-            // the following are Netdata calculated alarm states
-            else if (!ft->is_average &&
-                isnan(sft_value(ft, SENSORS_SUBFEATURE_IN_LCRIT_ALARM)) &&
-                ft->value < sft_value(ft, SENSORS_SUBFEATURE_IN_LCRIT))
-                ft->state = FEATURE_STATE_CRITICAL;
-            else if (!ft->is_average &&
-                isnan(sft_value(ft, SENSORS_SUBFEATURE_IN_CRIT_ALARM)) &&
-                ft->value >= sft_value(ft, SENSORS_SUBFEATURE_IN_CRIT))
-                ft->state = FEATURE_STATE_CRITICAL;
-            else if (!ft->is_average &&
-                isnan(sft_value(ft, SENSORS_SUBFEATURE_IN_MIN_ALARM)) &&
-                ft->value < sft_value(ft, SENSORS_SUBFEATURE_IN_MIN))
-                ft->state = FEATURE_STATE_ALARM;
-            else if (!ft->is_average &&
-                isnan(sft_value(ft, SENSORS_SUBFEATURE_IN_MAX_ALARM)) &&
-                ft->value >= sft_value(ft, SENSORS_SUBFEATURE_IN_MAX))
-                ft->state = FEATURE_STATE_ALARM;
+#ifdef NETDATA_CALCULATED_STATES
+            double lcrit = sft_value(ft, SENSORS_SUBFEATURE_IN_LCRIT);
+            double crit = sft_value(ft, SENSORS_SUBFEATURE_IN_CRIT);
+            double min = sft_value(ft, SENSORS_SUBFEATURE_IN_MIN);
+            double max = sft_value(ft, SENSORS_SUBFEATURE_IN_MAX);
+
+            if((isnan(lcrit_alarm) && !isnan(lcrit)) ||
+                (isnan(crit_alarm) && !isnan(crit)))
+                ft->supported_states |= FEATURE_STATE_CRITICAL;
+
+            if((isnan(min_alarm) && !isnan(min)) ||
+                (isnan(max_alarm) && !isnan(max)))
+                ft->supported_states |= FEATURE_STATE_ALARM;
+
+            ft->supported_states |= FEATURE_STATE_FAULT;
+
+            if(ft->state == FEATURE_STATE_CLEAR) {
+                if (ft->exposed_input && isnan(ft->input)) {
+                    ft->state = FEATURE_STATE_FAULT;
+                } else if (ft->exposed_average && isnan(ft->average)) {
+                    ft->state = FEATURE_STATE_FAULT;
+                } else if (!isnan(ft->input) && isnan(lcrit_alarm) && ft->input < lcrit)
+                    ft->state = FEATURE_STATE_CRITICAL;
+                else if (!isnan(ft->input) && isnan(crit_alarm) && ft->input >= crit)
+                    ft->state = FEATURE_STATE_CRITICAL;
+                else if (!isnan(ft->input) && isnan(min_alarm) && ft->input < min)
+                    ft->state = FEATURE_STATE_ALARM;
+                else if (!isnan(ft->input) && isnan(max_alarm) && ft->input >= max)
+                    ft->state = FEATURE_STATE_ALARM;
+            }
+#endif
             break;
         }
 
         case SENSORS_FEATURE_FAN:
-            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_FAULT|FEATURE_STATE_ALARM);
+            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_ALARM| custom_states);
 
-            ft->value = sft_value(ft, SENSORS_SUBFEATURE_FAN_INPUT);
-            if(isnan(ft->value))
+            ft->input = sft_value(ft, SENSORS_SUBFEATURE_FAN_INPUT);
+            ft->average = NAN;
+
+#ifdef NETDATA_CALCULATED_STATES
+            if(isnan(ft->input))
                 ft->state = FEATURE_STATE_FAULT;
+#endif
 
             // the following are kernel driver reported states
             else if(
@@ -290,28 +317,37 @@ static void set_sensor_state(SENSOR *ft) {
                 sft_value(ft, SENSORS_SUBFEATURE_FAN_MAX_ALARM) > 0)
                 ft->state = FEATURE_STATE_ALARM;
 
+#ifdef NETDATA_CALCULATED_STATES
             // the following are Netdata calculated alarm states
             else if(
                 isnan(sft_value(ft, SENSORS_SUBFEATURE_FAN_MIN_ALARM)) &&
-                ft->value < sft_value(ft, SENSORS_SUBFEATURE_FAN_MIN))
+                ft->input < sft_value(ft, SENSORS_SUBFEATURE_FAN_MIN))
                 ft->state = FEATURE_STATE_ALARM;
             else if(
                 isnan(sft_value(ft, SENSORS_SUBFEATURE_FAN_MAX_ALARM)) &&
-                ft->value >= sft_value(ft, SENSORS_SUBFEATURE_FAN_MAX))
+                ft->input >= sft_value(ft, SENSORS_SUBFEATURE_FAN_MAX))
                 ft->state = FEATURE_STATE_ALARM;
+#endif
             break;
 
         case SENSORS_FEATURE_TEMP:
-            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_FAULT|FEATURE_STATE_EMERGENCY|FEATURE_STATE_CRITICAL|FEATURE_STATE_ALARM);
+            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_FAULT|FEATURE_STATE_EMERGENCY|FEATURE_STATE_CRITICAL|FEATURE_STATE_ALARM| custom_states);
 
-            if(sft_value(ft, SENSORS_SUBFEATURE_TEMP_FAULT) > 0) {
+            ft->input = sft_value(ft, SENSORS_SUBFEATURE_TEMP_INPUT);
+            ft->average = NAN;
+
+#ifdef NETDATA_CALCULATED_STATES
+            if(isnan(ft->input)) {
                 ft->state = FEATURE_STATE_FAULT;
                 return;
             }
+#endif
 
-            ft->value = sft_value(ft, SENSORS_SUBFEATURE_TEMP_INPUT);
-            if(isnan(ft->value))
+            if(sft_value(ft, SENSORS_SUBFEATURE_TEMP_FAULT) > 0) {
+                ft->input = NAN;
                 ft->state = FEATURE_STATE_FAULT;
+                return;
+            }
 
             // the following are kernel driver reported states
             else if(
@@ -328,40 +364,44 @@ static void set_sensor_state(SENSOR *ft) {
                 sft_value(ft, SENSORS_SUBFEATURE_TEMP_MAX_ALARM) > 0)
                 ft->state = FEATURE_STATE_ALARM;
 
+#ifdef NETDATA_CALCULATED_STATES
             // the following are Netdata calculated alarm states
             else if(
                 isnan(sft_value(ft, SENSORS_SUBFEATURE_TEMP_LCRIT_ALARM)) &&
-                ft->value < sft_value(ft, SENSORS_SUBFEATURE_TEMP_LCRIT))
+                ft->input < sft_value(ft, SENSORS_SUBFEATURE_TEMP_LCRIT))
                 ft->state = FEATURE_STATE_CRITICAL;
             else if(
                 isnan(sft_value(ft, SENSORS_SUBFEATURE_TEMP_CRIT_ALARM)) &&
-                ft->value >= sft_value(ft, SENSORS_SUBFEATURE_TEMP_CRIT))
+                ft->input >= sft_value(ft, SENSORS_SUBFEATURE_TEMP_CRIT))
                 ft->state = FEATURE_STATE_CRITICAL;
             else if(
                 isnan(sft_value(ft, SENSORS_SUBFEATURE_TEMP_MIN_ALARM)) &&
-                ft->value < sft_value(ft, SENSORS_SUBFEATURE_TEMP_MIN))
+                ft->input < sft_value(ft, SENSORS_SUBFEATURE_TEMP_MIN))
                 ft->state = FEATURE_STATE_ALARM;
             else if(
                 isnan(sft_value(ft, SENSORS_SUBFEATURE_TEMP_MAX_ALARM)) &&
-                ft->value >= sft_value(ft, SENSORS_SUBFEATURE_TEMP_MAX))
+                ft->input >= sft_value(ft, SENSORS_SUBFEATURE_TEMP_MAX))
                 ft->state = FEATURE_STATE_ALARM;
+#endif
             break;
 
         case SENSORS_FEATURE_POWER: {
-            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_FAULT|FEATURE_STATE_CRITICAL|FEATURE_STATE_ALARM|FEATURE_STATE_CAP);
+            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_CRITICAL|FEATURE_STATE_ALARM|FEATURE_STATE_CAP| custom_states);
 
-            ft->value = sft_value(ft, SENSORS_SUBFEATURE_POWER_INPUT);
-            if (isnan(ft->value)) {
-                ft->value = sft_value(ft, SENSORS_SUBFEATURE_POWER_AVERAGE);
-                if (isnan(ft->value)) {
-                    ft->state = FEATURE_STATE_FAULT;
-                    return;
-                }
-                else
-                    ft->is_average = true;
+            ft->input = sft_value(ft, SENSORS_SUBFEATURE_POWER_INPUT);
+            ft->average = sft_value(ft, SENSORS_SUBFEATURE_POWER_AVERAGE);
+
+#ifdef NETDATA_CALCULATED_STATES
+            if(ft->exposed_input && isnan(ft->input)) {
+                ft->state = FEATURE_STATE_FAULT;
+                return;
             }
-            else
-                ft->is_average = false;
+
+            if(ft->exposed_average && isnan(ft->average)) {
+                ft->state = FEATURE_STATE_FAULT;
+                return;
+            }
+#endif
 
             // the following are kernel driver reported states
             if (
@@ -377,49 +417,57 @@ static void set_sensor_state(SENSOR *ft) {
                 sft_value(ft, SENSORS_SUBFEATURE_POWER_CAP_ALARM) > 0)
                 ft->state = FEATURE_STATE_CAP;
 
+#ifdef NETDATA_CALCULATED_STATES
             // the following are Netdata calculated alarm states
-            else if (!ft->is_average &&
+            else if (!isnan(ft->input) &&
                      isnan(sft_value(ft, SENSORS_SUBFEATURE_POWER_LCRIT_ALARM)) &&
-                     ft->value < sft_value(ft, SENSORS_SUBFEATURE_POWER_LCRIT))
+                     ft->input < sft_value(ft, SENSORS_SUBFEATURE_POWER_LCRIT))
                 ft->state = FEATURE_STATE_CRITICAL;
-            else if (!ft->is_average &&
+            else if (!isnan(ft->input) &&
                      isnan(sft_value(ft, SENSORS_SUBFEATURE_POWER_CRIT_ALARM)) &&
-                     ft->value >= sft_value(ft, SENSORS_SUBFEATURE_POWER_CRIT))
+                     ft->input >= sft_value(ft, SENSORS_SUBFEATURE_POWER_CRIT))
                 ft->state = FEATURE_STATE_CRITICAL;
-            else if (!ft->is_average &&
+            else if (!isnan(ft->input) &&
                      isnan(sft_value(ft, SENSORS_SUBFEATURE_POWER_MIN_ALARM)) &&
-                     ft->value < sft_value(ft, SENSORS_SUBFEATURE_POWER_MIN))
+                     ft->input < sft_value(ft, SENSORS_SUBFEATURE_POWER_MIN))
                 ft->state = FEATURE_STATE_ALARM;
-            else if (!ft->is_average &&
+            else if (!isnan(ft->input) &&
                      isnan(sft_value(ft, SENSORS_SUBFEATURE_POWER_MAX_ALARM)) &&
-                     ft->value >= sft_value(ft, SENSORS_SUBFEATURE_POWER_MAX))
+                     ft->input >= sft_value(ft, SENSORS_SUBFEATURE_POWER_MAX))
                 ft->state = FEATURE_STATE_ALARM;
+#endif
             break;
         }
 
         case SENSORS_FEATURE_ENERGY:
-            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_FAULT);
+            ft->supported_states = (FEATURE_STATE_CLEAR| custom_states);
 
-            ft->value = sft_value(ft, SENSORS_SUBFEATURE_ENERGY_INPUT);
-            if(isnan(ft->value))
+            ft->input = sft_value(ft, SENSORS_SUBFEATURE_ENERGY_INPUT);
+            ft->average = NAN;
+
+#ifdef NETDATA_CALCULATED_STATES
+            if(isnan(ft->input))
                 ft->state = FEATURE_STATE_FAULT;
+#endif
             break;
 
         case SENSORS_FEATURE_CURR: {
-            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_FAULT|FEATURE_STATE_CRITICAL|FEATURE_STATE_ALARM);
+            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_CRITICAL|FEATURE_STATE_ALARM| custom_states);
 
-            ft->value = sft_value(ft, SENSORS_SUBFEATURE_CURR_INPUT);
-            if (isnan(ft->value)) {
-                ft->value = sft_value(ft, SENSORS_SUBFEATURE_CURR_AVERAGE);
-                if (isnan(ft->value)) {
-                    ft->state = FEATURE_STATE_FAULT;
-                    return;
-                }
-                else
-                    ft->is_average = true;
+            ft->input = sft_value(ft, SENSORS_SUBFEATURE_CURR_INPUT);
+            ft->average = sft_value(ft, SENSORS_SUBFEATURE_CURR_AVERAGE);
+
+#ifdef NETDATA_CALCULATED_STATES
+            if(ft->exposed_input && isnan(ft->input)) {
+                ft->state = FEATURE_STATE_FAULT;
+                return;
             }
-            else
-                ft->is_average = false;
+
+            if(ft->exposed_average && isnan(ft->average)) {
+                ft->state = FEATURE_STATE_FAULT;
+                return;
+            }
+#endif
 
             // the following are kernel driver reported states
             if (
@@ -432,41 +480,53 @@ static void set_sensor_state(SENSOR *ft) {
                 sft_value(ft, SENSORS_SUBFEATURE_CURR_MAX_ALARM) > 0)
                 ft->state = FEATURE_STATE_ALARM;
 
+#ifdef NETDATA_CALCULATED_STATES
             // the following are Netdata calculated alarm states
-            else if (!ft->is_average &&
+            else if (!isnan(ft->input) &&
                      isnan(sft_value(ft, SENSORS_SUBFEATURE_CURR_LCRIT_ALARM)) &&
-                     ft->value < sft_value(ft, SENSORS_SUBFEATURE_CURR_LCRIT))
+                     ft->input < sft_value(ft, SENSORS_SUBFEATURE_CURR_LCRIT))
                 ft->state = FEATURE_STATE_CRITICAL;
-            else if (!ft->is_average &&
+            else if (!isnan(ft->input) &&
                      isnan(sft_value(ft, SENSORS_SUBFEATURE_CURR_CRIT_ALARM)) &&
-                     ft->value >= sft_value(ft, SENSORS_SUBFEATURE_CURR_CRIT))
+                     ft->input >= sft_value(ft, SENSORS_SUBFEATURE_CURR_CRIT))
                 ft->state = FEATURE_STATE_CRITICAL;
-            else if (!ft->is_average &&
+            else if (!isnan(ft->input) &&
                      isnan(sft_value(ft, SENSORS_SUBFEATURE_CURR_MIN_ALARM)) &&
-                     ft->value < sft_value(ft, SENSORS_SUBFEATURE_CURR_MIN))
+                     ft->input < sft_value(ft, SENSORS_SUBFEATURE_CURR_MIN))
                 ft->state = FEATURE_STATE_ALARM;
-            else if (!ft->is_average &&
+            else if (!isnan(ft->input) &&
                      isnan(sft_value(ft, SENSORS_SUBFEATURE_CURR_MAX_ALARM)) &&
-                     ft->value >= sft_value(ft, SENSORS_SUBFEATURE_CURR_MAX))
+                     ft->input >= sft_value(ft, SENSORS_SUBFEATURE_CURR_MAX))
                 ft->state = FEATURE_STATE_ALARM;
+#endif
             break;
         }
 
         case SENSORS_FEATURE_HUMIDITY:
-            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_FAULT);
+            ft->supported_states = (FEATURE_STATE_CLEAR| custom_states);
 
-            ft->value = sft_value(ft, SENSORS_SUBFEATURE_HUMIDITY_INPUT);
-            if(isnan(ft->value))
+            ft->input = sft_value(ft, SENSORS_SUBFEATURE_HUMIDITY_INPUT);
+            ft->average = NAN;
+
+#ifdef NETDATA_CALCULATED_STATES
+            if(isnan(ft->input))
                 ft->state = FEATURE_STATE_FAULT;
+#endif
             break;
 
         case SENSORS_FEATURE_INTRUSION:
-            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_FAULT|FEATURE_STATE_ALARM);
+            ft->supported_states = (FEATURE_STATE_CLEAR|FEATURE_STATE_ALARM| custom_states);
 
-            ft->value = sft_value(ft, SENSORS_SUBFEATURE_INTRUSION_ALARM);
-            if(isnan(ft->value))
+            ft->input = sft_value(ft, SENSORS_SUBFEATURE_INTRUSION_ALARM);
+            ft->average = NAN;
+
+#ifdef NETDATA_CALCULATED_STATES
+            if(isnan(ft->input)) {
                 ft->state = FEATURE_STATE_FAULT;
-            else if(ft->value > 0)
+                return;
+            }
+#endif
+            if(ft->input > 0)
                 ft->state = FEATURE_STATE_ALARM;
             break;
 
@@ -497,21 +557,21 @@ static SENSOR *sensor_get_or_create(DICTIONARY *dict, const sensors_chip_name *c
         case SENSORS_FEATURE_IN:
             title = "Sensor Voltage";
             units = "Volts";
-            context = "sensors.hw.voltages";
+            context = "sensors.hw.voltage";
             family = "Voltages";
             priority = 70002;
             break;
         case SENSORS_FEATURE_FAN:
             title = "Sensor Fan Speed";
             units = "rotations per minute";
-            context = "sensors.hw.fans";
+            context = "sensors.hw.fan";
             family = "Fans";
             priority = 70005;
             break;
         case SENSORS_FEATURE_TEMP:
             title = "Sensor Temperature";
             units = "degrees Celsius";
-            context = "sensors.hw.temperatures";
+            context = "sensors.hw.temperature";
             family = "Temperatures";
             priority = 70000;
             break;
@@ -532,7 +592,7 @@ static SENSOR *sensor_get_or_create(DICTIONARY *dict, const sensors_chip_name *c
         case SENSORS_FEATURE_CURR:
             title = "Sensor Current";
             units = "Amperes";
-            context = "sensors.hw.currents";
+            context = "sensors.hw.current";
             family = "Currents";
             priority = 70003;
             break;
@@ -587,6 +647,34 @@ static SENSOR *sensor_get_or_create(DICTIONARY *dict, const sensors_chip_name *c
     return ft;
 }
 
+static void sensor_labels(SENSOR *ft) {
+    printf(PLUGINSD_KEYWORD_CLABEL " label '%s' 1\n", string2str(ft->feature.label));
+    printf(PLUGINSD_KEYWORD_CLABEL " adapter '%s' 1\n", string2str(ft->chip.adapter));
+    printf(PLUGINSD_KEYWORD_CLABEL " bus '%s' 1\n", SENSOR_BUS_TYPE_2str(ft->chip.bus));
+    printf(PLUGINSD_KEYWORD_CLABEL " chip '%s' 1\n", string2str(ft->chip.name));
+    printf(PLUGINSD_KEYWORD_CLABEL " chip_id '%s' 1\n", string2str(ft->chip.id));
+    printf(PLUGINSD_KEYWORD_CLABEL " path '%s' 1\n", string2str(ft->chip.path));
+
+    printf(
+        PLUGINSD_KEYWORD_CLABEL " sensor '%s - %s' 1\n",
+        string2str(ft->chip.name),
+        string2str(ft->feature.label));
+
+    printf(PLUGINSD_KEYWORD_CLABEL_COMMIT "\n");
+}
+
+static size_t states_count(FEATURE_STATE state) {
+    // the gcc way
+    return __builtin_popcount(state);
+
+//    size_t count = 0;
+//    while (state) {
+//        state &= (state - 1);  // Clear the least significant set bit
+//        count++;
+//    }
+//    return count;
+}
+
 static void sensor_process(SENSOR *ft, int update_every, const char *name) {
     // evaluate the state of the feature
     set_sensor_state(ft);
@@ -598,47 +686,81 @@ static void sensor_process(SENSOR *ft, int update_every, const char *name) {
                    "LIBSENSORS: state %u is not in the supported list of states %u",
                    ft->state, ft->supported_states);
 
-    // send the feature data to netdata
-    if(!ft->sent_to_netdata) {
-        ft->sent_to_netdata = true;
+    bool do_input = ft->report_value && !isnan(ft->input);
+    bool do_average = ft->report_value && !isnan(ft->average);
+    bool do_state = ft->report_state && states_count(ft->supported_states) > 1;
 
-        printf(PLUGINSD_KEYWORD_CHART "'sensors.%s-%s-%s-%s' '' '%s' '%s' '%s' '%s' line %d %d '' debugfs %s\n",
-               SENSOR_FEATURE_TYPE_2str(ft->feature.type),
-               string2str(ft->chip.id),
-               string2str(ft->feature.name),
-               string2str(ft->feature.label_sanitized),
-               string2str(ft->title),
-               string2str(ft->units),
-               string2str(ft->family),
-               string2str(ft->context),
-               ft->priority,
-               update_every,
-               name);
+    // send the feature data to netdata
+    if(do_input && !ft->exposed_input) {
+        printf(
+            PLUGINSD_KEYWORD_CHART "'sensors.%s_%s_%s_%s' '' '%s' '%s' '%s' '%s' line %d %d '' debugfs %s\n",
+            SENSOR_FEATURE_TYPE_2str(ft->feature.type),
+            string2str(ft->chip.id),
+            string2str(ft->feature.name),
+            string2str(ft->feature.label_sanitized),
+            string2str(ft->title),
+            string2str(ft->units),
+            string2str(ft->family),
+            string2str(ft->context),
+            ft->priority,
+            update_every,
+            name);
 
         printf(PLUGINSD_KEYWORD_DIMENSION " 'input' 1 10000 \n");
+        sensor_labels(ft);
+        ft->exposed_input = true;
+    }
 
-        printf(PLUGINSD_KEYWORD_CLABEL " label '%s' 1\n",
-               string2str(ft->feature.label));
+    if(do_average && !ft->exposed_average) {
+        printf(
+            PLUGINSD_KEYWORD_CHART "'sensors.%s_%s_%s_%s_average' '' '%s Average' '%s' '%s' '%s_average' line %d %d '' debugfs %s\n",
+            SENSOR_FEATURE_TYPE_2str(ft->feature.type),
+            string2str(ft->chip.id),
+            string2str(ft->feature.name),
+            string2str(ft->feature.label_sanitized),
+            string2str(ft->title),
+            string2str(ft->units),
+            string2str(ft->family),
+            string2str(ft->context),
+            ft->priority,
+            update_every,
+            name);
 
-        printf(PLUGINSD_KEYWORD_CLABEL " adapter '%s' 1\n",
-               string2str(ft->chip.adapter));
+        printf(PLUGINSD_KEYWORD_DIMENSION " 'average' 1 10000 \n");
+        sensor_labels(ft);
+        ft->exposed_average = true;
+    }
 
-        printf(PLUGINSD_KEYWORD_CLABEL " bus '%s' 1\n",
-               SENSOR_BUS_TYPE_2str(ft->chip.bus));
+    if(do_state && !ft->exposed_state) {
+        printf(
+            PLUGINSD_KEYWORD_CHART "'sensors.%s_%s_%s_%s_state' '' '%s State' '%s' '%s' '%s_states' line %d %d '' debugfs %s\n",
+            SENSOR_FEATURE_TYPE_2str(ft->feature.type),
+            string2str(ft->chip.id),
+            string2str(ft->feature.name),
+            string2str(ft->feature.label_sanitized),
+            string2str(ft->title),
+            string2str(ft->units),
+            string2str(ft->family),
+            string2str(ft->context),
+            ft->priority,
+            update_every,
+            name);
 
-        printf(PLUGINSD_KEYWORD_CLABEL " chip '%s' 1\n",
-               string2str(ft->chip.name));
+        if(ft->supported_states & FEATURE_STATE_CLEAR)
+            printf(PLUGINSD_KEYWORD_DIMENSION " clear 1 1 \n");
+        if(ft->supported_states & FEATURE_STATE_CAP)
+            printf(PLUGINSD_KEYWORD_DIMENSION " cap 1 1 \n");
+        if(ft->supported_states & FEATURE_STATE_ALARM)
+            printf(PLUGINSD_KEYWORD_DIMENSION " alarm 1 1 \n");
+        if(ft->supported_states & FEATURE_STATE_CRITICAL)
+            printf(PLUGINSD_KEYWORD_DIMENSION " critical 1 1 \n");
+        if(ft->supported_states & FEATURE_STATE_EMERGENCY)
+            printf(PLUGINSD_KEYWORD_DIMENSION " emergency 1 1 \n");
+        if(ft->supported_states & FEATURE_STATE_FAULT)
+            printf(PLUGINSD_KEYWORD_DIMENSION " fault 1 1 \n");
 
-        printf(PLUGINSD_KEYWORD_CLABEL " chip_id '%s' 1\n",
-               string2str(ft->chip.id));
-
-        printf(PLUGINSD_KEYWORD_CLABEL " sensor '%s - %s' 1\n",
-               string2str(ft->chip.name), string2str(ft->feature.label));
-
-        printf(PLUGINSD_KEYWORD_CLABEL " path '%s' 1\n",
-               string2str(ft->chip.path));
-
-        printf(PLUGINSD_KEYWORD_CLABEL_COMMIT "\n");
+        sensor_labels(ft);
+        ft->exposed_state = true;
     }
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -670,22 +792,65 @@ static void sensor_process(SENSOR *ft, int update_every, const char *name) {
                 sft->value, sft->read ? "OK" : "FAILED");
     }
 
-    fprintf(stderr,
-            " ------------ >>> "
-            " %0.4f (%s)\n",
-            ft->value, ft->is_average ? "average" : "input");
+    if(do_input)
+        fprintf(stderr, " ------------ >>> %0.4f (input)\n", ft->input);
+
+    if(do_average)
+        fprintf(stderr, " ------------ >>> %0.4f (average)\n", ft->average);
+
+    if(do_state)
+        fprintf(stderr, " ------------ >>> %u (state)\n", ft->state);
 
     // ----------------------------------------------------------------------------------------------------------------
-    // debugging
+    // send the data
 
-    printf(PLUGINSD_KEYWORD_BEGIN " 'sensors.%s-%s-%s-%s'\n",
-           SENSOR_FEATURE_TYPE_2str(ft->feature.type),
-           string2str(ft->chip.id),
-           string2str(ft->feature.name),
-           string2str(ft->feature.label_sanitized));
+    if(do_input) {
+        printf(
+            PLUGINSD_KEYWORD_BEGIN " 'sensors.%s_%s_%s_%s'\n",
+            SENSOR_FEATURE_TYPE_2str(ft->feature.type),
+            string2str(ft->chip.id),
+            string2str(ft->feature.name),
+            string2str(ft->feature.label_sanitized));
 
-    printf(PLUGINSD_KEYWORD_SET " 'input' = %lld\n", (long long)(ft->value * 10000.0));
-    printf(PLUGINSD_KEYWORD_END "\n");
+        printf(PLUGINSD_KEYWORD_SET " input = %lld\n", (long long)(ft->input * 10000.0));
+        printf(PLUGINSD_KEYWORD_END "\n");
+    }
+
+    if(do_average) {
+        printf(
+            PLUGINSD_KEYWORD_BEGIN " 'sensors.%s_%s_%s_%s_average'\n",
+            SENSOR_FEATURE_TYPE_2str(ft->feature.type),
+            string2str(ft->chip.id),
+            string2str(ft->feature.name),
+            string2str(ft->feature.label_sanitized));
+
+        printf(PLUGINSD_KEYWORD_SET " average = %lld\n", (long long)(ft->average * 10000.0));
+        printf(PLUGINSD_KEYWORD_END "\n");
+    }
+
+    if(do_state) {
+        printf(
+            PLUGINSD_KEYWORD_BEGIN " 'sensors.%s_%s_%s_%s_state'\n",
+            SENSOR_FEATURE_TYPE_2str(ft->feature.type),
+            string2str(ft->chip.id),
+            string2str(ft->feature.name),
+            string2str(ft->feature.label_sanitized));
+
+        if(ft->supported_states & FEATURE_STATE_CLEAR)
+            printf(PLUGINSD_KEYWORD_DIMENSION " clear = %d\n", ft->state == FEATURE_STATE_CLEAR ? 1 : 0);
+        if(ft->supported_states & FEATURE_STATE_CAP)
+            printf(PLUGINSD_KEYWORD_DIMENSION " cap = %d\n", ft->state == FEATURE_STATE_CAP ? 1 : 0);
+        if(ft->supported_states & FEATURE_STATE_ALARM)
+            printf(PLUGINSD_KEYWORD_DIMENSION " alarm = %d\n", ft->state == FEATURE_STATE_ALARM ? 1 : 0);
+        if(ft->supported_states & FEATURE_STATE_CRITICAL)
+            printf(PLUGINSD_KEYWORD_DIMENSION " critical = %d\n", ft->state == FEATURE_STATE_CRITICAL ? 1 : 0);
+        if(ft->supported_states & FEATURE_STATE_EMERGENCY)
+            printf(PLUGINSD_KEYWORD_DIMENSION " emergency = %d\n", ft->state == FEATURE_STATE_EMERGENCY ? 1 : 0);
+        if(ft->supported_states & FEATURE_STATE_FAULT)
+            printf(PLUGINSD_KEYWORD_DIMENSION " fault = %d\n", ft->state == FEATURE_STATE_FAULT ? 1 : 0);
+
+        printf(PLUGINSD_KEYWORD_END "\n");
+    }
 }
 
 int do_module_libsensors(int update_every, const char *name) {

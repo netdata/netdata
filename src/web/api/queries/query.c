@@ -1498,8 +1498,8 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
          && (last_point).sp.end_time_s == (this_point).sp.start_time_s  \
                                                                         \
             /* both points are valid numbers */                         \
-         && netdata_double_isnumber((this_point).value)                 \
-         && netdata_double_isnumber((last_point).value)                 \
+         && netdata_double_isnumber((this_point).input)                 \
+         && netdata_double_isnumber((last_point).input)                 \
                                                                         \
         )) {                                                            \
             (this_point).value = (last_point).value + ((this_point).value - (last_point).value) * (1.0 - (NETDATA_DOUBLE)((this_point).sp.end_time_s - (now)) / (NETDATA_DOUBLE)((this_point).sp.end_time_s - (this_point).sp.start_time_s)); \
@@ -1508,8 +1508,8 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 } while(0)
 
 #define query_add_point_to_group(r, point, ops, add_flush)        do {  \
-    if(likely(netdata_double_isnumber((point).value))) {                \
-        if(likely(fpclassify((point).value) != FP_ZERO))                \
+    if(likely(netdata_double_isnumber((point).input))) {                \
+        if(likely(fpclassify((point).input) != FP_ZERO))                \
             (ops)->group_points_non_zero++;                             \
                                                                         \
         if(unlikely((point).sp.flags & SN_FLAG_RESET))                  \
