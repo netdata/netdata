@@ -55,7 +55,7 @@ typedef struct ebpf_cgroup_target {
     uint32_t updated;
 
     netdata_ebpf_swap_t publish_systemd_swap;
-    netdata_publish_fd_stat_t publish_systemd_fd;
+    netdata_fd_stat_t publish_systemd_fd;
     netdata_publish_vfs_t publish_systemd_vfs;
     ebpf_publish_process_t publish_systemd_ps;
     netdata_publish_dcstat_t publish_dc;

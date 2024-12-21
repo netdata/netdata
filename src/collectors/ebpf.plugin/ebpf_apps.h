@@ -155,7 +155,7 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
     struct ebpf_pid_data *prev;
     struct ebpf_pid_data *next;
 
-    netdata_publish_fd_stat_t *fd;
+    netdata_fd_stat_t *fd;
     netdata_ebpf_swap_t *swap;
     netdata_publish_shm_t *shm; // this has a leak issue
     netdata_publish_dcstat_t *dc;
@@ -191,18 +191,6 @@ static inline void *ebpf_dcallocate_publish()
 }
 
 static inline void ebpf_dc_release_publish(netdata_publish_dcstat_t *ptr)
-{
-    ebpf_hash_table_pids_count--;
-    freez(ptr);
-}
-
-static inline void *ebpf_fd_allocate_publish()
-{
-    ebpf_hash_table_pids_count++;
-    return callocz(1, sizeof(netdata_publish_fd_stat_t));
-}
-
-static inline void ebpf_fd_release_publish(netdata_publish_fd_stat_t *ptr)
 {
     ebpf_hash_table_pids_count--;
     freez(ptr);

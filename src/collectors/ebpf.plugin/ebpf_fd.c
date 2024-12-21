@@ -878,7 +878,7 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
  * @param fd  structure used to store data
  * @param pids input data
  */
-static void ebpf_fd_sum_cgroup_pids(netdata_publish_fd_stat_t *fd, struct pid_on_target2 *pids)
+static void ebpf_fd_sum_cgroup_pids(netdata_fd_stat_t *fd, struct pid_on_target2 *pids)
 {
     netdata_fd_stat_t accumulator;
     memset(&accumulator, 0, sizeof(accumulator));
@@ -1001,7 +1001,7 @@ static void ebpf_obsolete_specific_fd_charts(char *type, ebpf_module_t *em)
  * @param type   chart type
  * @param values structure with values that will be sent to netdata
  */
-static void ebpf_send_specific_fd_data(char *type, netdata_publish_fd_stat_t *values, ebpf_module_t *em)
+static void ebpf_send_specific_fd_data(char *type, netdata_fd_stat_t *values, ebpf_module_t *em)
 {
     ebpf_write_begin_chart(type, NETDATA_SYSCALL_APPS_FILE_OPEN, "");
     write_chart_dimension(fd_publish_aggregated[NETDATA_FD_SYSCALL_OPEN].name, (long long)values->open_call);
