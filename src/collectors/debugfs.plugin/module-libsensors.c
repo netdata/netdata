@@ -25,8 +25,8 @@ ENUM_STR_MAP_DEFINE(SENSOR_BUS_TYPE) = {
 };
 ENUM_STR_DEFINE_FUNCTIONS(SENSOR_BUS_TYPE, SENSORS_BUS_TYPE_ANY, "any");
 
-typedef sensors_feature_type SENSOR_FEATURE_TYPE;
-ENUM_STR_MAP_DEFINE(SENSOR_FEATURE_TYPE) = {
+typedef sensors_feature_type SENSOR_TYPE;
+ENUM_STR_MAP_DEFINE(SENSOR_TYPE) = {
     { .id = SENSORS_FEATURE_IN, .name = "in", },
     { .id = SENSORS_FEATURE_FAN, .name = "fan", },
     { .id = SENSORS_FEATURE_TEMP, .name = "temp", },
@@ -42,7 +42,7 @@ ENUM_STR_MAP_DEFINE(SENSOR_FEATURE_TYPE) = {
     // terminator
     {.id = 0, .name = NULL}
 };
-ENUM_STR_DEFINE_FUNCTIONS(SENSOR_FEATURE_TYPE, SENSORS_FEATURE_UNKNOWN, "unknown");
+ENUM_STR_DEFINE_FUNCTIONS(SENSOR_TYPE, SENSORS_FEATURE_UNKNOWN, "unknown");
 
 typedef sensors_subfeature_type SENSOR_SUBFEATURE_TYPE;
 ENUM_STR_MAP_DEFINE(SENSOR_SUBFEATURE_TYPE) = {
@@ -161,14 +161,14 @@ ENUM_STR_MAP_DEFINE(SENSOR_SUBFEATURE_TYPE) = {
 ENUM_STR_DEFINE_FUNCTIONS(SENSOR_SUBFEATURE_TYPE, SENSORS_SUBFEATURE_UNKNOWN, "unknown");
 
 typedef enum {
-    SENSOR_STATE_NONE       = 0,
-    SENSOR_STATE_CLEAR      = (1 << 0),
-    SENSOR_STATE_WARNING    = (1 << 1),
-    SENSOR_STATE_CAP        = (1 << 2),
-    SENSOR_STATE_ALARM      = (1 << 3),
-    SENSOR_STATE_CRITICAL   = (1 << 4),
-    SENSOR_STATE_EMERGENCY  = (1 << 5),
-    SENSOR_STATE_FAULT      = (1 << 6),
+    SENSOR_STATE_NONE       = 0,        // unset
+    SENSOR_STATE_CLEAR      = (1 << 0), // everything is good
+    SENSOR_STATE_WARNING    = (1 << 1), // our own calculations indicate an alarm, but not the driver
+    SENSOR_STATE_CAP        = (1 << 2), // our own calculations or the driver, indicate cap
+    SENSOR_STATE_ALARM      = (1 << 3), // the kernel driver has raised an alarm
+    SENSOR_STATE_CRITICAL   = (1 << 4), // our own calculations, or the driver, indicate a critical condition
+    SENSOR_STATE_EMERGENCY  = (1 << 5), // our own calculations, or the driver, indicate an emergency
+    SENSOR_STATE_FAULT      = (1 << 6), // our own calculations, or the driver, indicate a fault
 } SENSOR_STATE;
 
 ENUM_STR_MAP_DEFINE(SENSOR_STATE) = {
@@ -491,7 +491,7 @@ typedef struct sensor {
     } chip;
 
     struct {
-        SENSOR_FEATURE_TYPE type;
+        SENSOR_TYPE type;
         STRING *name;
         STRING *label;
         STRING *label_sanitized;
@@ -517,40 +517,63 @@ static inline msec_t chip_update_interval(const char *path, msec_t default_inter
     return result;
 }
 
-static inline double sft_value(SENSOR *ft, SENSOR_SUBFEATURE_TYPE type) {
+static inline bool sensor_subfeature_needed(SENSOR *s, SENSOR_SUBFEATURE_TYPE type) {
+    return
+        type != NOT_SUPPORTED &&
+        (
+            type == s->config.input ||
+            type == s->config.average ||
+            type == s->config.min ||
+            type == s->config.max ||
+            type == s->config.lcrit ||
+            type == s->config.crit ||
+            type == s->config.cap ||
+            type == s->config.emergency ||
+            type == s->config.fault ||
+            type == s->config.alarm ||
+            type == s->config.min_alarm ||
+            type == s->config.max_alarm ||
+            type == s->config.lcrit_alarm ||
+            type == s->config.crit_alarm ||
+            type == s->config.cap_alarm ||
+            type == s->config.emergency_alarm
+        );
+}
+
+static inline double sensor_value(SENSOR *s, SENSOR_SUBFEATURE_TYPE type) {
     double value = NAN;
 
-    SUBFEATURE *sft = SUBFEATURES_GET(&ft->values, type);
+    SUBFEATURE *sft = SUBFEATURES_GET(&s->values, type);
     if(sft && sft->read && !isinf(sft->value) && !isnan(sft->value))
         value = sft->value;
 
     return value;
 }
 
-static inline void transition_to_state(SENSOR *ft) {
-    if(ft->state_logged == ft->state) {
-        string_freez(ft->log_msg);
-        ft->log_msg = NULL;
+static inline void transition_to_state(SENSOR *s) {
+    if(s->state_logged == s->state) {
+        string_freez(s->log_msg);
+        s->log_msg = NULL;
         return;
     }
 
     nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
            "LIBSENSORS: sensor '%s' transitioned from state '%s' to '%s': %s",
-           string2str(ft->id),
-           SENSOR_STATE_2str(ft->state_logged), SENSOR_STATE_2str(ft->state),
-           string2str(ft->log_msg));
+           string2str(s->id),
+           SENSOR_STATE_2str(s->state_logged), SENSOR_STATE_2str(s->state),
+           string2str(s->log_msg));
 
-    string_freez(ft->log_msg);
-    ft->log_msg = NULL;
+    string_freez(s->log_msg);
+    s->log_msg = NULL;
 
-    ft->state_logged = ft->state;
+    s->state_logged = s->state;
 }
 
-static inline void check_kernel_alarm(SENSOR *ft, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
+static inline void check_kernel_alarm(SENSOR *s, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
     if(*config == NOT_SUPPORTED)
         return;
 
-    double status = sft_value(ft, *config);
+    double status = sensor_value(s, *config);
     if(isnan(status)) {
         // we cannot read this
         // exclude it from future iterations for this sensor
@@ -558,26 +581,26 @@ static inline void check_kernel_alarm(SENSOR *ft, SENSOR_SUBFEATURE_TYPE *config
     }
     else {
         // the sensor supports this state
-        ft->supported_states |= state;
+        s->supported_states |= state;
 
         // set it to this state if it is raised
-        if(status > 0 && ft->state == SENSOR_STATE_CLEAR) {
-            ft->state = state;
+        if(status > 0 && s->state == SENSOR_STATE_CLEAR) {
+            s->state = state;
 
-            string_freez(ft->log_msg);
+            string_freez(s->log_msg);
             char buf[100];
             snprintf(buf, sizeof(buf), " %s == %f ",
                      SENSOR_SUBFEATURE_TYPE_2str(*config), status);
-            ft->log_msg = string_strdupz(buf);
+            s->log_msg = string_strdupz(buf);
         }
     }
 }
 
-static inline void check_custom_alarm_min(SENSOR *ft, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
+static inline void check_custom_alarm_min(SENSOR *s, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
     if(*config == NOT_SUPPORTED)
         return;
 
-    double threshold = sft_value(ft, *config);
+    double threshold = sensor_value(s, *config);
     if(isnan(threshold)) {
         // we cannot read this
         // exclude it from future iterations for this sensor
@@ -585,35 +608,33 @@ static inline void check_custom_alarm_min(SENSOR *ft, SENSOR_SUBFEATURE_TYPE *co
     }
     else {
         // the sensor supports this state
-        ft->supported_states |= state;
+        s->supported_states |= state;
 
         // set it to this state if it is raised
-        if(ft->input < threshold && ft->state == SENSOR_STATE_CLEAR) {
-            ft->state = state;
+        if(s->input < threshold && s->state == SENSOR_STATE_CLEAR) {
+            s->state = state;
 
-            string_freez(ft->log_msg);
+            string_freez(s->log_msg);
             char buf[100];
-            snprintf(buf, sizeof(buf), " input %f < %s %f ",
-                     ft->input, SENSOR_SUBFEATURE_TYPE_2str(*config), threshold);
-            ft->log_msg = string_strdupz(buf);
+            snprintf(buf, sizeof(buf), " input %f < %s %f ", s->input, SENSOR_SUBFEATURE_TYPE_2str(*config), threshold);
+            s->log_msg = string_strdupz(buf);
         }
-        else if(ft->average < threshold && ft->state == SENSOR_STATE_CLEAR) {
-            ft->state = state;
+        else if(s->average < threshold && s->state == SENSOR_STATE_CLEAR) {
+            s->state = state;
 
-            string_freez(ft->log_msg);
+            string_freez(s->log_msg);
             char buf[100];
-            snprintf(buf, sizeof(buf), " average %f < %s %f ",
-                     ft->average, SENSOR_SUBFEATURE_TYPE_2str(*config), threshold);
-            ft->log_msg = string_strdupz(buf);
+            snprintf(buf, sizeof(buf), " average %f < %s %f ", s->average, SENSOR_SUBFEATURE_TYPE_2str(*config), threshold);
+            s->log_msg = string_strdupz(buf);
         }
     }
 }
 
-static inline void check_custom_alarm_max(SENSOR *ft, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
+static inline void check_custom_alarm_max(SENSOR *s, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
     if(*config == NOT_SUPPORTED)
         return;
 
-    double threshold = sft_value(ft, *config);
+    double threshold = sensor_value(s, *config);
     if(isnan(threshold)) {
         // we cannot read this
         // exclude it from future iterations for this sensor
@@ -621,64 +642,62 @@ static inline void check_custom_alarm_max(SENSOR *ft, SENSOR_SUBFEATURE_TYPE *co
     }
     else {
         // the sensor supports this state
-        ft->supported_states |= state;
+        s->supported_states |= state;
 
         // set it to this state if it is raised
-        if(ft->input >= threshold && ft->state == SENSOR_STATE_CLEAR) {
-            ft->state = state;
+        if(s->input >= threshold && s->state == SENSOR_STATE_CLEAR) {
+            s->state = state;
 
-            string_freez(ft->log_msg);
+            string_freez(s->log_msg);
             char buf[100];
-            snprintf(buf, sizeof(buf), " input %f >= %s %f ",
-                     ft->input, SENSOR_SUBFEATURE_TYPE_2str(*config), threshold);
-            ft->log_msg = string_strdupz(buf);
+            snprintf(buf, sizeof(buf), " input %f >= %s %f ", s->input, SENSOR_SUBFEATURE_TYPE_2str(*config), threshold);
+            s->log_msg = string_strdupz(buf);
         }
-        else if(ft->average >= threshold && ft->state == SENSOR_STATE_CLEAR) {
-            ft->state = state;
+        else if(s->average >= threshold && s->state == SENSOR_STATE_CLEAR) {
+            s->state = state;
 
-            string_freez(ft->log_msg);
+            string_freez(s->log_msg);
             char buf[100];
-            snprintf(buf, sizeof(buf), " average %f >= %s %f ",
-                     ft->average, SENSOR_SUBFEATURE_TYPE_2str(*config), threshold);
-            ft->log_msg = string_strdupz(buf);
+            snprintf(buf, sizeof(buf), " average %f >= %s %f ", s->average, SENSOR_SUBFEATURE_TYPE_2str(*config), threshold);
+            s->log_msg = string_strdupz(buf);
         }
     }
 }
 
-static void set_sensor_state(SENSOR *ft) {
-    ft->supported_states = SENSOR_STATE_CLEAR;
-    ft->state = SENSOR_STATE_CLEAR;
+static void set_sensor_state(SENSOR *s) {
+    s->supported_states = SENSOR_STATE_CLEAR;
+    s->state = SENSOR_STATE_CLEAR;
 
     // ----------------------------------------------------------------------------------------------------------------
     // read the values
 
-    if(ft->config.input != NOT_SUPPORTED) {
-        ft->input = sft_value(ft, ft->config.input);
-        if(isnan(ft->input) && !ft->exposed_input) {
-            ft->config.input = NOT_SUPPORTED;
-            ft->input = NAN;
+    if(s->config.input != NOT_SUPPORTED) {
+        s->input = sensor_value(s, s->config.input);
+        if(isnan(s->input) && !s->exposed_input) {
+            s->config.input = NOT_SUPPORTED;
+            s->input = NAN;
         }
     }
     
-    if(ft->config.average != NOT_SUPPORTED) {
-        ft->average = sft_value(ft, ft->config.average);
-        if(isnan(ft->average) && !ft->exposed_average) {
-            ft->config.average = NOT_SUPPORTED;
-            ft->average = NAN;
+    if(s->config.average != NOT_SUPPORTED) {
+        s->average = sensor_value(s, s->config.average);
+        if(isnan(s->average) && !s->exposed_average) {
+            s->config.average = NOT_SUPPORTED;
+            s->average = NAN;
         }
     }
 
     // ----------------------------------------------------------------------------------------------------------------
     // read the sensor alarms as exposed by the kernel driver
 
-    check_kernel_alarm(ft, &ft->config.fault, SENSOR_STATE_FAULT);
-    check_kernel_alarm(ft, &ft->config.emergency_alarm, SENSOR_STATE_EMERGENCY);
-    check_kernel_alarm(ft, &ft->config.crit_alarm, SENSOR_STATE_CRITICAL);
-    check_kernel_alarm(ft, &ft->config.lcrit_alarm, SENSOR_STATE_CRITICAL);
-    check_kernel_alarm(ft, &ft->config.max_alarm, SENSOR_STATE_ALARM);
-    check_kernel_alarm(ft, &ft->config.min_alarm, SENSOR_STATE_ALARM);
-    check_kernel_alarm(ft, &ft->config.alarm, SENSOR_STATE_ALARM);
-    check_kernel_alarm(ft, &ft->config.cap_alarm, SENSOR_STATE_CAP);
+    check_kernel_alarm(s, &s->config.fault, SENSOR_STATE_FAULT);
+    check_kernel_alarm(s, &s->config.emergency_alarm, SENSOR_STATE_EMERGENCY);
+    check_kernel_alarm(s, &s->config.crit_alarm, SENSOR_STATE_CRITICAL);
+    check_kernel_alarm(s, &s->config.lcrit_alarm, SENSOR_STATE_CRITICAL);
+    check_kernel_alarm(s, &s->config.max_alarm, SENSOR_STATE_ALARM);
+    check_kernel_alarm(s, &s->config.min_alarm, SENSOR_STATE_ALARM);
+    check_kernel_alarm(s, &s->config.alarm, SENSOR_STATE_ALARM);
+    check_kernel_alarm(s, &s->config.cap_alarm, SENSOR_STATE_CAP);
 
 #ifdef NETDATA_CALCULATED_STATES
 
@@ -687,24 +706,25 @@ static void set_sensor_state(SENSOR *ft) {
 
     // if the sensor is already exposed to netdata, but now it cannot give values,
     // set it to faulty state
-    ft->supported_states |= SENSOR_STATE_FAULT;
-    if(isnan(ft->input) && isnan(ft->average) && (ft->exposed_input || ft->exposed_average) && ft->state == SENSOR_STATE_CLEAR) {
-        ft->state = SENSOR_STATE_FAULT;
+    s->supported_states |= SENSOR_STATE_FAULT;
+    if(isnan(s->input) && isnan(s->average) && (s->exposed_input || s->exposed_average) &&
+        s->state == SENSOR_STATE_CLEAR) {
+        s->state = SENSOR_STATE_FAULT;
     }
 
-    check_custom_alarm_max(ft, &ft->config.emergency, SENSOR_STATE_EMERGENCY);
-    check_custom_alarm_max(ft, &ft->config.crit, SENSOR_STATE_CRITICAL);
-    check_custom_alarm_min(ft, &ft->config.lcrit, SENSOR_STATE_CRITICAL);
-    check_custom_alarm_max(ft, &ft->config.cap, SENSOR_STATE_CAP);
-    check_custom_alarm_max(ft, &ft->config.max, SENSOR_STATE_WARNING);
-    check_custom_alarm_min(ft, &ft->config.min, SENSOR_STATE_WARNING);
+    check_custom_alarm_max(s, &s->config.emergency, SENSOR_STATE_EMERGENCY);
+    check_custom_alarm_max(s, &s->config.crit, SENSOR_STATE_CRITICAL);
+    check_custom_alarm_min(s, &s->config.lcrit, SENSOR_STATE_CRITICAL);
+    check_custom_alarm_max(s, &s->config.cap, SENSOR_STATE_CAP);
+    check_custom_alarm_max(s, &s->config.max, SENSOR_STATE_WARNING);
+    check_custom_alarm_min(s, &s->config.min, SENSOR_STATE_WARNING);
 
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------
     // log any transitions
 
-    transition_to_state(ft);
+    transition_to_state(s);
 }
 
 static SENSOR *sensor_get_or_create(DICTIONARY *dict, const sensors_chip_name *chip, const sensors_feature *feature) {
@@ -721,44 +741,44 @@ static SENSOR *sensor_get_or_create(DICTIONARY *dict, const sensors_chip_name *c
               "%s|%s-%d-%d-%s",
               chip->path, chip->prefix, chip->bus.type, chip->addr, feature->name);
 
-    SENSOR *ft = dictionary_get(dict, buf);
-    if(ft) return ft;
+    SENSOR *s = dictionary_get(dict, buf);
+    if(s) return s;
 
-    ft = dictionary_set(dict, buf, NULL, sizeof(SENSOR));
-    ft->config = *config;
-    ft->state_logged = SENSOR_STATE_CLEAR;
-    ft->input = NAN;
-    ft->average = NAN;
+    s = dictionary_set(dict, buf, NULL, sizeof(SENSOR));
+    s->config = *config;
+    s->state_logged = SENSOR_STATE_CLEAR;
+    s->input = NAN;
+    s->average = NAN;
 
     sensors_snprintf_chip_name(buf, sizeof(buf), chip);
-    ft->chip.id = string_strdupz(buf);
-    ft->chip.name = string_strdupz(chip->prefix);
-    ft->chip.adapter = string_strdupz(sensors_get_adapter_name(&chip->bus));
-    ft->chip.path = string_strdupz(chip->path);
-    ft->chip.bus = chip->bus.type;
-    ft->chip.addr = chip->addr;
+    s->chip.id = string_strdupz(buf);
+    s->chip.name = string_strdupz(chip->prefix);
+    s->chip.adapter = string_strdupz(sensors_get_adapter_name(&chip->bus));
+    s->chip.path = string_strdupz(chip->path);
+    s->chip.bus = chip->bus.type;
+    s->chip.addr = chip->addr;
 
-    ft->feature.name = string_strdupz(feature->name);
+    s->feature.name = string_strdupz(feature->name);
     const char *label = sensors_get_label(chip, feature);
-    ft->feature.label = string_strdupz(label ? label : feature->name);
-    ft->feature.type = feature->type;
+    s->feature.label = string_strdupz(label ? label : feature->name);
+    s->feature.type = feature->type;
 
-    char *label_sanitized = strdupz(string2str(ft->feature.label));
+    char *label_sanitized = strdupz(string2str(s->feature.label));
     netdata_fix_chart_id(label_sanitized);
-    ft->feature.label_sanitized = string_strdupz(label_sanitized);
+    s->feature.label_sanitized = string_strdupz(label_sanitized);
     freez(label_sanitized);
 
     snprintfz(buf, sizeof(buf),
               "%s_%s_%s_%s",
-              SENSOR_FEATURE_TYPE_2str(ft->feature.type),
-              string2str(ft->chip.id),
-              string2str(ft->feature.name),
-              string2str(ft->feature.label_sanitized)
+              SENSOR_TYPE_2str(s->feature.type),
+              string2str(s->chip.id),
+              string2str(s->feature.name),
+              string2str(s->feature.label_sanitized)
               );
     netdata_fix_chart_id(buf);
-    ft->id = string_strdupz(buf);
+    s->id = string_strdupz(buf);
 
-    return ft;
+    return s;
 }
 
 static void sensor_labels(SENSOR *ft) {
@@ -789,88 +809,88 @@ static size_t states_count(SENSOR_STATE state) {
 //    return count;
 }
 
-static void sensor_process(SENSOR *ft, int update_every, const char *name) {
+static void sensor_process(SENSOR *s, int update_every, const char *name) {
     // evaluate the state of the feature
-    set_sensor_state(ft);
-    internal_fatal(ft->state == 0,
-                   "LIBSENSORS: state %u is not a valid state",
-                   ft->state);
+    set_sensor_state(s);
+    internal_fatal(s->state == 0,
+                   "LIBSENSORS: state %u is not a valid state", s->state);
 
-    internal_fatal((ft->state & ft->supported_states) == 0,
+    internal_fatal((s->state & s->supported_states) == 0,
                    "LIBSENSORS: state %u is not in the supported list of states %u",
-                   ft->state, ft->supported_states);
+        s->state,
+        s->supported_states);
 
-    bool do_input = ft->config.report_value && !isnan(ft->input);
-    bool do_average = ft->config.report_value && !isnan(ft->average);
-    bool do_state = ft->config.report_state && states_count(ft->supported_states) > 1;
+    bool do_input = s->config.report_value && !isnan(s->input);
+    bool do_average = s->config.report_value && !isnan(s->average);
+    bool do_state = s->config.report_state && states_count(s->supported_states) > 1;
 
     // send the feature data to netdata
-    if(do_input && !ft->exposed_input) {
+    if(do_input && !s->exposed_input) {
         printf(
             PLUGINSD_KEYWORD_CHART " 'sensors.%s' '' '%s' '%s' '%s' '%s' line %d %d '' debugfs %s\n",
-            string2str(ft->id),
-            ft->config.title,
-            ft->config.units,
-            ft->config.family,
-            ft->config.context,
-            ft->config.priority,
+            string2str(s->id),
+            s->config.title,
+            s->config.units,
+            s->config.family,
+            s->config.context,
+            s->config.priority,
             update_every,
             name);
 
         printf(PLUGINSD_KEYWORD_DIMENSION " input '' absolute 1 10000 ''\n");
-        sensor_labels(ft);
-        ft->exposed_input = true;
+        sensor_labels(s);
+        s->exposed_input = true;
     }
 
-    if(do_average && !ft->exposed_average) {
+    if(do_average && !s->exposed_average) {
         printf(
             PLUGINSD_KEYWORD_CHART " 'sensors.%s_average' '' '%s Average' '%s' '%s' '%s_average' line %d %d '' debugfs %s\n",
-            string2str(ft->id),
-            ft->config.title,
-            ft->config.units,
-            ft->config.family,
-            ft->config.context,
-            ft->config.priority,
+            string2str(s->id),
+            s->config.title,
+            s->config.units,
+            s->config.family,
+            s->config.context,
+            s->config.priority,
             update_every,
             name);
 
         printf(PLUGINSD_KEYWORD_DIMENSION " average '' absolute 1 10000 ''\n");
-        sensor_labels(ft);
-        ft->exposed_average = true;
+        sensor_labels(s);
+        s->exposed_average = true;
     }
 
-    if(do_state && ft->exposed_states != ft->supported_states) {
+    if(do_state && s->exposed_states != s->supported_states) {
         printf(
             PLUGINSD_KEYWORD_CHART " 'sensors.%s_state' '' '%s State' '%s' '%s' '%s_states' line %d %d '' debugfs %s\n",
-            string2str(ft->id),
-            ft->config.title,
+            string2str(s->id),
+            s->config.title,
             "status",
-            ft->config.family,
-            ft->config.context,
-            ft->config.priority + 1,
+            s->config.family,
+            s->config.context,
+            s->config.priority + 1,
             update_every,
             name);
 
-        if(ft->supported_states & SENSOR_STATE_CLEAR)
+        if(s->supported_states & SENSOR_STATE_CLEAR)
             printf(PLUGINSD_KEYWORD_DIMENSION " clear '' absolute 1 1 ''\n");
-        if(ft->supported_states & SENSOR_STATE_WARNING)
+        if(s->supported_states & SENSOR_STATE_WARNING)
             printf(PLUGINSD_KEYWORD_DIMENSION " warning '' absolute 1 1 ''\n");
-        if(ft->supported_states & SENSOR_STATE_CAP)
+        if(s->supported_states & SENSOR_STATE_CAP)
             printf(PLUGINSD_KEYWORD_DIMENSION " cap '' absolute 1 1 ''\n");
-        if(ft->supported_states & SENSOR_STATE_ALARM)
+        if(s->supported_states & SENSOR_STATE_ALARM)
             printf(PLUGINSD_KEYWORD_DIMENSION " alarm '' absolute 1 1 ''\n");
-        if(ft->supported_states & SENSOR_STATE_CRITICAL)
+        if(s->supported_states & SENSOR_STATE_CRITICAL)
             printf(PLUGINSD_KEYWORD_DIMENSION " critical '' absolute 1 1 ''\n");
-        if(ft->supported_states & SENSOR_STATE_EMERGENCY)
+        if(s->supported_states & SENSOR_STATE_EMERGENCY)
             printf(PLUGINSD_KEYWORD_DIMENSION " emergency '' absolute 1 1 ''\n");
-        if(ft->supported_states & SENSOR_STATE_FAULT)
+        if(s->supported_states & SENSOR_STATE_FAULT)
             printf(PLUGINSD_KEYWORD_DIMENSION " fault '' absolute 1 1 ''\n");
 
-        sensor_labels(ft);
-        ft->exposed_states = ft->supported_states;
+        sensor_labels(s);
+        s->exposed_states = s->supported_states;
     }
 
-#if 0
+#if 1
     // ----------------------------------------------------------------------------------------------------------------
     // debugging
 
@@ -879,19 +899,20 @@ static void sensor_process(SENSOR *ft, int update_every, const char *name) {
             "{ chip id '%s', name '%s', addr %d }, "
             "{ adapter '%s', bus '%s', path '%s'}, "
             "{ feature label '%s', name '%s', type '%s' }\n",
-            string2str(ft->chip.id),
-            string2str(ft->chip.name), ft->chip.addr,
-            string2str(ft->chip.adapter),
-            SENSOR_BUS_TYPE_2str(ft->chip.bus),
-            string2str(ft->chip.path),
-            string2str(ft->feature.label),
-            string2str(ft->feature.name),
-            SENSOR_FEATURE_TYPE_2str(ft->feature.type));
+            string2str(s->chip.id),
+            string2str(s->chip.name),
+        s->chip.addr,
+            string2str(s->chip.adapter),
+            SENSOR_BUS_TYPE_2str(s->chip.bus),
+            string2str(s->chip.path),
+            string2str(s->feature.label),
+            string2str(s->feature.name),
+            SENSOR_TYPE_2str(s->feature.type));
 
     Word_t idx = 0;
-    for(SUBFEATURE *sft = SUBFEATURES_FIRST(&ft->values, &idx);
+    for(SUBFEATURE *sft = SUBFEATURES_FIRST(&s->values, &idx);
          sft;
-         sft = SUBFEATURES_NEXT(&ft->values, &idx)) {
+         sft = SUBFEATURES_NEXT(&s->values, &idx)) {
         fprintf(stderr,
                 " ------------ >>> "
                 "{ subfeature '%s', type '%s' } "
@@ -901,13 +922,13 @@ static void sensor_process(SENSOR *ft, int update_every, const char *name) {
     }
 
     if(do_input)
-        fprintf(stderr, " ------------ >>> %f (input)\n", ft->input);
+        fprintf(stderr, " ------------ >>> %f (input)\n", s->input);
 
     if(do_average)
-        fprintf(stderr, " ------------ >>> %f (average)\n", ft->average);
+        fprintf(stderr, " ------------ >>> %f (average)\n", s->average);
 
     if(do_state)
-        fprintf(stderr, " ------------ >>> %u (state)\n", ft->state);
+        fprintf(stderr, " ------------ >>> %u (state)\n", s->state);
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -916,43 +937,57 @@ static void sensor_process(SENSOR *ft, int update_every, const char *name) {
     if(do_input) {
         printf(
             PLUGINSD_KEYWORD_BEGIN " 'sensors.%s'\n",
-            string2str(ft->id));
+            string2str(s->id));
 
-        printf(PLUGINSD_KEYWORD_SET " input = %lld\n", (long long)(ft->input * 10000.0));
+        printf(PLUGINSD_KEYWORD_SET " input = %lld\n", (long long)(s->input * 10000.0));
         printf(PLUGINSD_KEYWORD_END "\n");
     }
 
     if(do_average) {
         printf(
             PLUGINSD_KEYWORD_BEGIN " 'sensors.%s_average'\n",
-            string2str(ft->id));
+            string2str(s->id));
 
-        printf(PLUGINSD_KEYWORD_SET " average = %lld\n", (long long)(ft->average * 10000.0));
+        printf(PLUGINSD_KEYWORD_SET " average = %lld\n", (long long)(s->average * 10000.0));
         printf(PLUGINSD_KEYWORD_END "\n");
     }
 
     if(do_state) {
         printf(
             PLUGINSD_KEYWORD_BEGIN " 'sensors.%s_state'\n",
-            string2str(ft->id));
+            string2str(s->id));
 
-        if(ft->supported_states & SENSOR_STATE_CLEAR)
-            printf(PLUGINSD_KEYWORD_SET " clear = %d\n", ft->state == SENSOR_STATE_CLEAR ? 1 : 0);
-        if(ft->supported_states & SENSOR_STATE_WARNING)
-            printf(PLUGINSD_KEYWORD_SET " warning = %d\n", ft->state == SENSOR_STATE_WARNING ? 1 : 0);
-        if(ft->supported_states & SENSOR_STATE_CAP)
-            printf(PLUGINSD_KEYWORD_SET " cap = %d\n", ft->state == SENSOR_STATE_CAP ? 1 : 0);
-        if(ft->supported_states & SENSOR_STATE_ALARM)
-            printf(PLUGINSD_KEYWORD_SET " alarm = %d\n", ft->state == SENSOR_STATE_ALARM ? 1 : 0);
-        if(ft->supported_states & SENSOR_STATE_CRITICAL)
-            printf(PLUGINSD_KEYWORD_SET " critical = %d\n", ft->state == SENSOR_STATE_CRITICAL ? 1 : 0);
-        if(ft->supported_states & SENSOR_STATE_EMERGENCY)
-            printf(PLUGINSD_KEYWORD_SET " emergency = %d\n", ft->state == SENSOR_STATE_EMERGENCY ? 1 : 0);
-        if(ft->supported_states & SENSOR_STATE_FAULT)
-            printf(PLUGINSD_KEYWORD_SET " fault = %d\n", ft->state == SENSOR_STATE_FAULT ? 1 : 0);
+        if(s->supported_states & SENSOR_STATE_CLEAR)
+            printf(PLUGINSD_KEYWORD_SET " clear = %d\n", s->state == SENSOR_STATE_CLEAR ? 1 : 0);
+        if(s->supported_states & SENSOR_STATE_WARNING)
+            printf(PLUGINSD_KEYWORD_SET " warning = %d\n", s->state == SENSOR_STATE_WARNING ? 1 : 0);
+        if(s->supported_states & SENSOR_STATE_CAP)
+            printf(PLUGINSD_KEYWORD_SET " cap = %d\n", s->state == SENSOR_STATE_CAP ? 1 : 0);
+        if(s->supported_states & SENSOR_STATE_ALARM)
+            printf(PLUGINSD_KEYWORD_SET " alarm = %d\n", s->state == SENSOR_STATE_ALARM ? 1 : 0);
+        if(s->supported_states & SENSOR_STATE_CRITICAL)
+            printf(PLUGINSD_KEYWORD_SET " critical = %d\n", s->state == SENSOR_STATE_CRITICAL ? 1 : 0);
+        if(s->supported_states & SENSOR_STATE_EMERGENCY)
+            printf(PLUGINSD_KEYWORD_SET " emergency = %d\n", s->state == SENSOR_STATE_EMERGENCY ? 1 : 0);
+        if(s->supported_states & SENSOR_STATE_FAULT)
+            printf(PLUGINSD_KEYWORD_SET " fault = %d\n", s->state == SENSOR_STATE_FAULT ? 1 : 0);
 
         printf(PLUGINSD_KEYWORD_END "\n");
     }
+}
+
+static FILE *sensors_open_file(const char *env_var, const char *def_dir, const char *file) {
+    const char *dir = getenv(env_var);
+    if(!dir || !*dir)
+        dir = def_dir;
+
+    if (dir && *dir) {
+        char filename[FILENAME_MAX];
+        snprintfz(filename, sizeof(filename), "%s/%s", dir, file);
+        return fopen(filename, "r");
+    }
+
+    return NULL;
 }
 
 int do_module_libsensors(int update_every, const char *name) {
@@ -966,14 +1001,11 @@ int do_module_libsensors(int update_every, const char *name) {
         if(libsensors_initialized)
             sensors_cleanup();
 
-        FILE *fp = NULL;
-        const char *etc_netdata_dir = getenv("NETDATA_CONFIG_DIR");
-        if(etc_netdata_dir) {
-            // In static installs, we copy the file sensors3.conf to /opt/netdata/etc
-            char filename[FILENAME_MAX];
-            snprintfz(filename, sizeof(filename), "%s/../sensors3.conf", etc_netdata_dir);
-            fp = fopen(filename, "r");
-        }
+        // first try the default directory for libsensors
+        FILE *fp = fopen("/etc/sensors3.conf", "r");
+        if(!fp) fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "../sensors3.conf");
+        if(!fp) fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "sensors3.conf");
+        if(!fp) fp = sensors_open_file("NETDATA_STOCK_CONFIG_DIR", LIBCONFIG_DIR, "sensors3.conf");
 
         if (sensors_init(fp) != 0) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "cannot initialize libsensors - disabling sensors monitoring");
@@ -990,11 +1022,11 @@ int do_module_libsensors(int update_every, const char *name) {
     // ----------------------------------------------------------------------------------------------------------------
     // reset all sensors to unread
 
-    SENSOR *ft;
-    dfe_start_read(features, ft) {
-        ft->read = false;
+    SENSOR *s;
+    dfe_start_read(features, s) {
+        s->read = false;
     }
-    dfe_done(ft);
+    dfe_done(s);
 
     // ----------------------------------------------------------------------------------------------------------------
     // Iterate over all detected chips
@@ -1007,20 +1039,19 @@ int do_module_libsensors(int update_every, const char *name) {
         const sensors_feature *feature;
         int feature_nr = 0;
         while ((feature = sensors_get_features(chip, &feature_nr)) != NULL) {
-            ft = sensor_get_or_create(features, chip, feature);
-            if(!ft) continue;
-            internal_fatal(ft->read, "The features key is not unique!");
-            ft->read = true;
+            s = sensor_get_or_create(features, chip, feature);
+            if(!s) continue;
+
+            internal_fatal(s->read, "The features key is not unique!");
+            s->read = true;
 
             // --------------------------------------------------------------------------------------------------------
             // mark all existing subfeatures as unread
 
             Word_t idx = 0;
-            for(SUBFEATURE *sft = SUBFEATURES_FIRST(&ft->values, &idx);
-                 sft;
-                 sft = SUBFEATURES_NEXT(&ft->values, &idx)) {
-                sft->read = false;
-                sft->value = NAN;
+            for(SUBFEATURE *sf = SUBFEATURES_FIRST(&s->values, &idx); sf; sf = SUBFEATURES_NEXT(&s->values, &idx)) {
+                sf->read = false;
+                sf->value = NAN;
             }
 
             // --------------------------------------------------------------------------------------------------------
@@ -1029,14 +1060,15 @@ int do_module_libsensors(int update_every, const char *name) {
             const sensors_subfeature *subfeature;
             int subfeature_nr = 0;
             while ((subfeature = sensors_get_all_subfeatures(chip, feature, &subfeature_nr)) != NULL) {
-                if(!(subfeature->flags & SENSORS_MODE_R))
+                if(!(subfeature->flags & SENSORS_MODE_R) ||         // not readable
+                    !sensor_subfeature_needed(s, subfeature->type)) // we don't need it
                     continue;
 
-                SUBFEATURE *sft = SUBFEATURES_GET(&ft->values, subfeature->type);
+                SUBFEATURE *sft = SUBFEATURES_GET(&s->values, subfeature->type);
                 if(!sft) {
                     sft = callocz(1, sizeof(*sft));
                     sft->name = string_strdupz(subfeature->name);
-                    SUBFEATURES_SET(&ft->values, subfeature->type, sft);
+                    SUBFEATURES_SET(&s->values, subfeature->type, sft);
                 }
 
                 if (sensors_get_value(chip, subfeature->number, &sft->value) == 0)
@@ -1047,7 +1079,7 @@ int do_module_libsensors(int update_every, const char *name) {
                 }
             }
 
-            sensor_process(ft, update_every, name);
+            sensor_process(s, update_every, name);
         }
     }
 
