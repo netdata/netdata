@@ -262,11 +262,10 @@ int zswap_collect_data(struct netdata_zswap_metric *metric)
 }
 
 static void
-zswap_send_chart(struct netdata_zswap_metric *metric, int update_every, const char *name, const char *option)
+zswap_send_chart_unsafe(struct netdata_zswap_metric *metric, int update_every, const char *name, const char *option)
 {
-    fprintf(
-        stdout,
-        "CHART mem.zswap_%s '' '%s' '%s' 'zswap' '' '%s' %d %d '%s' 'debugfs.plugin' '%s'\n",
+    printf(
+        PLUGINSD_KEYWORD_CHART " mem.zswap_%s '' '%s' '%s' 'zswap' '' '%s' %d %d '%s' 'debugfs.plugin' '%s'\n",
         metric->chart_id,
         metric->title,
         metric->units,
@@ -277,90 +276,103 @@ zswap_send_chart(struct netdata_zswap_metric *metric, int update_every, const ch
         name);
 }
 
-static void zswap_send_dimension(struct netdata_zswap_metric *metric)
+static void zswap_send_dimension_unsafe(struct netdata_zswap_metric *metric)
 {
     int div = metric->divisor > 0 ? metric->divisor : 1;
-    fprintf(
-        stdout,
-        "DIMENSION '%s' '%s' %s 1 %d ''\n",
+    printf(
+        PLUGINSD_KEYWORD_DIMENSION " '%s' '%s' %s 1 %d ''\n",
         metric->dimension,
         metric->dimension,
         debugfs_rrd_algorithm_name(metric->algorithm),
         div);
 }
 
-static void zswap_send_begin(struct netdata_zswap_metric *metric)
+static void zswap_send_begin_unsafe(struct netdata_zswap_metric *metric)
 {
-    fprintf(stdout, "BEGIN mem.zswap_%s\n", metric->chart_id);
+    printf(PLUGINSD_KEYWORD_BEGIN " mem.zswap_%s\n", metric->chart_id);
 }
 
-static void zswap_send_set(struct netdata_zswap_metric *metric)
+static void zswap_send_set_unsafe(struct netdata_zswap_metric *metric)
 {
-    fprintf(stdout, "SET %s = %lld\n", metric->dimension, metric->value);
+    printf(PLUGINSD_KEYWORD_SET " %s = %lld\n", metric->dimension, metric->value);
 }
 
-static void zswap_send_end_and_flush()
+static void zswap_send_end_unsafe()
 {
-    fprintf(stdout, "END\n");
-    fflush(stdout);
+    printf(PLUGINSD_KEYWORD_END "\n");
 }
 
 static void zswap_independent_chart(struct netdata_zswap_metric *metric, int update_every, const char *name)
 {
+    netdata_mutex_lock(&stdout_mutex);
+
     if (unlikely(!metric->chart_created)) {
         metric->chart_created = CONFIG_BOOLEAN_YES;
 
-        zswap_send_chart(metric, update_every, name, NULL);
-        zswap_send_dimension(metric);
+        zswap_send_chart_unsafe(metric, update_every, name, NULL);
+        zswap_send_dimension_unsafe(metric);
     }
 
-    zswap_send_begin(metric);
-    zswap_send_set(metric);
-    zswap_send_end_and_flush();
+    zswap_send_begin_unsafe(metric);
+    zswap_send_set_unsafe(metric);
+    zswap_send_end_unsafe();
+
+    fflush(stdout);
+    netdata_mutex_unlock(&stdout_mutex);
 }
 
 void zswap_reject_chart(int update_every, const char *name)
 {
+    netdata_mutex_lock(&stdout_mutex);
+
     struct netdata_zswap_metric *metric = &zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART];
 
     if (unlikely(!metric->chart_created)) {
         metric->chart_created = CONFIG_BOOLEAN_YES;
 
-        zswap_send_chart(metric, update_every, name, NULL);
+        zswap_send_chart_unsafe(metric, update_every, name, NULL);
         for (int i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
             metric = &zswap_rejected_metrics[i];
             if (likely(metric->enabled))
-                zswap_send_dimension(metric);
+                zswap_send_dimension_unsafe(metric);
         }
     }
 
     metric = &zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART];
-    zswap_send_begin(metric);
+    zswap_send_begin_unsafe(metric);
     for (int i = NETDATA_ZSWAP_REJECTED_COMPRESS_POOR; zswap_rejected_metrics[i].filename; i++) {
         metric = &zswap_rejected_metrics[i];
         if (likely(metric->enabled))
-            zswap_send_set(metric);
+            zswap_send_set_unsafe(metric);
     }
-    zswap_send_end_and_flush();
+    zswap_send_end_unsafe();
+
+    fflush(stdout);
+    netdata_mutex_unlock(&stdout_mutex);
 }
 
 static void zswap_obsolete_charts(int update_every, const char *name)
 {
+    netdata_mutex_lock(&stdout_mutex);
+
     struct netdata_zswap_metric *metric = NULL;
 
     for (int i = 0; zswap_independent_metrics[i].filename; i++) {
         metric = &zswap_independent_metrics[i];
         if (likely(metric->chart_created))
-            zswap_send_chart(metric, update_every, name, "obsolete");
+            zswap_send_chart_unsafe(metric, update_every, name, "obsolete");
     }
 
     metric = &zswap_rejected_metrics[NETDATA_ZSWAP_REJECTED_CHART];
     if (likely(metric->chart_created))
-        zswap_send_chart(metric, update_every, name, "obsolete");
+        zswap_send_chart_unsafe(metric, update_every, name, "obsolete");
 
     metric = &zswap_calculated_metrics[NETDATA_ZSWAP_COMPRESSION_RATIO_CHART];
     if (likely(metric->chart_created))
-        zswap_send_chart(metric, update_every, name, "obsolete");
+        zswap_send_chart_unsafe(metric, update_every, name, "obsolete");
+
+    fflush(stdout);
+    netdata_mutex_unlock(&stdout_mutex);
 }
 
 #define ZSWAP_STATE_SIZE 1 // Y or N

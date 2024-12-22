@@ -224,7 +224,7 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Voltage",
         .units = "Volts",
-        .context = "sensors.hw.voltage",
+        .context = "sensors.hw_voltage",
         .family = "Voltages",
         .priority = 70002,
         .report_value = true,
@@ -254,7 +254,7 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Fan Speed",
         .units = "rotations per minute",
-        .context = "sensors.hw.fan",
+        .context = "sensors.hw_fan",
         .family = "Fans",
         .priority = 70005,
         .report_value = true,
@@ -284,7 +284,7 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Temperature",
         .units = "degrees Celsius",
-        .context = "sensors.hw.temperature",
+        .context = "sensors.hw_temperature",
         .family = "Temperatures",
         .priority = 70000,
         .report_value = true,
@@ -314,7 +314,7 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Power",
         .units = "Watts",
-        .context = "sensors.hw.power",
+        .context = "sensors.hw_power",
         .family = "Power",
         .priority = 70006,
         .report_value = true,
@@ -344,7 +344,7 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Energy",
         .units = "Joules",
-        .context = "sensors.hw.energy",
+        .context = "sensors.hw_energy",
         .family = "Energy",
         .priority = 70007,
         .report_value = true,
@@ -374,7 +374,7 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Current",
         .units = "Amperes",
-        .context = "sensors.hw.current",
+        .context = "sensors.hw_current",
         .family = "Currents",
         .priority = 70003,
         .report_value = true,
@@ -404,7 +404,7 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Humidity",
         .units = "percentage",
-        .context = "sensors.hw.humidity",
+        .context = "sensors.hw_humidity",
         .family = "Humidity",
         .priority = 70004,
         .report_value = true,
@@ -434,7 +434,7 @@ struct sensor_config {
         .enabled = true,
         .title = "Sensor Intrusion",
         .units = "", // No specific unit, as this is a binary state
-        .context = "sensors.hw.intrusion",
+        .context = "sensors.hw_intrusion",
         .family = "Intrusion",
         .priority = 70008,
         .report_value = false, // there is not value in intrusion
@@ -954,10 +954,10 @@ static void sensor_process(SENSOR *s, int update_every, const char *name) {
     // evaluate the state of the feature
     set_sensor_state(s);
     internal_fatal(s->state == 0,
-                   "LIBSENSORS: state %u is not a valid state", s->state);
+                   "SENSORS: state %u is not a valid state", s->state);
 
     internal_fatal((s->state & s->supported_states) == 0,
-                   "LIBSENSORS: state %u is not in the supported list of states %u",
+                   "SENSORS: state %u is not in the supported list of states %u",
         s->state,
         s->supported_states);
 
@@ -1036,7 +1036,7 @@ static void sensor_process(SENSOR *s, int update_every, const char *name) {
     // debugging
 
     fprintf(stderr,
-            "LIBSENSORS: "
+            "SENSORS: "
             "{ chip id '%s', name '%s', addr %d }, "
             "{ adapter '%s', bus '%s', path '%s'}, "
             "{ feature label '%s', name '%s', type '%s' }\n",
@@ -1131,40 +1131,14 @@ static FILE *sensors_open_file(const char *env_var, const char *def_dir, const c
     return NULL;
 }
 
-int do_module_libsensors(int update_every, const char *name) {
-    static bool libsensors_initialized = false;
-    static DICTIONARY *features = NULL;
+static DICTIONARY *sensors_dict = NULL;
 
-    // ----------------------------------------------------------------------------------------------------------------
-    // initialize it, if it is not initialized already
-
-    if(!libsensors_initialized) {
-        if(libsensors_initialized)
-            sensors_cleanup();
-
-        // first try the default directory for libsensors
-        FILE *fp = fopen("/etc/sensors3.conf", "r");
-        if(!fp) fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "../sensors3.conf");
-        if(!fp) fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "sensors3.conf");
-        if(!fp) fp = sensors_open_file("NETDATA_STOCK_CONFIG_DIR", LIBCONFIG_DIR, "sensors3.conf");
-
-        if (sensors_init(fp) != 0) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "cannot initialize libsensors - disabling sensors monitoring");
-            return 1;
-        }
-
-        if(fp)
-            fclose(fp);
-
-        features = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED);
-        libsensors_initialized = true;
-    }
-
+static int sensors_collect_data(void) {
     // ----------------------------------------------------------------------------------------------------------------
     // reset all sensors to unread
 
     SENSOR *s;
-    dfe_start_read(features, s) {
+    dfe_start_read(sensors_dict, s) {
         s->read = false;
     }
     dfe_done(s);
@@ -1180,7 +1154,7 @@ int do_module_libsensors(int update_every, const char *name) {
         const sensors_feature *feature;
         int feature_nr = 0;
         while ((feature = sensors_get_features(chip, &feature_nr)) != NULL) {
-            s = sensor_get_or_create(features, chip, feature);
+            s = sensor_get_or_create(sensors_dict, chip, feature);
             if(!s) continue;
 
             internal_fatal(s->read, "The features key is not unique!");
@@ -1219,10 +1193,95 @@ int do_module_libsensors(int update_every, const char *name) {
                     sft->read = false;
                 }
             }
-
-            sensor_process(s, update_every, name);
         }
     }
 
     return 0;
+}
+
+void *libsensors_thread(void *ptr) {
+    int update_every = *(int *)ptr;
+
+    // first try the default directory for libsensors
+    FILE *fp = fopen("/etc/sensors3.conf", "r");
+    if(!fp) fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "../sensors3.conf");
+    if(!fp) fp = sensors_open_file("NETDATA_CONFIG_DIR", CONFIG_DIR, "sensors3.conf");
+    if(!fp) fp = sensors_open_file("NETDATA_STOCK_CONFIG_DIR", LIBCONFIG_DIR, "sensors3.conf");
+
+    if (sensors_init(fp) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "cannot initialize libsensors - disabling sensors monitoring");
+        if(fp) fclose(fp);
+        goto cleanup;
+    }
+    if(fp) fclose(fp);
+
+    sensors_dict = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED);
+
+    // preflight to check data collection latency
+    {
+        SENSOR *s;
+
+        sensors_collect_data(); // do the first before starting measurements
+        dfe_start_read(sensors_dict, s) { set_sensor_state(s); } dfe_done(s);
+
+        usec_t max_ut = 0;
+        size_t samples = 0;
+        usec_t started_ut = now_monotonic_usec();
+        for(size_t i = 0; i < 20; i++) {
+            usec_t before_ut = now_monotonic_usec();
+            sensors_collect_data();
+            dfe_start_read(sensors_dict, s) { set_sensor_state(s); } dfe_done(s);
+            usec_t after_ut = now_monotonic_usec();
+            max_ut = MAX(max_ut, after_ut - before_ut);
+            samples++;
+        }
+        usec_t ended_ut = now_monotonic_usec();
+        usec_t average_ut = (ended_ut - started_ut) / samples;
+
+        // List of valid intervals in seconds (divisors and multiples of 60)
+        static const int valid_update_every_intervals[] = {1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60, 120, 180, 240, 300, 600, 900, 1200, 1800, 3600};
+
+        // Find the smallest valid interval that satisfies our timing requirement
+        int best_update_every = update_every;
+        for(size_t i = 0; i < _countof(valid_update_every_intervals); i++) {
+            if(valid_update_every_intervals[i] >= update_every &&
+                max_ut <= (valid_update_every_intervals[i] * USEC_PER_SEC / 5)) {
+                best_update_every = valid_update_every_intervals[i];
+                break;
+            }
+        }
+
+        char avg[64], max[64];
+        duration_snprintf(avg, sizeof(avg), (int64_t)average_ut, "us", false);
+        duration_snprintf(max, sizeof(max), (int64_t)max_ut, "us", false);
+
+        nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
+               "SENSORS max data collection latency is %s (average %s), setting update_every to %ds (default is %ds)",
+               max, avg, best_update_every, update_every);
+
+        update_every = best_update_every;
+    }
+
+    heartbeat_t hb;
+    heartbeat_init(&hb, update_every * USEC_PER_SEC);
+
+    while(!nd_thread_signaled_to_cancel()) {
+        heartbeat_next(&hb);
+
+        sensors_collect_data();
+
+        netdata_mutex_lock(&stdout_mutex);
+
+        SENSOR *s;
+        dfe_start_read(sensors_dict, s) {
+            sensor_process(s, update_every, "sensors");
+        }
+        dfe_done(s);
+
+        fflush(stdout);
+        netdata_mutex_unlock(&stdout_mutex);
+    }
+
+cleanup:
+    return NULL;
 }

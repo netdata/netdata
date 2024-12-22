@@ -7,7 +7,10 @@
 #include "collectors/all.h"
 #include "database/rrd.h"
 
-int do_module_libsensors(int update_every, const char *name);
+extern netdata_mutex_t stdout_mutex;
+
+void *libsensors_thread(void *ptr);
+
 int do_module_numa_extfrag(int update_every, const char *name);
 int do_module_zswap(int update_every, const char *name);
 int do_module_devices_powercap(int update_every, const char *name);

@@ -7,12 +7,11 @@ static char *user_config_dir = CONFIG_DIR;
 static char *stock_config_dir = LIBCONFIG_DIR;
 
 static int update_every = 1;
+netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 
 static struct debugfs_module {
     const char *name;
-
     int enabled;
-
     int (*func)(int update_every, const char *name);
 }  debugfs_modules[] = {
     {
@@ -32,14 +31,9 @@ static struct debugfs_module {
         .enabled = CONFIG_BOOLEAN_YES,
         .func = do_module_devices_powercap
     },
-    {// Linux powercap metrics is here because it needs privilege to read each RAPL zone
-     .name = "libsensors",
-     .enabled = CONFIG_BOOLEAN_YES,
-     .func = do_module_libsensors
-    },
 
     // The terminator
-    { .name = NULL, .enabled = CONFIG_BOOLEAN_NO, .func = NULL}
+    {.name = NULL, .enabled = CONFIG_BOOLEAN_NO, .func = NULL}
 };
 
 #ifdef HAVE_SYS_CAPABILITY_H
@@ -221,11 +215,9 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    // if (!debugfs_check_sys_permission()) {
-    //     exit(2);
-    // }
-
     debugfs_parse_args(argc, argv);
+
+    ND_THREAD *libsensors = nd_thread_create("LIBSENSORS", NETDATA_THREAD_OPTION_JOINABLE, libsensors_thread, &update_every);
 
     size_t iteration;
     heartbeat_t hb;
@@ -244,20 +236,29 @@ int main(int argc, char **argv)
             if (likely(pm->enabled))
                 enabled++;
         }
+
         if (!enabled) {
             netdata_log_info("all modules are disabled, exiting...");
             return 1;
         }
 
+        netdata_mutex_lock(&stdout_mutex);
         fprintf(stdout, "\n");
         fflush(stdout);
+        netdata_mutex_unlock(&stdout_mutex);
+
         if (ferror(stdout) && errno == EPIPE) {
             netdata_log_error("error writing to stdout: EPIPE. Exiting...");
             return 1;
         }
     }
 
+    nd_thread_signal_cancel(libsensors);
+    nd_thread_join(libsensors);
+
+    netdata_mutex_lock(&stdout_mutex);
     fprintf(stdout, "EXIT\n");
     fflush(stdout);
+    netdata_mutex_unlock(&stdout_mutex);
     return 0;
 }
