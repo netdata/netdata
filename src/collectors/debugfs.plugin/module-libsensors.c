@@ -483,9 +483,11 @@ typedef struct sensor {
 
     struct {
         STRING *id;
-        STRING *name;
+        STRING *driver;
         STRING *adapter;
         STRING *path;
+        STRING *device;
+        STRING *subsystem;
         short bus;
         int addr;
     } chip;
@@ -515,6 +517,46 @@ static inline msec_t chip_update_interval(const char *path, msec_t default_inter
         result = default_interval_ms;
 
     return result;
+}
+
+static STRING *get_device_name(const char *hwmon_path) {
+    char device_path[FILENAME_MAX];
+    char link_target[FILENAME_MAX];
+
+    // Construct path to the device symlink
+    snprintfz(device_path, sizeof(device_path), "%s/device", hwmon_path);
+
+    // Read the symlink
+    ssize_t len = readlink(device_path, link_target, sizeof(link_target) - 1);
+    if (len < 0) return NULL;
+    link_target[len] = '\0';
+
+    // Extract the last component of the path
+    char *last_slash = strrchr(link_target, '/');
+    if (last_slash)
+        return string_strdupz(last_slash + 1);
+
+    return NULL;
+}
+
+static STRING *get_subsystem_name(const char *hwmon_path) {
+    char device_path[FILENAME_MAX];
+    char link_target[FILENAME_MAX];
+
+    // Construct path to the device symlink
+    snprintfz(device_path, sizeof(device_path), "%s/device/subsystem", hwmon_path);
+
+    // Read the symlink
+    ssize_t len = readlink(device_path, link_target, sizeof(link_target) - 1);
+    if (len < 0) return NULL;
+    link_target[len] = '\0';
+
+    // Extract the last component of the path
+    char *last_slash = strrchr(link_target, '/');
+    if (last_slash)
+        return string_strdupz(last_slash + 1);
+
+    return NULL;
 }
 
 static inline bool sensor_subfeature_needed(SENSOR *s, SENSOR_SUBFEATURE_TYPE type) {
@@ -752,9 +794,11 @@ static SENSOR *sensor_get_or_create(DICTIONARY *dict, const sensors_chip_name *c
 
     sensors_snprintf_chip_name(buf, sizeof(buf), chip);
     s->chip.id = string_strdupz(buf);
-    s->chip.name = string_strdupz(chip->prefix);
+    s->chip.driver = string_strdupz(chip->prefix);
     s->chip.adapter = string_strdupz(sensors_get_adapter_name(&chip->bus));
     s->chip.path = string_strdupz(chip->path);
+    s->chip.device = get_device_name(chip->path);
+    s->chip.subsystem = get_subsystem_name(chip->path);
     s->chip.bus = chip->bus.type;
     s->chip.addr = chip->addr;
 
@@ -785,14 +829,16 @@ static void sensor_labels(SENSOR *ft) {
     printf(PLUGINSD_KEYWORD_CLABEL " label '%s' 1\n", string2str(ft->feature.label));
     printf(PLUGINSD_KEYWORD_CLABEL " adapter '%s' 1\n", string2str(ft->chip.adapter));
     printf(PLUGINSD_KEYWORD_CLABEL " bus '%s' 1\n", SENSOR_BUS_TYPE_2str(ft->chip.bus));
-    printf(PLUGINSD_KEYWORD_CLABEL " chip '%s' 1\n", string2str(ft->chip.name));
+    printf(PLUGINSD_KEYWORD_CLABEL " driver '%s' 1\n", string2str(ft->chip.driver));
     printf(PLUGINSD_KEYWORD_CLABEL " chip_id '%s' 1\n", string2str(ft->chip.id));
     printf(PLUGINSD_KEYWORD_CLABEL " path '%s' 1\n", string2str(ft->chip.path));
+    printf(PLUGINSD_KEYWORD_CLABEL " device '%s' 1\n", string2str(ft->chip.device));
+    printf(PLUGINSD_KEYWORD_CLABEL " subsystem '%s' 1\n", string2str(ft->chip.subsystem));
 
-    printf(
-        PLUGINSD_KEYWORD_CLABEL " sensor '%s - %s' 1\n",
-        string2str(ft->chip.name),
-        string2str(ft->feature.label));
+//    printf(
+//        PLUGINSD_KEYWORD_CLABEL " sensor '%s - %s' 1\n",
+//        string2str(ft->chip.name),
+//        string2str(ft->feature.label));
 
     printf(PLUGINSD_KEYWORD_CLABEL_COMMIT "\n");
 }
@@ -900,7 +946,7 @@ static void sensor_process(SENSOR *s, int update_every, const char *name) {
             "{ adapter '%s', bus '%s', path '%s'}, "
             "{ feature label '%s', name '%s', type '%s' }\n",
             string2str(s->chip.id),
-            string2str(s->chip.name),
+            string2str(s->chip.driver),
         s->chip.addr,
             string2str(s->chip.adapter),
             SENSOR_BUS_TYPE_2str(s->chip.bus),
