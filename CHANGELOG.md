@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#19265](https://github.com/netdata/netdata/pull/19265) ([netdatabot](https://github.com/netdatabot))
+- improvement\(go.d/nats\): add routez metrics [\#19264](https://github.com/netdata/netdata/pull/19264) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19263](https://github.com/netdata/netdata/pull/19263) ([netdatabot](https://github.com/netdatabot))
+- improvement\(go.d/nats\): add accstatz metrics [\#19262](https://github.com/netdata/netdata/pull/19262) ([ilyam8](https://github.com/ilyam8))
+- HELP and TYPE in prometheus fix [\#19261](https://github.com/netdata/netdata/pull/19261) ([ktsaou](https://github.com/ktsaou))
+- Add an alert guide for reboot required [\#19260](https://github.com/netdata/netdata/pull/19260) ([ralphm](https://github.com/ralphm))
+- fix crash when the DRM file does not contain the right information [\#19258](https://github.com/netdata/netdata/pull/19258) ([ktsaou](https://github.com/ktsaou))
+- docs: change "node-membership-rules" filename/title [\#19257](https://github.com/netdata/netdata/pull/19257) ([ilyam8](https://github.com/ilyam8))
+- Updated copyright notices [\#19256](https://github.com/netdata/netdata/pull/19256) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations docs [\#19254](https://github.com/netdata/netdata/pull/19254) ([netdatabot](https://github.com/netdatabot))
 - docs: fix nats metadata suffix [\#19253](https://github.com/netdata/netdata/pull/19253) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d\): add  NATS collector [\#19252](https://github.com/netdata/netdata/pull/19252) ([ilyam8](https://github.com/ilyam8))
@@ -451,13 +460,6 @@
 - Delay child disconnect update [\#18712](https://github.com/netdata/netdata/pull/18712) ([stelfrag](https://github.com/stelfrag))
 - Windows installer \(Change descriptions add helping\) [\#18711](https://github.com/netdata/netdata/pull/18711) ([thiagoftsm](https://github.com/thiagoftsm))
 - add instructions to configure SCIM integration in Okta [\#18710](https://github.com/netdata/netdata/pull/18710) ([juacker](https://github.com/juacker))
-- fix wrong config file name in go.d/oracledb meta [\#18709](https://github.com/netdata/netdata/pull/18709) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18708](https://github.com/netdata/netdata/pull/18708) ([netdatabot](https://github.com/netdatabot))
-- feat\(go.d/sensors\): add a config option to update/add sensor label value [\#18707](https://github.com/netdata/netdata/pull/18707) ([ilyam8](https://github.com/ilyam8))
-- improve apps.plugin readme [\#18705](https://github.com/netdata/netdata/pull/18705) ([ilyam8](https://github.com/ilyam8))
-- Update windows documentation [\#18703](https://github.com/netdata/netdata/pull/18703) ([Ancairon](https://github.com/Ancairon))
-- Detect when swap is disabled when agent is running [\#18702](https://github.com/netdata/netdata/pull/18702) ([stelfrag](https://github.com/stelfrag))
-- Bump golang.org/x/net from 0.29.0 to 0.30.0 in /src/go [\#18701](https://github.com/netdata/netdata/pull/18701) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 

@@ -69,14 +69,55 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| nats.server_traffic | in, out | bytes/s |
-| nats.server_messages | in, out | messages/s |
-| nats.server_connections_current | active | connections |
+| nats.server_traffic | received, sent | bytes/s |
+| nats.server_messages | received, sent | messages/s |
+| nats.server_connections | active | connections |
 | nats.server_connections_rate | connections | connections/s |
 | nats.server_health_probe_status | ok, error | status |
 | nats.server_cpu_usage | used | percent |
 | nats.server_mem_usage | used | bytes |
 | nats.server_uptime | uptime | seconds |
+
+### Per account
+
+These metrics refer to [Accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| account | Account name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nats.account_traffic | received, sent | bytes/s |
+| nats.account_messages | received, sent | messages/s |
+| nats.account_connections | active | connections |
+| nats.account_connections_rate | connections | connections/s |
+| nats.account_subscriptions | active | subscriptions |
+| nats.account_slow_consumers | slow | consumers/s |
+| nats.account_leaf_nodes | leafnode | servers |
+
+### Per route
+
+These metrics refer to [Routes](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#route-information).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| route_id | A unique identifier for a route within the NATS cluster. |
+| remote_id | he unique identifier of the remote server connected via the route. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nats.route_traffic | in, out | bytes/s |
+| nats.route_messages | in, out | messages/s |
+| nats.route_subscriptions | active | subscriptions |
 
 ### Per http endpoint
 
@@ -138,6 +179,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | url | Server URL. | http://127.0.0.1:8222 | yes |
 | timeout | HTTP request timeout. | 1 | no |
+| healthz_check | Controls the behavior of the `/healthz` endpoint [health check](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#health). | default | no |
 | username | Username for basic HTTP authentication. |  | no |
 | password | Password for basic HTTP authentication. |  | no |
 | proxy_url | Proxy URL. |  | no |
