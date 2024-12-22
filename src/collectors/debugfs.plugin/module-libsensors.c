@@ -2,8 +2,6 @@
 
 #include "debugfs_plugin.h"
 
-#if defined(HAVE_LIBSENSORS)
-
 #define NETDATA_CALCULATED_STATES 1
 
 #include "libsensors/vendored/lib/sensors.h"
@@ -1055,7 +1053,3 @@ int do_module_libsensors(int update_every, const char *name) {
 
     return 0;
 }
-
-#else
-int do_module_libsensors(int update_every __maybe_unused, const char *name __maybe_unused) { return 1; }
-#endif

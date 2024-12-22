@@ -88,7 +88,6 @@
 #cmakedefine HAVE_SD_JOURNAL_RESTART_FIELDS
 #cmakedefine HAVE_SD_JOURNAL_GET_SEQNUM
 #cmakedefine ENABLE_SYSTEMD_DBUS
-#cmakedefine HAVE_LIBSENSORS
 
 // checked source compilation
 

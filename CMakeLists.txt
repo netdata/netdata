@@ -2219,9 +2219,6 @@ if(ENABLE_PLUGIN_DEBUGFS)
     target_include_directories(debugfs.plugin PRIVATE ${CAP_INCLUDE_DIRS})
     target_compile_options(debugfs.plugin PRIVATE ${CAP_CFLAGS_OTHER})
 
-    # Add libsensors compile definition
-    target_compile_definitions(debugfs.plugin PRIVATE HAVE_LIBSENSORS)
-
     # Install the debugfs.plugin binary
     install(TARGETS debugfs.plugin
             COMPONENT plugin-debugfs
