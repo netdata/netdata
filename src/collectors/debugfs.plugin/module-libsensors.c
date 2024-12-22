@@ -6,8 +6,8 @@
 
 #define NETDATA_CALCULATED_STATES 1
 
-#include <sensors/sensors.h>
-#include <sensors/error.h>
+#include "libsensors/vendored/lib/sensors.h"
+#include "libsensors/vendored/lib/error.h"
 
 typedef short SENSOR_BUS_TYPE;
 ENUM_STR_MAP_DEFINE(SENSOR_BUS_TYPE) = {
