@@ -2224,6 +2224,12 @@ if(ENABLE_PLUGIN_DEBUGFS)
             COMPONENT plugin-debugfs
             DESTINATION usr/libexec/netdata/plugins.d)
 
+    install(FILES
+            src/collectors/debugfs.plugin/libsensors/vendored/etc/sensors.conf.default
+            COMPONENT plugin-debugfs
+            DESTINATION usr/lib/netdata/conf.d
+            RENAME sensors3.conf)
+
     # Install additional packaging files if building for packaging
     if(BUILD_FOR_PACKAGING)
         install(FILES
