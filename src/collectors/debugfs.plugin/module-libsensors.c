@@ -27,9 +27,9 @@ ENUM_STR_DEFINE_FUNCTIONS(SENSOR_BUS_TYPE, SENSORS_BUS_TYPE_ANY, "any");
 
 typedef sensors_feature_type SENSOR_TYPE;
 ENUM_STR_MAP_DEFINE(SENSOR_TYPE) = {
-    { .id = SENSORS_FEATURE_IN, .name = "in", },
+    { .id = SENSORS_FEATURE_IN, .name = "voltage", },
     { .id = SENSORS_FEATURE_FAN, .name = "fan", },
-    { .id = SENSORS_FEATURE_TEMP, .name = "temp", },
+    { .id = SENSORS_FEATURE_TEMP, .name = "temperature", },
     { .id = SENSORS_FEATURE_POWER, .name = "power", },
     { .id = SENSORS_FEATURE_ENERGY, .name = "energy", },
     { .id = SENSORS_FEATURE_CURR, .name = "curr", },
@@ -599,11 +599,46 @@ static inline void transition_to_state(SENSOR *s) {
         return;
     }
 
-    nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
-           "LIBSENSORS: sensor '%s' transitioned from state '%s' to '%s': %s",
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &sensors_state_transition_msgid),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    ND_LOG_FIELD_PRIORITY prio;
+    switch(s->state) {
+        default:
+        case SENSOR_STATE_CLEAR:
+            prio = NDLP_NOTICE;
+            break;
+
+        case SENSOR_STATE_CAP:
+        case SENSOR_STATE_WARNING:
+            prio = NDLP_WARNING;
+            break;
+
+        case SENSOR_STATE_FAULT:
+        case SENSOR_STATE_ALARM:
+            prio = NDLP_ERR;
+            break;
+
+        case SENSOR_STATE_CRITICAL:
+            prio = NDLP_CRIT;
+            break;
+
+        case SENSOR_STATE_EMERGENCY:
+            prio = NDLP_ALERT;
+            break;
+    }
+
+    nd_log(NDLS_COLLECTORS, prio,
+           "%s sensor '%s' transitioned from state '%s' to '%s' [device '%s', driver '%s', subsystem '%s', path '%s']%s%s",
+           SENSOR_TYPE_2str(s->feature.type),
            string2str(s->id),
            SENSOR_STATE_2str(s->state_logged), SENSOR_STATE_2str(s->state),
-           string2str(s->log_msg));
+           string2str(s->chip.device), string2str(s->chip.driver),
+           string2str(s->chip.subsystem), string2str(s->chip.path),
+           s->log_msg ? ": " : "", string2str(s->log_msg));
 
     string_freez(s->log_msg);
     s->log_msg = NULL;
@@ -611,7 +646,7 @@ static inline void transition_to_state(SENSOR *s) {
     s->state_logged = s->state;
 }
 
-static inline void check_kernel_alarm(SENSOR *s, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
+static inline void check_value_greater_than_zero(SENSOR *s, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
     if(*config == NOT_SUPPORTED)
         return;
 
@@ -631,14 +666,22 @@ static inline void check_kernel_alarm(SENSOR *s, SENSOR_SUBFEATURE_TYPE *config,
 
             string_freez(s->log_msg);
             char buf[100];
-            snprintf(buf, sizeof(buf), " %s == %f ",
+            snprintf(buf, sizeof(buf), "%s == %f (kernel driver generated)",
                      SENSOR_SUBFEATURE_TYPE_2str(*config), status);
             s->log_msg = string_strdupz(buf);
         }
     }
 }
 
-static inline void check_custom_alarm_min(SENSOR *s, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
+static void userspace_evaluation_log_msg(SENSOR *s, const char *reading_txt, const char *condition, const char *threshold_txt, double reading, double threshold) {
+    string_freez(s->log_msg);
+    char buf[200];
+    snprintf(buf, sizeof(buf), "%s %f %s %s %f (userspace evaluation using kernel provided thresholds)",
+             reading_txt, reading, condition, threshold_txt, threshold);
+    s->log_msg = string_strdupz(buf);
+}
+
+static inline void check_smaller_than_threshold(SENSOR *s, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
     if(*config == NOT_SUPPORTED)
         return;
 
@@ -655,24 +698,80 @@ static inline void check_custom_alarm_min(SENSOR *s, SENSOR_SUBFEATURE_TYPE *con
         // set it to this state if it is raised
         if(s->input < threshold && s->state == SENSOR_STATE_CLEAR) {
             s->state = state;
-
-            string_freez(s->log_msg);
-            char buf[100];
-            snprintf(buf, sizeof(buf), " input %f < %s %f ", s->input, SENSOR_SUBFEATURE_TYPE_2str(*config), threshold);
-            s->log_msg = string_strdupz(buf);
+            userspace_evaluation_log_msg(
+                s, "input", "<", SENSOR_SUBFEATURE_TYPE_2str(*config),
+                s->input, threshold);
         }
         else if(s->average < threshold && s->state == SENSOR_STATE_CLEAR) {
             s->state = state;
-
-            string_freez(s->log_msg);
-            char buf[100];
-            snprintf(buf, sizeof(buf), " average %f < %s %f ", s->average, SENSOR_SUBFEATURE_TYPE_2str(*config), threshold);
-            s->log_msg = string_strdupz(buf);
+            userspace_evaluation_log_msg(
+                s, "average", "<", SENSOR_SUBFEATURE_TYPE_2str(*config),
+                s->average, threshold);
         }
     }
 }
 
-static inline void check_custom_alarm_max(SENSOR *s, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
+static inline void check_greater_than_threshold(SENSOR *s, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
+    if(*config == NOT_SUPPORTED)
+        return;
+
+    double threshold = sensor_value(s, *config);
+    if(isnan(threshold)) {
+        // we cannot read this
+        // exclude it from future iterations for this sensor
+        *config = NOT_SUPPORTED;
+    }
+    else {
+        // the sensor supports this state
+        s->supported_states |= state;
+
+        // set it to this state if it is raised
+        if(s->input > threshold && s->state == SENSOR_STATE_CLEAR) {
+            s->state = state;
+            userspace_evaluation_log_msg(
+                s, "input", ">", SENSOR_SUBFEATURE_TYPE_2str(*config),
+                s->input, threshold);
+        }
+        else if(s->average > threshold && s->state == SENSOR_STATE_CLEAR) {
+            s->state = state;
+            userspace_evaluation_log_msg(
+                s, "average", ">", SENSOR_SUBFEATURE_TYPE_2str(*config),
+                s->average, threshold);
+        }
+    }
+}
+
+static inline void check_smaller_or_equal_to_threshold(SENSOR *s, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
+    if(*config == NOT_SUPPORTED)
+        return;
+
+    double threshold = sensor_value(s, *config);
+    if(isnan(threshold)) {
+        // we cannot read this
+        // exclude it from future iterations for this sensor
+        *config = NOT_SUPPORTED;
+    }
+    else {
+        // the sensor supports this state
+        s->supported_states |= state;
+
+        // set it to this state if it is raised
+        if(s->input <= threshold && s->state == SENSOR_STATE_CLEAR) {
+            s->state = state;
+            userspace_evaluation_log_msg(
+                s, "input", "<=", SENSOR_SUBFEATURE_TYPE_2str(*config),
+                s->input, threshold);
+        }
+        else if(s->average <= threshold && s->state == SENSOR_STATE_CLEAR) {
+            s->state = state;
+            userspace_evaluation_log_msg(
+                s, "average", "<=", SENSOR_SUBFEATURE_TYPE_2str(*config),
+                s->average, threshold);
+        }
+    }
+}
+
+static inline void check_greater_or_equal_to_threshold(SENSOR *s, SENSOR_SUBFEATURE_TYPE *config, SENSOR_STATE state) {
     if(*config == NOT_SUPPORTED)
         return;
 
@@ -689,19 +788,15 @@ static inline void check_custom_alarm_max(SENSOR *s, SENSOR_SUBFEATURE_TYPE *con
         // set it to this state if it is raised
         if(s->input >= threshold && s->state == SENSOR_STATE_CLEAR) {
             s->state = state;
-
-            string_freez(s->log_msg);
-            char buf[100];
-            snprintf(buf, sizeof(buf), " input %f >= %s %f ", s->input, SENSOR_SUBFEATURE_TYPE_2str(*config), threshold);
-            s->log_msg = string_strdupz(buf);
+            userspace_evaluation_log_msg(
+                s, "input", ">=", SENSOR_SUBFEATURE_TYPE_2str(*config),
+                s->input, threshold);
         }
         else if(s->average >= threshold && s->state == SENSOR_STATE_CLEAR) {
             s->state = state;
-
-            string_freez(s->log_msg);
-            char buf[100];
-            snprintf(buf, sizeof(buf), " average %f >= %s %f ", s->average, SENSOR_SUBFEATURE_TYPE_2str(*config), threshold);
-            s->log_msg = string_strdupz(buf);
+            userspace_evaluation_log_msg(
+                s, "average", ">=", SENSOR_SUBFEATURE_TYPE_2str(*config),
+                s->average, threshold);
         }
     }
 }
@@ -732,14 +827,14 @@ static void set_sensor_state(SENSOR *s) {
     // ----------------------------------------------------------------------------------------------------------------
     // read the sensor alarms as exposed by the kernel driver
 
-    check_kernel_alarm(s, &s->config.fault, SENSOR_STATE_FAULT);
-    check_kernel_alarm(s, &s->config.emergency_alarm, SENSOR_STATE_EMERGENCY);
-    check_kernel_alarm(s, &s->config.crit_alarm, SENSOR_STATE_CRITICAL);
-    check_kernel_alarm(s, &s->config.lcrit_alarm, SENSOR_STATE_CRITICAL);
-    check_kernel_alarm(s, &s->config.max_alarm, SENSOR_STATE_ALARM);
-    check_kernel_alarm(s, &s->config.min_alarm, SENSOR_STATE_ALARM);
-    check_kernel_alarm(s, &s->config.alarm, SENSOR_STATE_ALARM);
-    check_kernel_alarm(s, &s->config.cap_alarm, SENSOR_STATE_CAP);
+    check_value_greater_than_zero(s, &s->config.fault, SENSOR_STATE_FAULT);
+    check_value_greater_than_zero(s, &s->config.emergency_alarm, SENSOR_STATE_EMERGENCY);
+    check_value_greater_than_zero(s, &s->config.crit_alarm, SENSOR_STATE_CRITICAL);
+    check_value_greater_than_zero(s, &s->config.lcrit_alarm, SENSOR_STATE_CRITICAL);
+    check_value_greater_than_zero(s, &s->config.max_alarm, SENSOR_STATE_ALARM);
+    check_value_greater_than_zero(s, &s->config.min_alarm, SENSOR_STATE_ALARM);
+    check_value_greater_than_zero(s, &s->config.alarm, SENSOR_STATE_ALARM);
+    check_value_greater_than_zero(s, &s->config.cap_alarm, SENSOR_STATE_CAP);
 
 #ifdef NETDATA_CALCULATED_STATES
 
@@ -754,12 +849,12 @@ static void set_sensor_state(SENSOR *s) {
         s->state = SENSOR_STATE_FAULT;
     }
 
-    check_custom_alarm_max(s, &s->config.emergency, SENSOR_STATE_EMERGENCY);
-    check_custom_alarm_max(s, &s->config.crit, SENSOR_STATE_CRITICAL);
-    check_custom_alarm_min(s, &s->config.lcrit, SENSOR_STATE_CRITICAL);
-    check_custom_alarm_max(s, &s->config.cap, SENSOR_STATE_CAP);
-    check_custom_alarm_max(s, &s->config.max, SENSOR_STATE_WARNING);
-    check_custom_alarm_min(s, &s->config.min, SENSOR_STATE_WARNING);
+    check_greater_or_equal_to_threshold(s, &s->config.emergency, SENSOR_STATE_EMERGENCY);
+    check_greater_or_equal_to_threshold(s, &s->config.crit, SENSOR_STATE_CRITICAL);
+    check_smaller_or_equal_to_threshold(s, &s->config.lcrit, SENSOR_STATE_CRITICAL);
+    check_greater_than_threshold(s, &s->config.cap, SENSOR_STATE_CAP);
+    check_greater_than_threshold(s, &s->config.max, SENSOR_STATE_WARNING);
+    check_smaller_than_threshold(s, &s->config.min, SENSOR_STATE_WARNING);
 
 #endif
 
@@ -936,7 +1031,7 @@ static void sensor_process(SENSOR *s, int update_every, const char *name) {
         s->exposed_states = s->supported_states;
     }
 
-#if 1
+#if 0
     // ----------------------------------------------------------------------------------------------------------------
     // debugging
 
