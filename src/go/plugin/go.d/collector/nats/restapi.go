@@ -3,8 +3,6 @@
 package nats
 
 import (
-	"time"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
@@ -19,6 +17,8 @@ const (
 	urlPathAccstatz = "/accstatz"
 	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#route-information
 	urlPathRoutez = "/routez"
+	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information
+	urlPathGatewayz = "/gatewayz"
 )
 
 var (
@@ -61,8 +61,7 @@ type varzResponse struct {
 	IP               string            `json:"ip,omitempty"`
 	MaxConn          int               `json:"max_connections"`
 	MaxSubs          int               `json:"max_subscriptions,omitempty"`
-	Start            time.Time         `json:"start"`
-	Now              time.Time         `json:"now"`
+	Uptime           string            `json:"uptime"`
 	Mem              int64             `json:"mem"`
 	CPU              float64           `json:"cpu"`
 	Connections      int               `json:"connections"`
@@ -80,8 +79,11 @@ type varzResponse struct {
 }
 
 // https://github.com/nats-io/nats-server/blob/v2.10.24/server/monitor.go#L2279
-type accstatzResponse struct {
-	AccStats []struct {
+type (
+	accstatzResponse struct {
+		AccStats []accountInfo `json:"account_statz"`
+	}
+	accountInfo struct {
 		Account    string `json:"acc"`
 		Conns      int    `json:"conns"`
 		TotalConns int    `json:"total_conns"`
@@ -96,12 +98,15 @@ type accstatzResponse struct {
 			Bytes int64 `json:"bytes"`
 		} `json:"received"`
 		SlowConsumers int64 `json:"slow_consumers"`
-	} `json:"account_statz"`
-}
+	}
+)
 
 // https://github.com/nats-io/nats-server/blob/v2.10.24/server/monitor.go#L752
-type routezResponse struct {
-	Routes []struct {
+type (
+	routezResponse struct {
+		Routes []routeInfo `json:"routes"`
+	}
+	routeInfo struct {
 		Rid      uint64 `json:"rid"`
 		RemoteID string `json:"remote_id"`
 		InMsgs   int64  `json:"in_msgs"`
@@ -109,5 +114,27 @@ type routezResponse struct {
 		InBytes  int64  `json:"in_bytes"`
 		OutBytes int64  `json:"out_bytes"`
 		NumSubs  uint32 `json:"subscriptions"`
-	} `json:"routes"`
-}
+	}
+)
+
+type (
+	// https://github.com/nats-io/nats-server/blob/v2.10.24/server/monitor.go#L1875
+	gatewayzResponse struct {
+		Name             string                          `json:"name"`
+		OutboundGateways map[string]*remoteGatewayInfo   `json:"outbound_gateways"`
+		InboundGateways  map[string][]*remoteGatewayInfo `json:"inbound_gateways"`
+	}
+	remoteGatewayInfo struct {
+		IsConfigured bool           `json:"configured"`
+		Connection   connectionInfo `json:"connection"`
+	}
+	connectionInfo struct {
+		Cid      uint64 `json:"cid"`
+		Uptime   string `json:"uptime"`
+		InMsgs   int64  `json:"in_msgs"`
+		OutMsgs  int64  `json:"out_msgs"`
+		InBytes  int64  `json:"in_bytes"`
+		OutBytes int64  `json:"out_bytes"`
+		NumSubs  uint32 `json:"subscriptions"`
+	}
+)

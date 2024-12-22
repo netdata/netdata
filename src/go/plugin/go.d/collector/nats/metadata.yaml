@@ -238,6 +238,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+        - name: http endpoint
+          description: These metrics refer to HTTP endpoints.
+          labels:
+            - name: http_endpoint
+              description: "HTTP endpoint path."
+          metrics:
+            - name: nats.http_endpoint_requests
+              description: HTTP Endpoint Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
         - name: account
           description: These metrics refer to [Accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
           labels:
@@ -316,15 +328,75 @@ modules:
               chart_type: line
               dimensions:
                 - name: active
-        - name: http endpoint
-          description: These metrics refer to HTTP endpoints.
+        - name: inbound gateway connection
+          description: These metrics refer to [Inbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
           labels:
-            - name: http_endpoint
-              description: "HTTP endpoint path."
+            - name: gateway
+              description: "The name of the local gateway."
+            - name: remote_gateway
+              description: "The name of the remote gateway."
+            - name: cid
+              description: "A unique identifier for the connection."
           metrics:
-            - name: nats.http_endpoint_requests
-              description: HTTP Endpoint Requests
-              unit: requests/s
+            - name: nats.inbound_gateway_conn_traffic
+              description: Inbound Gateway Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.inbound_gateway_conn_messages
+              description: Inbound Gateway Messages
+              unit: messages/s
               chart_type: line
               dimensions:
-                - name: requests
+                - name: in
+                - name: out
+            - name: nats.inbound_gateway_conn_subscriptions
+              description: Inbound Gateway Active Subscriptions
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nats.inbound_gateway_conn_uptime
+              description: Inbound Gateway Connection Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: outbound gateway connection
+          description: These metrics refer to [Outbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
+          labels:
+            - name: gateway
+              description: "The name of the local gateway."
+            - name: remote_gateway
+              description: "The name of the remote gateway."
+            - name: cid
+              description: "A unique identifier for the connection."
+          metrics:
+            - name: nats.outbound_gateway_conn_traffic
+              description: Outbound Gateway Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.outbound_gateway_conn_messages
+              description: Outbound Gateway Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.outbound_gateway_conn_subscriptions
+              description: Outbound Gateway Active Subscriptions
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nats.outbound_gateway_conn_uptime
+              description: Outbound Gateway Connection Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
