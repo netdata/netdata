@@ -163,6 +163,10 @@ static int create_listen_socket4(int socktype, const char *ip, uint16_t port, in
         return -1;
     }
 
+    // Add TCP_DEFER_ACCEPT for TCP sockets
+    if(socktype == SOCK_STREAM)
+        sock_set_tcp_defer_accept(sock);
+
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "LISTENER: Listening on IPv4 ip '%s' port %d, socktype %d",
            ip, port, socktype);
@@ -229,6 +233,10 @@ static int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip
 
         return -1;
     }
+
+    // Add TCP_DEFER_ACCEPT for TCP sockets
+    if(socktype == SOCK_STREAM)
+        sock_set_tcp_defer_accept(sock);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "LISTENER: Listening on IPv6 ip '%s' port %d, socktype %d",

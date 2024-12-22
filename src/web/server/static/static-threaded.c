@@ -190,9 +190,7 @@ static int web_server_file_write_callback(POLLINFO *pi, short int *events) {
 // ----------------------------------------------------------------------------
 // web server clients
 
-static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data) {
-    (void)data;         // Suppress warning on unused argument
-
+static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data __maybe_unused) {
     worker_is_busy(WORKER_JOB_ADD_CONNECTION);
     worker_private->connected++;
 

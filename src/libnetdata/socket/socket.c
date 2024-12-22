@@ -63,7 +63,7 @@ bool fd_is_socket(int fd) {
     return true;
 }
 
-#ifdef POLLRDHUP
+#if defined(POLLRDHUP) && 0 // ktsaou: disabled because the recv() method is faster (1 syscall vs multiple by poll())
 bool is_socket_closed(int fd) {
     if(fd < 0)
         return true;
@@ -142,6 +142,28 @@ int sock_delnonblock(int fd) {
                fd);
 
     return ret;
+}
+
+int sock_set_tcp_defer_accept(int fd) {
+#ifdef TCP_DEFER_ACCEPT
+    // Only set TCP_DEFER_ACCEPT for TCP sockets
+    if(!fd_is_socket(fd))
+        return 0;
+
+    int timeout = 5;
+    int ret = setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &timeout, sizeof(timeout));
+
+    if(ret == -1 && errno != EINVAL && errno != ENOPROTOOPT) {
+        // EINVAL or ENOPROTOOPT means this is not a TCP socket (might be UNIX domain socket)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to set TCP_DEFER_ACCEPT on socket %d",
+               fd);
+    }
+
+    return ret;
+#else
+    return 0;
+#endif
 }
 
 int sock_setreuse(int fd, int reuse) {

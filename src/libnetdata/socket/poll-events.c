@@ -6,8 +6,6 @@
 // this should be the fastest possible listener for up to 100 sockets
 // above 100, an epoll() interface is needed on Linux
 
-#define POLL_FDS_INCREASE_STEP 10
-
 inline POLLINFO *poll_add_fd(POLLJOB *p
                              , int fd
                              , int socktype
@@ -31,7 +29,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     //}
 
     if(unlikely(!p->first_free)) {
-        size_t new_slots = p->slots + POLL_FDS_INCREASE_STEP;
+        size_t new_slots = p->slots ? p->slots * 2 : 10;
 
         p->fds = reallocz(p->fds, sizeof(struct pollfd) * new_slots);
         p->inf = reallocz(p->inf, sizeof(POLLINFO) * new_slots);
@@ -357,6 +355,12 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "POLLFD: LISTENER: accept() failed.");
 
+    }
+    else if(is_socket_closed(nfd)) {
+        nd_log_limit_static_global_var(erl, 10, 1000);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                     "POLLFD: LISTENER: received client socket %d is closed on accept(), dropping connection", nfd);
+            close(nfd);
     }
     else {
         // accept ok

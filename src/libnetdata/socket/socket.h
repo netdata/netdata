@@ -20,6 +20,7 @@ void sock_setcloexec(int fd);
 int sock_setreuse_port(int fd, int reuse);
 int sock_enlarge_in(int fd);
 int sock_enlarge_out(int fd);
+int sock_set_tcp_defer_accept(int fd);
 
 int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize,
                               SIMPLE_PATTERN *access_list, const char *patname, int allow_dns);
