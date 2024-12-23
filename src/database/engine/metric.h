@@ -30,8 +30,8 @@ struct mrg_statistics {
 
     // --- atomic --- multiple readers / writers
 
-    PAD64(size_t) entries_referenced;
-    PAD64(size_t) current_references;
+    PAD64(ssize_t) entries_acquired;
+    PAD64(ssize_t) current_references;
 
     PAD64(size_t) search_hits;
     PAD64(size_t) search_misses;

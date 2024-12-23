@@ -217,7 +217,7 @@ static inline bool metric_acquire(MRG *mrg, METRIC *metric) {
     size_t partition = metric->partition;
 
     if(desired == 1)
-        __atomic_add_fetch(&mrg->index[partition].stats.entries_referenced, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
 
     __atomic_add_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
 
@@ -244,7 +244,7 @@ static inline bool metric_release(MRG *mrg, METRIC *metric, bool delete_if_last_
     } while(!__atomic_compare_exchange_n(&metric->refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
 
     if(desired == 0 || desired == REFCOUNT_DELETING) {
-        __atomic_sub_fetch(&mrg->index[partition].stats.entries_referenced, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
 
         if(desired == REFCOUNT_DELETING)
             acquired_for_deletion_metric_delete(mrg, metric);
@@ -317,6 +317,9 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
     metric->refcount = 1;
     metric->partition = partition;
     *PValue = metric;
+
+    __atomic_add_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
 
     MRG_STATS_ADDED_METRIC(mrg, partition);
 
@@ -717,7 +720,7 @@ inline void mrg_get_statistics(MRG *mrg, struct mrg_statistics *s) {
 
     for(size_t i = 0; i < mrg->partitions ;i++) {
         s->entries += __atomic_load_n(&mrg->index[i].stats.entries, __ATOMIC_RELAXED);
-        s->entries_referenced += __atomic_load_n(&mrg->index[i].stats.entries_referenced, __ATOMIC_RELAXED);
+        s->entries_acquired += __atomic_load_n(&mrg->index[i].stats.entries_acquired, __ATOMIC_RELAXED);
         s->size += __atomic_load_n(&mrg->index[i].stats.size, __ATOMIC_RELAXED);
         s->current_references += __atomic_load_n(&mrg->index[i].stats.current_references, __ATOMIC_RELAXED);
         s->additions += __atomic_load_n(&mrg->index[i].stats.additions, __ATOMIC_RELAXED);
