@@ -14,6 +14,15 @@ import (
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
+	if c.srvMeta.id == "" {
+		id, name, err := c.getServerMeta()
+		if err != nil {
+			return nil, err
+		}
+		c.srvMeta.id = id
+		c.srvMeta.name = name
+	}
+
 	mx := make(map[string]int64)
 
 	c.cache.resetUpdated()
@@ -37,6 +46,24 @@ func (c *Collector) collect() (map[string]int64, error) {
 	c.updateCharts()
 
 	return mx, nil
+}
+
+func (c *Collector) getServerMeta() (srvId, srvName string, err error) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathVarz)
+	if err != nil {
+		return "", "", err
+	}
+
+	var resp struct {
+		ID   string `json:"server_id"`
+		Name string `json:"server_name"`
+	}
+
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
+		return "", "", err
+	}
+
+	return resp.ID, resp.Name, nil
 }
 
 func (c *Collector) collectHealthz(mx map[string]int64) error {

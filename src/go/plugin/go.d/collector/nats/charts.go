@@ -392,6 +392,8 @@ var (
 )
 
 func (c *Collector) updateCharts() {
+	c.onceAddSrvCharts.Do(c.addServerCharts)
+
 	maps.DeleteFunc(c.cache.accounts, func(_ string, acc *accCacheEntry) bool {
 		if !acc.updated {
 			c.removeAccountCharts(acc)
@@ -444,12 +446,27 @@ func (c *Collector) updateCharts() {
 	})
 }
 
+func (c *Collector) addServerCharts() {
+	charts := serverCharts.Copy()
+
+	for _, chart := range *charts {
+		chart.Labels = []module.Label{
+			{Key: "server_id", Value: c.srvMeta.id},
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add server charts: %v", err)
+	}
+}
+
 func (c *Collector) addAccountCharts(acc *accCacheEntry) {
 	charts := accountChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, acc.accName)
 		chart.Labels = []module.Label{
+			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "account", Value: acc.accName},
 		}
 		for _, dim := range chart.Dims {
@@ -473,6 +490,7 @@ func (c *Collector) addRouteCharts(route *routeCacheEntry) {
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, route.rid)
 		chart.Labels = []module.Label{
+			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "route_id", Value: strconv.FormatUint(route.rid, 10)},
 			{Key: "remote_id", Value: route.remoteId},
 		}
@@ -504,6 +522,7 @@ func (c *Collector) addGatewayConnCharts(gwConn *gwConnCacheEntry, isInbound boo
 		chart.Title = fmt.Sprintf(chart.Title, cases.Title(language.English, cases.Compact).String(direction))
 		chart.Ctx = fmt.Sprintf(chart.Ctx, direction)
 		chart.Labels = []module.Label{
+			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "gateway", Value: gwConn.gwName},
 			{Key: "remote_gateway", Value: gwConn.rgwName},
 		}
