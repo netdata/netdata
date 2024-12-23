@@ -26,9 +26,11 @@ static inline ND_PROFILE prefer_profile(ND_PROFILE setting, ND_PROFILE preferred
 
 ND_PROFILE nd_profile_detect_and_configure(bool recheck) {
     static ND_PROFILE profile = ND_PROFILE_NONE;
-
     if(!recheck && profile != ND_PROFILE_NONE)
         return profile;
+
+    // required for detecting the profile
+    stream_conf_load();
 
     ND_PROFILE def_profile = ND_PROFILE_NONE;
 
@@ -91,7 +93,11 @@ ND_PROFILE nd_profile_detect_and_configure(bool recheck) {
 
 struct nd_profile_t nd_profile = { 0 };
 
-void nd_profile_apply(void) {
+void nd_profile_setup(void) {
+    static bool run = false;
+    if(run) return;
+    run = true;
+
     ND_PROFILE profile = nd_profile_detect_and_configure(true); (void)profile;
     if(netdata_conf_is_iot()) {
         nd_profile.storage_tiers = 1;

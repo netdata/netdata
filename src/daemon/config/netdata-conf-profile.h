@@ -24,7 +24,7 @@ BITMAP_STR_DEFINE_FUNCTIONS_EXTERN(ND_PROFILE);
 
 ND_PROFILE nd_profile_detect_and_configure(bool recheck);
 
-void nd_profile_apply(void);
+void nd_profile_setup(void);
 
 static inline bool netdata_conf_is_iot(void) {
     return (nd_profile_detect_and_configure(false) & ND_CONF_PROFILES_SYSTEM) == ND_PROFILE_IOT;

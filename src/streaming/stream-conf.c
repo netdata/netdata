@@ -90,11 +90,12 @@ bool stream_conf_receiver_needs_dbengine(void) {
 }
 
 void stream_conf_load() {
-    static bool loaded = false;
-    if(loaded) return;
-    loaded = true;
+    static bool run = false;
+    if(run) return;
+    run = true;
 
     stream_conf_load_internal();
+    check_local_streaming_capabilities();
 
     stream_send.enabled =
         appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", stream_send.enabled);

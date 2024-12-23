@@ -126,6 +126,8 @@ void netdata_conf_section_global(void) {
     netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
 
     netdata_conf_section_directories();
+
+    nd_profile_setup(); // required for configuring the database
     netdata_conf_section_db();
 
     // --------------------------------------------------------------------

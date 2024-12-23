@@ -174,4 +174,6 @@ void check_local_streaming_capabilities(void) {
     ieee754_doubles = is_system_ieee754_double();
     if(!ieee754_doubles)
         globally_disabled_capabilities |= STREAM_CAP_IEEE754;
+    else
+        globally_disabled_capabilities &= ~STREAM_CAP_IEEE754;
 }

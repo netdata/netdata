@@ -770,9 +770,7 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     // profiles
 
-    stream_conf_load();
-    check_local_streaming_capabilities();
-    nd_profile_apply();
+    nd_profile_setup();
 
     // ----------------------------------------------------------------------------------------------------------------
     // streaming, replication, functions initialization
