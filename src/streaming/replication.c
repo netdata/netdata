@@ -1759,13 +1759,14 @@ static int replication_pipeline_execute_next(void) {
 
             if (rq->st && !rq->q) {
                 worker_is_busy(WORKER_JOB_PREPARE_QUERY);
-                rq->q = replication_response_prepare(
-                    rq->st,
-                    rq->start_streaming,
-                    rq->after,
-                    rq->before,
-                    rq->sender->capabilities,
-                    rtp.max_requests_ahead == 1);
+                if(!rq->start_streaming)
+                    rq->q = replication_response_prepare(
+                        rq->st,
+                        rq->start_streaming,
+                        rq->after,
+                        rq->before,
+                        rq->sender->capabilities,
+                        rtp.max_requests_ahead == 1);
             }
 
             rq->executed = false;
