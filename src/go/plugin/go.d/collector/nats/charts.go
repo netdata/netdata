@@ -4,8 +4,12 @@ package nats
 
 import (
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
@@ -32,6 +36,11 @@ const (
 	prioRouteTraffic
 	prioRouteMessages
 	prioRouteSubscriptions
+
+	prioGatewayConnTraffic
+	prioGatewayConnMessages
+	prioGatewayConnSubscriptions
+	prioGatewayConnUptime
 )
 
 var serverCharts = func() module.Charts {
@@ -276,29 +285,6 @@ var (
 	}
 )
 
-func (c *Collector) addAccountCharts(acc string) {
-	charts := accountChartsTmpl.Copy()
-
-	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, acc)
-		chart.Labels = []module.Label{
-			{Key: "account", Value: acc},
-		}
-		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, acc)
-		}
-	}
-
-	if err := c.Charts().Add(*charts...); err != nil {
-		c.Warningf("failed to add charts for account %s: %s", acc, err)
-	}
-}
-
-func (c *Collector) removeAccountCharts(acc string) {
-	px := fmt.Sprintf("account_%s_", acc)
-	c.removeCharts(px)
-}
-
 var routeChartsTmpl = module.Charts{
 	routeTrafficTmpl.Copy(),
 	routeMessagesTmpl.Copy(),
@@ -346,28 +332,197 @@ var (
 	}
 )
 
-func (c *Collector) addRouteCharts(rid uint64, remoteId string) {
-	charts := routeChartsTmpl.Copy()
+var gatewayConnChartsTmpl = module.Charts{
+	gatewayConnTrafficTmpl.Copy(),
+	gatewayConnMessagesTmpl.Copy(),
+	gatewayConnSubscriptionsTmpl.Copy(),
+	gatewayConnUptime.Copy(),
+}
+
+var (
+	gatewayConnTrafficTmpl = module.Chart{
+		ID:       "%s_gw_%s_cid_%d_traffic",
+		Title:    "%s Gateway Traffic",
+		Units:    "bytes/s",
+		Fam:      "gw traffic",
+		Ctx:      "nats.%s_gateway_conn_traffic",
+		Priority: prioGatewayConnTraffic,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "gatewayz_%s_gw_%s_cid_%d_in_bytes", Name: "in", Algo: module.Incremental},
+			{ID: "gatewayz_%s_gw_%s_cid_%d_out_bytes", Name: "out", Mul: -1, Algo: module.Incremental},
+		},
+	}
+	gatewayConnMessagesTmpl = module.Chart{
+		ID:       "%s_gw_%s_cid_%d_messages",
+		Title:    "%s Gateway Messages",
+		Units:    "messages/s",
+		Fam:      "gw traffic",
+		Ctx:      "nats.%s_gateway_conn_messages",
+		Priority: prioGatewayConnMessages,
+		Type:     module.Line,
+		Dims: module.Dims{
+			{ID: "gatewayz_%s_gw_%s_cid_%d_in_msgs", Name: "in", Algo: module.Incremental},
+			{ID: "gatewayz_%s_gw_%s_cid_%d_out_msgs", Name: "out", Mul: -1, Algo: module.Incremental},
+		},
+	}
+	gatewayConnSubscriptionsTmpl = module.Chart{
+		ID:       "%s_gw_%s_cid_%d_subscriptions",
+		Title:    "%s Gateway Active Subscriptions",
+		Units:    "subscriptions",
+		Fam:      "gw subscriptions",
+		Ctx:      "nats.%s_gateway_conn_subscriptions",
+		Priority: prioGatewayConnSubscriptions,
+		Type:     module.Line,
+		Dims: module.Dims{
+			{ID: "gatewayz_%s_gw_%s_cid_%d_num_subs", Name: "active"},
+		},
+	}
+	gatewayConnUptime = module.Chart{
+		ID:       "%s_gw_%s_cid_%d_uptime",
+		Title:    "%s Gateway Connection Uptime",
+		Units:    "seconds",
+		Fam:      "gw uptime",
+		Ctx:      "nats.%s_gateway_conn_uptime",
+		Priority: prioGatewayConnUptime,
+		Dims: module.Dims{
+			{ID: "gatewayz_%s_gw_%s_cid_%d_uptime", Name: "uptime"},
+		},
+	}
+)
+
+func (c *Collector) updateCharts() {
+	maps.DeleteFunc(c.cache.accounts, func(_ string, acc *accCacheEntry) bool {
+		if !acc.updated {
+			c.removeAccountCharts(acc)
+			return true
+		}
+		if !acc.hasCharts {
+			acc.hasCharts = true
+			c.addAccountCharts(acc)
+		}
+		return false
+	})
+	maps.DeleteFunc(c.cache.routes, func(_ uint64, route *routeCacheEntry) bool {
+		if !route.updated {
+			c.removeRouteCharts(route)
+			return true
+		}
+		if !route.hasCharts {
+			route.hasCharts = true
+			c.addRouteCharts(route)
+		}
+		return false
+	})
+	maps.DeleteFunc(c.cache.inGateways, func(_ string, igw *gwCacheEntry) bool {
+		maps.DeleteFunc(igw.conns, func(_ uint64, inConn *gwConnCacheEntry) bool {
+			if !inConn.updated {
+				c.removeGatewayConnCharts(inConn, true)
+				return true
+			}
+			if !inConn.hasCharts {
+				inConn.hasCharts = true
+				c.addGatewayConnCharts(inConn, true)
+			}
+			return false
+		})
+		return false
+	})
+	maps.DeleteFunc(c.cache.outGateways, func(_ string, ogw *gwCacheEntry) bool {
+		maps.DeleteFunc(ogw.conns, func(_ uint64, outConn *gwConnCacheEntry) bool {
+			if !outConn.updated {
+				c.removeGatewayConnCharts(outConn, false)
+				return true
+			}
+			if !outConn.hasCharts {
+				outConn.hasCharts = true
+				c.addGatewayConnCharts(outConn, false)
+			}
+			return false
+		})
+		return false
+	})
+}
+
+func (c *Collector) addAccountCharts(acc *accCacheEntry) {
+	charts := accountChartsTmpl.Copy()
 
 	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, rid)
+		chart.ID = fmt.Sprintf(chart.ID, acc.accName)
 		chart.Labels = []module.Label{
-			{Key: "route_id", Value: strconv.FormatUint(rid, 10)},
-			{Key: "remote_id", Value: remoteId},
+			{Key: "account", Value: acc.accName},
 		}
 		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, rid)
+			dim.ID = fmt.Sprintf(dim.ID, acc.accName)
 		}
 	}
 
 	if err := c.Charts().Add(*charts...); err != nil {
-		c.Warningf("failed to add charts for route id %d: %s", rid, err)
+		c.Warningf("failed to add charts for account %s: %s", acc.accName, err)
 	}
-
 }
 
-func (c *Collector) removeRouteCharts(rid uint64) {
-	px := fmt.Sprintf("route_%d_", rid)
+func (c *Collector) removeAccountCharts(acc *accCacheEntry) {
+	px := fmt.Sprintf("account_%s_", acc.accName)
+	c.removeCharts(px)
+}
+
+func (c *Collector) addRouteCharts(route *routeCacheEntry) {
+	charts := routeChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, route.rid)
+		chart.Labels = []module.Label{
+			{Key: "route_id", Value: strconv.FormatUint(route.rid, 10)},
+			{Key: "remote_id", Value: route.remoteId},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, route.rid)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add charts for route id %d: %s", route.rid, err)
+	}
+}
+
+func (c *Collector) removeRouteCharts(route *routeCacheEntry) {
+	px := fmt.Sprintf("route_%d_", route.rid)
+	c.removeCharts(px)
+}
+
+func (c *Collector) addGatewayConnCharts(gwConn *gwConnCacheEntry, isInbound bool) {
+	direction := "outbound"
+	if isInbound {
+		direction = "inbound"
+	}
+
+	charts := gatewayConnChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, direction, gwConn.rgwName, gwConn.cid)
+		chart.Title = fmt.Sprintf(chart.Title, cases.Title(language.English, cases.Compact).String(direction))
+		chart.Ctx = fmt.Sprintf(chart.Ctx, direction)
+		chart.Labels = []module.Label{
+			{Key: "gateway", Value: gwConn.gwName},
+			{Key: "remote_gateway", Value: gwConn.rgwName},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, direction, gwConn.rgwName, gwConn.cid)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add charts for gateway %s %s %d: %s", direction, gwConn.rgwName, gwConn.cid, err)
+	}
+}
+
+func (c *Collector) removeGatewayConnCharts(gwConn *gwConnCacheEntry, isInbound bool) {
+	direction := "outbound"
+	if isInbound {
+		direction = "inbound"
+	}
+	px := fmt.Sprintf("%s_gw_%s_cid_%d_", direction, gwConn.rgwName, gwConn.cid)
 	c.removeCharts(px)
 }
 
