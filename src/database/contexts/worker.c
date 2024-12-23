@@ -251,9 +251,9 @@ bool rrdmetric_update_retention(RRDMETRIC *rm) {
         for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
             STORAGE_ENGINE *eng = rrdhost->db[tier].eng;
 
-            time_t first_time_t, last_time_t;
+            time_t first_time_t = 0, last_time_t = 0;
             if (eng->api.metric_retention_by_uuid(rrdhost->db[tier].si, &rm->uuid, &first_time_t, &last_time_t)) {
-                if (first_time_t < min_first_time_t)
+                if (first_time_t > 0 && first_time_t < min_first_time_t)
                     min_first_time_t = first_time_t;
 
                 if (last_time_t > max_last_time_t)

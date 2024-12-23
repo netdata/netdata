@@ -98,8 +98,8 @@ void pulse_daemon_memory_do(bool extended) {
         int sqlite3_memory_used_current = 0, sqlite3_memory_used_highwater = 0;
         sqlite3_status(SQLITE_STATUS_MEMORY_USED, &sqlite3_memory_used_current, &sqlite3_memory_used_highwater, 1);
 
-        size_t strings = 0;
-        string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
+        size_t strings_memory = 0, strings_index = 0;
+        string_statistics(NULL, NULL, NULL, NULL, NULL, &strings_memory, &strings_index, NULL, NULL);
 
         rrddim_set_by_pointer(st_memory, rd_db_dbengine, (collected_number)pulse_dbengine_total_memory);
         rrddim_set_by_pointer(st_memory, rd_db_rrd, (collected_number)pulse_rrd_memory_size);
@@ -153,7 +153,7 @@ void pulse_daemon_memory_do(bool extended) {
                               (collected_number)pulse_ml_get_current_memory_usage());
 
         rrddim_set_by_pointer(st_memory, rd_strings,
-                              (collected_number)strings);
+                              (collected_number)(strings_memory + strings_index));
 
         rrddim_set_by_pointer(st_memory, rd_streaming,
                               (collected_number)netdata_buffers_statistics.rrdhost_senders + (collected_number)netdata_buffers_statistics.rrdhost_receivers);

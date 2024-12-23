@@ -10,13 +10,14 @@ void pulse_string_do(bool extended) {
     static RRDDIM *rd_ops_inserts = NULL, *rd_ops_deletes = NULL;
     static RRDDIM *rd_entries_entries = NULL;
     static RRDDIM *rd_mem = NULL;
+    static RRDDIM *rd_mem_idx = NULL;
 #ifdef NETDATA_INTERNAL_CHECKS
     static RRDDIM *rd_entries_refs = NULL, *rd_ops_releases = NULL,  *rd_ops_duplications = NULL, *rd_ops_searches = NULL;
 #endif
 
-    size_t inserts, deletes, searches, entries, references, memory, duplications, releases;
+    size_t inserts, deletes, searches, entries, references, memory, memory_index, duplications, releases;
 
-    string_statistics(&inserts, &deletes, &searches, &entries, &references, &memory, &duplications, &releases);
+    string_statistics(&inserts, &deletes, &searches, &entries, &references, &memory, &memory_index, &duplications, &releases);
 
     if (unlikely(!st_ops)) {
         st_ops = rrdset_create_localhost(
@@ -93,9 +94,11 @@ void pulse_string_do(bool extended) {
             , localhost->rrd_update_every
             , RRDSET_TYPE_AREA);
 
-        rd_mem  = rrddim_add(st_mem, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_mem     = rrddim_add(st_mem, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_mem_idx = rrddim_add(st_mem, "index", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(st_mem, rd_mem, (collected_number)memory);
+    rrddim_set_by_pointer(st_mem, rd_mem_idx, (collected_number)memory_index);
     rrdset_done(st_mem);
 }
