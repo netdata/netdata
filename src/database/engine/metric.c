@@ -154,7 +154,12 @@ static void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const char *msg)
 static inline bool acquired_metric_has_retention(MRG *mrg, METRIC *metric) {
     time_t first, last;
     mrg_metric_get_retention(mrg, metric, &first, &last, NULL);
-    return (!first || !last || first > last);
+    bool rc = (first != 0 && last != 0 && first <= last);
+
+    if(!rc && __atomic_load_n(&mrg->index[metric->partition].stats.writers, __ATOMIC_RELAXED) > 0)
+        rc = true;
+
+    return rc;
 }
 
 static inline void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric) {
@@ -224,7 +229,7 @@ static inline bool metric_acquire(MRG *mrg, METRIC *metric) {
     return true;
 }
 
-static inline bool metric_release(MRG *mrg, METRIC *metric, bool delete_if_last_without_retention) {
+static inline bool metric_release(MRG *mrg, METRIC *metric) {
     size_t partition = metric->partition;
     REFCOUNT expected, desired;
 
@@ -236,7 +241,7 @@ static inline bool metric_release(MRG *mrg, METRIC *metric, bool delete_if_last_
             fatal("METRIC: refcount is %d (zero or negative) during release", expected);
         }
 
-        if(expected == 1 && delete_if_last_without_retention && !acquired_metric_has_retention(mrg, metric))
+        if(expected == 1 && !acquired_metric_has_retention(mrg, metric))
             desired = REFCOUNT_DELETING;
         else
             desired = expected - 1;
@@ -414,7 +419,7 @@ inline METRIC *mrg_metric_get_and_acquire(MRG *mrg, nd_uuid_t *uuid, Word_t sect
 }
 
 inline bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric) {
-    return metric_release(mrg, metric, true);
+    return metric_release(mrg, metric);
 }
 
 inline METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric) {
@@ -423,7 +428,7 @@ inline METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric) {
 }
 
 inline void mrg_metric_release(MRG *mrg, METRIC *metric) {
-    metric_release(mrg, metric, false);
+    metric_release(mrg, metric);
 }
 
 inline Word_t mrg_metric_id(MRG *mrg __maybe_unused, METRIC *metric) {
