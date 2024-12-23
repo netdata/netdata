@@ -185,7 +185,9 @@ modules:
       scopes:
         - name: server
           description: These metrics refer to NATS servers.
-          labels: []
+          labels:
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
           metrics:
             - name: nats.server_traffic
               description: Server Traffic
@@ -241,6 +243,8 @@ modules:
         - name: http endpoint
           description: These metrics refer to HTTP endpoints.
           labels:
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
             - name: http_endpoint
               description: "HTTP endpoint path."
           metrics:
@@ -253,6 +257,8 @@ modules:
         - name: account
           description: These metrics refer to [Accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
           labels:
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
             - name: account
               description: "Account name."
           metrics:
@@ -303,6 +309,8 @@ modules:
         - name: route
           description: These metrics refer to [Routes](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#route-information).
           labels:
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
             - name: route_id
               description: "A unique identifier for a route within the NATS cluster."
             - name: remote_id
@@ -331,6 +339,8 @@ modules:
         - name: inbound gateway connection
           description: These metrics refer to [Inbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
           labels:
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
             - name: gateway
               description: "The name of the local gateway."
             - name: remote_gateway
@@ -367,6 +377,8 @@ modules:
         - name: outbound gateway connection
           description: These metrics refer to [Outbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
           labels:
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
             - name: gateway
               description: "The name of the local gateway."
             - name: remote_gateway
