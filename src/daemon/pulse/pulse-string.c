@@ -92,7 +92,7 @@ void pulse_string_do(bool extended) {
             , "pulse"
             , 910001
             , localhost->rrd_update_every
-            , RRDSET_TYPE_AREA);
+            , RRDSET_TYPE_STACKED);
 
         rd_mem     = rrddim_add(st_mem, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_mem_idx = rrddim_add(st_mem, "index", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
