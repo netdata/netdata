@@ -42,8 +42,9 @@ func New() *Collector {
 			CollectQueues: false,
 		},
 
-		charts: &module.Charts{},
-		cache:  newCache(),
+		charts:           &module.Charts{},
+		cache:            newCache(),
+		queryClusterMeta: true,
 	}
 }
 
@@ -62,9 +63,10 @@ type Collector struct {
 
 	httpClient *http.Client
 
-	clusterName string
-	clusterId   string
-	cache       *cache
+	queryClusterMeta bool
+	clusterName      string
+	clusterId        string
+	cache            *cache
 }
 
 func (c *Collector) Configuration() any {

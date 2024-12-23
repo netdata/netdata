@@ -6,17 +6,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
-	if c.clusterName == "" {
+	if c.queryClusterMeta {
 		id, name, err := c.getClusterMeta()
 		if err != nil {
 			return nil, err
 		}
+		c.queryClusterMeta = false
 		c.clusterId = id
 		c.clusterName = name
 	}
@@ -46,7 +48,26 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 func (c *Collector) getClusterMeta() (id string, name string, err error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPIDefinitions)
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPIWhoami)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create whoami request: %w", err)
+	}
+
+	var user apiWhoamiResp
+	if err := c.webClient().RequestJSON(req, &user); err != nil {
+		return "", "", fmt.Errorf("failed to send whoami request: %w", err)
+	}
+
+	if user.Name == "" {
+		return "", "", fmt.Errorf("unexpected response: whoami: user name n is empty")
+	}
+
+	if !slices.Contains(user.Tags, "administrator") {
+		c.Warningf("user %s lacks 'administrator' tag: cluster ID and name cannot be collected.", user.Name)
+		return "", "", nil
+	}
+
+	req, err = web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPIDefinitions)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create definitions request: %w", err)
 	}
