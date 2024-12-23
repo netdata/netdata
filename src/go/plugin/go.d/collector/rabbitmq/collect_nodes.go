@@ -4,6 +4,7 @@ package rabbitmq
 
 import (
 	"fmt"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
