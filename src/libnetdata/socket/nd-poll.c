@@ -34,12 +34,16 @@ bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
         .events = (events & ND_POLL_READ ? EPOLLIN : 0) | (events & ND_POLL_WRITE ? EPOLLOUT : 0),
         .data.ptr = data,
     };
-    return epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_ADD, fd, &ev) == 0;
+    bool rc = epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_ADD, fd, &ev) == 0;
+    internal_fatal(!rc, "epoll_ctl() failed");
+    return rc;
 }
 
 // Remove a file descriptor from the event poll
 bool nd_poll_del(nd_poll_t *ndpl, int fd) {
-    return epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_DEL, fd, NULL) == 0;
+    bool rc = epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_DEL, fd, NULL) == 0;
+    internal_fatal(!rc, "epoll_ctl() failed");
+    return rc;
 }
 
 // Update an existing file descriptor in the event poll
@@ -48,7 +52,9 @@ bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
         .events = (events & ND_POLL_READ ? EPOLLIN : 0) | (events & ND_POLL_WRITE ? EPOLLOUT : 0),
         .data.ptr = data,
     };
-    return epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_MOD, fd, &ev) == 0;
+    bool rc = epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_MOD, fd, &ev) == 0;
+    internal_fatal(!rc, "epoll_ctl() failed");
+    return rc;
 }
 
 static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *result) {

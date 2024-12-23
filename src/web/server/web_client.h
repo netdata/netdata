@@ -140,15 +140,10 @@ struct response {
     BUFFER *header;         // our response header
     BUFFER *header_output;  // internal use
     BUFFER *data;           // our response data buffer
-
+    size_t sent;            // current data length sent to output
     short int code;         // the HTTP response code
     bool has_cookies;
-
-    size_t rlen; // if non-zero, the excepted size of ifd (input of firecopy)
-    size_t sent; // current data length sent to output
-
-    bool zoutput; // if set to 1, web_client_send() will send compressed data
-
+    bool zoutput;           // if set to 1, web_client_send() will send compressed data
     bool zinitialized;
     z_stream zstream;                                    // zlib stream for sending compressed output to client
     size_t zsent;                                        // the compressed bytes we have sent to the client
@@ -196,10 +191,6 @@ struct web_client {
 
     BUFFER *payload;                    // when this request is a POST, this has the payload
 
-    // STATIC-THREADED WEB SERVER MEMBERS
-    size_t pollinfo_slot;               // POLLINFO slot of the web client
-    size_t pollinfo_filecopy_slot;      // POLLINFO slot of the file read
-
     NETDATA_SSL ssl;
 
     struct {
@@ -241,7 +232,6 @@ int web_client_service_unavailable(struct web_client *w);
 
 ssize_t web_client_send(struct web_client *w);
 ssize_t web_client_receive(struct web_client *w);
-ssize_t web_client_read_file(struct web_client *w);
 
 void web_client_process_request_from_web_server(struct web_client *w);
 void web_client_request_done(struct web_client *w);

@@ -873,12 +873,12 @@ struct statsd_udp {
 };
 
 // new TCP client connected
-static void *statsd_add_callback(POLLINFO *pi, short int *events, void *data) {
+static void *statsd_add_callback(POLLINFO *pi, nd_poll_event_t *events, void *data) {
     (void)pi;
     (void)data;
 
     worker_is_busy(WORKER_JOB_TYPE_TCP_CONNECTED);
-    *events = POLLIN;
+    *events = ND_POLL_READ;
 
     struct statsd_tcp *t = (struct statsd_tcp *)callocz(sizeof(struct statsd_tcp) + STATSD_TCP_BUFFER_SIZE, 1);
     t->type = STATSD_SOCKET_DATA_TYPE_TCP;
@@ -916,11 +916,11 @@ static void statsd_del_callback(POLLINFO *pi) {
 }
 
 // Receive data
-static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
+static int statsd_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
     int retval = -1;
     worker_is_busy(WORKER_JOB_TYPE_RCV_DATA);
 
-    *events = POLLIN;
+    *events = ND_POLL_READ;
 
     int fd = pi->fd;
 
@@ -1064,10 +1064,7 @@ cleanup:
     return retval;
 }
 
-static int statsd_snd_callback(POLLINFO *pi, short int *events) {
-    (void)pi;
-    (void)events;
-
+static int statsd_snd_callback(POLLINFO *pi __maybe_unused, nd_poll_event_t *events __maybe_unused) {
     worker_is_busy(WORKER_JOB_TYPE_SND_DATA);
     netdata_log_error("STATSD: snd_callback() called, but we never requested to send data to statsd clients.");
     worker_is_idle();
