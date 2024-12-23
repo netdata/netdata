@@ -94,7 +94,6 @@ POLLINFO *poll_add_fd(POLLJOB *p
                       , poll_events_snd_callback_t snd_callback
                       , void *data
 );
-void poll_close_fd(POLLINFO *pi);
 
 void poll_events(LISTEN_SOCKETS *sockets
                  , poll_events_add_callback_t add_callback

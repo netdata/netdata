@@ -72,12 +72,14 @@ POLLINFO *poll_add_fd(POLLJOB *p
     return pi;
 }
 
-inline void poll_close_fd(POLLINFO *pi) {
+static inline void poll_close_fd(POLLINFO *pi, const char *func) {
     POLLJOB *p = pi->p;
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->ll, pi, prev, next);
     if(!nd_poll_del(p->ndpl, pi->fd))
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to delete socket %d from nd_poll", pi->fd);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to delete socket %d from nd_poll() - called from %s()",
+               pi->fd, func);
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
         pi->del_callback(pi);
@@ -158,7 +160,7 @@ static void poll_events_cleanup(void *pptr) {
     p->ndpl = NULL;
 
     for(POLLINFO *pi = p->ll; pi ;pi = pi->next)
-        poll_close_fd(pi);
+        poll_close_fd(pi, __FUNCTION__ );
 }
 
 static int poll_process_error(POLLINFO *pi, nd_poll_event_t revents) {
@@ -181,7 +183,7 @@ static int poll_process_error(POLLINFO *pi, nd_poll_event_t revents) {
            , revents & ND_POLL_READ ? "READ" : "", revents & ND_POLL_WRITE ? "WRITE" : ""
     );
 
-    poll_close_fd(pi);
+    poll_close_fd(pi, __FUNCTION__ );
     return 1;
 }
 
@@ -192,7 +194,7 @@ static inline int poll_process_send(POLLINFO *pi, time_t now) {
     pi->events = 0;
 
     if (unlikely(pi->snd_callback(pi, &pi->events) == -1))
-        poll_close_fd(pi);
+        poll_close_fd(pi, __FUNCTION__ );
     else
         poll_process_updated_events(pi);
 
@@ -206,7 +208,7 @@ static inline int poll_process_tcp_read(POLLINFO *pi, time_t now) {
     pi->events = 0;
 
     if (pi->rcv_callback(pi, &pi->events) == -1)
-        poll_close_fd(pi);
+        poll_close_fd(pi, __FUNCTION__ );
     else
         poll_process_updated_events(pi);
 
@@ -454,7 +456,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                                pi->client_port ? pi->client_port : "<undefined-port>",
                                pi->socktype);
 
-                        poll_close_fd(pi);
+                        poll_close_fd(pi, "poll_events1");
                     }
                 }
                 else if (pi->flags & POLLINFO_FLAG_SERVER_SOCKET) {
@@ -471,7 +473,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                            , pi->flags
                     );
 
-                    poll_close_fd(pi);
+                    poll_close_fd(pi, "poll_events2");
                 }
             }
             else {
@@ -484,7 +486,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                        , (int)result.events
                 );
 
-                poll_close_fd(pi);
+                poll_close_fd(pi, "poll_events3");
             }
         }
 
@@ -506,7 +508,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                                , pi->client_port ? pi->client_port : "<undefined-port>"
                                , (size_t) p.complete_request_timeout
                         );
-                        poll_close_fd(pi);
+                        poll_close_fd(pi, "poll_events4");
                     }
                     else if(unlikely(pi->recv_count && p.idle_timeout > 0 && now - ((pi->last_received_t > pi->last_sent_t) ? pi->last_received_t : pi->last_sent_t) >= p.idle_timeout )) {
                         nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -517,7 +519,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                                , pi->client_port ? pi->client_port : "<undefined-port>"
                                , (size_t) p.idle_timeout
                         );
-                        poll_close_fd(pi);
+                        poll_close_fd(pi, "poll_events5");
                     }
                 }
             }
