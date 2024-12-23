@@ -29,7 +29,7 @@ static struct web_client *web_client_create_on_fd(POLLINFO *pi) {
     struct web_client *w;
 
     w = web_client_get_from_cache();
-    w->ifd = w->ofd = pi->fd;
+    w->fd = pi->fd;
 
     strncpyz(w->client_ip,   pi->client_ip,   sizeof(w->client_ip) - 1);
     strncpyz(w->client_port, pi->client_port, sizeof(w->client_port) - 1);
@@ -41,12 +41,12 @@ static struct web_client *web_client_create_on_fd(POLLINFO *pi) {
 
     int flag = 1;
     if(unlikely(
-            web_client_check_conn_tcp(w) && setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0))
-        netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
+            web_client_check_conn_tcp(w) && setsockopt(w->fd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0))
+        netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->fd);
 
     flag = 1;
-    if(unlikely(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0))
-        netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
+    if(unlikely(setsockopt(w->fd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0))
+        netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->fd);
 
     web_client_update_acl_matches(w);
     web_client_enable_wait_receive(w);
@@ -111,17 +111,17 @@ static void *web_server_add_callback(POLLINFO *pi, nd_poll_event_t *events, void
     }
 
     if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
-        sock_delnonblock(w->ifd);
+        sock_delnonblock(w->fd);
 
         //Read the first 7 bytes from the message, but the message
         //is not removed from the queue, because we are using MSG_PEEK
         char test[8];
-        if ( recv(w->ifd,test, 7, MSG_PEEK) == 7 ) {
+        if ( recv(w->fd,test, 7, MSG_PEEK) == 7 ) {
             test[7] = '\0';
         }
         else {
             // we couldn't read 7 bytes
-            sock_setnonblock(w->ifd);
+            sock_setnonblock(w->fd);
             goto cleanup;
         }
 
@@ -131,11 +131,11 @@ static void *web_server_add_callback(POLLINFO *pi, nd_poll_event_t *events, void
         }
         else {
             // SSL
-            if(!netdata_ssl_open(&w->ssl, netdata_ssl_web_server_ctx, w->ifd) || !netdata_ssl_accept(&w->ssl))
+            if(!netdata_ssl_open(&w->ssl, netdata_ssl_web_server_ctx, w->fd) || !netdata_ssl_accept(&w->ssl))
                 WEB_CLIENT_IS_DEAD(w);
         }
 
-        sock_setnonblock(w->ifd);
+        sock_setnonblock(w->fd);
     }
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
@@ -186,20 +186,20 @@ static int web_server_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
         if (unlikely(w->mode == HTTP_REQUEST_MODE_STREAM)) {
             web_client_send(w);
         }
-        else if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
+        else if(unlikely(w->fd == fd && web_client_has_wait_receive(w)))
             *events |= ND_POLL_READ;
 
-        if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
+        if(unlikely(w->fd == fd && web_client_has_wait_send(w)))
             *events |= ND_POLL_WRITE;
 
     } else if(unlikely(bytes < 0)) {
         ret = -1;
         goto cleanup;
     } else if (unlikely(bytes == 0)) {
-        if(unlikely(w->ifd == fd && web_client_has_ssl_wait_receive(w)))
+        if(unlikely(w->fd == fd && web_client_has_ssl_wait_receive(w)))
             *events |= ND_POLL_READ;
 
-        if(unlikely(w->ofd == fd && web_client_has_ssl_wait_send(w)))
+        if(unlikely(w->fd == fd && web_client_has_ssl_wait_send(w)))
             *events |= ND_POLL_WRITE;
     }
 
@@ -228,10 +228,10 @@ static int web_server_snd_callback(POLLINFO *pi, nd_poll_event_t *events) {
         goto cleanup;
     }
 
-    if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
+    if(unlikely(w->fd == fd && web_client_has_wait_receive(w)))
         *events |= ND_POLL_READ;
 
-    if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
+    if(unlikely(w->fd == fd && web_client_has_wait_send(w)))
         *events |= ND_POLL_WRITE;
 
     retval = web_server_check_client_status(w);

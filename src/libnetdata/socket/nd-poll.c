@@ -42,7 +42,7 @@ bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
 // Remove a file descriptor from the event poll
 bool nd_poll_del(nd_poll_t *ndpl, int fd) {
     bool rc = epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_DEL, fd, NULL) == 0;
-    internal_fatal(!rc, "epoll_ctl() failed");
+    internal_error(!rc, "epoll_ctl() failed (is the socket already closed)"); // this is ok if the socket is already closed
     return rc;
 }
 

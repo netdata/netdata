@@ -77,8 +77,9 @@ static inline void poll_close_fd(POLLINFO *pi, const char *func) {
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->ll, pi, prev, next);
     if(!nd_poll_del(p->ndpl, pi->fd))
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "Failed to delete socket %d from nd_poll() - called from %s()",
+        // this is ok, if the socket is already closed
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "Failed to delete socket %d from nd_poll() - called from %s() - is the socket already closed?",
                pi->fd, func);
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {

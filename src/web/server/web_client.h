@@ -170,8 +170,7 @@ struct web_client {
     size_t header_parse_last_size;
 
     bool tcp_cork;
-    int ifd;
-    int ofd;
+    int fd;
 
     char client_ip[INET6_ADDRSTRLEN];   // Defined buffer sizes include null-terminators
     char client_port[NI_MAXSERV];

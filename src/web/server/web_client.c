@@ -84,9 +84,9 @@ static inline int bad_request_multiple_dashboard_versions(struct web_client *w) 
 
 static inline int web_client_cork_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
-    if(likely(web_client_check_conn_tcp(w) && !w->tcp_cork && w->ofd != -1)) {
+    if(likely(web_client_check_conn_tcp(w) && !w->tcp_cork && w->fd != -1)) {
         w->tcp_cork = true;
-        if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
+        if(unlikely(setsockopt(w->fd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
             netdata_log_error("%llu: failed to enable TCP_CORK on socket.", w->id);
 
             w->tcp_cork = false;
@@ -111,9 +111,9 @@ static inline void web_client_enable_wait_from_ssl(struct web_client *w) {
 
 static inline int web_client_uncork_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
-    if(likely(w->tcp_cork && w->ofd != -1)) {
+    if(likely(w->tcp_cork && w->fd != -1)) {
         w->tcp_cork = false;
-        if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
+        if(unlikely(setsockopt(w->fd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
             netdata_log_error("%llu: failed to disable TCP_CORK on socket.", w->id);
             w->tcp_cork = true;
             return -1;
@@ -534,7 +534,7 @@ static int web_server_static_file(struct web_client *w, char *filename) {
         close(fd);
 
     w->response.data->content_type = contenttype_for_filename(web_filename);
-    netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%"PRId64" bytes, ifd %d, ofd %d).", w->id, web_filename, (int64_t)statbuf.st_size, w->ifd, w->ofd);
+    netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%"PRId64" bytes, fd %d).", w->id, web_filename, (int64_t)statbuf.st_size, w->fd);
 
     w->mode = HTTP_REQUEST_MODE_GET;
     web_client_enable_wait_send(w);
@@ -811,9 +811,9 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
                 bytes = netdata_ssl_write(&w->ssl, buf, len);
                 web_client_enable_wait_from_ssl(w);
             } else
-                bytes = send(w->ofd, buf, len, flags);
+                bytes = send(w->fd, buf, len, flags);
         } else if (web_client_check_conn_tcp(w) || web_client_check_conn_unix(w))
-            bytes = send(w->ofd, buf, len, flags);
+            bytes = send(w->fd, buf, len, flags);
         else
             bytes = -999;
 
@@ -960,7 +960,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
             web_client_enable_wait_from_ssl(w);
         }
         else {
-            while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
+            while((bytes = send(w->fd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
                 count++;
 
                 if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
@@ -971,7 +971,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
         }
     }
     else if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w)) {
-        while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
+        while((bytes = send(w->fd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
             count++;
 
             if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
@@ -1748,11 +1748,11 @@ ssize_t web_client_receive(struct web_client *w) {
             web_client_enable_wait_from_ssl(w);
         }
         else {
-            bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+            bytes = recv(w->fd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
         }
     }
     else if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w)) {
-        bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+        bytes = recv(w->fd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
     }
     else // other connection methods
         bytes = -1;
@@ -1846,7 +1846,7 @@ void web_client_reuse_from_cache(struct web_client *w) {
     // zero everything
     memset(w, 0, sizeof(struct web_client));
 
-    w->ifd = w->ofd = -1;
+    w->fd = -1;
     w->statistics.memory_accounting = statistics_memory_accounting;
     w->use_count = use_count;
 

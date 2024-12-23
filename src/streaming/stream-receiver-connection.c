@@ -89,7 +89,7 @@ static int stream_receiver_response_too_busy_now(struct web_client *w) {
 }
 
 static void stream_receiver_takeover_web_connection(struct web_client *w, struct receiver_state *rpt) {
-    rpt->sock.fd = w->ifd;
+    rpt->sock.fd = w->fd;
     rpt->sock.ssl = w->ssl;
 
     w->ssl = NETDATA_SSL_UNSET_CONNECTION;
@@ -99,12 +99,8 @@ static void stream_receiver_takeover_web_connection(struct web_client *w, struct
     if(web_server_mode == WEB_SERVER_MODE_STATIC_THREADED) {
         web_client_flag_set(w, WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET);
     }
-    else {
-        if(w->ifd == w->ofd)
-            w->ifd = w->ofd = -1;
-        else
-            w->ifd = -1;
-    }
+    else
+        w->fd = -1;
 
     buffer_flush(w->response.data);
 }
