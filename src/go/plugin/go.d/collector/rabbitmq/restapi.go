@@ -3,12 +3,18 @@
 package rabbitmq
 
 const (
+	urlPathAPIWhoami      = "/api/whoami"
 	urlPathAPIDefinitions = "/api/definitions"
 	urlPathAPIOverview    = "/api/overview"
 	urlPathAPINodes       = "/api/nodes"
 	urlPathAPIVhosts      = "/api/vhosts"
 	urlPathAPIQueues      = "/api/queues"
 )
+
+type apiWhoamiResp struct {
+	Name string   `json:"name"`
+	Tags []string `json:"tags"`
+}
 
 type apiDefinitionsResp struct {
 	RabbitmqVersion string `json:"rabbitmq_version"`

@@ -39,9 +39,8 @@ func New() *Collector {
 			},
 			HealthzCheck: "default",
 		},
-		charts:       serverCharts.Copy(),
-		seenAccounts: make(map[string]bool),
-		seenRoutes:   make(map[uint64]bool),
+		charts: serverCharts.Copy(),
+		cache:  newCache(),
 	}
 }
 
@@ -60,8 +59,7 @@ type Collector struct {
 
 	httpClient *http.Client
 
-	seenAccounts map[string]bool
-	seenRoutes   map[uint64]bool
+	cache *cache
 }
 
 func (c *Collector) Configuration() any {

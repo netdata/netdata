@@ -1,0 +1,110 @@
+{
+  "server_id": "NANVBOU62MDUWTXWRQ5KH3PSMYNCHCEUHQV3TW3YH7WZLS7FMJE6END6",
+  "now": "2019-07-24T18:02:55.597398-06:00",
+  "name": "region1",
+  "host": "2601:283:4601:1350:1895:efda:2010:95a1",
+  "port": 4501,
+  "outbound_gateways": {
+    "region2": {
+      "configured": true,
+      "connection": {
+        "cid": 7,
+        "ip": "127.0.0.1",
+        "port": 5500,
+        "start": "2019-07-24T18:02:48.765621-06:00",
+        "last_activity": "2019-07-24T18:02:48.765621-06:00",
+        "uptime": "6s",
+        "idle": "6s",
+        "pending_bytes": 0,
+        "in_msgs": 0,
+        "out_msgs": 0,
+        "in_bytes": 0,
+        "out_bytes": 0,
+        "subscriptions": 0,
+        "name": "NCXBIYWT7MV7OAQTCR4QTKBN3X3HDFGSFWTURTCQ22ZZB6NKKJPO7MN4"
+      }
+    },
+    "region3": {
+      "configured": true,
+      "connection": {
+        "cid": 5,
+        "ip": "::1",
+        "port": 6500,
+        "start": "2019-07-24T18:02:48.764685-06:00",
+        "last_activity": "2019-07-24T18:02:48.764685-06:00",
+        "uptime": "6s",
+        "idle": "6s",
+        "pending_bytes": 0,
+        "in_msgs": 0,
+        "out_msgs": 0,
+        "in_bytes": 0,
+        "out_bytes": 0,
+        "subscriptions": 0,
+        "name": "NCVS7Q65WX3FGIL2YQRLI77CE6MQRWO2Y453HYVLNMBMTVLOKMPW7R6K"
+      }
+    }
+  },
+  "inbound_gateways": {
+    "region2": [
+      {
+        "configured": false,
+        "connection": {
+          "cid": 9,
+          "ip": "::1",
+          "port": 52029,
+          "start": "2019-07-24T18:02:48.76677-06:00",
+          "last_activity": "2019-07-24T18:02:48.767096-06:00",
+          "uptime": "6s",
+          "idle": "6s",
+          "pending_bytes": 0,
+          "in_msgs": 0,
+          "out_msgs": 0,
+          "in_bytes": 0,
+          "out_bytes": 0,
+          "subscriptions": 0,
+          "name": "NCXBIYWT7MV7OAQTCR4QTKBN3X3HDFGSFWTURTCQ22ZZB6NKKJPO7MN4"
+        }
+      }
+    ],
+    "region3": [
+      {
+        "configured": false,
+        "connection": {
+          "cid": 4,
+          "ip": "::1",
+          "port": 52025,
+          "start": "2019-07-24T18:02:48.764577-06:00",
+          "last_activity": "2019-07-24T18:02:48.764994-06:00",
+          "uptime": "6s",
+          "idle": "6s",
+          "pending_bytes": 0,
+          "in_msgs": 0,
+          "out_msgs": 0,
+          "in_bytes": 0,
+          "out_bytes": 0,
+          "subscriptions": 0,
+          "name": "NCVS7Q65WX3FGIL2YQRLI77CE6MQRWO2Y453HYVLNMBMTVLOKMPW7R6K"
+        }
+      },
+      {
+        "configured": false,
+        "connection": {
+          "cid": 8,
+          "ip": "127.0.0.1",
+          "port": 52026,
+          "start": "2019-07-24T18:02:48.766173-06:00",
+          "last_activity": "2019-07-24T18:02:48.766999-06:00",
+          "uptime": "6s",
+          "idle": "6s",
+          "pending_bytes": 0,
+          "in_msgs": 0,
+          "out_msgs": 0,
+          "in_bytes": 0,
+          "out_bytes": 0,
+          "subscriptions": 0,
+          "name": "NCKCYK5LE3VVGOJQ66F65KA27UFPCLBPX4N4YOPOXO3KHGMW24USPCKN"
+        }
+      }
+    ]
+  }
+}

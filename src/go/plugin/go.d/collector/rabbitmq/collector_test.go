@@ -20,6 +20,7 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
+	dataClusterWhoami, _      = os.ReadFile("testdata/v4.0.3/cluster/whoami.json")
 	dataClusterDefinitions, _ = os.ReadFile("testdata/v4.0.3/cluster/definitions.json")
 	dataClusterOverview, _    = os.ReadFile("testdata/v4.0.3/cluster/overview.json")
 	dataClusterNodes, _       = os.ReadFile("testdata/v4.0.3/cluster/nodes.json")
@@ -31,6 +32,7 @@ func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
 		"dataConfigJSON":         dataConfigJSON,
 		"dataConfigYAML":         dataConfigYAML,
+		"dataClusterWhoami":      dataClusterWhoami,
 		"dataClusterDefinitions": dataClusterDefinitions,
 		"dataClusterOverview":    dataClusterOverview,
 		"dataClusterNodes":       dataClusterNodes,
@@ -379,6 +381,8 @@ func caseClusterOk() (*Collector, func()) {
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
+				case urlPathAPIWhoami:
+					_, _ = w.Write(dataClusterWhoami)
 				case urlPathAPIDefinitions:
 					_, _ = w.Write(dataClusterDefinitions)
 				case urlPathAPIOverview:

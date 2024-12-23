@@ -78,6 +78,22 @@ Metrics:
 | nats.server_mem_usage | used | bytes |
 | nats.server_uptime | uptime | seconds |
 
+### Per http endpoint
+
+These metrics refer to HTTP endpoints.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| http_endpoint | HTTP endpoint path. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nats.http_endpoint_requests | requests | requests/s |
+
 ### Per account
 
 These metrics refer to [Accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
@@ -119,21 +135,47 @@ Metrics:
 | nats.route_messages | in, out | messages/s |
 | nats.route_subscriptions | active | subscriptions |
 
-### Per http endpoint
+### Per inbound gateway connection
 
-These metrics refer to HTTP endpoints.
+These metrics refer to [Inbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| http_endpoint | HTTP endpoint path. |
+| gateway | The name of the local gateway. |
+| remote_gateway | The name of the remote gateway. |
+| cid | A unique identifier for the connection. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| nats.http_endpoint_requests | requests | requests/s |
+| nats.inbound_gateway_conn_traffic | in, out | bytes/s |
+| nats.inbound_gateway_conn_messages | in, out | messages/s |
+| nats.inbound_gateway_conn_subscriptions | active | subscriptions |
+| nats.inbound_gateway_conn_uptime | uptime | seconds |
+
+### Per outbound gateway connection
+
+These metrics refer to [Outbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| gateway | The name of the local gateway. |
+| remote_gateway | The name of the remote gateway. |
+| cid | A unique identifier for the connection. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nats.outbound_gateway_conn_traffic | in, out | bytes/s |
+| nats.outbound_gateway_conn_messages | in, out | messages/s |
+| nats.outbound_gateway_conn_subscriptions | active | subscriptions |
+| nats.outbound_gateway_conn_uptime | uptime | seconds |
 
 
 
