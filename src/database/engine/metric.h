@@ -31,10 +31,10 @@ struct mrg_statistics {
     // --- atomic --- multiple readers / writers
 
     CACHE_LINE_PADDING();
-    size_t entries_referenced;
+    ssize_t entries_acquired;
 
     CACHE_LINE_PADDING();
-    size_t current_references;
+    ssize_t current_references;
 
     CACHE_LINE_PADDING();
     size_t search_hits;
