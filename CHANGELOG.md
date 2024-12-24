@@ -6,6 +6,19 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#19281](https://github.com/netdata/netdata/pull/19281) ([netdatabot](https://github.com/netdatabot))
+- improvement\(go.d/nats\): add server\_id label [\#19280](https://github.com/netdata/netdata/pull/19280) ([ilyam8](https://github.com/ilyam8))
+- Fix metric retention check and cleanup [\#19278](https://github.com/netdata/netdata/pull/19278) ([stelfrag](https://github.com/stelfrag))
+- fix\(go.d/rabbitmq\): handle insufficient perms when querying definitions [\#19277](https://github.com/netdata/netdata/pull/19277) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#19276](https://github.com/netdata/netdata/pull/19276) ([netdatabot](https://github.com/netdatabot))
+- Updates to onprem docs [\#19275](https://github.com/netdata/netdata/pull/19275) ([M4itee](https://github.com/M4itee))
+- Skip label cleanup during metadata processing [\#19274](https://github.com/netdata/netdata/pull/19274) ([stelfrag](https://github.com/stelfrag))
+- build\(deps\): update go toolchain to v1.23.4 [\#19273](https://github.com/netdata/netdata/pull/19273) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/jackc/pgx/v5 from 5.7.1 to 5.7.2 in /src/go [\#19271](https://github.com/netdata/netdata/pull/19271) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/axiomhq/hyperloglog from 0.2.0 to 0.2.2 in /src/go [\#19270](https://github.com/netdata/netdata/pull/19270) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump golang.org/x/net from 0.32.0 to 0.33.0 in /src/go [\#19269](https://github.com/netdata/netdata/pull/19269) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/docker/docker from 27.4.0+incompatible to 27.4.1+incompatible in /src/go [\#19268](https://github.com/netdata/netdata/pull/19268) ([dependabot[bot]](https://github.com/apps/dependabot))
+- improvement\(go.d/nats\): add gatewayz metrics [\#19266](https://github.com/netdata/netdata/pull/19266) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19265](https://github.com/netdata/netdata/pull/19265) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/nats\): add routez metrics [\#19264](https://github.com/netdata/netdata/pull/19264) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19263](https://github.com/netdata/netdata/pull/19263) ([netdatabot](https://github.com/netdatabot))
@@ -448,18 +461,6 @@
 - apps.plugin: print also the original comm [\#18727](https://github.com/netdata/netdata/pull/18727) ([ktsaou](https://github.com/ktsaou))
 - Fix handling of workflow artifacts. [\#18726](https://github.com/netdata/netdata/pull/18726) ([Ferroin](https://github.com/Ferroin))
 - reset the log sources to apply user selection [\#18725](https://github.com/netdata/netdata/pull/18725) ([ktsaou](https://github.com/ktsaou))
-- fix logs POST query payload parsing [\#18722](https://github.com/netdata/netdata/pull/18722) ([ktsaou](https://github.com/ktsaou))
-- fix\(go.d/portcheck\): stop checking UDP ports on ICMP listen error [\#18721](https://github.com/netdata/netdata/pull/18721) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#18720](https://github.com/netdata/netdata/pull/18720) ([netdatabot](https://github.com/netdatabot))
-- static install: bump openssl and curl to latest stable versions [\#18719](https://github.com/netdata/netdata/pull/18719) ([ilyam8](https://github.com/ilyam8))
-- go.d: use lib function to check if stderr connected to journal [\#18718](https://github.com/netdata/netdata/pull/18718) ([ilyam8](https://github.com/ilyam8))
-- Pass correct GOOS and GOARCH on to package builders in CI. [\#18717](https://github.com/netdata/netdata/pull/18717) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#18715](https://github.com/netdata/netdata/pull/18715) ([netdatabot](https://github.com/netdatabot))
-- Regenerate integrations.js [\#18714](https://github.com/netdata/netdata/pull/18714) ([netdatabot](https://github.com/netdatabot))
-- Add link to meta section on integrations template [\#18713](https://github.com/netdata/netdata/pull/18713) ([Ancairon](https://github.com/Ancairon))
-- Delay child disconnect update [\#18712](https://github.com/netdata/netdata/pull/18712) ([stelfrag](https://github.com/stelfrag))
-- Windows installer \(Change descriptions add helping\) [\#18711](https://github.com/netdata/netdata/pull/18711) ([thiagoftsm](https://github.com/thiagoftsm))
-- add instructions to configure SCIM integration in Okta [\#18710](https://github.com/netdata/netdata/pull/18710) ([juacker](https://github.com/juacker))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
