@@ -41,6 +41,11 @@ const (
 	prioGatewayConnMessages
 	prioGatewayConnSubscriptions
 	prioGatewayConnUptime
+
+	prioLeafConnTraffic
+	prioLeafConnMessages
+	prioLeafConnSubscriptions
+	prioLeafRTT
 )
 
 var serverCharts = func() module.Charts {
@@ -391,6 +396,65 @@ var (
 	}
 )
 
+var leafConnChartsTmpl = module.Charts{
+	leafConnTrafficTmpl.Copy(),
+	leafConnMessagesTmpl.Copy(),
+	leafConnSubscriptionsTmpl.Copy(),
+	leafConnRTT.Copy(),
+}
+
+var (
+	leafConnTrafficTmpl = module.Chart{
+		ID:       "leaf_node_conn_%s_%s_%s_%d_traffic",
+		Title:    "Leaf Node Connection Traffic",
+		Units:    "bytes/s",
+		Fam:      "leaf traffic",
+		Ctx:      "nats.leaf_node_conn_traffic",
+		Priority: prioLeafConnTraffic,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "leafz_leaf_%s_%s_%s_%d_in_bytes", Name: "in", Algo: module.Incremental},
+			{ID: "leafz_leaf_%s_%s_%s_%d_out_bytes", Name: "out", Mul: -1, Algo: module.Incremental},
+		},
+	}
+	leafConnMessagesTmpl = module.Chart{
+		ID:       "leaf_node_conn_%s_%s_%s_%d_messages",
+		Title:    "Leaf Node Connection Messages",
+		Units:    "messages/s",
+		Fam:      "leaf traffic",
+		Ctx:      "nats.leaf_node_conn_messages",
+		Priority: prioLeafConnMessages,
+		Type:     module.Line,
+		Dims: module.Dims{
+			{ID: "leafz_leaf_%s_%s_%s_%d_in_msgs", Name: "in", Algo: module.Incremental},
+			{ID: "leafz_leaf_%s_%s_%s_%d_out_msgs", Name: "out", Mul: -1, Algo: module.Incremental},
+		},
+	}
+	leafConnSubscriptionsTmpl = module.Chart{
+		ID:       "leaf_node_conn_%s_%s_%s_%d_subscriptions",
+		Title:    "Leaf Node Connection Active Subscriptions",
+		Units:    "subscriptions",
+		Fam:      "leaf subscriptions",
+		Ctx:      "nats.leaf_node_conn_subscriptions",
+		Priority: prioLeafConnSubscriptions,
+		Type:     module.Line,
+		Dims: module.Dims{
+			{ID: "leafz_leaf_%s_%s_%s_%d_num_subs", Name: "active"},
+		},
+	}
+	leafConnRTT = module.Chart{
+		ID:       "leaf_node_conn_%s_%s_%s_%d_rtt",
+		Title:    "Leaf Node Connection RTT",
+		Units:    "microseconds",
+		Fam:      "leaf rtt",
+		Ctx:      "nats.leaf_node_conn_rtt",
+		Priority: prioLeafRTT,
+		Dims: module.Dims{
+			{ID: "leafz_leaf_%s_%s_%s_%d_rtt", Name: "rtt"},
+		},
+	}
+)
+
 func (c *Collector) updateCharts() {
 	c.onceAddSrvCharts.Do(c.addServerCharts)
 
@@ -442,6 +506,17 @@ func (c *Collector) updateCharts() {
 			}
 			return false
 		})
+		return false
+	})
+	maps.DeleteFunc(c.cache.leafs, func(_ string, leaf *leafCacheEntry) bool {
+		if !leaf.updated {
+			c.removeLeafCharts(leaf)
+			return true
+		}
+		if !leaf.hasCharts {
+			leaf.hasCharts = true
+			c.addLeafCharts(leaf)
+		}
 		return false
 	})
 }
@@ -545,6 +620,35 @@ func (c *Collector) removeGatewayConnCharts(gwConn *gwConnCacheEntry, isInbound 
 	c.removeCharts(px)
 }
 
+func (c *Collector) addLeafCharts(leaf *leafCacheEntry) {
+	charts := leafConnChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, leaf.leafName, leaf.account, leaf.ip, leaf.port)
+		chart.ID = cleanChartID(chart.ID)
+		chart.Labels = []module.Label{
+			{Key: "server_id", Value: c.srvMeta.id},
+			{Key: "remote_name", Value: leaf.leafName},
+			{Key: "account", Value: leaf.account},
+			{Key: "ip", Value: leaf.ip},
+			{Key: "port", Value: strconv.Itoa(leaf.port)},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, leaf.leafName, leaf.account, leaf.ip, leaf.port)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add charts for leaf %s: %s", leaf.leafName, err)
+	}
+}
+
+func (c *Collector) removeLeafCharts(leaf *leafCacheEntry) {
+	px := fmt.Sprintf("leaf_node_conn_%s_%s_%s_%d_", leaf.leafName, leaf.account, leaf.ip, leaf.port)
+	cleanChartID(px)
+	c.removeCharts(px)
+}
+
 func (c *Collector) removeCharts(prefix string) {
 	for _, chart := range *c.Charts() {
 		if strings.HasPrefix(chart.ID, prefix) {
@@ -552,4 +656,9 @@ func (c *Collector) removeCharts(prefix string) {
 			chart.MarkNotCreated()
 		}
 	}
+}
+
+func cleanChartID(id string) string {
+	r := strings.NewReplacer(".", "_", " ", "_")
+	return strings.ToLower(r.Replace(id))
 }
