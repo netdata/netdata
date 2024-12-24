@@ -19,6 +19,8 @@ const (
 	urlPathRoutez = "/routez"
 	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information
 	urlPathGatewayz = "/gatewayz"
+	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#leaf-node-information
+	urlPathLeafz = "/leafz"
 )
 
 var (
@@ -131,6 +133,25 @@ type (
 	connectionInfo struct {
 		Cid      uint64 `json:"cid"`
 		Uptime   string `json:"uptime"`
+		InMsgs   int64  `json:"in_msgs"`
+		OutMsgs  int64  `json:"out_msgs"`
+		InBytes  int64  `json:"in_bytes"`
+		OutBytes int64  `json:"out_bytes"`
+		NumSubs  uint32 `json:"subscriptions"`
+	}
+)
+
+type (
+	// https://github.com/nats-io/nats-server/blob/v2.10.24/server/monitor.go#L2163
+	leafzResponse struct {
+		Leafs []leafInfo `json:"leafs"`
+	}
+	leafInfo struct {
+		Name     string `json:"name"` // remote server name or id
+		Account  string `json:"account"`
+		IP       string `json:"ip"`
+		Port     int    `json:"port"`
+		RTT      string `json:"rtt,omitempty"`
 		InMsgs   int64  `json:"in_msgs"`
 		OutMsgs  int64  `json:"out_msgs"`
 		InBytes  int64  `json:"in_bytes"`

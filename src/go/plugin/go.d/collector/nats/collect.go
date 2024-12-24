@@ -42,6 +42,9 @@ func (c *Collector) collect() (map[string]int64, error) {
 	if err := c.collectGatewayz(mx); err != nil {
 		return mx, err
 	}
+	if err := c.collectLeafz(mx); err != nil {
+		return mx, err
+	}
 
 	c.updateCharts()
 
@@ -142,7 +145,7 @@ func (c *Collector) collectAccstatz(mx map[string]int64) error {
 	}
 
 	for _, acc := range resp.AccStats {
-		c.cache.accounts.put(acc.Account)
+		c.cache.accounts.put(acc)
 
 		px := fmt.Sprintf("accstatz_acc_%s_", acc.Account)
 
@@ -172,7 +175,7 @@ func (c *Collector) collectRoutez(mx map[string]int64) error {
 	}
 
 	for _, route := range resp.Routes {
-		c.cache.routes.put(route.Rid, route.RemoteID)
+		c.cache.routes.put(route)
 
 		px := fmt.Sprintf("routez_route_id_%d_", route.Rid)
 
@@ -198,8 +201,7 @@ func (c *Collector) collectGatewayz(mx map[string]int64) error {
 	}
 
 	for name, ogw := range resp.OutboundGateways {
-		c.cache.outGateways.put(resp.Name, name)
-		c.cache.outGateways.putConn(resp.Name, name, ogw.Connection.Cid)
+		c.cache.outGateways.put(resp.Name, name, ogw)
 
 		px := fmt.Sprintf("gatewayz_outbound_gw_%s_cid_%d_", name, ogw.Connection.Cid)
 
@@ -213,9 +215,8 @@ func (c *Collector) collectGatewayz(mx map[string]int64) error {
 	}
 
 	for name, igws := range resp.InboundGateways {
-		c.cache.inGateways.put(resp.Name, name)
 		for _, igw := range igws {
-			c.cache.inGateways.putConn(resp.Name, name, igw.Connection.Cid)
+			c.cache.inGateways.put(resp.Name, name, igw)
 
 			px := fmt.Sprintf("gatewayz_inbound_gw_%s_cid_%d_", name, igw.Connection.Cid)
 
@@ -227,6 +228,33 @@ func (c *Collector) collectGatewayz(mx map[string]int64) error {
 			uptime, _ := parseUptime(igw.Connection.Uptime)
 			mx[px+"uptime"] = int64(uptime.Seconds())
 		}
+	}
+
+	return nil
+}
+
+func (c *Collector) collectLeafz(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathLeafz)
+	if err != nil {
+		return err
+	}
+
+	var resp leafzResponse
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
+		return err
+	}
+
+	for _, leaf := range resp.Leafs {
+		c.cache.leafs.put(leaf)
+		px := fmt.Sprintf("leafz_leaf_%s_%s_%s_%d_", leaf.Name, leaf.Account, leaf.IP, leaf.Port)
+
+		mx[px+"in_bytes"] = leaf.InBytes
+		mx[px+"out_bytes"] = leaf.OutBytes
+		mx[px+"in_msgs"] = leaf.InMsgs
+		mx[px+"out_msgs"] = leaf.OutMsgs
+		mx[px+"num_subs"] = int64(leaf.NumSubs)
+		rtt, _ := time.ParseDuration(leaf.RTT)
+		mx[px+"rtt"] = rtt.Microseconds()
 	}
 
 	return nil

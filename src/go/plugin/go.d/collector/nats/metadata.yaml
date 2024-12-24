@@ -412,3 +412,41 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+        - name: leaf node connection
+          description: These metrics refer to [Leaf Node Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#leaf-node-information).
+          labels:
+            - name: remote_name
+              description: "Unique identifier of the remote leaf node server, either its configured name or automatically assigned ID."
+            - name: account
+              description: "Name of the associated account."
+            - name: ip
+              description: "IP address of the remote server."
+            - name: port
+              description: "Port used for the connection to the remote server."
+          metrics:
+            - name: nats.leaf_node_conn_traffic
+              description: Leaf Node Connection Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.leaf_node_conn_messages
+              description: Leaf Node Connection Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.leaf_node_conn_subscriptions
+              description: Leaf Node Connection Active Subscriptions
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nats.leaf_node_conn_rtt
+              description: Leaf Node Connection RTT
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: rtt

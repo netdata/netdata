@@ -25,6 +25,7 @@ var (
 	dataVer210Accstatz, _  = os.ReadFile("testdata/v2.10.24/accstatz.json")
 	dataVer210Routez, _    = os.ReadFile("testdata/v2.10.24/routez.json")
 	dataVer210Gatewayz, _  = os.ReadFile("testdata/v2.10.24/gatewayz.json")
+	dataVer210Leafz, _     = os.ReadFile("testdata/v2.10.24/leafz.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -36,6 +37,7 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataVer210Accstatz":  dataVer210Accstatz,
 		"dataVer210Routez":    dataVer210Routez,
 		"dataVer210Gatewayz":  dataVer210Gatewayz,
+		"dataVer210Leafz":     dataVer210Leafz,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -134,7 +136,8 @@ func TestCollector_Collect(t *testing.T) {
 			wantNumOfCharts: len(serverCharts) +
 				len(accountChartsTmpl)*3 +
 				len(routeChartsTmpl)*1 +
-				len(gatewayConnChartsTmpl)*5,
+				len(gatewayConnChartsTmpl)*5 +
+				len(leafConnChartsTmpl)*1,
 			wantMetrics: map[string]int64{
 				"accstatz_acc_$G_conns":                        0,
 				"accstatz_acc_$G_leaf_nodes":                   0,
@@ -193,6 +196,12 @@ func TestCollector_Collect(t *testing.T) {
 				"gatewayz_outbound_gw_region3_cid_5_out_bytes": 0,
 				"gatewayz_outbound_gw_region3_cid_5_out_msgs":  0,
 				"gatewayz_outbound_gw_region3_cid_5_uptime":    6,
+				"leafz_leaf__$G_127.0.0.1_6223_in_bytes":       0,
+				"leafz_leaf__$G_127.0.0.1_6223_in_msgs":        0,
+				"leafz_leaf__$G_127.0.0.1_6223_num_subs":       1,
+				"leafz_leaf__$G_127.0.0.1_6223_out_bytes":      1280000,
+				"leafz_leaf__$G_127.0.0.1_6223_out_msgs":       10000,
+				"leafz_leaf__$G_127.0.0.1_6223_rtt":            0,
 				"routez_route_id_1_in_bytes":                   4,
 				"routez_route_id_1_in_msgs":                    1,
 				"routez_route_id_1_num_subs":                   1,
@@ -284,6 +293,8 @@ func caseOk(t *testing.T) (*Collector, func()) {
 				_, _ = w.Write(dataVer210Routez)
 			case urlPathGatewayz:
 				_, _ = w.Write(dataVer210Gatewayz)
+			case urlPathLeafz:
+				_, _ = w.Write(dataVer210Leafz)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
