@@ -25,11 +25,11 @@ This error typically indicates **insufficient cluster resources**. Here's how to
 
 #### Diagnosis Steps
 
-**Important**:
-
-- For full installation: Ensure you're in the correct cluster context.
-- For Light PoC: SSH into the Ubuntu VM with `kubectl` pre-configured.
-- For Light PoC, always perform a complete uninstallation before attempting a new installation.
+> **Important**
+>
+> - For full installation: Ensure you're in the correct cluster context.
+> - For Light PoC: SSH into the Ubuntu VM with `kubectl` pre-configured.
+> - For Light PoC, always perform a complete uninstallation before attempting a new installation.
 
 1. Check for pods stuck in Pending state:
 
