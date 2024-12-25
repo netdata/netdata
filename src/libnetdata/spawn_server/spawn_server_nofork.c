@@ -662,8 +662,8 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
     if (cmsg == NULL || cmsg->cmsg_len != CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: Received invalid control message (expected %zu bytes, received %zu bytes)",
-            CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS), cmsg?cmsg->cmsg_len:0);
+               "SPAWN SERVER: Received invalid control message (expected %zu bytes, received %zu bytes)",
+               (size_t)(CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)), (size_t)(cmsg?cmsg->cmsg_len:0));
         close(sock);
         return;
     }

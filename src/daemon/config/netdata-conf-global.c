@@ -55,7 +55,7 @@ static int get_hostname(char *buf, size_t buf_size) {
     return rc;
 }
 
-void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_threshold) {
+void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_threshold __maybe_unused) {
     wanted_arenas = config_get_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", wanted_arenas);
     if(wanted_arenas < 1 || wanted_arenas > os_get_system_cpus_cached(true)) {
         if(wanted_arenas < 1) wanted_arenas = 1;
