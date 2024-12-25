@@ -1039,13 +1039,22 @@ static struct replication_thread {
 
     struct {
         Word_t unique_id;               // the last unique id we gave to a request (auto-increment, starting from 1)
+        size_t received;                // the number of replication requests received
         size_t executed;                // the number of replication requests executed
+        size_t error_not_found;         // the number of replication requests ignored because the chart was not found
+        size_t error_duplicate;         // the number of replication requests found duplicate (same chart)
+        size_t error_flushed;           // the number of replication requests deleted due to disconnections
         size_t latest_first_time;       // the 'after' timestamp of the last request we executed
         size_t memory;                  // the total memory allocated by replication
     } atomic;                           // access should be with atomic operations
 
     struct {
-        size_t last_executed;           // caching of the atomic.executed to report number of requests executed since last time
+        // same as the atomic versions, for finding the delta over time
+        size_t last_received;
+        size_t last_executed;
+        size_t last_error_flushed;
+        size_t last_error_duplicate;
+        size_t last_error_not_found;
 
         ND_THREAD **threads_ptrs;
         size_t threads;
@@ -1377,6 +1386,8 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
     struct replication_request *rq = old_value; (void)rq;
     struct replication_request *rq_new = new_value;
 
+    __atomic_add_fetch(&replication_globals.atomic.error_duplicate, 1, __ATOMIC_RELAXED);
+
     replication_recursive_lock();
 
     if(!rq->indexed_in_judy && rq->not_indexed_buffer_full && !rq->not_indexed_preprocessing) {
@@ -1448,9 +1459,9 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     }
 
     if(!rq->st) {
+        __atomic_add_fetch(&replication_globals.atomic.error_not_found, 1, __ATOMIC_RELAXED);
         internal_error(true, "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' not found",
                        rrdhost_hostname(rq->sender->host), string2str(rq->chart_id));
-
         goto cleanup;
     }
 
@@ -1467,15 +1478,12 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     if(likely(workers)) worker_is_busy(WORKER_JOB_QUERYING);
 
     // send the replication data
+    size_t max_msg_size = (size_t)((unsigned long long)stream_circular_buffer_get_max_size(rq->sender->scb) * MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER / 100ULL);
     rq->q->rq = rq;
-    replication_response_execute_and_finalize(
-            rq->q,
-        (size_t)((unsigned long long)stream_circular_buffer_get_max_size(rq->sender->scb) * MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER / 100ULL), workers);
-
+    replication_response_execute_and_finalize(rq->q, max_msg_size, workers);
     rq->q = NULL;
 
     __atomic_add_fetch(&replication_globals.atomic.executed, 1, __ATOMIC_RELAXED);
-
     ret = true;
 
 cleanup:
@@ -1509,10 +1517,12 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
         sender->replication.oldest_request_after_t = rq.after;
 
     dictionary_set(sender->replication.requests, chart_id, &rq, sizeof(struct replication_request));
+    __atomic_add_fetch(&replication_globals.atomic.received, 1, __ATOMIC_RELAXED);
 }
 
 void replication_sender_delete_pending_requests(struct sender_state *sender) {
     // allow the dictionary destructor to go faster on locks
+    __atomic_add_fetch(&replication_globals.atomic.error_flushed, dictionary_entries(sender->replication.requests), __ATOMIC_RELAXED);
     dictionary_flush(sender->replication.requests);
     sender->replication.oldest_request_after_t = 0;
 }
@@ -1627,15 +1637,40 @@ static size_t verify_host_charts_are_streaming_now(RRDHOST *host) {
 static void verify_all_hosts_charts_are_streaming_now(void) {
     worker_is_busy(WORKER_JOB_CHECK_CONSISTENCY);
 
-    size_t errors = 0;
+    size_t charts_flagged_pending = 0, entries_in_dictionaries = 0;
     RRDHOST *host;
-    dfe_start_read(rrdhost_root_index, host)
-        errors += verify_host_charts_are_streaming_now(host);
+    dfe_start_read(rrdhost_root_index, host) {
+        charts_flagged_pending += verify_host_charts_are_streaming_now(host);
+        entries_in_dictionaries += dictionary_entries(host->sender->replication.requests);
+    }
     dfe_done(host);
 
+    size_t flushed = __atomic_load_n(&replication_globals.atomic.error_flushed, __ATOMIC_RELAXED);
+    size_t duplicate = __atomic_load_n(&replication_globals.atomic.error_duplicate, __ATOMIC_RELAXED);
+    size_t not_found = __atomic_load_n(&replication_globals.atomic.error_not_found, __ATOMIC_RELAXED);
+    size_t received = __atomic_load_n(&replication_globals.atomic.received, __ATOMIC_RELAXED);
     size_t executed = __atomic_load_n(&replication_globals.atomic.executed, __ATOMIC_RELAXED);
-    netdata_log_info("REPLICATION SUMMARY: finished, executed %zu replication requests, %zu charts pending replication",
-         executed - replication_globals.main_thread.last_executed, errors);
+
+    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+           "REPLICATION SUMMARY: all senders finished replication, "
+           "received %zu and executed %zu replication requests, "
+           "%zu charts are currently flagged with replication pending, "
+           "while having %zu replication requests waiting for execution, "
+           "%zu requests were ignored because the instances were not found, "
+           "%zu were ignored/merged as duplicate (same instance), "
+           "and %zu were flushed due to disconnects.",
+           received - replication_globals.main_thread.last_received,
+           executed - replication_globals.main_thread.last_executed,
+           charts_flagged_pending,
+           entries_in_dictionaries,
+           not_found - replication_globals.main_thread.last_error_not_found,
+           duplicate - replication_globals.main_thread.last_error_duplicate,
+           flushed - replication_globals.main_thread.last_error_flushed);
+
+    replication_globals.main_thread.last_error_flushed = flushed;
+    replication_globals.main_thread.last_error_duplicate = duplicate;
+    replication_globals.main_thread.last_error_not_found = not_found;
+    replication_globals.main_thread.last_received = received;
     replication_globals.main_thread.last_executed = executed;
 }
 
