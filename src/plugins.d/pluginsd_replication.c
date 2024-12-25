@@ -4,6 +4,92 @@
 #include "streaming/stream-receiver-internals.h"
 #include "streaming/stream-replication-receiver.h"
 #include "streaming/stream-waiting-list.h"
+#include "web/api/queries/backfill.h"
+
+static bool backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, struct backfill_request_data *brd) {
+    if(!rrdhost_state_acquire(brd->host, brd->rrdhost_receiver_state_id)) {
+        netdata_log_error(
+            "PLUGINSD: 'host:%s' failed to acquire host for sending replication command for 'chart:%s'",
+            rrdhost_hostname(brd->host),
+            rrdset_id(brd->st));
+
+        return false;
+    }
+
+    bool rc = replicate_chart_request(send_to_plugin, brd->parser, brd->host, brd->st,
+                                      brd->first_entry_child, brd->last_entry_child, brd->child_wall_clock_time,
+                                      0, 0);
+    if (rc) {
+        rrdset_flag_set(brd->st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
+        rrdset_flag_clear(brd->st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        rrdhost_receiver_replicating_charts_plus_one(brd->st->rrdhost);
+    }
+    else {
+        netdata_log_error(
+            "PLUGINSD: 'host:%s' failed to initiate replication for 'chart:%s'",
+            rrdhost_hostname(brd->host),
+            rrdset_id(brd->st));
+    }
+
+    rrdhost_state_release(brd->host);
+    return rc;
+}
+
+PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *parser) {
+    const char *first_entry_txt = get_word(words, num_words, 1);
+    const char *last_entry_txt = get_word(words, num_words, 2);
+    const char *wall_clock_time_txt = get_word(words, num_words, 3);
+
+    RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+
+    RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, PLUGINSD_KEYWORD_CHART);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+
+    time_t first_entry_child = (first_entry_txt && *first_entry_txt) ? (time_t)str2ul(first_entry_txt) : 0;
+    time_t last_entry_child = (last_entry_txt && *last_entry_txt) ? (time_t)str2ul(last_entry_txt) : 0;
+    time_t child_wall_clock_time = (wall_clock_time_txt && *wall_clock_time_txt) ? (time_t)str2ul(wall_clock_time_txt) : now_realtime_sec();
+
+    bool ok = true;
+    if(!rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
+
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
+        st->replay.start_streaming = false;
+        st->replay.after = 0;
+        st->replay.before = 0;
+#endif
+
+        struct backfill_request_data brd = {
+            .rrdhost_receiver_state_id = rrdhost_state_id(host),
+            .parser = parser,
+            .host = host,
+            .st = st,
+            .first_entry_child = first_entry_child,
+            .last_entry_child = last_entry_child,
+            .child_wall_clock_time = child_wall_clock_time,
+        };
+
+        if(!rrdset_flag_check(st, RRDSET_FLAG_BACKFILLED_HIGH_TIERS)) {
+            ok = backfill_request_add(st, backfill_callback, &brd);
+            if (!ok)
+                ok = backfill_callback(0, 0, &brd);
+            else
+                rrdset_flag_set(st, RRDSET_FLAG_BACKFILLED_HIGH_TIERS);
+        }
+        else
+            ok = backfill_callback(0, 0, &brd);
+    }
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
+    else {
+        internal_error(true, "REPLAY: 'host:%s/chart:%s' not sending duplicate replication request",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st));
+    }
+#endif
+
+    stream_thread_received_metadata();
+
+    return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
+}
 
 PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PARSER *parser) {
     int idx = 1;

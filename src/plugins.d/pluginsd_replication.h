@@ -10,5 +10,6 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARSER *parser);
 PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words, PARSER *parser);
 PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words, PARSER *parser);
 PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser);
+PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *parser);
 
 #endif //NETDATA_PLUGINSD_REPLICATION_H

@@ -115,11 +115,13 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
     RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS = (1 << 21), // the receiving side has replication in progress
     RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED    = (1 << 22), // the receiving side has completed replication
 
-    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 23), // a custom variable has been updated and needs to be exposed to parent
+    RRDSET_FLAG_BACKFILLED_HIGH_TIERS            = (1 << 23), // we have backfilled this chart
 
-    RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 24), // when set, data collection is not available for this chart
+    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 24), // a custom variable has been updated and needs to be exposed to parent
 
-    RRDSET_FLAG_HAS_RRDCALC_LINKED               = (1 << 25), // this chart has at least one rrdcal linked
+    RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 25), // when set, data collection is not available for this chart
+
+    RRDSET_FLAG_HAS_RRDCALC_LINKED               = (1 << 26), // this chart has at least one rrdcal linked
 } RRDSET_FLAGS;
 
 #include "daemon/common.h"

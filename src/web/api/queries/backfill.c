@@ -5,9 +5,9 @@
 struct backfill_request {
     size_t rrdhost_receiver_state_id;
     RRDSET_ACQUIRED *rsa;
-    uint32_t works;
-    uint32_t successful;
-    uint32_t failed;
+    int32_t works;
+    int32_t successful;
+    int32_t failed;
     backfill_callback_t cb;
     struct backfill_request_data data;
 };
@@ -46,7 +46,7 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
     struct backfill_dim_work *array[dimensions];
 
     if(backfill_globals.running) {
-        struct backfill_request *br = aral_mallocz(backfill_globals.ar_br);
+        struct backfill_request *br = aral_callocz(backfill_globals.ar_br);
         br->data = *data;
         br->rrdhost_receiver_state_id = rrdhost_state_id(st->rrdhost);
         br->rsa = rrdset_find_and_acquire(st->rrdhost, string2str(st->id));
@@ -59,7 +59,7 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
                     break;
 
                 if (!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
-                    struct backfill_dim_work *bdm = aral_mallocz(backfill_globals.ar_bdm);
+                    struct backfill_dim_work *bdm = aral_callocz(backfill_globals.ar_bdm);
                     bdm->rda = (RRDDIM_ACQUIRED *)dictionary_acquired_item_dup(st->rrddim_root_index, rd_dfe.item);
                     bdm->br = br;
                     br->works++;
@@ -68,6 +68,8 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
             }
             rrddim_foreach_done(rd);
         }
+
+        internal_fatal((size_t)br->works != added, "works and added are not the same");
 
         if(added) {
             spinlock_lock(&backfill_globals.spinlock);
@@ -120,8 +122,12 @@ static void backfill_dim_work_free(bool successful, struct backfill_dim_work *bd
     else
         __atomic_add_fetch(&br->failed, 1, __ATOMIC_RELAXED);
 
-    uint32_t works = __atomic_sub_fetch(&br->works, 1, __ATOMIC_RELAXED);
-    if(!works) {
+    int32_t works = __atomic_sub_fetch(&br->works, 1, __ATOMIC_RELAXED);
+    internal_fatal(works < 0, "negative backfill jobs");
+
+    if(works == 0) {
+        // we are the last dimension of the chart
+
         if(br->cb)
             br->cb(__atomic_load_n(&br->successful, __ATOMIC_RELAXED),
                    __atomic_load_n(&br->failed, __ATOMIC_RELAXED),
