@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "stream-thread.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 static __thread struct sender_buffer commit___thread = { 0 };
 
@@ -169,7 +169,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
             goto overflow_with_lock;
     }
 
-    replication_recalculate_buffer_used_ratio_unsafe(s);
+    replication_sender_recalculate_buffer_used_ratio_unsafe(s);
 
     if (enable_sending)
         msg = s->thread.msg;

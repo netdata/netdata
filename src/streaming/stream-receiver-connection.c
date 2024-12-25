@@ -4,7 +4,7 @@
 #include "stream-thread.h"
 #include "stream-receiver-internals.h"
 #include "web/server/h2o/http_server.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 

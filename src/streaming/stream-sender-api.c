@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "stream-sender-internals.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 bool stream_sender_has_capabilities(struct rrdhost *host, STREAM_CAPABILITIES capabilities) {
     return host && stream_has_capability(host->sender, capabilities);
@@ -66,7 +66,7 @@ void stream_sender_structures_free(struct rrdhost *host) {
     host->sender->scb = NULL;
     stream_compressor_destroy(&host->sender->compressor);
 
-    replication_cleanup_sender(host->sender);
+    replication_sender_cleanup(host->sender);
 
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
 

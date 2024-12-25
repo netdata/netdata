@@ -2,7 +2,7 @@
 
 #include "stream-control.h"
 #include "stream.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 static struct {
     PAD64(uint32_t) backfill_runners;

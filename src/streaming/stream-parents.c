@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "stream-sender-internals.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 #define TIME_TO_CONSIDER_PARENTS_SIMILAR 120
 

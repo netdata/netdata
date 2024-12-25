@@ -1525,8 +1525,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-compression/zstd.h
         src/streaming/stream-receiver.c
         src/streaming/stream-sender.c
-        src/streaming/replication.c
-        src/streaming/replication.h
+        src/streaming/stream-replication-sender.c
+        src/streaming/stream-replication-sender.h
         src/streaming/h2o-common.h
         src/streaming/protocol/command-nodeid.c
         src/streaming/protocol/commands.c
@@ -1567,6 +1567,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-control.h
         src/streaming/stream-waiting-list.c
         src/streaming/stream-waiting-list.h
+        src/streaming/stream-replication-receiver.c
+        src/streaming/stream-replication-receiver.h
 )
 
 set(WEB_PLUGIN_FILES

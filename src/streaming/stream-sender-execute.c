@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "stream-thread.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 struct inflight_stream_function {
     struct sender_state *sender;
@@ -287,11 +287,8 @@ void stream_sender_execute_commands(struct sender_state *s) {
                                   before ? before : "(unset)");
             }
             else {
-                replication_add_request(s, chart_id,
-                                        strtoll(after, NULL, 0),
-                                        strtoll(before, NULL, 0),
-                                        !strcmp(start_streaming, "true")
-                );
+                replication_sender_request_add(
+                    s, chart_id, strtoll(after, NULL, 0), strtoll(before, NULL, 0), !strcmp(start_streaming, "true"));
             }
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_NODE_ID) == 0) {

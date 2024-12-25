@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "pluginsd_internals.h"
-#include "streaming/replication.h"
+#include "streaming/stream-replication-receiver.h"
 #include "streaming/stream-waiting-list.h"
 #include "web/api/queries/backfill.h"
 
@@ -377,8 +377,14 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
 }
 
 static bool backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, struct backfill_request_data *brd) {
-    if(!rrdhost_state_acquire(brd->host, brd->rrdhost_receiver_state_id))
+    if(!rrdhost_state_acquire(brd->host, brd->rrdhost_receiver_state_id)) {
+        netdata_log_error(
+            "PLUGINSD: 'host:%s' failed to acquire host for sending replication command for 'chart:%s'",
+            rrdhost_hostname(brd->host),
+            rrdset_id(brd->st));
+
         return false;
+    }
 
     bool rc = replicate_chart_request(send_to_plugin, brd->parser, brd->host, brd->st,
                                       brd->first_entry_child, brd->last_entry_child, brd->child_wall_clock_time,

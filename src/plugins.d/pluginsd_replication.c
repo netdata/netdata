@@ -2,7 +2,7 @@
 
 #include "pluginsd_replication.h"
 #include "streaming/stream-receiver-internals.h"
-#include "streaming/replication.h"
+#include "streaming/stream-replication-receiver.h"
 #include "streaming/stream-waiting-list.h"
 
 PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PARSER *parser) {
@@ -372,5 +372,6 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
     bool ok = replicate_chart_request(send_to_plugin, parser, host, st,
                                       first_entry_child, last_entry_child, child_world_time,
                                       first_entry_requested, last_entry_requested);
+
     return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
 }

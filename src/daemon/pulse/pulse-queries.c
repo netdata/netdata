@@ -2,7 +2,7 @@
 
 #define PULSE_INTERNALS 1
 #include "pulse-queries.h"
-#include "streaming/replication.h"
+#include "streaming/stream-replication-sender.h"
 
 static struct query_statistics {
     PAD64(uint64_t) api_data_queries_made;

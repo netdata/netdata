@@ -2,7 +2,7 @@
 
 #include "stream-thread.h"
 #include "stream-sender-internals.h"
-#include "replication.h"
+#include "stream-replication-sender.h"
 
 static void stream_sender_move_running_to_connector_or_remove(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, bool reconnect);
 
@@ -271,7 +271,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         s->last_state_since_t = now_realtime_sec();
 
         stream_circular_buffer_flush_unsafe(s->scb, stream_send.buffer_max_size);
-        replication_recalculate_buffer_used_ratio_unsafe(s);
+        replication_sender_recalculate_buffer_used_ratio_unsafe(s);
         stream_sender_unlock(s);
 
         internal_fatal(META_GET(&sth->run.meta, (Word_t)&s->thread.meta) != NULL, "Sender already exists in meta list");
@@ -466,7 +466,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
         ssize_t rc = nd_sock_send_nowait(&s->sock, chunk, outstanding);
         if (likely(rc > 0)) {
             stream_circular_buffer_del_unsafe(s->scb, rc);
-            replication_recalculate_buffer_used_ratio_unsafe(s);
+            replication_sender_recalculate_buffer_used_ratio_unsafe(s);
             s->thread.last_traffic_ut = now_ut;
             sth->snd.bytes_sent += rc;
 
