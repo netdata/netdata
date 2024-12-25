@@ -25,6 +25,16 @@ const (
 	prioServerMemoryUsage
 	prioServerUptime
 
+	prioJetStreamStreams
+	prioJetStreamConsumers
+	prioJetStreamBytes
+	prioJetStreamMessages
+	prioJetStreamApiRequests
+	prioJetStreamApiErrors
+	prioJetStreamApiInflight
+	prioJetStreamMemoryUsed
+	prioJetStreamStorageUsed
+
 	prioAccountTraffic
 	prioAccountMessages
 	prioAccountConnections
@@ -48,7 +58,7 @@ const (
 	prioLeafRTT
 )
 
-var serverCharts = func() module.Charts {
+func serverCharts() *module.Charts {
 	charts := module.Charts{
 		chartServerConnectionsCurrent.Copy(),
 		chartServerConnectionsRate.Copy(),
@@ -60,8 +70,9 @@ var serverCharts = func() module.Charts {
 		chartServerUptime.Copy(),
 	}
 	charts = append(charts, httpEndpointsCharts()...)
-	return charts
-}()
+	charts = append(charts, *jetStreamCharts.Copy()...)
+	return charts.Copy()
+}
 
 var (
 	chartServerTraffic = module.Chart{
@@ -190,6 +201,122 @@ var httpEndpointRequestsChartTmpl = module.Chart{
 		{ID: "varz_http_endpoint_%s_req", Name: "requests", Algo: module.Incremental},
 	},
 }
+
+var jetStreamCharts = module.Charts{
+	jetStreamStreams.Copy(),
+	jetStreamStreamsStorageBytes.Copy(),
+	jetStreamStreamsStorageMessages.Copy(),
+	jetStreamConsumers.Copy(),
+	jetStreamApiRequests.Copy(),
+	jetStreamApiInflightRequests.Copy(),
+	jetStreamApiErrors.Copy(),
+	jetStreamMemoryUsed.Copy(),
+	jetStreamStorageUsed.Copy(),
+}
+
+var (
+	jetStreamStreams = module.Chart{
+		ID:       "jetstream_streams",
+		Title:    "JetStream Streams",
+		Units:    "streams",
+		Fam:      "jstream streams",
+		Ctx:      "nats.jetstream_streams",
+		Priority: prioJetStreamStreams,
+		Dims: module.Dims{
+			{ID: "jsz_streams", Name: "active"},
+		},
+	}
+	jetStreamStreamsStorageBytes = module.Chart{
+		ID:       "jetstream_streams_storage_bytes",
+		Title:    "JetStream Bytes",
+		Units:    "bytes",
+		Fam:      "jstream streams",
+		Ctx:      "nats.jetstream_streams_storage_bytes",
+		Priority: prioJetStreamBytes,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "jsz_bytes", Name: "used"},
+		},
+	}
+	jetStreamStreamsStorageMessages = module.Chart{
+		ID:       "jetstream_streams_storage_messages",
+		Title:    "JetStream Messages",
+		Units:    "messages",
+		Fam:      "jstream streams",
+		Ctx:      "nats.jetstream_streams_storage_messages",
+		Priority: prioJetStreamMessages,
+		Dims: module.Dims{
+			{ID: "jsz_messages", Name: "stored"},
+		},
+	}
+	jetStreamConsumers = module.Chart{
+		ID:       "jetstream_consumers",
+		Title:    "JetStream Consumers",
+		Units:    "consumers",
+		Fam:      "jstream consumers",
+		Ctx:      "nats.jetstream_consumers",
+		Priority: prioJetStreamConsumers,
+		Dims: module.Dims{
+			{ID: "jsz_consumers", Name: "active"},
+		},
+	}
+	jetStreamApiRequests = module.Chart{
+		ID:       "jetstream_api_requests",
+		Title:    "JetStream API Requests",
+		Units:    "requests/s",
+		Fam:      "jstream api",
+		Ctx:      "nats.jetstream_api_requests",
+		Priority: prioJetStreamApiRequests,
+		Dims: module.Dims{
+			{ID: "jsz_api_total", Name: "requests", Algo: module.Incremental},
+		},
+	}
+	jetStreamApiErrors = module.Chart{
+		ID:       "jetstream_api_errors",
+		Title:    "JetStream API Errors",
+		Units:    "errors/s",
+		Fam:      "jstream api",
+		Ctx:      "nats.jetstream_api_errors",
+		Priority: prioJetStreamApiErrors,
+		Dims: module.Dims{
+			{ID: "jsz_api_errors", Name: "errors", Algo: module.Incremental},
+		},
+	}
+	jetStreamApiInflightRequests = module.Chart{
+		ID:       "jetstream_api_inflight",
+		Title:    "JetStream API Inflight",
+		Units:    "requests",
+		Fam:      "jstream api",
+		Ctx:      "nats.jetstream_api_inflight",
+		Priority: prioJetStreamApiInflight,
+		Dims: module.Dims{
+			{ID: "jsz_api_inflight", Name: "inflight"},
+		},
+	}
+	jetStreamMemoryUsed = module.Chart{
+		ID:       "jetstream_memory_used",
+		Title:    "JetStream Used Memory",
+		Units:    "bytes",
+		Fam:      "jstream rusage",
+		Ctx:      "nats.jetstream_memory_used",
+		Priority: prioJetStreamMemoryUsed,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "jsz_memory_used", Name: "used"},
+		},
+	}
+	jetStreamStorageUsed = module.Chart{
+		ID:       "jetstream_storage_used",
+		Title:    "JetStream Used Storage",
+		Units:    "bytes",
+		Fam:      "jstream rusage",
+		Ctx:      "nats.jetstream_storage_used",
+		Priority: prioJetStreamStorageUsed,
+		Dims: module.Dims{
+			{ID: "jsz_store_used", Name: "used"},
+		},
+	}
+)
 
 var accountChartsTmpl = module.Charts{
 	accountTrafficTmpl.Copy(),
@@ -522,7 +649,7 @@ func (c *Collector) updateCharts() {
 }
 
 func (c *Collector) addServerCharts() {
-	charts := serverCharts.Copy()
+	charts := serverCharts()
 
 	for _, chart := range *charts {
 		chart.Labels = []module.Label{
