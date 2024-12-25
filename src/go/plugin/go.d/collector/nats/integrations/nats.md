@@ -81,6 +81,15 @@ Metrics:
 | nats.server_cpu_usage | used | percent |
 | nats.server_mem_usage | used | bytes |
 | nats.server_uptime | uptime | seconds |
+| nats.jetstream_streams | active | streams |
+| nats.jetstream_streams_storage_bytes | used | bytes |
+| nats.jetstream_streams_storage_messages | stored | messaged |
+| nats.jetstream_consumers | active | consumers |
+| nats.jetstream_api_requests | requests | requests/s |
+| nats.jetstream_api_errors | errors | errors/s |
+| nats.jetstream_api_inflight | inflight | requests |
+| nats.jetstream_memory_used | used | bytes |
+| nats.jetstream_storage_used | used | bytes |
 
 ### Per http endpoint
 
