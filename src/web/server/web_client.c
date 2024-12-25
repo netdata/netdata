@@ -244,7 +244,7 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
 }
 
 void web_client_request_done(struct web_client *w) {
-    sock_delcork(w->fd);
+    sock_setcork(w->fd, false);
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
 
@@ -917,7 +917,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
           , buffer_tostring(w->response.header_output)
     );
 
-    sock_setcloexec(w->fd);
+    sock_setcork(w->fd, true);
 
     size_t count = 0;
     ssize_t bytes;

@@ -425,11 +425,14 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
            "STREAM RCV[%zu] '%s' [from [%s]:%s]: moving host from receiver queue to receiver running...",
            sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
 
-    sock_setnonblock(rpt->sock.fd);
-    sock_setcloexec(rpt->sock.fd);
-    sock_enlarge_in(rpt->sock.fd);
-    sock_enlarge_out(rpt->sock.fd);
-    sock_delcork(rpt->sock.fd);
+    sock_setcloexec(rpt->sock.fd, true);
+    sock_enlarge_rcv_buf(rpt->sock.fd);
+    sock_enlarge_snd_buf(rpt->sock.fd);
+    sock_setcork(rpt->sock.fd, false);
+    if(sock_setnonblock(rpt->sock.fd, true) != 1)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM RCV '%s' [from [%s]:%s]: failed to set non-blocking mode on socket %d",
+               rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->sock.fd);
 
     rpt->host->stream.rcv.status.tid = gettid_cached();
     rpt->thread.meta.type = POLLFD_TYPE_RECEIVER;
@@ -444,11 +447,6 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
 
     internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) != NULL, "Receiver to be added is already in the list of receivers");
     META_SET(&sth->run.meta, (Word_t)&rpt->thread.meta, &rpt->thread.meta);
-
-    if(sock_setnonblock(rpt->sock.fd) < 0)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM RCV '%s' [from [%s]:%s]: cannot set the non-blocking flag from socket %d",
-               rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->sock.fd);
 
     if(!nd_poll_add(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
         nd_log(NDLS_DAEMON, NDLP_ERR,

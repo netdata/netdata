@@ -227,7 +227,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
 #endif
         {
             // remove the non-blocking flag from the socket
-            if(sock_delnonblock(rpt->sock.fd) < 0)
+            if(sock_setnonblock(rpt->sock.fd, false) != 0)
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "STREAM RCV '%s' [from [%s]:%s]: cannot remove the non-blocking flag from socket %d",
                        rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->sock.fd);

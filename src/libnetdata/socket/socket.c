@@ -48,12 +48,6 @@ bool ip_to_hostname(const char *ip, char *dst, size_t dst_len) {
 // --------------------------------------------------------------------------------------------------------------------
 // various library calls
 
-#ifdef __gnu_linux__
-#define LARGE_SOCK_SIZE 33554431 // don't ask why - I found it at brubeck source - I guess it is just a large number
-#else
-#define LARGE_SOCK_SIZE 4096
-#endif
-
 bool fd_is_socket(int fd) {
     int type;
     socklen_t len = sizeof(type);
@@ -114,148 +108,245 @@ bool is_socket_closed(int fd) {
 }
 #endif
 
-int sock_setnonblock(int fd) {
-    int flags;
+#if defined(OS_LINUX)
+// Valid from: 4 KB to 64 MB (typical range)
+// Default is usually: 128 KB to 256 KB
+// Maximum is controlled by: /proc/sys/net/core/rmem_max and /proc/sys/net/core/wmem_max
+// Interactive applications should use: 256 KB
+// High-performance applications should use: 8 MB to 64 MB
+#define LARGE_SOCK_SIZE (32 * 1024 * 1024)
 
-    flags = fcntl(fd, F_GETFL);
-    flags |= O_NONBLOCK;
+#elif defined(OS_FREEBSD)
+// Valid from: 4 KB to 16 MB (typical range)
+// Default is usually: 64 KB to 256 KB
+// Maximum is controlled by: kern.ipc.maxsockbuf
+// Interactive applications should use: 128 KB to 256 KB
+// High-performance applications should use: 2 MB to 16 MB
+#define LARGE_SOCK_SIZE (8 * 1024 * 1024)
 
-    int ret = fcntl(fd, F_SETFL, flags);
-    if(ret < 0)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "Failed to set O_NONBLOCK on socket %d",
-               fd);
+#elif defined(OS_MACOS)
+// Valid from: 4 KB to 8 MB (typical range)
+// Default is usually: 128 KB
+// Maximum is controlled by: net.inet.tcp.sendspace and net.inet.tcp.recvspace
+// Interactive applications should use: 128 KB
+// High-performance applications should use: 1 MB to 8 MB
+#define LARGE_SOCK_SIZE (4 * 1024 * 1024)
 
-    return ret;
-}
+#elif defined(OS_WINDOWS)
+// Valid from: 8 KB to 16 MB (typical range)
+// Default is usually: 8 KB to 64 KB
+// Maximum is controlled by: registry keys such as TcpWindowSize
+// Interactive applications should use: 64 KB to 128 KB
+// High-performance applications should use: 1 MB to 16 MB
+#define LARGE_SOCK_SIZE (8 * 1024 * 1024)
 
-int sock_delnonblock(int fd) {
-    int flags;
+#else
+// Valid from: 4 KB to platform-dependent maximum
+// Default is usually: 64 KB to 256 KB
+// Interactive applications should use: 128 KB to 256 KB
+// High-performance applications should use: 1 MB to platform-dependent maximum
+#define LARGE_SOCK_SIZE (1 * 1024 * 1024)
+#endif
 
-    flags = fcntl(fd, F_GETFL);
-    flags &= ~O_NONBLOCK;
+// Returns -1 for errors, current buffer size if successful
+int sock_enlarge_rcv_buf(int fd) {
+    int ret = -1;
+    int bs = LARGE_SOCK_SIZE;
+    int current_bs = 0;
+    socklen_t optlen = sizeof(current_bs);
 
-    int ret = fcntl(fd, F_SETFL, flags);
-    if(ret < 0)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "Failed to remove O_NONBLOCK on socket %d",
-               fd);
+    // Get the current receive buffer size
+    if (getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &current_bs, &optlen) == 0) {
+        // Set the buffer size only if it's smaller than the desired size
+        if (current_bs < bs) {
+            setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &bs, sizeof(bs));
 
-    return ret;
-}
-
-int sock_set_tcp_defer_accept(int fd) {
-#ifdef TCP_DEFER_ACCEPT
-    // Only set TCP_DEFER_ACCEPT for TCP sockets
-    if(!fd_is_socket(fd))
-        return 0;
-
-    int timeout = 5;
-    int ret = setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &timeout, sizeof(timeout));
-
-    if(ret == -1 && errno != EINVAL && errno != ENOPROTOOPT) {
-        // EINVAL or ENOPROTOOPT means this is not a TCP socket (might be UNIX domain socket)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "Failed to set TCP_DEFER_ACCEPT on socket %d",
-               fd);
+            // Re-check the buffer size after attempting to set it
+            if (getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &current_bs, &optlen) == 0)
+                ret = current_bs;
+        } else {
+            // Current buffer size is already large enough
+            ret = current_bs;
+        }
     }
 
     return ret;
-#else
-    return 0;
-#endif
 }
 
-int sock_setreuse(int fd, int reuse) {
-    int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+// Returns -1 for errors, current buffer size if successful
+int sock_enlarge_snd_buf(int fd) {
+    int ret = -1;
+    int bs = LARGE_SOCK_SIZE;
+    int current_bs = 0;
+    socklen_t optlen = sizeof(current_bs);
 
-    if(ret == -1)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "Failed to set SO_REUSEADDR on socket %d",
-               fd);
+    // Get the current send buffer size
+    if (getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &current_bs, &optlen) == 0) {
+        // Set the buffer size only if it's smaller than the desired size
+        if (current_bs < bs) {
+            setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &bs, sizeof(bs));
+
+            // Re-check the buffer size after attempting to set it
+            if (getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &current_bs, &optlen) == 0)
+                ret = current_bs;
+        } else {
+            // Current buffer size is already large enough
+            ret = current_bs;
+        }
+    }
 
     return ret;
 }
 
-void sock_setcloexec(int fd)
-{
-    UNUSED(fd);
-    int flags = fcntl(fd, F_GETFD);
-    if (flags != -1)
-        (void) fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+// returns -1 for errors, 0 if cork is unset, 1 if cork is set
+int sock_setcork(int fd __maybe_unused, bool cork) {
+    int rc = -1;
+
+#ifdef TCP_CORK
+    int tcp_cork = (cork) ? 1 : 0;
+    socklen_t optlen = sizeof(tcp_cork);
+
+    if(setsockopt(fd, IPPROTO_TCP, TCP_CORK, &tcp_cork, optlen) == 0) {
+        // setting was successful, return the intended state
+        rc = cork ? 1 : 0;
+    }
+    else if(getsockopt(fd, IPPROTO_TCP, TCP_CORK, &tcp_cork, &optlen) == 0) {
+        // return the current state since retrieval is successful
+        rc = tcp_cork ? 1 : 0;
+    }
+#endif
+
+    return rc;
 }
 
-int sock_setreuse_port(int fd __maybe_unused, int reuse __maybe_unused) {
-    int ret;
+// Returns -1 for errors, 0 if O_NONBLOCK is unset, 1 if O_NONBLOCK is set
+int sock_setnonblock(int fd, bool nonblock) {
+    int rc = -1;
+    int flags = fcntl(fd, F_GETFL);
+
+    if (flags < 0) {
+        // Failed to get current flags
+        return -1;
+    }
+
+    int new_flags = nonblock ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK);
+
+    if (fcntl(fd, F_SETFL, new_flags) == 0) {
+        // Setting was successful, return the intended state
+        rc = nonblock ? 1 : 0;
+    } else {
+        // If setting failed, return the current state
+        flags = fcntl(fd, F_GETFL);
+        if (flags >= 0)
+            rc = (flags & O_NONBLOCK) ? 1 : 0;
+    }
+
+    return rc;
+}
+
+// Returns -1 for errors, 0 if SO_REUSEADDR is unset, 1 if SO_REUSEADDR is set
+int sock_setreuse_addr(int fd, bool reuse) {
+    int rc = -1;
+    int reuse_val = reuse ? 1 : 0;
+    socklen_t optlen = sizeof(reuse_val);
+
+    // Attempt to set SO_REUSEADDR
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse_val, optlen) == 0) {
+        // Setting was successful, return the intended state
+        rc = reuse ? 1 : 0;
+    } else {
+        // If setting failed, attempt to retrieve the current state
+        if (getsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse_val, &optlen) == 0) {
+            // Return the current state
+            rc = reuse_val ? 1 : 0;
+        }
+    }
+
+    return rc;
+}
+
+// Returns -1 for errors, 0 if SO_REUSEPORT is unset, 1 if SO_REUSEPORT is set
+int sock_setreuse_port(int fd, bool reuse) {
+    int rc = -1;
 
 #ifdef SO_REUSEPORT
-    ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse));
-    if(ret == -1 && errno != ENOPROTOOPT)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "failed to set SO_REUSEPORT on socket %d",
-               fd);
+    int reuse_val = reuse ? 1 : 0;
+    socklen_t optlen = sizeof(reuse_val);
+
+    // Attempt to set SO_REUSEPORT
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuse_val, optlen) == 0) {
+        // Setting was successful, return the intended state
+        rc = reuse ? 1 : 0;
+    } else if (errno != ENOPROTOOPT) {
+        // If setting failed for a reason other than unsupported option, check the current state
+        if (getsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuse_val, &optlen) == 0) {
+            // Return the current state
+            rc = reuse_val ? 1 : 0;
+        }
+    }
 #else
-    ret = -1;
+    // SO_REUSEPORT is not supported
+    errno = ENOPROTOOPT;
 #endif
 
-    return ret;
+    return rc;
 }
 
-int sock_enlarge_in(int fd) {
-    int ret, bs = LARGE_SOCK_SIZE;
+// Returns -1 for errors, 0 if FD_CLOEXEC is unset, 1 if FD_CLOEXEC is set
+int sock_setcloexec(int fd, bool cloexec) {
+    int rc = -1;
 
-    ret = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &bs, sizeof(bs));
+    // Get current file descriptor flags
+    int flags = fcntl(fd, F_GETFD);
+    if (flags == -1)
+        return -1; // Error retrieving flags
 
-    if(ret == -1)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "Failed to set SO_RCVBUF on socket %d",
-               fd);
+    int new_flags = cloexec ? (flags | FD_CLOEXEC) : (flags & ~FD_CLOEXEC);
 
-    return ret;
-}
-
-int sock_enlarge_out(int fd) {
-    int ret, bs = LARGE_SOCK_SIZE;
-    ret = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &bs, sizeof(bs));
-
-    if(ret == -1)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "Failed to set SO_SNDBUF on socket %d",
-               fd);
-
-    return ret;
-}
-
-int sock_setcork(int fd) {
-    int tcp_cork = 0;
-    int ret = -1;
-
-#ifdef TCP_CORK
-    ret = setsockopt(fd, IPPROTO_TCP, TCP_CORK, (char *)&tcp_cork, sizeof(tcp_cork));
-
-    if(ret == -1) {
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-            "Failed to set TCP_CORK on socket %d.", fd);
+    // Set the FD_CLOEXEC flag as requested
+    if (fcntl(fd, F_SETFD, new_flags) == 0) {
+        // Setting was successful, return the intended state
+        rc = cloexec ? 1 : 0;
+    } else {
+        // If setting failed, return the current state
+        flags = fcntl(fd, F_GETFD);
+        if (flags != -1) {
+            rc = (flags & FD_CLOEXEC) ? 1 : 0;
+        }
     }
-#endif
 
-    return ret;
+    return rc;
 }
 
-int sock_delcork(int fd) {
-    int tcp_cork = 0;
-    int ret = -1;
+// Returns -1 for errors, 0 if TCP_DEFER_ACCEPT is unset, 1 if TCP_DEFER_ACCEPT is set
+int sock_set_tcp_defer_accept(int fd, bool defer) {
+#ifdef TCP_DEFER_ACCEPT
+    // Check if the file descriptor is a socket
+    if (!fd_is_socket(fd))
+        return 0; // Not a socket
 
-#ifdef TCP_CORK
-    ret = setsockopt(fd, IPPROTO_TCP, TCP_CORK, (char *)&tcp_cork, sizeof(tcp_cork));
+    int rc = -1;
+    int timeout = defer ? 5 : 0; // Set timeout to 5 seconds for enabling, 0 to disable
+    socklen_t optlen = sizeof(timeout);
 
-    if(ret == -1) {
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "Failed to del TCP_CORK on socket %d.", fd);
+    // Attempt to set TCP_DEFER_ACCEPT
+    if (setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &timeout, optlen) == 0) {
+        // Setting was successful, return the intended state
+        rc = defer ? 1 : 0;
+    } else if (errno != EINVAL && errno != ENOPROTOOPT) {
+        // If setting failed and it's not because of invalid option or unsupported protocol
+        // Check the current state
+        if (getsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &timeout, &optlen) == 0) {
+            rc = timeout > 0 ? 1 : 0;
+        }
     }
-#endif
 
-    return ret;
+    return rc;
+#else
+    // TCP_DEFER_ACCEPT not supported
+    errno = ENOPROTOOPT;
+    return -1;
+#endif
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -491,7 +582,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
         if (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
             strncpyz(client_ip, "localhost", ipsize);
         }
-        sock_setcloexec(nfd);
+        sock_setcloexec(nfd, true);
 
 #ifdef __FreeBSD__
         if(((struct sockaddr *)&sadr)->sa_family == AF_LOCAL)

@@ -111,7 +111,7 @@ static void *web_server_add_callback(POLLINFO *pi, nd_poll_event_t *events, void
     }
 
     if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
-        sock_delnonblock(w->fd);
+        sock_setnonblock(w->fd, false);
 
         //Read the first 7 bytes from the message, but the message
         //is not removed from the queue, because we are using MSG_PEEK
@@ -121,7 +121,7 @@ static void *web_server_add_callback(POLLINFO *pi, nd_poll_event_t *events, void
         }
         else {
             // we couldn't read 7 bytes
-            sock_setnonblock(w->fd);
+            sock_setnonblock(w->fd, true);
             goto cleanup;
         }
 
@@ -135,7 +135,7 @@ static void *web_server_add_callback(POLLINFO *pi, nd_poll_event_t *events, void
                 WEB_CLIENT_IS_DEAD(w);
         }
 
-        sock_setnonblock(w->fd);
+        sock_setnonblock(w->fd, true);
     }
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);

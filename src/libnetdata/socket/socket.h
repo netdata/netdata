@@ -13,16 +13,29 @@ int wait_on_socket_or_cancel_with_timeout(NETDATA_SSL *ssl, int fd, int timeout_
 bool fd_is_socket(int fd);
 bool is_socket_closed(int fd);
 
-int sock_setnonblock(int fd);
-int sock_delnonblock(int fd);
-int sock_setreuse(int fd, int reuse);
-void sock_setcloexec(int fd);
-int sock_setreuse_port(int fd, int reuse);
-int sock_enlarge_in(int fd);
-int sock_enlarge_out(int fd);
-int sock_set_tcp_defer_accept(int fd);
-int sock_setcork(int fd);
-int sock_delcork(int fd);
+// Returns -1 for errors, 0 if TCP_DEFER_ACCEPT is unset, 1 if TCP_DEFER_ACCEPT is set
+int sock_set_tcp_defer_accept(int fd, bool defer);
+
+// Returns -1 for errors, 0 if FD_CLOEXEC is unset, 1 if FD_CLOEXEC is set
+int sock_setcloexec(int fd, bool cloexec);
+
+// Returns -1 for errors, 0 if O_NONBLOCK is unset, 1 if O_NONBLOCK is set
+int sock_setnonblock(int fd, bool nonblock);
+
+// Returns -1 for errors, 0 if SO_REUSEADDR is unset, 1 if SO_REUSEADDR is set
+int sock_setreuse_addr(int fd, bool reuse);
+
+// Returns -1 for errors, 0 if SO_REUSEPORT is unset, 1 if SO_REUSEPORT is set
+int sock_setreuse_port(int fd, bool reuse);
+
+// Returns -1 for errors, current buffer size if successful
+int sock_enlarge_rcv_buf(int fd);
+
+// Returns -1 for errors, current buffer size if successful
+int sock_enlarge_snd_buf(int fd);
+
+// returns -1 for errors, 0 if cork is unset, 1 if cork is set
+int sock_setcork(int fd, bool cork);
 
 int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize,
                               SIMPLE_PATTERN *access_list, const char *patname, int allow_dns);

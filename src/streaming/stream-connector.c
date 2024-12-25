@@ -377,18 +377,6 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     }
     response[bytes] = '\0';
 
-    if(sock_setnonblock(s->sock.fd) < 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM CONNECT '%s' [to %s]: cannot set non-blocking mode for socket.",
-               rrdhost_hostname(host), s->connected_to);
-
-    sock_setcloexec(s->sock.fd);
-
-    if(sock_enlarge_out(s->sock.fd) < 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM CONNECT '%s' [to %s]: cannot enlarge the socket buffer.",
-               rrdhost_hostname(host), s->connected_to);
-
     if(!stream_connect_validate_first_response(host, s, response, bytes)) {
         nd_sock_close(&s->sock);
         return false;

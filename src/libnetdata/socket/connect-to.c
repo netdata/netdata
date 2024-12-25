@@ -26,7 +26,7 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
                    path);
     }
 
-    sock_setcloexec(fd);
+    sock_setcloexec(fd, true);
 
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
@@ -145,7 +145,7 @@ int connect_to_this_ip46(
                            "Failed to set timeout on the socket to ip '%s' port '%s'",
                            hostBfr, servBfr);
             }
-            sock_setcloexec(fd);
+            sock_setcloexec(fd, true);
 
             errno_clear();
             if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {

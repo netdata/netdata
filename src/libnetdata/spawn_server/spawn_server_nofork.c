@@ -908,7 +908,7 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
             }
 
             // do not fork this socket
-            sock_setcloexec(sock);
+            sock_setcloexec(sock, true);
 
             // receive the request and process it
             spawn_server_receive_request(sock, server);

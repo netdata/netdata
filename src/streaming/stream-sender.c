@@ -248,11 +248,15 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
                "STREAM SND[%zu] '%s' [to %s]: moving host from dispatcher queue to dispatcher running...",
                sth->id, rrdhost_hostname(s->host), s->connected_to);
 
-        sock_setnonblock(s->sock.fd);
-        sock_setcloexec(s->sock.fd);
-        sock_enlarge_in(s->sock.fd);
-        sock_enlarge_out(s->sock.fd);
-        sock_delcork(s->sock.fd);
+        if(sock_setnonblock(s->sock.fd, true) != 1)
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "STREAM SND[%zu] '%s' [to %s]: failed to set non-blocking mode on socket %d",
+                   sth->id, rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
+
+        sock_setcloexec(s->sock.fd, true);
+        sock_enlarge_rcv_buf(s->sock.fd);
+        sock_enlarge_snd_buf(s->sock.fd);
+        sock_setcork(s->sock.fd, false);
 
         stream_sender_lock(s);
         s->thread.meta.type = POLLFD_TYPE_SENDER;

@@ -70,9 +70,13 @@ static int create_listen_socket_unix(const char *path, int listen_backlog) {
         return -1;
     }
 
-    sock_setnonblock(sock);
-    sock_setcloexec(sock);
-    sock_enlarge_in(sock);
+    if(sock_setnonblock(sock, true) != 1)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: UNIX socket on path '%s' failed to set non-blocking mode.",
+               path);
+
+    sock_setcloexec(sock, true);
+    sock_enlarge_rcv_buf(sock);
 
     struct sockaddr_un name;
     memset(&name, 0, sizeof(struct sockaddr_un));
@@ -124,11 +128,24 @@ static int create_listen_socket4(int socktype, const char *ip, uint16_t port, in
 
         return -1;
     }
-    sock_setreuse(sock, 1);
-    sock_setreuse_port(sock, 0);
-    sock_setnonblock(sock);
-    sock_setcloexec(sock);
-    sock_enlarge_in(sock);
+
+    if(sock_setreuse_addr(sock, true) != 1)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: IPv4 socket on ip '%s' port %d, socktype %d failed to enable reuse address.",
+               ip, port, socktype);
+
+    if(sock_setreuse_port(sock, false) == 1) // -1 means not supported
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: IPv4 socket on ip '%s' port %d, socktype %d failed to disable reuse port.",
+               ip, port, socktype);
+
+    if(sock_setnonblock(sock, true) != 1)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: IPv4 socket on ip '%s' port %d, socktype %d failed to set non-blocking mode.",
+               ip, port, socktype);
+
+    sock_setcloexec(sock, true);
+    sock_enlarge_rcv_buf(sock);
 
     struct sockaddr_in name;
     memset(&name, 0, sizeof(struct sockaddr_in));
@@ -165,7 +182,7 @@ static int create_listen_socket4(int socktype, const char *ip, uint16_t port, in
 
     // Add TCP_DEFER_ACCEPT for TCP sockets
     if(socktype == SOCK_STREAM)
-        sock_set_tcp_defer_accept(sock);
+        sock_set_tcp_defer_accept(sock, true);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "LISTENER: Listening on IPv4 ip '%s' port %d, socktype %d",
@@ -186,11 +203,24 @@ static int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip
 
         return -1;
     }
-    sock_setreuse(sock, 1);
-    sock_setreuse_port(sock, 0);
-    sock_setnonblock(sock);
-    sock_setcloexec(sock);
-    sock_enlarge_in(sock);
+
+    if(sock_setreuse_addr(sock, true) != 1)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: IPv6 socket on ip '%s' port %d, socktype %d failed to set reuse address.",
+               ip, port, socktype);
+
+    if(sock_setreuse_port(sock, false) == 1) // -1 means not supported
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: IPv6 socket on ip '%s' port %d, socktype %d failed to disable reuse port.",
+               ip, port, socktype);
+
+    if(sock_setnonblock(sock, true) != 1)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "LISTENER: IPv6 socket on ip '%s' port %d, socktype %d, failed to set non-blocking mode.",
+               ip, port, socktype);
+
+    sock_setcloexec(sock, true);
+    sock_enlarge_rcv_buf(sock);
 
     /* IPv6 only */
     if(setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (void*)&ipv6only, sizeof(ipv6only)) != 0)
@@ -236,7 +266,7 @@ static int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip
 
     // Add TCP_DEFER_ACCEPT for TCP sockets
     if(socktype == SOCK_STREAM)
-        sock_set_tcp_defer_accept(sock);
+        sock_set_tcp_defer_accept(sock, true);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "LISTENER: Listening on IPv6 ip '%s' port %d, socktype %d",
