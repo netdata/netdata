@@ -3,6 +3,8 @@
 package nats
 
 import (
+	"time"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
@@ -21,6 +23,8 @@ const (
 	urlPathGatewayz = "/gatewayz"
 	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#leaf-node-information
 	urlPathLeafz = "/leafz"
+	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#jetstream-information
+	urlPathJsz = "/jsz"
 )
 
 var (
@@ -157,5 +161,44 @@ type (
 		InBytes  int64  `json:"in_bytes"`
 		OutBytes int64  `json:"out_bytes"`
 		NumSubs  uint32 `json:"subscriptions"`
+	}
+)
+
+// https://github.com/nats-io/nats-server/blob/v2.10.24/server/monitor.go#L2801
+type (
+	jszResponse struct {
+		Disabled       bool   `json:"disabled"`
+		Streams        int    `json:"streams"`
+		Consumers      int    `json:"consumers"`
+		Messages       uint64 `json:"messages"`
+		Bytes          uint64 `json:"bytes"`
+		Memory         uint64 `json:"memory"`
+		Store          uint64 `json:"storage"`
+		ReservedMemory uint64 `json:"reserved_memory"`
+		ReservedStore  uint64 `json:"reserved_storage"`
+		Accounts       int    `json:"accounts"`
+		HAAssets       int    `json:"ha_assets"`
+		Api            struct {
+			Total    uint64 `json:"total"`
+			Errors   uint64 `json:"errors"`
+			Inflight uint64 `json:"inflight"`
+		} `json:"api"`
+		Meta *jszMetaClusterInfo `json:"meta_cluster"`
+	}
+	jszMetaClusterInfo struct {
+		Name     string         `json:"name"`
+		Leader   string         `json:"leader"`
+		Peer     string         `json:"peer"`
+		Replicas []*jszPeerInfo `json:"replicas"`
+		Size     int            `json:"cluster_size"`
+		Pending  int            `json:"pending"`
+	}
+	jszPeerInfo struct {
+		Name    string        `json:"name"`
+		Current bool          `json:"current"`
+		Offline bool          `json:"offline"`
+		Active  time.Duration `json:"active"`
+		Lag     uint64        `json:"lag"`
+		Peer    string        `json:"peer"`
 	}
 )

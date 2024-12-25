@@ -26,6 +26,7 @@ var (
 	dataVer210Routez, _    = os.ReadFile("testdata/v2.10.24/routez.json")
 	dataVer210Gatewayz, _  = os.ReadFile("testdata/v2.10.24/gatewayz.json")
 	dataVer210Leafz, _     = os.ReadFile("testdata/v2.10.24/leafz.json")
+	dataVer210Jsz, _       = os.ReadFile("testdata/v2.10.24/jsz.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -38,6 +39,7 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataVer210Routez":    dataVer210Routez,
 		"dataVer210Gatewayz":  dataVer210Gatewayz,
 		"dataVer210Leafz":     dataVer210Leafz,
+		"dataVer210Jsz":       dataVer210Jsz,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -133,7 +135,7 @@ func TestCollector_Collect(t *testing.T) {
 	}{
 		"success on valid response": {
 			prepare: caseOk,
-			wantNumOfCharts: len(serverCharts) +
+			wantNumOfCharts: len(*serverCharts()) +
 				len(accountChartsTmpl)*3 +
 				len(routeChartsTmpl)*1 +
 				len(gatewayConnChartsTmpl)*5 +
@@ -196,6 +198,15 @@ func TestCollector_Collect(t *testing.T) {
 				"gatewayz_outbound_gw_region3_cid_5_out_bytes": 0,
 				"gatewayz_outbound_gw_region3_cid_5_out_msgs":  0,
 				"gatewayz_outbound_gw_region3_cid_5_uptime":    6,
+				"jsz_api_errors":                               588,
+				"jsz_api_inflight":                             0,
+				"jsz_api_total":                                936916,
+				"jsz_bytes":                                    114419224,
+				"jsz_consumers":                                9,
+				"jsz_memory_used":                              128,
+				"jsz_messages":                                 5670,
+				"jsz_store_used":                               114419224,
+				"jsz_streams":                                  198,
 				"leafz_leaf__$G_127.0.0.1_6223_in_bytes":       0,
 				"leafz_leaf__$G_127.0.0.1_6223_in_msgs":        0,
 				"leafz_leaf__$G_127.0.0.1_6223_num_subs":       1,
@@ -297,6 +308,8 @@ func caseOk(t *testing.T) (*Collector, func()) {
 				_, _ = w.Write(dataVer210Gatewayz)
 			case urlPathLeafz:
 				_, _ = w.Write(dataVer210Leafz)
+			case urlPathJsz:
+				_, _ = w.Write(dataVer210Jsz)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
