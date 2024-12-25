@@ -93,6 +93,9 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
 
     stream_sender_log_payload(s, wb, type, false);
 
+    // if there are data already in the buffer, we don't need to send an opcode
+    bool enable_sending = stats->bytes_outstanding == 0;
+
     if (s->compressor.initialized) {
         // compressed traffic
         if(rrdhost_is_this_a_stream_thread(s->host))
@@ -166,7 +169,6 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
             goto overflow_with_lock;
     }
 
-    bool enable_sending = stats->bytes_outstanding == 0;
     replication_recalculate_buffer_used_ratio_unsafe(s);
 
     if (enable_sending)

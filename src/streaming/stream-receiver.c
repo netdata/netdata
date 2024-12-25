@@ -640,7 +640,11 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
         STREAM_CIRCULAR_BUFFER_STATS *stats = stream_circular_buffer_stats_unsafe(scb);
         size_t outstanding = stream_circular_buffer_get_unsafe(scb, &chunk);
 
-        internal_fatal(!outstanding, "Trying to send without data");
+        if(!outstanding) {
+            status = EVLOOP_STATUS_NO_MORE_DATA;
+            spinlock_unlock(&rpt->thread.send_to_child.spinlock);
+            continue;
+        }
 
         ssize_t rc = write_stream(rpt, chunk, outstanding);
         if (likely(rc > 0)) {
@@ -809,22 +813,14 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
     if (events & ND_POLL_WRITE) {
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
-//        usec_t started_ut = now_monotonic_usec();
         if(!stream_receiver_send_data(sth, rpt, now_ut, true))
             return false;
-//        usec_t duration_rcv_snd = now_monotonic_usec() - started_ut;
-//        errno_clear();
-//        nd_log(NDLS_DAEMON, NDLP_DEBUG, "DURATION rcv snd = %llu", (unsigned long long )duration_rcv_snd);
     }
 
     if (events & ND_POLL_READ) {
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
-//        usec_t started_ut = now_monotonic_usec();
         if(!stream_receiver_receive_data(sth, rpt, now_ut, true))
             return false;
-//        usec_t duration_rcv_rcv = now_monotonic_usec() - started_ut;
-//        errno_clear();
-//        nd_log(NDLS_DAEMON, NDLP_DEBUG, "DURATION rcv rcv = %llu", (unsigned long long )duration_rcv_rcv);
     }
 
     return true;
