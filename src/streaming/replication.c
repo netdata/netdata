@@ -1656,7 +1656,7 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
            "REPLICATION SEND SUMMARY: all senders finished replication, "
            "received %zu and executed %zu replication requests, "
-           "%zu charts are currently flagged with replication pending, "
+           "%zu instances are waiting for replication requests from parent, "
            "while having %zu replication requests waiting for execution, "
            "%zu requests were ignored because the instances were not found, "
            "%zu were ignored/merged as duplicate (same instance), "
