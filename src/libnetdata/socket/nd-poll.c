@@ -2,6 +2,10 @@
 
 #include "nd-poll.h"
 
+#ifndef POLLRDHUP
+#define POLLRDHUP 0
+#endif
+
 #if defined(OS_LINUX)
 #include <sys/epoll.h>
 
