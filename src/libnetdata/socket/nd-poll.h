@@ -5,14 +5,17 @@
 
 #include "libnetdata/common.h"
 
-typedef enum {
-    ND_POLL_READ            = 1 << 0,
-    ND_POLL_WRITE           = 1 << 1,
-    ND_POLL_ERROR           = 1 << 2,
-    ND_POLL_HUP             = 1 << 3,
-    ND_POLL_INVALID         = 1 << 4,
-    ND_POLL_TIMEOUT         = 1 << 5,
-    ND_POLL_OTHER_ERROR     = 1 << 6,
+typedef enum __attribute__((packed)) {
+    ND_POLL_NONE            = 0,
+
+    ND_POLL_READ            = 1 << 0, // same as EPOLLIN, POLLIN
+    ND_POLL_WRITE           = 1 << 2, // same as EPOLLOUT, POLLOUT
+    ND_POLL_ERROR           = 1 << 3, // same as EPOLLERR, POLLERR
+    ND_POLL_HUP             = 1 << 4, // same as EPOLLHUP, POLLHUP
+    ND_POLL_INVALID         = 1 << 5, // same as POLLNVAL
+
+    ND_POLL_TIMEOUT         = 1 << 6,
+    ND_POLL_POLL_ERROR      = 1 << 7,
 } nd_poll_event_t;
 
 typedef struct {

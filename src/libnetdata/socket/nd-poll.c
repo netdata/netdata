@@ -57,30 +57,35 @@ bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
     return rc;
 }
 
+static inline nd_poll_event_t nd_poll_events_from_epoll_events(uint32_t events) {
+    nd_poll_event_t nd_poll_events = ND_POLL_NONE;
+
+    if (events & (EPOLLIN|EPOLLPRI|EPOLLRDNORM|EPOLLRDBAND))
+        nd_poll_events |= ND_POLL_READ;
+
+    if (events & (EPOLLOUT|EPOLLWRNORM|EPOLLWRBAND))
+        nd_poll_events |= ND_POLL_WRITE;
+
+    if (events & EPOLLERR)
+        nd_poll_events |= ND_POLL_ERROR;
+
+    if (events & (EPOLLHUP|EPOLLRDHUP))
+        nd_poll_events |= ND_POLL_HUP;
+
+    return nd_poll_events;
+}
+
 static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *result) {
-    for(size_t i = ndpl->last_pos; i < ndpl->used ;i++) {
+    if(ndpl->last_pos < ndpl->used) {
         *result = (nd_poll_result_t){
-            .events = 0,
-            .data = ndpl->ev[i].data.ptr,
+            .events = nd_poll_events_from_epoll_events(ndpl->ev[ndpl->last_pos].events),
+            .data = ndpl->ev[ndpl->last_pos].data.ptr,
         };
 
-        if (ndpl->ev[i].events & EPOLLIN)
-            result->events |= ND_POLL_READ;
-
-        if (ndpl->ev[i].events & EPOLLOUT)
-            result->events |= ND_POLL_WRITE;
-
-        if (ndpl->ev[i].events & EPOLLERR)
-            result->events |= ND_POLL_ERROR;
-
-        if (ndpl->ev[i].events & EPOLLHUP)
-            result->events |= ND_POLL_HUP;
-
-        ndpl->last_pos = i + 1;
+        ndpl->last_pos++;
         return true;
     }
 
-    ndpl->last_pos = _countof(ndpl->ev);
     return false;
 }
 
@@ -96,7 +101,7 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
         int n = epoll_wait(ndpl->epoll_fd, &ndpl->ev[0], _countof(ndpl->ev), timeout_ms);
 
         if(unlikely(n <= 0)) {
-            if (n == 0) {
+            if(n == 0) {
                 result->events = ND_POLL_TIMEOUT;
                 result->data = NULL;
                 return 0;
@@ -105,15 +110,17 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
             if(errno == EINTR || errno == EAGAIN)
                 continue;
 
-            result->events = ND_POLL_OTHER_ERROR;
+            result->events = ND_POLL_POLL_ERROR;
             result->data = NULL;
             return -1;
         }
 
         ndpl->used = n;
+        ndpl->last_pos = 0;
         if (nd_poll_get_next_event(ndpl, result))
             return 1;
 
+        internal_fatal(true, "nd_poll_get_next_event() should have 1 event!");
     } while(true);
 }
 
@@ -211,31 +218,37 @@ bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
     return false;
 }
 
+static inline nd_poll_event_t nd_poll_events_from_poll_revents(short int events) {
+    nd_poll_event_t nd_poll_events = ND_POLL_NONE;
+
+    if (events & (POLLIN|POLLPRI|POLLRDNORM|POLLRDBAND))
+        nd_poll_events |= ND_POLL_READ;
+
+    if (events & (POLLOUT|POLLWRNORM|POLLWRBAND))
+        nd_poll_events |= ND_POLL_WRITE;
+
+    if (events & POLLERR)
+        nd_poll_events |= ND_POLL_ERROR;
+
+    if (events & (POLLHUP|POLLRDHUP))
+        nd_poll_events |= ND_POLL_HUP;
+
+    if (events & (POLLNVAL))
+        nd_poll_events |= ND_POLL_INVALID;
+
+    return nd_poll_events;
+}
+
 static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *result) {
     for (nfds_t i = ndpl->last_pos; i < ndpl->nfds; i++) {
         if (ndpl->fds[i].revents != 0) {
 
             result->data = POINTERS_GET(&ndpl->pointers, ndpl->fds[i].fd);
+            result->events = nd_poll_events_from_poll_revents(ndpl->fds[i].revents);
+            ndpl->fds[i].revents = 0;
 
-            result->events = 0;
-            if (ndpl->fds[i].revents & (POLLIN|POLLPRI))
-                result->events |= ND_POLL_READ;
-
-            if (ndpl->fds[i].revents & POLLOUT)
-                result->events |= ND_POLL_WRITE;
-
-            if (ndpl->fds[i].revents & POLLERR)
-                result->events |= ND_POLL_ERROR;
-
-            if (ndpl->fds[i].revents & POLLHUP)
-                result->events |= ND_POLL_HUP;
-
-            if (ndpl->fds[i].revents & POLLNVAL)
-                result->events |= ND_POLL_INVALID;
-
-            ndpl->fds[i].revents = 0; // Clear the event after handling
             ndpl->last_pos = i + 1;
-            return true; // Return only the first triggered event
+            return true;
         }
     }
 
@@ -265,25 +278,25 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
         int ret = poll(ndpl->fds, ndpl->nfds, timeout_ms);
 
         if(unlikely(ret <= 0)) {
-            if (ret < 0) {
-                if(errno == EAGAIN || errno == EINTR)
-                    continue;
-
-                result->events = ND_POLL_OTHER_ERROR;
-                result->data = NULL;
-                return -1;
-            }
-            else {
+            if(ret == 0) {
                 result->events = ND_POLL_TIMEOUT;
                 result->data = NULL;
                 return 0;
             }
+
+            if(errno == EAGAIN || errno == EINTR)
+                continue;
+
+            result->events = ND_POLL_POLL_ERROR;
+            result->data = NULL;
+            return -1;
         }
 
         // Process the next event
         if (nd_poll_get_next_event(ndpl, result))
             return 1;
 
+        internal_fatal(true, "nd_poll_get_next_event() should have 1 event!");
     } while (true);
 }
 
