@@ -45,6 +45,9 @@ func (c *Collector) collect() (map[string]int64, error) {
 	if err := c.collectLeafz(mx); err != nil {
 		return mx, err
 	}
+	if err := c.collectJsz(mx); err != nil {
+		return mx, err
+	}
 
 	c.updateCharts()
 
@@ -256,6 +259,30 @@ func (c *Collector) collectLeafz(mx map[string]int64) error {
 		rtt, _ := time.ParseDuration(leaf.RTT)
 		mx[px+"rtt"] = rtt.Microseconds()
 	}
+
+	return nil
+}
+
+func (c *Collector) collectJsz(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathJsz)
+	if err != nil {
+		return err
+	}
+
+	var resp jszResponse
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
+		return err
+	}
+
+	mx["jsz_streams"] = int64(resp.Streams)
+	mx["jsz_consumers"] = int64(resp.Consumers)
+	mx["jsz_bytes"] = int64(resp.Bytes)
+	mx["jsz_messages"] = int64(resp.Messages)
+	mx["jsz_memory_used"] = int64(resp.Memory)
+	mx["jsz_store_used"] = int64(resp.Store)
+	mx["jsz_api_total"] = int64(resp.Api.Total)
+	mx["jsz_api_errors"] = int64(resp.Api.Errors)
+	mx["jsz_api_inflight"] = int64(resp.Api.Inflight)
 
 	return nil
 }
