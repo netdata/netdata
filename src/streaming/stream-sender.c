@@ -438,6 +438,81 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
     worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, overall_buffer_ratio);
 }
 
+bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes) {
+    EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
+    while(status == EVLOOP_STATUS_CONTINUE) {
+        if(!stream_sender_trylock(s)) {
+            sth->snd.send_misses++;
+            status = EVLOOP_CANT_GET_LOCK;
+            break;
+        }
+
+        STREAM_CIRCULAR_BUFFER_STATS *stats = stream_circular_buffer_stats_unsafe(s->scb);
+        char *chunk;
+        size_t outstanding = stream_circular_buffer_get_unsafe(s->scb, &chunk);
+
+        internal_fatal(!outstanding, "Trying to send without data");
+
+        ssize_t rc = nd_sock_send_nowait(&s->sock, chunk, outstanding);
+        if (likely(rc > 0)) {
+            stream_circular_buffer_del_unsafe(s->scb, rc);
+            replication_recalculate_buffer_used_ratio_unsafe(s);
+            s->thread.last_traffic_ut = now_ut;
+            sth->snd.bytes_sent += rc;
+
+            if (!stats->bytes_outstanding) {
+                // we sent them all - remove ND_POLL_WRITE
+                if (!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
+                           sth->id, rrdhost_hostname(s->host), s->connected_to);
+
+                // recreate the circular buffer if we have to
+                stream_circular_buffer_recreate_timed_unsafe(s->scb, now_ut, false);
+                status = EVLOOP_STATUS_NO_MORE_DATA;
+            }
+        }
+        else if (rc == 0 || errno == ECONNRESET)
+            status = EVLOOP_STATUS_SOCKET_CLOSED;
+
+        else if (rc < 0) {
+            if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
+                status = EVLOOP_STATUS_SOCKET_FULL;
+            else
+                status = EVLOOP_STATUS_SOCKET_ERROR;
+        }
+        stream_sender_unlock(s);
+
+        if (status == EVLOOP_STATUS_SOCKET_ERROR || status == EVLOOP_STATUS_SOCKET_CLOSED) {
+            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR);
+            const char *disconnect_reason = NULL;
+            STREAM_HANDSHAKE reason;
+
+            if(status == EVLOOP_STATUS_SOCKET_ERROR) {
+                disconnect_reason = "socket reports error while writing";
+                reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED;
+            }
+            else /* if(status == EVLOOP_STATUS_SOCKET_CLOSED) */ {
+                disconnect_reason = "socket reports EOF (closed by parent)";
+                reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END;
+            }
+
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM SND[%zu] '%s' [to %s]: %s (%zd, on fd %d) - restarting connection - "
+                   "we have sent %zu bytes in %zu operations.",
+                   sth->id, rrdhost_hostname(s->host), s->connected_to, disconnect_reason, rc, s->sock.fd,
+                   stats->bytes_sent, stats->sends);
+
+            stream_sender_move_running_to_connector_or_remove(sth, s, reason, true);
+            return false;
+        }
+        else if(process_opcodes && status == EVLOOP_STATUS_CONTINUE && stream_thread_process_opcodes(sth, &s->thread.meta))
+            status = EVLOOP_STATUS_OPCODE_ON_ME;
+    }
+
+    return status == EVLOOP_STATUS_NO_MORE_DATA || status == EVLOOP_STATUS_SOCKET_FULL || status == EVLOOP_CANT_GET_LOCK;
+}
+
 // process poll() events for streaming senders
 // returns true when the sender is still there, false if it removed it
 bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t events, usec_t now_ut) {
@@ -484,73 +559,9 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
     }
 
     if(events & ND_POLL_WRITE) {
-        // we can send data on this socket
-
-        bool stop = false;
-        while(!stop) {
-            if(stream_sender_trylock(s)) {
-                worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
-
-                const char *disconnect_reason = NULL;
-                STREAM_HANDSHAKE reason;
-
-                STREAM_CIRCULAR_BUFFER_STATS *stats = stream_circular_buffer_stats_unsafe(s->scb);
-                char *chunk;
-                size_t outstanding = stream_circular_buffer_get_unsafe(s->scb, &chunk);
-                ssize_t rc = nd_sock_send_nowait(&s->sock, chunk, outstanding);
-                if (likely(rc > 0)) {
-                    stream_circular_buffer_del_unsafe(s->scb, rc);
-                    replication_recalculate_buffer_used_ratio_unsafe(s);
-                    s->thread.last_traffic_ut = now_ut;
-                    sth->snd.bytes_sent += rc;
-
-                    if (!stats->bytes_outstanding) {
-                        // we sent them all - remove ND_POLL_WRITE
-                        if (!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
-                            nd_log(NDLS_DAEMON, NDLP_ERR,
-                                   "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
-                                   sth->id, rrdhost_hostname(s->host), s->connected_to);
-
-                        // recreate the circular buffer if we have to
-                        stream_circular_buffer_recreate_timed_unsafe(s->scb, now_ut, false);
-                        stop = true;
-                    }
-                    else if(stream_thread_process_opcodes(sth, &s->thread.meta))
-                        stop = true;
-                }
-                else if (rc == 0 || errno == ECONNRESET) {
-                    disconnect_reason = "socket reports EOF (closed by parent)";
-                    reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END;
-                }
-                else if (rc < 0) {
-                    if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR) {
-                        // will try later
-                        stop = true;
-                    }
-                    else {
-                        disconnect_reason = "socket reports error while writing";
-                        reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED;
-                    }
-                }
-                stream_sender_unlock(s);
-
-                if (disconnect_reason) {
-                    worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR);
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "STREAM SND[%zu] '%s' [to %s]: %s (%zd, on fd %d) - restarting connection - "
-                           "we have sent %zu bytes in %zu operations.",
-                           sth->id, rrdhost_hostname(s->host), s->connected_to, disconnect_reason, rc, s->sock.fd,
-                           stats->bytes_sent, stats->sends);
-
-                    stream_sender_move_running_to_connector_or_remove(sth, s, reason, true);
-                    return false;
-                }
-            }
-            else {
-                sth->snd.send_misses++;
-                break;
-            }
-        }
+        worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
+        if(!stream_sender_send_data(sth, s, now_ut, true))
+            return false;
     }
 
     if(!(events & ND_POLL_READ))

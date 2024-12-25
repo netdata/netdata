@@ -98,6 +98,16 @@ struct stream_opcode {
 #define MAX_IO_ITERATIONS_PER_EVENT 65536 // drain the input, take it all
 
 typedef enum {
+    EVLOOP_STATUS_CONTINUE,
+    EVLOOP_STATUS_SOCKET_FULL,
+    EVLOOP_STATUS_SOCKET_CLOSED,
+    EVLOOP_STATUS_SOCKET_ERROR,
+    EVLOOP_STATUS_NO_MORE_DATA,
+    EVLOOP_STATUS_OPCODE_ON_ME,
+    EVLOOP_CANT_GET_LOCK,
+} EVLOOP_STATUS;
+
+typedef enum {
     POLLFD_TYPE_EMPTY,
     POLLFD_TYPE_SENDER,
     POLLFD_TYPE_RECEIVER,
@@ -213,6 +223,9 @@ void stream_thread_node_removed(struct rrdhost *host);
 bool stream_thread_process_opcodes(struct stream_thread *sth, struct pollfd_meta *my_meta);
 
 void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct receiver_state *rpt);
+
+bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes);
+bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut, bool process_opcodes);
 
 #include "stream-sender-internals.h"
 #include "stream-receiver-internals.h"
