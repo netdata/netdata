@@ -29,12 +29,17 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
     {
         if(m->type == POLLFD_TYPE_SENDER) {
             if(msg->opcode & STREAM_OPCODE_SENDER_POLLOUT) {
-                if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, ND_POLL_READ|ND_POLL_WRITE, m)) {
+                if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, ND_POLL_READ | ND_POLL_WRITE, m)) {
                     nd_log_limit_static_global_var(erl, 1, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
                                  "STREAM SND[%zu] '%s' [to %s]: cannot enable output on sender socket %d.",
                                  sth->id, rrdhost_hostname(m->s->host), m->s->connected_to, m->s->sock.fd);
                 }
+
+                if(!stream_sender_send_data(sth, m->s, now_monotonic_usec(), false))
+                    // sender has been removed
+                    return;
+
                 msg->opcode &= ~(STREAM_OPCODE_SENDER_POLLOUT);
             }
 
@@ -45,10 +50,15 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
             if (msg->opcode & STREAM_OPCODE_RECEIVER_POLLOUT) {
                 if (!nd_poll_upd(sth->run.ndpl, m->rpt->sock.fd, ND_POLL_READ | ND_POLL_WRITE, m)) {
                     nd_log_limit_static_global_var(erl, 1, 0);
-                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
+                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                                  "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot enable output on receiver socket %d.",
                                  sth->id, rrdhost_hostname(m->rpt->host), m->rpt->client_ip, m->rpt->client_port, m->rpt->sock.fd);
                 }
+
+                if(!stream_receiver_send_data(sth, m->rpt, now_monotonic_usec(), false))
+                    // receiver has been removed
+                    return;
+
                 msg->opcode &= ~(STREAM_OPCODE_RECEIVER_POLLOUT);
             }
 
@@ -394,9 +404,9 @@ void *stream_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_OVERFLOW, "disconnect overflow");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT, "disconnect timeout");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR, "disconnect socket error");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED, "disconnect remote closed");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
-    worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
+    worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED, "disconnect remote closed");
+    worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_RECEIVE_ERROR, "disconnect receive error");
+    worker_register_job_name(WORKER_STREAM_JOB_DISCONNECT_SEND_ERROR, "disconnect send error");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_COMPRESSION_ERROR, "disconnect compression error");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_RECEIVER_LEFT, "disconnect receiver left");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_HOST_CLEANUP, "disconnect host cleanup");

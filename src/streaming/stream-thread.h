@@ -64,9 +64,9 @@ struct stream_opcode {
 #define WORKER_SENDER_JOB_DISCONNECT_OVERFLOW                           16
 #define WORKER_SENDER_JOB_DISCONNECT_TIMEOUT                            17
 #define WORKER_SENDER_JOB_DISCONNECT_SOCKET_ERROR                       18
-#define WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED                      19
-#define WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR                      20
-#define WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR                         21
+#define WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED                      19
+#define WORKER_STREAM_JOB_DISCONNECT_RECEIVE_ERROR                      20
+#define WORKER_STREAM_JOB_DISCONNECT_SEND_ERROR                         21
 #define WORKER_SENDER_JOB_DISCONNECT_COMPRESSION_ERROR                  22
 #define WORKER_SENDER_JOB_DISCONNECT_RECEIVER_LEFT                      23
 #define WORKER_SENDER_JOB_DISCONNECT_HOST_CLEANUP                       24
@@ -104,8 +104,11 @@ typedef enum {
     EVLOOP_STATUS_SOCKET_ERROR,
     EVLOOP_STATUS_NO_MORE_DATA,
     EVLOOP_STATUS_OPCODE_ON_ME,
-    EVLOOP_CANT_GET_LOCK,
+    EVLOOP_STATUS_CANT_GET_LOCK,
+    EVLOOP_STATUS_PARSER_FAILED,
 } EVLOOP_STATUS;
+
+#define EVLOOP_STATUS_STILL_ALIVE(status) (status == EVLOOP_STATUS_CONTINUE || status == EVLOOP_STATUS_NO_MORE_DATA || status == EVLOOP_STATUS_SOCKET_FULL || status == EVLOOP_STATUS_CANT_GET_LOCK)
 
 typedef enum {
     POLLFD_TYPE_EMPTY,
@@ -224,7 +227,10 @@ bool stream_thread_process_opcodes(struct stream_thread *sth, struct pollfd_meta
 
 void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct receiver_state *rpt);
 
+bool stream_sender_receive_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes);
 bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes);
+
+bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut, bool process_opcodes);
 bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut, bool process_opcodes);
 
 #include "stream-sender-internals.h"

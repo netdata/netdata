@@ -227,7 +227,7 @@ int sock_enlarge_out(int fd) {
 }
 
 int sock_setcork(int fd) {
-    bool tcp_cork = true;
+    int tcp_cork = 0;
     int ret = -1;
 
 #ifdef TCP_CORK
@@ -243,7 +243,7 @@ int sock_setcork(int fd) {
 }
 
 int sock_delcork(int fd) {
-    bool tcp_cork = false;
+    int tcp_cork = 0;
     int ret = -1;
 
 #ifdef TCP_CORK

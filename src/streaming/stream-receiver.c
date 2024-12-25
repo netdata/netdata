@@ -626,10 +626,12 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
 }
 
 bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut, bool process_opcodes) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
     EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
     while(status == EVLOOP_STATUS_CONTINUE) {
         if (!spinlock_trylock(&rpt->thread.send_to_child.spinlock)) {
-            status = EVLOOP_CANT_GET_LOCK;
+            status = EVLOOP_STATUS_CANT_GET_LOCK;
             break;
         }
 
@@ -667,21 +669,22 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
         spinlock_unlock(&rpt->thread.send_to_child.spinlock);
 
         if (status == EVLOOP_STATUS_SOCKET_ERROR || status == EVLOOP_STATUS_SOCKET_CLOSED) {
-            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SEND_ERROR);
             const char *disconnect_reason;
             STREAM_HANDSHAKE reason;
 
             if(status == EVLOOP_STATUS_SOCKET_ERROR) {
+                worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_SEND_ERROR);
                 disconnect_reason = "socket reports error while writing";
                 reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_WRITE_FAILED;
             }
             else /* if(status == EVLOOP_STATUS_SOCKET_CLOSED) */ {
+                worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED);
                 disconnect_reason = "socket reports EOF (closed by child)";
                 reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END;
             }
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s (%zd, on fd %d) - closing connection - "
+                   "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s (%zd, on fd %d) - closing receiver connection - "
                    "we have sent %zu bytes in %zu operations.",
                    sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port,
                    disconnect_reason, rc, rpt->sock.fd, stats->bytes_sent, stats->sends);
@@ -693,26 +696,83 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
             status = EVLOOP_STATUS_OPCODE_ON_ME;
     }
 
-    return status == EVLOOP_STATUS_NO_MORE_DATA || status == EVLOOP_STATUS_SOCKET_FULL || status == EVLOOP_CANT_GET_LOCK;
+    return EVLOOP_STATUS_STILL_ALIVE(status);
+}
+
+bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut, bool process_opcodes) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
+    PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
+        ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
+        ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
+        ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
+    size_t iterations = 0;
+    while(status == EVLOOP_STATUS_CONTINUE && iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
+        bool removed = false;
+        ssize_t rc = stream_receive_and_process(sth, rpt, parser, &removed);
+        if(unlikely(removed))
+            status = EVLOOP_STATUS_PARSER_FAILED;
+
+        else if (likely(rc > 0))
+            rpt->last_msg_t = (time_t)(now_ut / USEC_PER_SEC);
+
+        else if (rc == 0 || errno == ECONNRESET)
+            status = EVLOOP_STATUS_SOCKET_CLOSED;
+
+        else if (rc < 0) {
+            if ((errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
+                status = EVLOOP_STATUS_SOCKET_FULL;
+            else
+                status = EVLOOP_STATUS_SOCKET_ERROR;
+        }
+
+        if(status == EVLOOP_STATUS_SOCKET_ERROR || status == EVLOOP_STATUS_SOCKET_CLOSED) {
+            const char *disconnect_reason;
+            STREAM_HANDSHAKE reason;
+
+            if(status == EVLOOP_STATUS_SOCKET_ERROR) {
+                worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_RECEIVE_ERROR);
+                reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED;
+                disconnect_reason = "error during receive";
+            }
+            else /* if(status == EVLOOP_STATUS_SOCKET_CLOSED) */ {
+                worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_REMOTE_CLOSED);
+                reason = STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END;
+                disconnect_reason = "socket reports EOF (closed by child)";
+            }
+
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s (fd %d) - closing receiver connection.",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, disconnect_reason, rpt->sock.fd);
+
+            receiver_set_exit_reason(rpt, reason, false);
+            stream_receiver_remove(sth, rpt, disconnect_reason);
+        }
+        else if(status == EVLOOP_STATUS_CONTINUE && process_opcodes && stream_thread_process_opcodes(sth, &rpt->thread.meta))
+            status = EVLOOP_STATUS_OPCODE_ON_ME;
+    }
+
+    return EVLOOP_STATUS_STILL_ALIVE(status);
 }
 
 // process poll() events for streaming receivers
 // returns true when the receiver is still there, false if it removed it
-bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events, usec_t now_ut)
-{
+bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t events, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
 
-    PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
         ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
         ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rpt->hostname),
         ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
         ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
-        ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
-        ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
-        ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
-        ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -754,51 +814,13 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
             return false;
     }
 
-    if (!(events & ND_POLL_READ))
-        return true;
-
-    // we can receive data from this socket
-
-    worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
-    bool removed = false, stop = false;
-    size_t iterations = 0;
-    while(!removed && !stop && iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
-        ssize_t rc = stream_receive_and_process(sth, rpt, parser, &removed);
-        if (likely(rc > 0)) {
-            rpt->last_msg_t = (time_t)(now_ut / USEC_PER_SEC);
-
-            if(stream_thread_process_opcodes(sth, &rpt->thread.meta))
-                stop = true;
-        }
-        else if (rc == 0 || errno == ECONNRESET) {
-            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_REMOTE_CLOSED);
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM RCV[%zu] '%s' [from [%s]:%s]: socket %d reports EOF (closed by child).",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->sock.fd);
-            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE_END, false);
-            stream_receiver_remove(sth, rpt, "socket reports EOF (closed by child)");
+    if (events & ND_POLL_READ) {
+        worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
+        if(!stream_receiver_receive_data(sth, rpt, now_ut, true))
             return false;
-        }
-        else if (rc < 0) {
-            if(removed)
-                return false;
-
-            else if ((errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
-                // will try later
-                stop = true;
-            else {
-                worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_RECEIVE_ERROR);
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM RCV[%zu] '%s' [from [%s]:%s]: error during receive (%zd, on fd %d) - closing connection.",
-                       sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rc, rpt->sock.fd);
-                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_FAILED, false);
-                stream_receiver_remove(sth, rpt, "error during receive");
-                return false;
-            }
-        }
     }
 
-    return !removed;
+    return true;
 }
 
 void stream_receiver_cleanup(struct stream_thread *sth) {
