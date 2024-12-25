@@ -155,6 +155,7 @@ static void backfill_dim_work_free(bool successful, struct backfill_dim_work *bd
 void *backfill_worker_thread(void *ptr) {
     bool main_thread = (ptr == (void *)0x01);
     size_t warning = LOG_WARNING_EVERY;
+    bool timeout = false;
 
     worker_register("BACKFILL");
 
@@ -182,7 +183,7 @@ void *backfill_worker_thread(void *ptr) {
             backfill_dim_work_free(success, bdm);
             continue;
         }
-        else if(main_thread) {
+        else if(main_thread && timeout) {
             size_t added = __atomic_load_n(&backfill_globals.charts_added, __ATOMIC_RELAXED);
             size_t executed = __atomic_load_n(&backfill_globals.callbacks_executed, __ATOMIC_RELAXED);
 
@@ -198,7 +199,9 @@ void *backfill_worker_thread(void *ptr) {
         worker_set_metric(2, (NETDATA_DOUBLE)queue_size);
 
         worker_is_idle();
-        job_id = completion_wait_for_a_job_with_timeout(&backfill_globals.completion, job_id, 1000);
+        size_t new_job_id = completion_wait_for_a_job_with_timeout(&backfill_globals.completion, job_id, 1000);
+        timeout = new_job_id == job_id;
+        job_id = new_job_id;
     }
 
     worker_unregister();
