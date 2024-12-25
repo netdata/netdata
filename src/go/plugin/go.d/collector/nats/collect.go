@@ -77,9 +77,9 @@ func (c *Collector) collectHealthz(mx map[string]int64) error {
 
 	switch c.HealthzCheck {
 	case "js-enabled-only":
-		req.URL.Scheme = urlQueryHealthzJsEnabledOnly
+		req.URL.RawQuery = urlQueryHealthzJsEnabledOnly
 	case "js-server-only":
-		req.URL.Scheme = urlQueryHealthzJsServerOnly
+		req.URL.RawQuery = urlQueryHealthzJsServerOnly
 	}
 
 	var resp healthzResponse

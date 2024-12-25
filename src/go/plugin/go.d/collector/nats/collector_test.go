@@ -201,7 +201,7 @@ func TestCollector_Collect(t *testing.T) {
 				"leafz_leaf__$G_127.0.0.1_6223_num_subs":       1,
 				"leafz_leaf__$G_127.0.0.1_6223_out_bytes":      1280000,
 				"leafz_leaf__$G_127.0.0.1_6223_out_msgs":       10000,
-				"leafz_leaf__$G_127.0.0.1_6223_rtt":            0,
+				"leafz_leaf__$G_127.0.0.1_6223_rtt":            200,
 				"routez_route_id_1_in_bytes":                   4,
 				"routez_route_id_1_in_msgs":                    1,
 				"routez_route_id_1_num_subs":                   1,
@@ -264,6 +264,8 @@ func TestCollector_Collect(t *testing.T) {
 			_ = collr.Check(context.Background())
 
 			mx := collr.Collect(context.Background())
+
+			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
 				assert.Equal(t, test.wantNumOfCharts, len(*collr.Charts()), "want charts")
