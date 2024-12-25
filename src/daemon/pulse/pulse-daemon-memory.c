@@ -140,7 +140,7 @@ void pulse_daemon_memory_do(bool extended) {
             dictionary_stats_category_functions.memory.dict + dictionary_stats_category_functions.memory.index +
             dictionary_stats_category_replication.memory.dict + dictionary_stats_category_replication.memory.index +
             netdata_buffers_statistics.rrdhost_allocations_size +
-            replication_allocated_memory();
+            replication_sender_allocated_memory();
 
         rrddim_set_by_pointer(st_memory, rd_metadata, (collected_number)metadata);
 #endif
