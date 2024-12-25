@@ -713,8 +713,7 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
     ND_LOG_STACK_PUSH(lgs);
 
     EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
-    size_t iterations = 0;
-    while(status == EVLOOP_STATUS_CONTINUE && iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
+    while(status == EVLOOP_STATUS_CONTINUE) {
         bool removed = false;
         ssize_t rc = stream_receive_and_process(sth, rpt, parser, &removed);
         if(unlikely(removed))
@@ -810,14 +809,22 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
     if (events & ND_POLL_WRITE) {
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
+//        usec_t started_ut = now_monotonic_usec();
         if(!stream_receiver_send_data(sth, rpt, now_ut, true))
             return false;
+//        usec_t duration_rcv_snd = now_monotonic_usec() - started_ut;
+//        errno_clear();
+//        nd_log(NDLS_DAEMON, NDLP_DEBUG, "DURATION rcv snd = %llu", (unsigned long long )duration_rcv_snd);
     }
 
     if (events & ND_POLL_READ) {
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
+//        usec_t started_ut = now_monotonic_usec();
         if(!stream_receiver_receive_data(sth, rpt, now_ut, true))
             return false;
+//        usec_t duration_rcv_rcv = now_monotonic_usec() - started_ut;
+//        errno_clear();
+//        nd_log(NDLS_DAEMON, NDLP_DEBUG, "DURATION rcv rcv = %llu", (unsigned long long )duration_rcv_rcv);
     }
 
     return true;

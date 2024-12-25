@@ -518,8 +518,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
 
 bool stream_sender_receive_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes) {
     EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
-    size_t iterations = 0;
-    while(status == EVLOOP_STATUS_CONTINUE && iterations++ < MAX_IO_ITERATIONS_PER_EVENT) {
+    while(status == EVLOOP_STATUS_CONTINUE) {
         ssize_t rc = nd_sock_revc_nowait(&s->sock, s->rbuf.b + s->rbuf.read_len, sizeof(s->rbuf.b) - s->rbuf.read_len - 1);
         if (likely(rc > 0)) {
             s->rbuf.read_len += rc;
@@ -616,14 +615,22 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
 
     if(events & ND_POLL_READ) {
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_RECEIVE);
+//        usec_t started_ut = now_monotonic_usec();
         if(!stream_sender_receive_data(sth, s, now_ut, true))
             return false;
+//        usec_t duration_snd_rcv = now_monotonic_usec() - started_ut;
+//        errno_clear();
+//        nd_log(NDLS_DAEMON, NDLP_DEBUG, "DURATION snd rcv = %llu", (unsigned long long )duration_snd_rcv);
     }
 
     if(events & ND_POLL_WRITE) {
         worker_is_busy(WORKER_STREAM_JOB_SOCKET_SEND);
+//        usec_t started_ut = now_monotonic_usec();
         if(!stream_sender_send_data(sth, s, now_ut, true))
             return false;
+//        usec_t duration_snd_snd = now_monotonic_usec() - started_ut;
+//        errno_clear();
+//        nd_log(NDLS_DAEMON, NDLP_DEBUG, "DURATION snd snd = %llu", (unsigned long long )duration_snd_snd);
     }
 
     return true;

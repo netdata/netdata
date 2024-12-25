@@ -525,7 +525,7 @@ void *stream_thread(void *ptr) {
             last_dequeue_ut = now_ut;
         }
 
-        if(now_ut - last_check_all_nodes_ut >= USEC_PER_SEC) {
+        if(now_ut - last_check_all_nodes_ut >= USEC_PER_SEC / 2) {
             worker_is_busy(WORKER_STREAM_JOB_LIST);
 
             // periodically check the entire list of nodes
