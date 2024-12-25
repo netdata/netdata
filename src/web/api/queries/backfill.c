@@ -28,6 +28,9 @@ static struct {
     size_t queue_size;
     BACKFILL_JudyLSet queue;
 
+    size_t charts_added;
+    size_t callbacks_executed;
+
     ARAL *ar_br;
     ARAL *ar_bdm;
 
@@ -73,6 +76,8 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
 
         if(added) {
             spinlock_lock(&backfill_globals.spinlock);
+
+            __atomic_add_fetch(&backfill_globals.charts_added, 1, __ATOMIC_RELAXED);
 
             for(size_t i = 0; i < added ;i++) {
                 backfill_globals.queue_size++;
@@ -128,10 +133,14 @@ static void backfill_dim_work_free(bool successful, struct backfill_dim_work *bd
     if(works == 0) {
         // we are the last dimension of the chart
 
-        if(br->cb)
-            br->cb(__atomic_load_n(&br->successful, __ATOMIC_RELAXED),
-                   __atomic_load_n(&br->failed, __ATOMIC_RELAXED),
-                   &br->data);
+        if(br->cb) {
+            __atomic_add_fetch(&backfill_globals.callbacks_executed, 1, __ATOMIC_RELAXED);
+
+            br->cb(
+                __atomic_load_n(&br->successful, __ATOMIC_RELAXED),
+                __atomic_load_n(&br->failed, __ATOMIC_RELAXED),
+                &br->data);
+        }
 
         rrdset_acquired_release(br->rsa);
         aral_freez(backfill_globals.ar_br, br);
@@ -141,7 +150,12 @@ static void backfill_dim_work_free(bool successful, struct backfill_dim_work *bd
     aral_freez(backfill_globals.ar_bdm, bdm);
 }
 
-void *backfill_worker_thread(void *ptr __maybe_unused) {
+#define LOG_WARNING_EVERY 10
+
+void *backfill_worker_thread(void *ptr) {
+    bool main_thread = (ptr == (void *)0x01);
+    size_t warning = LOG_WARNING_EVERY;
+
     worker_register("BACKFILL");
 
     worker_register_job_name(0, "get");
@@ -162,10 +176,23 @@ void *backfill_worker_thread(void *ptr __maybe_unused) {
         spinlock_unlock(&backfill_globals.spinlock);
 
         if(bdm) {
+            warning = LOG_WARNING_EVERY;
             worker_is_busy(1);
             bool success = backfill_execute(bdm);
             backfill_dim_work_free(success, bdm);
             continue;
+        }
+        else if(main_thread) {
+            size_t added = __atomic_load_n(&backfill_globals.charts_added, __ATOMIC_RELAXED);
+            size_t executed = __atomic_load_n(&backfill_globals.callbacks_executed, __ATOMIC_RELAXED);
+
+            if(executed != added && --warning == 0) {
+                warning = LOG_WARNING_EVERY;
+
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "BACKFILL: the queue is empty, but the commands executed %zu is not equal to the commands added %zu",
+                       executed, added);
+            }
         }
 
         worker_set_metric(2, (NETDATA_DOUBLE)queue_size);
@@ -205,7 +232,7 @@ void *backfill_thread(void *ptr) {
         th[t] = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, backfill_worker_thread, NULL);
     }
 
-    backfill_worker_thread(NULL);
+    backfill_worker_thread((void *)0x01);
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     for(size_t t = 0; t < threads - 1 ;t++) {
