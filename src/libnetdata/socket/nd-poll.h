@@ -15,7 +15,7 @@ typedef enum __attribute__((packed)) {
     ND_POLL_INVALID         = 1 << 5, // same as POLLNVAL
 
     ND_POLL_TIMEOUT         = 1 << 6,
-    ND_POLL_POLL_ERROR      = 1 << 7,
+    ND_POLL_POLL_FAILED     = 1 << 7,
 } nd_poll_event_t;
 
 typedef struct {

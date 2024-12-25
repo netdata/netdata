@@ -110,7 +110,7 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
             if(errno == EINTR || errno == EAGAIN)
                 continue;
 
-            result->events = ND_POLL_POLL_ERROR;
+            result->events = ND_POLL_POLL_FAILED;
             result->data = NULL;
             return -1;
         }
@@ -287,7 +287,7 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
             if(errno == EAGAIN || errno == EINTR)
                 continue;
 
-            result->events = ND_POLL_POLL_ERROR;
+            result->events = ND_POLL_POLL_FAILED;
             result->data = NULL;
             return -1;
         }

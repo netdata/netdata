@@ -226,10 +226,12 @@ static inline int poll_process_udp_read(POLLINFO *pi, time_t now __maybe_unused)
 
     pi->events = 0;
 
-    int rc = pi->rcv_callback(pi, &pi->events) == -1 ? 0 : 1;
-    poll_process_updated_events(pi);
-
-    return rc;
+    if(pi->rcv_callback(pi, &pi->events) == -1)
+        return 0;
+    else {
+        poll_process_updated_events(pi);
+        return 1;
+    }
 }
 
 static int poll_process_new_tcp_connection(POLLINFO *pi, time_t now) {
