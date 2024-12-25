@@ -1144,7 +1144,7 @@ ARAL *aral_by_size_acquire(size_t size) {
         aral_by_size_globals.array[size].refcount++;
 
         internal_fatal(
-            aral_requested_element_size(ar) != size, "DICTIONARY: aral has size %zu but we want %zu",
+            aral_requested_element_size(ar) != size, "ARAL BY SIZE: aral has size %zu but we want %zu",
             aral_requested_element_size(ar), size);
     }
 
