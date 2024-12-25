@@ -1583,15 +1583,15 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
 
 static size_t verify_host_charts_are_streaming_now(RRDHOST *host) {
     internal_error(
-            host->sender &&
-            !stream_sender_pending_replication_requests(host->sender) &&
-            dictionary_entries(host->sender->replication.requests) != 0,
-            "STREAM SND REPLAY SUMMARY: 'host:%s' reports %zu pending replication requests, "
-            "but its chart replication index says there are %zu charts pending replication",
-            rrdhost_hostname(host),
+        host->sender &&
+        !stream_sender_pending_replication_requests(host->sender) &&
+        dictionary_entries(host->sender->replication.requests) != 0,
+        "STREAM SND REPLAY SUMMARY: 'host:%s' reports %zu pending replication requests, "
+        "but its chart replication index says there are %zu charts pending replication",
+        rrdhost_hostname(host),
         stream_sender_pending_replication_requests(host->sender),
-            dictionary_entries(host->sender->replication.requests)
-            );
+        dictionary_entries(host->sender->replication.requests)
+        );
 
     size_t ok = 0;
     size_t errors = 0;
@@ -1641,7 +1641,9 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
     RRDHOST *host;
     dfe_start_read(rrdhost_root_index, host) {
         charts_flagged_pending += verify_host_charts_are_streaming_now(host);
-        entries_in_dictionaries += dictionary_entries(host->sender->replication.requests);
+
+        if(host->sender)
+            entries_in_dictionaries += dictionary_entries(host->sender->replication.requests);
     }
     dfe_done(host);
 
@@ -1652,7 +1654,7 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
     size_t executed = __atomic_load_n(&replication_globals.atomic.executed, __ATOMIC_RELAXED);
 
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "REPLICATION SUMMARY: all senders finished replication, "
+           "REPLICATION SEND SUMMARY: all senders finished replication, "
            "received %zu and executed %zu replication requests, "
            "%zu charts are currently flagged with replication pending, "
            "while having %zu replication requests waiting for execution, "
