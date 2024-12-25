@@ -157,8 +157,11 @@ static void poll_events_cleanup(void *pptr) {
     POLLJOB *p = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!p) return;
 
-    for(POLLINFO *pi = p->ll; pi ;pi = pi->next)
+    while(p->ll) {
+        POLLINFO *pi = p->ll;
+        pi->flags &= ~(POLLINFO_FLAG_DONT_CLOSE);
         poll_close_fd(pi, __FUNCTION__ );
+    }
 
     nd_poll_destroy(p->ndpl);
     p->ndpl = NULL;
