@@ -425,6 +425,12 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
            "STREAM RCV[%zu] '%s' [from [%s]:%s]: moving host from receiver queue to receiver running...",
            sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
 
+    sock_setnonblock(rpt->sock.fd);
+    sock_setcloexec(rpt->sock.fd);
+    sock_enlarge_in(rpt->sock.fd);
+    sock_enlarge_out(rpt->sock.fd);
+    sock_delcork(rpt->sock.fd);
+
     rpt->host->stream.rcv.status.tid = gettid_cached();
     rpt->thread.meta.type = POLLFD_TYPE_RECEIVER;
     rpt->thread.meta.rpt = rpt;

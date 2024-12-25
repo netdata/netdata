@@ -82,22 +82,6 @@ static inline int bad_request_multiple_dashboard_versions(struct web_client *w) 
     return HTTP_RESP_BAD_REQUEST;
 }
 
-static inline int web_client_cork_socket(struct web_client *w __maybe_unused) {
-#ifdef TCP_CORK
-    if(likely(web_client_check_conn_tcp(w) && !w->tcp_cork && w->fd != -1)) {
-        w->tcp_cork = true;
-        if(unlikely(setsockopt(w->fd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
-            netdata_log_error("%llu: failed to enable TCP_CORK on socket.", w->id);
-
-            w->tcp_cork = false;
-            return -1;
-        }
-    }
-#endif /* TCP_CORK */
-
-    return 0;
-}
-
 static inline void web_client_enable_wait_from_ssl(struct web_client *w) {
     if (w->ssl.ssl_errno == SSL_ERROR_WANT_READ)
         web_client_enable_ssl_wait_receive(w);
@@ -107,22 +91,6 @@ static inline void web_client_enable_wait_from_ssl(struct web_client *w) {
         web_client_disable_ssl_wait_receive(w);
         web_client_disable_ssl_wait_send(w);
     }
-}
-
-static inline int web_client_uncork_socket(struct web_client *w __maybe_unused) {
-#ifdef TCP_CORK
-    if(likely(w->tcp_cork && w->fd != -1)) {
-        w->tcp_cork = false;
-        if(unlikely(setsockopt(w->fd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
-            netdata_log_error("%llu: failed to disable TCP_CORK on socket.", w->id);
-            w->tcp_cork = true;
-            return -1;
-        }
-    }
-#endif /* TCP_CORK */
-
-    w->tcp_cork = false;
-    return 0;
 }
 
 static inline char *strip_control_characters(char *url) {
@@ -276,7 +244,7 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
 }
 
 void web_client_request_done(struct web_client *w) {
-    web_client_uncork_socket(w);
+    sock_delcork(w->fd);
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
 
@@ -949,7 +917,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
           , buffer_tostring(w->response.header_output)
     );
 
-    web_client_cork_socket(w);
+    sock_setcloexec(w->fd);
 
     size_t count = 0;
     ssize_t bytes;

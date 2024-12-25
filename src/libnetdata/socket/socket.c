@@ -226,6 +226,38 @@ int sock_enlarge_out(int fd) {
     return ret;
 }
 
+int sock_setcork(int fd) {
+    bool tcp_cork = true;
+    int ret = -1;
+
+#ifdef TCP_CORK
+    ret = setsockopt(fd, IPPROTO_TCP, TCP_CORK, (char *)&tcp_cork, sizeof(tcp_cork));
+
+    if(ret == -1) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+            "Failed to set TCP_CORK on socket %d.", fd);
+    }
+#endif
+
+    return ret;
+}
+
+int sock_delcork(int fd) {
+    bool tcp_cork = false;
+    int ret = -1;
+
+#ifdef TCP_CORK
+    ret = setsockopt(fd, IPPROTO_TCP, TCP_CORK, (char *)&tcp_cork, sizeof(tcp_cork));
+
+    if(ret == -1) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Failed to del TCP_CORK on socket %d.", fd);
+    }
+#endif
+
+    return ret;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // helpers to send/receive data in one call, in blocking mode, with a timeout
 
