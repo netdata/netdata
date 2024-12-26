@@ -1125,7 +1125,6 @@ struct rrdhost {
 
                 struct {
                     size_t charts;                  // the number of charts currently being replicated from a child
-                    size_t ignored_duplicate;
                     NETDATA_DOUBLE percent;         // the % of replication completion
                 } replication;
             } status;

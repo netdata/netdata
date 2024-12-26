@@ -8,10 +8,13 @@
 
 static bool backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, struct backfill_request_data *brd) {
     if(!rrdhost_state_acquire(brd->host, brd->rrdhost_receiver_state_id)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, 
-            "PLUGINSD REPLAY ERROR: 'host:%s' failed to acquire host for sending replication command for 'chart:%s'",
-            rrdhost_hostname(brd->host),
-            rrdset_id(brd->st));
+        // this may happen because the host got reconnected
+
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                "PLUGINSD REPLAY ERROR: 'host:%s' failed to acquire host for sending replication"
+               " command for 'chart:%s'",
+                rrdhost_hostname(brd->host),
+                rrdset_id(brd->st));
 
         return false;
     }
@@ -80,10 +83,9 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
             ok = backfill_callback(0, 0, &brd);
     }
     else {
-        __atomic_add_fetch(&host->stream.rcv.status.replication.ignored_duplicate, 1, __ATOMIC_RELAXED);
-        nd_log(NDLS_DAEMON, NDLP_ERR, "PLUGINSD REPLAY ERROR: ignoring duplicate request for 'host:%s/chart:%s'",
-                          rrdhost_hostname(st->rrdhost), rrdset_id(st));
-        
+        // this is normal, since dimensions may be added to a chart,
+        // and the child will send another CHART_DEFINITION_END command.
+
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         internal_error(true, "REPLAY: 'host:%s/chart:%s' not sending duplicate replication request",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st));
