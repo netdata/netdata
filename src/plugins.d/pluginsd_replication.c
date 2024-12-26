@@ -186,11 +186,6 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PARSER *parser) 
                           wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock",
                           tolerance);
     }
-    else {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN
-                          " without timestamps. Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
-                          rrdhost_hostname(st->rrdhost), rrdset_id(st));
-    }
 
     // the child sends an RBEGIN without any parameters initially
     // setting rset_enabled to false, means the RSET should not store any metrics
