@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#19286](https://github.com/netdata/netdata/pull/19286) ([netdatabot](https://github.com/netdatabot))
+- improvement\(go.d/nats\): add basic jetstream metrics [\#19285](https://github.com/netdata/netdata/pull/19285) ([ilyam8](https://github.com/ilyam8))
+- fix go.d/nats tests [\#19284](https://github.com/netdata/netdata/pull/19284) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19283](https://github.com/netdata/netdata/pull/19283) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/nats\): add leafz metrics [\#19282](https://github.com/netdata/netdata/pull/19282) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19281](https://github.com/netdata/netdata/pull/19281) ([netdatabot](https://github.com/netdatabot))
@@ -459,9 +462,6 @@
 - apps.plugin; allow parents to identify the children [\#18734](https://github.com/netdata/netdata/pull/18734) ([ktsaou](https://github.com/ktsaou))
 - Windows deploy metadata [\#18733](https://github.com/netdata/netdata/pull/18733) ([Ancairon](https://github.com/Ancairon))
 - \[storcli\] Support for controller ROC temperature. [\#18732](https://github.com/netdata/netdata/pull/18732) ([eatnumber1](https://github.com/eatnumber1))
-- systemd-cat-native negative timeout [\#18729](https://github.com/netdata/netdata/pull/18729) ([ktsaou](https://github.com/ktsaou))
-- fix\(perf.plugin\): disable if all events disabled during init [\#18728](https://github.com/netdata/netdata/pull/18728) ([ilyam8](https://github.com/ilyam8))
-- apps.plugin: print also the original comm [\#18727](https://github.com/netdata/netdata/pull/18727) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.47.5](https://github.com/netdata/netdata/tree/v1.47.5) (2024-10-24)
 
