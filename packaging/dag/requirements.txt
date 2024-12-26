@@ -1,3 +1,3 @@
 click==8.1.7
 dagger-io==0.9.7
-Jinja2==3.1.4
+Jinja2==3.1.5
