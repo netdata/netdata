@@ -3497,7 +3497,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if(qt->query.used)
         ops = onewayalloc_callocz(owa, qt->query.used, sizeof(QUERY_ENGINE_OPS *));
 
-    size_t capacity = libuv_worker_threads * 10;
+    size_t capacity = MAX(netdata_conf_cpus() / 2, 4);
     size_t max_queries_to_prepare = (qt->query.used > (capacity - 1)) ? (capacity - 1) : qt->query.used;
     size_t queries_prepared = 0;
     while(queries_prepared < max_queries_to_prepare) {
