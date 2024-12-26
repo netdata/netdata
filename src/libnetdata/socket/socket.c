@@ -199,7 +199,7 @@ int sock_enlarge_snd_buf(int fd) {
 }
 
 // returns -1 for errors, 0 if cork is unset, 1 if cork is set
-int sock_setcork(int fd __maybe_unused, bool cork) {
+int sock_setcork(int fd __maybe_unused, bool cork __maybe_unused) {
     int rc = -1;
 
 #ifdef TCP_CORK
@@ -266,7 +266,7 @@ int sock_setreuse_addr(int fd, bool reuse) {
 }
 
 // Returns -1 for errors, 0 if SO_REUSEPORT is unset, 1 if SO_REUSEPORT is set
-int sock_setreuse_port(int fd, bool reuse) {
+int sock_setreuse_port(int fd __maybe_unused, bool reuse __maybe_unused) {
     int rc = -1;
 
 #ifdef SO_REUSEPORT
@@ -319,7 +319,7 @@ int sock_setcloexec(int fd, bool cloexec) {
 }
 
 // Returns -1 for errors, 0 if TCP_DEFER_ACCEPT is unset, 1 if TCP_DEFER_ACCEPT is set
-int sock_set_tcp_defer_accept(int fd, bool defer) {
+int sock_set_tcp_defer_accept(int fd __maybe_unused, bool defer __maybe_unused) {
 #ifdef TCP_DEFER_ACCEPT
     // Check if the file descriptor is a socket
     if (!fd_is_socket(fd))
