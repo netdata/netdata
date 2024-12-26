@@ -700,9 +700,8 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
             // enable normal streaming if we have to
             // but only if the sender buffer has not been flushed since we started
 
-            if(rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
-                rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
-                rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+            RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+            if(!(old & RRDSET_FLAG_SENDER_REPLICATION_FINISHED)) {
                 rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
 
                 if(!finished_with_gap)
@@ -714,10 +713,11 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
 #endif
             }
             else
-                internal_error(true,
-                               "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' "
-                               "received start streaming command, but the chart is not in progress replicating",
-                               rrdhost_hostname(st->rrdhost), rrdset_id(st));
+                internal_error(
+                    true,
+                    "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' "
+                    "received start streaming command, but the chart was not in progress replicating",
+                    rrdhost_hostname(st->rrdhost), rrdset_id(st));
         }
     }
     else {

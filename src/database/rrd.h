@@ -259,10 +259,11 @@ typedef enum __attribute__ ((__packed__)) rrddim_flags {
     // this is 8 bit
 } RRDDIM_FLAGS;
 
-#define rrddim_flag_get(rd) __atomic_load_n(&((rd)->flags), __ATOMIC_ACQUIRE)
-#define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_ACQUIRE) & (flag))
-#define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), (flag), __ATOMIC_RELEASE)
-#define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_RELEASE)
+#define rrddim_flag_get(rd)                         atomic_flags_get(&((rd)->flags))
+#define rrddim_flag_check(rd, flag)                 atomic_flags_check(&((rd)->flags), flag)
+#define rrddim_flag_set(rd, flag)                   atomic_flags_set(&((rd)->flags), flag)
+#define rrddim_flag_clear(rd, flag)                 atomic_flags_clear(&((rd)->flags), flag)
+#define rrddim_flag_set_and_clear(rd, set, clear)   atomic_flags_set_and_clear(&((rd)->flags), set, clear)
 
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection
@@ -682,10 +683,11 @@ STORAGE_ENGINE* storage_engine_find(const char* name);
 // ----------------------------------------------------------------------------
 // RRDSET - this is a chart
 
-#define rrdset_flag_get(st) __atomic_load_n(&((st)->flags), __ATOMIC_ACQUIRE)
-#define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_ACQUIRE) & (flag))
-#define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_RELEASE)
-#define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~(flag), __ATOMIC_RELEASE)
+#define rrdset_flag_get(st)                         atomic_flags_get(&((st)->flags))
+#define rrdset_flag_check(st, flag)                 atomic_flags_check(&((st)->flags), flag)
+#define rrdset_flag_set(st, flag)                   atomic_flags_set(&((st)->flags), flag)
+#define rrdset_flag_clear(st, flag)                 atomic_flags_clear(&((st)->flags), flag)
+#define rrdset_flag_set_and_clear(st, set, clear)   atomic_flags_set_and_clear(&((st)->flags), set, clear)
 
 #define rrdset_is_replicating(st) (rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS|RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) \
     && !rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED|RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
@@ -984,9 +986,11 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 28), // set when the host has updated global functions
 } RRDHOST_FLAGS;
 
-#define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
-#define rrdhost_flag_set(host, flag)   __atomic_or_fetch(&((host)->flags), flag, __ATOMIC_SEQ_CST)
-#define rrdhost_flag_clear(host, flag) __atomic_and_fetch(&((host)->flags), ~(flag), __ATOMIC_SEQ_CST)
+#define rrdhost_flag_get(host)                         atomic_flags_get(&((host)->flags))
+#define rrdhost_flag_check(host, flag)                 atomic_flags_check(&((host)->flags), flag)
+#define rrdhost_flag_set(host, flag)                   atomic_flags_set(&((host)->flags), flag)
+#define rrdhost_flag_clear(host, flag)                 atomic_flags_clear(&((host)->flags), flag)
+#define rrdhost_flag_set_and_clear(host, set, clear)   atomic_flags_set_and_clear(&((host)->flags), set, clear)
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdset_debug(st, fmt, args...) do { if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \

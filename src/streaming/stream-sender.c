@@ -75,8 +75,7 @@ static void stream_sender_charts_and_replication_reset(struct sender_state *s) {
     // reset the state of all charts
     RRDSET *st;
     rrdset_foreach_read(st, s->host) {
-        rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
-        rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+        rrdset_flag_set_and_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
 
 #ifdef REPLICATION_TRACKING
         st->stream.snd.who = REPLAY_WHO_UNKNOWN;

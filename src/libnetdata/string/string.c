@@ -199,7 +199,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
 
     rw_spinlock_write_lock(&string_base[partition].spinlock);
 
-    int64_t mem_index = 0;
+    int64_t judy_mem = 0;
 
     STRING **ptr;
     {
@@ -209,7 +209,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
 
         Pvoid_t *Rc = JudyHSIns(&string_base[partition].JudyHSArray, (void *)str, length - 1, &J_Error);
 
-        mem_index = JudyAllocThreadPulseGetAndReset();
+        judy_mem = JudyAllocThreadPulseGetAndReset();
 
         if (unlikely(Rc == PJERR)) {
             fatal(
@@ -232,7 +232,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
         string_base[partition].inserts++;
         string_base[partition].entries++;
         string_base[partition].memory += mem_size;
-        string_base[partition].memory_index += mem_index;
+        string_base[partition].memory_index += judy_mem;
     }
     else {
         // the item is already in the index
@@ -268,7 +268,7 @@ static inline void string_index_delete(STRING *string) {
 #endif
 
     bool deleted = false;
-    int64_t mem_index = 0;
+    int64_t judy_mem = 0;
 
     if (likely(string_base[partition].JudyHSArray)) {
         JError_t J_Error;
@@ -277,7 +277,7 @@ static inline void string_index_delete(STRING *string) {
 
         int ret = JudyHSDel(&string_base[partition].JudyHSArray, (void *)string->str, string->length - 1, &J_Error);
 
-        mem_index = JudyAllocThreadPulseGetAndReset();
+        judy_mem = JudyAllocThreadPulseGetAndReset();
 
         if (unlikely(ret == JERR)) {
             netdata_log_error(
@@ -296,7 +296,7 @@ static inline void string_index_delete(STRING *string) {
         string_base[partition].deletes++;
         string_base[partition].entries--;
         string_base[partition].memory -= mem_size;
-        string_base[partition].memory_index += mem_index;
+        string_base[partition].memory_index += judy_mem;
         freez(string);
     }
 

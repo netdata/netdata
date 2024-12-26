@@ -9,13 +9,12 @@ extern "C" {
 
 #include "common.h"
 
-#define JUDYHS_INDEX_SIZE_ESTIMATE(key_bytes) (((key_bytes) + sizeof(Word_t) - 1) / sizeof(Word_t) * 4)
-
 // NETDATA_TRACE_ALLOCATIONS does not work under musl libc, so don't enable it
 //#if defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_TRACE_ALLOCATIONS)
 //#define NETDATA_TRACE_ALLOCATIONS 1
 //#endif
 
+#include "atomics/atomics.h"
 #include "libjudy/judy-malloc.h"
 
 #include "storage-point.h"

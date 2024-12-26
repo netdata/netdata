@@ -192,7 +192,7 @@ static inline void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric)
 
         rc = JudyHSDel(&mrg->index[partition].uuid_judy, &metric->uuid, sizeof(nd_uuid_t), PJE0);
 
-        int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
+        judy_mem = JudyAllocThreadPulseGetAndReset();
 
         if(unlikely(!rc))
             fatal("DBENGINE METRIC: cannot delete UUID from JudyHS");

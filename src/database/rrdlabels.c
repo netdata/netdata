@@ -70,7 +70,7 @@ static inline void STATS_PLUS_MEMORY(struct dictionary_stats *stats, int64_t jud
         __atomic_fetch_add(&stats->memory.index, judy_mem, __ATOMIC_RELAXED);
 
     if(item_size)
-        __atomic_fetch_add(&stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
+        __atomic_fetch_add(&stats->memory.dict, (ssize_t)item_size, __ATOMIC_RELAXED);
 
     if(value_size)
         __atomic_fetch_add(&stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
@@ -81,7 +81,7 @@ static inline void STATS_MINUS_MEMORY(struct dictionary_stats *stats, int64_t ju
         __atomic_fetch_add(&stats->memory.index, judy_mem, __ATOMIC_RELAXED);
 
     if(item_size)
-        __atomic_fetch_sub(&stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
+        __atomic_fetch_sub(&stats->memory.dict, (ssize_t)item_size, __ATOMIC_RELAXED);
 
     if(value_size)
         __atomic_fetch_sub(&stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
