@@ -185,12 +185,13 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PARSER *parser) 
             return PARSER_RC_OK;
         }
 
-        nd_log(NDLS_DAEMON, NDLP_ERR, "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN
-                          " from %ld to %ld, but timestamps are invalid "
-                          "(now is %ld [%s], tolerance %ld). Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
-                          rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time,
-                          wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock",
-                          tolerance);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN
+               " from %ld to %ld, but timestamps are invalid "
+               "(now is %ld [%s], tolerance %ld). Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
+               rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time,
+               wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock",
+               tolerance);
     }
 
     // the child sends an RBEGIN without any parameters initially
