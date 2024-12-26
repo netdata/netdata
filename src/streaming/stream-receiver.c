@@ -854,6 +854,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
 
     if (!host->receiver) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+        rrdhost_set_health_evloop_iteration(host);
 
         host->stream.rcv.status.connections++;
         streaming_receiver_connected();
@@ -921,6 +922,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
             {
                 // run all these without having the receiver lock
 
+                rrdhost_set_health_evloop_iteration(host);
                 ml_host_stop(host);
                 stream_path_child_disconnected(host);
                 stream_sender_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);

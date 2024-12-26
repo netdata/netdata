@@ -99,4 +99,8 @@ int alert_variable_lookup_trace(RRDHOST *host, RRDSET *st, const char *variable,
 typedef void (*prototype_metadata_cb_t)(void *data, STRING *type, STRING *component, STRING *classification, STRING *recipient);
 void health_prototype_metadata_foreach(void *data, prototype_metadata_cb_t cb);
 
+uint64_t health_evloop_current_iteration(void);
+void rrdhost_set_health_evloop_iteration(RRDHOST *host);
+uint64_t rrdhost_health_evloop_last_iteration(RRDHOST *host);
+
 #endif //NETDATA_HEALTH_H
