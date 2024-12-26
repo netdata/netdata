@@ -839,7 +839,7 @@ void *aral_mallocz_internal(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEF
 
     void *data = aral_get_free_slot___no_lock_required(ar, page, marked);
 
-    internal_fatal((uintptr_t)found_fr % SYSTEM_REQUIRED_ALIGNMENT != 0, "Pointer is not aligned properly");
+    internal_fatal((uintptr_t)data % SYSTEM_REQUIRED_ALIGNMENT != 0, "Pointer is not aligned properly");
 
     return data;
 }
