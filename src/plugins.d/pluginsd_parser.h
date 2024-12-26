@@ -175,7 +175,9 @@ bool parser_reconstruct_instance(BUFFER *wb, void *ptr);
 bool parser_reconstruct_context(BUFFER *wb, void *ptr);
 
 static inline int parser_action(PARSER *parser, char *input) {
+#ifdef NETDATA_LOG_STREAM_RECEIVER
     stream_receiver_log_payload(parser->user.rpt, input, STREAM_TRAFFIC_TYPE_METADATA, true);
+#endif
 
     parser->line.count++;
 

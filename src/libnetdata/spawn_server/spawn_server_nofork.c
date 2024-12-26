@@ -1091,7 +1091,7 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         };
         os_close_all_non_std_open_fds_except(fds_to_keep, _countof(fds_to_keep), 0);
         nd_log_reopen_log_files_for_spawn_server(buf);
-        exit(spawn_server_event_loop(server));
+        _exit(spawn_server_event_loop(server));
     }
     else if (pid > 0) {
         // the parent
