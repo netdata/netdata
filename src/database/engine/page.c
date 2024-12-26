@@ -197,7 +197,7 @@ void pgd_init_arals(void) {
                 0,
                 0,
                 &pgd_aral_statistics,
-                NULL, NULL, false, false);
+                NULL, NULL, false, false, true);
         }
     }
 

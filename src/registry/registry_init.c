@@ -149,28 +149,28 @@ int registry_init(void) {
                                             &registry.aral_stats,
                                             "registry_persons",
                                             &netdata_configured_cache_dir,
-                                            use_mmap, true);
+                                            use_mmap, true, true);
 
         registry.machines_aral = aral_create("registry_machines", sizeof(REGISTRY_MACHINE),
                                              min_page_size / sizeof(REGISTRY_MACHINE), max_page_size,
                                              &registry.aral_stats,
                                              "registry_machines",
                                              &netdata_configured_cache_dir,
-                                             use_mmap, true);
+                                             use_mmap, true, true);
 
         registry.person_urls_aral = aral_create("registry_person_urls", sizeof(REGISTRY_PERSON_URL),
                                                 min_page_size / sizeof(REGISTRY_PERSON_URL), max_page_size,
                                                 &registry.aral_stats,
                                                 "registry_person_urls",
                                                 &netdata_configured_cache_dir,
-                                                use_mmap, true);
+                                                use_mmap, true, true);
 
         registry.machine_urls_aral = aral_create("registry_machine_urls", sizeof(REGISTRY_MACHINE_URL),
                                                  min_page_size / sizeof(REGISTRY_MACHINE_URL), max_page_size,
                                                  &registry.aral_stats,
                                                  "registry_machine_urls",
                                                  &netdata_configured_cache_dir,
-                                                 use_mmap, true);
+                                                 use_mmap, true, true);
 
         registry_log_open();
         registry_db_load();

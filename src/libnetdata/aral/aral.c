@@ -68,6 +68,7 @@ typedef struct aral_page {
 typedef enum {
     ARAL_LOCKLESS           = (1 << 0),
     ARAL_ALLOCATED_STATS    = (1 << 1),
+    ARAL_DONT_DUMP          = (1 << 2),
 } ARAL_OPTIONS;
 
 struct aral_ops {
@@ -501,7 +502,7 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
         page->filename = strdupz(filename);
         page->mapped = true;
 
-        page->data = netdata_mmap(page->filename, size, MAP_SHARED, 0, false, NULL);
+        page->data = netdata_mmap(page->filename, size, MAP_SHARED, 0, false, ar->config.options & ARAL_DONT_DUMP, NULL);
         if (unlikely(!page->data))
             fatal("ARAL: '%s' cannot allocate aral buffer of size %zu on filename '%s'",
                   ar->config.name, size, page->filename);
@@ -523,7 +524,7 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
 
         if (size >= ARAL_MMAP_PAGES_ABOVE) {
             bool mapped;
-            uint8_t *ptr = netdata_mmap(NULL, size, MAP_PRIVATE, 1, false, NULL);
+            uint8_t *ptr = netdata_mmap(NULL, size, MAP_PRIVATE, 1, false, ar->config.options & ARAL_DONT_DUMP, NULL);
             if (ptr) {
                 mapped = true;
                 stats = &ar->stats->mmap;
@@ -1024,9 +1025,10 @@ size_t aral_actual_element_size(ARAL *ar) {
 }
 
 ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size,
-                  struct aral_statistics *stats, const char *filename, const char **cache_dir, bool mmap, bool lockless) {
+                  struct aral_statistics *stats, const char *filename, const char **cache_dir,
+                  bool mmap, bool lockless, bool dont_dump) {
     ARAL *ar = callocz(1, sizeof(ARAL));
-    ar->config.options = ((lockless) ? ARAL_LOCKLESS : 0);
+    ar->config.options = ((lockless) ? ARAL_LOCKLESS : 0) | ((dont_dump) ? ARAL_DONT_DUMP : 0);
     ar->config.requested_element_size = element_size;
     ar->config.initial_page_elements = initial_page_elements;
     ar->config.requested_max_page_size = max_page_size;
@@ -1195,7 +1197,7 @@ ARAL *aral_by_size_acquire(size_t size) {
                          0,
                          0,
                          &aral_by_size_globals.shared_statistics,
-                         NULL, NULL, false, false);
+                         NULL, NULL, false, false, false);
 
         if(size <= ARAL_BY_SIZE_MAX_SIZE) {
             aral_by_size_globals.array[size].ar = ar;
@@ -1382,7 +1384,7 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
                           16384,
                           NULL,
                           "aral-stress-test",
-                          NULL, false, false),
+                          NULL, false, false, false),
             .elements = elements,
             .errors = 0,
     };
@@ -1459,8 +1461,7 @@ int aral_unittest(size_t elements) {
                           NULL,
                           "aral-test",
                           &cache_dir,
-                          false,
-                          false),
+                          false, false, false),
             .elements = elements,
             .errors = 0,
     };

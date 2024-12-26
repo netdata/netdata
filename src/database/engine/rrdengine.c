@@ -142,7 +142,7 @@ static void work_request_init(void) {
         0,
         0,
         NULL,
-        NULL, NULL, false, false
+        NULL, NULL, false, false, true
     );
 
     pulse_aral_register(rrdeng_main.work_cmd.ar, "workers");
@@ -263,7 +263,7 @@ void page_descriptors_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false);
+            NULL, NULL, false, false, true);
 
     pulse_aral_register(rrdeng_main.descriptors.ar, "descriptors");
 }
@@ -288,7 +288,7 @@ static void extent_io_descriptor_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false
+            NULL, NULL, false, false, true
             );
 
     pulse_aral_register(rrdeng_main.xt_io_descr.ar, "extent io");
@@ -314,7 +314,7 @@ void rrdeng_query_handle_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false);
+            NULL, NULL, false, false, true);
 
     pulse_aral_register(rrdeng_main.handles.ar, "query handles");
 }
@@ -436,7 +436,7 @@ static void rrdeng_cmd_queue_init(void) {
                                            0,
                                            0,
                                            NULL,
-                                           NULL, NULL, false, false);
+                                           NULL, NULL, false, false, true);
 
     pulse_aral_register(rrdeng_main.cmd_queue.ar, "opcodes");
 }

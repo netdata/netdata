@@ -30,7 +30,8 @@ struct aral_statistics {
 const char *aral_name(ARAL *ar);
 
 ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size,
-                  struct aral_statistics *stats, const char *filename, const char **cache_dir, bool mmap, bool lockless);
+                  struct aral_statistics *stats, const char *filename, const char **cache_dir,
+                  bool mmap, bool lockless, bool dont_dump);
 
 // --------------------------------------------------------------------------------------------------------------------
 

@@ -386,7 +386,8 @@ inline MRG *mrg_create(ssize_t partitions) {
         char buf[ARAL_MAX_NAME + 1];
         snprintfz(buf, ARAL_MAX_NAME, "mrg[%zu]", i);
 
-        mrg->index[i].aral = aral_create(buf, sizeof(METRIC), 0, 16384, &mrg_aral_statistics, NULL, NULL, false, false);
+        mrg->index[i].aral = aral_create(buf, sizeof(METRIC), 0, 16384, &mrg_aral_statistics, NULL, NULL,
+                                         false, false, true);
     }
     pulse_aral_register_statistics(&mrg_aral_statistics, "mrg");
 

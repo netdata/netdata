@@ -585,7 +585,7 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
 #endif
 }
 
-void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, int *open_fd)
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, bool dont_dump, int *open_fd)
 {
     // netdata_log_info("netdata_mmap('%s', %zu", filename, size);
 
@@ -644,7 +644,7 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool r
 
         // madvise_sequential(mem, size);
         // madvise_dontfork(mem, size); // aral is initialized before we daemonize
-        if(filename) madvise_dontdump(mem, size);
+        if(dont_dump) madvise_dontdump(mem, size);
         // if(flags & MAP_SHARED) madvise_willneed(mem, size);
         if(ksm) madvise_mergeable(mem, size);
     }

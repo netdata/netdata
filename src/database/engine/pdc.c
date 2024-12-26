@@ -55,7 +55,7 @@ void pdc_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false
+            NULL, NULL, false, false, true
             );
 
     pulse_aral_register(pdc_globals.pdc.ar, "pdc");
@@ -85,7 +85,7 @@ void page_details_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false
+            NULL, NULL, false, false, true
     );
     pulse_aral_register(pdc_globals.pd.ar, "pd");
 }
@@ -114,7 +114,7 @@ void epdl_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false
+            NULL, NULL, false, false, true
     );
     pulse_aral_register(pdc_globals.epdl.ar, "epdl");
 }
@@ -143,7 +143,7 @@ void deol_init(void) {
             0,
             0,
             NULL,
-            NULL, NULL, false, false
+            NULL, NULL, false, false, true
     );
 
     pulse_aral_register(pdc_globals.deol.ar, "deol");

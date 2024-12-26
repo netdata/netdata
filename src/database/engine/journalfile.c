@@ -1338,7 +1338,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     total_file_size  += sizeof(struct journal_v2_block_trailer);
 
     int fd_v2;
-    uint8_t *data_start = netdata_mmap(path, total_file_size, MAP_SHARED, 0, false, &fd_v2);
+    uint8_t *data_start = netdata_mmap(path, total_file_size, MAP_SHARED, 0, false, true, &fd_v2);
     uint8_t *data = data_start;
 
     memset(data_start, 0, extent_offset);

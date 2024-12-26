@@ -30,7 +30,7 @@ __attribute__((constructor)) void aral_judy_init(void) {
                 0,
                 0,
                 &judy_sizes_aral_statistics,
-                NULL, NULL, false, false);
+                NULL, NULL, false, false, false);
         }
 }
 

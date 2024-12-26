@@ -560,7 +560,8 @@ static void pgc_section_pages_static_aral_init(void) {
 
     if(!pgc_sections_aral) {
         pgc_sections_aral = aral_create(
-            "pgc-sections", sizeof(struct section_pages), 0, 0, &pgc_aral_statistics, NULL, NULL, false, false);
+            "pgc-sections", sizeof(struct section_pages), 0, 0, &pgc_aral_statistics,
+            NULL, NULL, false, false, false);
 
         pulse_aral_register_statistics(&pgc_aral_statistics, "pgc");
     }
@@ -2073,10 +2074,8 @@ PGC *pgc_create(const char *name,
                 0,
                 0,
                 &pgc_aral_statistics,
-                NULL,
-                NULL,
-                false,
-                false);
+                NULL, NULL,
+                false, false, false);
         }
     }
 #endif
