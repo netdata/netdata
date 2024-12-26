@@ -8,8 +8,8 @@
 
 static bool backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, struct backfill_request_data *brd) {
     if(!rrdhost_state_acquire(brd->host, brd->rrdhost_receiver_state_id)) {
-        netdata_log_error(
-            "PLUGINSD: 'host:%s' failed to acquire host for sending replication command for 'chart:%s'",
+        nd_log(NDLS_DAEMON, NDLP_ERR, 
+            "PLUGINSD REPLAY ERROR: 'host:%s' failed to acquire host for sending replication command for 'chart:%s'",
             rrdhost_hostname(brd->host),
             rrdset_id(brd->st));
 
@@ -25,8 +25,8 @@ static bool backfill_callback(size_t successful_dims __maybe_unused, size_t fail
         rrdhost_receiver_replicating_charts_plus_one(brd->st->rrdhost);
     }
     else {
-        netdata_log_error(
-            "PLUGINSD: 'host:%s' failed to initiate replication for 'chart:%s'",
+        nd_log(NDLS_DAEMON, NDLP_ERR, 
+            "PLUGINSD REPLAY ERROR: 'host:%s' failed to initiate replication for 'chart:%s'",
             rrdhost_hostname(brd->host),
             rrdset_id(brd->st));
     }
@@ -79,12 +79,16 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
         else
             ok = backfill_callback(0, 0, &brd);
     }
-#ifdef NETDATA_LOG_REPLICATION_REQUESTS
     else {
+        __atomic_add_fetch(&host->stream.rcv.status.replication.ignored_duplicate, 1, __ATOMIC_RELAXED);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "PLUGINSD REPLAY ERROR: ignoring duplicate request for 'host:%s/chart:%s'",
+                          rrdhost_hostname(st->rrdhost), rrdset_id(st));
+        
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
         internal_error(true, "REPLAY: 'host:%s/chart:%s' not sending duplicate replication request",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st));
-    }
 #endif
+    }
 
     stream_thread_received_metadata();
 
@@ -175,12 +179,17 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PARSER *parser) 
             return PARSER_RC_OK;
         }
 
-        netdata_log_error("PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN
-        " from %ld to %ld, but timestamps are invalid "
-        "(now is %ld [%s], tolerance %ld). Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
-                rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time,
-                wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock",
-                tolerance);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN
+                          " from %ld to %ld, but timestamps are invalid "
+                          "(now is %ld [%s], tolerance %ld). Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
+                          rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time,
+                          wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock",
+                          tolerance);
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN
+                          " without timestamps. Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
+                          rrdhost_hostname(st->rrdhost), rrdset_id(st));
     }
 
     // the child sends an RBEGIN without any parameters initially
@@ -213,7 +222,7 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARSER *parser) {
     if(!parser->user.replay.rset_enabled) {
         nd_log_limit_static_thread_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
-                     "PLUGINSD: 'host:%s/chart:%s' got a %s but it is disabled by %s errors",
+                     "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a %s but it is disabled by %s errors",
                      rrdhost_hostname(host), rrdset_id(st), PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
         // we have to return OK here
@@ -226,14 +235,13 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARSER *parser) {
     st->pluginsd.set = true;
 
     if (unlikely(!parser->user.replay.start_time || !parser->user.replay.end_time)) {
-        netdata_log_error("PLUGINSD: 'host:%s/chart:%s/dim:%s' got a %s with invalid timestamps %ld to %ld from a %s. Disabling it.",
-                          rrdhost_hostname(host),
-                          rrdset_id(st),
-                          dimension,
-                          PLUGINSD_KEYWORD_REPLAY_SET,
-                          parser->user.replay.start_time,
-                          parser->user.replay.end_time,
-                          PLUGINSD_KEYWORD_REPLAY_BEGIN);
+        
+        nd_log(NDLS_DAEMON, NDLP_ERR, 
+            "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s/dim:%s' got a %s with "
+            "invalid timestamps %ld to %ld from a %s. Disabling it.",
+            rrdhost_hostname(host), rrdset_id(st), dimension, PLUGINSD_KEYWORD_REPLAY_SET,
+            parser->user.replay.start_time, parser->user.replay.end_time, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+        
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }
 
@@ -263,7 +271,7 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARSER *parser) {
         else {
             nd_log_limit_static_global_var(erl, 1, 0);
             nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_WARNING,
-                         "PLUGINSD: 'host:%s/chart:%s/dim:%s' has the ARCHIVED flag set, but it is replicated. "
+                         "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s/dim:%s' has the ARCHIVED flag set, but it is replicated. "
                          "Ignoring data.",
                          rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_name(rd));
         }
@@ -305,7 +313,7 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
     usec_t last_collected_ut = last_collected_ut_str ? str2ull_encoded(last_collected_ut_str) : 0;
     if(last_collected_ut > dim_last_collected_ut) {
         rd->collector.last_collected_time.tv_sec = (time_t)(last_collected_ut / USEC_PER_SEC);
-        rd->collector.last_collected_time.tv_usec = (last_collected_ut % USEC_PER_SEC);
+        rd->collector.last_collected_time.tv_usec = (suseconds_t)(last_collected_ut % USEC_PER_SEC);
     }
 
     rd->collector.last_collected_value = last_collected_value_str ? str2ll_encoded(last_collected_value_str) : 0;
@@ -333,14 +341,14 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
     usec_t last_collected_ut = last_collected_ut_str ? str2ull_encoded(last_collected_ut_str) : 0;
     if(last_collected_ut > chart_last_collected_ut) {
         st->last_collected_time.tv_sec = (time_t)(last_collected_ut / USEC_PER_SEC);
-        st->last_collected_time.tv_usec = (last_collected_ut % USEC_PER_SEC);
+        st->last_collected_time.tv_usec = (suseconds_t)(last_collected_ut % USEC_PER_SEC);
     }
 
     usec_t chart_last_updated_ut = (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec;
     usec_t last_updated_ut = last_updated_ut_str ? str2ull_encoded(last_updated_ut_str) : 0;
     if(last_updated_ut > chart_last_updated_ut) {
         st->last_updated.tv_sec = (time_t)(last_updated_ut / USEC_PER_SEC);
-        st->last_updated.tv_usec = (last_updated_ut % USEC_PER_SEC);
+        st->last_updated.tv_usec = (suseconds_t)(last_updated_ut % USEC_PER_SEC);
     }
 
     st->counter++;
@@ -351,7 +359,7 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
 
 PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
     if (num_words < 7) { // accepts 7, but the 7th is optional
-        netdata_log_error("REPLAY: malformed " PLUGINSD_KEYWORD_REPLAY_END " command");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "REPLAY: malformed " PLUGINSD_KEYWORD_REPLAY_END " command");
         return PARSER_RC_ERROR;
     }
 
@@ -435,11 +443,12 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
             rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
             rrdhost_receiver_replicating_charts_minus_one(st->rrdhost);
         }
-#ifdef NETDATA_LOG_REPLICATION_REQUESTS
-        else
-            internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_END " with enable_streaming = true, but there is no replication in progress for this chart.",
-                  rrdhost_hostname(host), rrdset_id(st));
-#endif
+        else {
+            nd_log(NDLS_DAEMON, NDLP_ERR, 
+                "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_END " "
+                "with enable_streaming = true, but there is no replication in progress for this chart.",
+                rrdhost_hostname(host), rrdset_id(st));
+        }
 
         pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END);
 
