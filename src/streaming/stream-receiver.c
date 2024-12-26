@@ -894,15 +894,24 @@ void stream_receiver_cleanup(struct stream_thread *sth) {
 static void stream_receiver_replication_reset(RRDHOST *host) {
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
-        rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
+        if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
+            rrdhost_receiver_replicating_charts_minus_one(host);
 
 #ifdef REPLICATION_TRACKING
         st->stream.rcv.who = REPLAY_WHO_UNKNOWN;
 #endif
     }
     rrdset_foreach_done(st);
-    rrdhost_receiver_replicating_charts_zero(host);
+
+    if(rrdhost_receiver_replicating_charts(host) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM REPLAY ERROR: receiver replication instances counter should be zero, but it is %zu"
+               " - resetting it to zero",
+               rrdhost_receiver_replicating_charts(host));
+
+        rrdhost_receiver_replicating_charts_zero(host);
+    }
 }
 
 bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
@@ -985,7 +994,6 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
                 ml_host_stop(host);
                 stream_path_child_disconnected(host);
                 stream_sender_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
-                stream_receiver_replication_reset(host);
                 rrdcontext_host_child_disconnected(host);
 
                 if (rpt->config.health.enabled)
@@ -997,6 +1005,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
             // now we have the lock again
 
+            stream_receiver_replication_reset(host);
             streaming_receiver_disconnected();
 
             __atomic_store_n(&host->receiver->exit.shutdown, false, __ATOMIC_RELAXED);

@@ -75,7 +75,9 @@ static void stream_sender_charts_and_replication_reset(struct sender_state *s) {
     // reset the state of all charts
     RRDSET *st;
     rrdset_foreach_read(st, s->host) {
-        rrdset_flag_set_and_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+        RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+        if(!(old & RRDSET_FLAG_SENDER_REPLICATION_FINISHED))
+            rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
 
 #ifdef REPLICATION_TRACKING
         st->stream.snd.who = REPLAY_WHO_UNKNOWN;
@@ -92,7 +94,15 @@ static void stream_sender_charts_and_replication_reset(struct sender_state *s) {
     }
     rrdset_foreach_done(st);
 
-    rrdhost_sender_replicating_charts_zero(s->host);
+    if(rrdhost_sender_replicating_charts(s->host) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM REPLAY ERROR: sender replicating instances counter should be zero, but it is %zu"
+               " - resetting it to zero",
+               rrdhost_sender_replicating_charts(s->host));
+
+        rrdhost_sender_replicating_charts_zero(s->host);
+    }
+
     stream_sender_replicating_charts_zero(s);
 }
 

@@ -22,14 +22,10 @@ static bool backfill_callback(size_t successful_dims __maybe_unused, size_t fail
     bool rc = replicate_chart_request(send_to_plugin, brd->parser, brd->host, brd->st,
                                       brd->first_entry_child, brd->last_entry_child, brd->child_wall_clock_time,
                                       0, 0);
-    if (rc) {
-        rrdset_flag_set(brd->st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
-        rrdset_flag_clear(brd->st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
-        rrdhost_receiver_replicating_charts_plus_one(brd->st->rrdhost);
-    }
-    else {
-        nd_log(NDLS_DAEMON, NDLP_ERR, 
-            "PLUGINSD REPLAY ERROR: 'host:%s' failed to initiate replication for 'chart:%s'",
+
+    if (!rc) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+            "PLUGINSD REPLAY ERROR: 'host:%s' failed to initiate replication for 'chart:%s' - replication may not proceed for this instance.",
             rrdhost_hostname(brd->host),
             rrdset_id(brd->st));
     }
@@ -54,7 +50,11 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
     time_t child_wall_clock_time = (wall_clock_time_txt && *wall_clock_time_txt) ? (time_t)str2ul(wall_clock_time_txt) : now_realtime_sec();
 
     bool ok = true;
-    if(!rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
+    RRDSET_FLAGS old = rrdset_flag_set_and_clear(
+        st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+
+    if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
+        rrdhost_receiver_replicating_charts_plus_one(st->rrdhost);
 
 #ifdef REPLICATION_TRACKING
         st->stream.rcv.who = REPLAY_WHO_ME;
@@ -443,18 +443,18 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
         if (st->update_every != update_every_child)
             rrdset_set_update_every_s(st, update_every_child);
 
-        if(rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
-            rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
-            rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
-            rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
+        RRDSET_FLAGS old = rrdset_flag_set_and_clear(
+            st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED,
+            RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS | RRDSET_FLAG_SYNC_CLOCK);
+
+        if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
             rrdhost_receiver_replicating_charts_minus_one(st->rrdhost);
-        }
-        else {
-            nd_log(NDLS_DAEMON, NDLP_ERR, 
+
+        else
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
                 "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_END " "
-                "with enable_streaming = true, but there is no replication in progress for this chart.",
+                "with enable_streaming = true, but there was no replication in progress for this chart.",
                 rrdhost_hostname(host), rrdset_id(st));
-        }
 
         pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END);
 
