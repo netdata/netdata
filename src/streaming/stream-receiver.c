@@ -372,73 +372,6 @@ static ssize_t send_to_child(const char *txt, void *data, STREAM_TRAFFIC_TYPE ty
     return rc;
 }
 
-static void streaming_parser_init(struct receiver_state *rpt) {
-    rpt->thread.cd = (struct plugind){
-        .update_every = nd_profile.update_every,
-        .unsafe = {
-            .spinlock = SPINLOCK_INITIALIZER,
-            .running = true,
-            .enabled = true,
-        },
-        .started_t = now_realtime_sec(),
-    };
-
-    // put the client IP and port into the buffers used by plugins.d
-    {
-        char buf[CONFIG_MAX_NAME];
-        snprintfz(buf, sizeof(buf),  "[%s]:%s", rpt->client_ip, rpt->client_port);
-        string_freez(rpt->thread.cd.id);
-        rpt->thread.cd.id = string_strdupz(buf);
-
-        string_freez(rpt->thread.cd.filename);
-        rpt->thread.cd.filename = string_strdupz(buf);
-
-        string_freez(rpt->thread.cd.fullfilename);
-        rpt->thread.cd.fullfilename = string_strdupz(buf);
-
-        string_freez(rpt->thread.cd.cmd);
-        rpt->thread.cd.cmd = string_strdupz(buf);
-    }
-
-    PARSER *parser = NULL;
-    {
-        PARSER_USER_OBJECT user = {
-            .enabled = plugin_is_enabled(&rpt->thread.cd),
-            .host = rpt->host,
-            .opaque = rpt,
-            .cd = &rpt->thread.cd,
-            .trust_durations = 1,
-            .capabilities = rpt->capabilities,
-#ifdef NETDATA_LOG_STREAM_RECEIVER
-            .rpt = rpt,
-#endif
-        };
-
-        parser = parser_init(&user, -1, -1, PARSER_INPUT_SPLIT, &rpt->sock);
-        parser->send_to_plugin_data = rpt;
-        parser->send_to_plugin_cb = send_to_child;
-    }
-
-#ifdef ENABLE_H2O
-    parser->h2o_ctx = rpt->h2o_ctx;
-#endif
-
-    pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
-
-    rpt->thread.compressed.start = 0;
-    rpt->thread.compressed.used = 0;
-    rpt->thread.compressed.enabled = stream_decompression_initialize(rpt);
-    buffered_reader_init(&rpt->reader);
-
-    __atomic_store_n(&rpt->thread.parser, parser, __ATOMIC_RELAXED);
-    stream_receiver_send_node_and_claim_id_to_child(rpt->host);
-
-    rpt->thread.buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
-
-    // help rrdset_push_metric_initialize() select the right buffer
-    rpt->host->stream.snd.commit.receiver_tid = gettid_cached();
-}
-
 // --------------------------------------------------------------------------------------------------------------------
 
 static void stream_receive_log_database_gap(struct receiver_state *rpt) {
@@ -510,11 +443,75 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
                "Failed to add receiver socket to nd_poll()",
                sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
 
+    // put the client IP and port into the buffers used by plugins.d
+    {
+        char buf[CONFIG_MAX_NAME];
+        snprintfz(buf, sizeof(buf),  "[%s]:%s", rpt->client_ip, rpt->client_port);
+        string_freez(rpt->thread.cd.id);
+        rpt->thread.cd.id = string_strdupz(buf);
+
+        string_freez(rpt->thread.cd.filename);
+        rpt->thread.cd.filename = string_strdupz(buf);
+
+        string_freez(rpt->thread.cd.fullfilename);
+        rpt->thread.cd.fullfilename = string_strdupz(buf);
+
+        string_freez(rpt->thread.cd.cmd);
+        rpt->thread.cd.cmd = string_strdupz(buf);
+    }
+
+    rpt->thread.compressed.start = 0;
+    rpt->thread.compressed.used = 0;
+    rpt->thread.compressed.enabled = stream_decompression_initialize(rpt);
+    buffered_reader_init(&rpt->reader);
+
+    rpt->thread.buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
+
+    // help preferred_sender_buffer() select the right buffer
+    rpt->host->stream.snd.commit.receiver_tid = gettid_cached();
+
+    PARSER *parser = NULL;
+    {
+        rpt->thread.cd = (struct plugind){
+            .update_every = nd_profile.update_every,
+            .unsafe = {
+                .spinlock = SPINLOCK_INITIALIZER,
+                .running = true,
+                .enabled = true,
+            },
+            .started_t = now_realtime_sec(),
+        };
+
+        PARSER_USER_OBJECT user = {
+            .enabled = plugin_is_enabled(&rpt->thread.cd),
+            .host = rpt->host,
+            .opaque = rpt,
+            .cd = &rpt->thread.cd,
+            .trust_durations = 1,
+            .capabilities = rpt->capabilities,
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+            .rpt = rpt,
+#endif
+        };
+
+        parser = parser_init(&user, -1, -1, PARSER_INPUT_SPLIT, &rpt->sock);
+        parser->send_to_plugin_data = rpt;
+        parser->send_to_plugin_cb = send_to_child;
+
+        pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
+
+        __atomic_store_n(&rpt->thread.parser, parser, __ATOMIC_RELAXED);
+    }
+
+#ifdef ENABLE_H2O
+    parser->h2o_ctx = rpt->h2o_ctx;
+#endif
+
     stream_receive_log_database_gap(rpt);
     rrdhost_state_connected(rpt->host);
 
-    // keep this last, since it sends commands back to the child
-    streaming_parser_init(rpt);
+    // keep this last - it needs everything ready since to sends data to the child
+    stream_receiver_send_node_and_claim_id_to_child(rpt->host);
 }
 
 void stream_receiver_move_entire_queue_to_running_unsafe(struct stream_thread *sth) {
@@ -598,6 +595,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
 static ssize_t
 stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt, PARSER *parser, bool *removed) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
+    *removed = false;
 
     ssize_t rc;
     if(rpt->thread.compressed.enabled) {
@@ -661,7 +659,8 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
     }
     else {
         rc = receiver_read_uncompressed(rpt);
-        if(rc <= 0) return rc;
+        if(rc <= 0)
+            return rc;
 
         while(buffered_reader_next_line(&rpt->reader, rpt->thread.buffer)) {
             if(unlikely(parser_action(parser, rpt->thread.buffer->buffer))) {
