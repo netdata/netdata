@@ -67,6 +67,11 @@ void stream_receiver_free(struct receiver_state *rpt) {
     string_freez(rpt->config.send.parents);
     string_freez(rpt->config.send.charts_matching);
 
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+    if(rpt->log.fp)
+        fclose(rpt->log.fp);
+#endif
+
     freez(rpt);
 }
 

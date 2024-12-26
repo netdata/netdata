@@ -11,6 +11,7 @@ extern "C" {
 #include "rrd-database-mode.h"
 #include "streaming/stream-traffic-types.h"
 #include "streaming/stream-sender-commit.h"
+#include "streaming/stream-replication-tracking.h"
 #include "rrdhost-state-id.h"
 #include "health/health-alert-log.h"
 #include "rrdhost-system-info.h"
@@ -774,9 +775,17 @@ struct rrdset {
             uint32_t sent_version;
             uint32_t chart_slot;
             uint32_t dim_last_slot_used;
-
+#ifdef REPLICATION_TRACKING
+            REPLAY_WHO who;
+#endif
             time_t resync_time_s;                   // the timestamp up to which we should resync clock upstream
         } snd;
+
+        struct {
+#ifdef REPLICATION_TRACKING
+            REPLAY_WHO who;
+#endif
+        } rcv;
     } stream;
 
     // ------------------------------------------------------------------------

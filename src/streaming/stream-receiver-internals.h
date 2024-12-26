@@ -3,6 +3,16 @@
 #ifndef NETDATA_STREAM_RECEIVER_INTERNALS_H
 #define NETDATA_STREAM_RECEIVER_INTERNALS_H
 
+#include "libnetdata/libnetdata.h"
+
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+#include "stream-traffic-types.h"
+struct receiver_state;
+void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload, STREAM_TRAFFIC_TYPE type, bool inbound);
+#else
+#define stream_receiver_log_payload(s, payload, type, inbound) debug_dummy()
+#endif
+
 #include "stream.h"
 #include "stream-thread.h"
 #include "stream-conf.h"
@@ -70,6 +80,14 @@ struct receiver_state {
     struct stream_receiver_config config;
 
     time_t replication_first_time_t;
+
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+    struct {
+        struct timespec first_call;
+        SPINLOCK spinlock;
+        FILE *fp;
+    } log;
+#endif
 
 #ifdef ENABLE_H2O
     void *h2o_ctx;

@@ -692,6 +692,10 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     if(workers) worker_is_busy(WORKER_JOB_CLEANUP);
 
     if(enable_streaming) {
+#ifdef REPLICATION_TRACKING
+        st->stream.snd.who = REPLAY_WHO_FINISHED;
+#endif
+
         if(sender_is_still_connected_for_this_request(rq)) {
             // enable normal streaming if we have to
             // but only if the sender buffer has not been flushed since we started
@@ -715,6 +719,11 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
                                "received start streaming command, but the chart is not in progress replicating",
                                rrdhost_hostname(st->rrdhost), rrdset_id(st));
         }
+    }
+    else {
+#ifdef REPLICATION_TRACKING
+        st->stream.snd.who = REPLAY_WHO_THEM;
+#endif
     }
 
     if(locked_data_collection)

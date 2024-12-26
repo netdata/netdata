@@ -5,6 +5,10 @@
 
 #include "daemon/common.h"
 
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+#include "streaming/stream-receiver-internals.h"
+#endif
+
 #define WORKER_PARSER_FIRST_JOB 36
 
 // this has to be in-sync with the same at stream-thread.c
@@ -56,9 +60,8 @@ typedef struct parser_user_object {
     size_t data_collections_count;
     int enabled;
 
-#ifdef NETDATA_LOG_STREAM_RECEIVE
-    FILE *stream_log_fp;
-    PARSER_REPERTOIRE stream_log_repertoire;
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+    void *rpt;
 #endif
 
     STREAM_CAPABILITIES capabilities; // receiver capabilities
@@ -172,10 +175,7 @@ bool parser_reconstruct_instance(BUFFER *wb, void *ptr);
 bool parser_reconstruct_context(BUFFER *wb, void *ptr);
 
 static inline int parser_action(PARSER *parser, char *input) {
-#ifdef NETDATA_LOG_STREAM_RECEIVE
-    static __thread char line[PLUGINSD_LINE_MAX + 1];
-    strncpyz(line, input, sizeof(line) - 1);
-#endif
+    stream_receiver_log_payload(parser->user.rpt, input, STREAM_TRAFFIC_TYPE_METADATA, true);
 
     parser->line.count++;
 
@@ -221,11 +221,6 @@ static inline int parser_action(PARSER *parser, char *input) {
     parser->keyword = parser_find_keyword(parser, command);
     if(likely(parser->keyword)) {
         worker_is_busy(parser->keyword->worker_job_id);
-
-#ifdef NETDATA_LOG_STREAM_RECEIVE
-        if(parser->user.stream_log_fp && parser->keyword->repertoire & parser->user.stream_log_repertoire)
-            fprintf(parser->user.stream_log_fp, "%s", line);
-#endif
 
         rc = parser_execute(parser, parser->keyword, parser->line.words, parser->line.num_words);
         // rc = (*t->func)(words, num_words, parser);

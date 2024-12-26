@@ -121,6 +121,10 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
         return false;
     }
 
+#ifdef REPLICATION_TRACKING
+    st->stream.rcv.who = REPLAY_WHO_THEM;
+#endif
+
     return true;
 }
 

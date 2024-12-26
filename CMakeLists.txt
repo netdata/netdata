@@ -1569,6 +1569,8 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-waiting-list.h
         src/streaming/stream-replication-receiver.c
         src/streaming/stream-replication-receiver.h
+        src/streaming/stream-replication-tracking.c
+        src/streaming/stream-replication-tracking.h
 )
 
 set(WEB_PLUGIN_FILES

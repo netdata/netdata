@@ -5,6 +5,66 @@
 #include "stream-receiver-internals.h"
 #include "web/server/h2o/http_server.h"
 
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload, STREAM_TRAFFIC_TYPE type __maybe_unused, bool inbound) {
+    if (!rpt) return; // not a streaming parser
+
+    spinlock_lock(&rpt->log.spinlock);
+
+    if (!rpt->log.fp) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(
+            filename, FILENAME_MAX, "/tmp/stream-receiver-%s.txt", rpt->host ? rrdhost_hostname(rpt->host) : "unknown");
+
+        rpt->log.fp = fopen(filename, "w");
+
+        // Align first_call to wall clock time
+        clock_gettime(CLOCK_REALTIME, &rpt->log.first_call);
+        rpt->log.first_call.tv_nsec = 0; // Align to the start of the second
+    }
+
+    if (rpt->log.fp) {
+        struct timespec now;
+        clock_gettime(CLOCK_REALTIME, &now);
+
+        time_t elapsed_sec = now.tv_sec - rpt->log.first_call.tv_sec;
+        long elapsed_nsec = now.tv_nsec - rpt->log.first_call.tv_nsec;
+
+        if (elapsed_nsec < 0) {
+            elapsed_sec--;
+            elapsed_nsec += 1000000000;
+        }
+
+        uint16_t days = elapsed_sec / 86400;
+        uint8_t hours = (elapsed_sec % 86400) / 3600;
+        uint8_t minutes = (elapsed_sec % 3600) / 60;
+        uint8_t seconds = elapsed_sec % 60;
+        uint16_t milliseconds = elapsed_nsec / 1000000;
+
+        char prefix[30];
+        snprintf(prefix, sizeof(prefix), "%03ud.%02u:%02u:%02u.%03u ",
+                 days, hours, minutes, seconds, milliseconds);
+
+        const char *line_start = payload;
+        const char *line_end;
+
+        while (line_start && *line_start) {
+            line_end = strchr(line_start, '\n');
+            if (line_end) {
+                fprintf(rpt->log.fp, "%s%s%.*s\n", prefix, inbound ? "> " : "< ", (int)(line_end - line_start), line_start);
+                line_start = line_end + 1;
+            } else {
+                fprintf(rpt->log.fp, "%s%s%s\n", prefix, inbound ? "> " : "< ", line_start);
+                break;
+            }
+        }
+    }
+
+    fflush(rpt->log.fp);
+    spinlock_unlock(&rpt->log.spinlock);
+}
+#endif
+
 static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, const char *why);
 
 // When a child disconnects this is the maximum we will wait
@@ -297,8 +357,12 @@ static ssize_t send_to_child(const char *txt, void *data, STREAM_TRAFFIC_TYPE ty
         msg.opcode = STREAM_OPCODE_RECEIVER_BUFFER_OVERFLOW;
         rc = -1;
     }
-    else if(was_empty)
-        msg.opcode = STREAM_OPCODE_RECEIVER_POLLOUT;
+    else {
+        stream_receiver_log_payload(rpt, txt, type, false);
+
+        if(was_empty)
+            msg.opcode = STREAM_OPCODE_RECEIVER_POLLOUT;
+    }
 
     spinlock_unlock(&rpt->thread.send_to_child.spinlock);
 
@@ -345,6 +409,9 @@ static void streaming_parser_init(struct receiver_state *rpt) {
             .cd = &rpt->thread.cd,
             .trust_durations = 1,
             .capabilities = rpt->capabilities,
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+            .rpt = rpt,
+#endif
         };
 
         parser = parser_init(&user, -1, -1, PARSER_INPUT_SPLIT, &rpt->sock);
@@ -362,17 +429,6 @@ static void streaming_parser_init(struct receiver_state *rpt) {
     rpt->thread.compressed.used = 0;
     rpt->thread.compressed.enabled = stream_decompression_initialize(rpt);
     buffered_reader_init(&rpt->reader);
-
-#ifdef NETDATA_LOG_STREAM_RECEIVE
-    {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "/tmp/stream-receiver-%s.txt", rpt->host ? rrdhost_hostname(
-                                                                                         rpt->host) : "unknown"
-        );
-        parser->user.stream_log_fp = fopen(filename, "w");
-        parser->user.stream_log_repertoire = PARSER_REP_METADATA;
-    }
-#endif
 
     __atomic_store_n(&rpt->thread.parser, parser, __ATOMIC_RELAXED);
     stream_receiver_send_node_and_claim_id_to_child(rpt->host);
@@ -841,6 +897,10 @@ static void stream_receiver_replication_reset(RRDHOST *host) {
     rrdset_foreach_read(st, host) {
         rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+
+#ifdef REPLICATION_TRACKING
+        st->stream.rcv.who = REPLAY_WHO_UNKNOWN;
+#endif
     }
     rrdset_foreach_done(st);
     rrdhost_receiver_replicating_charts_zero(host);

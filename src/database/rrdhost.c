@@ -755,7 +755,7 @@ bool rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t no
         && rrdhost_sender_replicating_charts(host) == 0
         && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
         && !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_COLLECTOR_ONLINE)
-        && health_evloop_current_iteration() - rrdhost_health_evloop_last_iteration(host) > 2
+        && health_evloop_current_iteration() - rrdhost_health_evloop_last_iteration(host) > 10
         && host->stream.rcv.status.last_disconnected
         && host->stream.rcv.status.last_disconnected + rrdhost_free_orphan_time_s < now_s)
         return true;

@@ -277,7 +277,7 @@ void stream_sender_execute_commands(struct sender_state *s) {
             const char *before = get_word(s->rbuf.line.words, s->rbuf.line.num_words, 4);
 
             if (!chart_id || !start_streaming || !after || !before) {
-                netdata_log_error("STREAM SND '%s' [to %s] %s command is incomplete"
+                netdata_log_error("STREAM REPLAY ERROR '%s' [send to %s] %s command is incomplete"
                                   " (chart=%s, start_streaming=%s, after=%s, before=%s)",
                                   rrdhost_hostname(s->host), s->connected_to,
                                   command,
@@ -287,6 +287,12 @@ void stream_sender_execute_commands(struct sender_state *s) {
                                   before ? before : "(unset)");
             }
             else {
+#ifdef REPLICATION_TRACKING
+                RRDSET *st = rrdset_find(s->host, chart_id);
+                if(st)
+                    st->stream.snd.who = REPLAY_WHO_ME;
+#endif
+
                 replication_sender_request_add(
                     s, chart_id, strtoll(after, NULL, 0), strtoll(before, NULL, 0), !strcmp(start_streaming, "true"));
             }

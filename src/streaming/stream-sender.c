@@ -18,25 +18,50 @@ void stream_sender_log_payload(struct sender_state *s, BUFFER *payload, STREAM_T
             filename, FILENAME_MAX, "/tmp/stream-sender-%s.txt", s->host ? rrdhost_hostname(s->host) : "unknown");
 
         s->log.fp = fopen(filename, "w");
+
+        // Align first_call to wall clock time
+        clock_gettime(CLOCK_REALTIME, &s->log.first_call);
+        s->log.first_call.tv_nsec = 0; // Align to the start of the second
     }
 
-    if(inbound) {
-        fprintf(
-            s->log.fp,
-            "\n--- RECEIVE MESSAGE START: %s => %s ----\n"
-            "%s"
-            "--- RECEIVE MESSAGE END ----------------------------------------\n",
-            s->connected_to, rrdhost_hostname(s->host), buffer_tostring(payload));
-    }
-    else {
-        fprintf(
-            s->log.fp,
-            "\n--- SEND MESSAGE START: %s => %s ----\n"
-            "%s"
-            "--- SEND MESSAGE END ----------------------------------------\n",
-            rrdhost_hostname(s->host), s->connected_to, buffer_tostring(payload));
+    if (s->log.fp) {
+        struct timespec now;
+        clock_gettime(CLOCK_REALTIME, &now);
+
+        time_t elapsed_sec = now.tv_sec - s->log.first_call.tv_sec;
+        long elapsed_nsec = now.tv_nsec - s->log.first_call.tv_nsec;
+
+        if (elapsed_nsec < 0) {
+            elapsed_sec--;
+            elapsed_nsec += 1000000000;
+        }
+
+        uint16_t days = elapsed_sec / 86400;
+        uint8_t hours = (elapsed_sec % 86400) / 3600;
+        uint8_t minutes = (elapsed_sec % 3600) / 60;
+        uint8_t seconds = elapsed_sec % 60;
+        uint16_t milliseconds = elapsed_nsec / 1000000;
+
+        char prefix[30];
+        snprintf(prefix, sizeof(prefix), "%03ud.%02u:%02u:%02u.%03u ",
+                 days, hours, minutes, seconds, milliseconds);
+
+        const char *line_start = buffer_tostring(payload);
+        const char *line_end;
+
+        while (line_start && *line_start) {
+            line_end = strchr(line_start, '\n');
+            if (line_end) {
+                fprintf(s->log.fp, "%s%s%.*s\n", prefix, inbound ? "> " : "< ", (int)(line_end - line_start), line_start);
+                line_start = line_end + 1;
+            } else {
+                fprintf(s->log.fp, "%s%s%s\n", prefix, inbound ? "> " : "< ", line_start);
+                break;
+            }
+        }
     }
 
+    fflush(s->log.fp);
     spinlock_unlock(&s->log.spinlock);
 }
 #endif
@@ -52,6 +77,10 @@ static void stream_sender_charts_and_replication_reset(struct sender_state *s) {
     rrdset_foreach_read(st, s->host) {
         rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
         rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+
+#ifdef REPLICATION_TRACKING
+        st->stream.snd.who = REPLAY_WHO_UNKNOWN;
+#endif
 
         st->stream.snd.resync_time_s = 0;
 

@@ -1104,13 +1104,6 @@ void pluginsd_process_cleanup(PARSER *parser) {
     pluginsd_cleanup_v2(parser);
     pluginsd_host_define_cleanup(parser);
 
-#ifdef NETDATA_LOG_STREAM_RECEIVE
-    if(parser->user.stream_log_fp) {
-        fclose(parser->user.stream_log_fp);
-        parser->user.stream_log_fp = NULL;
-    }
-#endif
-
     parser_destroy(parser);
 }
 

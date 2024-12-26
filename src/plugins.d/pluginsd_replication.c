@@ -56,6 +56,10 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
     bool ok = true;
     if(!rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
 
+#ifdef REPLICATION_TRACKING
+        st->stream.rcv.who = REPLAY_WHO_ME;
+#endif
+
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         st->replay.start_streaming = false;
         st->replay.after = 0;
@@ -431,6 +435,10 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
 #endif
 
     if (start_streaming) {
+#ifdef REPLICATION_TRACKING
+        st->stream.rcv.who = REPLAY_WHO_FINISHED;
+#endif
+
         if (st->update_every != update_every_child)
             rrdset_set_update_every_s(st, update_every_child);
 
@@ -456,6 +464,10 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
 
         return PARSER_RC_OK;
     }
+
+#ifdef REPLICATION_TRACKING
+    st->stream.rcv.who = REPLAY_WHO_ME;
+#endif
 
     pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END);
 

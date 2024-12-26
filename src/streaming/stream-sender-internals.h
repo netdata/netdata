@@ -72,6 +72,7 @@ struct sender_state {
 #ifdef NETDATA_LOG_STREAM_SENDER
     struct {
         SPINLOCK spinlock;
+        struct timespec first_call;
         BUFFER *received;
         FILE *fp;
     } log;
