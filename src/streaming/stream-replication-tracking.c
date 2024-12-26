@@ -22,15 +22,18 @@ void replication_tracking_counters(struct rrdhost *host, struct replay_who_count
 
         if(!is_host_local && !(st_flags & RRDSET_FLAG_ANOMALY_DETECTION)) {
             REPLAY_WHO rcv = st->stream.rcv.who;
-            if (rcv <= 0 || rcv >= REPLAY_WHO_MAX) {
+            if (rcv <= 0 || rcv >= REPLAY_WHO_MAX)
                 rcv = REPLAY_WHO_UNKNOWN;
-#ifdef NETDATA_LOG_STREAM_RECEIVER
-                char buf[1024];
-                snprintfz(buf, sizeof(buf), "### REPLICATION WHO UNKNOWN ON CHART '%s'\n", rrdset_id(st));
-                stream_receiver_log_payload(host->receiver, buf, STREAM_TRAFFIC_TYPE_METADATA, true);
-#endif
-            }
             c->rcv[rcv]++;
+
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+            if(rcv == REPLAY_WHO_ME || rcv == REPLAY_WHO_THEM) {
+                char buf[1024];
+                snprintfz(buf, sizeof(buf), "### REPLICATION RECEIVE waits on %s for chart '%s'\n",
+                          rcv == REPLAY_WHO_ME ? "me" : "them", rrdset_id(st));
+                stream_receiver_log_payload(host->receiver, buf, STREAM_TRAFFIC_TYPE_METADATA, rcv == REPLAY_WHO_THEM);
+            }
+#endif
         }
 
         if(is_host_sending && (st_flags & RRDSET_FLAG_UPSTREAM_SEND) && !(st_flags & RRDSET_FLAG_UPSTREAM_IGNORE)) {
@@ -38,6 +41,15 @@ void replication_tracking_counters(struct rrdhost *host, struct replay_who_count
             if (snd <= 0 || snd >= REPLAY_WHO_MAX)
                 snd = REPLAY_WHO_UNKNOWN;
             c->snd[snd]++;
+
+#ifdef NETDATA_LOG_STREAM_SENDER
+            if(snd == REPLAY_WHO_ME || snd == REPLAY_WHO_THEM) {
+                char buf[1024];
+                snprintfz(buf, sizeof(buf), "### REPLICATION SEND waits on %s for chart '%s'\n",
+                          snd == REPLAY_WHO_ME ? "me" : "them", rrdset_id(st));
+                stream_receiver_log_payload(host->receiver, buf, STREAM_TRAFFIC_TYPE_METADATA, snd == REPLAY_WHO_THEM);
+            }
+#endif
         }
     }
     rrdset_foreach_done(st);
