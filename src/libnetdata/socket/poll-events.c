@@ -76,7 +76,7 @@ static inline void poll_close_fd(POLLINFO *pi, const char *func) {
     POLLJOB *p = pi->p;
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(p->ll, pi, prev, next);
-    if(!nd_poll_del(p->ndpl, pi->fd))
+    if(!nd_poll_del(p->ndpl, pi->fd, pi))
         // this is ok, if the socket is already closed
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "Failed to delete socket %d from nd_poll() - called from %s() - is the socket already closed?",

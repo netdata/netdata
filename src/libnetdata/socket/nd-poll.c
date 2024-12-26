@@ -32,8 +32,17 @@ nd_poll_t *nd_poll_create() {
     return ndpl;
 }
 
+static inline void nd_poll_replace_data_on_loaded_events(nd_poll_t *ndpl, int fd __maybe_unused, void *old_data, void *new_data) {
+    for(size_t i = ndpl->last_pos; i < ndpl->used; i++) {
+        if(ndpl->ev[i].data.ptr == old_data)
+            ndpl->ev[i].data.ptr = new_data;
+    }
+}
+
 // Add a file descriptor to the event poll
 bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
+    internal_fatal(!data, "nd_poll() does not support NULL data pointers");
+
     struct epoll_event ev = {
         .events = (events & ND_POLL_READ ? EPOLLIN : 0) | (events & ND_POLL_WRITE ? EPOLLOUT : 0),
         .data.ptr = data,
@@ -44,14 +53,23 @@ bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
 }
 
 // Remove a file descriptor from the event poll
-bool nd_poll_del(nd_poll_t *ndpl, int fd) {
+bool nd_poll_del(nd_poll_t *ndpl, int fd, void *data) {
+    internal_fatal(!data, "nd_poll() does not support NULL data pointers");
+
     bool rc = epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_DEL, fd, NULL) == 0;
     internal_error(!rc, "epoll_ctl() failed (is the socket already closed)"); // this is ok if the socket is already closed
+
+    // we may have an event pending for this fd.
+    // but epoll() does not give us fd in the events,
+    // so we use the data pointer to invalidate it
+    nd_poll_replace_data_on_loaded_events(ndpl, fd, data, NULL);
     return rc;
 }
 
 // Update an existing file descriptor in the event poll
 bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
+    internal_fatal(!data, "nd_poll() does not support NULL data pointers - you should also NEVER change the pointer with an update");
+
     struct epoll_event ev = {
         .events = (events & ND_POLL_READ ? EPOLLIN : 0) | (events & ND_POLL_WRITE ? EPOLLOUT : 0),
         .data.ptr = data,
@@ -80,10 +98,18 @@ static inline nd_poll_event_t nd_poll_events_from_epoll_events(uint32_t events) 
 }
 
 static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *result) {
-    if(ndpl->last_pos < ndpl->used) {
+    while(ndpl->last_pos < ndpl->used) {
+        void *data = ndpl->ev[ndpl->last_pos].data.ptr;
+
+        // Skip events that have been invalidated by nd_poll_del()
+        if(!data) {
+            ndpl->last_pos++;
+            continue;
+        }
+
         *result = (nd_poll_result_t){
             .events = nd_poll_events_from_epoll_events(ndpl->ev[ndpl->last_pos].events),
-            .data = ndpl->ev[ndpl->last_pos].data.ptr,
+            .data = data,
         };
 
         ndpl->last_pos++;
@@ -189,13 +215,18 @@ bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, void *data) {
 }
 
 // Remove a file descriptor from the event poll
-bool nd_poll_del(nd_poll_t *ndpl, int fd) {
+bool nd_poll_del(nd_poll_t *ndpl, int fd, void *data __maybe_unused) {
     for (nfds_t i = 0; i < ndpl->nfds; i++) {
         if (ndpl->fds[i].fd == fd) {
+
             // Remove the file descriptor by shifting the array
             memmove(&ndpl->fds[i], &ndpl->fds[i + 1], (ndpl->nfds - i - 1) * sizeof(struct pollfd));
             ndpl->nfds--;
             POINTERS_DEL(&ndpl->pointers, fd);
+
+            if(i < ndpl->last_pos)
+                ndpl->last_pos--;
+
             return true;
         }
     }

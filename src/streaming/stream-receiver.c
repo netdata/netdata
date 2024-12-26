@@ -549,7 +549,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
     internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) == NULL, "Receiver to be removed is not found in the list of receivers");
     META_DEL(&sth->run.meta, (Word_t)&rpt->thread.meta);
 
-    if(!nd_poll_del(sth->run.ndpl, rpt->sock.fd))
+    if(!nd_poll_del(sth->run.ndpl, rpt->sock.fd, &rpt->thread.meta))
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to delete receiver socket from nd_poll()");
 
     rpt->host->stream.rcv.status.tid = 0;

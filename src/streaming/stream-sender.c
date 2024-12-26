@@ -356,7 +356,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     internal_fatal(META_GET(&sth->run.meta, (Word_t)&s->thread.meta) == NULL, "Sender to be removed is not in the list of senders");
     META_DEL(&sth->run.meta, (Word_t)&s->thread.meta);
 
-    if(!nd_poll_del(sth->run.ndpl, s->sock.fd))
+    if(!nd_poll_del(sth->run.ndpl, s->sock.fd, &s->thread.meta))
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND[%zu] '%s' [to %s]: failed to delete sender socket from nd_poll()",
                sth->id, rrdhost_hostname(s->host), s->connected_to);
