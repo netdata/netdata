@@ -327,7 +327,7 @@ static RRDHOST *rrdhost_create(
     }
 
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
-    host->state_refcount = -1;
+    host->state_refcount = RRDHOST_STATE_DISCONNECTED;
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 

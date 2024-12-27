@@ -15,7 +15,7 @@
  */
 
 typedef int32_t REFCOUNT;
-#define REFCOUNT_DELETING (-100)
+#define REFCOUNT_DICONNECTED (-100)
 
 // to use ARAL uncomment the following line:
 #if !defined(FSANITIZE_ADDRESS)
@@ -918,7 +918,7 @@ static inline bool non_acquired_page_get_for_deletion___while_having_clean_locke
         spins++;
 
         if (expected == 0) {
-            desired = REFCOUNT_DELETING;
+            desired = REFCOUNT_DICONNECTED;
             delete_it = true;
         }
         else {
@@ -961,7 +961,7 @@ static inline bool acquired_page_get_for_deletion_or_release_it(PGC *cache __may
 
         if (expected == 1) {
             // we are the only one having this page referenced
-            desired = REFCOUNT_DELETING;
+            desired = REFCOUNT_DICONNECTED;
             delete_it = true;
         }
         else {

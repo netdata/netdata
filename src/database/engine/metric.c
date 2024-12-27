@@ -5,7 +5,7 @@
 #include "rrddiskprotocol.h"
 
 typedef int32_t REFCOUNT;
-#define REFCOUNT_DELETING (-100)
+#define REFCOUNT_DICONNECTED (-100)
 
 struct metric {
     nd_uuid_t uuid;                    // never changes
@@ -242,22 +242,22 @@ static inline bool metric_release(MRG *mrg, METRIC *metric) {
         }
 
         if(expected == 1 && !acquired_metric_has_retention(mrg, metric))
-            desired = REFCOUNT_DELETING;
+            desired = REFCOUNT_DICONNECTED;
         else
             desired = expected - 1;
 
     } while(!__atomic_compare_exchange_n(&metric->refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
 
-    if(desired == 0 || desired == REFCOUNT_DELETING) {
+    if(desired == 0 || desired == REFCOUNT_DICONNECTED) {
         __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
 
-        if(desired == REFCOUNT_DELETING)
+        if(desired == REFCOUNT_DICONNECTED)
             acquired_for_deletion_metric_delete(mrg, metric);
     }
 
     __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
 
-    return desired == REFCOUNT_DELETING;
+    return desired == REFCOUNT_DICONNECTED;
 }
 
 static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {

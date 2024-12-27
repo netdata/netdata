@@ -529,6 +529,9 @@ void stream_receiver_move_entire_queue_to_running_unsafe(struct stream_thread *s
 static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, const char *why) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
+    // this will wait until all workers finish
+    rrdhost_state_disconnected(rpt->host);
+
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
         ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
@@ -553,8 +556,6 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
            , rpt->remote_port ? rpt->remote_port : "-"
            , count
            , why ? why : "");
-
-    rrdhost_state_disconnected(rpt->host);
 
     internal_fatal(META_GET(&sth->run.meta, (Word_t)&rpt->thread.meta) == NULL, "Receiver to be removed is not found in the list of receivers");
     META_DEL(&sth->run.meta, (Word_t)&rpt->thread.meta);
