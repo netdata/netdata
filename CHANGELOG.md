@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- bump dag req jinja version [\#19287](https://github.com/netdata/netdata/pull/19287) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#19286](https://github.com/netdata/netdata/pull/19286) ([netdatabot](https://github.com/netdatabot))
 - improvement\(go.d/nats\): add basic jetstream metrics [\#19285](https://github.com/netdata/netdata/pull/19285) ([ilyam8](https://github.com/ilyam8))
 - fix go.d/nats tests [\#19284](https://github.com/netdata/netdata/pull/19284) ([ilyam8](https://github.com/ilyam8))
