@@ -553,7 +553,7 @@ void *stream_thread(void *ptr) {
 
         if(now_ut - last_check_replication_ut >= 10 * 60 * USEC_PER_SEC) {
             worker_is_busy(WORKER_STREAM_JOB_LIST);
-            
+
             stream_sender_replication_check_from_poll(sth, now_ut);
             stream_receiver_replication_check_from_poll(sth, now_ut);
 

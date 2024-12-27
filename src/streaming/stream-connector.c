@@ -500,6 +500,10 @@ static void stream_connector_remove(struct sender_state *s) {
     struct connector *sc = stream_connector_get(s);
     __atomic_sub_fetch(&sc->nodes, 1, __ATOMIC_RELAXED);
 
+    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+           "STREAM CNT '%s' [to %s]: streaming connector removed host: %s (signaled to stop)",
+           rrdhost_hostname(s->host), s->remote_ip, stream_handshake_error_to_string(s->exit.reason));
+
     stream_sender_remove(s);
 }
 

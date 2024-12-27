@@ -981,9 +981,10 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
         }
         rrdset_foreach_done(st);
 
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS: expecting %zu replication commands.",
-               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, exceptions);
+        if(exceptions)
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS SUMMARY: expecting %zu replication commands.",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, exceptions);
     }
 }
 

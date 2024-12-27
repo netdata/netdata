@@ -1417,21 +1417,40 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
     size_t received = __atomic_load_n(&replication_globals.atomic.received, __ATOMIC_RELAXED);
     size_t executed = __atomic_load_n(&replication_globals.atomic.executed, __ATOMIC_RELAXED);
 
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+
+    if(entries_in_dictionaries) {
+        if(buffer_strlen(wb)) buffer_strcat(wb, ", ");
+        buffer_sprintf(wb, "%zu requests pending",
+                       entries_in_dictionaries);
+    }
+    if(charts_flagged_pending) {
+        if(buffer_strlen(wb)) buffer_strcat(wb, ", ");
+        buffer_sprintf(wb, "%zu instances waiting parent",
+                       charts_flagged_pending);
+    }
+    if(not_found - replication_globals.main_thread.last_error_not_found) {
+        if(buffer_strlen(wb)) buffer_strcat(wb, ", ");
+        buffer_sprintf(wb, "%zu ignored-not-found",
+                       not_found - replication_globals.main_thread.last_error_not_found);
+    }
+    if(duplicate - replication_globals.main_thread.last_error_duplicate) {
+        if(buffer_strlen(wb)) buffer_strcat(wb, ", ");
+        buffer_sprintf(wb, "%zu ignored-merged",
+                       duplicate - replication_globals.main_thread.last_error_duplicate);
+    }
+    if(flushed - replication_globals.main_thread.last_error_flushed) {
+        if(buffer_strlen(wb)) buffer_strcat(wb, ", ");
+        buffer_sprintf(wb, "%zu were flushed",
+                       flushed - replication_globals.main_thread.last_error_flushed);
+    }
+
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
            "REPLICATION SEND SUMMARY: all senders finished replication, "
-           "received %zu and executed %zu replication requests, "
-           "%zu instances are waiting for replication requests from parent, "
-           "while having %zu replication requests waiting for execution, "
-           "%zu requests were ignored because the instances were not found, "
-           "%zu were ignored/merged as duplicate (same instance), "
-           "and %zu were flushed due to disconnects.",
+           "received %zu and executed %zu replication requests%s",
            received - replication_globals.main_thread.last_received,
            executed - replication_globals.main_thread.last_executed,
-           charts_flagged_pending,
-           entries_in_dictionaries,
-           not_found - replication_globals.main_thread.last_error_not_found,
-           duplicate - replication_globals.main_thread.last_error_duplicate,
-           flushed - replication_globals.main_thread.last_error_flushed);
+           buffer_tostring(wb));
 
     replication_globals.main_thread.last_error_flushed = flushed;
     replication_globals.main_thread.last_error_duplicate = duplicate;

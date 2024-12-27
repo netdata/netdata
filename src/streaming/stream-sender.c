@@ -330,10 +330,6 @@ void stream_sender_remove(struct sender_state *s) {
     // THIS FUNCTION IS USED BY THE CONNECTOR TOO
     // when it gives up on a certain node
 
-    nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "STREAM SND '%s' [to %s]: streaming sender removed host: %s",
-           rrdhost_hostname(s->host), s->remote_ip, stream_handshake_error_to_string(s->exit.reason));
-
     stream_sender_lock(s);
 
     __atomic_store_n(&s->exit.shutdown, false, __ATOMIC_RELAXED);
@@ -543,9 +539,10 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
         }
         rrdset_foreach_done(st);
 
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS: completed %zu replication retransmits.",
-               sth->id, rrdhost_hostname(s->host), s->remote_ip, exceptions);
+        if(exceptions)
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS SUMMARY: completed %zu replication retransmits.",
+                   sth->id, rrdhost_hostname(s->host), s->remote_ip, exceptions);
     }
 }
 
