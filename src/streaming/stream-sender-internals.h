@@ -48,7 +48,6 @@ struct sender_state {
         uint32_t msg_slot;      // ensures a opcode queue that can never get full
 
         usec_t last_traffic_ut;
-
         struct pollfd_meta meta;
     } thread;
 
@@ -56,7 +55,7 @@ struct sender_state {
         int8_t id;                              // the connector id - protected by sender_lock()
     } connector;
 
-    char connected_to[CONNECTED_TO_SIZE + 1];   // We don't know which proxy we connect to, passed back from socket.c
+    char remote_ip[CONNECTED_TO_SIZE + 1];      // We don't know which proxy we connect to, passed back from socket.c
     time_t last_state_since_t;                  // the timestamp of the last state (online/offline) change
 
     WAITING_QUEUE *wait_queue;

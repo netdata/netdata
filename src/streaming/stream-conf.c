@@ -214,8 +214,7 @@ void stream_conf_receiver_config(struct receiver_state *rpt, struct stream_recei
         netdata_log_error("STREAM RCV '%s' [from [%s]:%s]: "
                           "dbengine is not enabled, falling back to default."
                           , rpt->hostname
-                          , rpt->client_ip, rpt->client_port
-        );
+                          , rpt->remote_ip, rpt->remote_port);
         config->mode = default_rrd_memory_mode;
     }
 

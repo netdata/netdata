@@ -222,7 +222,7 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND[%zu] '%s' [to %s]: send buffer is full (buffer size %u, max %u, used %u, available %u). "
                "Restarting connection.",
-               sth->id, rrdhost_hostname(s->host), s->connected_to,
+               sth->id, rrdhost_hostname(s->host), s->remote_ip,
                stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
 
         stream_sender_move_running_to_connector_or_remove(
@@ -242,7 +242,7 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
         errno_clear();
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND[%zu] '%s' [to %s]: restarting connection without compression.",
-               sth->id, rrdhost_hostname(s->host), s->connected_to);
+               sth->id, rrdhost_hostname(s->host), s->remote_ip);
 
         stream_sender_move_running_to_connector_or_remove(
             sth, s, STREAM_HANDSHAKE_DISCONNECT_NOT_SUFFICIENT_SENDER_COMPRESSION_FAILED, true);
@@ -284,12 +284,12 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "STREAM SND[%zu] '%s' [to %s]: moving host from dispatcher queue to dispatcher running...",
-               sth->id, rrdhost_hostname(s->host), s->connected_to);
+               sth->id, rrdhost_hostname(s->host), s->remote_ip);
 
         if(sock_setnonblock(s->sock.fd, true) != 1)
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "STREAM SND[%zu] '%s' [to %s]: failed to set non-blocking mode on socket %d",
-                   sth->id, rrdhost_hostname(s->host), s->connected_to, s->sock.fd);
+                   sth->id, rrdhost_hostname(s->host), s->remote_ip, s->sock.fd);
 
         sock_setcloexec(s->sock.fd, true);
         sock_enlarge_rcv_buf(s->sock.fd);
@@ -318,7 +318,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         if(!nd_poll_add(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM SND[%zu] '%s' [to %s]: failed to add sender socket to nd_poll()",
-                   sth->id, rrdhost_hostname(s->host), s->connected_to);
+                   sth->id, rrdhost_hostname(s->host), s->remote_ip);
 
         stream_sender_on_ready_to_dispatch(s);
     }
@@ -330,7 +330,7 @@ void stream_sender_remove(struct sender_state *s) {
 
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
            "STREAM SND '%s' [to %s]: streaming sender removed host: %s",
-           rrdhost_hostname(s->host), s->connected_to, stream_handshake_error_to_string(s->exit.reason));
+           rrdhost_hostname(s->host), s->remote_ip, stream_handshake_error_to_string(s->exit.reason));
 
     stream_sender_lock(s);
 
@@ -368,7 +368,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     if(!nd_poll_del(sth->run.ndpl, s->sock.fd, &s->thread.meta))
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND[%zu] '%s' [to %s]: failed to delete sender socket from nd_poll()",
-               sth->id, rrdhost_hostname(s->host), s->connected_to);
+               sth->id, rrdhost_hostname(s->host), s->remote_ip);
 
     // clear this flag asap, to stop other threads from pushing metrics for this node
     rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_SENDER_CONNECTED | RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
@@ -384,7 +384,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
 
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
            "STREAM SND[%zu] '%s' [to %s]: sender disconnected from parent, reason: %s",
-           sth->id, rrdhost_hostname(s->host), s->connected_to, stream_handshake_error_to_string(reason));
+           sth->id, rrdhost_hostname(s->host), s->remote_ip, stream_handshake_error_to_string(reason));
 
     nd_sock_close(&s->sock);
 
@@ -426,8 +426,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
         if(unlikely(stats.bytes_outstanding &&
                      s->thread.last_traffic_ut + stream_send.parents.timeout_s * USEC_PER_SEC < now_ut &&
                      !stream_sender_pending_replication_requests(s) &&
-                     !stream_sender_replicating_charts(s)
-                         )) {
+                     !stream_sender_replicating_charts(s))) {
 
             ND_LOG_STACK lgs[] = {
                 ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
@@ -450,10 +449,10 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
                 size_snprintf(pending, sizeof(pending), stats.bytes_outstanding, "B", false);
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SND[%zu] '%s' [to %s]: could not send data for %ld seconds - closing connection - "
+                   "STREAM SND[%zu] '%s' [to %s]: there was not traffic for %ld seconds - closing connection - "
                    "we have sent %zu bytes in %zu operations, it is idle for %s, and we have %s pending to send "
                    "(buffer is used %.2f%%).",
-                   sth->id, rrdhost_hostname(s->host), s->connected_to, stream_send.parents.timeout_s,
+                   sth->id, rrdhost_hostname(s->host), s->remote_ip, stream_send.parents.timeout_s,
                    stats.bytes_sent, stats.sends,
                 duration, pending, stats.buffer_ratio);
 
@@ -467,7 +466,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
         if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0), &s->thread.meta))
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
-                   sth->id, rrdhost_hostname(s->host), s->connected_to);
+                   sth->id, rrdhost_hostname(s->host), s->remote_ip);
     }
 
     if (bytes_compressed && bytes_uncompressed) {
@@ -503,7 +502,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
 
         ssize_t rc = nd_sock_send_nowait(&s->sock, chunk, outstanding);
         if (likely(rc > 0)) {
-            stream_circular_buffer_del_unsafe(s->scb, rc);
+            stream_circular_buffer_del_unsafe(s->scb, rc, now_ut);
             replication_sender_recalculate_buffer_used_ratio_unsafe(s);
             s->thread.last_traffic_ut = now_ut;
             sth->snd.bytes_sent += rc;
@@ -513,7 +512,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
                 if (!nd_poll_upd(sth->run.ndpl, s->sock.fd, ND_POLL_READ, &s->thread.meta))
                     nd_log(NDLS_DAEMON, NDLP_ERR,
                            "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
-                           sth->id, rrdhost_hostname(s->host), s->connected_to);
+                           sth->id, rrdhost_hostname(s->host), s->remote_ip);
 
                 // recreate the circular buffer if we have to
                 stream_circular_buffer_recreate_timed_unsafe(s->scb, now_ut, false);
@@ -549,7 +548,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM SND[%zu] '%s' [to %s]: %s (%zd, on fd %d) - restarting connection - "
                    "we have sent %zu bytes in %zu operations.",
-                   sth->id, rrdhost_hostname(s->host), s->connected_to, disconnect_reason, rc, s->sock.fd,
+                   sth->id, rrdhost_hostname(s->host), s->remote_ip, disconnect_reason, rc, s->sock.fd,
                    stats->bytes_sent, stats->sends);
 
             stream_sender_move_running_to_connector_or_remove(sth, s, reason, true);
@@ -602,7 +601,7 @@ bool stream_sender_receive_data(struct stream_thread *sth, struct sender_state *
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM SND[%zu] '%s' [to %s]: %s (fd %d) - restarting sender connection.",
-                   sth->id, rrdhost_hostname(s->host), s->connected_to, disconnect_reason, s->sock.fd);
+                   sth->id, rrdhost_hostname(s->host), s->remote_ip, disconnect_reason, s->sock.fd);
 
             stream_sender_move_running_to_connector_or_remove(
                 sth, s, reason, true);
@@ -653,7 +652,7 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND[%zu] '%s' [to %s]: %s restarting connection - %zu bytes transmitted in %zu operations.",
-               sth->id, rrdhost_hostname(s->host), s->connected_to, error, stats.bytes_sent, stats.sends);
+               sth->id, rrdhost_hostname(s->host), s->remote_ip, error, stats.bytes_sent, stats.sends);
 
         stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR, true);
         return false;

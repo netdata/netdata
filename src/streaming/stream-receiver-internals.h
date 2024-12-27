@@ -32,14 +32,13 @@ struct receiver_state {
     char *registry_hostname;
     char *machine_guid;
     char *os;
-    char *timezone;         // Unused?
+    char *timezone;             // Unused?
     char *abbrev_timezone;
-    char *client_ip;        // Duplicated in pluginsd
-    char *client_port;        // Duplicated in pluginsd
-    char *program_name;        // Duplicated in pluginsd
+    char *remote_ip;            // Duplicated in pluginsd
+    char *remote_port;          // Duplicated in pluginsd
+    char *program_name;         // Duplicated in pluginsd
     char *program_version;
     struct rrdhost_system_info *system_info;
-    time_t last_msg_t;
     time_t connected_since_s;
 
     struct buffered_reader reader;
@@ -69,6 +68,7 @@ struct receiver_state {
             STREAM_CIRCULAR_BUFFER *scb;
         } send_to_child;
 
+        usec_t last_traffic_ut;
         struct pollfd_meta meta;
     } thread;
 
@@ -108,5 +108,7 @@ bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE rea
 
 void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcode msg);
 void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state *rpt, struct stream_opcode *msg);
+
+void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t now_ut);
 
 #endif //NETDATA_STREAM_RECEIVER_INTERNALS_H

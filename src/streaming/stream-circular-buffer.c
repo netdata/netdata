@@ -6,7 +6,9 @@
 struct stream_circular_buffer {
     struct circular_buffer *cb;
     STREAM_CIRCULAR_BUFFER_STATS stats;
-    usec_t last_reset_ut;
+
+    usec_t last_recreate_ut;            // recreates are only used to shrink the buffer, they are normal during operation
+    usec_t last_sent_ut;                // the last time we removed or flushed data from the buffer
 
     struct {
         // the current max size of the buffer
@@ -17,7 +19,7 @@ struct stream_circular_buffer {
 
         // the last time we flushed the buffer
         // by monitoring this we can know if the system was reconnected
-        usec_t since_ut;
+        usec_t last_flush_ut;
     } atomic;
 };
 
@@ -52,9 +54,11 @@ bool stream_circular_buffer_set_max_size_unsafe(STREAM_CIRCULAR_BUFFER *scb, siz
 }
 
 void stream_circular_buffer_flush_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t buffer_max_size) {
-    __atomic_store_n(&((scb)->atomic.since_ut), now_monotonic_usec(), __ATOMIC_RELAXED);
+    usec_t now_ut = now_monotonic_usec();
+    __atomic_store_n(&scb->atomic.last_flush_ut, now_ut, __ATOMIC_RELAXED);
 
     // flush the output buffer from any data it may have
+    scb->last_sent_ut = now_ut;
     cbuffer_flush(scb->cb);
     memset(&scb->stats, 0, sizeof(scb->stats));
     stream_circular_buffer_set_max_size_unsafe(scb, buffer_max_size, true);
@@ -62,7 +66,7 @@ void stream_circular_buffer_flush_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t buf
 }
 
 inline size_t stream_sender_get_buffer_used_percent(STREAM_CIRCULAR_BUFFER *scb) {
-    return __atomic_load_n(&((scb)->atomic.buffer_ratio), __ATOMIC_RELAXED);
+    return __atomic_load_n(&scb->atomic.buffer_ratio, __ATOMIC_RELAXED);
 }
 
 size_t stream_circular_buffer_get_max_size(STREAM_CIRCULAR_BUFFER *scb) {
@@ -70,10 +74,10 @@ size_t stream_circular_buffer_get_max_size(STREAM_CIRCULAR_BUFFER *scb) {
 }
 
 void stream_circular_buffer_recreate_timed_unsafe(STREAM_CIRCULAR_BUFFER *scb, usec_t now_ut, bool force) {
-    if(!force && (scb->stats.bytes_outstanding || now_ut - scb->last_reset_ut < 300 * USEC_PER_SEC))
+    if(!force && (scb->stats.bytes_outstanding || now_ut - scb->last_recreate_ut < 300 * USEC_PER_SEC))
         return;
 
-    scb->last_reset_ut = now_ut;
+    scb->last_recreate_ut = now_ut;
 
     scb->stats.recreates++; // we increase even if we don't do it, to have sender_start() recreate its buffers
 
@@ -84,8 +88,14 @@ void stream_circular_buffer_recreate_timed_unsafe(STREAM_CIRCULAR_BUFFER *scb, u
     }
 }
 
-inline usec_t stream_circular_buffer_get_since_ut(STREAM_CIRCULAR_BUFFER *scb) {
-    return __atomic_load_n(&((scb)->atomic.since_ut), __ATOMIC_RELAXED);
+inline usec_t stream_circular_buffer_last_flush_ut(STREAM_CIRCULAR_BUFFER *scb) {
+    return __atomic_load_n(&((scb)->atomic.last_flush_ut), __ATOMIC_RELAXED);
+}
+
+inline usec_t stream_circular_buffer_last_sent_ut(STREAM_CIRCULAR_BUFFER *scb) {
+    // this is ok without locks and atomics, since only the stream threads
+    // can actually remove data and call this
+    return scb->last_sent_ut;
 }
 
 void stream_circular_buffer_destroy(STREAM_CIRCULAR_BUFFER *scb) {
@@ -118,7 +128,8 @@ size_t stream_circular_buffer_get_unsafe(STREAM_CIRCULAR_BUFFER *scb, char **chu
 }
 
 // removes data from the beginning of the circular buffer
-void stream_circular_buffer_del_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t bytes) {
+void stream_circular_buffer_del_unsafe(STREAM_CIRCULAR_BUFFER *scb, size_t bytes, usec_t now_ut) {
+    scb->last_sent_ut = now_ut ? now_ut : now_monotonic_usec();
     scb->stats.sends++;
     scb->stats.bytes_sent += bytes;
     cbuffer_remove_unsafe(scb->cb, bytes);

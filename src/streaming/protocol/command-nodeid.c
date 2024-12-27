@@ -52,7 +52,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     if (uuid_parse(claim_id_str ? claim_id_str : "", claim_id.uuid) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND '%s' [to %s] received invalid claim id '%s'",
-               rrdhost_hostname(s->host), s->connected_to,
+               rrdhost_hostname(s->host), s->remote_ip,
                claim_id_str ? claim_id_str : "(unset)");
         return;
     }
@@ -61,7 +61,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     if(uuid_parse(node_id_str ? node_id_str : "", node_id.uuid) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND '%s' [to %s] received an invalid node id '%s'",
-               rrdhost_hostname(s->host), s->connected_to,
+               rrdhost_hostname(s->host), s->remote_ip,
                node_id_str ? node_id_str : "(unset)");
         return;
     }
@@ -69,14 +69,14 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     if (!UUIDiszero(s->host->aclk.claim_id_of_parent) && !UUIDeq(s->host->aclk.claim_id_of_parent, claim_id))
         nd_log(NDLS_DAEMON, NDLP_INFO,
                "STREAM SND '%s' [to %s] changed parent's claim id to %s",
-               rrdhost_hostname(s->host), s->connected_to,
+               rrdhost_hostname(s->host), s->remote_ip,
                claim_id_str ? claim_id_str : "(unset)");
 
     if(!UUIDiszero(s->host->node_id) && !UUIDeq(s->host->node_id, node_id)) {
         if(claimed) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "STREAM SND '%s' [to %s] parent reports different node id '%s', but we are claimed. Ignoring it.",
-                   rrdhost_hostname(s->host), s->connected_to,
+                   rrdhost_hostname(s->host), s->remote_ip,
                    node_id_str ? node_id_str : "(unset)");
             return;
         }
@@ -84,7 +84,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
             update_node_id = true;
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "STREAM SND '%s' [to %s] changed node id to %s",
-                   rrdhost_hostname(s->host), s->connected_to,
+                   rrdhost_hostname(s->host), s->remote_ip,
                    node_id_str ? node_id_str : "(unset)");
         }
     }
@@ -92,7 +92,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s) {
     if(!url || !*url) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND '%s' [to %s] received an invalid cloud URL '%s'",
-               rrdhost_hostname(s->host), s->connected_to,
+               rrdhost_hostname(s->host), s->remote_ip,
                url ? url : "(unset)");
         return;
     }

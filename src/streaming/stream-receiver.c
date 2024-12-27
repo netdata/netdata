@@ -209,7 +209,7 @@ static inline decompressor_status_t receiver_feed_decompressor(struct receiver_s
     if (unlikely(!compressed_message_size)) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV[x] '%s' [from [%s]:%s]: multiplexed uncompressed data in compressed stream!",
-               rrdhost_hostname(r->host), r->client_ip, r->client_port);
+               rrdhost_hostname(r->host), r->remote_ip, r->remote_port);
         return DECOMPRESS_FAILED;
     }
 
@@ -218,7 +218,7 @@ static inline decompressor_status_t receiver_feed_decompressor(struct receiver_s
                "STREAM RCV[x] '%s' [from [%s]:%s]: received a compressed message of %zu bytes, "
                "which is bigger than the max compressed message "
                "size supported of %zu. Ignoring message.",
-               rrdhost_hostname(r->host), r->client_ip, r->client_port,
+               rrdhost_hostname(r->host), r->remote_ip, r->remote_port,
                compressed_message_size, (size_t)COMPRESSION_MAX_MSG_SIZE);
         return DECOMPRESS_FAILED;
     }
@@ -235,7 +235,7 @@ static inline decompressor_status_t receiver_feed_decompressor(struct receiver_s
     if (unlikely(!bytes_to_parse)) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV[x] '%s' [from [%s]:%s]: no bytes to decompress.",
-               rrdhost_hostname(r->host), r->client_ip, r->client_port);
+               rrdhost_hostname(r->host), r->remote_ip, r->remote_port);
         return DECOMPRESS_FAILED;
     }
 
@@ -308,8 +308,8 @@ static inline bool receiver_should_stop(struct receiver_state *rpt) {
 void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state *rpt, struct stream_opcode *msg) {
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
-        ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
-        ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
+        ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
+        ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
         ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
         ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
         ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
@@ -327,7 +327,7 @@ void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV[%zu] '%s' [from [%s]:%s]: send buffer is full (buffer size %u, max %u, used %u, available %u). "
                "Restarting connection.",
-               sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port,
+               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
                stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
 
         stream_receiver_remove(sth, rpt, "receiver send buffer overflow");
@@ -387,14 +387,14 @@ static void stream_receive_log_database_gap(struct receiver_state *rpt) {
     if(!last_db_entry) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "STREAM RCV '%s' [from [%s]:%s]: node connected; for the first time!",
-               rrdhost_hostname(host), rpt->client_ip, rpt->client_port);
+               rrdhost_hostname(host), rpt->remote_ip, rpt->remote_port);
     }
     else {
         char buf[128];
         duration_snprintf(buf, sizeof(buf), now - last_db_entry, "s", true);
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "STREAM RCV '%s' [from [%s]:%s]: node connected; last sample in the database %s ago",
-               rrdhost_hostname(host), rpt->client_ip, rpt->client_port, buf);
+               rrdhost_hostname(host), rpt->remote_ip, rpt->remote_port, buf);
     }
 }
 
@@ -412,7 +412,7 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM RCV[%zu] '%s' [from [%s]:%s]: moving host from receiver queue to receiver running...",
-           sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+           sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
 
     sock_setcloexec(rpt->sock.fd, true);
     sock_enlarge_rcv_buf(rpt->sock.fd);
@@ -421,7 +421,7 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
     if(sock_setnonblock(rpt->sock.fd, true) != 1)
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV '%s' [from [%s]:%s]: failed to set non-blocking mode on socket %d",
-               rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->sock.fd);
+               rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
 
     rpt->host->stream.rcv.status.tid = gettid_cached();
     rpt->thread.meta.type = POLLFD_TYPE_RECEIVER;
@@ -441,12 +441,12 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV[%zu] '%s' [from [%s]:%s]:"
                "Failed to add receiver socket to nd_poll()",
-               sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
 
     // put the client IP and port into the buffers used by plugins.d
     {
         char buf[CONFIG_MAX_NAME];
-        snprintfz(buf, sizeof(buf),  "[%s]:%s", rpt->client_ip, rpt->client_port);
+        snprintfz(buf, sizeof(buf),  "[%s]:%s", rpt->remote_ip, rpt->remote_port);
         string_freez(rpt->thread.cd.id);
         rpt->thread.cd.id = string_strdupz(buf);
 
@@ -539,8 +539,8 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
            "receiver disconnected (after %zu received messages): %s"
            , sth->id
            , rpt->hostname ? rpt->hostname : "-"
-           , rpt->client_ip ? rpt->client_ip : "-"
-           , rpt->client_port ? rpt->client_port : "-"
+           , rpt->remote_ip ? rpt->remote_ip : "-"
+           , rpt->remote_port ? rpt->remote_port : "-"
            , count
            , why ? why : "");
 
@@ -701,12 +701,13 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
 
         ssize_t rc = write_stream(rpt, chunk, outstanding);
         if (likely(rc > 0)) {
-            stream_circular_buffer_del_unsafe(scb, rc);
+            rpt->thread.last_traffic_ut = now_ut;
+            stream_circular_buffer_del_unsafe(scb, rc, now_ut);
             if (!stats->bytes_outstanding) {
                 if (!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ, &rpt->thread.meta))
                     nd_log(NDLS_DAEMON, NDLP_ERR,
                            "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot update nd_poll()",
-                           sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+                           sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
 
                 // recreate the circular buffer if we have to
                 stream_circular_buffer_recreate_timed_unsafe(rpt->thread.send_to_child.scb, now_ut, false);
@@ -743,7 +744,7 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s (%zd, on fd %d) - closing receiver connection - "
                    "we have sent %zu bytes in %zu operations.",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port,
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
                    disconnect_reason, rc, rpt->sock.fd, stats->bytes_sent, stats->sends);
 
             receiver_set_exit_reason(rpt, reason, false);
@@ -777,7 +778,7 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
             status = EVLOOP_STATUS_PARSER_FAILED;
 
         else if (likely(rc > 0))
-            rpt->last_msg_t = (time_t)(now_ut / USEC_PER_SEC);
+            rpt->thread.last_traffic_ut = now_ut;
 
         else if (rc == 0 || errno == ECONNRESET)
             status = EVLOOP_STATUS_SOCKET_CLOSED;
@@ -806,7 +807,7 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s (fd %d) - closing receiver connection.",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, disconnect_reason, rpt->sock.fd);
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, disconnect_reason, rpt->sock.fd);
 
             receiver_set_exit_reason(rpt, reason, false);
             stream_receiver_remove(sth, rpt, disconnect_reason);
@@ -824,8 +825,8 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
 
     ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
-        ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
+        ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
+        ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
         ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rpt->hostname),
         ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
         ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
@@ -857,7 +858,7 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV[%zu] '%s' [from [%s]:%s]: %s - closing connection",
-               sth->id, rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, error);
+               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, error);
 
         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_ERROR, false);
         stream_receiver_remove(sth, rpt, error);
@@ -877,6 +878,68 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
     }
 
     return true;
+}
+
+void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t now_ut) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
+    NETDATA_DOUBLE overall_buffer_ratio = 0.0;
+
+    Word_t idx = 0;
+    for(struct pollfd_meta *m = META_FIRST(&sth->run.meta, &idx);
+         m;
+         m = META_NEXT(&sth->run.meta, &idx)) {
+        if (m->type != POLLFD_TYPE_RECEIVER) continue;
+        struct receiver_state *rpt = m->rpt;
+
+        spinlock_lock(&rpt->thread.send_to_child.spinlock);
+        STREAM_CIRCULAR_BUFFER_STATS stats = *stream_circular_buffer_stats_unsafe(rpt->thread.send_to_child.scb);
+        spinlock_lock(&rpt->thread.send_to_child.spinlock);
+
+        if (stats.buffer_ratio > overall_buffer_ratio)
+            overall_buffer_ratio = stats.buffer_ratio;
+
+        time_t timeout_s = 600;
+        if(unlikely(rpt->thread.last_traffic_ut + timeout_s * USEC_PER_SEC < now_ut &&
+                     !rrdhost_receiver_replicating_charts(rpt->host))) {
+
+            ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
+                ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
+                ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rpt->hostname),
+                ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
+                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
+                ND_LOG_FIELD_END(),
+            };
+            ND_LOG_STACK_PUSH(lgs);
+
+            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
+
+            char duration[RFC3339_MAX_LENGTH];
+            duration_snprintf(duration, sizeof(duration), (int64_t)(now_monotonic_usec() - rpt->thread.last_traffic_ut), "us", true);
+
+            char pending[64] = "0";
+            if(stats.bytes_outstanding)
+                size_snprintf(pending, sizeof(pending), stats.bytes_outstanding, "B", false);
+
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM RCV[%zu] '%s' [from %s]: there was not traffic for %ld seconds - closing connection - "
+                   "we have sent %zu bytes in %zu operations, it is idle for %s, and we have %s pending to send "
+                   "(buffer is used %.2f%%).",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, timeout_s,
+                   stats.bytes_sent, stats.sends, duration, pending, stats.buffer_ratio);
+
+            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_TIMEOUT, false);
+            stream_receiver_remove(sth, rpt, "timeout");
+            continue;
+        }
+
+        if(!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0), &rpt->thread.meta))
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM RCV[%zu] '%s' [from %s]: failed to update nd_poll().",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip);
+
+    }
 }
 
 void stream_receiver_cleanup(struct stream_thread *sth) {
@@ -942,7 +1005,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
                        "STREAM RCV '%s' [from [%s]:%s]: "
                        "Postponing health checks for %" PRId64 " seconds, because it was just connected.",
-                       rrdhost_hostname(host), rpt->client_ip, rpt->client_port,
+                       rrdhost_hostname(host), rpt->remote_ip, rpt->remote_port,
                        (int64_t) rpt->config.health.delay);
             }
         }
@@ -1054,7 +1117,7 @@ bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE rea
         netdata_log_error("STREAM RCV[x] '%s' [from [%s]:%s]: "
               "streaming thread takes too long to stop, giving up..."
               , rrdhost_hostname(host)
-              , host->receiver->client_ip, host->receiver->client_port);
+              , host->receiver->remote_ip, host->receiver->remote_port);
     else
         ret = true;
 

@@ -33,7 +33,7 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
                     nd_log_limit_static_global_var(erl, 1, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
                                  "STREAM SND[%zu] '%s' [to %s]: cannot enable output on sender socket %d.",
-                                 sth->id, rrdhost_hostname(m->s->host), m->s->connected_to, m->s->sock.fd);
+                                 sth->id, rrdhost_hostname(m->s->host), m->s->remote_ip, m->s->sock.fd);
                 }
 
                 if(!stream_sender_send_data(sth, m->s, now_monotonic_usec(), false))
@@ -52,7 +52,7 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
                     nd_log_limit_static_global_var(erl, 1, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                                  "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot enable output on receiver socket %d.",
-                                 sth->id, rrdhost_hostname(m->rpt->host), m->rpt->client_ip, m->rpt->client_port, m->rpt->sock.fd);
+                                 sth->id, rrdhost_hostname(m->rpt->host), m->rpt->remote_ip, m->rpt->remote_port, m->rpt->sock.fd);
                 }
 
                 if(!stream_receiver_send_data(sth, m->rpt, now_monotonic_usec(), false))
@@ -94,14 +94,14 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
     if(msg.meta != &rpt->thread.meta) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV '%s' [from [%s]:%s]: the receiver in the opcode the message does not match this receiver. "
-               "Ignoring opcode.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+               "Ignoring opcode.", rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
         return;
     }
     struct stream_thread *sth = stream_thread_by_slot_id(msg.thread_slot);
     if(!sth) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM RCV '%s' [from [%s]:%s]: the opcode (%u) message cannot be verified. Ignoring it.",
-               rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, msg.opcode);
+               rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, msg.opcode);
         return;
     }
 
@@ -148,7 +148,7 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
 #endif
 
                 fatal("STREAM RCV '%s' [from [%s]:%s]: The streaming opcode queue is full, but this should never happen...",
-                      rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+                      rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
             }
 
             // let's use a new slot
@@ -174,7 +174,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
     if(msg.meta != &s->thread.meta) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND '%s' [to %s]: the opcode message does not match this sender. "
-               "Ignoring opcode.", rrdhost_hostname(s->host), s->connected_to);
+               "Ignoring opcode.", rrdhost_hostname(s->host), s->remote_ip);
         return;
     }
 
@@ -182,7 +182,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
     if(!sth) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM SND[x] '%s' [to %s] the opcode (%u) message cannot be verified. Ignoring it.",
-               rrdhost_hostname(s->host), s->connected_to, msg.opcode);
+               rrdhost_hostname(s->host), s->remote_ip, msg.opcode);
         return;
     }
 
@@ -229,7 +229,7 @@ void stream_sender_send_opcode(struct sender_state *s, struct stream_opcode msg)
 #endif
 
                 fatal("STREAM SND '%s' [to %s]: The streaming opcode queue is full, but this should never happen...",
-                      rrdhost_hostname(s->host), s->connected_to);
+                      rrdhost_hostname(s->host), s->remote_ip);
             }
 
             // let's use a new slot
@@ -526,12 +526,14 @@ void *stream_thread(void *ptr) {
             last_dequeue_ut = now_ut;
         }
 
-        if(now_ut - last_check_all_nodes_ut >= USEC_PER_SEC) {
+        if(now_ut - last_check_all_nodes_ut >= nd_profile.update_every * USEC_PER_SEC) {
             worker_is_busy(WORKER_STREAM_JOB_LIST);
 
             // periodically check the entire list of nodes
             // this detects unresponsive parents too (timeout)
             stream_sender_check_all_nodes_from_poll(sth, now_ut);
+            stream_receiver_check_all_nodes_from_poll(sth, now_ut);
+
             worker_set_metric(WORKER_SENDER_JOB_MESSAGES, (NETDATA_DOUBLE)(sth->messages.processed));
             worker_set_metric(WORKER_STREAM_METRIC_NODES, (NETDATA_DOUBLE)sth->nodes_count);
 

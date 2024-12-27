@@ -743,7 +743,7 @@ struct replication_request {
     time_t after;                       // the start time of the query (maybe zero) key for sorting (JudyL)
     time_t before;                      // the end time of the query (maybe zero)
 
-    usec_t sender_circular_buffer_since_ut;        // the timestamp of the sender, at the time we indexed this request
+    usec_t sender_circular_buffer_last_flush_ut;        // the timestamp of the sender, at the time we indexed this request
     Word_t unique_id;                   // auto-increment, later requests have bigger
 
     bool start_streaming;               // true, when the parent wants to send the rest of the data (before is overwritten) and enable normal streaming
@@ -1149,7 +1149,7 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
         internal_error(
                 true,
                 "STREAM SND '%s' [to %s]: REPLAY: 'host:%s/chart:%s' replacing duplicate replication command received (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
-                rrdhost_hostname(s->host), s->connected_to, rrdhost_hostname(s->host), dictionary_acquired_item_name(item),
+                rrdhost_hostname(s->host), s->remote_ip, rrdhost_hostname(s->host), dictionary_acquired_item_name(item),
                 (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false",
                 (unsigned long long)rq_new->after, (unsigned long long)rq_new->before, rq_new->start_streaming ? "true" : "false");
 
@@ -1162,7 +1162,7 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
         internal_error(
                 true,
                 "STREAM SND '%s' [to %s]: REPLAY: 'host:%s/chart:%s' adding duplicate replication command received (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
-                rrdhost_hostname(s->host), s->connected_to, rrdhost_hostname(s->host), dictionary_acquired_item_name(item),
+                rrdhost_hostname(s->host), s->remote_ip, rrdhost_hostname(s->host), dictionary_acquired_item_name(item),
                 (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false",
                 (unsigned long long)rq_new->after, (unsigned long long)rq_new->before, rq_new->start_streaming ? "true" : "false");
     }
@@ -1170,7 +1170,7 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
         internal_error(
                 true,
                 "STREAM SND '%s' [to %s]: REPLAY: 'host:%s/chart:%s' ignoring duplicate replication command received (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
-                rrdhost_hostname(s->host), s->connected_to, rrdhost_hostname(s->host),
+                rrdhost_hostname(s->host), s->remote_ip, rrdhost_hostname(s->host),
                 dictionary_acquired_item_name(item),
                 (unsigned long long) rq->after, (unsigned long long) rq->before, rq->start_streaming ? "true" : "false",
                 (unsigned long long) rq_new->after, (unsigned long long) rq_new->before, rq_new->start_streaming ? "true" : "false");
@@ -1201,7 +1201,7 @@ static void replication_request_delete_callback(const DICTIONARY_ITEM *item __ma
 }
 
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq) {
-    return rq->sender_circular_buffer_since_ut == stream_circular_buffer_get_since_ut(rq->sender->scb);
+    return rq->sender_circular_buffer_last_flush_ut == stream_circular_buffer_last_flush_ut(rq->sender->scb);
 }
 
 static bool replication_execute_request(struct replication_request *rq, bool workers) {
@@ -1261,7 +1261,7 @@ void replication_sender_request_add(struct sender_state *sender, const char *cha
             .after = after,
             .before = before,
             .start_streaming = start_streaming,
-            .sender_circular_buffer_since_ut = stream_circular_buffer_get_since_ut(sender->scb),
+            .sender_circular_buffer_last_flush_ut = stream_circular_buffer_last_flush_ut(sender->scb),
             .indexed_in_judy = false,
             .not_indexed_buffer_full = false,
             .not_indexed_preprocessing = false,
@@ -1575,7 +1575,7 @@ static int replication_pipeline_execute_next(void) {
         if(rq->found) {
             internal_fatal(rq->executed, "REPLAY FATAL: query has already been executed!");
 
-            if (rq->sender_circular_buffer_since_ut != stream_circular_buffer_get_since_ut(rq->sender->scb)) {
+            if (rq->sender_circular_buffer_last_flush_ut != stream_circular_buffer_last_flush_ut(rq->sender->scb)) {
                 // the sender has reconnected since this request was queued,
                 // we can safely throw it away, since the parent will resend it
                 replication_response_cancel_and_finalize(rq->q);

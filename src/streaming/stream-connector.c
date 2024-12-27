@@ -261,7 +261,7 @@ stream_connect_validate_first_response(RRDHOST *host, struct sender_state *s, ch
 
     nd_log(NDLS_DAEMON, priority,
            "STREAM CONNECT '%s' [to %s]: %s - will retry in %d secs, at %s",
-           rrdhost_hostname(host), s->connected_to, error, delay, buf);
+           rrdhost_hostname(host), s->remote_ip, error, delay, buf);
 
     return false;
 }
@@ -282,7 +282,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
     if(!stream_parent_connect_to_one(
             &s->sock, host, default_port, timeout,
-            s->connected_to, sizeof(s->connected_to) - 1,
+            s->remote_ip, sizeof(s->remote_ip) - 1,
             &host->stream.snd.parents.current)) {
 
         if(s->sock.error != ND_SOCK_ERR_NO_DESTINATION_AVAILABLE)
@@ -346,7 +346,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM CONNECT '%s' [to %s]: failed to send HTTP header to remote netdata.",
-               rrdhost_hostname(host), s->connected_to);
+               rrdhost_hostname(host), s->remote_ip);
 
         stream_parent_set_reconnect_delay(
             host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_SEND_TIMEOUT, 60);
@@ -368,7 +368,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "STREAM CONNECT '%s' [to %s]: remote netdata does not respond.",
-               rrdhost_hostname(host), s->connected_to);
+               rrdhost_hostname(host), s->remote_ip);
 
         stream_parent_set_reconnect_delay(
             host->stream.snd.parents.current, STREAM_HANDSHAKE_ERROR_RECEIVE_TIMEOUT, 30);
@@ -394,7 +394,7 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM CONNECT '%s' [to %s]: connected to parent...",
-           rrdhost_hostname(host), s->connected_to);
+           rrdhost_hostname(host), s->remote_ip);
 
     return true;
 }

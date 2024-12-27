@@ -23,14 +23,14 @@ BUFFER *sender_commit_start_with_trace(struct sender_state *s __maybe_unused, st
     if(unlikely(commit->used))
         fatal("STREAM SND '%s' [to %s]: thread buffer is used multiple times concurrently (%u). "
               "It is already being used by '%s()', and now is called by '%s()'",
-              rrdhost_hostname(s->host), s->connected_to,
+              rrdhost_hostname(s->host), s->remote_ip,
               (unsigned)commit->used,
               commit->last_function ? commit->last_function : "(null)",
               func ? func : "(null)");
 
     if(unlikely(commit->receiver_tid && commit->receiver_tid != gettid_cached()))
         fatal("STREAM SND '%s' [to %s]: thread buffer is reserved for tid %d, but it used by thread %d function '%s()'.",
-              rrdhost_hostname(s->host), s->connected_to,
+              rrdhost_hostname(s->host), s->remote_ip,
               commit->receiver_tid, gettid_cached(), func ? func : "(null)");
 
     if(unlikely(commit->wb &&
@@ -92,7 +92,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
         // adaptive sizing of the circular buffer
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "STREAM SND '%s' [to %s]: Increased max buffer size to %u (message size %zu).",
-               rrdhost_hostname(s->host), s->connected_to, stats->bytes_max_size, src_len + 1);
+               rrdhost_hostname(s->host), s->remote_ip, stats->bytes_max_size, src_len + 1);
     }
 
     stream_sender_log_payload(s, wb, type, false);
@@ -134,7 +134,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
             if (!dst_len) {
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                     "STREAM SND '%s' [to %s]: COMPRESSION failed. Resetting compressor and re-trying",
-                    rrdhost_hostname(s->host), s->connected_to);
+                    rrdhost_hostname(s->host), s->remote_ip);
 
                 stream_compression_initialize(s);
                 dst_len = stream_compress(&s->compressor, src, size_to_compress, &dst);
@@ -151,7 +151,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
                 fatal(
                     "STREAM SND '%s' [to %s]: invalid signature, original payload %zu bytes, "
                     "compressed payload length %zu bytes, but signature says payload is %zu bytes",
-                    rrdhost_hostname(s->host), s->connected_to,
+                    rrdhost_hostname(s->host), s->remote_ip,
                     size_to_compress, dst_len, decoded_dst_len);
 #endif
 
@@ -198,7 +198,7 @@ overflow_with_lock: {
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                      "STREAM SND '%s' [to %s]: buffer overflow (buffer size %u, max size %u, used %u, available %u). "
                      "Restarting connection.",
-                     rrdhost_hostname(s->host), s->connected_to,
+                     rrdhost_hostname(s->host), s->remote_ip,
                      stats->bytes_size, stats->bytes_max_size, stats->bytes_outstanding, stats->bytes_available);
         return;
     }
@@ -214,7 +214,7 @@ compression_failed_with_lock: {
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                      "STREAM SND '%s' [to %s]: COMPRESSION failed (twice). "
                      "Deactivating compression and restarting connection.",
-                     rrdhost_hostname(s->host), s->connected_to);
+                     rrdhost_hostname(s->host), s->remote_ip);
     }
 }
 
@@ -223,11 +223,11 @@ void sender_thread_commit_with_trace(struct sender_state *s, BUFFER *wb, STREAM_
 
     if (unlikely(wb != commit->wb))
         fatal("STREAM SND '%s' [to %s]: function '%s()' is trying to commit an unknown commit buffer.",
-              rrdhost_hostname(s->host), s->connected_to, func);
+              rrdhost_hostname(s->host), s->remote_ip, func);
 
     if (unlikely(!commit->used))
         fatal("STREAM SND '%s' [to %s]: function '%s()' is committing a sender buffer twice.",
-              rrdhost_hostname(s->host), s->connected_to, func);
+              rrdhost_hostname(s->host), s->remote_ip, func);
 
     commit->used = false;
     commit->last_function = NULL;
