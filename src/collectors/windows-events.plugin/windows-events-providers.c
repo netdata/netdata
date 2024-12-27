@@ -99,8 +99,8 @@ static inline bool provider_cache_compar(PROVIDER_KEY *a, PROVIDER_KEY *b) {
 
 void provider_cache_init(void) {
     simple_hashtable_init_PROVIDER(&pbc.hashtable, 100000);
-    pbc.aral_providers = aral_create("wevt_providers", sizeof(PROVIDER), 0, 4096, NULL, NULL, NULL, false, true);
-    pbc.aral_handles = aral_create("wevt_handles", sizeof(PROVIDER_META_HANDLE), 0, 4096, NULL, NULL, NULL, false, true);
+    pbc.aral_providers = aral_create("wevt_providers", sizeof(PROVIDER), 0, 4096, NULL, NULL, NULL, false, true, false);
+    pbc.aral_handles = aral_create("wevt_handles", sizeof(PROVIDER_META_HANDLE), 0, 4096, NULL, NULL, NULL, false, true, false);
 }
 
 static bool provider_property_get(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, EVT_PUBLISHER_METADATA_PROPERTY_ID property_id) {
