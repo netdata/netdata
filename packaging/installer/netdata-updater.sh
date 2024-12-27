@@ -551,6 +551,10 @@ else:
     commit_date="$(python3 -c "${python_version_check}" < "${commit_check_file}")"
   fi
 
+  if [ -z "${NETDATA_TMPDIR_PATH}" ]; then
+    rm -rf "${ndtmpdir}" >&3 2>&3
+  fi
+
   if [ -z "${commit_date}" ] ; then
     return 0
   elif [ "$(uname)" = "Linux" ]; then
