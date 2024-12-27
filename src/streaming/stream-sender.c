@@ -207,7 +207,6 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
         ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
         ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
         ND_LOG_FIELD_CB(NDF_DST_CAPABILITIES, stream_sender_log_capabilities, s),
-        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -277,7 +276,10 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
 
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
-            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
+            ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+            ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+            ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+            ND_LOG_FIELD_CB(NDF_DST_CAPABILITIES, stream_sender_log_capabilities, s),
             ND_LOG_FIELD_END(),
         };
         ND_LOG_STACK_PUSH(lgs);
@@ -359,8 +361,30 @@ void stream_sender_remove(struct sender_state *s) {
 #endif
 }
 
+static void stream_sender_log_disconnection(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason) {
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
+    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+           "STREAM SND[%zu] '%s' [to %s]: sender disconnected from parent, reason: %s",
+           sth->id, rrdhost_hostname(s->host), s->remote_ip, stream_handshake_error_to_string(reason));
+}
+
 static void stream_sender_move_running_to_connector_or_remove(struct stream_thread *sth, struct sender_state *s, STREAM_HANDSHAKE reason, bool reconnect) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+        ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+        ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+        ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+        ND_LOG_FIELD_CB(NDF_DST_CAPABILITIES, stream_sender_log_capabilities, s),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
     internal_fatal(META_GET(&sth->run.meta, (Word_t)&s->thread.meta) == NULL, "Sender to be removed is not in the list of senders");
     META_DEL(&sth->run.meta, (Word_t)&s->thread.meta);
@@ -382,9 +406,7 @@ static void stream_sender_move_running_to_connector_or_remove(struct stream_thre
     s->host->stream.snd.status.tid = 0;
     stream_sender_unlock(s);
 
-    nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "STREAM SND[%zu] '%s' [to %s]: sender disconnected from parent, reason: %s",
-           sth->id, rrdhost_hostname(s->host), s->remote_ip, stream_handshake_error_to_string(reason));
+    stream_sender_log_disconnection(sth, s, reason);
 
     nd_sock_close(&s->sock);
 
@@ -433,8 +455,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
                 ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
                 ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
                 ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
-                ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
-                ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
+                ND_LOG_FIELD_CB(NDF_DST_CAPABILITIES, stream_sender_log_capabilities, s),
                 ND_LOG_FIELD_END(),
             };
             ND_LOG_STACK_PUSH(lgs);
@@ -623,8 +644,7 @@ bool stream_sender_process_poll_events(struct stream_thread *sth, struct sender_
         ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
         ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
         ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
-        ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
-        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
+        ND_LOG_FIELD_CB(NDF_DST_CAPABILITIES, stream_sender_log_capabilities, s),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -681,17 +701,6 @@ void stream_sender_cleanup(struct stream_thread *sth) {
          m = META_NEXT(&sth->run.meta, &idx)) {
         if(m->type != POLLFD_TYPE_SENDER) continue;
         struct sender_state *s = m->s;
-
-        ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
-            ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
-            ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
-            ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
-            ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_sender_log_capabilities, s),
-            ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
-            ND_LOG_FIELD_END(),
-        };
-        ND_LOG_STACK_PUSH(lgs);
 
         s->exit.reason = STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN;
         s->exit.shutdown = true;

@@ -312,7 +312,6 @@ void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state 
         ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
         ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
         ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
-        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -405,7 +404,7 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
-        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_to_parent_msgid),
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_from_child_msgid),
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -529,6 +528,17 @@ void stream_receiver_move_entire_queue_to_running_unsafe(struct stream_thread *s
 
 static void stream_receiver_remove(struct stream_thread *sth, struct receiver_state *rpt, const char *why) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
+
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
+        ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
+        ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
+        ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
+        ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
+        ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &streaming_from_child_msgid),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
     PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
     size_t count = parser ? parser->user.data_collections_count : 0;
