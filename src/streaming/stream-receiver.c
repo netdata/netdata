@@ -60,7 +60,7 @@ void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload
         }
     }
 
-    fflush(rpt->log.fp);
+    // fflush(rpt->log.fp);
     spinlock_unlock(&rpt->log.spinlock);
 }
 #endif

@@ -61,7 +61,7 @@ void stream_sender_log_payload(struct sender_state *s, BUFFER *payload, STREAM_T
         }
     }
 
-    fflush(s->log.fp);
+    // fflush(s->log.fp);
     spinlock_unlock(&s->log.spinlock);
 }
 #endif
