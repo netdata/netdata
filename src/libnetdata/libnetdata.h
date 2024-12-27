@@ -124,6 +124,7 @@ extern const char *netdata_configured_host_prefix;
 #include "locks/spinlock.h"
 #include "locks/rw-spinlock.h"
 #include "completion/completion.h"
+#include "waiting-queue/waiting-queue.h"
 #include "clocks/clocks.h"
 #include "simple_pattern/simple_pattern.h"
 #include "libnetdata/log/nd_log.h"

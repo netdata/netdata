@@ -14,7 +14,7 @@ void sender_buffer_destroy(struct sender_buffer *commit) {
     commit->last_function = NULL;
 }
 
-void sender_commit_thread_buffer_free(void) {
+void sender_thread_buffer_free(void) {
     sender_buffer_destroy(&commit___thread);
 }
 
@@ -68,6 +68,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     if (unlikely(!src || !src_len))
         return;
 
+    waiting_queue_wait(s->wait_queue, (commit && commit->receiver_tid == gettid_cached()) ? WAITING_QUEUE_PRIO_HIGH : WAITING_QUEUE_PRIO_NORMAL);
     stream_sender_lock(s);
 
     // copy the sequence number of sender buffer recreates, while having our lock
@@ -77,9 +78,12 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
 
     if (!s->thread.msg.session) {
         // the dispatcher is not there anymore - ignore these data
-        stream_sender_unlock(s);
+
         if(commit)
             sender_buffer_destroy(commit);
+
+        stream_sender_unlock(s);
+        waiting_queue_done(s->wait_queue);
         return;
     }
 
@@ -175,6 +179,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
         msg = s->thread.msg;
 
     stream_sender_unlock(s);
+    waiting_queue_done(s->wait_queue);
 
     if (enable_sending) {
         msg.opcode = STREAM_OPCODE_SENDER_POLLOUT;
@@ -186,6 +191,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
 overflow_with_lock: {
         msg = s->thread.msg;
         stream_sender_unlock(s);
+        waiting_queue_done(s->wait_queue);
         msg.opcode = STREAM_OPCODE_SENDER_BUFFER_OVERFLOW;
         stream_sender_send_opcode(s, msg);
         nd_log_limit_static_global_var(erl, 1, 0);
@@ -201,6 +207,7 @@ compression_failed_with_lock: {
         stream_compression_deactivate(s);
         msg = s->thread.msg;
         stream_sender_unlock(s);
+        waiting_queue_done(s->wait_queue);
         msg.opcode = STREAM_OPCODE_SENDER_RECONNECT_WITHOUT_COMPRESSION;
         stream_sender_send_opcode(s, msg);
         nd_log_limit_static_global_var(erl, 1, 0);
@@ -211,8 +218,8 @@ compression_failed_with_lock: {
     }
 }
 
-void sender_thread_commit(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type, const char *func) {
-    struct sender_buffer *commit = (wb == commit___thread.wb) ? & commit___thread : &s->host->stream.snd.commit;
+void sender_thread_commit_with_trace(struct sender_state *s, BUFFER *wb, STREAM_TRAFFIC_TYPE type, const char *func) {
+    struct sender_buffer *commit = (wb == commit___thread.wb) ? &commit___thread : &s->host->stream.snd.commit;
 
     if (unlikely(wb != commit->wb))
         fatal("STREAM SND '%s' [to %s]: function '%s()' is trying to commit an unknown commit buffer.",

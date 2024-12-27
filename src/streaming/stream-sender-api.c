@@ -34,6 +34,7 @@ void stream_sender_structures_init(RRDHOST *host, bool stream, STRING *parents, 
     host->sender->connector.id = -1;
     host->sender->host = host;
     host->sender->scb = stream_circular_buffer_create();
+    host->sender->wait_queue = waiting_queue_create();
     host->sender->capabilities = stream_our_capabilities(host, true);
 
     nd_sock_init(&host->sender->sock, netdata_ssl_streaming_sender_ctx, netdata_ssl_validate_certificate_sender);
@@ -64,6 +65,8 @@ void stream_sender_structures_free(struct rrdhost *host) {
     stream_sender_signal_to_stop_and_wait(host, STREAM_HANDSHAKE_DISCONNECT_HOST_CLEANUP, true);
     stream_circular_buffer_destroy(host->sender->scb);
     host->sender->scb = NULL;
+    waiting_queue_destroy(host->sender->wait_queue);
+    host->sender->wait_queue = NULL;
     stream_compressor_destroy(&host->sender->compressor);
 
     replication_sender_cleanup(host->sender);

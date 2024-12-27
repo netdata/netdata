@@ -383,6 +383,7 @@ int netdata_main(int argc, char **argv) {
                             if (ctx_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
+                            if (unittest_waiting_queue()) return 1;
                             sqlite_library_shutdown();
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
@@ -397,6 +398,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "araltest") == 0) {
                             unittest_running = true;
                             return aral_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "waitqtest") == 0) {
+                            unittest_running = true;
+                            return unittest_waiting_queue();
                         }
                         else if(strcmp(optarg, "stringtest") == 0)  {
                             unittest_running = true;

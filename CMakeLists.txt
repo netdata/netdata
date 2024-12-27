@@ -948,6 +948,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/rw-spinlock.h
         src/libnetdata/atomics/atomic_flags.h
         src/libnetdata/atomics/atomics.h
+        src/libnetdata/waiting-queue/waiting-queue.c
+        src/libnetdata/waiting-queue/waiting-queue.h
 )
 
 set(LIBH2O_FILES

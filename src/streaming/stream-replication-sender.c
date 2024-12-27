@@ -1644,7 +1644,7 @@ static void *replication_worker_thread(void *ptr __maybe_unused) {
         }
 
         if (unlikely(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY)) {
-            sender_commit_thread_buffer_free();
+            sender_thread_buffer_free();
             worker_is_busy(WORKER_JOB_WAIT);
             worker_is_idle();
             sleep_usec(1 * USEC_PER_SEC);
@@ -1811,7 +1811,7 @@ void *replication_thread_main(void *ptr) {
             if(slow) {
                 // no work to be done, wait for a request to come in
                 timeout = 1000 * USEC_PER_MS;
-                sender_commit_thread_buffer_free();
+                sender_thread_buffer_free();
             }
 
             else if(replication_globals.unsafe.pending > 0) {
