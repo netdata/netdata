@@ -7,7 +7,7 @@
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
 void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload, STREAM_TRAFFIC_TYPE type __maybe_unused, bool inbound) {
-    if (!rpt) return; // not a streaming parser
+    if (!rpt || type != STREAM_TRAFFIC_TYPE_REPLICATION) return; // not a streaming parser
 
     spinlock_lock(&rpt->log.spinlock);
 

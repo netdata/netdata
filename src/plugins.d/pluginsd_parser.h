@@ -35,7 +35,9 @@ typedef enum __attribute__ ((__packed__)) parser_input_type {
 typedef enum __attribute__ ((__packed__)) {
     PARSER_INIT_PLUGINSD        = (1 << 1),
     PARSER_INIT_STREAMING       = (1 << 2),
-    PARSER_REP_METADATA         = (1 << 3),
+    PARSER_REP_REPLICATION      = (1 << 3),
+    PARSER_REP_METADATA         = (1 << 4),
+    PARSER_REP_DATA             = (1 << 5),
 } PARSER_REPERTOIRE;
 
 struct parser;
@@ -176,7 +178,8 @@ bool parser_reconstruct_context(BUFFER *wb, void *ptr);
 
 static inline int parser_action(PARSER *parser, char *input) {
 #ifdef NETDATA_LOG_STREAM_RECEIVER
-    stream_receiver_log_payload(parser->user.rpt, input, STREAM_TRAFFIC_TYPE_METADATA, true);
+    char line[1024];
+    strncpyz(line, input, sizeof(line) - 1);
 #endif
 
     parser->line.count++;
@@ -237,6 +240,11 @@ static inline int parser_action(PARSER *parser, char *input) {
         netdata_log_error("PLUGINSD: parser_action('%s') failed on line %zu: { %s } (quotes added to show parsing)",
                 command, parser->line.count, buffer_tostring(wb));
     }
+
+#ifdef NETDATA_LOG_STREAM_RECEIVER
+    if((parser->keyword->repertoire & PARSER_REP_REPLICATION) && !(parser->keyword->repertoire & PARSER_REP_DATA))
+        stream_receiver_log_payload(parser->user.rpt, line, STREAM_TRAFFIC_TYPE_REPLICATION, true);
+#endif
 
     line_splitter_reset(&parser->line);
     return (rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP);

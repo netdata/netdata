@@ -65,7 +65,7 @@ static inline PARSER_RC pluginsd_begin(char **words, size_t num_words, PARSER *p
                        rrdhost_hostname(host), rrdset_id(st),
                        st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec,
                        st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec,
-                       microseconds
+                       (long long unsigned)microseconds
                        );
     }
 #endif

@@ -1,5 +1,5 @@
 /* ANSI-C code produced by gperf version 3.1 */
-/* Command-line: gperf --multiple-iterations=1000 --output-file=gperf-hashtable.h gperf-config.txt  */
+/* Command-line: gperf --multiple-iterations=1000 --output-file=gperf-hashtable.h -r gperf-config.txt  */
 /* Computed positions: -k'1-2' */
 
 #if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
@@ -135,11 +135,11 @@ static const PARSER_KEYWORD gperf_keywords[] =
 #line 69 "gperf-config.txt"
     {"HOST",            PLUGINSD_KEYWORD_ID_HOST,            PARSER_INIT_PLUGINSD|PARSER_REP_METADATA, WORKER_PARSER_FIRST_JOB + 4},
 #line 103 "gperf-config.txt"
-    {"REND",                 PLUGINSD_KEYWORD_ID_REND,                 PARSER_INIT_STREAMING,                     WORKER_PARSER_FIRST_JOB + 29},
+    {"REND",                 PLUGINSD_KEYWORD_ID_REND,                 PARSER_INIT_STREAMING|PARSER_REP_REPLICATION|PARSER_REP_DATA,     WORKER_PARSER_FIRST_JOB + 29},
 #line 68 "gperf-config.txt"
     {"EXIT",            PLUGINSD_KEYWORD_ID_EXIT,            PARSER_INIT_PLUGINSD,                     WORKER_PARSER_FIRST_JOB + 3},
 #line 77 "gperf-config.txt"
-    {"CHART",                 PLUGINSD_KEYWORD_ID_CHART,                 PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING|PARSER_REP_METADATA, WORKER_PARSER_FIRST_JOB + 9},
+    {"CHART",                 PLUGINSD_KEYWORD_ID_CHART,                 PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING|PARSER_REP_METADATA|PARSER_REP_REPLICATION, WORKER_PARSER_FIRST_JOB + 9},
 #line 89 "gperf-config.txt"
     {"CONFIG",                PLUGINSD_KEYWORD_ID_CONFIG,                PARSER_INIT_PLUGINSD|PARSER_REP_METADATA,                       WORKER_PARSER_FIRST_JOB + 21},
 #line 86 "gperf-config.txt"
@@ -148,8 +148,8 @@ static const PARSER_KEYWORD gperf_keywords[] =
     {"HOST_LABEL",      PLUGINSD_KEYWORD_ID_HOST_LABEL,      PARSER_INIT_PLUGINSD|PARSER_REP_METADATA, WORKER_PARSER_FIRST_JOB + 7},
 #line 70 "gperf-config.txt"
     {"HOST_DEFINE",     PLUGINSD_KEYWORD_ID_HOST_DEFINE,     PARSER_INIT_PLUGINSD|PARSER_REP_METADATA, WORKER_PARSER_FIRST_JOB + 5},
-#line 102 "gperf-config.txt"
-    {"RDSTATE",              PLUGINSD_KEYWORD_ID_RDSTATE,              PARSER_INIT_STREAMING,                     WORKER_PARSER_FIRST_JOB + 28},
+#line 104 "gperf-config.txt"
+    {"RDSTATE",              PLUGINSD_KEYWORD_ID_RDSTATE,              PARSER_INIT_STREAMING|PARSER_REP_REPLICATION|PARSER_REP_METADATA, WORKER_PARSER_FIRST_JOB + 30},
     {(char*)0,0,PARSER_INIT_PLUGINSD,0},
 #line 118 "gperf-config.txt"
     {"DELETE_JOB",             PLUGINSD_KEYWORD_ID_DELETE_JOB,             PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 38},
@@ -162,17 +162,17 @@ static const PARSER_KEYWORD gperf_keywords[] =
 #line 117 "gperf-config.txt"
     {"REPORT_JOB_STATUS",      PLUGINSD_KEYWORD_ID_REPORT_JOB_STATUS,      PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 37},
 #line 87 "gperf-config.txt"
-    {"SET",                   PLUGINSD_KEYWORD_ID_SET,                   PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                     WORKER_PARSER_FIRST_JOB + 19},
+    {"SET",                   PLUGINSD_KEYWORD_ID_SET,                   PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING|PARSER_REP_DATA,     WORKER_PARSER_FIRST_JOB + 19},
 #line 95 "gperf-config.txt"
-    {"SET2",       PLUGINSD_KEYWORD_ID_SET2,       PARSER_INIT_STREAMING,                     WORKER_PARSER_FIRST_JOB + 24},
-#line 104 "gperf-config.txt"
-    {"RSET",                 PLUGINSD_KEYWORD_ID_RSET,                 PARSER_INIT_STREAMING,                     WORKER_PARSER_FIRST_JOB + 30},
+    {"SET2",       PLUGINSD_KEYWORD_ID_SET2,       PARSER_INIT_STREAMING|PARSER_REP_DATA,     WORKER_PARSER_FIRST_JOB + 24},
+#line 102 "gperf-config.txt"
+    {"RSET",                 PLUGINSD_KEYWORD_ID_RSET,                 PARSER_INIT_STREAMING|PARSER_REP_REPLICATION|PARSER_REP_DATA,     WORKER_PARSER_FIRST_JOB + 28},
 #line 100 "gperf-config.txt"
-    {"CHART_DEFINITION_END", PLUGINSD_KEYWORD_ID_CHART_DEFINITION_END, PARSER_INIT_STREAMING|PARSER_REP_METADATA, WORKER_PARSER_FIRST_JOB + 26},
+    {"CHART_DEFINITION_END", PLUGINSD_KEYWORD_ID_CHART_DEFINITION_END, PARSER_INIT_STREAMING|PARSER_REP_REPLICATION|PARSER_REP_METADATA, WORKER_PARSER_FIRST_JOB + 26},
 #line 115 "gperf-config.txt"
     {"DYNCFG_REGISTER_JOB",    PLUGINSD_KEYWORD_ID_DYNCFG_REGISTER_JOB,    PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING, WORKER_PARSER_FIRST_JOB + 35},
 #line 105 "gperf-config.txt"
-    {"RSSTATE",              PLUGINSD_KEYWORD_ID_RSSTATE,              PARSER_INIT_STREAMING,                     WORKER_PARSER_FIRST_JOB + 31},
+    {"RSSTATE",              PLUGINSD_KEYWORD_ID_RSSTATE,              PARSER_INIT_STREAMING|PARSER_REP_REPLICATION|PARSER_REP_METADATA, WORKER_PARSER_FIRST_JOB + 31},
 #line 78 "gperf-config.txt"
     {"CLABEL",                PLUGINSD_KEYWORD_ID_CLABEL,                PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING|PARSER_REP_METADATA, WORKER_PARSER_FIRST_JOB + 10},
 #line 114 "gperf-config.txt"
@@ -184,17 +184,17 @@ static const PARSER_KEYWORD gperf_keywords[] =
 #line 93 "gperf-config.txt"
     {"CLAIMED_ID", PLUGINSD_KEYWORD_ID_CLAIMED_ID, PARSER_INIT_STREAMING|PARSER_REP_METADATA, WORKER_PARSER_FIRST_JOB + 22},
 #line 81 "gperf-config.txt"
-    {"END",                   PLUGINSD_KEYWORD_ID_END,                   PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                     WORKER_PARSER_FIRST_JOB + 13},
+    {"END",                   PLUGINSD_KEYWORD_ID_END,                   PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING|PARSER_REP_DATA,     WORKER_PARSER_FIRST_JOB + 13},
 #line 96 "gperf-config.txt"
-    {"END2",       PLUGINSD_KEYWORD_ID_END2,       PARSER_INIT_STREAMING,                     WORKER_PARSER_FIRST_JOB + 25},
+    {"END2",       PLUGINSD_KEYWORD_ID_END2,       PARSER_INIT_STREAMING|PARSER_REP_DATA,     WORKER_PARSER_FIRST_JOB + 25},
 #line 79 "gperf-config.txt"
     {"CLABEL_COMMIT",         PLUGINSD_KEYWORD_ID_CLABEL_COMMIT,         PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING|PARSER_REP_METADATA, WORKER_PARSER_FIRST_JOB + 11},
 #line 76 "gperf-config.txt"
-    {"BEGIN",                 PLUGINSD_KEYWORD_ID_BEGIN,                 PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                     WORKER_PARSER_FIRST_JOB + 8},
+    {"BEGIN",                 PLUGINSD_KEYWORD_ID_BEGIN,                 PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING|PARSER_REP_DATA,     WORKER_PARSER_FIRST_JOB + 8},
 #line 94 "gperf-config.txt"
-    {"BEGIN2",     PLUGINSD_KEYWORD_ID_BEGIN2,     PARSER_INIT_STREAMING,                     WORKER_PARSER_FIRST_JOB + 23},
+    {"BEGIN2",     PLUGINSD_KEYWORD_ID_BEGIN2,     PARSER_INIT_STREAMING|PARSER_REP_DATA,     WORKER_PARSER_FIRST_JOB + 23},
 #line 101 "gperf-config.txt"
-    {"RBEGIN",               PLUGINSD_KEYWORD_ID_RBEGIN,               PARSER_INIT_STREAMING,                     WORKER_PARSER_FIRST_JOB + 27},
+    {"RBEGIN",               PLUGINSD_KEYWORD_ID_RBEGIN,               PARSER_INIT_STREAMING|PARSER_REP_REPLICATION|PARSER_REP_DATA,     WORKER_PARSER_FIRST_JOB + 27},
 #line 67 "gperf-config.txt"
     {"DISABLE",         PLUGINSD_KEYWORD_ID_DISABLE,         PARSER_INIT_PLUGINSD,                     WORKER_PARSER_FIRST_JOB + 2},
 #line 84 "gperf-config.txt"
