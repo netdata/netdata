@@ -953,6 +953,40 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
     }
 }
 
+void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut __maybe_unused) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
+
+    Word_t idx = 0;
+    for(struct pollfd_meta *m = META_FIRST(&sth->run.meta, &idx);
+         m;
+         m = META_NEXT(&sth->run.meta, &idx)) {
+        if (m->type != POLLFD_TYPE_RECEIVER) continue;
+        struct receiver_state *rpt = m->rpt;
+
+        size_t exceptions = 0;
+        RRDSET *st;
+        rrdset_foreach_read(st, rpt->host) {
+            RRDSET_FLAGS st_flags = rrdset_flag_get(st);
+            if(st_flags & (RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
+                continue;
+
+            const char *status = (st_flags & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) ? "has not finished" : "has not started";
+
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS: instance '%s' %s replication yet.",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip,
+                   rrdset_id(st), status);
+
+            exceptions++;
+        }
+        rrdset_foreach_done(st);
+
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS: expecting %zu replication commands.",
+               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, exceptions);
+    }
+}
+
 void stream_receiver_cleanup(struct stream_thread *sth) {
     Word_t idx = 0;
     for(struct pollfd_meta *m = META_FIRST(&sth->run.meta, &idx);

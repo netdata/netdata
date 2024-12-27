@@ -110,5 +110,6 @@ void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcod
 void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state *rpt, struct stream_opcode *msg);
 
 void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t now_ut);
+void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut);
 
 #endif //NETDATA_STREAM_RECEIVER_INTERNALS_H

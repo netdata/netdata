@@ -510,6 +510,10 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
         if (m->type != POLLFD_TYPE_SENDER) continue;
         struct sender_state *s = m->s;
 
+        if(dictionary_entries(s->replication.requests))
+            // we are still replicating
+            continue;
+
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
             ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
@@ -520,6 +524,7 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
         };
         ND_LOG_STACK_PUSH(lgs);
 
+        size_t exceptions = 0;
         RRDSET *st;
         rrdset_foreach_read(st, s->host) {
             RRDSET_FLAGS st_flags = rrdset_flag_get(st);
@@ -529,13 +534,18 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
             const char *status = (st_flags & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS) ? "has not finished" : "has not started";
 
             nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "STREAM SND[%zu] '%s' [to %s]: chart '%s' %s replication yet, resending request.",
+                   "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS: instance '%s' %s replication yet, resending request.",
                    sth->id, rrdhost_hostname(s->host), s->remote_ip,
                    rrdset_id(st), status);
 
             stream_sender_send_rrdset_definition_now(st);
+            exceptions++;
         }
         rrdset_foreach_done(st);
+
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS: completed %zu replication retransmits.",
+               sth->id, rrdhost_hostname(s->host), s->remote_ip, exceptions);
     }
 }
 

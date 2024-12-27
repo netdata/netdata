@@ -482,6 +482,7 @@ void *stream_thread(void *ptr) {
     sth->pipe.size = set_pipe_size(sth->pipe.fds[PIPE_READ], 65536 * sizeof(*sth->pipe.buffer)) / sizeof(*sth->pipe.buffer);
     sth->pipe.buffer = mallocz(sth->pipe.size * sizeof(*sth->pipe.buffer));
 
+    usec_t last_check_replication_ut = 0;
     usec_t last_check_all_nodes_ut = 0;
     usec_t last_dequeue_ut = 0;
 
@@ -550,10 +551,13 @@ void *stream_thread(void *ptr) {
             last_check_all_nodes_ut = now_ut;
         }
 
-        if(now_ut - last_check_all_nodes_ut >= 10 * 60 * USEC_PER_SEC) {
+        if(now_ut - last_check_replication_ut >= 10 * 60 * USEC_PER_SEC) {
             worker_is_busy(WORKER_STREAM_JOB_LIST);
-
+            
             stream_sender_replication_check_from_poll(sth, now_ut);
+            stream_receiver_replication_check_from_poll(sth, now_ut);
+
+            last_check_replication_ut = now_ut;
         }
 
         worker_is_idle();

@@ -1349,10 +1349,18 @@ static size_t verify_host_charts_are_streaming_now(RRDHOST *host) {
 
     size_t ok = 0;
     size_t errors = 0;
+    size_t ignored = 0;
 
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        RRDSET_FLAGS flags = rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS | RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+        RRDSET_FLAGS flags = rrdset_flag_check(
+            st, RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_UPSTREAM_IGNORE |
+                    RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS | RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+
+        if(flags & (RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_UPSTREAM_IGNORE)) {
+            ignored++;
+            continue;
+        }
 
         bool is_error = false;
 
@@ -1382,8 +1390,10 @@ static size_t verify_host_charts_are_streaming_now(RRDHOST *host) {
     rrdset_foreach_done(st);
 
     internal_error(errors,
-                   "STREAM SND REPLAY SUMMARY: 'host:%s' finished replicating %zu charts, but %zu charts are still in progress although replication finished",
-                   rrdhost_hostname(host), ok, errors);
+                   "STREAM SND REPLAY SUMMARY: 'host:%s' finished replicating %zu charts, "
+                   "but %zu charts are still in progress although replication finished "
+                   "(%zu charts are not streamed - obsolete or excluded)",
+                   rrdhost_hostname(host), ok, errors, ignored);
 
     return errors;
 }
