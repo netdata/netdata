@@ -475,7 +475,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
                    "(buffer is used %.2f%%).",
                    sth->id, rrdhost_hostname(s->host), s->remote_ip, stream_send.parents.timeout_s,
                    stats.bytes_sent, stats.sends,
-                duration, pending, stats.buffer_ratio);
+                   duration, pending, stats.buffer_ratio);
 
             stream_sender_move_running_to_connector_or_remove(sth, s, STREAM_HANDSHAKE_DISCONNECT_SOCKET_TIMEOUT, true);
             continue;
@@ -498,6 +498,45 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
     worker_set_metric(WORKER_SENDER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_uncompressed);
     worker_set_metric(WORKER_SENDER_JOB_BYTES_COMPRESSED, (NETDATA_DOUBLE)bytes_compressed);
     worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, overall_buffer_ratio);
+}
+
+void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut __maybe_unused) {
+    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
+
+    Word_t idx = 0;
+    for(struct pollfd_meta *m = META_FIRST(&sth->run.meta, &idx);
+         m;
+         m = META_NEXT(&sth->run.meta, &idx)) {
+        if (m->type != POLLFD_TYPE_SENDER) continue;
+        struct sender_state *s = m->s;
+
+        ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_STR(NDF_NIDL_NODE, s->host->hostname),
+            ND_LOG_FIELD_CB(NDF_DST_IP, stream_sender_log_dst_ip, s),
+            ND_LOG_FIELD_CB(NDF_DST_PORT, stream_sender_log_dst_port, s),
+            ND_LOG_FIELD_CB(NDF_DST_TRANSPORT, stream_sender_log_transport, s),
+            ND_LOG_FIELD_CB(NDF_DST_CAPABILITIES, stream_sender_log_capabilities, s),
+            ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
+        RRDSET *st;
+        rrdset_foreach_read(st, s->host) {
+            RRDSET_FLAGS st_flags = rrdset_flag_get(st);
+            if(st_flags & (RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_UPSTREAM_IGNORE | RRDSET_FLAG_SENDER_REPLICATION_FINISHED))
+                continue;
+
+            const char *status = (st_flags & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS) ? "has not finished" : "has not started";
+
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "STREAM SND[%zu] '%s' [to %s]: chart '%s' %s replication yet, resending request.",
+                   sth->id, rrdhost_hostname(s->host), s->remote_ip,
+                   rrdset_id(st), status);
+
+            stream_sender_send_rrdset_definition_now(st);
+        }
+        rrdset_foreach_done(st);
+    }
 }
 
 bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes) {

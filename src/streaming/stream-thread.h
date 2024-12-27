@@ -204,6 +204,7 @@ extern struct stream_thread_globals stream_thread_globals;
 void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth);
 void stream_receiver_move_entire_queue_to_running_unsafe(struct stream_thread *sth);
 void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t now_ut);
+void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut);
 
 void stream_receiver_add_to_queue(struct receiver_state *rpt);
 void stream_sender_add_to_connector_queue(struct rrdhost *host);

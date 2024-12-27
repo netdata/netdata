@@ -15,7 +15,7 @@ void replication_tracking_counters(struct rrdhost *host, struct replay_who_count
 
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        RRDSET_FLAGS st_flags = __atomic_load_n(&st->flags, __ATOMIC_RELAXED);
+        RRDSET_FLAGS st_flags = rrdset_flag_get(st);
 
         if(st_flags & RRDSET_FLAG_OBSOLETE)
             continue;

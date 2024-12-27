@@ -550,6 +550,12 @@ void *stream_thread(void *ptr) {
             last_check_all_nodes_ut = now_ut;
         }
 
+        if(now_ut - last_check_all_nodes_ut >= 10 * 60 * USEC_PER_SEC) {
+            worker_is_busy(WORKER_STREAM_JOB_LIST);
+
+            stream_sender_replication_check_from_poll(sth, now_ut);
+        }
+
         worker_is_idle();
 
         nd_poll_result_t ev;

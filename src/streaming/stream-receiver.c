@@ -904,7 +904,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
 
         spinlock_lock(&rpt->thread.send_to_child.spinlock);
         STREAM_CIRCULAR_BUFFER_STATS stats = *stream_circular_buffer_stats_unsafe(rpt->thread.send_to_child.scb);
-        spinlock_lock(&rpt->thread.send_to_child.spinlock);
+        spinlock_unlock(&rpt->thread.send_to_child.spinlock);
 
         if (stats.buffer_ratio > overall_buffer_ratio)
             overall_buffer_ratio = stats.buffer_ratio;
