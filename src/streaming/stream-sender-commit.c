@@ -68,7 +68,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     if (unlikely(!src || !src_len))
         return;
 
-    waiting_queue_wait(s->wait_queue, (commit && commit->receiver_tid == gettid_cached()) ? WAITING_QUEUE_PRIO_HIGH : WAITING_QUEUE_PRIO_NORMAL);
+    waiting_queue_wait(s->wait_queue, (s->host->stream.rcv.status.tid == gettid_cached()) ? WAITING_QUEUE_PRIO_HIGH : WAITING_QUEUE_PRIO_NORMAL);
     stream_sender_lock(s);
 
     // copy the sequence number of sender buffer recreates, while having our lock

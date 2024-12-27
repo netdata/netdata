@@ -22,7 +22,7 @@
  * About 0.5M thread switches/s per WAITING QUEUE, on modern hardware.
  *
  * Be careful: higher priority threads can starve the rest!
- * 
+ *
  */
 
 typedef struct waiting_queue WAITING_QUEUE;
