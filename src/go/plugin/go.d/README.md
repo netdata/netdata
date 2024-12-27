@@ -144,7 +144,6 @@ All capabilities are set automatically during Netdata installation using the [of
 | [web_log](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/weblog)                        |         Apache/NGINX          |
 | [wireguard](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/wireguard)                   |           WireGuard           |
 | [whoisquery](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/whoisquery)                 |         Domain Expiry         |
-| [windows](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/windows)                       |            Windows            |
 | [x509check](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/x509check)                   |     Digital Certificates      |
 | [zfspool](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/zfspool)                       |           ZFS Pools           |
 | [zookeeper](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/zookeeper)                   |           ZooKeeper           |
