@@ -619,14 +619,14 @@ static struct replication_query *replication_response_prepare(
             wall_clock_time, capabilities, synchronous);
 }
 
-void replication_response_cancel_and_finalize(struct replication_query *q) {
+static void replication_response_cancel_and_finalize(struct replication_query *q) {
     if(!q) return;
     replication_query_finalize(NULL, q, false);
 }
 
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq);
 
-bool replication_response_execute_and_finalize(struct replication_query *q, size_t max_msg_size, bool workers) {
+bool replication_response_execute_finalize_and_send(struct replication_query *q, size_t max_msg_size, bool workers) {
     bool with_slots = (q->query.capabilities & STREAM_CAP_SLOTS) ? true : false;
     NUMBER_ENCODING integer_encoding = (q->query.capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     struct replication_request *rq = q->rq;
@@ -1210,13 +1210,13 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     if(!rq->st) {
         if(likely(workers)) worker_is_busy(WORKER_JOB_FIND_CHART);
         rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
-    }
-
-    if(!rq->st) {
-        __atomic_add_fetch(&replication_globals.atomic.error_not_found, 1, __ATOMIC_RELAXED);
-        internal_error(true, "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' not found",
-                       rrdhost_hostname(rq->sender->host), string2str(rq->chart_id));
-        goto cleanup;
+        if(!rq->st) {
+            __atomic_add_fetch(&replication_globals.atomic.error_not_found, 1, __ATOMIC_RELAXED);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' not found",
+                   rrdhost_hostname(rq->sender->host), string2str(rq->chart_id));
+            goto cleanup;
+        }
     }
 
     if(!rq->q) {
@@ -1234,17 +1234,15 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     // send the replication data
     size_t max_msg_size = (size_t)((unsigned long long)stream_circular_buffer_get_max_size(rq->sender->scb) * MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER / 100ULL);
     rq->q->rq = rq;
-    replication_response_execute_and_finalize(rq->q, max_msg_size, workers);
+    replication_response_execute_finalize_and_send(rq->q, max_msg_size, workers);
     rq->q = NULL;
 
     __atomic_add_fetch(&replication_globals.atomic.executed, 1, __ATOMIC_RELAXED);
     ret = true;
 
 cleanup:
-    if(rq->q) {
-        replication_response_cancel_and_finalize(rq->q);
-        rq->q = NULL;
-    }
+    replication_response_cancel_and_finalize(rq->q);
+    rq->q = NULL;
 
     string_freez(rq->chart_id);
     worker_is_idle();
@@ -1572,14 +1570,14 @@ static int replication_pipeline_execute_next(void) {
         rq = &rtp.rqs[rtp.rqs_last_prepared];
 
         if(rq->found) {
-            if (!rq->st) {
-                worker_is_busy(WORKER_JOB_FIND_CHART);
-                rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
-            }
+//            if(!rq->start_streaming) {
+                if (!rq->st) {
+                    worker_is_busy(WORKER_JOB_FIND_CHART);
+                    rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+                }
 
-            if (rq->st && !rq->q) {
-                worker_is_busy(WORKER_JOB_PREPARE_QUERY);
-                if(!rq->start_streaming)
+                if (rq->st && !rq->q) {
+                    worker_is_busy(WORKER_JOB_PREPARE_QUERY);
                     rq->q = replication_response_prepare(
                         rq->st,
                         rq->start_streaming,
@@ -1587,7 +1585,8 @@ static int replication_pipeline_execute_next(void) {
                         rq->before,
                         rq->sender->capabilities,
                         rtp.max_requests_ahead == 1);
-            }
+                }
+//            }
 
             rq->executed = false;
         }

@@ -417,7 +417,7 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
         ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
-    
+
     size_t saved_winerror = 0;
 #if defined(OS_WINDOWS)
     saved_winerror = GetLastError();
