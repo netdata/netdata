@@ -1204,9 +1204,10 @@ static int sensors_collect_data(void) {
 }
 
 static bool libsensors_running = false;
+static int libsensors_update_every = 1;
 
 void *libsensors_thread(void *ptr) {
-    int update_every = *(int *)ptr;
+    int update_every = libsensors_update_every;
 
     // first try the default directory for libsensors
     FILE *fp = fopen("/etc/sensors3.conf", "r");
@@ -1301,8 +1302,9 @@ cleanup:
 static ND_THREAD *libsensors = NULL;
 int do_module_libsensors(int update_every, const char *name __maybe_unused) {
     if(!libsensors) {
+        libsensors_update_every = update_every;
         libsensors_running = true;
-        libsensors = nd_thread_create("LIBSENSORS", NETDATA_THREAD_OPTION_JOINABLE, libsensors_thread, &update_every);
+        libsensors = nd_thread_create("LIBSENSORS", NETDATA_THREAD_OPTION_JOINABLE, libsensors_thread, NULL);
     }
 
     return libsensors && libsensors_running ? 0 : 1;
