@@ -8,6 +8,7 @@ NON_INTERACTIVE=0
 DONT_WAIT=0
 
 declare -a package_tree=(
+  bison
   c-basic
   curl
   devpkg-elfutils
@@ -19,6 +20,7 @@ declare -a package_tree=(
   devpkg-util-linux
   devpkg-zlib
   findutils
+  flex
   git
   gzip
   make

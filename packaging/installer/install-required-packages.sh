@@ -637,6 +637,14 @@ declare -A pkg_distro_sdk=(
   ['default']="NOTREQUIRED"
 )
 
+# bison and flex are required by libsensors
+declare -A pkg_bison=(
+  ['default']="bison"
+)
+declare -A pkg_flex=(
+  ['default']="flex"
+)
+
 declare -A pkg_coreutils=(
   ['alpine']="coreutils"
   ['default']="NOTREQUIRED"
@@ -1220,6 +1228,9 @@ packages() {
   require_cmd pkg-config || suitable_package pkg-config
   require_cmd cmake || suitable_package cmake
   require_cmd make || suitable_package make
+
+  require_cmd flex || suitable_package flex
+  require_cmd bison || suitable_package bison
 
   # -------------------------------------------------------------------------
   # debugging tools for development
