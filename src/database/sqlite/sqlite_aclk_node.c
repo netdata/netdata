@@ -190,7 +190,7 @@ void aclk_check_node_info_and_collectors(void)
                   replay_counters.snd[REPLAY_WHO_UNKNOWN], replay_counters.snd[REPLAY_WHO_ME], replay_counters.snd[REPLAY_WHO_THEM], replay_counters.snd[REPLAY_WHO_FINISHED]
         );
 #else
-        char replay_counters_txt = "";
+        char *replay_counters_txt = "";
 #endif
 
         const char *context_loading_pre = "", *context_loading_body = "", *context_loading_post = "";

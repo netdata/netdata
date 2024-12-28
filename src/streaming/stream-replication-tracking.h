@@ -5,7 +5,7 @@
 
 #include "libnetdata/libnetdata.h"
 
-#define REPLICATION_TRACKING 1
+// #define REPLICATION_TRACKING 1
 
 #ifdef REPLICATION_TRACKING
 
