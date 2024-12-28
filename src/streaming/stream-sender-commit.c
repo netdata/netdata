@@ -68,7 +68,9 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     if (unlikely(!src || !src_len))
         return;
 
-    waiting_queue_wait(s->wait_queue, (s->host->stream.rcv.status.tid == gettid_cached()) ? WAITING_QUEUE_PRIO_HIGH : WAITING_QUEUE_PRIO_NORMAL);
+    waiting_queue_wait(s->wait_queue, (s->host->stream.rcv.status.tid == gettid_cached()
+                                       || s->host->stream.snd.status.tid == gettid_cached()) ?
+                                          WAITING_QUEUE_PRIO_HIGH : WAITING_QUEUE_PRIO_NORMAL);
     stream_sender_lock(s);
 
     // copy the sequence number of sender buffer recreates, while having our lock
@@ -196,10 +198,10 @@ overflow_with_lock: {
         stream_sender_send_opcode(s, msg);
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                     "STREAM SND '%s' [to %s]: buffer overflow (buffer size %u, max size %u, used %u, available %u). "
+                     "STREAM SND '%s' [to %s]: buffer overflow (buffer size %u, max size %u, available %u). "
                      "Restarting connection.",
                      rrdhost_hostname(s->host), s->remote_ip,
-                     stats->bytes_size, stats->bytes_max_size, stats->bytes_outstanding, stats->bytes_available);
+                     stats->bytes_size, stats->bytes_max_size, stats->bytes_available);
         return;
     }
 
