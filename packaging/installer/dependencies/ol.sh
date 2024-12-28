@@ -8,9 +8,11 @@ NON_INTERACTIVE=0
 DONT_WAIT=0
 
 declare -a package_tree=(
+  bison
   cmake
   curl
   elfutils-libelf-devel
+  flex
   gcc
   gcc-c++
   git

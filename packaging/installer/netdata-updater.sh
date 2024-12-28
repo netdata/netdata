@@ -551,6 +551,10 @@ else:
     commit_date="$(python3 -c "${python_version_check}" < "${commit_check_file}")"
   fi
 
+  if [ -z "${NETDATA_TMPDIR_PATH}" ]; then
+    rm -rf "${ndtmpdir}" >&3 2>&3
+  fi
+
   if [ -z "${commit_date}" ] ; then
     return 0
   elif [ "$(uname)" = "Linux" ]; then
@@ -582,11 +586,13 @@ self_update() {
     if _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
       chmod +x ./netdata-updater.sh || exit 1
       export ENVIRONMENT_FILE="${ENVIRONMENT_FILE}"
-      force_update=""
-      [ "$NETDATA_FORCE_UPDATE" = "1" ] && force_update="--force-update"
-      interactive=""
-      [ "$INTERACTIVE" = "0" ] && interactive="--non-interactive"
-      exec ./netdata-updater.sh --not-running-from-cron --no-updater-self-update "$force_update" "$interactive" --tmpdir-path "$(pwd)"
+
+      cmd="./netdata-updater.sh --not-running-from-cron --no-updater-self-update"
+      [ "$NETDATA_FORCE_UPDATE" = "1" ] && cmd="$cmd --force-update"
+      [ "$INTERACTIVE" = "0" ] && cmd="$cmd --non-interactive"
+      cmd="$cmd --tmpdir-path $(pwd)"
+
+      exec $cmd
     else
       error "Failed to download newest version of updater script, continuing with current version."
     fi

@@ -5,13 +5,27 @@ package nats
 import (
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
+	if c.srvMeta.id == "" {
+		id, name, err := c.getServerMeta()
+		if err != nil {
+			return nil, err
+		}
+		c.srvMeta.id = id
+		c.srvMeta.name = name
+	}
+
 	mx := make(map[string]int64)
+
+	c.cache.resetUpdated()
 
 	if err := c.collectHealthz(mx); err != nil {
 		return nil, err
@@ -25,8 +39,37 @@ func (c *Collector) collect() (map[string]int64, error) {
 	if err := c.collectRoutez(mx); err != nil {
 		return mx, err
 	}
+	if err := c.collectGatewayz(mx); err != nil {
+		return mx, err
+	}
+	if err := c.collectLeafz(mx); err != nil {
+		return mx, err
+	}
+	if err := c.collectJsz(mx); err != nil {
+		return mx, err
+	}
+
+	c.updateCharts()
 
 	return mx, nil
+}
+
+func (c *Collector) getServerMeta() (srvId, srvName string, err error) {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathVarz)
+	if err != nil {
+		return "", "", err
+	}
+
+	var resp struct {
+		ID   string `json:"server_id"`
+		Name string `json:"server_name"`
+	}
+
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
+		return "", "", err
+	}
+
+	return resp.ID, resp.Name, nil
 }
 
 func (c *Collector) collectHealthz(mx map[string]int64) error {
@@ -37,9 +80,9 @@ func (c *Collector) collectHealthz(mx map[string]int64) error {
 
 	switch c.HealthzCheck {
 	case "js-enabled-only":
-		req.URL.Scheme = urlQueryHealthzJsEnabledOnly
+		req.URL.RawQuery = urlQueryHealthzJsEnabledOnly
 	case "js-server-only":
-		req.URL.Scheme = urlQueryHealthzJsServerOnly
+		req.URL.RawQuery = urlQueryHealthzJsServerOnly
 	}
 
 	var resp healthzResponse
@@ -68,7 +111,8 @@ func (c *Collector) collectVarz(mx map[string]int64) error {
 		return err
 	}
 
-	mx["varz_srv_uptime"] = int64(resp.Now.Sub(resp.Start).Seconds())
+	uptime, _ := parseUptime(resp.Uptime)
+	mx["varz_srv_uptime"] = int64(uptime.Seconds())
 	mx["varz_srv_in_msgs"] = resp.InMsgs
 	mx["varz_srv_out_msgs"] = resp.OutMsgs
 	mx["varz_srv_in_bytes"] = resp.InBytes
@@ -103,14 +147,8 @@ func (c *Collector) collectAccstatz(mx map[string]int64) error {
 		return err
 	}
 
-	seen := make(map[string]bool)
-
 	for _, acc := range resp.AccStats {
-		if acc.Account == "" {
-			continue
-		}
-
-		seen[acc.Account] = true
+		c.cache.accounts.put(acc)
 
 		px := fmt.Sprintf("accstatz_acc_%s_", acc.Account)
 
@@ -123,19 +161,6 @@ func (c *Collector) collectAccstatz(mx map[string]int64) error {
 		mx[px+"received_msgs"] = acc.Received.Msgs
 		mx[px+"sent_bytes"] = acc.Sent.Bytes
 		mx[px+"sent_msgs"] = acc.Sent.Msgs
-	}
-
-	for acc := range seen {
-		if !c.seenAccounts[acc] {
-			c.seenAccounts[acc] = true
-			c.addAccountCharts(acc)
-		}
-	}
-	for acc := range c.seenAccounts {
-		if !seen[acc] {
-			delete(c.seenAccounts, acc)
-			c.removeAccountCharts(acc)
-		}
 	}
 
 	return nil
@@ -152,14 +177,8 @@ func (c *Collector) collectRoutez(mx map[string]int64) error {
 		return err
 	}
 
-	seen := make(map[uint64]bool)
-
 	for _, route := range resp.Routes {
-		seen[route.Rid] = true
-		if !c.seenRoutes[route.Rid] {
-			c.seenRoutes[route.Rid] = true
-			c.addRouteCharts(route.Rid, route.RemoteID)
-		}
+		c.cache.routes.put(route)
 
 		px := fmt.Sprintf("routez_route_id_%d_", route.Rid)
 
@@ -170,12 +189,146 @@ func (c *Collector) collectRoutez(mx map[string]int64) error {
 		mx[px+"num_subs"] = int64(route.NumSubs)
 	}
 
-	for rid := range c.seenRoutes {
-		if !seen[rid] {
-			delete(c.seenRoutes, rid)
-			c.removeRouteCharts(rid)
+	return nil
+}
+
+func (c *Collector) collectGatewayz(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathGatewayz)
+	if err != nil {
+		return err
+	}
+
+	var resp gatewayzResponse
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
+		return err
+	}
+
+	for name, ogw := range resp.OutboundGateways {
+		c.cache.outGateways.put(resp.Name, name, ogw)
+
+		px := fmt.Sprintf("gatewayz_outbound_gw_%s_cid_%d_", name, ogw.Connection.Cid)
+
+		mx[px+"in_bytes"] = ogw.Connection.InBytes
+		mx[px+"out_bytes"] = ogw.Connection.OutBytes
+		mx[px+"in_msgs"] = ogw.Connection.InMsgs
+		mx[px+"out_msgs"] = ogw.Connection.OutMsgs
+		mx[px+"num_subs"] = int64(ogw.Connection.NumSubs)
+		uptime, _ := parseUptime(ogw.Connection.Uptime)
+		mx[px+"uptime"] = int64(uptime.Seconds())
+	}
+
+	for name, igws := range resp.InboundGateways {
+		for _, igw := range igws {
+			c.cache.inGateways.put(resp.Name, name, igw)
+
+			px := fmt.Sprintf("gatewayz_inbound_gw_%s_cid_%d_", name, igw.Connection.Cid)
+
+			mx[px+"in_bytes"] = igw.Connection.InBytes
+			mx[px+"out_bytes"] = igw.Connection.OutBytes
+			mx[px+"in_msgs"] = igw.Connection.InMsgs
+			mx[px+"out_msgs"] = igw.Connection.OutMsgs
+			mx[px+"num_subs"] = int64(igw.Connection.NumSubs)
+			uptime, _ := parseUptime(igw.Connection.Uptime)
+			mx[px+"uptime"] = int64(uptime.Seconds())
 		}
 	}
 
 	return nil
+}
+
+func (c *Collector) collectLeafz(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathLeafz)
+	if err != nil {
+		return err
+	}
+
+	var resp leafzResponse
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
+		return err
+	}
+
+	for _, leaf := range resp.Leafs {
+		c.cache.leafs.put(leaf)
+		px := fmt.Sprintf("leafz_leaf_%s_%s_%s_%d_", leaf.Name, leaf.Account, leaf.IP, leaf.Port)
+
+		mx[px+"in_bytes"] = leaf.InBytes
+		mx[px+"out_bytes"] = leaf.OutBytes
+		mx[px+"in_msgs"] = leaf.InMsgs
+		mx[px+"out_msgs"] = leaf.OutMsgs
+		mx[px+"num_subs"] = int64(leaf.NumSubs)
+		rtt, _ := time.ParseDuration(leaf.RTT)
+		mx[px+"rtt"] = rtt.Microseconds()
+	}
+
+	return nil
+}
+
+func (c *Collector) collectJsz(mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathJsz)
+	if err != nil {
+		return err
+	}
+
+	var resp jszResponse
+	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &resp); err != nil {
+		return err
+	}
+
+	mx["jsz_streams"] = int64(resp.Streams)
+	mx["jsz_consumers"] = int64(resp.Consumers)
+	mx["jsz_bytes"] = int64(resp.Bytes)
+	mx["jsz_messages"] = int64(resp.Messages)
+	mx["jsz_memory_used"] = int64(resp.Memory)
+	mx["jsz_store_used"] = int64(resp.Store)
+	mx["jsz_api_total"] = int64(resp.Api.Total)
+	mx["jsz_api_errors"] = int64(resp.Api.Errors)
+	mx["jsz_api_inflight"] = int64(resp.Api.Inflight)
+
+	return nil
+}
+
+func parseUptime(uptime string) (time.Duration, error) {
+	// https://github.com/nats-io/nats-server/blob/v2.10.24/server/monitor.go#L1354
+
+	var duration time.Duration
+	var num strings.Builder
+
+	for i := 0; i < len(uptime); i++ {
+		ch := uptime[i]
+		if ch >= '0' && ch <= '9' {
+			num.WriteByte(ch)
+			continue
+		}
+
+		if num.Len() == 0 {
+			return 0, fmt.Errorf("invalid format: unit '%c' without number", ch)
+		}
+
+		n, err := strconv.Atoi(num.String())
+		if err != nil {
+			return 0, fmt.Errorf("invalid number in duration: %s", num.String())
+		}
+
+		switch ch {
+		case 'y':
+			duration += time.Duration(n) * 365 * 24 * time.Hour
+		case 'd':
+			duration += time.Duration(n) * 24 * time.Hour
+		case 'h':
+			duration += time.Duration(n) * time.Hour
+		case 'm':
+			duration += time.Duration(n) * time.Minute
+		case 's':
+			duration += time.Duration(n) * time.Second
+		default:
+			return 0, fmt.Errorf("invalid unit in duration: %c", ch)
+		}
+		num.Reset()
+	}
+
+	if num.Len() > 0 {
+		return 0, fmt.Errorf("invalid format: number without unit at end")
+	}
+
+	return duration, nil
 }

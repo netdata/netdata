@@ -9,10 +9,12 @@ DONT_WAIT=0
 
 package_tree="
   alpine-sdk
+  bison
   cmake
   coreutils
   curl
   elfutils-dev
+  flex
   g++
   gcc
   git

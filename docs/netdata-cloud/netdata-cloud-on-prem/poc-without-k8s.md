@@ -28,19 +28,21 @@ sudo ./provision.sh install \
 The script above is responsible for:
 
 1. Prompting the user to provide:
-    - `-key-id` - AWS ECR access key ID.
-    - `-access-key` - AWS ECR Access Key.
-    - `-onprem-license-key` - Netdata Cloud On-Prem license key.
-    - `-onprem-license-subject` - Netdata Cloud On-Prem license subject.
-    - `-onprem-url` - URL for the On-prem (without http(s) protocol).
-    - `-certificate-path` - path to your PEM encoded certificate.
-    - `-private-key-path` - path to your PEM encoded key.
+
+   - `-key-id` - AWS ECR access key ID.
+   - `-access-key` - AWS ECR Access Key.
+   - `-onprem-license-key` - Netdata Cloud On-Prem license key.
+   - `-onprem-license-subject` - Netdata Cloud On-Prem license subject.
+   - `-onprem-url` - URL for the On-prem (without http(s) protocol).
+   - `-certificate-path` - path to your PEM encoded certificate.
+   - `-private-key-path` - path to your PEM encoded key.
 
 2. Installation will begin. The script will install:
-    - Helm
-    - Kubectl
-    - AWS CLI
-    - K3s cluster (single node)
+
+   - Helm
+   - Kubectl
+   - AWS CLI
+   - K3s cluster (single node)
 
 3. The script starts to provision the K3s cluster with gathered data.
 
@@ -67,3 +69,7 @@ To uninstall the whole PoC, use the same script that installed it, with the `uni
 cd <script dir>
 sudo ./provision.sh uninstall
 ```
+
+> **Note**
+>
+> In most cases of a failed installation, an automatic prompt will trigger for the user to start the uninstallation process automatically.

@@ -185,7 +185,9 @@ modules:
       scopes:
         - name: server
           description: These metrics refer to NATS servers.
-          labels: []
+          labels:
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
           metrics:
             - name: nats.server_traffic
               description: Server Traffic
@@ -238,9 +240,79 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+            - name: nats.jetstream_streams
+              description: JetStream Streams
+              unit: streams
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nats.jetstream_streams_storage_bytes
+              description: JetStream Bytes
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: nats.jetstream_streams_storage_messages
+              description: JetStream Messages
+              unit: messaged
+              chart_type: line
+              dimensions:
+                - name: stored
+            - name: nats.jetstream_consumers
+              description: JetStream Consumers
+              unit: consumers
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nats.jetstream_api_requests
+              description: JetStream API Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: nats.jetstream_api_errors
+              description: JetStream API Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: errors
+            - name: nats.jetstream_api_inflight
+              description: JetStream API Inflight
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: inflight
+            - name: nats.jetstream_memory_used
+              description: JetStream Used Memory
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: nats.jetstream_storage_used
+              description: JetStream Used Storage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+        - name: http endpoint
+          description: These metrics refer to HTTP endpoints.
+          labels:
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
+            - name: http_endpoint
+              description: "HTTP endpoint path."
+          metrics:
+            - name: nats.http_endpoint_requests
+              description: HTTP Endpoint Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
         - name: account
           description: These metrics refer to [Accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
           labels:
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
             - name: account
               description: "Account name."
           metrics:
@@ -291,6 +363,8 @@ modules:
         - name: route
           description: These metrics refer to [Routes](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#route-information).
           labels:
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
             - name: route_id
               description: "A unique identifier for a route within the NATS cluster."
             - name: remote_id
@@ -316,15 +390,117 @@ modules:
               chart_type: line
               dimensions:
                 - name: active
-        - name: http endpoint
-          description: These metrics refer to HTTP endpoints.
+        - name: inbound gateway connection
+          description: These metrics refer to [Inbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
           labels:
-            - name: http_endpoint
-              description: "HTTP endpoint path."
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
+            - name: gateway
+              description: "The name of the local gateway."
+            - name: remote_gateway
+              description: "The name of the remote gateway."
+            - name: cid
+              description: "A unique identifier for the connection."
           metrics:
-            - name: nats.http_endpoint_requests
-              description: HTTP Endpoint Requests
-              unit: requests/s
+            - name: nats.inbound_gateway_conn_traffic
+              description: Inbound Gateway Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.inbound_gateway_conn_messages
+              description: Inbound Gateway Messages
+              unit: messages/s
               chart_type: line
               dimensions:
-                - name: requests
+                - name: in
+                - name: out
+            - name: nats.inbound_gateway_conn_subscriptions
+              description: Inbound Gateway Active Subscriptions
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nats.inbound_gateway_conn_uptime
+              description: Inbound Gateway Connection Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: outbound gateway connection
+          description: These metrics refer to [Outbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
+          labels:
+            - name: server_id
+              description: "A unique identifier for a server within the NATS cluster."
+            - name: gateway
+              description: "The name of the local gateway."
+            - name: remote_gateway
+              description: "The name of the remote gateway."
+            - name: cid
+              description: "A unique identifier for the connection."
+          metrics:
+            - name: nats.outbound_gateway_conn_traffic
+              description: Outbound Gateway Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.outbound_gateway_conn_messages
+              description: Outbound Gateway Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.outbound_gateway_conn_subscriptions
+              description: Outbound Gateway Active Subscriptions
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nats.outbound_gateway_conn_uptime
+              description: Outbound Gateway Connection Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: leaf node connection
+          description: These metrics refer to [Leaf Node Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#leaf-node-information).
+          labels:
+            - name: remote_name
+              description: "Unique identifier of the remote leaf node server, either its configured name or automatically assigned ID."
+            - name: account
+              description: "Name of the associated account."
+            - name: ip
+              description: "IP address of the remote server."
+            - name: port
+              description: "Port used for the connection to the remote server."
+          metrics:
+            - name: nats.leaf_node_conn_traffic
+              description: Leaf Node Connection Traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.leaf_node_conn_messages
+              description: Leaf Node Connection Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: nats.leaf_node_conn_subscriptions
+              description: Leaf Node Connection Active Subscriptions
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nats.leaf_node_conn_rtt
+              description: Leaf Node Connection RTT
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: rtt
