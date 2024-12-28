@@ -5,10 +5,12 @@
 set -e
 
 declare -a package_tree=(
+  bison
   cmake
   curl
   elfutils-libelf-devel
   findutils
+  flex
   gcc
   gcc-c++
   git
