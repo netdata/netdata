@@ -8,9 +8,11 @@ NON_INTERACTIVE=0
 DONT_WAIT=0
 
 package_tree="
+  bison
   cmake
   curl
   e2fsprogs-libuuid
+  flex
   git
   gzip
   json-c

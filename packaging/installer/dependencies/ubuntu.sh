@@ -8,8 +8,10 @@ NON_INTERACTIVE=0
 DONT_WAIT=0
 
 package_tree="
+  bison
   cmake
   curl
+  flex
   g++
   gcc
   git

@@ -9,8 +9,10 @@ DONT_WAIT=0
 
 declare -a package_tree=(
   binutils
+  bison
   cmake
   curl
+  flex
   gcc
   git
   gzip
