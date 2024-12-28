@@ -1146,6 +1146,8 @@ static int sensors_collect_data(void) {
     // ----------------------------------------------------------------------------------------------------------------
     // Iterate over all detected chips
 
+    size_t subfeatures_collected = 0;
+
     const sensors_chip_name *chip;
     int chip_nr = 0;
     while ((chip = sensors_get_detected_chips(NULL, &chip_nr)) != NULL) {
@@ -1186,8 +1188,10 @@ static int sensors_collect_data(void) {
                     SUBFEATURES_SET(&s->values, subfeature->type, sft);
                 }
 
-                if (sensors_get_value(chip, subfeature->number, &sft->value) == 0)
+                if (sensors_get_value(chip, subfeature->number, &sft->value) == 0) {
                     sft->read = true;
+                    subfeatures_collected++;
+                }
                 else {
                     sft->value = NAN;
                     sft->read = false;
@@ -1196,8 +1200,10 @@ static int sensors_collect_data(void) {
         }
     }
 
-    return 0;
+    return subfeatures_collected ? 0 : 1;
 }
+
+static bool libsensors_running = false;
 
 void *libsensors_thread(void *ptr) {
     int update_every = *(int *)ptr;
@@ -1227,7 +1233,7 @@ void *libsensors_thread(void *ptr) {
         usec_t max_ut = 0;
         size_t samples = 0;
         usec_t started_ut = now_monotonic_usec();
-        for(size_t i = 0; i < 20; i++) {
+        for(size_t i = 0; i < 5; i++) {
             usec_t before_ut = now_monotonic_usec();
             sensors_collect_data();
             dfe_start_read(sensors_dict, s) { set_sensor_state(s); } dfe_done(s);
@@ -1268,7 +1274,8 @@ void *libsensors_thread(void *ptr) {
     while(!nd_thread_signaled_to_cancel()) {
         heartbeat_next(&hb);
 
-        sensors_collect_data();
+        if(sensors_collect_data())
+            break;
 
         netdata_mutex_lock(&stdout_mutex);
 
@@ -1283,5 +1290,25 @@ void *libsensors_thread(void *ptr) {
     }
 
 cleanup:
+    libsensors_running = false;
+
+    dictionary_destroy(sensors_dict);
+    sensors_dict = NULL;
+
     return NULL;
+}
+
+static ND_THREAD *libsensors = NULL;
+int do_module_libsensors(int update_every, const char *name __maybe_unused) {
+    if(!libsensors) {
+        libsensors_running = true;
+        libsensors = nd_thread_create("LIBSENSORS", NETDATA_THREAD_OPTION_JOINABLE, libsensors_thread, &update_every);
+    }
+
+    return libsensors && libsensors_running ? 0 : 1;
+}
+
+void module_libsensors_cleanup(void) {
+    nd_thread_signal_cancel(libsensors);
+    nd_thread_join(libsensors);
 }

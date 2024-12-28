@@ -31,6 +31,11 @@ static struct debugfs_module {
         .enabled = CONFIG_BOOLEAN_YES,
         .func = do_module_devices_powercap
     },
+    {
+     .name = "libsensors",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .func = do_module_libsensors
+    },
 
     // The terminator
     {.name = NULL, .enabled = CONFIG_BOOLEAN_NO, .func = NULL}
@@ -217,8 +222,6 @@ int main(int argc, char **argv)
 
     debugfs_parse_args(argc, argv);
 
-    ND_THREAD *libsensors = nd_thread_create("LIBSENSORS", NETDATA_THREAD_OPTION_JOINABLE, libsensors_thread, &update_every);
-
     size_t iteration;
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
@@ -253,8 +256,7 @@ int main(int argc, char **argv)
         }
     }
 
-    nd_thread_signal_cancel(libsensors);
-    nd_thread_join(libsensors);
+    module_libsensors_cleanup();
 
     netdata_mutex_lock(&stdout_mutex);
     fprintf(stdout, "EXIT\n");
