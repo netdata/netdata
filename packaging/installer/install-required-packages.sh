@@ -637,12 +637,12 @@ declare -A pkg_distro_sdk=(
   ['default']="NOTREQUIRED"
 )
 
-declare -A pkg_flex=(
-  ['default']="flex"
-)
-
+# bison and flex are required by libsensors
 declare -A pkg_bison=(
   ['default']="bison"
+)
+declare -A pkg_flex=(
+  ['default']="flex"
 )
 
 declare -A pkg_coreutils=(

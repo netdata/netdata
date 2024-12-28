@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
@@ -39,9 +40,9 @@ func New() *Collector {
 			},
 			HealthzCheck: "default",
 		},
-		charts:       serverCharts.Copy(),
-		seenAccounts: make(map[string]bool),
-		seenRoutes:   make(map[uint64]bool),
+		charts:           &module.Charts{},
+		cache:            newCache(),
+		onceAddSrvCharts: &sync.Once{},
 	}
 }
 
@@ -60,8 +61,13 @@ type Collector struct {
 
 	httpClient *http.Client
 
-	seenAccounts map[string]bool
-	seenRoutes   map[uint64]bool
+	cache *cache
+
+	srvMeta struct {
+		id   string
+		name string
+	}
+	onceAddSrvCharts *sync.Once
 }
 
 func (c *Collector) Configuration() any {

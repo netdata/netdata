@@ -22,6 +22,8 @@ package_tree="
   net-misc/curl
   sys-apps/findutils
   sys-apps/util-linux
+  sys-devel/bison
+  sys-devel/flex
   sys-devel/gcc
   sys-devel/make
   virtual/libelf

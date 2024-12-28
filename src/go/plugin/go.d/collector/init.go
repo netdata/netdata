@@ -121,7 +121,6 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/w1sensor"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/weblog"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/whoisquery"
-	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/windows"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/wireguard"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/x509check"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/zfspool"

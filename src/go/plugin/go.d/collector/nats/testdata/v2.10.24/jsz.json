@@ -1,0 +1,25 @@
+{
+  "server_id": "NDR5FR76SWSTAP5LSKUNYG7ADXPFLXXWNC7ALU3WGX6WLFMMCIDQAD4J",
+  "now": "2024-12-25T14:20:19.733407331Z",
+  "config": {
+    "max_memory": 10737418240,
+    "max_storage": 440234147840,
+    "store_dir": "/var/jetstream/jetstream",
+    "sync_interval": 120000000000,
+    "compress_ok": true
+  },
+  "memory": 128,
+  "storage": 114419224,
+  "reserved_memory": 0,
+  "reserved_storage": 1620615736,
+  "accounts": 1,
+  "ha_assets": 0,
+  "api": {
+    "total": 936916,
+    "errors": 588
+  },
+  "streams": 198,
+  "consumers": 9,
+  "messages": 5670,
+  "bytes": 114419224
+}

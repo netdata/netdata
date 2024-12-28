@@ -4,8 +4,12 @@ package nats
 
 import (
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
@@ -21,6 +25,16 @@ const (
 	prioServerMemoryUsage
 	prioServerUptime
 
+	prioJetStreamStreams
+	prioJetStreamConsumers
+	prioJetStreamBytes
+	prioJetStreamMessages
+	prioJetStreamApiRequests
+	prioJetStreamApiErrors
+	prioJetStreamApiInflight
+	prioJetStreamMemoryUsed
+	prioJetStreamStorageUsed
+
 	prioAccountTraffic
 	prioAccountMessages
 	prioAccountConnections
@@ -32,9 +46,19 @@ const (
 	prioRouteTraffic
 	prioRouteMessages
 	prioRouteSubscriptions
+
+	prioGatewayConnTraffic
+	prioGatewayConnMessages
+	prioGatewayConnSubscriptions
+	prioGatewayConnUptime
+
+	prioLeafConnTraffic
+	prioLeafConnMessages
+	prioLeafConnSubscriptions
+	prioLeafRTT
 )
 
-var serverCharts = func() module.Charts {
+func serverCharts() *module.Charts {
 	charts := module.Charts{
 		chartServerConnectionsCurrent.Copy(),
 		chartServerConnectionsRate.Copy(),
@@ -46,8 +70,9 @@ var serverCharts = func() module.Charts {
 		chartServerUptime.Copy(),
 	}
 	charts = append(charts, httpEndpointsCharts()...)
-	return charts
-}()
+	charts = append(charts, *jetStreamCharts.Copy()...)
+	return charts.Copy()
+}
 
 var (
 	chartServerTraffic = module.Chart{
@@ -177,6 +202,122 @@ var httpEndpointRequestsChartTmpl = module.Chart{
 	},
 }
 
+var jetStreamCharts = module.Charts{
+	jetStreamStreams.Copy(),
+	jetStreamStreamsStorageBytes.Copy(),
+	jetStreamStreamsStorageMessages.Copy(),
+	jetStreamConsumers.Copy(),
+	jetStreamApiRequests.Copy(),
+	jetStreamApiInflightRequests.Copy(),
+	jetStreamApiErrors.Copy(),
+	jetStreamMemoryUsed.Copy(),
+	jetStreamStorageUsed.Copy(),
+}
+
+var (
+	jetStreamStreams = module.Chart{
+		ID:       "jetstream_streams",
+		Title:    "JetStream Streams",
+		Units:    "streams",
+		Fam:      "jstream streams",
+		Ctx:      "nats.jetstream_streams",
+		Priority: prioJetStreamStreams,
+		Dims: module.Dims{
+			{ID: "jsz_streams", Name: "active"},
+		},
+	}
+	jetStreamStreamsStorageBytes = module.Chart{
+		ID:       "jetstream_streams_storage_bytes",
+		Title:    "JetStream Bytes",
+		Units:    "bytes",
+		Fam:      "jstream streams",
+		Ctx:      "nats.jetstream_streams_storage_bytes",
+		Priority: prioJetStreamBytes,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "jsz_bytes", Name: "used"},
+		},
+	}
+	jetStreamStreamsStorageMessages = module.Chart{
+		ID:       "jetstream_streams_storage_messages",
+		Title:    "JetStream Messages",
+		Units:    "messages",
+		Fam:      "jstream streams",
+		Ctx:      "nats.jetstream_streams_storage_messages",
+		Priority: prioJetStreamMessages,
+		Dims: module.Dims{
+			{ID: "jsz_messages", Name: "stored"},
+		},
+	}
+	jetStreamConsumers = module.Chart{
+		ID:       "jetstream_consumers",
+		Title:    "JetStream Consumers",
+		Units:    "consumers",
+		Fam:      "jstream consumers",
+		Ctx:      "nats.jetstream_consumers",
+		Priority: prioJetStreamConsumers,
+		Dims: module.Dims{
+			{ID: "jsz_consumers", Name: "active"},
+		},
+	}
+	jetStreamApiRequests = module.Chart{
+		ID:       "jetstream_api_requests",
+		Title:    "JetStream API Requests",
+		Units:    "requests/s",
+		Fam:      "jstream api",
+		Ctx:      "nats.jetstream_api_requests",
+		Priority: prioJetStreamApiRequests,
+		Dims: module.Dims{
+			{ID: "jsz_api_total", Name: "requests", Algo: module.Incremental},
+		},
+	}
+	jetStreamApiErrors = module.Chart{
+		ID:       "jetstream_api_errors",
+		Title:    "JetStream API Errors",
+		Units:    "errors/s",
+		Fam:      "jstream api",
+		Ctx:      "nats.jetstream_api_errors",
+		Priority: prioJetStreamApiErrors,
+		Dims: module.Dims{
+			{ID: "jsz_api_errors", Name: "errors", Algo: module.Incremental},
+		},
+	}
+	jetStreamApiInflightRequests = module.Chart{
+		ID:       "jetstream_api_inflight",
+		Title:    "JetStream API Inflight",
+		Units:    "requests",
+		Fam:      "jstream api",
+		Ctx:      "nats.jetstream_api_inflight",
+		Priority: prioJetStreamApiInflight,
+		Dims: module.Dims{
+			{ID: "jsz_api_inflight", Name: "inflight"},
+		},
+	}
+	jetStreamMemoryUsed = module.Chart{
+		ID:       "jetstream_memory_used",
+		Title:    "JetStream Used Memory",
+		Units:    "bytes",
+		Fam:      "jstream rusage",
+		Ctx:      "nats.jetstream_memory_used",
+		Priority: prioJetStreamMemoryUsed,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "jsz_memory_used", Name: "used"},
+		},
+	}
+	jetStreamStorageUsed = module.Chart{
+		ID:       "jetstream_storage_used",
+		Title:    "JetStream Used Storage",
+		Units:    "bytes",
+		Fam:      "jstream rusage",
+		Ctx:      "nats.jetstream_storage_used",
+		Priority: prioJetStreamStorageUsed,
+		Dims: module.Dims{
+			{ID: "jsz_store_used", Name: "used"},
+		},
+	}
+)
+
 var accountChartsTmpl = module.Charts{
 	accountTrafficTmpl.Copy(),
 	accountMessagesTmpl.Copy(),
@@ -276,29 +417,6 @@ var (
 	}
 )
 
-func (c *Collector) addAccountCharts(acc string) {
-	charts := accountChartsTmpl.Copy()
-
-	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, acc)
-		chart.Labels = []module.Label{
-			{Key: "account", Value: acc},
-		}
-		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, acc)
-		}
-	}
-
-	if err := c.Charts().Add(*charts...); err != nil {
-		c.Warningf("failed to add charts for account %s: %s", acc, err)
-	}
-}
-
-func (c *Collector) removeAccountCharts(acc string) {
-	px := fmt.Sprintf("account_%s_", acc)
-	c.removeCharts(px)
-}
-
 var routeChartsTmpl = module.Charts{
 	routeTrafficTmpl.Copy(),
 	routeMessagesTmpl.Copy(),
@@ -346,28 +464,315 @@ var (
 	}
 )
 
-func (c *Collector) addRouteCharts(rid uint64, remoteId string) {
-	charts := routeChartsTmpl.Copy()
+var gatewayConnChartsTmpl = module.Charts{
+	gatewayConnTrafficTmpl.Copy(),
+	gatewayConnMessagesTmpl.Copy(),
+	gatewayConnSubscriptionsTmpl.Copy(),
+	gatewayConnUptime.Copy(),
+}
+
+var (
+	gatewayConnTrafficTmpl = module.Chart{
+		ID:       "%s_gw_%s_cid_%d_traffic",
+		Title:    "%s Gateway Traffic",
+		Units:    "bytes/s",
+		Fam:      "gw traffic",
+		Ctx:      "nats.%s_gateway_conn_traffic",
+		Priority: prioGatewayConnTraffic,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "gatewayz_%s_gw_%s_cid_%d_in_bytes", Name: "in", Algo: module.Incremental},
+			{ID: "gatewayz_%s_gw_%s_cid_%d_out_bytes", Name: "out", Mul: -1, Algo: module.Incremental},
+		},
+	}
+	gatewayConnMessagesTmpl = module.Chart{
+		ID:       "%s_gw_%s_cid_%d_messages",
+		Title:    "%s Gateway Messages",
+		Units:    "messages/s",
+		Fam:      "gw traffic",
+		Ctx:      "nats.%s_gateway_conn_messages",
+		Priority: prioGatewayConnMessages,
+		Type:     module.Line,
+		Dims: module.Dims{
+			{ID: "gatewayz_%s_gw_%s_cid_%d_in_msgs", Name: "in", Algo: module.Incremental},
+			{ID: "gatewayz_%s_gw_%s_cid_%d_out_msgs", Name: "out", Mul: -1, Algo: module.Incremental},
+		},
+	}
+	gatewayConnSubscriptionsTmpl = module.Chart{
+		ID:       "%s_gw_%s_cid_%d_subscriptions",
+		Title:    "%s Gateway Active Subscriptions",
+		Units:    "subscriptions",
+		Fam:      "gw subscriptions",
+		Ctx:      "nats.%s_gateway_conn_subscriptions",
+		Priority: prioGatewayConnSubscriptions,
+		Type:     module.Line,
+		Dims: module.Dims{
+			{ID: "gatewayz_%s_gw_%s_cid_%d_num_subs", Name: "active"},
+		},
+	}
+	gatewayConnUptime = module.Chart{
+		ID:       "%s_gw_%s_cid_%d_uptime",
+		Title:    "%s Gateway Connection Uptime",
+		Units:    "seconds",
+		Fam:      "gw uptime",
+		Ctx:      "nats.%s_gateway_conn_uptime",
+		Priority: prioGatewayConnUptime,
+		Dims: module.Dims{
+			{ID: "gatewayz_%s_gw_%s_cid_%d_uptime", Name: "uptime"},
+		},
+	}
+)
+
+var leafConnChartsTmpl = module.Charts{
+	leafConnTrafficTmpl.Copy(),
+	leafConnMessagesTmpl.Copy(),
+	leafConnSubscriptionsTmpl.Copy(),
+	leafConnRTT.Copy(),
+}
+
+var (
+	leafConnTrafficTmpl = module.Chart{
+		ID:       "leaf_node_conn_%s_%s_%s_%d_traffic",
+		Title:    "Leaf Node Connection Traffic",
+		Units:    "bytes/s",
+		Fam:      "leaf traffic",
+		Ctx:      "nats.leaf_node_conn_traffic",
+		Priority: prioLeafConnTraffic,
+		Type:     module.Area,
+		Dims: module.Dims{
+			{ID: "leafz_leaf_%s_%s_%s_%d_in_bytes", Name: "in", Algo: module.Incremental},
+			{ID: "leafz_leaf_%s_%s_%s_%d_out_bytes", Name: "out", Mul: -1, Algo: module.Incremental},
+		},
+	}
+	leafConnMessagesTmpl = module.Chart{
+		ID:       "leaf_node_conn_%s_%s_%s_%d_messages",
+		Title:    "Leaf Node Connection Messages",
+		Units:    "messages/s",
+		Fam:      "leaf traffic",
+		Ctx:      "nats.leaf_node_conn_messages",
+		Priority: prioLeafConnMessages,
+		Type:     module.Line,
+		Dims: module.Dims{
+			{ID: "leafz_leaf_%s_%s_%s_%d_in_msgs", Name: "in", Algo: module.Incremental},
+			{ID: "leafz_leaf_%s_%s_%s_%d_out_msgs", Name: "out", Mul: -1, Algo: module.Incremental},
+		},
+	}
+	leafConnSubscriptionsTmpl = module.Chart{
+		ID:       "leaf_node_conn_%s_%s_%s_%d_subscriptions",
+		Title:    "Leaf Node Connection Active Subscriptions",
+		Units:    "subscriptions",
+		Fam:      "leaf subscriptions",
+		Ctx:      "nats.leaf_node_conn_subscriptions",
+		Priority: prioLeafConnSubscriptions,
+		Type:     module.Line,
+		Dims: module.Dims{
+			{ID: "leafz_leaf_%s_%s_%s_%d_num_subs", Name: "active"},
+		},
+	}
+	leafConnRTT = module.Chart{
+		ID:       "leaf_node_conn_%s_%s_%s_%d_rtt",
+		Title:    "Leaf Node Connection RTT",
+		Units:    "microseconds",
+		Fam:      "leaf rtt",
+		Ctx:      "nats.leaf_node_conn_rtt",
+		Priority: prioLeafRTT,
+		Dims: module.Dims{
+			{ID: "leafz_leaf_%s_%s_%s_%d_rtt", Name: "rtt"},
+		},
+	}
+)
+
+func (c *Collector) updateCharts() {
+	c.onceAddSrvCharts.Do(c.addServerCharts)
+
+	maps.DeleteFunc(c.cache.accounts, func(_ string, acc *accCacheEntry) bool {
+		if !acc.updated {
+			c.removeAccountCharts(acc)
+			return true
+		}
+		if !acc.hasCharts {
+			acc.hasCharts = true
+			c.addAccountCharts(acc)
+		}
+		return false
+	})
+	maps.DeleteFunc(c.cache.routes, func(_ uint64, route *routeCacheEntry) bool {
+		if !route.updated {
+			c.removeRouteCharts(route)
+			return true
+		}
+		if !route.hasCharts {
+			route.hasCharts = true
+			c.addRouteCharts(route)
+		}
+		return false
+	})
+	maps.DeleteFunc(c.cache.inGateways, func(_ string, igw *gwCacheEntry) bool {
+		maps.DeleteFunc(igw.conns, func(_ uint64, inConn *gwConnCacheEntry) bool {
+			if !inConn.updated {
+				c.removeGatewayConnCharts(inConn, true)
+				return true
+			}
+			if !inConn.hasCharts {
+				inConn.hasCharts = true
+				c.addGatewayConnCharts(inConn, true)
+			}
+			return false
+		})
+		return false
+	})
+	maps.DeleteFunc(c.cache.outGateways, func(_ string, ogw *gwCacheEntry) bool {
+		maps.DeleteFunc(ogw.conns, func(_ uint64, outConn *gwConnCacheEntry) bool {
+			if !outConn.updated {
+				c.removeGatewayConnCharts(outConn, false)
+				return true
+			}
+			if !outConn.hasCharts {
+				outConn.hasCharts = true
+				c.addGatewayConnCharts(outConn, false)
+			}
+			return false
+		})
+		return false
+	})
+	maps.DeleteFunc(c.cache.leafs, func(_ string, leaf *leafCacheEntry) bool {
+		if !leaf.updated {
+			c.removeLeafCharts(leaf)
+			return true
+		}
+		if !leaf.hasCharts {
+			leaf.hasCharts = true
+			c.addLeafCharts(leaf)
+		}
+		return false
+	})
+}
+
+func (c *Collector) addServerCharts() {
+	charts := serverCharts()
 
 	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, rid)
 		chart.Labels = []module.Label{
-			{Key: "route_id", Value: strconv.FormatUint(rid, 10)},
-			{Key: "remote_id", Value: remoteId},
-		}
-		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, rid)
+			{Key: "server_id", Value: c.srvMeta.id},
 		}
 	}
 
 	if err := c.Charts().Add(*charts...); err != nil {
-		c.Warningf("failed to add charts for route id %d: %s", rid, err)
+		c.Warningf("failed to add server charts: %v", err)
 	}
-
 }
 
-func (c *Collector) removeRouteCharts(rid uint64) {
-	px := fmt.Sprintf("route_%d_", rid)
+func (c *Collector) addAccountCharts(acc *accCacheEntry) {
+	charts := accountChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, acc.accName)
+		chart.Labels = []module.Label{
+			{Key: "server_id", Value: c.srvMeta.id},
+			{Key: "account", Value: acc.accName},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, acc.accName)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add charts for account %s: %s", acc.accName, err)
+	}
+}
+
+func (c *Collector) removeAccountCharts(acc *accCacheEntry) {
+	px := fmt.Sprintf("account_%s_", acc.accName)
+	c.removeCharts(px)
+}
+
+func (c *Collector) addRouteCharts(route *routeCacheEntry) {
+	charts := routeChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, route.rid)
+		chart.Labels = []module.Label{
+			{Key: "server_id", Value: c.srvMeta.id},
+			{Key: "route_id", Value: strconv.FormatUint(route.rid, 10)},
+			{Key: "remote_id", Value: route.remoteId},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, route.rid)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add charts for route id %d: %s", route.rid, err)
+	}
+}
+
+func (c *Collector) removeRouteCharts(route *routeCacheEntry) {
+	px := fmt.Sprintf("route_%d_", route.rid)
+	c.removeCharts(px)
+}
+
+func (c *Collector) addGatewayConnCharts(gwConn *gwConnCacheEntry, isInbound bool) {
+	direction := "outbound"
+	if isInbound {
+		direction = "inbound"
+	}
+
+	charts := gatewayConnChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, direction, gwConn.rgwName, gwConn.cid)
+		chart.Title = fmt.Sprintf(chart.Title, cases.Title(language.English, cases.Compact).String(direction))
+		chart.Ctx = fmt.Sprintf(chart.Ctx, direction)
+		chart.Labels = []module.Label{
+			{Key: "server_id", Value: c.srvMeta.id},
+			{Key: "gateway", Value: gwConn.gwName},
+			{Key: "remote_gateway", Value: gwConn.rgwName},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, direction, gwConn.rgwName, gwConn.cid)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add charts for gateway %s %s %d: %s", direction, gwConn.rgwName, gwConn.cid, err)
+	}
+}
+
+func (c *Collector) removeGatewayConnCharts(gwConn *gwConnCacheEntry, isInbound bool) {
+	direction := "outbound"
+	if isInbound {
+		direction = "inbound"
+	}
+	px := fmt.Sprintf("%s_gw_%s_cid_%d_", direction, gwConn.rgwName, gwConn.cid)
+	c.removeCharts(px)
+}
+
+func (c *Collector) addLeafCharts(leaf *leafCacheEntry) {
+	charts := leafConnChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, leaf.leafName, leaf.account, leaf.ip, leaf.port)
+		chart.ID = cleanChartID(chart.ID)
+		chart.Labels = []module.Label{
+			{Key: "server_id", Value: c.srvMeta.id},
+			{Key: "remote_name", Value: leaf.leafName},
+			{Key: "account", Value: leaf.account},
+			{Key: "ip", Value: leaf.ip},
+			{Key: "port", Value: strconv.Itoa(leaf.port)},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, leaf.leafName, leaf.account, leaf.ip, leaf.port)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add charts for leaf %s: %s", leaf.leafName, err)
+	}
+}
+
+func (c *Collector) removeLeafCharts(leaf *leafCacheEntry) {
+	px := fmt.Sprintf("leaf_node_conn_%s_%s_%s_%d_", leaf.leafName, leaf.account, leaf.ip, leaf.port)
+	cleanChartID(px)
 	c.removeCharts(px)
 }
 
@@ -378,4 +783,9 @@ func (c *Collector) removeCharts(prefix string) {
 			chart.MarkNotCreated()
 		}
 	}
+}
+
+func cleanChartID(id string) string {
+	r := strings.NewReplacer(".", "_", " ", "_")
+	return strings.ToLower(r.Replace(id))
 }
