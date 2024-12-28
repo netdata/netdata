@@ -29,7 +29,7 @@ struct rrd_host_function {
     rrd_function_execute_cb_t execute_cb;
     void *execute_cb_data;
 
-    RRDHOST_STATE rrdhost_state_id;
+    OBJECT_STATE_ID rrdhost_state_id;
     struct rrd_collector *collector;
 };
 

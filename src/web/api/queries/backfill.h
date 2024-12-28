@@ -7,7 +7,7 @@
 
 struct parser;
 struct backfill_request_data {
-    size_t rrdhost_receiver_state_id;
+    OBJECT_STATE_ID host_state_id;
     struct parser *parser;
     RRDHOST *host;
     RRDSET *st;

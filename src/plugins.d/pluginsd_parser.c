@@ -203,7 +203,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
 
     rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
     rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
-    rrdhost_state_connected(host);
+    object_state_activate(&host->state_id);
     ml_host_start(host);
     dyncfg_host_init(host);
 

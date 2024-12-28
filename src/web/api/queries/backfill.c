@@ -3,7 +3,7 @@
 #include "backfill.h"
 
 struct backfill_request {
-    size_t rrdhost_receiver_state_id;
+    OBJECT_STATE_ID host_state_id;
     RRDSET_ACQUIRED *rsa;
     int32_t works;
     int32_t successful;
@@ -51,7 +51,7 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
     if(backfill_globals.running) {
         struct backfill_request *br = aral_callocz(backfill_globals.ar_br);
         br->data = *data;
-        br->rrdhost_receiver_state_id = rrdhost_state_id(st->rrdhost);
+        br->host_state_id = object_state_id(&st->rrdhost->state_id);
         br->rsa = rrdset_find_and_acquire(st->rrdhost, string2str(st->id));
         if(br->rsa) {
             br->cb = cb;
@@ -102,7 +102,7 @@ bool backfill_request_add(RRDSET *st, backfill_callback_t cb, struct backfill_re
 bool backfill_execute(struct backfill_dim_work *bdm) {
     RRDSET *st = rrdset_acquired_to_rrdset(bdm->br->rsa);
 
-    if(!rrdhost_state_acquire(st->rrdhost, bdm->br->rrdhost_receiver_state_id))
+    if(!object_state_acquire(&st->rrdhost->state_id, bdm->br->host_state_id))
         return false;
 
     size_t success = 0;
@@ -115,7 +115,7 @@ bool backfill_execute(struct backfill_dim_work *bdm) {
     if (success > 0)
         rrddim_option_set(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS);
 
-    rrdhost_state_release(st->rrdhost);
+    object_state_release(&st->rrdhost->state_id);
     return success > 0;
 }
 

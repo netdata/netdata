@@ -12,7 +12,6 @@ extern "C" {
 #include "streaming/stream-traffic-types.h"
 #include "streaming/stream-sender-commit.h"
 #include "streaming/stream-replication-tracking.h"
-#include "rrdhost-state-id.h"
 #include "health/health-alert-log.h"
 #include "rrdhost-system-info.h"
 
@@ -1044,8 +1043,7 @@ struct rrdhost {
     STRING *program_name;                           // the program name that collects metrics for this host
     STRING *program_version;                        // the program version that collects metrics for this host
 
-    REFCOUNT state_refcount;
-    RRDHOST_STATE state_id;                         // every time data collection (stream receiver) (dis)connects,
+    OBJECT_STATE state_id;                          // every time data collection (stream receiver) (dis)connects,
                                                     // this gets incremented - it is used to detect stale functions,
                                                     // stale backfilling requests, etc.
 

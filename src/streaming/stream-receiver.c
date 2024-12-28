@@ -507,7 +507,7 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
 #endif
 
     stream_receive_log_database_gap(rpt);
-    rrdhost_state_connected(rpt->host);
+    object_state_activate(&rpt->host->state_id);
 
     // keep this last - it needs everything ready since to sends data to the child
     stream_receiver_send_node_and_claim_id_to_child(rpt->host);
@@ -530,7 +530,7 @@ static void stream_receiver_remove(struct stream_thread *sth, struct receiver_st
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     // this will wait until all workers finish
-    rrdhost_state_disconnected(rpt->host);
+    object_state_deactivate(&rpt->host->state_id);
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),

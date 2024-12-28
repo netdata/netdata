@@ -950,6 +950,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/atomics/atomics.h
         src/libnetdata/waiting-queue/waiting-queue.c
         src/libnetdata/waiting-queue/waiting-queue.h
+        src/libnetdata/object-state/object-state.c
+        src/libnetdata/object-state/object-state.h
 )
 
 set(LIBH2O_FILES
@@ -1445,8 +1447,6 @@ set(RRD_PLUGIN_FILES
         src/database/rrdcollector-internals.h
         src/database/rrd-database-mode.h
         src/database/rrd-database-mode.c
-        src/database/rrdhost-state-id.c
-        src/database/rrdhost-state-id.h
         src/database/rrdhost-system-info.c
         src/database/rrdhost-system-info.h
 )

@@ -7,7 +7,7 @@
 #include "web/api/queries/backfill.h"
 
 static bool backfill_callback(size_t successful_dims __maybe_unused, size_t failed_dims __maybe_unused, struct backfill_request_data *brd) {
-    if(!rrdhost_state_acquire(brd->host, brd->rrdhost_receiver_state_id)) {
+    if(!object_state_acquire(&brd->host->state_id, brd->host_state_id)) {
         // this may happen because the host got reconnected
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -30,7 +30,7 @@ static bool backfill_callback(size_t successful_dims __maybe_unused, size_t fail
             rrdset_id(brd->st));
     }
 
-    rrdhost_state_release(brd->host);
+    object_state_release(&brd->host->state_id);
     return rc;
 }
 
@@ -67,7 +67,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
 #endif
 
         struct backfill_request_data brd = {
-            .rrdhost_receiver_state_id = rrdhost_state_id(host),
+            .host_state_id = object_state_id(&host->state_id),
             .parser = parser,
             .host = host,
             .st = st,
